@@ -778,26 +778,37 @@ func TestTable_All(t *testing.T) {
 
 func TestInTerritoryIsStrict3D(t *testing.T) {
 	// Spawn.isInMyTerritory uses Location.isIn3DRadius: distance3D < MAX_DRIFT_RANGE.
-	// Axis-aligned integer offsets at the same Z make sqrt(d²) == d, so
-	// 199 / 200 / 201 are the exact representable neighbors of the boundary.
+	// Axis-aligned integer offsets make sqrt(d²) == d, so 199 / 200 / 201 are
+	// the exact representable neighbors of the boundary. Pure-Z cases fail
+	// if InTerritory drops to 2D.
 	home := location.Location{X: 100, Y: 0, Z: 0}
 	cases := []struct {
+		axis   string
 		offset int
 		want   bool
 	}{
-		{offset: defaultDriftRange - 1, want: true},
-		{offset: defaultDriftRange, want: false},
-		{offset: defaultDriftRange + 1, want: false},
+		{axis: "x", offset: defaultDriftRange - 1, want: true},
+		{axis: "x", offset: defaultDriftRange, want: false},
+		{axis: "x", offset: defaultDriftRange + 1, want: false},
+		{axis: "z", offset: defaultDriftRange - 1, want: true},
+		{axis: "z", offset: defaultDriftRange, want: false},
 	}
 	for _, tc := range cases {
-		t.Run(fmt.Sprintf("offset=%d", tc.offset), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s=%d", tc.axis, tc.offset), func(t *testing.T) {
 			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
 			hostile.Instance.HasHome = true
 			hostile.Instance.Home = home
-			world.New().Spawn(hostile, home.X+tc.offset, home.Y, home.Z, 0)
+			x, y, z := home.X, home.Y, home.Z
+			switch tc.axis {
+			case "x":
+				x += tc.offset
+			case "z":
+				z += tc.offset
+			}
+			world.New().Spawn(hostile, x, y, z, 0)
 
 			if got := hostile.InTerritory(); got != tc.want {
-				t.Fatalf("InTerritory() = %v at 3D distance %d, want %v", got, tc.offset, tc.want)
+				t.Fatalf("InTerritory() = %v at 3D %s distance %d, want %v", got, tc.axis, tc.offset, tc.want)
 			}
 		})
 	}
