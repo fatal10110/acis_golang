@@ -305,7 +305,7 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 
 	frames := wire.NewFrameReader(conn)
 	for {
-		if err := setReadDeadline(conn, c.authed); err != nil {
+		if err := setLoginClientReadDeadline(conn, c.authed); err != nil {
 			return
 		}
 		payload, err := frames.ReadFrame()

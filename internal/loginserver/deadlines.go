@@ -7,14 +7,16 @@ import (
 
 const (
 	connectionHandshakeTimeout = time.Minute
-	connectionIdleTimeout      = 15 * time.Minute
-	connectionWriteTimeout     = time.Minute
+	// loginClientIdleTimeout applies only to login clients; established
+	// game-server links intentionally remain open while idle.
+	loginClientIdleTimeout = 15 * time.Minute
+	connectionWriteTimeout = time.Minute
 )
 
-func setReadDeadline(conn net.Conn, authed bool) error {
+func setLoginClientReadDeadline(conn net.Conn, authed bool) error {
 	timeout := connectionHandshakeTimeout
 	if authed {
-		timeout = connectionIdleTimeout
+		timeout = loginClientIdleTimeout
 	}
 	return conn.SetReadDeadline(time.Now().Add(timeout))
 }
