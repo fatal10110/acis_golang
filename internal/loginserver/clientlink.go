@@ -368,8 +368,10 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
 		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
+	if err := c.send(serverpackets.EncodeGGAuth(c.sessionID)); err != nil {
+		return false
+	}
 	c.ggAuthed = true
-	_ = c.send(serverpackets.EncodeGGAuth(c.sessionID))
 	return true
 }
 
