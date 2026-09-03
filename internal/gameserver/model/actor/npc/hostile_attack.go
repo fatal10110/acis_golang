@@ -36,30 +36,21 @@ func (h *Hostile) AttackDisabled() bool {
 	return h.Dead()
 }
 
-// MovementDisabled reports whether this NPC is unable to move. No
-// abnormal-effect system (root, sleep, paralysis) is wired to a live NPC
-// yet, so the template's own movement flag is the only condition modeled
-// so far.
+// MovementDisabled reports whether this NPC is unable to move: a
+// canMove=false template, or a crowd-control / death / teleport lock.
+// Fear is not included; it is an out-of-control state, not a movement lock.
 func (h *Hostile) MovementDisabled() bool {
-	return !h.Instance.Template.CanMove
+	return !h.Instance.Template.CanMove || h.AlikeDead() || h.Stunned() ||
+		h.ImmobileUntilAttacked() || h.Rooted() || h.Sleeping() ||
+		h.Paralyzed() || h.Immobilized() || h.Teleporting()
 }
 
-// InAttackRange reports whether target sits within this NPC's physical
-// attack range, accounting for both actors' collision footprints. A target
-// with no known position/footprint is out of range by definition.
+// InAttackRange reports whether target sits within this NPC's 2D physical
+// attack reach, accounting for both actors' collision footprints and a
+// moving-target grace margin. A target with no known position/footprint is
+// out of range by definition.
 func (h *Hostile) InAttackRange(target attackable.Combatant) bool {
-	other, ok := target.(interface {
-		Position() (int, int, int)
-		CollisionRadius() float64
-	})
-	if !ok {
-		return false
-	}
-
-	tx, ty, tz := other.Position()
-	totalRadius := h.PhysicalAttackRange() + int(h.CollisionRadius()) + int(other.CollisionRadius())
-	at := h.location()
-	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
+	return attack.InPhysicalRange(h.location(), h.PhysicalAttackRange(), h.CollisionRadius(), target)
 }
 
 // LineOfSight is the geodata query CanSee needs to gate targeting on real

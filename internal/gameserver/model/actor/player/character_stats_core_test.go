@@ -663,6 +663,61 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 	}
 }
 
+func TestCharacterMovementDisabledTracksImmobilityNotFear(t *testing.T) {
+	c := &Character{ID: 1}
+	if c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true on a fresh standing character")
+	}
+
+	attachTestLive(t, c)
+	if c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true after Live attach with no crowd-control")
+	}
+
+	c.SetStanding(false)
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while sitting")
+	}
+	c.SetStanding(true)
+
+	if !c.SetTeleporting(true) {
+		t.Fatal("SetTeleporting(true) reported no change")
+	}
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while teleporting")
+	}
+	c.SetTeleporting(false)
+
+	if !c.SetImmobilized(true) {
+		t.Fatal("SetImmobilized(true) reported no change")
+	}
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while immobilized")
+	}
+	c.SetImmobilized(false)
+
+	root := addCharacterEffect(t, c, "Root")
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while rooted")
+	}
+	c.EffectList().Remove(root)
+	if c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true after root was removed")
+	}
+
+	addCharacterEffect(t, c, "Fear")
+	if c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true while afraid; fear does not disable movement")
+	}
+
+	if !c.MarkDead() {
+		t.Fatal("MarkDead() = false, want true")
+	}
+	if !c.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while dead")
+	}
+}
+
 func TestCharacterThrowUpEffectActivatesAndMovesToLanding(t *testing.T) {
 	effector := &Character{ID: 1}
 	effector.SetLastKnownPosition(location.Location{X: 100, Y: 0, Z: 0}, 0)

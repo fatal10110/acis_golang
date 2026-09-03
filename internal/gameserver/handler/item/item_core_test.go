@@ -603,16 +603,16 @@ func (d aiCastDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition
 	return def, ok
 }
 
-func TestResolveAICastSkill(t *testing.T) {
+func TestResolveAICastSkills(t *testing.T) {
 	scroll := modelskill.Definition{ID: 2005, Level: 1, Activation: modelskill.ActivationActive}
+	other := modelskill.Definition{ID: 2006, Level: 1, Activation: modelskill.ActivationActive}
 	potion := modelskill.Definition{ID: 2031, Level: 1, Potion: true}
 
 	tests := []struct {
-		name   string
-		tmpl   *modelitem.Template
-		defs   actorcast.Definitions
-		wantID modelskill.ID
-		wantOK bool
+		name    string
+		tmpl    *modelitem.Template
+		defs    actorcast.Definitions
+		wantIDs []modelskill.ID
 	}{
 		{
 			name: "non-potion carried skill resolves",
@@ -621,8 +621,18 @@ func TestResolveAICastSkill(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}},
 			},
-			defs:   aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
-			wantID: 2005, wantOK: true,
+			defs:    aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
+			wantIDs: []modelskill.ID{2005},
+		},
+		{
+			name: "later non-potion skills are kept in template order",
+			tmpl: &modelitem.Template{
+				Kind:           modelitem.KindEtcItem,
+				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
+				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}, {ID: 2006, Level: 1}},
+			},
+			defs:    aiCastDefinitions{{ID: 2005, Level: 1}: scroll, {ID: 2006, Level: 1}: other},
+			wantIDs: []modelskill.ID{2005, 2006},
 		},
 		{
 			name: "potion carried skill is left to the instant-cast path",
@@ -631,8 +641,7 @@ func TestResolveAICastSkill(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2031, Level: 1}},
 			},
-			defs:   aiCastDefinitions{{ID: 2031, Level: 1}: potion},
-			wantOK: false,
+			defs: aiCastDefinitions{{ID: 2031, Level: 1}: potion},
 		},
 		{
 			name: "non-ItemSkills handler is not handled",
@@ -641,8 +650,7 @@ func TestResolveAICastSkill(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: "SomeOtherHandler"},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}},
 			},
-			defs:   aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
-			wantOK: false,
+			defs: aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
 		},
 		{
 			name: "no attached skills is not handled",
@@ -650,25 +658,25 @@ func TestResolveAICastSkill(t *testing.T) {
 				Kind:    modelitem.KindEtcItem,
 				EtcItem: &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 			},
-			defs:   aiCastDefinitions{},
-			wantOK: false,
+			defs: aiCastDefinitions{},
 		},
 		{
-			name:   "nil template is not handled",
-			tmpl:   nil,
-			defs:   aiCastDefinitions{},
-			wantOK: false,
+			name: "nil template is not handled",
+			tmpl: nil,
+			defs: aiCastDefinitions{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			def, ok := ResolveAICastSkill(tt.tmpl, tt.defs)
-			if ok != tt.wantOK {
-				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			got := ResolveAICastSkills(tt.tmpl, tt.defs)
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("len = %d, want %d", len(got), len(tt.wantIDs))
 			}
-			if ok && def.ID != tt.wantID {
-				t.Fatalf("Definition.ID = %v, want %v", def.ID, tt.wantID)
+			for i, id := range tt.wantIDs {
+				if got[i].ID != id {
+					t.Fatalf("skill %d ID = %v, want %v", i, got[i].ID, id)
+				}
 			}
 		})
 	}

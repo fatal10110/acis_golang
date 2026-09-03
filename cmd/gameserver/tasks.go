@@ -181,8 +181,8 @@ func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logg
 	startTicker(lc, log, items.Start)
 }
 
-func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, log zerolog.Logger) (*task.Autosave, error) {
-	effects.SetAutosave(roster, skills, log)
+func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, pets *gamesql.PetStore, log zerolog.Logger) (*task.Autosave, error) {
+	effects.SetAutosave(roster, skills, pets, log)
 	return task.NewAutosave(effects, time.Now)
 }
 

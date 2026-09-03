@@ -39,6 +39,16 @@ func encodeUseItem(objectID int32, ctrl bool) []byte {
 	return w.Bytes()
 }
 
+func encodeAttackRequest(objectID int32, x, y, z int32, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAttackRequest)
+	w.WriteInt32(objectID)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
 func encodeRequestUnEquipItem(bodySlot int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUnEquipItem)
 	w.WriteInt32(bodySlot)
@@ -365,17 +375,25 @@ func assertExAutoSoulShot(t *testing.T, frame []byte, itemID int32, enabled bool
 	}
 }
 
+func magicSkillUseSkillID(frame []byte) int32 {
+	_, _, skillID, _, _, _ := decodeMagicSkillUse(frame)
+	return skillID
+}
+
+func decodeMagicSkillUse(frame []byte) (caster, target, skillID, level, hitTime, reuse int32) {
+	r := wire.NewReader(frame[1:])
+	return r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+}
+
 // assertMagicSkillUseSelf asserts a MagicSkillUse cast by and on objectID.
 func assertMagicSkillUseSelf(t *testing.T, frame []byte, objectID, skillID, level, hitTime, reuse int32) {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
-	r := wire.NewReader(frame[1:])
-	caster, target, sid, lvl := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	caster, target, sid, lvl, gotHit, gotReuse := decodeMagicSkillUse(frame)
 	if caster != objectID || target != objectID || sid != skillID || lvl != level {
 		t.Fatalf("MagicSkillUse = caster %d target %d skill %d level %d, want %d/%d/%d/%d",
 			caster, target, sid, lvl, objectID, objectID, skillID, level)
 	}
-	gotHit, gotReuse := r.ReadInt32(), r.ReadInt32()
 	if gotHit != hitTime || gotReuse != reuse {
 		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want %d/%d", gotHit, gotReuse, hitTime, reuse)
 	}

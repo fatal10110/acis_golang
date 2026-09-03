@@ -46,6 +46,18 @@ func In3DRange(ax, ay, az, bx, by, bz, radius int) bool {
 	return dx*dx+dy*dy+dz*dz <= int64(radius)*int64(radius)
 }
 
+// In2DRadius reports whether other is strictly inside radius units of l on
+// the XY plane, ignoring Z. The exact boundary is outside.
+func (l Location) In2DRadius(other Location, radius int) bool {
+	return l.Distance2D(other) < float64(radius)
+}
+
+// In2DRadius reports whether two XY pairs are strictly inside radius units
+// of each other. The exact boundary is outside.
+func In2DRadius(ax, ay, bx, by, radius int) bool {
+	return (Location{X: ax, Y: ay}).In2DRadius(Location{X: bx, Y: by}, radius)
+}
+
 // headingScale converts a full-circle angle in degrees to the game's
 // heading range (65536 units per circle): 65536 / 360.
 const headingScale = 182.04444444444444

@@ -31,7 +31,7 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -51,7 +51,7 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -75,7 +75,7 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -129,7 +129,7 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	}
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
 
 	autosaveDone := make(chan struct{})
 	go func() {

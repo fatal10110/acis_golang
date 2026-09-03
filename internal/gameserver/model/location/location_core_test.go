@@ -68,6 +68,31 @@ func TestIn3DRange(t *testing.T) {
 	}
 }
 
+func TestIn2DRadius(t *testing.T) {
+	origin := Location{X: 0, Y: 0, Z: 0}
+	// 3-4-5 triangle: ground distance 5.
+	onBoundary := Location{X: 3, Y: 4, Z: 1000}
+
+	if origin.In2DRadius(onBoundary, 5) {
+		t.Fatal("In2DRadius() = true at exact radius; want strict exclusion")
+	}
+	if !origin.In2DRadius(onBoundary, 6) {
+		t.Fatal("In2DRadius() = false one unit inside radius")
+	}
+	if origin.In2DRadius(Location{X: 6, Y: 0, Z: 0}, 5) {
+		t.Fatal("In2DRadius() = true one unit outside radius")
+	}
+	if !origin.In2DRadius(Location{X: 0, Y: 0, Z: 1000}, 1) {
+		t.Fatal("In2DRadius() = false for altitude-only offset")
+	}
+	if In2DRadius(0, 0, 3, 4, 5) {
+		t.Fatal("In2DRadius() package helper = true at exact radius")
+	}
+	if !In2DRadius(0, 0, 3, 4, 6) {
+		t.Fatal("In2DRadius() package helper = false inside radius")
+	}
+}
+
 func TestAddRandomOffsetBetweenRejectsInvalidRange(t *testing.T) {
 	origin := Location{X: 10, Y: 20, Z: 30}
 	cases := []struct{ min, max int }{

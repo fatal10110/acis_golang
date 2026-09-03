@@ -395,25 +395,35 @@ func (c *Character) AttackDisabled() bool {
 	return c.AlikeDead()
 }
 
-// MovementDisabled reports whether this player is unable to move.
+// MovementDisabled reports whether this player is in a state where they
+// cannot move. Sit-down is immediate (`!Standing()`), matching Java's
+// sittingNow window from t=0. Stand-up is not: Java keeps
+// isMovementDisabled true for 2.5s after standUp (`_isStandingNow`), so an
+// out-of-range attack is still rejected; Go's StandUp calls SetStanding(true)
+// synchronously, so the range gate is skipped for that window.
 func (c *Character) MovementDisabled() bool {
-	return false
-}
-
-// InAttackRange reports whether target is inside this player's weapon range.
-func (c *Character) InAttackRange(target attackable.Combatant) bool {
-	other, ok := target.(interface {
-		Position() (int, int, int)
-		CollisionRadius() float64
-	})
-	if !ok {
+	if c.AlikeDead() || !c.Standing() {
+		return true
+	}
+	live := c.liveLocked()
+	if live == nil {
 		return false
 	}
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Rooted() || live.Sleeping() || live.Paralyzed() || live.Immobilized() || live.Teleporting()
+}
 
-	tx, ty, tz := other.Position()
-	totalRadius := c.PhysicalAttackRange() + int(c.CollisionRadius()) + int(other.CollisionRadius())
-	at := c.CurrentLocation()
-	return location.In3DRange(at.X, at.Y, at.Z, tx, ty, tz, totalRadius)
+// IsMoving reports whether this player has an in-flight movement request.
+func (c *Character) IsMoving() bool {
+	if c.Live == nil {
+		return false
+	}
+	return c.Live.Move().Moving()
+}
+
+// InAttackRange reports whether target is inside this player's 2D weapon
+// reach, including collision radii and a moving-target grace margin.
+func (c *Character) InAttackRange(target attackable.Combatant) bool {
+	return attack.InPhysicalRange(c.CurrentLocation(), c.PhysicalAttackRange(), c.CollisionRadius(), target)
 }
 
 // Knows reports whether target is visible to this player.

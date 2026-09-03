@@ -199,6 +199,34 @@ func TestHostileReduceHPStopsSleepAndImmobileUntilAttackedEffects(t *testing.T) 
 	}
 }
 
+func TestHostileMovementDisabledTracksCrowdControl(t *testing.T) {
+	h := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	h.Instance.Template.CanMove = true
+	if h.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true for a mobile NPC with no crowd-control")
+	}
+
+	h.Instance.Template.CanMove = false
+	if !h.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false for canMove=false")
+	}
+	h.Instance.Template.CanMove = true
+
+	root := addHostileEffect(t, h, "Root")
+	if !h.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while rooted")
+	}
+	h.EffectList().Remove(root)
+	if h.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true after root was removed")
+	}
+
+	addHostileEffect(t, h, "Fear")
+	if h.MovementDisabled() {
+		t.Fatal("MovementDisabled() = true while afraid; fear does not disable movement")
+	}
+}
+
 // TestHostileReduceHPByDOTLeavesEffectsAloneOnRealDOTTick mirrors the
 // !isDOT gate on CreatureStatus.reduceHp's whole SLEEP/IMMOBILE/STUN block:
 // NpcStatus has no PlayerStatus-style override, so a real DOT tick
