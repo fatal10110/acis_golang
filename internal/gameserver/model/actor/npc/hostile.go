@@ -856,10 +856,11 @@ func (h *Hostile) InTerritory() bool {
 		return master.InTerritory()
 	}
 	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
-		if maker.ContainsBanned(h.location()) {
+		loc := h.location()
+		if maker.ContainsBanned(loc) {
 			return false
 		}
-		return maker.Contains(h.location())
+		return maker.Contains(loc)
 	}
 	if !h.Instance.HasHome {
 		return true
