@@ -847,7 +847,7 @@ func (h *Hostile) InTerritory() bool {
 	if !h.Instance.HasHome {
 		return true
 	}
-	return h.location().In3DRange(h.Instance.Home, defaultDriftRange)
+	return h.location().In3DRadius(h.Instance.Home, defaultDriftRange)
 }
 
 func hostileKind(inst *Instance) InstanceKind {
