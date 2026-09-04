@@ -624,6 +624,8 @@ func (m *CreatureMove) followIntervalLocked() time.Duration {
 
 // FollowTick reevaluates the active follow target and starts movement when
 // the target is still known and outside the collision-adjusted follow range.
+// Tests are the only callers. Path-outcome accounting is not applied here;
+// production chase goes through Controller.maybeStartFollow.
 func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (Event, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

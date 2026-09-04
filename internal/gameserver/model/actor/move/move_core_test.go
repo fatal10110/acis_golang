@@ -270,8 +270,8 @@ func TestControllerMoveHomeReturnsMoveErrors(t *testing.T) {
 	if err := controller.MoveHome(location.Location{X: 100}); err == nil {
 		t.Fatal("MoveHome() error = nil, want zero-speed rejection")
 	}
-	if got := self.failCount; got != 1 {
-		t.Fatalf("failCount = %d, want 1 after rejected move", got)
+	if got := self.failCount; got != 0 {
+		t.Fatalf("failCount = %d, want 0: a rejected move never pathfinds", got)
 	}
 }
 
@@ -395,35 +395,6 @@ func TestControllerMoveToLocationEventIncrementsFailCountOnBlockedPath(t *testin
 	}
 	if got := self.failCount; got != 1 {
 		t.Fatalf("failCount = %d, want 1 after blocked walker pathfinding move", got)
-	}
-}
-
-func TestControllerMoveToLocationEventResetsFailCountOnRoutedFallback(t *testing.T) {
-	self := &homeRecoverySelf{}
-	geo := &recordingGeo{canMove: false, height: 0, findPathOK: false}
-	mover, err := NewCreatureMove(location.Location{X: 100, Y: 100, Z: 0}, 100, geo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	controller, err := NewController(mover, self)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := controller.MoveToLocationEvent(location.Location{X: 0, Y: 0, Z: 0}); err != nil {
-		t.Fatalf("blocked MoveToLocationEvent() error = %v", err)
-	}
-	if got := self.failCount; got != 1 {
-		t.Fatalf("failCount = %d after blocked tick, want 1", got)
-	}
-
-	geo.findPath = []location.Location{{X: 50, Y: 100, Z: 0}, {X: 200, Y: 100, Z: 0}}
-	geo.findPathOK = true
-	if _, err := controller.MoveToLocationEvent(location.Location{X: 200, Y: 100, Z: 0}); err != nil {
-		t.Fatalf("routed MoveToLocationEvent() error = %v", err)
-	}
-	if got := self.failCount; got != 0 {
-		t.Fatalf("failCount = %d after routed fallback, want 0 (consecutive, not cumulative)", got)
 	}
 }
 

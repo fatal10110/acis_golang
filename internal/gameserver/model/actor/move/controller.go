@@ -258,9 +258,6 @@ func (c *Controller) MoveHome(home location.Location) error {
 
 	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	if err != nil {
-		if hasRecovery {
-			recovery.AddGeoPathFailCount()
-		}
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
