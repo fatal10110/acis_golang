@@ -888,6 +888,20 @@ func (h *Hostile) location() location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
+// RestoreSpawnHeadingIfAtHome faces the spawn heading when this NPC has
+// landed exactly on its spawn point. Escort FOLLOW arrivals skip the
+// caller, so a minion whose master is standing on the minion spawn keeps
+// the heading it had while following.
+func (h *Hostile) RestoreSpawnHeadingIfAtHome() {
+	if h.Instance == nil || !h.Instance.HasHome {
+		return
+	}
+	if h.location() != h.Instance.Home {
+		return
+	}
+	h.SetHeading(h.Instance.SpawnHeading)
+}
+
 // IsMoving reports whether this NPC has an in-flight movement request.
 func (h *Hostile) IsMoving() bool { return h.Move().Moving() }
 

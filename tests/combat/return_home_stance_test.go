@@ -81,6 +81,11 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	if err := hostile.Think(); err != nil {
 		t.Fatalf("Think() after idle error: %v", err)
 	}
+	// Empty-queue idle Think matches thinkIdle: abort leftover movement
+	// (StopMove) and force walk stance. SiegeGuard return-home had switched
+	// to run, so observers then see ChangeMoveType(walk) and nothing else.
+	assertFrameOpcode(t, mustRead(t, c, "idle StopMove"), serverpackets.OpcodeStopMove, "StopMove")
+	assertChangeMoveType(t, mustRead(t, c, "idle walk stance"), hostile.ObjectID(), false)
 	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 		t.Fatalf("unexpected frame after idle Think: opcode %#x", frame[0])
 	}

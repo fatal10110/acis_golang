@@ -1225,6 +1225,29 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
 }
 
+func TestRestoreSpawnHeadingIfAtHome(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	w := world.New()
+	w.Spawn(hostile, 100, 0, 0, 0)
+	hostile.SetWorld(w)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.SpawnHeading = 40000
+	hostile.SetHeading(1)
+
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 40000 {
+		t.Fatalf("Heading() at home = %d, want spawn heading 40000", got)
+	}
+
+	hostile.SetXYZ(200, 0, 0)
+	hostile.SetHeading(1)
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 1 {
+		t.Fatalf("Heading() off home = %d, want unchanged 1", got)
+	}
+}
+
 func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	movement := &hostileMove{moved: make(chan location.Location, 1)}
 	hostile := newTestHostile(t, movement, &hostileAttack{})

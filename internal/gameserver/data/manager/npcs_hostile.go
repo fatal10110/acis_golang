@@ -208,12 +208,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
 		hostile.SyncPosition(pos)
-		// aCis NpcAI.onEvtArrived: an arrival that lands exactly back on the
-		// spawn point restores the spawn heading, regardless of what the NPC
-		// last faced while moving.
-		if inst.HasHome && pos == inst.Home {
-			hostile.SetHeading(inst.SpawnHeading)
-		}
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome fire this
 		// same hook and must not advance/reissue the patrol route.
