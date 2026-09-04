@@ -3,7 +3,9 @@ package network
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -41,5 +43,35 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 			}
 			assertStaticSystemMessageFrame(t, got[0], tt.message)
 		})
+	}
+}
+
+type magicSkillDoorShape struct{}
+
+func (magicSkillDoorShape) GeoX() int               { return 0 }
+func (magicSkillDoorShape) GeoY() int               { return 0 }
+func (magicSkillDoorShape) GeoZ() int               { return 0 }
+func (magicSkillDoorShape) Height() int             { return 0 }
+func (magicSkillDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{block.AllDirections}} }
+
+func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) {
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	locked, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenClick}, magicSkillDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := &GameClientLink{targets: skilltarget.NewRegistry(nil)}
+	target, rejection := l.resolveMagicSkillTarget(live.Character, locked, modelskill.Definition{Target: modelskill.TargetUnlockable}, false)
+	if target != locked {
+		t.Fatalf("target = %T, want locked door", target)
+	}
+	if rejection != skilltarget.CastRejectSilent {
+		t.Fatalf("rejection = %v, want silent", rejection)
+	}
+	testsupport.ResetCapture(frames)
+	sendTargetCastRejection(live, rejection, modelskill.Definition{})
+	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 0 {
+		t.Fatalf("silent rejection opcodes = %x, want none", got)
 	}
 }

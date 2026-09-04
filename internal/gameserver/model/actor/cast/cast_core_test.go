@@ -1613,8 +1613,11 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 	if got := skilltarget.CastRejectionFor(modelskill.TargetOne, caster, skillDoor, &modelskill.Definition{Offensive: true}, false); got != skilltarget.CastRejectInvalidTarget {
 		t.Fatalf("TargetOne skill door rejection = %v, want invalid target", got)
 	}
-	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, lockedDoor, &modelskill.Definition{}, false); got != skilltarget.CastRejectNone {
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, lockedDoor, &modelskill.Definition{}, false); got != skilltarget.CastRejectSilent {
 		t.Fatalf("locked door rejection = %v, want silent", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, nil, &modelskill.Definition{}, false); got != skilltarget.CastRejectNone {
+		t.Fatalf("nil unlockable rejection = %v, want none", got)
 	}
 	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, monster, &modelskill.Definition{}, false); got != skilltarget.CastRejectInvalidTarget {
 		t.Fatalf("monster unlockable rejection = %v, want invalid target", got)

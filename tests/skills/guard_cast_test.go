@@ -2,6 +2,7 @@ package skills
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -96,4 +97,60 @@ func TestOffensiveCastOnSiegeGuardDoesNotUseFolkOrGuardBranch(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, siege.ObjectID())
+}
+
+// TestUnlockableCastRejectionsUseProductionPackets drives the UNLOCKABLE
+// cast boundary with real actors. Door coverage stays in the target core: the
+// boot fixture does not construct a door.
+func TestUnlockableCastRejectionsUseProductionPackets(t *testing.T) {
+	const skillID int32 = 2065
+	newServer := func(t *testing.T) (*gameservertest.Server, int32) {
+		t.Helper()
+		srv := gameservertest.Boot(t,
+			gameservertest.WithCharacter("Newbie", 5, 0),
+			gameservertest.WithWantChars(1),
+			gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+				ID: modelskill.ID(skillID), Level: 1, Activation: modelskill.ActivationActive,
+				Target: modelskill.TargetUnlockable, SkillType: "DELUXE_KEY_UNLOCK",
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			}})),
+		)
+		objID := srv.SoleObjectID(t)
+		seedKnownSkill(t, srv, objID, int(skillID), 1)
+		startInWorld(t, srv.Client)
+		return srv, objID
+	}
+
+	t.Run("Chest accepted", func(t *testing.T) {
+		srv, objID := newServer(t)
+		chest := srv.SpawnHostileNPCKindAt(t, "Chest", location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+		drainUntilQuiet(t, srv.Client)
+		targetHostile(t, srv.Client, chest.ObjectID())
+		drainUntilQuiet(t, srv.Client)
+		srv.Client.Send(encodeRequestMagicSkillUse(skillID, false, false))
+		readCastStartFrames(t, srv.Client, objID, skillID, 1, 500, 60_000, chest.ObjectID())
+	})
+
+	t.Run("Monster rejected", func(t *testing.T) {
+		srv, _ := newServer(t)
+		monster := srv.SpawnHostileNPCKindAt(t, "Monster", location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+		drainUntilQuiet(t, srv.Client)
+		targetHostile(t, srv.Client, monster.ObjectID())
+		drainUntilQuiet(t, srv.Client)
+		srv.Client.Send(encodeRequestMagicSkillUse(skillID, false, false))
+		assertStaticSystemMessage(t, srv.Client.Read(), serverpackets.SystemMessageInvalidTarget)
+		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeMoveToPawn, "unlockable rejection rotation")
+		if frame := srv.Client.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+			t.Fatalf("unlockable rejection extra opcode = %#x, want none", frame[0])
+		}
+	})
+
+	t.Run("no target", func(t *testing.T) {
+		srv, _ := newServer(t)
+		srv.Client.Send(encodeRequestMagicSkillUse(skillID, false, false))
+		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeActionFailed, "untargeted unlock")
+		if frame := srv.Client.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+			t.Fatalf("untargeted unlock extra opcode = %#x, want none", frame[0])
+		}
+	})
 }

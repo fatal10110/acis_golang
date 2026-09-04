@@ -172,7 +172,7 @@ func (o *Object) Unlockable() bool { return o.Template.OpenKind == OpenSkill }
 // Door identifies this object for the single-target attackability gate.
 func (*Object) Door() bool { return true }
 
-// ponytail: siege ownership is unported; add its attacker-side check here.
+// ponytail: siege ownership is unported (#236); add its attacker-side check here.
 // AttackableBy stays false until then.
 func (*Object) AttackableBy(skilltarget.Creature) bool { return false }
 
