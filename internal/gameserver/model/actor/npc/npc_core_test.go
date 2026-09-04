@@ -905,6 +905,65 @@ func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
 	}
 }
 
+// A private with a living master uses the master's territory, not its own
+// spawn sphere. Offset 200 is outside the exclusive 3D home radius, so a
+// minion that measured against its own home would walk back.
+func TestInTerritoryMinionUsesMasterSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	minionMove := &hostileMove{}
+	master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	minion := newTestHostile(t, minionMove, &hostileAttack{})
+	minion.Instance.ObjectID = 102
+	master.Instance.HasHome = true
+	master.Instance.Home = home
+	minion.Instance.HasHome = true
+	minion.Instance.Home = home
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	w := world.New()
+	w.Spawn(master, home.X, home.Y, home.Z, 0)
+	w.Spawn(minion, home.X+defaultDriftRange, home.Y, home.Z, 0)
+
+	if !minion.InTerritory() {
+		t.Fatal("InTerritory() = false at minion-home+200 with master in sphere, want true")
+	}
+	if minion.ReturnHome() {
+		t.Fatal("ReturnHome() = true, want false while master is in territory")
+	}
+	if minionMove.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk-back", minionMove.home)
+	}
+}
+
+func TestInTerritoryMinionFollowsMasterOutside(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	minionMove := &hostileMove{}
+	master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	minion := newTestHostile(t, minionMove, &hostileAttack{})
+	minion.Instance.ObjectID = 102
+	master.Instance.HasHome = true
+	master.Instance.Home = home
+	minion.Instance.HasHome = true
+	minion.Instance.Home = home
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	w := world.New()
+	w.Spawn(master, home.X+defaultDriftRange, home.Y, home.Z, 0)
+	w.Spawn(minion, home.X+defaultDriftRange, home.Y, home.Z, 0)
+
+	if minion.InTerritory() {
+		t.Fatal("InTerritory() = true while master is outside territory, want false")
+	}
+	if !minion.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want walk-back when master is outside")
+	}
+	if minionMove.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", minionMove.home, home)
+	}
+}
+
 func makerPoly() *spawn.Territory {
 	return &spawn.Territory{
 		Name: "maker",
