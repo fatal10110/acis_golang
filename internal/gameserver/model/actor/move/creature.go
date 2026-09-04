@@ -62,7 +62,11 @@ type TargetSnapshot struct {
 //
 // The arrival timer preserves progress when no position-update task is
 // wired. When it is wired, UpdatePosition advances origin at the fixed
-// movement correction cadence and may complete the move first.
+// movement correction cadence and may complete the move first. A blocked
+// interpolation tick that still has queued waypoints reseeds the next
+// remaining leg instead of stopping; the blocked hook fires only once the
+// route is exhausted, including when an earlier tick on that same request
+// was blocked.
 type CreatureMove struct {
 	geo          Geo
 	waterSurface func(location.Location, int) (int, bool)
@@ -73,6 +77,7 @@ type CreatureMove struct {
 	accurateX, accurateY float64
 	speed                float64
 	moving               bool
+	routeBlocked         bool
 	followTarget         int32
 	followOffset         int
 	followMode           FollowMode
@@ -136,8 +141,9 @@ func (m *CreatureMove) SetArrivedHook(arrived func()) {
 	m.arrived = arrived
 }
 
-// SetBlockedHook records the callback fired when an in-flight move is stopped
-// by a newly blocked geodata path. A nil hook (the default) makes it a no-op.
+// SetBlockedHook records the callback fired when an in-flight move stops
+// because a geodata path closed and no remaining geopath waypoints can
+// continue the route. A nil hook (the default) makes it a no-op.
 func (m *CreatureMove) SetBlockedHook(blocked func()) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -259,6 +265,7 @@ const (
 
 func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pathFindResult, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
+	m.routeBlocked = false
 
 	// Same-cell requests complete on the next movement tick.
 	if target.X == m.origin.X && target.Y == m.origin.Y {
@@ -437,13 +444,17 @@ func (m *CreatureMove) finishLocked() func() {
 	}
 
 	m.moving = false
+	if m.routeBlocked {
+		return m.blocked
+	}
 	return m.arrived
 }
 
 // UpdatePosition advances one in-flight movement by step and reports the
 // current movement event to broadcast. It returns false after the move has
-// already stopped or reaches its final destination; reaching an intermediate
-// waypoint segment returns the next segment's event with true.
+// already stopped or reaches its final destination. Reaching an intermediate
+// waypoint — including when the current leg is blocked and a later waypoint
+// remains — returns the next segment's event with true.
 func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 	m.mu.Lock()
 	if !m.moving {
@@ -473,12 +484,22 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
 	}
 	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
-		action := m.stopBlockedLocked()
+		m.routeBlocked = true
+		ok, action := m.startNextWaypointLocked()
+		if !ok {
+			action = m.stopBlockedLocked()
+			m.mu.Unlock()
+			if action != nil {
+				action()
+			}
+			return Event{}, false
+		}
+		event := m.currentEventLocked()
 		m.mu.Unlock()
 		if action != nil {
 			action()
 		}
-		return Event{}, false
+		return event, true
 	}
 	if left == 0 || passed >= left {
 		action := m.finishLocked()
@@ -523,6 +544,47 @@ func (m *CreatureMove) stopBlockedLocked() func() {
 	m.waypoints = nil
 	m.moving = false
 	return m.blocked
+}
+
+// startNextWaypointLocked starts the next queued geopath leg from the
+// current cell without snapping onto the blocked destination. One waypoint
+// per tick; a dry queue or a non-positive speed reports that the route is
+// exhausted. Callers hold mu.
+func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
+	if len(m.waypoints) == 0 || m.speed <= 0 {
+		return false, nil
+	}
+	next := m.waypoints[0]
+	m.waypoints = m.waypoints[1:]
+	m.accurateX = float64(m.origin.X)
+	m.accurateY = float64(m.origin.Y)
+	m.destination = next
+
+	distance := math.Hypot(float64(next.X)-float64(m.origin.X), float64(next.Y)-float64(m.origin.Y))
+	ticks := math.Ceil(distance / (m.speed / 10))
+	const tickDuration = 100 * time.Millisecond
+	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
+		m.waypoints = nil
+		m.moving = false
+		return false, nil
+	}
+	duration := time.Duration(ticks) * tickDuration
+	if duration <= 0 {
+		duration = PositionUpdateInterval
+	}
+	m.moving = true
+	m.rescheduleLocked(duration)
+	event := m.currentEventLocked()
+	segmentAdvanced := m.segmentAdvanced
+	if segmentAdvanced == nil {
+		return true, nil
+	}
+	log := m.log
+	return true, func() {
+		if err := segmentAdvanced(event); err != nil {
+			log.Warn().Err(err).Msg("move: segment-advance broadcast")
+		}
+	}
 }
 
 func (m *CreatureMove) currentEventLocked() Event {
