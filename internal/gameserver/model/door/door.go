@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -158,6 +159,18 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 
 // ObjectID returns the world object id assigned to this door.
 func (o *Object) ObjectID() int32 { return o.objectID }
+
+// Dead reports that doors are never corpse targets.
+func (*Object) Dead() bool { return false }
+
+// Category keeps doors out of creature-category target groups.
+func (*Object) Category() skilltarget.Category { return 0 }
+
+// Unlockable reports whether a skill can open this door.
+func (o *Object) Unlockable() bool { return o.Template.OpenKind == OpenSkill }
+
+var _ skilltarget.Creature = (*Object)(nil)
+var _ skilltarget.UnlockableTarget = (*Object)(nil)
 
 // DoorID returns the static door id from doors.xml.
 func (o *Object) DoorID() int { return o.Template.ID }

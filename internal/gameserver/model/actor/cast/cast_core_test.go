@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -1517,6 +1520,55 @@ func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
 	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls = %d, want 0 (door never reaches a skill handler)", len(rec.calls))
+	}
+}
+
+type castDoorShape struct{}
+
+func (castDoorShape) GeoX() int               { return 0 }
+func (castDoorShape) GeoY() int               { return 0 }
+func (castDoorShape) GeoZ() int               { return 0 }
+func (castDoorShape) Height() int             { return 1 }
+func (castDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{block.AllDirections}} }
+
+func TestResolveAffectedAcceptsOnlyHolyAndUnlockableRuntimeTargets(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	recorder := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", recorder)
+
+	holy, err := npc.NewHolyThing(&npc.Instance{ObjectID: 2, Template: &npc.Template{ID: 2, Type: "HolyThing"}, Kind: "HolyThing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlockableDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenSkill}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockedDoor, err := door.NewObject(4, &door.Template{ID: 4, OpenKind: door.OpenClick}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name   string
+		target world.Tracked
+		def    modelskill.Definition
+		want   bool
+	}{
+		{"holy thing", holy, modelskill.Definition{Target: modelskill.TargetHoly, SkillType: "DUMMY"}, true},
+		{"door rejected by holy", lockedDoor, modelskill.Definition{Target: modelskill.TargetHoly, SkillType: "DUMMY"}, false},
+		{"skill door", unlockableDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, true},
+		{"click door rejected", lockedDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selected, ok := SelectTarget(caster, tc.target, tc.def)
+			if !ok {
+				t.Fatal("SelectTarget() ok = false, want true")
+			}
+			_, got := ResolveAffected(handlers, caster, selected, tc.def)
+			if got != tc.want {
+				t.Fatalf("ResolveAffected() ok = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 
