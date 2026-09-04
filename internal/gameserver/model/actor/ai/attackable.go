@@ -63,6 +63,8 @@ type AttackController interface {
 	AttackingNow() bool
 	CanAttack(attackable.Combatant) bool
 	DoAttack(attackable.Combatant) error
+	// Stop aborts an in-flight attack, including a pending hit task.
+	Stop()
 }
 
 // CastController controls skill-cast requests emitted by the AI loop,
@@ -101,6 +103,8 @@ type CastController interface {
 	// Cast starts the cast against target. Delayed scheduling and effect
 	// application are the implementation's responsibility.
 	Cast(target attackable.Combatant, ref skill.Ref)
+	// Stop aborts an in-flight cast.
+	Stop()
 }
 
 type intention struct {
@@ -353,9 +357,14 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 
 func (a *Attackable) thinkIdle() {
 	_ = a.move.Stop()
-	if mover, ok := a.actor.(interface{ ForceWalkStance() }); ok {
-		mover.ForceWalkStance()
+	a.attack.Stop()
+	if a.cast != nil {
+		a.cast.Stop()
 	}
+	if actor, ok := a.actor.(stanceActor); ok {
+		actor.ForceWalkStance()
+	}
+	a.current = intention{kind: IntentionIdle}
 }
 
 func (a *Attackable) queueIdleFollow() {
@@ -370,8 +379,17 @@ type idleWanderer interface {
 	ShouldIdleWander() bool
 }
 
-type wanderMover interface {
+type stanceActor interface {
 	ForceWalkStance()
+	ForceRunStance()
+}
+
+type headingRestorer interface {
+	RestoreSpawnHeadingIfAtHome()
+}
+
+type wanderMover interface {
+	stanceActor
 	RealMoveSpeed() float64
 	MoveFromSpawnUsingRandomOffset(offset int)
 }
@@ -479,6 +497,12 @@ func (a *Attackable) SetWander() {
 	defer a.mu.Unlock()
 	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
 	a.wanderReady = time.Time{}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:     IntentionWander,
+		Timer:    defaultWanderTimer,
+		Weight:   defaultWanderWeight,
+		QueuedAt: time.Now(),
+	})
 }
 
 // SetBackToPeace clears combat memory and cancels the current action. It
@@ -588,13 +612,15 @@ func (a *Attackable) Think() error {
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
 	if _, ok := a.desires.Peek(); !ok {
-		if a.current.kind == IntentionIdle {
+		if a.cast == nil || !a.cast.CastingNow() {
 			a.thinkIdle()
+			a.queueIdleFollow()
 		}
-		a.queueIdleFollow()
 	}
 	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleWander()
+		if a.cast == nil || !a.cast.CastingNow() {
+			a.queueIdleWander()
+		}
 	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()
@@ -847,8 +873,8 @@ func (a *Attackable) thinkCast() (bool, error) {
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref))
 	if following {
-		if runner, ok := a.actor.(interface{ ForceRunStance() }); ok {
-			runner.ForceRunStance()
+		if actor, ok := a.actor.(stanceActor); ok {
+			actor.ForceRunStance()
 		}
 		return false, err
 	}
@@ -904,7 +930,7 @@ func (a *Attackable) Arrived() {
 		return
 	}
 	a.clearArrivalDesire()
-	if restorer, ok := a.actor.(interface{ RestoreSpawnHeadingIfAtHome() }); ok {
+	if restorer, ok := a.actor.(headingRestorer); ok {
 		restorer.RestoreSpawnHeadingIfAtHome()
 	}
 	a.syncOOTSweepLocked()

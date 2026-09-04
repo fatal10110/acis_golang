@@ -547,6 +547,7 @@ type recordingAttack struct {
 	target          attackable.Combatant
 	doAttackCalls   int
 	doAttackErr     error
+	stopCalls       int
 }
 
 func (a *recordingAttack) BowCoolingDown() bool { return a.bowCooling }
@@ -561,6 +562,10 @@ func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
 	a.doAttackCalls++
 	a.target = target
 	return a.doAttackErr
+}
+func (a *recordingAttack) Stop() {
+	a.stopCalls++
+	a.attackingNow = false
 }
 
 type recordingCast struct {
@@ -577,6 +582,7 @@ type recordingCast struct {
 	castCalls    int
 	castedTarget attackable.Combatant
 	castedRef    skill.Ref
+	stopCalls    int
 }
 
 func (c *recordingCast) Disabled() bool               { return c.disabled }
@@ -602,6 +608,11 @@ func (c *recordingCast) Cast(target attackable.Combatant, ref skill.Ref) {
 	c.castCalls++
 	c.castedTarget = target
 	c.castedRef = ref
+}
+
+func (c *recordingCast) Stop() {
+	c.stopCalls++
+	c.casting = false
 }
 
 // ---- from attackable_threat_test.go ----
@@ -1301,7 +1312,6 @@ func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1329,7 +1339,6 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1360,7 +1369,6 @@ func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1387,7 +1395,6 @@ func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
 	brain := NewAttackable(owner, mv, atk)
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1446,6 +1453,34 @@ func TestAttackableAIFollowArrivedSkipsSpawnHeadingAndOOTSweep(t *testing.T) {
 	tickOOTSweepDue(ai, start.Add(91*time.Second))
 	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); !got {
 		t.Fatal("FOLLOW arrival armed the OOT sweep, want it skipped")
+	}
+}
+
+func TestAttackableAIAttackArrivedRestoresHeadingAndArmsOOTSweep(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
+	addAttackHate(ai, target, 0, 1000)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack", got)
+	}
+
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	owner.inTerritory = false
+	ai.Arrived()
+
+	if owner.headingRestores != 1 {
+		t.Fatalf("heading restores = %d, want 1 on ATTACK arrival", owner.headingRestores)
+	}
+
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); got {
+		t.Fatal("ATTACK arrival did not arm the OOT sweep")
 	}
 }
 
@@ -1574,6 +1609,69 @@ func TestAttackableAIIdleHoldPositionForcesWalkStance(t *testing.T) {
 	}
 	if move.stopCount != 1 {
 		t.Fatalf("stop count = %d, want 1", move.stopCount)
+	}
+}
+
+func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true, attackingNow: true}
+	ai := NewAttackable(owner, move, strike)
+	addAttackHate(ai, target, 0, 20)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack", got)
+	}
+
+	ai.Desires().Clear()
+	strike.attackingNow = true
+	if err := ai.Think(); err != nil {
+		t.Fatalf("empty-queue Think() error: %v", err)
+	}
+
+	if strike.stopCalls != 1 {
+		t.Fatalf("attack Stop calls = %d, want 1", strike.stopCalls)
+	}
+	if owner.walkStanceCalls != 1 {
+		t.Fatalf("walk stance calls = %d, want 1", owner.walkStanceCalls)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle after empty-queue abort", got)
+	}
+}
+
+func TestAttackableAIIdleSkipsAbortWhileCasting(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true}
+	cast := &recordingCast{canAttempt: true, canCast: true, casting: true}
+	ai := NewAttackable(owner, move, strike)
+	ai.SetCastController(cast)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 10})
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+
+	ai.Desires().Clear()
+	cast.casting = true
+	walkBefore := owner.walkStanceCalls
+	if err := ai.Think(); err != nil {
+		t.Fatalf("casting Think() error: %v", err)
+	}
+	if strike.stopCalls != 0 {
+		t.Fatalf("attack Stop calls = %d, want 0 while casting", strike.stopCalls)
+	}
+	if cast.stopCalls != 0 {
+		t.Fatalf("cast Stop calls = %d, want 0 while casting", cast.stopCalls)
+	}
+	if owner.walkStanceCalls != walkBefore {
+		t.Fatalf("walk stance calls = %d, want %d while casting", owner.walkStanceCalls, walkBefore)
 	}
 }
 

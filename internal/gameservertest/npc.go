@@ -164,3 +164,4 @@ func (parkedAttack) BowCoolingDown() bool                { return false }
 func (parkedAttack) AttackingNow() bool                  { return false }
 func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
 func (parkedAttack) DoAttack(attackable.Combatant) error { return nil }
+func (parkedAttack) Stop()                               {}

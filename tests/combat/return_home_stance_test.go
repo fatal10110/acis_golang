@@ -66,6 +66,11 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
 		t.Fatalf("CurrentIntention() after Think = %v, want move_to", got)
 	}
+	// SetWander queued a wander timer so ReturnHome could leave current
+	// wander until Think. Drop it once MOVE_TO is current: SiegeGuard does
+	// not idle-wander, and a leftover wander desire would re-promote after
+	// arrival.
+	hostile.AI().Desires().RemoveKind(ai.IntentionWander)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 
 	// Production MoveToLocation snaps destination Z through geo.Height, so
