@@ -256,12 +256,6 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor.SkillDisabled(key) {
 		return ErrSkillDisabled
 	}
-	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
-		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
-			return ErrCubicListFull
-		}
-	}
-
 	initialMP := c.actor.MPInitialCost(def)
 	mp := c.actor.MPCost(def)
 	if (initialMP > 0 || mp > 0) && c.actor.MP() < initialMP+mp {
@@ -276,6 +270,11 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		}
 	} else if c.actor.PhysicalMuted() {
 		return ErrPhysicalMuted
+	}
+	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
+		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
+			return ErrCubicListFull
+		}
 	}
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
 		return ErrNotEnoughItems

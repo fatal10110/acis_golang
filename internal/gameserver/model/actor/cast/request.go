@@ -41,12 +41,13 @@ const fakeDeathSkillID = 60
 
 // StartedSkill is a player skill request accepted by the cast controller.
 type StartedSkill struct {
-	Definition modelskill.Definition
-	Target     Target
-	Rejection  skilltarget.CastRejection
-	Plan       Plan
-	Ctrl       bool
-	Shift      bool
+	Definition     modelskill.Definition
+	Target         Target
+	Rejection      skilltarget.CastRejection
+	CanCastFailure bool
+	Plan           Plan
+	Ctrl           bool
+	Shift          bool
 }
 
 // StartPlayerSkill validates and starts a live player skill cast.
@@ -109,12 +110,19 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	var ok bool
 	if resolveTarget != nil {
 		target, rejection = resolveTarget(caster, selected, def, ctrl)
-		ok = target != nil && rejection == skilltarget.CastRejectNone
+		ok = target != nil
 	} else {
 		target, ok = SelectTarget(caster, selected, def)
 	}
 	started := StartedSkill{Definition: def, Target: target, Rejection: rejection}
 	if !ok {
+		return started, ErrInvalidTarget
+	}
+	if err := controller.CanCast(target, def); err != nil {
+		started.CanCastFailure = true
+		return started, err
+	}
+	if rejection != skilltarget.CastRejectNone {
 		return started, ErrInvalidTarget
 	}
 

@@ -2,7 +2,9 @@ package skills
 
 import (
 	"testing"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -19,12 +21,12 @@ func corpsePlayerSkill() modelskill.Definition {
 	}
 }
 
-func bootCorpsePlayerCaster(t *testing.T) *gameservertest.Server {
+func bootCorpsePlayerCaster(t *testing.T, def modelskill.Definition) *gameservertest.Server {
 	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{corpsePlayerSkill()})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
 	)
 	seedKnownSkill(t, srv, srv.SoleObjectID(t), int(corpsePlayerSkillID), 1)
 	return srv
@@ -32,20 +34,70 @@ func bootCorpsePlayerCaster(t *testing.T) *gameservertest.Server {
 
 func TestCorpsePlayerCastRejections(t *testing.T) {
 	t.Run("living target", func(t *testing.T) {
-		srv := bootCorpsePlayerCaster(t)
-		c := srv.Client
-		startInWorld(t, c)
-		guard := srv.SpawnHostileNPC(t)
-		drainUntilQuiet(t, c)
-		targetHostile(t, c, guard.ObjectID())
+		srv := bootCorpsePlayerCaster(t, corpsePlayerSkill())
+		caster := srv.Client
+		patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
+		patient := srv.DialClient(t, "player2", 1)
 
-		c.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
-		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "living corpse-player rejection")
+		startInWorld(t, caster)
+		startInWorldAmongPlayers(t, patient)
+		drainUntilQuiet(t, caster)
+		drainUntilQuiet(t, patient)
+
+		x, y, z := srv.PlayerPosition(t, patientID)
+		casterX, casterY, casterZ := srv.PlayerPosition(t, srv.SoleObjectID(t))
+		caster.Send(encodeAction(patientID, int32(x), int32(y), int32(z), false))
+		drainUntilQuiet(t, caster)
+		drainUntilQuiet(t, patient)
+
+		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
+		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageInvalidTarget)
+		assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-player self rotation")
+		assertFrameOpcode(t, patient.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-player observer rotation")
+		casterState, ok := srv.State.Player(srv.SoleObjectID(t))
+		if !ok {
+			t.Fatal("caster state missing")
+		}
+		heading, ok := casterState.(interface{ CurrentHeading() int })
+		if !ok {
+			t.Fatalf("caster state %T does not expose CurrentHeading", casterState)
+		}
+		wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: x, Y: y, Z: z})
+		if got := heading.CurrentHeading(); got != wantHeading {
+			t.Fatalf("caster heading after rejected cast = %d, want %d", got, wantHeading)
+		}
+	})
+
+	t.Run("low MP wins over living target", func(t *testing.T) {
+		def := corpsePlayerSkill()
+		def.MPInitialConsume = 12
+		def.MPConsume = 99_999
+		srv := bootCorpsePlayerCaster(t, def)
+		caster := srv.Client
+		patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
+		patient := srv.DialClient(t, "player2", 1)
+
+		startInWorld(t, caster)
+		startInWorldAmongPlayers(t, patient)
+		drainUntilQuiet(t, caster)
+		drainUntilQuiet(t, patient)
+
+		x, y, z := srv.PlayerPosition(t, patientID)
+		caster.Send(encodeAction(patientID, int32(x), int32(y), int32(z), false))
+		drainUntilQuiet(t, caster)
+		drainUntilQuiet(t, patient)
+
+		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
+		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageNotEnoughMP)
+		assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToPawn, "low MP corpse-player self rotation")
+		assertFrameOpcode(t, patient.Read(), serverpackets.OpcodeMoveToPawn, "low MP corpse-player observer rotation")
+		if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("low MP corpse-player rejection extra frame = %#x, want no ActionFailed", extra[0])
+		}
 	})
 
 	t.Run("dead non-playable", func(t *testing.T) {
-		srv := bootCorpsePlayerCaster(t)
+		srv := bootCorpsePlayerCaster(t, corpsePlayerSkill())
 		c := srv.Client
 		startInWorld(t, c)
 		guard := srv.SpawnHostileNPC(t)
@@ -55,11 +107,14 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePlayerSkillID, 1)
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "dead non-playable corpse-player rejection")
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "dead non-playable corpse-player rotation")
+		if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("dead non-playable corpse-player rejection extra frame = %#x, want no ActionFailed", extra[0])
+		}
 	})
 
 	t.Run("dead playable starts cast", func(t *testing.T) {
-		srv := bootCorpsePlayerCaster(t)
+		srv := bootCorpsePlayerCaster(t, corpsePlayerSkill())
 		caster := srv.Client
 		patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
 		patient := srv.DialClient(t, "player2", 1)

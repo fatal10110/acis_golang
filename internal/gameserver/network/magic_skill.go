@@ -79,9 +79,14 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
-		if started.Rejection != skilltarget.CastRejectNone {
+		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
+			sendMagicCastFailureReason(live, started.Definition, err)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Rejection != skilltarget.CastRejectNone {
 			sendTargetCastRejection(live, started.Rejection, started.Definition)
-			sendMagicActionFailed(live)
+			l.rejectMagicCast(live, started.Definition, started.Target)
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
@@ -168,6 +173,39 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	})
 }
 
+func magicCastFailureMovesToPawn(err error) bool {
+	return errors.Is(err, actorcast.ErrNotEnoughMP) ||
+		errors.Is(err, actorcast.ErrNotEnoughHP) ||
+		errors.Is(err, actorcast.ErrMagicMuted) ||
+		errors.Is(err, actorcast.ErrPhysicalMuted) ||
+		errors.Is(err, actorcast.ErrCubicListFull) ||
+		errors.Is(err, actorcast.ErrNotEnoughItems)
+}
+
+func (l *GameClientLink) rejectMagicCast(live *livePlayer, def modelskill.Definition, target actorcast.Target) {
+	if live == nil || target == nil {
+		return
+	}
+	if def.HitTime > 50 {
+		if live.move != nil {
+			if err := live.move.Stop(); err != nil {
+				l.log.Warn().Err(err).Msg("move: stop before rejected cast")
+			}
+		}
+		if target.ObjectID() != live.ObjectID() {
+			live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
+		}
+	}
+	if target.ObjectID() == live.ObjectID() {
+		return
+	}
+	origin := live.CurrentLocation()
+	targetObject := skillCastObject(target)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMoveToPawn(live.ObjectID(), targetObject.ObjectID, int(origin.Distance3D(targetObject.Location)), origin)
+	})
+}
+
 func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
 	if live == nil || (def.Target != modelskill.TargetCorpseMob && def.Target != modelskill.TargetAreaCorpseMob) {
 		return
@@ -224,7 +262,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	}
 	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
-		return nil, rejection
+		return finalTarget, rejection
 	}
 	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
 		return nil, skilltarget.CastRejectNone
