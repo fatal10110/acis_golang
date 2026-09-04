@@ -39,9 +39,9 @@ func (h *Hostile) RealMoveSpeed() float64 {
 }
 
 // MoveFromSpawnUsingRandomOffset walks toward a geo-validated wander point.
-// Maker NPCs sample from the current position inside the maker territory;
-// a nil maker (single spawns, minions, fixtures) offsets from spawn home.
-// MinionSpawn's current-position origin is #2159. No spawn point or a
+// Maker NPCs sample from the current position inside the maker territory.
+// Privates (a live master, no maker) offset from the NPC's current XY.
+// Other nil-maker spawns offset from spawn home. No spawn point or a
 // sub-noticeable offset is a no-op.
 func (h *Hostile) MoveFromSpawnUsingRandomOffset(offset int) {
 	if h.Instance == nil || !h.Instance.HasHome || offset < minWanderOffset {
@@ -71,6 +71,9 @@ func (h *Hostile) randomWalkLocation(from location.Location, offset int) (locati
 
 func (h *Hostile) homeOffsetWalk(from location.Location, offset int) location.Location {
 	dest := h.Instance.Home
+	if h.Master() != nil {
+		dest = from
+	}
 	dest.X += rnd.GetRange(-offset, offset)
 	dest.Y += rnd.GetRange(-offset, offset)
 	return h.ValidLocation(from.X, from.Y, from.Z, dest.X, dest.Y, dest.Z)

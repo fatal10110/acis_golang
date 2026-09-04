@@ -843,11 +843,19 @@ func (h *Hostile) ReturnHome() bool {
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
+// A living private uses its master's territory. A dead master is treated
+// as unlinked, so the private stays in-territory for the corpse window.
 func (h *Hostile) InTerritory() bool {
+	if master := h.Master(); master != nil {
+		if master.Dead() {
+			return true
+		}
+		return master.InTerritory()
+	}
 	if !h.Instance.HasHome {
 		return true
 	}
-	return h.location().In3DRange(h.Instance.Home, defaultDriftRange)
+	return h.location().In3DRadius(h.Instance.Home, defaultDriftRange)
 }
 
 func hostileKind(inst *Instance) InstanceKind {
@@ -886,7 +894,9 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		h.ForceWalkStance()
 	}
 	_ = h.move.MoveHome(h.Instance.Home)
-	h.scheduleWanderRecheck()
+	if !h.SiegeGuard() {
+		h.scheduleWanderRecheck()
+	}
 	return true
 }
 

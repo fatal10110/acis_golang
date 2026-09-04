@@ -776,6 +776,64 @@ func TestTable_All(t *testing.T) {
 	}
 }
 
+func TestInTerritoryIsStrict3D(t *testing.T) {
+	// Spawn.isInMyTerritory uses Location.isIn3DRadius: distance3D < MAX_DRIFT_RANGE.
+	// Axis-aligned integer offsets make sqrt(d²) == d, so 199 / 200 / 201 are
+	// the exact representable neighbors of the boundary. Pure-Z cases fail
+	// if InTerritory drops to 2D.
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	cases := []struct {
+		axis   string
+		offset int
+		want   bool
+	}{
+		{axis: "x", offset: defaultDriftRange - 1, want: true},
+		{axis: "x", offset: defaultDriftRange, want: false},
+		{axis: "x", offset: defaultDriftRange + 1, want: false},
+		{axis: "z", offset: defaultDriftRange - 1, want: true},
+		{axis: "z", offset: defaultDriftRange, want: false},
+	}
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s=%d", tc.axis, tc.offset), func(t *testing.T) {
+			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			hostile.Instance.HasHome = true
+			hostile.Instance.Home = home
+			x, y, z := home.X, home.Y, home.Z
+			switch tc.axis {
+			case "x":
+				x += tc.offset
+			case "z":
+				z += tc.offset
+			}
+			world.New().Spawn(hostile, x, y, z, 0)
+
+			if got := hostile.InTerritory(); got != tc.want {
+				t.Fatalf("InTerritory() = %v at 3D %s distance %d, want %v", got, tc.axis, tc.offset, tc.want)
+			}
+		})
+	}
+}
+
+func TestReturnHomeAtExactTerritoryBoundaryWalksBack(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "Monster"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+defaultDriftRange, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true at 3D distance 200, want false")
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false at same-Z offset 200, want walk-back")
+	}
+	if movement.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
+	}
+}
+
 func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 	// Point2D.isIn2DRadius is distance2D < radius. Axis-aligned integer
 	// offsets make hypot(d, 0) == d, so d-1 / d / d+1 are the exact
@@ -898,6 +956,27 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("wander recheck did not move behind the actor")
+	}
+}
+
+func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.RunSpeed = 100
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	hostile.AI().SetWander()
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	select {
+	case <-movement.moved:
+		t.Fatal("SiegeGuard wander recheck moved behind the actor")
+	case <-time.After(2 * time.Second):
 	}
 }
 

@@ -45,6 +45,110 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 	}
 }
 
+// TestMinionIdleWanderOffsetsFromCurrentPosition pins private idle wander:
+// origin is the minion's current XY, not spawn home. Master stays in
+// territory so the private is treated as in-territory even after leaving
+// its own spawn point.
+func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	current := location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ}
+	master := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	minion := srv.SpawnMovingHostileNPCAt(t, "Monster", home, current)
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	drainUntilQuiet(t, c)
+
+	if err := minion.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander", got)
+	}
+
+	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
+	offset := 60 * 3
+	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
+		t.Fatalf("minion wander dest = %+v, want within ±%d of current %+v", dest, offset, current)
+	}
+	if absInt(dest.X-home.X) <= offset && absInt(dest.Y-home.Y) <= offset {
+		t.Fatalf("minion wander dest = %+v, still within ±%d of spawn home %+v", dest, offset, home)
+	}
+	if !minion.IsMoving() {
+		t.Fatal("IsMoving() = false after minion wander Think, want a live walk")
+	}
+}
+
+// TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory pins the corpse
+// window: Go keeps the master pointer until decay. A dead master must not
+// pull the private out of territory. The private keeps wandering around
+// its current XY even when both actors are far from spawn home.
+func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	masterAt := location.Location{X: hostileX + 400, Y: hostileY, Z: hostileZ}
+	current := location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ}
+	master := srv.SpawnMovingHostileNPCAt(t, "Monster", home, masterAt)
+	minion := srv.SpawnMovingHostileNPCAt(t, "Monster", home, current)
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+	if !master.MarkDead() {
+		t.Fatal("MarkDead() = false, want a fresh death")
+	}
+	drainUntilQuiet(t, c)
+
+	if err := minion.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander after master death", got)
+	}
+	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
+	offset := 60 * 3
+	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
+		t.Fatalf("minion wander dest = %+v, want within ±%d of current %+v", dest, offset, current)
+	}
+}
+
+// TestMinionOpeningHateUsesMasterTerritory pins a non-wander InTerritory
+// consumer: a private 500 off its own spawn still gets the 300 opening
+// hate while its living master is in territory.
+func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	player := liveCombatant(t, srv)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	current := location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ}
+	master := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	minion := srv.SpawnMovingHostileNPCAt(t, "Monster", home, current)
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	minion.AI().AddDefaultHate(player)
+	if got := minion.AI().Hates().Hate(player); got != 300 {
+		t.Fatalf("opening hate = %v, want 300 (master in territory)", got)
+	}
+}
+
 // TestGuardDoesNotIdleWander pins hold-position kinds: a Guard with an empty
 // desire queue stays idle instead of rolling a random walk.
 func TestGuardDoesNotIdleWander(t *testing.T) {
