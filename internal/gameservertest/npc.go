@@ -86,6 +86,13 @@ type movingHostileLocatedRef struct{ move.Actor }
 // server-initiated moves emit real observer packets.
 func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at location.Location) *npc.Hostile {
 	t.Helper()
+	return s.SpawnMovingHostileNPCAtGeo(t, kind, home, at, Geo{})
+}
+
+// SpawnMovingHostileNPCAtGeo is SpawnMovingHostileNPCAt with an explicit
+// movement geo, so a suite can close the path after the walk starts.
+func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at location.Location, geo move.Geo) *npc.Hostile {
+	t.Helper()
 	tmpl := &npc.Template{
 		ID:              100,
 		TemplateID:      100,
@@ -107,7 +114,7 @@ func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at loc
 	inst.HasHome = true
 	inst.Home = home
 	statRef := &movingHostileStatRef{}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, statRef)
+	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef)
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
