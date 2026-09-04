@@ -960,9 +960,9 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 }
 
 func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
-	// GrandBoss.returnHome is unconditionally false; onSpawn sets no
-	// random walk. A boss spawned outside drift range must not MoveHome
-	// or take the Attackable delayed backward nudge.
+	// GrandBoss.returnHome is unconditionally false. A boss spawned
+	// outside drift range must not MoveHome or take the Attackable
+	// delayed backward nudge.
 	movement := &hostileMove{moved: make(chan location.Location, 1)}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
 	hostile.Instance.Kind = "GrandBoss"
