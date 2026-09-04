@@ -226,7 +226,7 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	}
 	if obj, ok := e.state.Summon(live.ObjectID()); ok {
 		if actor, ok := obj.(*summon.Actor); ok {
-			savePet(ctx, pets, actor, log)
+			savePet(ctx, pets, actor, live.Inventory(), log)
 		}
 	}
 }

@@ -36,7 +36,7 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
 	if result.Outcome == summon.OutcomeApplied && (command == summon.CommandReturnPet || command == summon.CommandUnsummonServitor) {
-		l.savePet(context.WithoutCancel(ctx), actor)
+		l.savePet(context.WithoutCancel(ctx), actor, live.Inventory())
 		l.transferPetInventory(actor, live.Inventory())
 		// ApplyCommand's despawn (inside CommandReturnPet/CommandUnsummonServitor)
 		// synchronously triggers world visibility's Forget callback, which
