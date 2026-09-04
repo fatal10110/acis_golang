@@ -312,6 +312,51 @@ func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
 	}
 }
 
+func TestLoadMaxGeoPathFailCountUsesGeoengineProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 80\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 80 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 80", got)
+	}
+}
+
+func TestLoadMaxGeoPathFailCountDefaultsToFifty(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 50 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 50", got)
+	}
+}
+
+func TestLoadMaxGeoPathFailCountFloorsAtFifteen(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 15 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 15", got)
+	}
+}
+
 func TestLoadRandomWalkRateUsesNpcsProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "npcs.properties")
 	if err := os.WriteFile(configPath, []byte("RandomWalkRate = 45\n"), 0o600); err != nil {
