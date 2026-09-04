@@ -345,11 +345,23 @@ func (c *Controller) SetBlocked(blocked func()) {
 	})
 }
 
+// SetBlockedOverride replaces the default blocked-arrival correction path.
+// Returning true means the override already produced the client-visible
+// packet; false (or a nil override) still broadcasts same-cell MoveToLocation.
+func (c *Controller) SetBlockedOverride(override func() bool) {
+	c.move.SetBlockedHook(func() {
+		if override != nil && override() {
+			return
+		}
+		c.broadcastBlockedCorrection()
+	})
+}
+
 // broadcastBlockedCorrection snaps observers to the cell the actor actually
 // stopped on. A same-cell MoveToLocation is the correction packet; StopMove
 // would freeze client prediction at the stale destination. This is the base
-// blocked-arrival branch only; player INTERACT (StopMove in range) and CAST
-// (DIST_TOO_FAR_CASTING_STOPPED) are not this hook: #2231.
+// blocked-arrival branch. Player INTERACT (StopMove in range) and CAST
+// (DIST_TOO_FAR_CASTING_STOPPED) replace this hook via SetBlockedOverride.
 func (c *Controller) broadcastBlockedCorrection() {
 	pos := c.move.Position()
 	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})

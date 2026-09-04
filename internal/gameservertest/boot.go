@@ -22,6 +22,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -84,6 +85,7 @@ type options struct {
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
 	log                    zerolog.Logger
+	geo                    move.Geo
 }
 
 type characterSpec struct {
@@ -257,6 +259,17 @@ func WithLevels(levels *player.LevelTable) Option {
 
 // WithLog sets the link logger (default zero-logger).
 func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log } }
+
+// WithGeo supplies the movement geodata collaborator wired into live
+// players. The default is the always-passable Geo double.
+func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
+
+func bootGeo(geo move.Geo) move.Geo {
+	if geo != nil {
+		return geo
+	}
+	return Geo{}
+}
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
@@ -474,6 +487,21 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
 	}
 	holder.Inventory().SlotLimit = limit
+}
+
+// PlayerMove returns the live player's movement state so suites can drive
+// interpolation ticks and fire the blocked-arrival path.
+func (s *Server) PlayerMove(tb testing.TB, objID int32) *move.CreatureMove {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	mover, ok := obj.(interface{ Move() *move.CreatureMove })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose Move", objID, obj)
+	}
+	return mover.Move()
 }
 
 // PlayerPosition reports the live player's current world position.
@@ -858,7 +886,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		NPCs:             o.npcs,
 		SummonItems:      o.summonItems,
 		PetStore:         petStore,
-		Geo:              Geo{},
+		Geo:              bootGeo(o.geo),
 		IDs:              ids,
 		GroundItems:      groundItems,
 		Positions:        task.NewPositionUpdates(state),

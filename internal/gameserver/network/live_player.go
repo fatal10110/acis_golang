@@ -245,12 +245,24 @@ func (p *livePlayer) setPetInteract(pet *summon.Actor) {
 	p.petInteract = pet
 }
 
+func (p *livePlayer) petInteractTarget() *summon.Actor {
+	p.petInteractMu.Lock()
+	defer p.petInteractMu.Unlock()
+	return p.petInteract
+}
+
 func (p *livePlayer) takePetInteract() *summon.Actor {
 	p.petInteractMu.Lock()
 	defer p.petInteractMu.Unlock()
 	pet := p.petInteract
 	p.petInteract = nil
 	return pet
+}
+
+func (p *livePlayer) hasDeferredMagicSkill() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredMagic != nil
 }
 
 // pickupLockActive has no production caller: livePickupBlockedDeferrable

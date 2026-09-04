@@ -277,6 +277,47 @@ func (l *GameClientLink) finishPetInteract(live *livePlayer) {
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 }
 
+// onPlayerArrivedBlocked is the player blocked-arrival arm: INTERACT in
+// range broadcasts StopMove and finishes the interact; CAST sends
+// DIST_TOO_FAR_CASTING_STOPPED then the base same-cell MoveToLocation;
+// every other intention uses that base correction.
+func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
+	if live == nil {
+		return false
+	}
+	if live.move != nil {
+		pos := live.move.Position()
+		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+	}
+	if pet := live.petInteractTarget(); pet != nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		if l.playerCanDoInteract(live, pet) {
+			if err := live.BroadcastStop(); err != nil {
+				l.log.Warn().Err(err).Msg("move: blocked interact stop")
+			}
+			l.finishPetInteract(live)
+			return true
+		}
+		live.takePetInteract()
+		return false
+	}
+	if live.hasDeferredMagicSkill() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
+		live.takeDeferredMagicSkill()
+	}
+	return false
+}
+
+func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
+	if live == nil || pet == nil || live.Operating() {
+		return false
+	}
+	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
+		return false
+	}
+	return summonInRange(live, pet, summonInteractRange)
+}
+
 // requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
 // and the action-bar sit/stand button (RequestActionUse action 0), which the
 // reference routes through the same tryToSit(target)/tryToStand() AI calls.
