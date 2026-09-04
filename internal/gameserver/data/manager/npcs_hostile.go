@@ -98,8 +98,7 @@ func (r *walkerActorRef) MoveToLocation(target location.Location) (move.Event, e
 }
 
 func (r *walkerActorRef) TeleportTo(target location.Location) {
-	r.Hostile.SetXYZ(target.X, target.Y, target.Z)
-	r.Hostile.BroadcastPosition()
+	r.Hostile.TeleportTo(target)
 }
 
 // routeAwareMoveController wraps a Hostile's ai.MoveController so that any

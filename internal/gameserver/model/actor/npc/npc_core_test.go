@@ -1153,6 +1153,24 @@ func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
 	}
 }
 
+func TestHostileTeleportToClearsGeoPathFailCount(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	w := world.New()
+	w.Spawn(hostile, 0, 0, 0, 0)
+	hostile.SetWorld(w)
+	for range 7 {
+		hostile.AddGeoPathFailCount()
+	}
+	hostile.TeleportTo(location.Location{X: 50, Y: 0, Z: 0})
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after TeleportTo = %d, want 0", got)
+	}
+	x, y, z := hostile.Position()
+	if got := (location.Location{X: x, Y: y, Z: z}); got != (location.Location{X: 50, Y: 0, Z: 0}) {
+		t.Fatalf("Position() = %+v, want teleported cell", got)
+	}
+}
+
 func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})

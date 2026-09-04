@@ -219,7 +219,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		return false, nil
 	}
 	if !c.move.Moving() || c.move.Destination() != dest {
-		event, err := c.move.MoveToLocation(dest)
+		event, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
 		if err != nil {
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
@@ -227,6 +227,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			c.clearOffensiveFollow()
 			return false, nil
 		}
+		c.applyPathFindOutcome(outcome)
 		if mode == FollowOffensive {
 			if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
 				event.FollowTarget = target.ObjectID()
@@ -258,31 +259,24 @@ func (c *Controller) MoveHome(home location.Location) error {
 
 	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	if err != nil {
-		if hasRecovery {
-			recovery.AddGeoPathFailCount()
-		}
 		return err
 	}
-	if hasRecovery {
-		switch outcome {
-		case pathRouted:
-			recovery.ResetGeoPathFailCount()
-		case pathFailed:
-			recovery.AddGeoPathFailCount()
-		}
-	}
+	c.applyPathFindOutcome(outcome)
 	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
 	return broadcastErr
 }
 
-// MoveToLocation starts a direct movement request and reports whether it was
-// accepted.
+// MoveToLocation starts a pathfinding movement request and reports whether
+// it was accepted. A blocked route still walks toward the last reachable
+// point and counts as a geo-path failure for actors that recover from
+// repeated stalls.
 func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
-	event, err := c.move.MoveToLocation(target)
+	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
 		return false, nil
 	}
+	c.applyPathFindOutcome(outcome)
 	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
 	return true, broadcastErr
@@ -292,13 +286,27 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // accepted move's Event, for callers that need the move detail alongside
 // acceptance (task.Walker's WalkerActor contract).
 func (c *Controller) MoveToLocationEvent(target location.Location) (Event, error) {
-	event, err := c.move.MoveToLocation(target)
+	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
 		return Event{}, err
 	}
+	c.applyPathFindOutcome(outcome)
 	broadcastErr := c.self.BroadcastMove(event)
 	c.addPositionUpdate()
 	return event, broadcastErr
+}
+
+func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
+	recovery, ok := c.self.(homePathRecovery)
+	if !ok {
+		return
+	}
+	switch outcome {
+	case pathRouted:
+		recovery.ResetGeoPathFailCount()
+	case pathFailed:
+		recovery.AddGeoPathFailCount()
+	}
 }
 
 // Stop cancels any active follow task and any movement already under way,
