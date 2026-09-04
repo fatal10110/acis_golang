@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -67,12 +68,21 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 
-	hostile.SetXYZ(home.X, home.Y, home.Z)
+	// Production MoveToLocation snaps destination Z through geo.Height, so
+	// arrival is not an exact Home identity. Drive the onEvtArrived path.
+	hostile.SetXYZ(home.X, home.Y, home.Z-4)
+	hostile.AI().Arrived()
 	if err := hostile.Think(); err != nil {
 		t.Fatalf("Think() after arrival error: %v", err)
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	}
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() after idle error: %v", err)
+	}
+	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+		t.Fatalf("unexpected frame after idle Think: opcode %#x", frame[0])
 	}
 }
 

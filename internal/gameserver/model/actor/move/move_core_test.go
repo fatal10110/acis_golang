@@ -229,13 +229,13 @@ func TestControllerMoveHomeTeleportsAfterTenBlockedPaths(t *testing.T) {
 	}
 	home := location.Location{X: 0, Y: 0, Z: 0}
 
-	for range homeGeoFailLimit {
+	for range HomeGeoFailLimit {
 		if err := controller.MoveHome(home); err != nil {
 			t.Fatalf("MoveHome() error = %v", err)
 		}
 	}
-	if got := self.failCount; got != homeGeoFailLimit {
-		t.Fatalf("failCount = %d, want %d", got, homeGeoFailLimit)
+	if got := self.failCount; got != HomeGeoFailLimit {
+		t.Fatalf("failCount = %d, want %d", got, HomeGeoFailLimit)
 	}
 	if len(self.teleports) != 0 {
 		t.Fatal("teleport before fail limit")

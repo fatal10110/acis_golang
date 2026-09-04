@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -898,10 +899,13 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		h.ForceWalkStance()
 	}
 	if h.SiegeGuard() {
-		if h.GeoPathFailCount() >= 10 {
+		if h.GeoPathFailCount() >= move.HomeGeoFailLimit {
 			_ = h.move.MoveHome(h.Instance.Home)
 			return true
 		}
+		// AddMoveToDesire may drop the request (movement disabled, or the
+		// destination is not a straight-line walk). Return true anyway: the
+		// wander loop treats return-home as handled and must not random-walk.
 		h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight)
 		return true
 	}
