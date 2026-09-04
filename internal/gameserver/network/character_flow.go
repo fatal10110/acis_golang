@@ -528,7 +528,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		l.finishDeferredMagicSkill(live)
 		combat.Think()
 	})
-	moveCtl.SetBlockedOverride(func() bool {
+	moveCtl.SetBlocked(func() bool {
 		return l.onPlayerArrivedBlocked(live)
 	})
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {

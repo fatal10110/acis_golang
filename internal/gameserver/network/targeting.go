@@ -241,6 +241,7 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	// redirects live.move's single in-flight target, so any pending pickup
 	// walk that target was still driving toward has to go too.
 	live.takePickup()
+	live.takeDeferredMagicSkill()
 	live.setPetInteract(pet)
 	accepted, err := live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz})
 	if err != nil {
@@ -260,18 +261,26 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 
 // finishPetInteract fires once an approach walk started by showOwnedPetStatus
 // arrives (wired through move.Controller.SetArrived), mirroring
-// thinkInteract's post-move canDoInteract recheck (PlayerAI.java:445): the
-// owner or pet may have moved again meanwhile, so the range and ownership
-// gates run again before the status window opens.
+// thinkInteract's post-move canDoInteract recheck: the owner or pet may have
+// moved again meanwhile, so the range and ownership gates run again before
+// the status window opens.
 func (l *GameClientLink) finishPetInteract(live *livePlayer) {
-	pet := live.takePetInteract()
+	l.applyOwnedPetInteract(live, live.takePetInteract())
+}
+
+// applyOwnedPetInteract is the onInteract half of an owned-pet INTERACT:
+// world/owner checks plus the shared canDoInteract gate, then PetStatusShow.
+func (l *GameClientLink) applyOwnedPetInteract(live *livePlayer, pet *summon.Actor) {
 	if pet == nil {
 		return
 	}
 	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) {
 		return
 	}
-	if pet.OwnerID() != live.ObjectID() || !summonInRange(live, pet, summonInteractRange) {
+	if pet.OwnerID() != live.ObjectID() {
+		return
+	}
+	if !l.playerCanDoInteract(live, pet) {
 		return
 	}
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
@@ -289,21 +298,19 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		pos := live.move.Position()
 		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
 	}
-	if pet := live.petInteractTarget(); pet != nil {
+	if pet := live.takePetInteract(); pet != nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		if l.playerCanDoInteract(live, pet) {
 			if err := live.BroadcastStop(); err != nil {
 				l.log.Warn().Err(err).Msg("move: blocked interact stop")
 			}
-			l.finishPetInteract(live)
+			l.applyOwnedPetInteract(live, pet)
 			return true
 		}
-		live.takePetInteract()
 		return false
 	}
-	if live.hasDeferredMagicSkill() {
+	if live.takeDeferredMagicSkill() != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
-		live.takeDeferredMagicSkill()
 	}
 	return false
 }

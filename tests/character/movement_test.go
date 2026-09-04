@@ -3,8 +3,6 @@ package character
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -117,7 +115,7 @@ func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
 
-	advanced := tickPlayerBlocked(t, srv, objID, geo)
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
 	frame := c.Read()
 	if frame[0] == serverpackets.OpcodeStopMove {
 		t.Fatalf("blocked arrival opcode = StopMove (%#x), want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
@@ -125,43 +123,11 @@ func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
 	if frame[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("blocked arrival opcode = %#x, want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
 	}
-	objectID, dest, origin := readMoveToLocationCoords(t, frame)
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
 	if objectID != objID {
 		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
 	}
 	if dest != advanced || origin != advanced {
 		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
 	}
-}
-
-func tickPlayerBlocked(t *testing.T, srv *gameservertest.Server, objID int32, geo *gameservertest.GateGeo) location.Location {
-	t.Helper()
-	mover := srv.PlayerMove(t, objID)
-	for i := 0; i < 2; i++ {
-		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
-			t.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
-		}
-	}
-	advanced := mover.Position()
-	geo.Block()
-	if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); moving {
-		t.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
-	}
-	return advanced
-}
-
-func readMoveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
-	t.Helper()
-	r := wire.NewReader(frame[1:])
-	objectID = r.ReadInt32()
-	dest.X = int(r.ReadInt32())
-	dest.Y = int(r.ReadInt32())
-	dest.Z = int(r.ReadInt32())
-	origin.X = int(r.ReadInt32())
-	origin.Y = int(r.ReadInt32())
-	origin.Z = int(r.ReadInt32())
-	if err := r.Err(); err != nil {
-		t.Fatalf("read MoveToLocation: %v", err)
-	}
-	return objectID, dest, origin
 }

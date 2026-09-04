@@ -30,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -502,6 +503,46 @@ func (s *Server) PlayerMove(tb testing.TB, objID int32) *move.CreatureMove {
 		tb.Fatalf("world.Player(%d) = %T does not expose Move", objID, obj)
 	}
 	return mover.Move()
+}
+
+// TickPlayerBlocked advances two interpolation ticks then closes geo so the
+// next tick fires the blocked-arrival hook. Returns the cell the walk had
+// reached before the path closed.
+func (s *Server) TickPlayerBlocked(tb testing.TB, objID int32, geo *GateGeo) location.Location {
+	tb.Helper()
+	mover := s.PlayerMove(tb, objID)
+	for i := 0; i < 2; i++ {
+		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
+			tb.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
+		}
+	}
+	advanced := mover.Position()
+	geo.Block()
+	if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); moving {
+		tb.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
+	}
+	return advanced
+}
+
+// ReadMoveToLocationCoords decodes object id, destination, and origin from a
+// MoveToLocation frame (opcode byte included).
+func ReadMoveToLocationCoords(tb testing.TB, frame []byte) (objectID int32, dest, origin location.Location) {
+	tb.Helper()
+	if len(frame) < 1 {
+		tb.Fatal("MoveToLocation frame empty")
+	}
+	r := wire.NewReader(frame[1:])
+	objectID = r.ReadInt32()
+	dest.X = int(r.ReadInt32())
+	dest.Y = int(r.ReadInt32())
+	dest.Z = int(r.ReadInt32())
+	origin.X = int(r.ReadInt32())
+	origin.Y = int(r.ReadInt32())
+	origin.Z = int(r.ReadInt32())
+	if err := r.Err(); err != nil {
+		tb.Fatalf("read MoveToLocation: %v", err)
+	}
+	return objectID, dest, origin
 }
 
 // PlayerPosition reports the live player's current world position.

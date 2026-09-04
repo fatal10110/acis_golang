@@ -3,7 +3,6 @@ package pets
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -23,7 +22,7 @@ func TestBlockedInteractInRangeBroadcastsStopMoveAndPetStatus(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 
 	startOwnedPetApproach(t, h, pet)
-	tickPlayerBlocked(t, h.srv, h.ownerID, geo)
+	h.srv.TickPlayerBlocked(t, h.ownerID, geo)
 
 	frames := drainFrames(t, h.client)
 	if hasOpcode(frames, serverpackets.OpcodeMoveToLocation) {
@@ -51,7 +50,7 @@ func TestBlockedInteractOutOfRangeBroadcastsMoveToLocation(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 
 	startOwnedPetApproach(t, h, pet)
-	advanced := tickPlayerBlocked(t, h.srv, h.ownerID, geo)
+	advanced := h.srv.TickPlayerBlocked(t, h.ownerID, geo)
 
 	frames := drainFrames(t, h.client)
 	if hasOpcode(frames, serverpackets.OpcodeStopMove) {
@@ -67,7 +66,46 @@ func TestBlockedInteractOutOfRangeBroadcastsMoveToLocation(t *testing.T) {
 	if !ok {
 		t.Fatalf("out-of-range INTERACT blocked missing MoveToLocation: opcodes %x", frameOpcodes(frames))
 	}
-	objectID, dest, origin := readMoveToLocationCoords(t, frame)
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != h.ownerID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, h.ownerID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+}
+
+// TestBlockedWalkAfterPetApproachBroadcastsMoveToLocation pins that a later
+// client walk replaces the parked INTERACT slot: blocked arrival is MOVE_TO
+// (same-cell MoveToLocation), not StopMove + PetStatusShow.
+func TestBlockedWalkAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	h := bootOwnerWithCollarAndGeo(t, geo)
+	pet, _ := h.spawnWolf(t)
+	placePet(t, pet, location.Location{X: 220, Y: 20, Z: 30})
+	drainUntilQuiet(t, h.client)
+
+	startOwnedPetApproach(t, h, pet)
+	h.client.Send(encodeMoveBackwardToLocation(80, 20, 30))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeMoveToLocation, "walk MoveToLocation")
+	drainUntilQuiet(t, h.client)
+
+	advanced := h.srv.TickPlayerBlocked(t, h.ownerID, geo)
+	frames := drainFrames(t, h.client)
+	if hasOpcode(frames, serverpackets.OpcodeStopMove) {
+		t.Fatalf("MOVE_TO after INTERACT approach sent StopMove: opcodes %x", frameOpcodes(frames))
+	}
+	if hasOpcode(frames, serverpackets.OpcodePetStatusShow) {
+		t.Fatalf("MOVE_TO after INTERACT approach sent PetStatusShow: opcodes %x", frameOpcodes(frames))
+	}
+	if hasOpcode(frames, serverpackets.OpcodeActionFailed) {
+		t.Fatalf("MOVE_TO after INTERACT approach sent ActionFailed: opcodes %x", frameOpcodes(frames))
+	}
+	frame, ok := firstOpcode(frames, serverpackets.OpcodeMoveToLocation)
+	if !ok {
+		t.Fatalf("MOVE_TO after INTERACT approach missing MoveToLocation: opcodes %x", frameOpcodes(frames))
+	}
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
 	if objectID != h.ownerID {
 		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, h.ownerID)
 	}
@@ -102,22 +140,6 @@ func startOwnedPetApproach(t *testing.T, h *petWorld, pet *summon.Actor) {
 	drainUntilQuiet(t, h.client)
 }
 
-func tickPlayerBlocked(t *testing.T, srv *gameservertest.Server, objID int32, geo *gameservertest.GateGeo) location.Location {
-	t.Helper()
-	mover := srv.PlayerMove(t, objID)
-	for i := 0; i < 2; i++ {
-		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
-			t.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
-		}
-	}
-	advanced := mover.Position()
-	geo.Block()
-	if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); moving {
-		t.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
-	}
-	return advanced
-}
-
 func hasOpcode(frames [][]byte, opcode byte) bool {
 	_, ok := firstOpcode(frames, opcode)
 	return ok
@@ -130,20 +152,4 @@ func firstOpcode(frames [][]byte, opcode byte) ([]byte, bool) {
 		}
 	}
 	return nil, false
-}
-
-func readMoveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
-	t.Helper()
-	r := wire.NewReader(frame[1:])
-	objectID = r.ReadInt32()
-	dest.X = int(r.ReadInt32())
-	dest.Y = int(r.ReadInt32())
-	dest.Z = int(r.ReadInt32())
-	origin.X = int(r.ReadInt32())
-	origin.Y = int(r.ReadInt32())
-	origin.Z = int(r.ReadInt32())
-	if err := r.Err(); err != nil {
-		t.Fatalf("read MoveToLocation: %v", err)
-	}
-	return objectID, dest, origin
 }

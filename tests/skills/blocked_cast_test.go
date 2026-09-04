@@ -3,8 +3,6 @@ package skills
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -15,6 +13,64 @@ import (
 // same-cell MoveToLocation correction.
 func TestBlockedCastSendsDistTooFarThenMoveToLocation(t *testing.T) {
 	geo := &gameservertest.GateGeo{}
+	srv := bootBlockedGroundCast(t, geo)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+
+	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageDistTooFarCastingStopped)
+	frame := c.Read()
+	if frame[0] == serverpackets.OpcodeStopMove {
+		t.Fatalf("blocked CAST opcode = StopMove (%#x), want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
+	}
+	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "CAST blocked correction")
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+	drainUntilQuiet(t, c)
+}
+
+// TestBlockedWalkAfterGroundCastBroadcastsMoveToLocation pins that a later
+// client walk replaces the parked CAST slot: blocked arrival is MOVE_TO
+// (same-cell MoveToLocation only), not DIST_TOO_FAR_CASTING_STOPPED.
+func TestBlockedWalkAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	srv := bootBlockedGroundCast(t, geo)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+
+	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
+
+	c.Send(encodeMoveBackwardToLocation(80, 20, 30))
+	drainUntilQuiet(t, c)
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	frame := c.Read()
+	if frame[0] == serverpackets.OpcodeSystemMessage {
+		t.Fatalf("MOVE_TO after CAST approach sent SystemMessage, want MoveToLocation")
+	}
+	if frame[0] == serverpackets.OpcodeStopMove {
+		t.Fatalf("MOVE_TO after CAST approach sent StopMove, want MoveToLocation")
+	}
+	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "MOVE_TO blocked correction")
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+	drainUntilQuiet(t, c)
+}
+
+func bootBlockedGroundCast(t *testing.T, geo *gameservertest.GateGeo) *gameservertest.Server {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -28,55 +84,5 @@ func TestBlockedCastSendsDistTooFarThenMoveToLocation(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 5, 1)
 	startInWorld(t, c)
-
-	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
-
-	advanced := tickPlayerBlocked(t, srv, objID, geo)
-	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageDistTooFarCastingStopped)
-	frame := c.Read()
-	if frame[0] == serverpackets.OpcodeStopMove {
-		t.Fatalf("blocked CAST opcode = StopMove (%#x), want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
-	}
-	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "CAST blocked correction")
-	objectID, dest, origin := readMoveToLocationCoords(t, frame)
-	if objectID != objID {
-		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
-	}
-	if dest != advanced || origin != advanced {
-		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
-	}
-	drainUntilQuiet(t, c)
-}
-
-func tickPlayerBlocked(t *testing.T, srv *gameservertest.Server, objID int32, geo *gameservertest.GateGeo) location.Location {
-	t.Helper()
-	mover := srv.PlayerMove(t, objID)
-	for i := 0; i < 2; i++ {
-		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
-			t.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
-		}
-	}
-	advanced := mover.Position()
-	geo.Block()
-	if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); moving {
-		t.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
-	}
-	return advanced
-}
-
-func readMoveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
-	t.Helper()
-	r := wireReader(frame[1:])
-	objectID = r.ReadInt32()
-	dest.X = int(r.ReadInt32())
-	dest.Y = int(r.ReadInt32())
-	dest.Z = int(r.ReadInt32())
-	origin.X = int(r.ReadInt32())
-	origin.Y = int(r.ReadInt32())
-	origin.Z = int(r.ReadInt32())
-	if err := r.Err(); err != nil {
-		t.Fatalf("read MoveToLocation: %v", err)
-	}
-	return objectID, dest, origin
+	return srv
 }

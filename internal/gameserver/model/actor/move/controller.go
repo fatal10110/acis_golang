@@ -116,7 +116,7 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		return self.BroadcastMove(event)
 	})
 	c := &Controller{move: move, self: self}
-	move.SetBlockedHook(c.broadcastBlockedCorrection)
+	move.SetBlockedHook(c.BroadcastBlockedCorrection)
 	return c, nil
 }
 
@@ -333,36 +333,24 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 }
 
 // SetBlocked records the callback invoked when an in-flight move is stopped
-// by a newly blocked geodata path. The controller still broadcasts a
-// same-cell MoveToLocation correction; a nil callback leaves that broadcast
-// as the only side effect.
-func (c *Controller) SetBlocked(blocked func()) {
+// by a newly blocked geodata path. Returning true skips the default
+// same-cell MoveToLocation correction (the callback already produced the
+// client-visible packet). A nil callback, or false, still broadcasts that
+// correction. Callers that need correction-then-callback order (hostile
+// NPCs) must BroadcastBlockedCorrection themselves and return true.
+func (c *Controller) SetBlocked(blocked func() bool) {
 	c.move.SetBlockedHook(func() {
-		c.broadcastBlockedCorrection()
-		if blocked != nil {
-			blocked()
-		}
-	})
-}
-
-// SetBlockedOverride replaces the default blocked-arrival correction path.
-// Returning true means the override already produced the client-visible
-// packet; false (or a nil override) still broadcasts same-cell MoveToLocation.
-func (c *Controller) SetBlockedOverride(override func() bool) {
-	c.move.SetBlockedHook(func() {
-		if override != nil && override() {
+		if blocked != nil && blocked() {
 			return
 		}
-		c.broadcastBlockedCorrection()
+		c.BroadcastBlockedCorrection()
 	})
 }
 
-// broadcastBlockedCorrection snaps observers to the cell the actor actually
+// BroadcastBlockedCorrection snaps observers to the cell the actor actually
 // stopped on. A same-cell MoveToLocation is the correction packet; StopMove
-// would freeze client prediction at the stale destination. This is the base
-// blocked-arrival branch. Player INTERACT (StopMove in range) and CAST
-// (DIST_TOO_FAR_CASTING_STOPPED) replace this hook via SetBlockedOverride.
-func (c *Controller) broadcastBlockedCorrection() {
+// would freeze client prediction at the stale destination.
+func (c *Controller) BroadcastBlockedCorrection() {
 	pos := c.move.Position()
 	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})
 }

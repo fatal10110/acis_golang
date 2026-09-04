@@ -67,7 +67,11 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	}
 	// combat.Stop() above cancelled any move in flight, so a parked
 	// ground-pickup approach must not survive this new accepted walk (#1155).
+	// The same walk also replaces a parked INTERACT or CAST approach, or
+	// blocked arrival would still take those arms.
 	live.takePickup()
+	live.takePetInteract()
+	live.takeDeferredMagicSkill()
 	// Face the destination from the same server-authoritative origin the
 	// walk itself started from.
 	live.Character.SetHeading(origin.HeadingTo(target))
