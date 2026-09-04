@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -253,6 +254,24 @@ func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
 		return 0, err
 	}
 	return randomWalkRate(config.NewFields(props, "random walk rate").Int("RandomWalkRate", 30)), nil
+}
+
+// maxGeoPathFailCount is the consecutive pathfinding-fail overflow
+// threshold from geoengine.properties MaxGeopathFailCount. Values below
+// 15 floor at 15 so script AI gates still observe the count.
+type maxGeoPathFailCount int
+
+func loadMaxGeoPathFailCount(paths gameServerPaths) (maxGeoPathFailCount, error) {
+	props, err := config.LoadFile(paths.GeoConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	f := config.NewFields(props, "max geopath fail count")
+	n := npc.ClampMaxGeoPathFailCount(f.Int("MaxGeopathFailCount", npc.DefaultMaxGeoPathFailCount))
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return maxGeoPathFailCount(n), nil
 }
 
 // raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from

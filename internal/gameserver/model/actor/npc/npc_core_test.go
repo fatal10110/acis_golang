@@ -1153,6 +1153,33 @@ func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
 	}
 }
 
+func TestAddGeoPathFailCountOverflowResetsWithoutIncrement(t *testing.T) {
+	const max = 2
+	prev := MaxGeoPathFailCount()
+	SetMaxGeoPathFailCount(max)
+	t.Cleanup(func() { SetMaxGeoPathFailCount(prev) })
+
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	for i := 1; i <= max; i++ {
+		hostile.AddGeoPathFailCount()
+		if got := hostile.GeoPathFailCount(); got != i {
+			t.Fatalf("GeoPathFailCount() = %d after %d fails, want %d", got, i, i)
+		}
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != max+1 {
+		t.Fatalf("GeoPathFailCount() after max+1 = %d, want %d", got, max+1)
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after overflow reset = %d, want 0", got)
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != 1 {
+		t.Fatalf("GeoPathFailCount() after reset increment = %d, want 1", got)
+	}
+}
+
 func TestHostileTeleportToClearsGeoPathFailCount(t *testing.T) {
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
 	w := world.New()
