@@ -906,61 +906,78 @@ func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
 }
 
 // A private with a living master uses the master's territory, not its own
-// spawn sphere. Offset 200 is outside the exclusive 3D home radius, so a
-// minion that measured against its own home would walk back.
-func TestInTerritoryMinionUsesMasterSphere(t *testing.T) {
+// spawn sphere. ReturnHome's walk-back still requires the minion to be
+// outside its own 2D drift range, so that assertion cannot share a
+// placement with the "follows master's false" pin.
+func TestInTerritoryMinionFollowsMaster(t *testing.T) {
 	home := location.Location{X: 100, Y: 0, Z: 0}
-	minionMove := &hostileMove{}
-	master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
-	minion := newTestHostile(t, minionMove, &hostileAttack{})
-	minion.Instance.ObjectID = 102
-	master.Instance.HasHome = true
-	master.Instance.Home = home
-	minion.Instance.HasHome = true
-	minion.Instance.Home = home
-	master.AddMinion(minion)
-	minion.SetMaster(master)
-
-	w := world.New()
-	w.Spawn(master, home.X, home.Y, home.Z, 0)
-	w.Spawn(minion, home.X+defaultDriftRange, home.Y, home.Z, 0)
-
-	if !minion.InTerritory() {
-		t.Fatal("InTerritory() = false at minion-home+200 with master in sphere, want true")
+	cases := []struct {
+		name            string
+		masterOff       int
+		minionOff       int
+		deadMaster      bool
+		wantInTerritory bool
+		wantReturnHome  bool
+	}{
+		{
+			name:            "master in sphere, minion at exclusive edge",
+			minionOff:       defaultDriftRange,
+			wantInTerritory: true,
+		},
+		{
+			name:      "master outside, minion at own home",
+			masterOff: defaultDriftRange,
+		},
+		{
+			name:           "both outside own sphere",
+			masterOff:      defaultDriftRange,
+			minionOff:      defaultDriftRange,
+			wantReturnHome: true,
+		},
+		{
+			name:            "dead master, minion at exclusive edge",
+			masterOff:       defaultDriftRange,
+			minionOff:       defaultDriftRange,
+			deadMaster:      true,
+			wantInTerritory: true,
+		},
 	}
-	if minion.ReturnHome() {
-		t.Fatal("ReturnHome() = true, want false while master is in territory")
-	}
-	if minionMove.home != (location.Location{}) {
-		t.Fatalf("MoveHome destination = %#v, want no walk-back", minionMove.home)
-	}
-}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			minionMove := &hostileMove{}
+			master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			minion := newTestHostile(t, minionMove, &hostileAttack{})
+			minion.Instance.ObjectID = 102
+			master.Instance.HasHome = true
+			master.Instance.Home = home
+			minion.Instance.HasHome = true
+			minion.Instance.Home = home
+			master.AddMinion(minion)
+			minion.SetMaster(master)
 
-func TestInTerritoryMinionFollowsMasterOutside(t *testing.T) {
-	home := location.Location{X: 100, Y: 0, Z: 0}
-	minionMove := &hostileMove{}
-	master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
-	minion := newTestHostile(t, minionMove, &hostileAttack{})
-	minion.Instance.ObjectID = 102
-	master.Instance.HasHome = true
-	master.Instance.Home = home
-	minion.Instance.HasHome = true
-	minion.Instance.Home = home
-	master.AddMinion(minion)
-	minion.SetMaster(master)
+			w := world.New()
+			w.Spawn(master, home.X+tc.masterOff, home.Y, home.Z, 0)
+			w.Spawn(minion, home.X+tc.minionOff, home.Y, home.Z, 0)
+			if tc.deadMaster {
+				if !master.MarkDead() {
+					t.Fatal("MarkDead() = false, want a fresh death")
+				}
+			}
 
-	w := world.New()
-	w.Spawn(master, home.X+defaultDriftRange, home.Y, home.Z, 0)
-	w.Spawn(minion, home.X+defaultDriftRange, home.Y, home.Z, 0)
-
-	if minion.InTerritory() {
-		t.Fatal("InTerritory() = true while master is outside territory, want false")
-	}
-	if !minion.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want walk-back when master is outside")
-	}
-	if minionMove.home != home {
-		t.Fatalf("MoveHome destination = %#v, want %#v", minionMove.home, home)
+			if got := minion.InTerritory(); got != tc.wantInTerritory {
+				t.Fatalf("InTerritory() = %v, want %v", got, tc.wantInTerritory)
+			}
+			if got := minion.ReturnHome(); got != tc.wantReturnHome {
+				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantReturnHome)
+			}
+			if tc.wantReturnHome {
+				if minionMove.home != home {
+					t.Fatalf("MoveHome destination = %#v, want %#v", minionMove.home, home)
+				}
+			} else if minionMove.home != (location.Location{}) {
+				t.Fatalf("MoveHome destination = %#v, want no walk-back", minionMove.home)
+			}
+		})
 	}
 }
 
