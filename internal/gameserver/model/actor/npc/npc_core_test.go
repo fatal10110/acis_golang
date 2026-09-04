@@ -850,6 +850,19 @@ func TestInTerritoryNilMakerKeepsHomeSphere(t *testing.T) {
 	}
 }
 
+func TestInTerritoryEmptyMakerTerritoriesKeepsHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{}
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	if !hostile.InTerritory() {
+		t.Fatal("InTerritory() = false at home+100 with empty maker territories, want true (home sphere)")
+	}
+}
+
 func TestInTerritoryMakerOutsidePolygon(t *testing.T) {
 	home := location.Location{X: 100, Y: 0, Z: 0}
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
