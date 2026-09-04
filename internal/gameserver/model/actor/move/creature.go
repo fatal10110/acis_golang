@@ -265,7 +265,12 @@ const (
 
 func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pathFindResult, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
-	m.routeBlocked = false
+	// Retargeting an in-flight walk keeps a mid-route block sticky through
+	// the new destination. Only a fresh request (not currently moving)
+	// clears it.
+	if !m.moving {
+		m.routeBlocked = false
+	}
 
 	// Same-cell requests complete on the next movement tick.
 	if target.X == m.origin.X && target.Y == m.origin.Y {
@@ -416,7 +421,7 @@ func (m *CreatureMove) finishLocked() func() {
 			// Unrepresentable next-segment duration: stop here, drop tail.
 			m.waypoints = nil
 			m.moving = false
-			return m.arrived
+			return m.arrivalHookLocked()
 		}
 		duration := time.Duration(ticks) * tickDuration
 		if duration <= 0 {
@@ -444,10 +449,7 @@ func (m *CreatureMove) finishLocked() func() {
 	}
 
 	m.moving = false
-	if m.routeBlocked {
-		return m.blocked
-	}
-	return m.arrived
+	return m.arrivalHookLocked()
 }
 
 // UpdatePosition advances one in-flight movement by step and reports the
@@ -537,6 +539,13 @@ func (m *CreatureMove) maxZLocked() int {
 		return surface
 	}
 	return worldZMax
+}
+
+func (m *CreatureMove) arrivalHookLocked() func() {
+	if m.routeBlocked {
+		return m.blocked
+	}
+	return m.arrived
 }
 
 func (m *CreatureMove) stopBlockedLocked() func() {

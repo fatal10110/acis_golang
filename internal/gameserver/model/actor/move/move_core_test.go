@@ -1272,6 +1272,92 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	}
 }
 
+func startBlockedMidRouteMove(t *testing.T) (mover *CreatureMove, allow *bool, arrived, blocked *int) {
+	t.Helper()
+	on := false
+	allow = &on
+	waypoints := []location.Location{
+		{X: 100, Y: 0, Z: 30},
+		{X: 100, Y: 100, Z: 30},
+	}
+	geo := &recordingGeo{
+		height:     30,
+		findPath:   waypoints,
+		findPathOK: true,
+		canMoveAt:  func(int, int, int, int, int, int) bool { return *allow },
+	}
+	var err error
+	mover, err = NewCreatureMove(location.Location{Z: 30}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arrivedN, blockedN := 0, 0
+	arrived, blocked = &arrivedN, &blockedN
+	mover.SetArrivedHook(func() { arrivedN++ })
+	mover.SetBlockedHook(func() { blockedN++ })
+	if _, err := mover.MoveToLocation(location.Location{X: 100, Y: 100, Z: 30}); err != nil {
+		t.Fatal(err)
+	}
+	*allow = true
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); !moving {
+		t.Fatal("first UpdatePosition() stopped move, want moving")
+	}
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); !moving {
+		t.Fatal("second UpdatePosition() stopped move, want still on first leg")
+	}
+	*allow = false
+	if _, moving := mover.UpdatePosition(PositionUpdateInterval); !moving {
+		t.Fatal("UpdatePosition() moving = false after mid-route obstacle, want next-leg walk")
+	}
+	if arrivedN != 0 || blockedN != 0 {
+		t.Fatalf("arrival callbacks = (%d, %d), want (0, 0) while remaining waypoints exist", arrivedN, blockedN)
+	}
+	return mover, allow, arrived, blocked
+}
+
+func TestCreatureMove_RetargetWhileMovingKeepsBlockedArrival(t *testing.T) {
+	mover, allow, arrived, blocked := startBlockedMidRouteMove(t)
+	*allow = true
+	if _, err := mover.MoveToLocation(location.Location{X: 50, Y: 0, Z: 30}); err != nil {
+		t.Fatal(err)
+	}
+	if !mover.Moving() {
+		t.Fatal("MoveToLocation() while moving stopped the in-flight walk")
+	}
+	for range 40 {
+		if _, still := mover.UpdatePosition(PositionUpdateInterval); !still {
+			break
+		}
+	}
+	if mover.Moving() {
+		t.Fatal("UpdatePosition() still moving after retarget")
+	}
+	if *arrived != 0 || *blocked != 1 {
+		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1) after retarget of a previously blocked route", *arrived, *blocked)
+	}
+}
+
+func TestCreatureMove_RejectedRetargetDoesNotClearBlockedFlag(t *testing.T) {
+	mover, allow, arrived, blocked := startBlockedMidRouteMove(t)
+	mover.SetSpeed(0)
+	if _, err := mover.MoveToLocation(location.Location{X: 200, Y: 0, Z: 30}); err == nil {
+		t.Fatal("MoveToLocation() error = nil at zero speed")
+	}
+	if !mover.Moving() {
+		t.Fatal("rejected MoveToLocation() cancelled the in-flight walk")
+	}
+	mover.SetSpeed(100)
+	*allow = true
+	for range 40 {
+		if _, still := mover.UpdatePosition(PositionUpdateInterval); !still {
+			break
+		}
+	}
+	if *arrived != 0 || *blocked != 1 {
+		t.Fatalf("arrival callbacks = (%d, %d), want (0, 1) after a rejected retarget on a blocked route", *arrived, *blocked)
+	}
+}
+
 func TestCreatureMove_UpdatePositionResamplesDestinationHeight(t *testing.T) {
 	e := engine.New()
 	region, err := block.NewRegionFromBlocks([]block.Block{block.NewFlat(0)})
