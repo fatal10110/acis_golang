@@ -30,3 +30,19 @@ func TestShouldIdleWanderExcludesHoldKinds(t *testing.T) {
 		}
 	}
 }
+
+func TestShouldIdleWanderIncludesGrandBoss(t *testing.T) {
+	// Zaken.onNoDesire queues wander unconditionally. Engine-kind default
+	// until #2148; excluding the GrandBoss family freezes awake bosses.
+	h, err := NewHostile(&Instance{
+		ObjectID: 1,
+		Template: &Template{ID: 29022, Type: "GrandBoss"},
+		Kind:     "GrandBoss",
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatalf("NewHostile(GrandBoss): %v", err)
+	}
+	if !h.ShouldIdleWander() {
+		t.Fatal("GrandBoss ShouldIdleWander() = false, want true")
+	}
+}
