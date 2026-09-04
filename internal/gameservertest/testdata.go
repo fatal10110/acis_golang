@@ -21,6 +21,18 @@ type Geo struct{}
 func (Geo) CanMove(int, int, int, int, int, int) bool { return true }
 func (Geo) Height(_, _, z int) int16                  { return int16(z) }
 
+// GateGeo is an always-passable Geo until Block closes every straight-line
+// walk, so a suite can start a move then fire the in-flight blocked path.
+type GateGeo struct {
+	Geo
+	blocked bool
+}
+
+// Block makes later CanMove checks fail.
+func (g *GateGeo) Block() { g.blocked = true }
+
+func (g *GateGeo) CanMove(int, int, int, int, int, int) bool { return !g.blocked }
+
 func (Geo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (Geo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
