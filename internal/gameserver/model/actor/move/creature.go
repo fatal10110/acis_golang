@@ -241,7 +241,8 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 }
 
 // MoveToLocationWithPathOutcome behaves like MoveToLocation and also reports
-// how geodata resolved the route, for return-home fail accounting.
+// how geodata resolved the route, so callers can count blocked pathfinding
+// attempts the same way a successful routed search clears that streak.
 func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (Event, pathFindResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

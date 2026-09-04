@@ -89,9 +89,9 @@ type Hostile struct {
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
 
-	// geoPathFailCount counts consecutive route-walk moves that couldn't
-	// path toward their target node, for task.Walker's teleport-to-start
-	// recovery (see GeoPathFailCount).
+	// geoPathFailCount counts consecutive pathfinding moves that could
+	// not resolve a route, for walker teleport-to-start and SiegeGuard
+	// return-home recovery (see GeoPathFailCount).
 	geoPathFailCount atomic.Int32
 
 	// raidRelated marks this NPC as tied to a raid encounter (a raid boss

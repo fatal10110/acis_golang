@@ -301,6 +301,127 @@ func TestControllerMoveHomeResetsFailCountOnRoutedPath(t *testing.T) {
 	}
 }
 
+func TestControllerMoveToLocationIncrementsFailCountOnBlockedPath(t *testing.T) {
+	self := &homeRecoverySelf{}
+	geo := &recordingGeo{canMove: false, height: 0, findPathOK: false}
+	mover, err := NewCreatureMove(location.Location{X: 100, Y: 100, Z: 0}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accepted, err := controller.MoveToLocation(location.Location{X: 0, Y: 0, Z: 0})
+	if err != nil {
+		t.Fatalf("MoveToLocation() error = %v", err)
+	}
+	if !accepted {
+		t.Fatal("MoveToLocation() = false, want accepted fallback walk")
+	}
+	if got := self.failCount; got != 1 {
+		t.Fatalf("failCount = %d, want 1 after blocked pathfinding move", got)
+	}
+}
+
+func TestControllerMoveToLocationResetsFailCountOnRoutedPath(t *testing.T) {
+	self := &homeRecoverySelf{failCount: 5}
+	waypoints := []location.Location{{X: 50, Y: 0, Z: 0}, {X: 100, Y: 0, Z: 0}}
+	geo := &recordingGeo{
+		canMove:    false,
+		height:     0,
+		findPath:   waypoints,
+		findPathOK: true,
+	}
+	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accepted, err := controller.MoveToLocation(location.Location{X: 100, Y: 0, Z: 0})
+	if err != nil {
+		t.Fatalf("MoveToLocation() error = %v", err)
+	}
+	if !accepted {
+		t.Fatal("MoveToLocation() = false, want accepted routed walk")
+	}
+	if got := self.failCount; got != 0 {
+		t.Fatalf("failCount = %d, want 0 after routed pathfinding move", got)
+	}
+}
+
+func TestControllerMoveToLocationLeavesFailCountOnDirectPath(t *testing.T) {
+	self := &homeRecoverySelf{failCount: 5}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	accepted, err := controller.MoveToLocation(location.Location{X: 100, Y: 0, Z: 0})
+	if err != nil {
+		t.Fatalf("MoveToLocation() error = %v", err)
+	}
+	if !accepted {
+		t.Fatal("MoveToLocation() = false, want accepted direct walk")
+	}
+	if got := self.failCount; got != 5 {
+		t.Fatalf("failCount = %d, want 5 after straight-line move", got)
+	}
+}
+
+func TestControllerMoveToLocationEventIncrementsFailCountOnBlockedPath(t *testing.T) {
+	self := &homeRecoverySelf{}
+	geo := &recordingGeo{canMove: false, height: 0, findPathOK: false}
+	mover, err := NewCreatureMove(location.Location{X: 100, Y: 100, Z: 0}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := controller.MoveToLocationEvent(location.Location{X: 0, Y: 0, Z: 0}); err != nil {
+		t.Fatalf("MoveToLocationEvent() error = %v", err)
+	}
+	if got := self.failCount; got != 1 {
+		t.Fatalf("failCount = %d, want 1 after blocked walker pathfinding move", got)
+	}
+}
+
+func TestControllerOffensiveFollowIncrementsFailCountOnBlockedPath(t *testing.T) {
+	self := &homeRecoverySelf{}
+	geo := &recordingGeo{canMove: false, height: 0, findPathOK: false}
+	mover, err := NewCreatureMove(location.Location{}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	controller, err := NewController(mover, self)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	following, err := controller.MaybeStartOffensiveFollow(&followTarget{x: 200}, 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !following {
+		t.Fatal("MaybeStartOffensiveFollow() = false, want true when target is out of range")
+	}
+	if got := self.failCount; got != 1 {
+		t.Fatalf("failCount = %d, want 1 after blocked offensive-follow pathfinding", got)
+	}
+}
+
 // ---- from creature_allocs_test.go ----
 // TestCreatureMove_FollowTickAllocs locks in FollowTick's zero-steady-state
 // allocation property (#421, #425): the no-op path (target already in range,
