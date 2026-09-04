@@ -363,12 +363,20 @@ func wanderPoly(nodes ...spawn.Node) *spawn.Territory {
 	return &spawn.Territory{Name: "wander", MinZ: 0, MaxZ: 100, Nodes: nodes}
 }
 
-func moveToLocationDest(t *testing.T, frame []byte) location.Location {
+func moveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	r := wireReader(frame[1:])
-	_ = r.ReadInt32()
-	return location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	objectID = r.ReadInt32()
+	dest = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	origin = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	return objectID, dest, origin
+}
+
+func moveToLocationDest(t *testing.T, frame []byte) location.Location {
+	t.Helper()
+	_, dest, _ := moveToLocationCoords(t, frame)
+	return dest
 }
 
 func absInt(n int) int {

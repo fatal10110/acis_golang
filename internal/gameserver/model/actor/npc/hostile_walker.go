@@ -5,18 +5,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 )
 
-// GeoPathFailCount reports how many consecutive route-walk moves this NPC
-// failed to path toward, for task.Walker's teleport-to-start recovery.
+// GeoPathFailCount reports how many consecutive pathfinding moves this NPC
+// failed to resolve, for walker teleport-to-start and SiegeGuard
+// return-home recovery.
 func (h *Hostile) GeoPathFailCount() int {
 	return int(h.geoPathFailCount.Load())
 }
 
-// ResetGeoPathFailCount clears the route-walk path-failure streak.
+// ResetGeoPathFailCount clears the pathfinding-failure streak.
 func (h *Hostile) ResetGeoPathFailCount() {
 	h.geoPathFailCount.Store(0)
 }
 
-// AddGeoPathFailCount records one more failed route-walk path attempt.
+// AddGeoPathFailCount records one more failed pathfinding attempt.
 func (h *Hostile) AddGeoPathFailCount() {
 	h.geoPathFailCount.Add(1)
 }
