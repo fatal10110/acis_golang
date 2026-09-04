@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
@@ -171,6 +172,79 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 	}
 	if hostile.IsMoving() {
 		t.Fatal("IsMoving() = true for idle Guard, want no wander")
+	}
+}
+
+// TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
+// WANDER arm: finishing a wander step drops that desire and idles, then
+// the production follow-up Think re-queues idle wander without walking
+// again — lastDesire is still wander, so thinkWander arms the timer
+// instead of MoveFromSpawnUsingRandomOffset.
+func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().Arrived()
+	})
+}
+
+// TestIdleHostileWanderArrivedBlockedClearsDesire pins
+// NpcAI.onEvtArrivedBlocked: a blocked wander step also drops WANDER.
+func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().ArrivedBlocked()
+	})
+}
+
+func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after Think = %v, want wander", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after Think, want it queued before arrival")
+	}
+	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	_ = mustRead(t, c, "MoveToLocation")
+	if !hostile.IsMoving() {
+		t.Fatal("IsMoving() = false after wander Think, want an in-flight walk")
+	}
+	hostile.Move().CancelMove()
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true after CancelMove, want the walk finished before arrival")
+	}
+
+	arrive(hostile)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	}
+	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire still queued after arrival")
+	}
+
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() after arrival: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after arrival Think = %v, want wander re-queued", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after arrival Think")
+	}
+	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
+		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
 	}
 }
 

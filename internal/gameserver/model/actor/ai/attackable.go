@@ -861,25 +861,28 @@ func (a *Attackable) thinkMoveTo() {
 	_ = a.move.MoveHome(a.current.loc)
 }
 
-// Arrived clears a MOVE_TO desire when movement finishes and idles the
-// intention immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while
-// an attack or cast is in flight, so leaving current as MOVE_TO would
-// restart MoveHome on the same Think that production arrival hooks run.
+// Arrived clears MOVE_TO, FLEE, and WANDER when movement finishes and
+// idles immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while an
+// attack or cast is in flight, so leaving those kinds current would
+// restart the same walk on the Think that production arrival hooks run.
 func (a *Attackable) Arrived() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.current.kind == IntentionMoveTo {
-		a.clearCurrentDesire()
-		a.current = intention{kind: IntentionIdle}
-	}
+	a.clearArrivalDesire()
 }
 
-// ArrivedBlocked clears a MOVE_TO desire when an in-flight walk is stopped
-// by a blocked geodata path and idles the intention, same as Arrived.
+// ArrivedBlocked clears MOVE_TO, FLEE, and WANDER when an in-flight walk
+// is stopped by a blocked geodata path and idles, same as Arrived.
 func (a *Attackable) ArrivedBlocked() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.current.kind == IntentionMoveTo {
+	a.clearArrivalDesire()
+}
+
+func (a *Attackable) clearArrivalDesire() {
+	switch a.current.kind {
+	case IntentionMoveTo, IntentionFlee, IntentionWander:
+		// IntentionFlee is dormant until promoteNext can make it current.
 		a.clearCurrentDesire()
 		a.current = intention{kind: IntentionIdle}
 	}
