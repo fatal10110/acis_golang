@@ -1531,33 +1531,59 @@ func (castDoorShape) GeoZ() int               { return 0 }
 func (castDoorShape) Height() int             { return 1 }
 func (castDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{block.AllDirections}} }
 
-func TestResolveAffectedAcceptsOnlyHolyAndUnlockableRuntimeTargets(t *testing.T) {
+type castHostileMove struct{}
+
+func (castHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
+}
+func (castHostileMove) MoveHome(location.Location) error { return nil }
+func (castHostileMove) Stop() error                      { return nil }
+
+type castHostileAttack struct{}
+
+func (castHostileAttack) BowCoolingDown() bool                { return false }
+func (castHostileAttack) AttackingNow() bool                  { return false }
+func (castHostileAttack) CanAttack(attackable.Combatant) bool { return false }
+func (castHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+
+func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile, err := npc.NewHostile(&npc.Instance{ObjectID: id, Template: &npc.Template{ID: int(id), Type: kind}, Kind: npc.InstanceKind(kind)}, live, castHostileMove{}, castHostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hostile
+}
+
+func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
 	recorder := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", recorder)
 
-	holy, err := npc.NewHolyThing(&npc.Instance{ObjectID: 2, Template: &npc.Template{ID: 2, Type: "HolyThing"}, Kind: "HolyThing"})
+	unlockableDoor, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenSkill}, castDoorShape{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	unlockableDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenSkill}, castDoorShape{})
+	lockedDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenClick}, castDoorShape{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	lockedDoor, err := door.NewObject(4, &door.Template{ID: 4, OpenKind: door.OpenClick}, castDoorShape{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	chest := newCastHostile(t, 4, "Chest")
+	monster := newCastHostile(t, 5, "Monster")
 	for _, tc := range []struct {
 		name   string
 		target world.Tracked
 		def    modelskill.Definition
 		want   bool
 	}{
-		{"holy thing", holy, modelskill.Definition{Target: modelskill.TargetHoly, SkillType: "DUMMY"}, true},
-		{"door rejected by holy", lockedDoor, modelskill.Definition{Target: modelskill.TargetHoly, SkillType: "DUMMY"}, false},
 		{"skill door", unlockableDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, true},
 		{"click door rejected", lockedDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
+		{"chest", chest, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, true},
+		{"monster rejected", monster, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			selected, ok := SelectTarget(caster, tc.target, tc.def)
@@ -1569,6 +1595,32 @@ func TestResolveAffectedAcceptsOnlyHolyAndUnlockableRuntimeTargets(t *testing.T)
 				t.Fatalf("ResolveAffected() ok = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	skillDoor, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenSkill}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockedDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenClick}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	monster := newCastHostile(t, 4, "Monster")
+
+	if got := skilltarget.CastRejectionFor(modelskill.TargetOne, caster, skillDoor, &modelskill.Definition{Offensive: true}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("TargetOne skill door rejection = %v, want invalid target", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, lockedDoor, &modelskill.Definition{}, false); got != skilltarget.CastRejectNone {
+		t.Fatalf("locked door rejection = %v, want silent", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, monster, &modelskill.Definition{}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("monster unlockable rejection = %v, want invalid target", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetHoly, caster, monster, &modelskill.Definition{}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("monster holy rejection = %v, want invalid target", got)
 	}
 }
 

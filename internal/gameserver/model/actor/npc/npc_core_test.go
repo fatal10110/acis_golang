@@ -38,20 +38,6 @@ func TestHostileMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
 	}
 }
 
-func TestChestIsUnlockable(t *testing.T) {
-	chest, err := NewHostile(&Instance{
-		ObjectID: 1,
-		Template: &Template{ID: 1, Type: "Chest"},
-		Kind:     "Chest",
-	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !chest.Unlockable() {
-		t.Fatal("Chest.Unlockable() = false, want true")
-	}
-}
-
 func TestHostileMaxBuffCountUsesConfiguredBase(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
 	hostile.SetMaxBuffsAmount(2)

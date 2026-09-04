@@ -28,6 +28,22 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetHoly:
+		holy, ok := target.(HolyTarget)
+		if !ok || !holy.Holy() {
+			return CastRejectInvalidTarget
+		}
+	case modelskill.TargetUnlockable:
+		if door, ok := target.(DoorTarget); ok && door.Door() {
+			unlockable, ok := target.(UnlockableTarget)
+			if ok && !unlockable.Unlockable() {
+				return CastRejectNone
+			}
+		}
+		unlockable, ok := target.(UnlockableTarget)
+		if !ok || !unlockable.Unlockable() {
+			return CastRejectInvalidTarget
+		}
 	case modelskill.TargetCorpsePlayer:
 		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
