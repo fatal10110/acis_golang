@@ -174,6 +174,58 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 	}
 }
 
+// TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
+// WANDER arm: finishing a wander step drops that desire and idles, so
+// the next Think can re-queue idle wander instead of keeping the spent
+// WANDER current.
+func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().Arrived()
+	})
+}
+
+// TestIdleHostileWanderArrivedBlockedClearsDesire pins
+// NpcAI.onEvtArrivedBlocked: a blocked wander step also drops WANDER.
+func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().ArrivedBlocked()
+	})
+}
+
+func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after Think = %v, want wander", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after Think, want it queued before arrival")
+	}
+	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	_ = mustRead(t, c, "MoveToLocation")
+
+	arrive(hostile)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	}
+	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire still queued after arrival")
+	}
+}
+
 // TestMakerIdleWanderStaysInsideTerritory pins MultiSpawn's in-territory
 // sample: a maker NPC's wander destination stays inside the maker polygon
 // and is an offset sample, not the triangle-center fallback.
