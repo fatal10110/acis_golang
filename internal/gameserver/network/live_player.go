@@ -180,6 +180,8 @@ func (p *livePlayer) stopCubics() {
 func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
+	p.deferredMagic = nil
+	p.deferredItem = nil
 	p.pickup = &pickupIntention{ctx: ctx, target: target}
 }
 

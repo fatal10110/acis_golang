@@ -143,7 +143,7 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 	// pending pet-interact approach (showOwnedPetStatus) — drop it, or its
 	// stale SetArrived callback would fire a range recheck against wherever
 	// this walk actually lands instead of the pet it was originally aimed
-	// at.
+	// at. setPickup clears parked CAST/item-cast slots the same way.
 	live.takePetInteract()
 	live.setPickup(ctx, ground)
 	live.SendFrame(serverpackets.FrameActionFailed())
@@ -300,14 +300,16 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 	}
 	if pet := live.takePetInteract(); pet != nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		if l.playerCanDoInteract(live, pet) {
-			if err := live.BroadcastStop(); err != nil {
-				l.log.Warn().Err(err).Msg("move: blocked interact stop")
-			}
-			l.applyOwnedPetInteract(live, pet)
-			return true
+		if !l.playerCanDoInteract(live, pet) {
+			return false
 		}
-		return false
+		if err := live.BroadcastStop(); err != nil {
+			l.log.Warn().Err(err).Msg("move: blocked interact stop")
+		}
+		// onInteract has no world-presence check: PetStatusShow uses the
+		// snapshot summon even if it has already left the world.
+		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+		return true
 	}
 	if live.takeDeferredMagicSkill() != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
@@ -315,6 +317,9 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 	return false
 }
 
+// playerCanDoInteract is operating / active trade / 150 3D range. Blocked
+// INTERACT uses this as the single StopMove+PetStatusShow gate; arrived
+// INTERACT also requires the pet still in world and owned.
 func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
 	if live == nil || pet == nil || live.Operating() {
 		return false

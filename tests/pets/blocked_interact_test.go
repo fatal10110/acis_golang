@@ -114,6 +114,38 @@ func TestBlockedWalkAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
 	}
 }
 
+// TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus pins that an
+// INTERACT blocked arrival whose pet has already left the world still uses
+// the in-range arm: ActionFailed, StopMove, PetStatusShow — not the base
+// same-cell MoveToLocation. The last-known pet cell is still inside
+// interaction range, so the interact gate passes and onInteract has no
+// world-presence check.
+func TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	h := bootOwnerWithCollarAndGeo(t, geo)
+	pet, _ := h.spawnWolf(t)
+	placePet(t, pet, location.Location{X: 130, Y: 20, Z: 30})
+	drainUntilQuiet(t, h.client)
+
+	startOwnedPetApproach(t, h, pet)
+	h.returnPet(t)
+	h.srv.TickPlayerBlocked(t, h.ownerID, geo)
+
+	frames := drainFrames(t, h.client)
+	if hasOpcode(frames, serverpackets.OpcodeMoveToLocation) {
+		t.Fatalf("returned-pet INTERACT blocked sent MoveToLocation, want StopMove: opcodes %x", frameOpcodes(frames))
+	}
+	if !hasOpcode(frames, serverpackets.OpcodeActionFailed) {
+		t.Fatalf("returned-pet INTERACT blocked missing ActionFailed: opcodes %x", frameOpcodes(frames))
+	}
+	if !hasOpcode(frames, serverpackets.OpcodeStopMove) {
+		t.Fatalf("returned-pet INTERACT blocked missing StopMove: opcodes %x", frameOpcodes(frames))
+	}
+	if !hasOpcode(frames, serverpackets.OpcodePetStatusShow) {
+		t.Fatalf("returned-pet INTERACT blocked missing PetStatusShow: opcodes %x", frameOpcodes(frames))
+	}
+}
+
 func bootOwnerWithCollarAndGeo(t *testing.T, geo move.Geo) *petWorld {
 	t.Helper()
 	srv := bootPets(t, gameservertest.WithGeo(geo))

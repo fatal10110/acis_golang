@@ -3,6 +3,7 @@ package skills
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -59,6 +60,47 @@ func TestBlockedWalkAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
 		t.Fatalf("MOVE_TO after CAST approach sent StopMove, want MoveToLocation")
 	}
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "MOVE_TO blocked correction")
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+	drainUntilQuiet(t, c)
+}
+
+// TestBlockedPickupAfterGroundCastBroadcastsMoveToLocation pins that a
+// later out-of-range pickup walk replaces the parked CAST slot: blocked
+// arrival is PICK_UP (same-cell MoveToLocation only), not
+// DIST_TOO_FAR_CASTING_STOPPED.
+func TestBlockedPickupAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	srv := bootBlockedGroundCast(t, geo)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+
+	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
+
+	srv.SeedGroundItem(t, objID, item.AdenaID, 1, 200, 20, 30)
+	drainUntilQuiet(t, c)
+	snaps := srv.GroundItems.Snapshots(nil)
+	if len(snaps) != 1 {
+		t.Fatalf("tracked ground items = %d, want 1", len(snaps))
+	}
+	px, py, pz := srv.PlayerPosition(t, objID)
+	c.Send(encodeAction(snaps[0].ObjectID, int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, c)
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	frame := c.Read()
+	if frame[0] == serverpackets.OpcodeSystemMessage {
+		t.Fatalf("PICK_UP after CAST approach sent SystemMessage, want MoveToLocation")
+	}
+	if frame[0] == serverpackets.OpcodeStopMove {
+		t.Fatalf("PICK_UP after CAST approach sent StopMove, want MoveToLocation")
+	}
+	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "PICK_UP blocked correction")
 	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
 	if objectID != objID {
 		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
