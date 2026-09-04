@@ -838,6 +838,9 @@ func (h *Hostile) PoleAttackCountMax() int {
 
 // ReturnHome reports whether this NPC started returning to its spawn.
 func (h *Hostile) ReturnHome() bool {
+	if hostileKind(h.Instance) == "GrandBoss" {
+		return false
+	}
 	if h.SiegeGuard() {
 		return h.returnHomeOutsideDriftRange()
 	}
