@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -979,6 +980,14 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantHome)
 			}
 			if tc.wantHome {
+				if tc.kind == "SiegeGuard" {
+					if movement.home != (location.Location{}) {
+						t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+					}
+					if err := hostile.Think(); err != nil {
+						t.Fatalf("Think() error: %v", err)
+					}
+				}
 				if movement.home != home {
 					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
 				}
@@ -1005,8 +1014,66 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want SiegeGuard to return outside its 20-unit drift range")
 	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+	}
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 	if got := movement.home; got != hostile.Instance.Home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionMoveTo)
+	}
+}
+
+func TestSiegeGuardUnreachableHomeTeleportsAfterFailLimit(t *testing.T) {
+	movement := &hostileMove{denyMove: true}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	for i := 1; i <= move.HomeGeoFailLimit; i++ {
+		if !hostile.ReturnHome() {
+			t.Fatalf("ReturnHome() = false on attempt %d, want true", i)
+		}
+		if movement.home != (location.Location{}) {
+			t.Fatalf("MoveHome on attempt %d = %#v, want no walk", i, movement.home)
+		}
+		if got := hostile.GeoPathFailCount(); got != i {
+			t.Fatalf("GeoPathFailCount() = %d after attempt %d, want %d", got, i, i)
+		}
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false after fail limit, want teleport via MoveHome")
+	}
+	if movement.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
+	}
+}
+
+func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Template.CanMove = false
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() = %d, want 0 when movement disabled", got)
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk", movement.home)
 	}
 }
 

@@ -123,6 +123,11 @@ func (r routeAwareMoveController) MoveHome(home location.Location) error {
 	return r.MoveController.MoveHome(home)
 }
 
+func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
+	g, ok := r.MoveController.(interface{ CanMoveTo(location.Location) bool })
+	return !ok || g.CanMoveTo(target)
+}
+
 // newLiveHostile builds a live Hostile for inst, wiring a real movement
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
@@ -218,6 +223,13 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 				log.Warn().Err(err).Msg("task: walker arrived")
 			}
 		}
+		hostile.AI().Arrived()
+		if err := hostile.Think(); err != nil {
+			log.Warn().Err(err).Msg("ai: hostile think")
+		}
+	})
+	moveCtl.SetBlocked(func() {
+		hostile.AI().ArrivedBlocked()
 		if err := hostile.Think(); err != nil {
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}

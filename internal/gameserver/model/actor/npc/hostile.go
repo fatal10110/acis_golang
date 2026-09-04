@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -24,6 +25,10 @@ import (
 )
 
 const defaultDriftRange = 200
+
+// siegeGuardHomeMoveWeight is the MOVE_TO desire weight SiegeGuard return-home
+// queues so it outranks wander and ordinary combat desires.
+const siegeGuardHomeMoveWeight = 1_000_000
 
 // partyRangeDefault mirrors players.properties' PartyRange default (1500),
 // used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
@@ -906,10 +911,22 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	} else {
 		h.ForceWalkStance()
 	}
-	_ = h.move.MoveHome(h.Instance.Home)
-	if !h.SiegeGuard() {
-		h.scheduleWanderRecheck()
+	if h.SiegeGuard() {
+		if h.GeoPathFailCount() >= move.HomeGeoFailLimit {
+			_ = h.move.MoveHome(h.Instance.Home)
+			return true
+		}
+		// AddMoveToDesire drops an unreachable or movement-disabled home.
+		// Count only a reachability miss as a path failure so the teleport
+		// recovery above still trips; a root expires on its own and must
+		// not burn fail count.
+		if !h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
+			h.AddGeoPathFailCount()
+		}
+		return true
 	}
+	_ = h.move.MoveHome(h.Instance.Home)
+	h.scheduleWanderRecheck()
 	return true
 }
 

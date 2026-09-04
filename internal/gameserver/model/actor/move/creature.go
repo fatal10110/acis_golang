@@ -172,6 +172,16 @@ func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(Event) error)
 	m.segmentAdvanced = segmentAdvanced
 }
 
+// CanMoveTo reports whether a straight-line geodata walk from the current
+// origin reaches target.
+func (m *CreatureMove) CanMoveTo(target location.Location) bool {
+	m.mu.Lock()
+	origin := m.origin
+	geo := m.geo
+	m.mu.Unlock()
+	return geo.CanMove(origin.X, origin.Y, origin.Z, target.X, target.Y, target.Z)
+}
+
 // Position returns the actor's current server-authoritative position.
 func (m *CreatureMove) Position() location.Location {
 	m.mu.Lock()

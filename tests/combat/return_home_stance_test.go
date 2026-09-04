@@ -2,7 +2,9 @@ package combat
 
 import (
 	"testing"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -32,8 +34,9 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 }
 
-// TestSiegeGuardReturnHomeBroadcastsRunThenMove pins SiegeGuard.returnHome's
-// forceRunStance before the home move when the guard was walking.
+// TestSiegeGuardReturnHomeBroadcastsRunThenMove pins SiegeGuard.returnHome:
+// forceRunStance immediately, then a MOVE_TO home desire that the next Think
+// promotes and walks. Arrival at spawn idles (SiegeGuard does not idle-wander).
 func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -48,12 +51,39 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 
 	hostile.SetRunning(false)
 	hostile.SetXYZ(hostileX, hostileY+50, hostileZ)
+	hostile.AI().SetWander()
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
 	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after ReturnHome = %v, want wander until Think", got)
+	}
 
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want move_to", got)
+	}
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
+
+	// Production MoveToLocation snaps destination Z through geo.Height, so
+	// arrival is not an exact Home identity. Drive the onEvtArrived path.
+	hostile.SetXYZ(home.X, home.Y, home.Z-4)
+	hostile.AI().Arrived()
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() after arrival error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	}
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() after idle error: %v", err)
+	}
+	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+		t.Fatalf("unexpected frame after idle Think: opcode %#x", frame[0])
+	}
 }
 
 func assertChangeMoveType(t *testing.T, frame []byte, objectID int32, running bool) {

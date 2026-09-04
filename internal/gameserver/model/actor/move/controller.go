@@ -54,7 +54,9 @@ type homePathRecovery interface {
 	TeleportTo(location.Location)
 }
 
-const homeGeoFailLimit = 10
+// HomeGeoFailLimit is the consecutive blocked return-home path count at
+// which MoveHome teleports to spawn instead of walking.
+const HomeGeoFailLimit = 10
 
 // PositionUpdater is the moving actor surface consumed by the position
 // update task. PositionUpdate must deregister itself from whatever
@@ -241,11 +243,11 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 // registers for correction ticks the same way any other movement request
 // does — otherwise this controller's world presence would stay at the
 // stale pre-move cell for the entire walk back. When geodata cannot resolve
-// a route, failed attempts accumulate; after homeGeoFailLimit blocked
+// a route, failed attempts accumulate; after HomeGeoFailLimit blocked
 // resolutions the actor teleports to home instead of retrying silently.
 func (c *Controller) MoveHome(home location.Location) error {
 	recovery, hasRecovery := c.self.(homePathRecovery)
-	if hasRecovery && recovery.GeoPathFailCount() >= homeGeoFailLimit {
+	if hasRecovery && recovery.GeoPathFailCount() >= HomeGeoFailLimit {
 		c.move.CancelMove()
 		recovery.TeleportTo(home)
 		recovery.ResetGeoPathFailCount()
@@ -313,6 +315,25 @@ func (c *Controller) Stop() error {
 		return c.self.BroadcastStop()
 	}
 	return nil
+}
+
+// CanMoveTo reports whether a straight-line geodata walk from the actor's
+// current origin reaches target.
+func (c *Controller) CanMoveTo(target location.Location) bool {
+	return c.move.CanMoveTo(target)
+}
+
+// SetBlocked records the callback invoked when an in-flight move is stopped
+// by a newly blocked geodata path. The controller still broadcasts a stop
+// at the blocked cell; a nil callback leaves that broadcast as the only
+// side effect.
+func (c *Controller) SetBlocked(blocked func()) {
+	c.move.SetBlockedHook(func() {
+		_ = c.self.BroadcastStop()
+		if blocked != nil {
+			blocked()
+		}
+	})
 }
 
 // SetArrived records the callback invoked once movement this controller

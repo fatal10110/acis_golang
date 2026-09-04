@@ -509,6 +509,8 @@ type recordingMove struct {
 	followCalls   int
 	stopCount     int
 	stopErr       error
+	home          location.Location
+	denyMove      bool
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -518,7 +520,12 @@ func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, a
 	return m.followStarted, nil
 }
 
-func (m *recordingMove) MoveHome(location.Location) error { return nil }
+func (m *recordingMove) MoveHome(home location.Location) error {
+	m.home = home
+	return nil
+}
+
+func (m *recordingMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
 func (m *recordingMove) Stop() error {
 	m.stopCount++
@@ -1245,6 +1252,135 @@ func TestAttackableAIReconsiderTargetNoopWithSingleAttacker(t *testing.T) {
 }
 
 // ---- from attackable_wander_test.go ----
+func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	home := location.Location{}
+
+	brain.SetWander()
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	}
+	if move.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", move.home, home)
+	}
+
+	owner.x, owner.y, owner.z = home.X, home.Y, home.Z
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after arrival error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival = %v, want %v", got, IntentionIdle)
+	}
+}
+
+func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	home := location.Location{}
+
+	brain.SetWander()
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	}
+
+	// |ΔZ| > Desire.Equal's 30 so thinkMoveTo's fast path cannot idle.
+	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
+	brain.Arrived()
+	move.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after Arrived error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after Arrived = %v, want %v", got, IntentionIdle)
+	}
+	if move.home == home {
+		t.Fatal("Think after Arrived restarted MoveHome")
+	}
+}
+
+func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	home := location.Location{}
+
+	brain.SetWander()
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+
+	brain.ArrivedBlocked()
+	move.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after ArrivedBlocked error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after ArrivedBlocked = %v, want %v", got, IntentionIdle)
+	}
+	if move.home == home {
+		t.Fatal("Think after ArrivedBlocked restarted MoveHome")
+	}
+}
+
+func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	mv := &recordingMove{}
+	atk := &recordingAttack{attackingNow: true}
+	brain := NewAttackable(owner, mv, atk)
+	home := location.Location{}
+
+	brain.SetWander()
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	}
+
+	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
+	brain.Arrived()
+	mv.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after Arrived error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after Arrived while attacking = %v, want idle", got)
+	}
+	if mv.home == home {
+		t.Fatal("Think after Arrived restarted MoveHome while attacking")
+	}
+}
+
+func TestAttackableAIAddMoveToDesireSkipsUnreachable(t *testing.T) {
+	owner := actor(1)
+	move := &recordingMove{denyMove: true}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+
+	if brain.AddMoveToDesire(location.Location{X: 50, Y: 0, Z: 0}, 1_000_000) {
+		t.Fatal("AddMoveToDesire() = true, want false when unreachable")
+	}
+	if got := brain.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0", got)
+	}
+}
+
 func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner := actor(1)
 	owner.inTerritory = false
