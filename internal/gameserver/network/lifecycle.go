@@ -152,6 +152,9 @@ func savePet(ctx context.Context, store petStore, actor *summon.Actor, ownerInv 
 	}
 	if err := store.Save(ctx, itemObjectID, state); err != nil {
 		log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
+		// A failed pets-row write is not a restore source of truth. Skip
+		// the live control-item lift and its inventory update until a
+		// later save actually lands.
 		return
 	}
 	// The control item's enchant is the pet's displayed level. Lift it on

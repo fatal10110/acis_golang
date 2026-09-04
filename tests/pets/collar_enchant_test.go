@@ -2,9 +2,11 @@ package pets
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -37,6 +39,33 @@ func TestReturnPetSyncsCollarEnchantToPetLevel(t *testing.T) {
 	h.returnPet(t)
 
 	h.assertCollarEnchantedToPetLevel(t)
+}
+
+// TestLogoutSyncsCollarEnchantToPetLevel covers detachLivePlayer: the
+// collar lift must run before the owner inventory flush, or logout writes
+// the pre-lift enchant and never rewrites the row. Persistence is read
+// from the items table as detach left it — FlushItems after despawn would
+// not replay a lift that missed that flush.
+func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
+	h := bootOwnerWithCollar(t)
+	h.spawnWolf(t)
+	if got := h.liveCollarEnchant(t); got != 0 {
+		t.Fatalf("collar enchant before logout = %d, want 0", got)
+	}
+
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+	assertFrameOpcode(t, mustRead(t, h.client, "LeaveWorld"), serverpackets.OpcodeLeaveWorld, "LeaveWorld")
+	if !h.client.AwaitClose(2 * time.Second) {
+		t.Fatal("logout did not close the connection")
+	}
+	waitFor(t, "owner left world", func() bool {
+		_, ok := h.srv.State.Player(h.ownerID)
+		return !ok
+	})
+
+	if got := mustPersistedItem(t, h.srv, h.ownerID, h.collarID).EnchantLevel; got != wolfLevel {
+		t.Fatalf("persisted collar enchant after logout = %d, want %d", got, wolfLevel)
+	}
 }
 
 func (h *petWorld) assertCollarEnchantedToPetLevel(t *testing.T) {
