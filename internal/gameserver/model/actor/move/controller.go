@@ -339,7 +339,9 @@ func (c *Controller) SetBlocked(blocked func()) {
 
 // broadcastBlockedCorrection snaps observers to the cell the actor actually
 // stopped on. A same-cell MoveToLocation is the correction packet; StopMove
-// would freeze client prediction at the stale destination.
+// would freeze client prediction at the stale destination. This is the base
+// blocked-arrival branch only; player INTERACT (StopMove in range) and CAST
+// (DIST_TOO_FAR_CASTING_STOPPED) are not this hook: #2231.
 func (c *Controller) broadcastBlockedCorrection() {
 	pos := c.move.Position()
 	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})
