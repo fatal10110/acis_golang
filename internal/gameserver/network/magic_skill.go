@@ -79,15 +79,14 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
-		if started.Rejection != skilltarget.CastRejectNone {
+		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
+			sendMagicCastFailureReason(live, started.Definition, err)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Rejection != skilltarget.CastRejectNone {
 			sendTargetCastRejection(live, started.Rejection, started.Definition)
-			if started.Target != nil && started.Target.ObjectID() != live.ObjectID() {
-				origin := live.CurrentLocation()
-				target := skillCastObject(started.Target)
-				l.broadcastLiveFrame(live, func() wire.Frame {
-					return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID, int(origin.Distance3D(target.Location)), origin)
-				})
-			}
+			l.rejectMagicCast(live, started.Definition, started.Target)
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
@@ -171,6 +170,34 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicCastFailureReason(live, def, err)
 			sendMagicStatusUpdate(live, beforeVitals)
 		},
+	})
+}
+
+func magicCastFailureMovesToPawn(err error) bool {
+	return errors.Is(err, actorcast.ErrNotEnoughMP) ||
+		errors.Is(err, actorcast.ErrNotEnoughHP) ||
+		errors.Is(err, actorcast.ErrMagicMuted) ||
+		errors.Is(err, actorcast.ErrPhysicalMuted) ||
+		errors.Is(err, actorcast.ErrCubicListFull) ||
+		errors.Is(err, actorcast.ErrNotEnoughItems)
+}
+
+func (l *GameClientLink) rejectMagicCast(live *livePlayer, def modelskill.Definition, target actorcast.Target) {
+	if live == nil || target == nil || target.ObjectID() == live.ObjectID() {
+		return
+	}
+	if live.move != nil {
+		if err := live.move.Stop(); err != nil {
+			l.log.Warn().Err(err).Msg("move: stop before rejected cast")
+		}
+	}
+	if def.HitTime > 50 {
+		live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
+	}
+	origin := live.CurrentLocation()
+	targetObject := skillCastObject(target)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMoveToPawn(live.ObjectID(), targetObject.ObjectID, int(origin.Distance3D(targetObject.Location)), origin)
 	})
 }
 
@@ -413,7 +440,7 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
 	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrAllSkillsDisabled):

@@ -175,7 +175,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 }
 
 // TestCastRejectedInsufficientMP verifies a caster without the MP pays
-// nothing: the not-enough-MP message plus ActionFailed, and no cast starts.
+// nothing: the not-enough-MP message and no cast starts.
 func TestCastRejectedInsufficientMP(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -196,7 +196,6 @@ func TestCastRejectedInsufficientMP(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
 	reply := c.Read()
 	assertStaticSystemMessage(t, reply, serverpackets.SystemMessageNotEnoughMP)
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "not-enough-MP follow-up")
 	drainUntilQuiet(t, c)
 }
 

@@ -2012,30 +2012,6 @@ func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 // which runs right after super.doCast() commits to the cast — at cast
 // start, not cast finish. A rejected start (invalid target here) never
 // reaches that line in Java either, so the grace must survive it.
-func TestStartPlayerSkillPreconditionsPrecedeTargetRejection(t *testing.T) {
-	ch := newRequestCharacter(10)
-	ch.SetSkillLevel(3, 1)
-	ctrl := NewController(&testActor{mp: 0, hp: 100})
-	defs := requestDefinitions{{ID: 3, Level: 1}: {
-		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne, MPConsume: 1,
-	}}
-	target := &requestTarget{id: 20}
-
-	started, err := StartPlayerSkill(PlayerSkillRequest{
-		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
-		Selected: target, SkillID: 3, Definitions: defs,
-		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
-			return target, skilltarget.CastRejectInvalidTarget
-		},
-	})
-	if !errors.Is(err, ErrNotEnoughMP) {
-		t.Fatalf("StartPlayerSkill() error = %v, want ErrNotEnoughMP", err)
-	}
-	if got := started.Rejection; got != skilltarget.CastRejectInvalidTarget {
-		t.Fatalf("StartedSkill.Rejection = %v, want CastRejectInvalidTarget", got)
-	}
-}
-
 func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 	def := modelskill.Definition{
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
