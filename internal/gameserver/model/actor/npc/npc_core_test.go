@@ -959,6 +959,33 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	}
 }
 
+func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
+	// GrandBoss.returnHome is unconditionally false; onSpawn sets no
+	// random walk. A boss spawned outside drift range must not MoveHome
+	// or take the Attackable delayed backward nudge.
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "GrandBoss"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.WalkSpeed = 100
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	hostile.AI().SetWander()
+
+	if hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = true, want false for GrandBoss")
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
+	}
+	select {
+	case <-movement.moved:
+		t.Fatal("GrandBoss wander recheck moved behind the actor")
+	case <-time.After(2 * time.Second):
+	}
+}
+
 func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
 	movement := &hostileMove{moved: make(chan location.Location, 1)}
 	hostile := newTestHostile(t, movement, &hostileAttack{})

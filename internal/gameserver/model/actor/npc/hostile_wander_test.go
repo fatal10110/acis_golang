@@ -16,7 +16,7 @@ func TestShouldIdleWanderIgnoresMovingAttack(t *testing.T) {
 }
 
 func TestShouldIdleWanderExcludesHoldKinds(t *testing.T) {
-	for _, kind := range []InstanceKind{"Guard", "SiegeGuard", "Chest", "HalishaChest"} {
+	for _, kind := range []InstanceKind{"Guard", "SiegeGuard", "Chest", "HalishaChest", "GrandBoss"} {
 		h, err := NewHostile(&Instance{
 			ObjectID: 1,
 			Template: &Template{ID: 1, Type: string(kind)},

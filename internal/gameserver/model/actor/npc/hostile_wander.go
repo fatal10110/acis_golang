@@ -25,7 +25,7 @@ const territoryWalkAttempts = 10
 // MonsterBehavior.onNoDesire reads it. Script-accurate eligibility: #2148.
 func (h *Hostile) ShouldIdleWander() bool {
 	switch hostileKind(h.Instance) {
-	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
+	case "Guard", "SiegeGuard", "Chest", "HalishaChest", "GrandBoss":
 		return false
 	default:
 		return true
