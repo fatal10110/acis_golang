@@ -230,9 +230,9 @@ func (m *CreatureMove) Walkable(x, y, z int) bool {
 	return geo.Walkable(x, y, z)
 }
 
-// MoveToLocation records an accepted, height-normalized ground-movement
-// request and, once its Duration elapses, advances the actor's position to
-// destination and fires the arrived hook.
+// MoveToLocation is the outcome-free convenience form of
+// MoveToLocationWithPathOutcome, retained for tests and embedded movement
+// state. Production chase/wander/walker accounting goes through Controller.
 func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
