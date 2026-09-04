@@ -882,8 +882,8 @@ func (a *Attackable) ArrivedBlocked() {
 func (a *Attackable) clearArrivalDesire() {
 	switch a.current.kind {
 	case IntentionMoveTo, IntentionFlee, IntentionWander:
+		// IntentionFlee is dormant until promoteNext can make it current.
 		a.clearCurrentDesire()
-		a.wanderReady = time.Time{}
 		a.current = intention{kind: IntentionIdle}
 	}
 }

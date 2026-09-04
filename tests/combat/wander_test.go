@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
@@ -175,9 +176,10 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 }
 
 // TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
-// WANDER arm: finishing a wander step drops that desire and idles, so
-// the next Think can re-queue idle wander instead of keeping the spent
-// WANDER current.
+// WANDER arm: finishing a wander step drops that desire and idles, then
+// the production follow-up Think re-queues idle wander without walking
+// again — lastDesire is still wander, so thinkWander arms the timer
+// instead of MoveFromSpawnUsingRandomOffset.
 func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
 	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
 		hostile.AI().Arrived()
@@ -216,6 +218,13 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	}
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
 	_ = mustRead(t, c, "MoveToLocation")
+	if !hostile.IsMoving() {
+		t.Fatal("IsMoving() = false after wander Think, want an in-flight walk")
+	}
+	hostile.Move().CancelMove()
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true after CancelMove, want the walk finished before arrival")
+	}
 
 	arrive(hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
@@ -223,6 +232,19 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	}
 	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire still queued after arrival")
+	}
+
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() after arrival: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after arrival Think = %v, want wander re-queued", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after arrival Think")
+	}
+	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
+		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
 	}
 }
 
