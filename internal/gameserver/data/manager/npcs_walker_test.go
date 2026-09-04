@@ -287,14 +287,14 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	spawns := NewSpawns(table, nil)
 
 	home := location.Location{X: 100, Y: 200, Z: 0}
-	// Inside the default 200-unit drift range, so the general AI's own
-	// leash-return (hostile.Think -> ReturnHome, fired automatically on
-	// every arrival, including this route arrival) leaves the route alone
-	// once the NPC settles here.
+	// Inside the maker polygon and the default 200-unit drift range, so
+	// the general AI's own leash-return (hostile.Think -> ReturnHome,
+	// fired automatically on every arrival, including this route arrival)
+	// leaves the route alone once the NPC settles here.
 	routeNode := location.Location{X: 100, Y: 350, Z: 0}
-	// Outside the drift range from home, so a later ReturnHome() call
-	// actually triggers a leash move.
-	strayPoint := location.Location{X: 100, Y: 800, Z: 0}
+	// Outside the maker polygon (y < 0) and the 200-unit home sphere, so
+	// a later ReturnHome() call actually triggers a leash move.
+	strayPoint := location.Location{X: 100, Y: -500, Z: 0}
 	routes := route.WalkerRoutes{
 		"chasetest": {"chasetest": []route.WalkerLocation{{Location: routeNode}}},
 	}
@@ -349,7 +349,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	// Simulate the AI loop deciding this NPC must leash home — the same
 	// call hostile.Think() makes via returnHomeOutsideDriftRange.
 	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true (strayPoint is outside the default drift range)")
+		t.Fatal("ReturnHome() = false, want true (strayPoint is outside the maker polygon)")
 	}
 
 	deadline = time.Now().Add(2 * time.Second)

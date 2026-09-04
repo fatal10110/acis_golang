@@ -82,6 +82,10 @@ func (h *Hostile) homeOffsetWalk(from location.Location, offset int) location.Lo
 func (h *Hostile) makerWalkLocation(maker *spawn.Maker, from location.Location, offset int) (location.Location, bool) {
 	shape, ok := maker.ContainingTriangle(from.X, from.Y)
 	if !ok {
+		// Defensive: idle wander only calls this after InTerritory is true,
+		// which already requires a containing footprint, so this miss is
+		// not reached from that caller. Keep the territory-wide sample for
+		// a current-triangle lookup miss on the public walk helper.
 		return h.makerRandomLocation(maker)
 	}
 	for range randomWalkLoopLimit {

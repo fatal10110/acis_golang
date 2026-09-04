@@ -853,12 +853,22 @@ func (h *Hostile) ReturnHome() bool {
 // InTerritory reports whether this NPC is inside its spawn territory.
 // A living private uses its master's territory. A dead master is treated
 // as unlinked, so the private stays in-territory for the corpse window.
+// Maker NPCs with a resolved territory use banned-then-allowed polygon
+// containment. A nil maker, or a maker with no territories, uses a strict
+// 200-unit 3D sphere around Home.
 func (h *Hostile) InTerritory() bool {
 	if master := h.Master(); master != nil {
 		if master.Dead() {
 			return true
 		}
 		return master.InTerritory()
+	}
+	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
+		loc := h.location()
+		if maker.ContainsBanned(loc) {
+			return false
+		}
+		return maker.Contains(loc)
 	}
 	if !h.Instance.HasHome {
 		return true
