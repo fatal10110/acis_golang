@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -109,6 +110,49 @@ func TestBlockedPickupAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
 		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
 	}
 	drainUntilQuiet(t, c)
+}
+
+// TestBlockedAttackAfterGroundCastBroadcastsMoveToLocation pins that an
+// attack chase replaces the parked CAST slot: blocked arrival is ATTACK
+// (same-cell MoveToLocation only), not DIST_TOO_FAR_CASTING_STOPPED.
+func TestBlockedAttackAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	srv := bootBlockedGroundCast(t, geo)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+
+	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
+
+	startDistantAttackChase(t, srv, objID)
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	frame := c.Read()
+	if frame[0] == serverpackets.OpcodeSystemMessage {
+		t.Fatalf("ATTACK after CAST approach sent SystemMessage, want MoveToLocation")
+	}
+	if frame[0] == serverpackets.OpcodeStopMove {
+		t.Fatalf("ATTACK after CAST approach sent StopMove, want MoveToLocation")
+	}
+	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "ATTACK blocked correction")
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+	drainUntilQuiet(t, c)
+}
+
+func startDistantAttackChase(t *testing.T, srv *gameservertest.Server, objID int32) {
+	t.Helper()
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: 600, Y: 20, Z: 30})
+	drainUntilQuiet(t, srv.Client)
+	px, py, pz := srv.PlayerPosition(t, objID)
+	srv.Client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, srv.Client)
+	srv.Client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, srv.Client)
 }
 
 func bootBlockedGroundCast(t *testing.T, geo *gameservertest.GateGeo) *gameservertest.Server {

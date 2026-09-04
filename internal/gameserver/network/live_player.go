@@ -255,6 +255,14 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 	return pet
 }
 
+// clearParkedApproaches drops pickup, pet-interact, and deferred-magic
+// approach slots so a later walk or chase cannot inherit them.
+func (p *livePlayer) clearParkedApproaches() {
+	p.takePickup()
+	p.takePetInteract()
+	p.takeDeferredMagicSkill()
+}
+
 // pickupLockActive has no production caller: livePickupBlockedDeferrable
 // reads pickupLocked directly under its own pickupMu section instead. Kept
 // for the generation-primitive regression tests, which check lock state

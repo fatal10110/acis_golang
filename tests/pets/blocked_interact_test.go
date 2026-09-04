@@ -146,6 +146,43 @@ func TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus(t *testing.T) {
 	}
 }
 
+// TestBlockedAttackAfterPetApproachBroadcastsMoveToLocation pins that an
+// attack chase replaces the parked INTERACT slot: blocked arrival is ATTACK
+// (same-cell MoveToLocation), not StopMove + PetStatusShow.
+func TestBlockedAttackAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	h := bootOwnerWithCollarAndGeo(t, geo)
+	pet, _ := h.spawnWolf(t)
+	placePet(t, pet, location.Location{X: 220, Y: 20, Z: 30})
+	drainUntilQuiet(t, h.client)
+
+	startOwnedPetApproach(t, h, pet)
+	startDistantAttackChase(t, h)
+
+	advanced := h.srv.TickPlayerBlocked(t, h.ownerID, geo)
+	frames := drainFrames(t, h.client)
+	if hasOpcode(frames, serverpackets.OpcodeStopMove) {
+		t.Fatalf("ATTACK after INTERACT approach sent StopMove: opcodes %x", frameOpcodes(frames))
+	}
+	if hasOpcode(frames, serverpackets.OpcodePetStatusShow) {
+		t.Fatalf("ATTACK after INTERACT approach sent PetStatusShow: opcodes %x", frameOpcodes(frames))
+	}
+	if hasOpcode(frames, serverpackets.OpcodeActionFailed) {
+		t.Fatalf("ATTACK after INTERACT approach sent ActionFailed: opcodes %x", frameOpcodes(frames))
+	}
+	frame, ok := firstOpcode(frames, serverpackets.OpcodeMoveToLocation)
+	if !ok {
+		t.Fatalf("ATTACK after INTERACT approach missing MoveToLocation: opcodes %x", frameOpcodes(frames))
+	}
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != h.ownerID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, h.ownerID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+}
+
 func bootOwnerWithCollarAndGeo(t *testing.T, geo move.Geo) *petWorld {
 	t.Helper()
 	srv := bootPets(t, gameservertest.WithGeo(geo))
@@ -169,6 +206,17 @@ func startOwnedPetApproach(t *testing.T, h *petWorld, pet *summon.Actor) {
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
 	assertFrameOpcode(t, mustRead(t, h.client, "interact ActionFailed"), serverpackets.OpcodeActionFailed, "interact ActionFailed")
 	assertFrameOpcode(t, mustRead(t, h.client, "approach MoveToLocation"), serverpackets.OpcodeMoveToLocation, "approach MoveToLocation")
+	drainUntilQuiet(t, h.client)
+}
+
+func startDistantAttackChase(t *testing.T, h *petWorld) {
+	t.Helper()
+	hostile := h.srv.SpawnHostileNPCAt(t, location.Location{X: 600, Y: 20, Z: 30})
+	drainUntilQuiet(t, h.client)
+	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
+	h.client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
 	drainUntilQuiet(t, h.client)
 }
 
