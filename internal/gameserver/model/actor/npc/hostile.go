@@ -843,7 +843,15 @@ func (h *Hostile) ReturnHome() bool {
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
+// A living private uses its master's territory. A dead master is treated
+// as unlinked, so the private stays in-territory for the corpse window.
 func (h *Hostile) InTerritory() bool {
+	if master := h.Master(); master != nil {
+		if master.Dead() {
+			return true
+		}
+		return master.InTerritory()
+	}
 	if !h.Instance.HasHome {
 		return true
 	}
