@@ -30,9 +30,9 @@ type Instance struct {
 	// default run stance every other NPC spawns in (aCis Walkers.java
 	// onCreated's setWalkOrRun(false) for its WALKING_NPCS id subset).
 	WalkMode bool
-	// Maker is the spawning npc-maker group. Idle wander uses its
-	// territory when this is set. A nil Maker keeps the home-offset walk
-	// unless the NPC is a private, which offsets from current position.
+	// Maker is the spawning npc-maker group. InTerritory and idle wander
+	// use its polygon when this is set. A nil Maker keeps the home-offset
+	// walk unless the NPC is a private, which offsets from current position.
 	Maker *spawn.Maker
 }
 

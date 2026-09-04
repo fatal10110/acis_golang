@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -811,6 +812,96 @@ func TestInTerritoryIsStrict3D(t *testing.T) {
 				t.Fatalf("InTerritory() = %v at 3D %s distance %d, want %v", got, tc.axis, tc.offset, tc.want)
 			}
 		})
+	}
+}
+
+// MultiSpawn.isInMyTerritory uses banned-then-allowed polygon containment,
+// not Spawn's MAX_DRIFT_RANGE sphere. A point 250 from home is outside the
+// sphere and still inside this rectangle (Nightmare Lord / dion13_2222_01).
+func TestInTerritoryMakerUsesPolygonNotHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{makerPoly()}}
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if !hostile.InTerritory() {
+		t.Fatal("InTerritory() = false at home+250 inside maker polygon, want true")
+	}
+	if hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = true inside maker polygon, want no-op")
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
+	}
+}
+
+func TestInTerritoryNilMakerKeepsHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true at home+250 with nil Maker, want false")
+	}
+}
+
+func TestInTerritoryMakerOutsidePolygon(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{makerPoly()}}
+	world.New().Spawn(hostile, 5000, 0, 0, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true outside maker polygon, want false")
+	}
+}
+
+func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	allowed := makerPoly()
+	banned := &spawn.Territory{
+		Name: "banned",
+		MinZ: -1000,
+		MaxZ: 1000,
+		Nodes: []spawn.Node{
+			{X: 300, Y: -50},
+			{X: 400, Y: -50},
+			{X: 400, Y: 50},
+			{X: 300, Y: 50},
+		},
+	}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{
+		Territories:       []*spawn.Territory{allowed},
+		BannedTerritories: []*spawn.Territory{banned},
+	}
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true inside banned territory, want false")
+	}
+}
+
+func makerPoly() *spawn.Territory {
+	return &spawn.Territory{
+		Name: "maker",
+		MinZ: -1000,
+		MaxZ: 1000,
+		Nodes: []spawn.Node{
+			{X: -1000, Y: -1000},
+			{X: 2000, Y: -1000},
+			{X: 2000, Y: 2000},
+			{X: -1000, Y: 2000},
+		},
 	}
 }
 
