@@ -894,7 +894,9 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		h.ForceWalkStance()
 	}
 	_ = h.move.MoveHome(h.Instance.Home)
-	h.scheduleWanderRecheck()
+	if !h.SiegeGuard() {
+		h.scheduleWanderRecheck()
+	}
 	return true
 }
 
