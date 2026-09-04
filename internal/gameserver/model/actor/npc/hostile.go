@@ -25,6 +25,10 @@ import (
 
 const defaultDriftRange = 200
 
+// siegeGuardHomeMoveWeight is the MOVE_TO desire weight SiegeGuard return-home
+// queues so it outranks wander and ordinary combat desires.
+const siegeGuardHomeMoveWeight = 1_000_000
+
 // partyRangeDefault mirrors players.properties' PartyRange default (1500),
 // used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
 // ported yet, so this stays a local default instead of a wired Config
@@ -893,10 +897,16 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	} else {
 		h.ForceWalkStance()
 	}
-	_ = h.move.MoveHome(h.Instance.Home)
-	if !h.SiegeGuard() {
-		h.scheduleWanderRecheck()
+	if h.SiegeGuard() {
+		if h.GeoPathFailCount() >= 10 {
+			_ = h.move.MoveHome(h.Instance.Home)
+			return true
+		}
+		h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight)
+		return true
 	}
+	_ = h.move.MoveHome(h.Instance.Home)
+	h.scheduleWanderRecheck()
 	return true
 }
 

@@ -875,6 +875,14 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantHome)
 			}
 			if tc.wantHome {
+				if tc.kind == "SiegeGuard" {
+					if movement.home != (location.Location{}) {
+						t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+					}
+					if err := hostile.Think(); err != nil {
+						t.Fatalf("Think() error: %v", err)
+					}
+				}
 				if movement.home != home {
 					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
 				}
@@ -901,8 +909,17 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want SiegeGuard to return outside its 20-unit drift range")
 	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+	}
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 	if got := movement.home; got != hostile.Instance.Home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionMoveTo)
 	}
 }
 

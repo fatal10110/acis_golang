@@ -14,7 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-
 // zeroRoll always returns 0, pinning MakeAttackHit's hit/crit/damage-spread
 // rolls to a deterministic outcome: with any positive hit rate and
 // critical rate, a roll of 0 always hits and always crits.
@@ -37,6 +36,7 @@ func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackContro
 			ID:              9001,
 			Type:            "Monster",
 			BaseAttackRange: 80,
+			CanMove:         true,
 		},
 		Kind: "Monster",
 	}, newHostileLive(t), move, strike)
@@ -63,7 +63,7 @@ func (hostileGeo) Height(_, _, _ int) int16          { return 0 }
 // hostileGeo never blocks in these tests, so pathfinding and fall-back
 // queries never need a useful answer: return no path and reflect the origin.
 func (hostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
-func (hostileGeo) Walkable(int, int, int) bool { return true }
+func (hostileGeo) Walkable(int, int, int) bool                                 { return true }
 func (hostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

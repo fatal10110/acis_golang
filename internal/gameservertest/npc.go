@@ -95,6 +95,7 @@ func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at loc
 		AtkSpd:          300,
 		RunSpeed:        120,
 		WalkSpeed:       60,
+		CanMove:         true,
 		CollisionRadius: 8,
 		CollisionHeight: 20,
 	}
