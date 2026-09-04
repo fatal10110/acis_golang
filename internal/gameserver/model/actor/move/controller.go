@@ -115,8 +115,9 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 		self.SetHeading(event.Origin.HeadingTo(event.Destination))
 		return self.BroadcastMove(event)
 	})
-	move.SetBlockedHook(func() { _ = self.BroadcastStop() })
-	return &Controller{move: move, self: self}, nil
+	c := &Controller{move: move, self: self}
+	move.SetBlockedHook(c.broadcastBlockedCorrection)
+	return c, nil
 }
 
 // ObjectID returns the actor id this controller moves.
@@ -324,16 +325,26 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 }
 
 // SetBlocked records the callback invoked when an in-flight move is stopped
-// by a newly blocked geodata path. The controller still broadcasts a stop
-// at the blocked cell; a nil callback leaves that broadcast as the only
-// side effect.
+// by a newly blocked geodata path. The controller still broadcasts a
+// same-cell MoveToLocation correction; a nil callback leaves that broadcast
+// as the only side effect.
 func (c *Controller) SetBlocked(blocked func()) {
 	c.move.SetBlockedHook(func() {
-		_ = c.self.BroadcastStop()
+		c.broadcastBlockedCorrection()
 		if blocked != nil {
 			blocked()
 		}
 	})
+}
+
+// broadcastBlockedCorrection snaps observers to the cell the actor actually
+// stopped on. A same-cell MoveToLocation is the correction packet; StopMove
+// would freeze client prediction at the stale destination. This is the base
+// blocked-arrival branch only; player INTERACT (StopMove in range) and CAST
+// (DIST_TOO_FAR_CASTING_STOPPED) are not this hook: #2231.
+func (c *Controller) broadcastBlockedCorrection() {
+	pos := c.move.Position()
+	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})
 }
 
 // SetArrived records the callback invoked once movement this controller
