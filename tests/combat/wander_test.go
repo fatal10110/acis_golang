@@ -328,7 +328,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 // TestMakerIdleWanderOutOfTerritoryStaysIdle pins AttackableAI.thinkWander
 // when the maker NPC is outside the polygon but still at spawn: returnHome
 // is a no-op (inside 2D drift) and random walk is skipped, so intention
-// drops to idle.
+// drops to idle and the wander desire leaves the queue.
 func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -353,6 +353,9 @@ func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	}
+	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire still queued after out-of-territory Think, want it dropped")
 	}
 	if hostile.IsMoving() {
 		t.Fatal("IsMoving() = true for out-of-territory maker NPC at home, want idle")
