@@ -906,9 +906,14 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 			_ = h.move.MoveHome(h.Instance.Home)
 			return true
 		}
-		// AddMoveToDesire may drop the request (movement disabled, or the
-		// destination is not a straight-line walk). Return true anyway: the
-		// wander loop treats return-home as handled and must not random-walk.
+		// AddMoveToDesire drops an unreachable home (no straight-line walk).
+		// Count that as a path failure so the teleport recovery above still
+		// trips — otherwise the wander loop treats return-home as handled,
+		// never calls MoveHome, and the fail counter stays at 0 forever.
+		if g, ok := h.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(h.Instance.Home) {
+			h.AddGeoPathFailCount()
+			return true
+		}
 		h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight)
 		return true
 	}

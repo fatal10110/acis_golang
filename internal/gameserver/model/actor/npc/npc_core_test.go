@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -920,6 +921,34 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionMoveTo)
+	}
+}
+
+func TestSiegeGuardUnreachableHomeTeleportsAfterFailLimit(t *testing.T) {
+	movement := &hostileMove{denyMove: true}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	for i := 1; i <= move.HomeGeoFailLimit; i++ {
+		if !hostile.ReturnHome() {
+			t.Fatalf("ReturnHome() = false on attempt %d, want true", i)
+		}
+		if movement.home != (location.Location{}) {
+			t.Fatalf("MoveHome on attempt %d = %#v, want no walk", i, movement.home)
+		}
+		if got := hostile.GeoPathFailCount(); got != i {
+			t.Fatalf("GeoPathFailCount() = %d after attempt %d, want %d", got, i, i)
+		}
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false after fail limit, want teleport via MoveHome")
+	}
+	if movement.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
 	}
 }
 

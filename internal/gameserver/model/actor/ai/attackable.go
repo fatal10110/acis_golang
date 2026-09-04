@@ -859,24 +859,27 @@ func (a *Attackable) thinkMoveTo() {
 	_ = a.move.MoveHome(a.current.loc)
 }
 
-// Arrived clears a MOVE_TO desire when movement finishes. Callers then run
-// Think so an unqueued MOVE_TO intention drops to idle instead of restarting
-// the walk against a geodata-snapped destination that no longer equals Home.
+// Arrived clears a MOVE_TO desire when movement finishes and idles the
+// intention immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while
+// an attack or cast is in flight, so leaving current as MOVE_TO would
+// restart MoveHome on the same Think that production arrival hooks run.
 func (a *Attackable) Arrived() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.current.kind == IntentionMoveTo {
 		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
 	}
 }
 
 // ArrivedBlocked clears a MOVE_TO desire when an in-flight walk is stopped
-// by a blocked geodata path.
+// by a blocked geodata path and idles the intention, same as Arrived.
 func (a *Attackable) ArrivedBlocked() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.current.kind == IntentionMoveTo {
 		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
 	}
 }
 

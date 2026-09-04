@@ -92,6 +92,7 @@ type hostileMove struct {
 	// geometry.
 	followResult bool
 	followErr    error
+	denyMove     bool
 }
 
 func (m *hostileMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -104,6 +105,8 @@ func (m *hostileMove) MoveHome(home location.Location) error {
 	m.home = home
 	return nil
 }
+
+func (m *hostileMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
 func (m *hostileMove) MoveToLocation(target location.Location) (bool, error) {
 	m.locations = append(m.locations, target)

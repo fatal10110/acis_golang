@@ -1337,6 +1337,37 @@ func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
 	}
 }
 
+func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	mv := &recordingMove{}
+	atk := &recordingAttack{attackingNow: true}
+	brain := NewAttackable(owner, mv, atk)
+	home := location.Location{}
+
+	brain.SetWander()
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	}
+
+	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
+	brain.Arrived()
+	mv.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after Arrived error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after Arrived while attacking = %v, want idle", got)
+	}
+	if mv.home == home {
+		t.Fatal("Think after Arrived restarted MoveHome while attacking")
+	}
+}
+
 func TestAttackableAIAddMoveToDesireSkipsUnreachable(t *testing.T) {
 	owner := actor(1)
 	move := &recordingMove{denyMove: true}
