@@ -952,6 +952,27 @@ func TestSiegeGuardUnreachableHomeTeleportsAfterFailLimit(t *testing.T) {
 	}
 }
 
+func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Template.CanMove = false
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() = %d, want 0 when movement disabled", got)
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk", movement.home)
+	}
+}
+
 func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})

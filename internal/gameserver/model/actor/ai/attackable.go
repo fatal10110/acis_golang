@@ -312,16 +312,17 @@ type followThinker interface {
 	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
 }
 
-// AddMoveToDesire queues a weighted MOVE_TO request. It does not take the
-// AI mutex so ReturnHome can enqueue from thinkWander, which already holds
-// it. A movement-disabled actor, or one whose move controller reports the
-// destination unreachable, drops the request.
-func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) {
+// AddMoveToDesire queues a weighted MOVE_TO request and reports whether it
+// was accepted. It does not take the AI mutex so ReturnHome can enqueue
+// from thinkWander, which already holds it. A movement-disabled actor, or
+// one whose move controller reports the destination unreachable, drops the
+// request.
+func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
 	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
-		return
+		return false
 	}
 	if g, ok := a.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(loc) {
-		return
+		return false
 	}
 	a.desires.AddOrUpdate(&Desire{
 		Kind:     IntentionMoveTo,
@@ -329,6 +330,7 @@ func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) {
 		Weight:   weight,
 		QueuedAt: time.Now(),
 	})
+	return true
 }
 
 func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64) {

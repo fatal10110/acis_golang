@@ -1373,7 +1373,9 @@ func TestAttackableAIAddMoveToDesireSkipsUnreachable(t *testing.T) {
 	move := &recordingMove{denyMove: true}
 	brain := NewAttackable(owner, move, &recordingAttack{})
 
-	brain.AddMoveToDesire(location.Location{X: 50, Y: 0, Z: 0}, 1_000_000)
+	if brain.AddMoveToDesire(location.Location{X: 50, Y: 0, Z: 0}, 1_000_000) {
+		t.Fatal("AddMoveToDesire() = true, want false when unreachable")
+	}
 	if got := brain.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires = %d, want 0", got)
 	}

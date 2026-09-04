@@ -906,15 +906,13 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 			_ = h.move.MoveHome(h.Instance.Home)
 			return true
 		}
-		// AddMoveToDesire drops an unreachable home (no straight-line walk).
-		// Count that as a path failure so the teleport recovery above still
-		// trips — otherwise the wander loop treats return-home as handled,
-		// never calls MoveHome, and the fail counter stays at 0 forever.
-		if g, ok := h.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(h.Instance.Home) {
+		// AddMoveToDesire drops an unreachable or movement-disabled home.
+		// Count only a reachability miss as a path failure so the teleport
+		// recovery above still trips; a root expires on its own and must
+		// not burn fail count.
+		if !h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
 			h.AddGeoPathFailCount()
-			return true
 		}
-		h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight)
 		return true
 	}
 	_ = h.move.MoveHome(h.Instance.Home)
