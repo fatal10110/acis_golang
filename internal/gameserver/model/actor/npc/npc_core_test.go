@@ -14,9 +14,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -814,6 +816,109 @@ func TestInTerritoryIsStrict3D(t *testing.T) {
 	}
 }
 
+// MultiSpawn.isInMyTerritory uses banned-then-allowed polygon containment,
+// not Spawn's MAX_DRIFT_RANGE sphere. A point 250 from home is outside the
+// sphere and still inside this rectangle (Nightmare Lord / dion13_2222_01).
+func TestInTerritoryMakerUsesPolygonNotHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{makerPoly()}}
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if !hostile.InTerritory() {
+		t.Fatal("InTerritory() = false at home+250 inside maker polygon, want true")
+	}
+	if hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = true inside maker polygon, want no-op")
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
+	}
+}
+
+func TestInTerritoryNilMakerKeepsHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true at home+250 with nil Maker, want false")
+	}
+}
+
+func TestInTerritoryEmptyMakerTerritoriesKeepsHomeSphere(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{}
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	if !hostile.InTerritory() {
+		t.Fatal("InTerritory() = false at home+100 with empty maker territories, want true (home sphere)")
+	}
+}
+
+func TestInTerritoryMakerOutsidePolygon(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{makerPoly()}}
+	world.New().Spawn(hostile, 5000, 0, 0, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true outside maker polygon, want false")
+	}
+}
+
+func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	allowed := makerPoly()
+	banned := &spawn.Territory{
+		Name: "banned",
+		MinZ: -1000,
+		MaxZ: 1000,
+		Nodes: []spawn.Node{
+			{X: 300, Y: -50},
+			{X: 400, Y: -50},
+			{X: 400, Y: 50},
+			{X: 300, Y: 50},
+		},
+	}
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = home
+	hostile.Instance.Maker = &spawn.Maker{
+		Territories:       []*spawn.Territory{allowed},
+		BannedTerritories: []*spawn.Territory{banned},
+	}
+	world.New().Spawn(hostile, home.X+250, home.Y, home.Z, 0)
+
+	if hostile.InTerritory() {
+		t.Fatal("InTerritory() = true inside banned territory, want false")
+	}
+}
+
+func makerPoly() *spawn.Territory {
+	return &spawn.Territory{
+		Name: "maker",
+		MinZ: -1000,
+		MaxZ: 1000,
+		Nodes: []spawn.Node{
+			{X: -1000, Y: -1000},
+			{X: 2000, Y: -1000},
+			{X: 2000, Y: 2000},
+			{X: -1000, Y: 2000},
+		},
+	}
+}
+
 func TestReturnHomeAtExactTerritoryBoundaryWalksBack(t *testing.T) {
 	home := location.Location{X: 100, Y: 0, Z: 0}
 	movement := &hostileMove{}
@@ -875,6 +980,14 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantHome)
 			}
 			if tc.wantHome {
+				if tc.kind == "SiegeGuard" {
+					if movement.home != (location.Location{}) {
+						t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+					}
+					if err := hostile.Think(); err != nil {
+						t.Fatalf("Think() error: %v", err)
+					}
+				}
 				if movement.home != home {
 					t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
 				}
@@ -901,8 +1014,66 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want SiegeGuard to return outside its 20-unit drift range")
 	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+	}
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 	if got := movement.home; got != hostile.Instance.Home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionMoveTo)
+	}
+}
+
+func TestSiegeGuardUnreachableHomeTeleportsAfterFailLimit(t *testing.T) {
+	movement := &hostileMove{denyMove: true}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	for i := 1; i <= move.HomeGeoFailLimit; i++ {
+		if !hostile.ReturnHome() {
+			t.Fatalf("ReturnHome() = false on attempt %d, want true", i)
+		}
+		if movement.home != (location.Location{}) {
+			t.Fatalf("MoveHome on attempt %d = %#v, want no walk", i, movement.home)
+		}
+		if got := hostile.GeoPathFailCount(); got != i {
+			t.Fatalf("GeoPathFailCount() = %d after attempt %d, want %d", got, i, i)
+		}
+	}
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false after fail limit, want teleport via MoveHome")
+	}
+	if movement.home != home {
+		t.Fatalf("MoveHome destination = %#v, want %#v", movement.home, home)
+	}
+}
+
+func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
+	movement := &hostileMove{}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "SiegeGuard"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Template.CanMove = false
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Home = home
+	world.New().Spawn(hostile, home.X+100, home.Y, home.Z, 0)
+
+	if !hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = false, want true outside drift range")
+	}
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() = %d, want 0 when movement disabled", got)
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk", movement.home)
 	}
 }
 
@@ -956,6 +1127,33 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("wander recheck did not move behind the actor")
+	}
+}
+
+func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
+	// GrandBoss.returnHome is unconditionally false. A boss spawned
+	// outside drift range must not MoveHome or take the Attackable
+	// delayed backward nudge.
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.Kind = "GrandBoss"
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.WalkSpeed = 100
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	hostile.AI().SetWander()
+
+	if hostile.ReturnHome() {
+		t.Fatal("ReturnHome() = true, want false for GrandBoss")
+	}
+	if movement.home != (location.Location{}) {
+		t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
+	}
+	select {
+	case <-movement.moved:
+		t.Fatal("GrandBoss wander recheck moved behind the actor")
+	case <-time.After(2 * time.Second):
 	}
 }
 

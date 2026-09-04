@@ -219,8 +219,8 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 }
 
 // TestMakerIdleWanderFallsBackToShapeCenter pins MultiSpawn's three-sample
-// miss: every offset leaves the tiny triangle (and the same polygon is
-// banned), so the destination is the geo-validated triangle centroid
+// miss: home sits inside this tiny triangle, and every walk offset leaves
+// it, so the destination is the geo-validated triangle centroid
 // (55+65+60)/3, (15+15+28)/3.
 func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	srv := gameservertest.Boot(t,
@@ -237,10 +237,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 		spawn.Node{X: 65, Y: 15},
 		spawn.Node{X: 60, Y: 28},
 	)
-	hostile.Instance.Maker = &spawn.Maker{
-		Territories:       []*spawn.Territory{poly},
-		BannedTerritories: []*spawn.Territory{poly},
-	}
+	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
 	drainUntilQuiet(t, c)
 
 	if err := hostile.Think(); err != nil {
@@ -254,10 +251,11 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	}
 }
 
-// TestMakerIdleWanderOutOfTerritoryPicksTerritoryPoint pins MultiSpawn when
-// the NPC's current XY is outside every triangle: destination is a
-// geo-height sample inside the maker territory (avgZ, not the NPC's Z).
-func TestMakerIdleWanderOutOfTerritoryPicksTerritoryPoint(t *testing.T) {
+// TestMakerIdleWanderOutOfTerritoryStaysIdle pins AttackableAI.thinkWander
+// when the maker NPC is outside the polygon but still at spawn: returnHome
+// is a no-op (inside 2D drift) and random walk is skipped, so intention
+// drops to idle.
+func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -279,13 +277,11 @@ func TestMakerIdleWanderOutOfTerritoryPicksTerritoryPoint(t *testing.T) {
 	if err := hostile.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
-	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
-	if !poly.Contains2D(dest.X, dest.Y) {
-		t.Fatalf("out-of-territory dest XY = (%d,%d), want inside 500..800 square", dest.X, dest.Y)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle", got)
 	}
-	if dest.Z != 50 {
-		t.Fatalf("out-of-territory dest Z = %d, want avgZ 50", dest.Z)
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true for out-of-territory maker NPC at home, want idle")
 	}
 }
 

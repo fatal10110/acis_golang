@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -24,6 +25,10 @@ import (
 )
 
 const defaultDriftRange = 200
+
+// siegeGuardHomeMoveWeight is the MOVE_TO desire weight SiegeGuard return-home
+// queues so it outranks wander and ordinary combat desires.
+const siegeGuardHomeMoveWeight = 1_000_000
 
 // partyRangeDefault mirrors players.properties' PartyRange default (1500),
 // used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
@@ -836,6 +841,9 @@ func (h *Hostile) PoleAttackCountMax() int {
 
 // ReturnHome reports whether this NPC started returning to its spawn.
 func (h *Hostile) ReturnHome() bool {
+	if hostileKind(h.Instance) == "GrandBoss" {
+		return false
+	}
 	if h.SiegeGuard() {
 		return h.returnHomeOutsideDriftRange()
 	}
@@ -848,12 +856,22 @@ func (h *Hostile) ReturnHome() bool {
 // InTerritory reports whether this NPC is inside its spawn territory.
 // A living private uses its master's territory. A dead master is treated
 // as unlinked, so the private stays in-territory for the corpse window.
+// Maker NPCs with a resolved territory use banned-then-allowed polygon
+// containment. A nil maker, or a maker with no territories, uses a strict
+// 200-unit 3D sphere around Home.
 func (h *Hostile) InTerritory() bool {
 	if master := h.Master(); master != nil {
 		if master.Dead() {
 			return true
 		}
 		return master.InTerritory()
+	}
+	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
+		loc := h.location()
+		if maker.ContainsBanned(loc) {
+			return false
+		}
+		return maker.Contains(loc)
 	}
 	if !h.Instance.HasHome {
 		return true
@@ -896,10 +914,22 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 	} else {
 		h.ForceWalkStance()
 	}
-	_ = h.move.MoveHome(h.Instance.Home)
-	if !h.SiegeGuard() {
-		h.scheduleWanderRecheck()
+	if h.SiegeGuard() {
+		if h.GeoPathFailCount() >= move.HomeGeoFailLimit {
+			_ = h.move.MoveHome(h.Instance.Home)
+			return true
+		}
+		// AddMoveToDesire drops an unreachable or movement-disabled home.
+		// Count only a reachability miss as a path failure so the teleport
+		// recovery above still trips; a root expires on its own and must
+		// not burn fail count.
+		if !h.brain.AddMoveToDesire(h.Instance.Home, siegeGuardHomeMoveWeight) && !h.MovementDisabled() {
+			h.AddGeoPathFailCount()
+		}
+		return true
 	}
+	_ = h.move.MoveHome(h.Instance.Home)
+	h.scheduleWanderRecheck()
 	return true
 }
 

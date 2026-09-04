@@ -106,6 +106,7 @@ type intention struct {
 	kind   Intention
 	target attackable.Combatant
 	skill  skill.Ref
+	loc    location.Location
 	timer  int
 }
 
@@ -309,6 +310,27 @@ type idleFollower interface {
 // follow movement while IntentionFollow is current.
 type followThinker interface {
 	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
+}
+
+// AddMoveToDesire queues a weighted MOVE_TO request and reports whether it
+// was accepted. It does not take the AI mutex so ReturnHome can enqueue
+// from thinkWander, which already holds it. A movement-disabled actor, or
+// one whose move controller reports the destination unreachable, drops the
+// request.
+func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
+	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
+		return false
+	}
+	if g, ok := a.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(loc) {
+		return false
+	}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:     IntentionMoveTo,
+		Location: loc,
+		Weight:   weight,
+		QueuedAt: time.Now(),
+	})
+	return true
 }
 
 func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64) {
@@ -584,6 +606,9 @@ func (a *Attackable) Think() error {
 		case IntentionWander:
 			a.thinkWander()
 			a.lastDesire = IntentionWander
+		case IntentionMoveTo:
+			a.thinkMoveTo()
+			a.lastDesire = IntentionMoveTo
 		}
 		return nil
 	}
@@ -613,6 +638,8 @@ func (a *Attackable) promoteNext() {
 		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
 	case IntentionWander:
 		next = intention{kind: IntentionWander, timer: desire.Timer}
+	case IntentionMoveTo:
+		next = intention{kind: IntentionMoveTo, loc: desire.Location}
 	default:
 		return
 	}
@@ -719,6 +746,11 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 		if !a.desires.Has(probe) {
 			a.current = intention{kind: IntentionIdle}
 		}
+	case IntentionMoveTo:
+		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
+		if !a.desires.Has(probe) {
+			a.current = intention{kind: IntentionIdle}
+		}
 	}
 }
 
@@ -810,6 +842,52 @@ func (a *Attackable) thinkCast() (bool, error) {
 
 	a.cast.Cast(target, ref)
 	return false, stopErr
+}
+
+func (a *Attackable) thinkMoveTo() {
+	if a.actor.DenyAIAction() {
+		return
+	}
+	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
+		return
+	}
+	if ox, oy, oz, ok := combatantPosition(a.actor); ok {
+		if (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
+			a.clearCurrentDesire()
+			a.current = intention{kind: IntentionIdle}
+			return
+		}
+	}
+	_ = a.move.MoveHome(a.current.loc)
+}
+
+// Arrived clears a MOVE_TO desire when movement finishes and idles the
+// intention immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while
+// an attack or cast is in flight, so leaving current as MOVE_TO would
+// restart MoveHome on the same Think that production arrival hooks run.
+func (a *Attackable) Arrived() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.current.kind == IntentionMoveTo {
+		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
+	}
+}
+
+// ArrivedBlocked clears a MOVE_TO desire when an in-flight walk is stopped
+// by a blocked geodata path and idles the intention, same as Arrived.
+func (a *Attackable) ArrivedBlocked() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.current.kind == IntentionMoveTo {
+		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
+	}
+}
+
+func (a *Attackable) clearCurrentDesire() {
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill}
+	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 
 func (a *Attackable) thinkWander() {
