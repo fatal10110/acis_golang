@@ -271,6 +271,11 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	} else if c.actor.PhysicalMuted() {
 		return ErrPhysicalMuted
 	}
+	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
+		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
+			return ErrCubicListFull
+		}
+	}
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
 		return ErrNotEnoughItems
 	}
@@ -298,14 +303,6 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 		}
 	} else if c.actor.PhysicalMuted() {
 		return ErrPhysicalMuted
-	}
-	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
-		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
-			return ErrCubicListFull
-		}
-	}
-	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
-		return ErrNotEnoughItems
 	}
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -196,6 +197,54 @@ func TestCastRejectedInsufficientMP(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
 	reply := c.Read()
 	assertStaticSystemMessage(t, reply, serverpackets.SystemMessageNotEnoughMP)
+	drainUntilQuiet(t, c)
+}
+
+func TestSelfCubicCastRejectsWhenListIsFull(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: 4, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON", IsCubic: true,
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 4, 1)
+	startInWorld(t, c)
+
+	actor, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("caster state missing")
+	}
+	cubics, ok := actor.(interface {
+		AddOrRefreshCubic(cubic.ID, bool) (bool, bool)
+	})
+	if !ok {
+		t.Fatalf("caster state %T does not expose AddOrRefreshCubic", actor)
+	}
+	cubics.AddOrRefreshCubic(cubic.Storm, false)
+
+	c.Send(encodeRequestMagicSkillUse(4, false, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCubicSummoningFailed)
+	drainUntilQuiet(t, c)
+}
+
+func TestCastItemConsumeShortageNamesSkill(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			ItemConsumeID: 57, ItemConsumeCount: 1,
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 5, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(5, false, false))
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, 5, 1)
 	drainUntilQuiet(t, c)
 }
 
