@@ -2358,6 +2358,29 @@ func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 	}
 }
 
+func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
+	ch := newRequestCharacter(10)
+	target := &requestTarget{id: 20}
+	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	defs := requestDefinitions{
+		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable},
+	}
+
+	started, err := StartItemSkill(ItemSkillRequest{
+		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch, Selected: target,
+		Skill: modelskill.Ref{ID: 7, Level: 1}, Definitions: defs,
+		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+			return target, skilltarget.CastRejectInvalidTarget
+		},
+	})
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("StartItemSkill() error = %v, want ErrInvalidTarget", err)
+	}
+	if started.Target != target || started.Rejection != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("started = %+v, want preserved invalid target", started)
+	}
+}
+
 func TestResolvePlayerToggleAcceptsKnownToggleSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(288, 1)

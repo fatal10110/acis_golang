@@ -77,12 +77,13 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 // the definition directly (an item's own attached-skill entry), instead of
 // being looked up from the caster's learned skill list.
 type ItemSkillRequest struct {
-	Now         time.Time
-	Controller  *Controller
-	Caster      *player.Character
-	Selected    world.Tracked
-	Skill       modelskill.Ref
-	Definitions Definitions
+	Now           time.Time
+	Controller    *Controller
+	Caster        *player.Character
+	Selected      world.Tracked
+	Skill         modelskill.Ref
+	Definitions   Definitions
+	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
 }
 
 // StartItemSkill validates and starts an item-carried skill cast: the same
@@ -98,7 +99,7 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, req.ResolveTarget)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
