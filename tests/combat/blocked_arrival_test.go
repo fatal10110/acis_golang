@@ -38,6 +38,16 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "start walk")
 
+	for i := 0; i < 2; i++ {
+		if _, moving := hostile.Move().UpdatePosition(move.PositionUpdateInterval); !moving {
+			t.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
+		}
+	}
+	advanced := hostile.Move().Position()
+	if advanced == stranded {
+		t.Fatal("Move().Position() still at walk start after interpolation ticks")
+	}
+
 	geo.Block()
 	if _, moving := hostile.Move().UpdatePosition(move.PositionUpdateInterval); moving {
 		t.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
@@ -51,19 +61,7 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 	if objectID != hostile.ObjectID() {
 		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, hostile.ObjectID())
 	}
-	x, y, z := hostile.Position()
-	at := location.Location{X: x, Y: y, Z: z}
-	if dest != at || origin != at {
-		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want current cell %+v", dest, origin, at)
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v (not start %+v)", dest, origin, advanced, stranded)
 	}
-}
-
-func moveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
-	t.Helper()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
-	r := wireReader(frame[1:])
-	objectID = r.ReadInt32()
-	dest = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-	origin = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-	return objectID, dest, origin
 }
