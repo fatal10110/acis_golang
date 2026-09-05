@@ -19,8 +19,8 @@ func TestFirstSpawnSyncsCollarEnchantToPetLevel(t *testing.T) {
 	if actor.Level() != wolfLevel {
 		t.Fatalf("pet level = %d, want %d", actor.Level(), wolfLevel)
 	}
-	if countOpcode(burst, serverpackets.OpcodePetInfo) == 0 {
-		t.Fatalf("spawn burst missing PetInfo: opcodes %x", frameOpcodes(burst))
+	if got := countOpcode(burst, serverpackets.OpcodePetInfo); got != 2 {
+		t.Fatalf("spawn burst PetInfo count = %d, want 2 (collar-sync refresh + Discover); opcodes %x", got, frameOpcodes(burst))
 	}
 	h.assertCollarEnchantedTo(t, wolfLevel)
 }

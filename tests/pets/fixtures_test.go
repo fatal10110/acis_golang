@@ -249,8 +249,9 @@ func (h *petWorld) ownerItemCount(t *testing.T, templateID int32) int {
 
 // giveToPet hands an owner inventory stack (or part of it) to the active
 // pet through the give flow, syncing on a RequestItemList round-trip before
-// the batching tick so the transfer has settled, then consuming both
-// inventory-update frames in wire order.
+// the batching tick so the transfer has settled. After a collar-level sync
+// the owner inventory is already registered, so the transfer tick is
+// owner-side InventoryUpdate then pet-side PetInventoryUpdate.
 func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	t.Helper()
 	// Spawn queues a collar InventoryUpdate on the owner inventory. Flush
@@ -263,7 +264,8 @@ func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	}, serverpackets.OpcodeItemList)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
-	requirePetAndOwnerInventoryUpdates(t, drainFrames(t, h.client), "give to pet")
+	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "give to pet",
+		serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate)
 }
 
 func petCtx() context.Context { return context.Background() }
@@ -442,22 +444,25 @@ func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return nil
 }
 
-func requirePetAndOwnerInventoryUpdates(t *testing.T, frames [][]byte, what string) {
+func requireInventoryUpdateOrder(t *testing.T, frames [][]byte, what string, want ...byte) {
 	t.Helper()
-	var pet, owner bool
+	got := make([]byte, 0, len(want))
 	for _, frame := range frames {
 		if len(frame) == 0 {
 			continue
 		}
 		switch frame[0] {
-		case serverpackets.OpcodePetInventoryUpdate:
-			pet = true
-		case serverpackets.OpcodeInventoryUpdate:
-			owner = true
+		case serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate:
+			got = append(got, frame[0])
 		}
 	}
-	if !pet || !owner {
-		t.Fatalf("%s frames = opcodes %x, want PetInventoryUpdate and InventoryUpdate", what, frameOpcodes(frames))
+	if len(got) < len(want) {
+		t.Fatalf("%s frames = opcodes %x, want inventory-update order %x", what, frameOpcodes(frames), want)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Fatalf("%s inventory-update order = %x, want %x", what, got, want)
+		}
 	}
 }
 

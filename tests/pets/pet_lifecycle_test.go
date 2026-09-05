@@ -78,7 +78,8 @@ func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
 	}, serverpackets.OpcodeItemList)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
-	requirePetAndOwnerInventoryUpdates(t, drainFrames(t, h.client), "take from pet")
+	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "take from pet",
+		serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate)
 
 	if got := h.ownerItemCount(t, item.AdenaID); got != 85 {
 		t.Fatalf("owner adena count = %d, want 85", got)

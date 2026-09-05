@@ -373,7 +373,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		actor.SetOnDespawn(followTicker.Stop)
 	}
 	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
-	actor.SetOwnerInfoRefresher(func() { l.sendSummonInfosToOwner(actor) })
+	actor.SetOwnerInfoRefresher(func() { sendSummonInfosToOwner(actor) })
 	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	actor.SetAutoAttackStopBroadcaster(func() {
 		actor.BroadcastFrame(serverpackets.FrameAutoAttackStop(actor.ObjectID()))
@@ -395,19 +395,6 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, attackerName, damage))
 	})
 	return aiController
-}
-
-func (l *GameClientLink) sendSummonInfosToOwner(actor *summon.Actor) {
-	if actor == nil {
-		return
-	}
-	owner, ok := actor.ActingPlayer().(*livePlayer)
-	if !ok {
-		return
-	}
-	if snap, ok := petInfoSnapshot(actor, owner, owner.npcs); ok {
-		owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
-	}
 }
 
 func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
