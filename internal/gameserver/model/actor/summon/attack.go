@@ -95,6 +95,7 @@ func (a *Actor) CanSee(target attackable.Combatant) bool {
 }
 func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSpeed()) }
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }
+func (a *Actor) ConsumeBowMP()                   {}
 func (a *Actor) WeaponGrade() int                { return 0 }
 func (a *Actor) InPeaceZone() bool {
 	x, y, z := a.Position()

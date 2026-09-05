@@ -159,7 +159,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
-	if got, want := actor.events, []string{"consume", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
+	if got, want := actor.events, []string{"consume", "mp", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
 		t.Fatalf("bow fire events = %v, want %v", got, want)
 	}
 	if actor.drawMs != wantGauge {
@@ -176,8 +176,41 @@ func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
-	if got, want := actor.events, []string{"hit", "broadcast"}; !slices.Equal(got, want) {
+	if got, want := actor.events, []string{"mp", "hit", "broadcast"}; !slices.Equal(got, want) {
 		t.Fatalf("creature bow events = %v, want %v", got, want)
+	}
+}
+
+func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
+	// Independent oracle at fire time: sAtk = 1000; scaled reuse
+	// = 1500*345/500 = 1035. After the draw window, AttackSpeed 350 would
+	// recompute reuse as 1478; the cooldown must stay 1035.
+	actor := &timingPlayer{timingActor: timingActor{
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		reuse:       1500 * time.Millisecond,
+	}}
+	target := &timingTarget{id: 2}
+	clock := &timingClock{}
+	ctrl := NewPlayer(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	if actor.drawMs != 2035 {
+		t.Fatalf("NotifyBowDraw ms = %d, want 2035", actor.drawMs)
+	}
+
+	actor.attackSpeed = 350
+	clock.fire(time.Second)
+	clock.fire(time.Second)
+
+	if got := clock.activeCount(2035 * time.Millisecond); got != 1 {
+		t.Fatalf("frozen reuse timers at 2035ms = %d, want 1", got)
+	}
+	if got := clock.activeCount(2478 * time.Millisecond); got != 0 {
+		t.Fatalf("live-recomputed reuse timers at 2478ms = %d, want 0", got)
 	}
 }
 
@@ -424,6 +457,7 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	a.events = append(a.events, "hit")
 	return Hit{Target: t, Damage: 1}
 }
+func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
 func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
 	a.snapshot = snapshot
 	a.broadcasts++

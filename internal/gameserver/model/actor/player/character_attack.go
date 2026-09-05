@@ -327,15 +327,20 @@ func (c *Character) NotifyBowDraw(gaugeMs int) {
 	}
 }
 
-// ConsumeBowShot spends one equipped arrow and the active bow's MP at fire
-// time. A missing off-hand stack is a silent no-op; a zero MP cost skips
-// the status broadcast.
+// ConsumeBowShot spends one equipped arrow at fire time. A missing
+// off-hand stack is a silent no-op.
 func (c *Character) ConsumeBowShot() {
-	if c.inventory != nil {
-		if arrows := c.inventory.ItemAt(itemcontainer.LHand); arrows != nil {
-			c.inventory.DestroyItem(arrows, 1)
-		}
+	if c.inventory == nil {
+		return
 	}
+	if arrows := c.inventory.ItemAt(itemcontainer.LHand); arrows != nil {
+		c.inventory.DestroyItem(arrows, 1)
+	}
+}
+
+// ConsumeBowMP spends the active bow's MP at fire time. A zero cost
+// skips the status broadcast.
+func (c *Character) ConsumeBowMP() {
 	mp := c.WeaponMPConsume()
 	if mp <= 0 {
 		return
