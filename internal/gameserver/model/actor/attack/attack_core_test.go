@@ -381,8 +381,8 @@ func (a *timingPlayer) NotifyBowDraw(gaugeMs int) {
 	a.drawMs = gaugeMs
 	a.events = append(a.events, "draw")
 }
-func (a *timingPlayer) ClearRecentFakeDeath()     {}
-func (a *timingPlayer) ClientActionFailed()       { a.actionFailed++ }
+func (a *timingPlayer) ClearRecentFakeDeath() {}
+func (a *timingPlayer) ClientActionFailed()   { a.actionFailed++ }
 
 func (a *timingActor) ObjectID() int32                         { return 1 }
 func (a *timingActor) SiegeGuard() bool                        { return false }
