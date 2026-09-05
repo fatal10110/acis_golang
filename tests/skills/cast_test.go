@@ -459,6 +459,39 @@ func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
 	}
 }
 
+// blindGeo is passable movement geo whose line-of-sight query always fails,
+// so a ground-click point is in range but occluded.
+type blindGeo struct{ gameservertest.Geo }
+
+func (blindGeo) CanSeeActor(int, int, int, float64, int, int, int, float64) bool { return false }
+
+// TestGroundCastNoLineOfSightSendsCantSeeTarget pins that an in-range ground
+// click behind terrain still emits CANT_SEE_TARGET then ActionFailed, instead
+// of collapsing to a bare ActionFailed via the nil-target path.
+func TestGroundCastNoLineOfSightSendsCantSeeTarget(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithGeo(blindGeo{}),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, StaticHitTime: true, SkillType: "SIGNET",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 5, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCantSeeTarget)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "ground LOS rejection")
+	drainUntilQuiet(t, c)
+}
+
 // TestGroundCastShiftOutOfRangeRejected verifies the shift-click variant
 // refuses a ground point beyond cast range with the target-too-far message.
 func TestGroundCastShiftOutOfRangeRejected(t *testing.T) {

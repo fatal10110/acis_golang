@@ -284,7 +284,12 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
-	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
+	if finalTarget == nil {
+		return nil, skilltarget.CastRejectNone
+	}
+	// Ground LOS/peace/heading run after cost validation via AfterCanCast.
+	// handler.CanCast here would drop the caster target and skip those messages.
+	if def.Target != modelskill.TargetGround && !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
 		return nil, skilltarget.CastRejectNone
 	}
 	return finalTarget, skilltarget.CastRejectNone
