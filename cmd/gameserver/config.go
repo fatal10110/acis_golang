@@ -371,6 +371,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	maxConnections, err := db.ParseMaxConnections(serverProps.Lookup("MaxConnections"))
+	if err != nil {
+		return gameServerConfig{}, err
+	}
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -391,9 +395,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			},
 		},
 		Database: db.Config{
-			URL:      serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
-			Login:    serverProps.String("Login", "root"),
-			Password: serverProps.String("Password", ""),
+			URL:            serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
+			Login:          serverProps.String("Login", "root"),
+			Password:       serverProps.String("Password", ""),
+			MaxConnections: maxConnections,
 		},
 		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:         serverProps.Bool("AllowWater", true),

@@ -52,6 +52,9 @@ Password = secret
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
 	}
+	if cfg.Database.MaxConnections != 0 {
+		t.Errorf("Database.MaxConnections = %d, want 0 (default pool size)", cfg.Database.MaxConnections)
+	}
 }
 
 func TestLoginServerConfigDefaultsAutoCreateAccounts(t *testing.T) {
@@ -73,6 +76,23 @@ func TestLoginServerConfigDefaultsAutoCreateAccounts(t *testing.T) {
 	}
 	if cfg.LoginBlockAfterBan != 10*time.Minute {
 		t.Errorf("LoginBlockAfterBan = %s, want default 10m", cfg.LoginBlockAfterBan)
+	}
+}
+
+func TestLoginServerConfigFromPropertiesMaxConnections(t *testing.T) {
+	props, err := config.ParseString(`
+URL = jdbc:mariadb://localhost/acis
+MaxConnections = 16
+`)
+	if err != nil {
+		t.Fatalf("ParseString: %v", err)
+	}
+	cfg, err := loginServerConfigFromProperties(loginServerPaths{}, props)
+	if err != nil {
+		t.Fatalf("loginServerConfigFromProperties: %v", err)
+	}
+	if cfg.Database.MaxConnections != 16 {
+		t.Errorf("Database.MaxConnections = %d, want 16", cfg.Database.MaxConnections)
 	}
 }
 

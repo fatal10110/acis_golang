@@ -33,6 +33,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Format
+        run: test -z "$(gofmt -l internal cmd)"
+
       - name: Build
         run: go build ./...
 

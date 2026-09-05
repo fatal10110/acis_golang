@@ -3,3 +3,4 @@ log
 config/
 .DS_Store
 .vscode
+ops/admin-panel/admin-panel

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -32,12 +33,11 @@ func setTCPNoDelayForTest(fd uintptr) (bool, error) {
 	return v != 0, nil
 }
 
-func TestAcceptLoopDrainsHandlersBeforeReturningAcceptError(t *testing.T) {
+func TestAcceptLoopDrainsHandlersBeforeReturningClosedError(t *testing.T) {
 	server, client := net.Pipe()
 	t.Cleanup(func() { client.Close() })
 
-	wantErr := errors.New("accept failed")
-	ln := &oneConnThenErrorListener{conn: server, err: wantErr, addr: server.LocalAddr()}
+	ln := &oneConnThenErrorListener{conn: server, err: net.ErrClosed, addr: server.LocalAddr()}
 	finished := make(chan struct{})
 	errCh := make(chan error, 1)
 	go func() {
@@ -52,8 +52,8 @@ func TestAcceptLoopDrainsHandlersBeforeReturningAcceptError(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		if !errors.Is(err, wantErr) {
-			t.Fatalf("AcceptLoop error = %v, want %v", err, wantErr)
+		if !errors.Is(err, net.ErrClosed) {
+			t.Fatalf("AcceptLoop error = %v, want %v", err, net.ErrClosed)
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("AcceptLoop did not return after accept failure")
@@ -70,10 +70,9 @@ func TestAcceptLoopRetriesTemporaryAcceptError(t *testing.T) {
 	server, client := net.Pipe()
 	t.Cleanup(func() { client.Close() })
 
-	wantErr := errors.New("accept stopped")
 	ln := &temporaryErrorThenConnListener{
 		conn: server,
-		err:  wantErr,
+		err:  net.ErrClosed,
 		addr: server.LocalAddr(),
 	}
 	handled := make(chan struct{})
@@ -90,8 +89,55 @@ func TestAcceptLoopRetriesTemporaryAcceptError(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("handler did not run after temporary accept error")
 	}
-	if err := <-errCh; !errors.Is(err, wantErr) {
-		t.Fatalf("AcceptLoop error = %v, want %v", err, wantErr)
+	if err := <-errCh; !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("AcceptLoop error = %v, want %v", err, net.ErrClosed)
+	}
+}
+
+func TestAcceptLoopReturnsImmediatelyOnErrClosed(t *testing.T) {
+	ln := &oneConnThenErrorListener{err: net.ErrClosed}
+	start := time.Now()
+	err := AcceptLoop(context.Background(), ln, func(net.Conn) {}, zerolog.Nop())
+	if !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("AcceptLoop error = %v, want %v", err, net.ErrClosed)
+	}
+	if elapsed := time.Since(start); elapsed >= acceptRetryMin {
+		t.Fatalf("AcceptLoop returned after %v, want immediately on net.ErrClosed", elapsed)
+	}
+}
+
+func TestAcceptLoopBacksOffOnAcceptError(t *testing.T) {
+	var mu sync.Mutex
+	var calls []time.Time
+	ln := &recordingErrorListener{
+		accept: func() (net.Conn, error) {
+			mu.Lock()
+			calls = append(calls, time.Now())
+			n := len(calls)
+			mu.Unlock()
+			if n >= 3 {
+				return nil, net.ErrClosed
+			}
+			return nil, errors.New("accept busy")
+		},
+	}
+
+	err := AcceptLoop(context.Background(), ln, func(net.Conn) {}, zerolog.Nop())
+	if !errors.Is(err, net.ErrClosed) {
+		t.Fatalf("AcceptLoop error = %v, want %v", err, net.ErrClosed)
+	}
+
+	mu.Lock()
+	got := append([]time.Time(nil), calls...)
+	mu.Unlock()
+	if len(got) != 3 {
+		t.Fatalf("Accept calls = %d, want 3", len(got))
+	}
+	if delay := got[1].Sub(got[0]); delay < 4*time.Millisecond {
+		t.Fatalf("first retry delay = %v, want ~5ms backoff", delay)
+	}
+	if delay := got[2].Sub(got[1]); delay < 8*time.Millisecond {
+		t.Fatalf("second retry delay = %v, want ~10ms backoff", delay)
 	}
 }
 
@@ -204,6 +250,14 @@ func (l *temporaryErrorThenConnListener) Accept() (net.Conn, error) {
 
 func (*temporaryErrorThenConnListener) Close() error     { return nil }
 func (l *temporaryErrorThenConnListener) Addr() net.Addr { return l.addr }
+
+type recordingErrorListener struct {
+	accept func() (net.Conn, error)
+}
+
+func (l *recordingErrorListener) Accept() (net.Conn, error) { return l.accept() }
+func (*recordingErrorListener) Close() error                { return nil }
+func (*recordingErrorListener) Addr() net.Addr              { return nil }
 
 type temporaryError struct{ error }
 

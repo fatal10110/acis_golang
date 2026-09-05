@@ -4,19 +4,30 @@ package netutil
 
 import (
 	"context"
+	"errors"
+	"expvar"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 )
 
-// AcceptLoop accepts connections on ln until ctx is canceled or accepting
-// fails, running handle on its own goroutine per connection. On cancellation
-// it closes the listener and every accepted connection, then waits for all
-// handlers to return. AcceptLoop applies no timeout of its own, so callers
-// that need a bounded shutdown must impose one. Accepted TCP connections
-// have TCP_NODELAY enabled, matching the selector configuration shared by
-// both servers. A panic in either the shutdown
+var openConnections = expvar.NewInt("connections")
+
+const (
+	acceptRetryMin = 5 * time.Millisecond
+	acceptRetryMax = time.Second
+)
+
+// AcceptLoop accepts connections on ln until ctx is canceled or the
+// listener is closed, running handle on its own goroutine per connection.
+// On cancellation it closes the listener and every accepted connection,
+// then waits for all handlers to return. Transient Accept errors retry
+// with exponential backoff from 5ms to 1s. AcceptLoop applies no timeout
+// of its own, so callers that need a bounded shutdown must impose one.
+// Accepted TCP connections have TCP_NODELAY enabled, matching the selector
+// configuration shared by both servers. A panic in either the shutdown
 // watcher or a connection's handle is recovered and logged rather than taking
 // down the caller. The caller owns ln: AcceptLoop closes it on ctx cancellation
 // but does not create it. A zero-value logger disables logging.
@@ -52,6 +63,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 		}
 	}()
 
+	var retryDelay time.Duration
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -59,12 +71,28 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 			case <-ctx.Done():
 				return nil
 			default:
-				if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-					continue
-				}
+			}
+			if errors.Is(err, net.ErrClosed) {
 				return err
 			}
+			if retryDelay == 0 {
+				retryDelay = acceptRetryMin
+			} else {
+				retryDelay *= 2
+				if retryDelay > acceptRetryMax {
+					retryDelay = acceptRetryMax
+				}
+			}
+			timer := time.NewTimer(retryDelay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil
+			case <-timer.C:
+			}
+			continue
 		}
+		retryDelay = 0
 		if tcp, ok := conn.(*net.TCPConn); ok {
 			tcp.SetNoDelay(true)
 		}
@@ -72,6 +100,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 		conns[conn] = struct{}{}
 		handlers.Add(1)
 		connsMu.Unlock()
+		openConnections.Add(1)
 		go func(conn net.Conn) {
 			defer func() {
 				if r := recover(); r != nil {
@@ -80,6 +109,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 				connsMu.Lock()
 				delete(conns, conn)
 				connsMu.Unlock()
+				openConnections.Add(-1)
 				handlers.Done()
 			}()
 			handle(conn)

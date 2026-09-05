@@ -63,3 +63,31 @@ func TestStopAndWaitWaitsForTick(t *testing.T) {
 		t.Fatal("StopAndWait did not return after the tick finished")
 	}
 }
+
+func slowTick() {
+	time.Sleep(2 * time.Millisecond)
+}
+
+func TestStartRecordsTickDuration(t *testing.T) {
+	ticker := Start(time.Millisecond, slowTick, zerolog.Nop())
+	defer ticker.StopAndWait()
+
+	name := tickerName(slowTick)
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		v := tickerVars.Get(name)
+		s, ok := v.(*tickStat)
+		if !ok {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		s.mu.Lock()
+		last, max := s.last, s.max
+		s.mu.Unlock()
+		if last >= int64(2*time.Millisecond) && max >= last {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("ticker %q did not record last/max duration >= 2ms", name)
+}

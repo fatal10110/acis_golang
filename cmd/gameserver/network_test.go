@@ -13,8 +13,8 @@ type rosterPlayerStub struct {
 	account string
 }
 
-func (s rosterPlayerStub) ObjectID() int32      { return s.id }
-func (s rosterPlayerStub) AccountName() string  { return s.account }
+func (s rosterPlayerStub) ObjectID() int32     { return s.id }
+func (s rosterPlayerStub) AccountName() string { return s.account }
 
 func TestOnlineAccountsCollectsWorldRoster(t *testing.T) {
 	state := world.New()

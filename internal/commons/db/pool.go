@@ -14,17 +14,21 @@ import (
 // Config is the MariaDB connection setup read from a server's Database
 // section (the URL, Login, and Password keys).
 type Config struct {
-	URL      string
-	Login    string
-	Password string
+	URL            string
+	Login          string
+	Password       string
+	MaxConnections int
 }
 
 // Default pool sizing. The shipped config files carry no pool-size keys, so
 // this mirrors the MariaDB connector's own pool defaults: 8 connections,
-// idle ones dropped after 10 minutes.
+// idle ones dropped after 10 minutes. Connections are also recycled after
+// 5 minutes so a restarted or failed-over MariaDB cannot be held by a
+// long-lived client connection.
 const (
-	defaultMaxOpenConns = 8
-	defaultMaxIdleTime  = 10 * time.Minute
+	defaultMaxOpenConns    = 8
+	defaultMaxIdleTime     = 10 * time.Minute
+	defaultConnMaxLifetime = 5 * time.Minute
 )
 
 // Open builds a MariaDB connection pool from cfg. It does not dial the
@@ -42,9 +46,14 @@ func Open(cfg Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("open database pool: %w", err)
 	}
 
-	pool.SetMaxOpenConns(defaultMaxOpenConns)
-	pool.SetMaxIdleConns(defaultMaxOpenConns)
+	maxOpen := cfg.MaxConnections
+	if maxOpen <= 0 {
+		maxOpen = defaultMaxOpenConns
+	}
+	pool.SetMaxOpenConns(maxOpen)
+	pool.SetMaxIdleConns(maxOpen)
 	pool.SetConnMaxIdleTime(defaultMaxIdleTime)
+	pool.SetConnMaxLifetime(defaultConnMaxLifetime)
 	return pool, nil
 }
 
@@ -92,6 +101,19 @@ func dataSourceName(cfg Config) (string, error) {
 	}
 
 	return driverCfg.FormatDSN(), nil
+}
+
+// ParseMaxConnections reads the optional MaxConnections property. A missing
+// key yields 0, which Open treats as the default pool size.
+func ParseMaxConnections(value string, present bool) (int, error) {
+	if !present {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("parse MaxConnections as int: %w", err)
+	}
+	return n, nil
 }
 
 // applyConnectorOption translates one MariaDB Connector/J URL option

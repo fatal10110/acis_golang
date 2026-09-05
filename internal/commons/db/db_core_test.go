@@ -144,8 +144,35 @@ func TestOpenConfiguresPoolWithoutDialing(t *testing.T) {
 	}
 }
 
+func TestOpenHonorsMaxConnections(t *testing.T) {
+	pool, err := Open(Config{URL: "jdbc:mariadb://localhost/acis", Login: "root", MaxConnections: 16})
+	if err != nil {
+		t.Fatalf("Open() unexpected error: %v", err)
+	}
+	defer pool.Close()
+
+	stats := pool.Stats()
+	if stats.MaxOpenConnections != 16 {
+		t.Errorf("MaxOpenConnections = %d, want 16", stats.MaxOpenConnections)
+	}
+}
+
 func TestOpenRejectsMalformedURL(t *testing.T) {
 	if _, err := Open(Config{URL: "not-a-jdbc-url"}); err == nil {
 		t.Fatal("Open() with malformed url: want error, got nil")
+	}
+}
+
+func TestParseMaxConnections(t *testing.T) {
+	got, err := ParseMaxConnections("", false)
+	if err != nil || got != 0 {
+		t.Fatalf("missing key: got %d, %v; want 0, nil", got, err)
+	}
+	got, err = ParseMaxConnections("16", true)
+	if err != nil || got != 16 {
+		t.Fatalf("present key: got %d, %v; want 16, nil", got, err)
+	}
+	if _, err := ParseMaxConnections("nope", true); err == nil {
+		t.Fatal("malformed value: want error")
 	}
 }

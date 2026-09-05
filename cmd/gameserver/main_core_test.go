@@ -97,6 +97,9 @@ HexID = -7fff
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
 	}
+	if cfg.Database.MaxConnections != 0 {
+		t.Errorf("Database.MaxConnections = %d, want 0 (default pool size)", cfg.Database.MaxConnections)
+	}
 	if cfg.AllowCursedWeapons {
 		t.Error("AllowCursedWeapons = true, want false")
 	}
@@ -108,6 +111,30 @@ HexID = -7fff
 	}
 	if cfg.TownCombatRule != 2 {
 		t.Errorf("TownCombatRule = %d, want ZoneTown 2", cfg.TownCombatRule)
+	}
+}
+
+func TestGameServerConfigFromPropertiesMaxConnections(t *testing.T) {
+	serverProps, err := config.ParseString(`
+URL = jdbc:mariadb://localhost/acis
+MaxConnections = 16
+`)
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+	hexProps, err := config.ParseString(`
+ServerID = 3
+HexID = -7fff
+`)
+	if err != nil {
+		t.Fatalf("ParseString hexid: %v", err)
+	}
+	cfg, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, hexProps)
+	if err != nil {
+		t.Fatalf("gameServerConfigFromProperties: %v", err)
+	}
+	if cfg.Database.MaxConnections != 16 {
+		t.Errorf("Database.MaxConnections = %d, want 16", cfg.Database.MaxConnections)
 	}
 }
 
