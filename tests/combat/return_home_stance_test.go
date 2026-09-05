@@ -35,8 +35,9 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 }
 
 // TestSiegeGuardReturnHomeBroadcastsRunThenMove pins SiegeGuard.returnHome:
-// forceRunStance immediately, then a MOVE_TO home desire that the next Think
-// promotes and walks. Arrival at spawn idles (SiegeGuard does not idle-wander).
+// forceRunStance immediately, then a MOVE_TO home desire that the next
+// TickThink promotes and walks. Arrival at spawn idles (SiegeGuard does
+// not idle-wander).
 func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -51,20 +52,19 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 
 	hostile.SetRunning(false)
 	hostile.SetXYZ(hostileX, hostileY+50, hostileZ)
-	hostile.AI().SetWander()
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
 	}
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
-		t.Fatalf("CurrentIntention() after ReturnHome = %v, want wander until Think", got)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after ReturnHome = %v, want idle until TickThink", got)
 	}
 
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after Think = %v, want move_to", got)
+		t.Fatalf("CurrentIntention() after TickThink = %v, want move_to", got)
 	}
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 

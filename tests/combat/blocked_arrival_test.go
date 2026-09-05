@@ -28,7 +28,6 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 	stranded := location.Location{X: hostileX, Y: hostileY + 50, Z: hostileZ}
 	hostile.SetRunning(false)
 	hostile.SetXYZ(stranded.X, stranded.Y, stranded.Z)
-	hostile.AI().SetWander()
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
 	}

@@ -494,14 +494,6 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 	a.hates.AddDefault(attacker, a.actor.InTerritory())
 }
 
-// SetWander makes the next Think process wander/return-home behavior.
-func (a *Attackable) SetWander() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
-	a.wanderReady = time.Time{}
-}
-
 // SetBackToPeace clears combat memory and cancels the current action. It
 // does not start a return-home walk; an out-of-territory owner stays idle
 // until a later Think queues a new desire.

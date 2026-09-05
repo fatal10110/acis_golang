@@ -1258,10 +1258,12 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	hostile.SetHeading(0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if movement.home != (location.Location{X: 100, Y: 0, Z: 0}) {
+		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
 	}
 
 	select {
@@ -1286,7 +1288,6 @@ func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = true, want false for GrandBoss")
@@ -1310,7 +1311,6 @@ func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
 	hostile.Instance.Template.RunSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside drift range")
@@ -1330,11 +1330,11 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 200
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
 	}
+
 	select {
 	case <-movement.moved:
 		t.Fatal("wander recheck fired before the scaled delay")

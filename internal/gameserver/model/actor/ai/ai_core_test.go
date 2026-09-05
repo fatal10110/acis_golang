@@ -35,6 +35,11 @@ func tickThinkPromote(ai *Attackable) error {
 	return ai.TickThink()
 }
 
+func thinkWanderOnce(ai *Attackable) error {
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+	return ai.Think()
+}
+
 func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -1517,8 +1522,9 @@ func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner.returnHome = true
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if owner.returnHomeCalls != 1 {
 		t.Fatalf("ReturnHome calls = %d, want 1", owner.returnHomeCalls)
@@ -1535,8 +1541,9 @@ func TestAttackableAIWanderSkipsReturnHomeWhileMoving(t *testing.T) {
 	owner.moving = true
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if owner.returnHomeCalls != 0 {
 		t.Fatalf("ReturnHome calls = %d, want 0 while moving", owner.returnHomeCalls)
@@ -1548,9 +1555,9 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 	owner.inTerritory = false
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle outside territory without return home", got)
@@ -1568,8 +1575,7 @@ func TestAttackableAIWanderWalksFromSpawnOnFirstStep(t *testing.T) {
 	owner.moveSpeed = 50
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
 
@@ -1679,8 +1685,7 @@ func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
 	move := &recordingMove{}
 	strike := &recordingAttack{attackingNow: true}
 	ai := NewAttackable(owner, move, strike)
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
 	ai.Arrived()
@@ -1745,8 +1750,7 @@ func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
 	ai.SetRandomWalkRate(100)
 	ai.roll = func(int) int { return 0 }
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("first Think() error: %v", err)
 	}
 	owner.wanderCalls = 0
@@ -1784,8 +1788,7 @@ func TestAttackableAIWanderRateZeroReschedulesWithoutWalking(t *testing.T) {
 	ai.now = func() time.Time { return now }
 	ai.SetRandomWalkRate(0)
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("first Think() error: %v", err)
 	}
 	owner.wanderCalls = 0
@@ -1818,8 +1821,7 @@ func TestAttackableAIAttackInterruptsWander(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("wander Think() error: %v", err)
 	}
 
