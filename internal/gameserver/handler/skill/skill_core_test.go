@@ -42,17 +42,20 @@ var (
 
 	// Effect-carrying targets: the destination of any effect-applying,
 	// effect-cancelling, or continuous (buff/debuff/over-time) skill.
-	_ effectListTarget = (*player.Character)(nil)
-	_ effectListTarget = (*npc.Hostile)(nil)
-	_ effectListTarget = (*summon.Actor)(nil)
-	_ effectListTarget = (*npc.EffectPoint)(nil)
-	_ continuousTarget = (*player.Character)(nil)
-	_ continuousTarget = (*npc.Hostile)(nil)
-	_ continuousTarget = (*summon.Actor)(nil)
-	_ disablerTarget   = (*player.Character)(nil)
-	_ disablerTarget   = (*npc.Hostile)(nil)
-	_ disablerTarget   = (*summon.Actor)(nil)
-	_ cancelTarget     = (*player.Character)(nil)
+	_ effectListTarget     = (*player.Character)(nil)
+	_ effectListTarget     = (*npc.Hostile)(nil)
+	_ effectListTarget     = (*summon.Actor)(nil)
+	_ effectListTarget     = (*npc.EffectPoint)(nil)
+	_ continuousTarget     = (*player.Character)(nil)
+	_ continuousTarget     = (*npc.Hostile)(nil)
+	_ continuousTarget     = (*summon.Actor)(nil)
+	_ invulnerableEffected = (*player.Character)(nil)
+	_ invulnerableEffected = (*npc.Hostile)(nil)
+	_ invulnerableEffected = (*summon.Actor)(nil)
+	_ disablerTarget       = (*player.Character)(nil)
+	_ disablerTarget       = (*npc.Hostile)(nil)
+	_ disablerTarget       = (*summon.Actor)(nil)
+	_ cancelTarget         = (*player.Character)(nil)
 
 	// Damage targets: PDAM/CHARGEDAM, MDAM/DEATHLINK, BLOW, and MANADAM
 	// each narrow to one of these before touching HP or MP.
@@ -124,11 +127,21 @@ type effectLandingFake struct {
 	fakeActor
 	list    *effect.List
 	x, y, z int
+	invul   bool
 }
 
 func (f *effectLandingFake) EffectList() *effect.List { return f.list }
 
 func (f *effectLandingFake) Position() (int, int, int) { return f.x, f.y, f.z }
+
+func (f *effectLandingFake) Invul() bool { return f.invul }
+
+type damagePermissionFake struct {
+	fakeActor
+	allow bool
+}
+
+func (f damagePermissionFake) CanGiveDamage() bool { return f.allow }
 
 type positionedFakeActor struct {
 	fakeActor
@@ -227,6 +240,75 @@ func TestApplyEffectsRejectsPerfectShieldBeforeTemplates(t *testing.T) {
 
 	if got := len(target.list.All()); got != 0 {
 		t.Fatalf("landed effects after perfect shield = %d, want 0", got)
+	}
+}
+
+func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T) {
+	landing := []modelskill.EffectTemplate{{Name: "Buff", Time: 60}}
+	tests := []struct {
+		name   string
+		caster Actor
+		target *effectLandingFake
+		def    modelskill.Definition
+		want   int
+	}{
+		{
+			name:   "offensive vs invul",
+			caster: fakeActor{objectID: 1},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			def:    modelskill.Definition{Offensive: true},
+		},
+		{
+			name:   "debuff vs invul",
+			caster: fakeActor{objectID: 1},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			def:    modelskill.Definition{Debuff: true},
+		},
+		{
+			name:   "buff vs invul still lands",
+			caster: fakeActor{objectID: 1},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			want:   1,
+		},
+		{
+			name:   "self offensive on invul still lands",
+			caster: fakeActor{objectID: 1},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: effect.NewList(nil), invul: true},
+			def:    modelskill.Definition{Offensive: true},
+			want:   1,
+		},
+		{
+			name:   "nil caster still refuses invul offensive",
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			def:    modelskill.Definition{Offensive: true},
+		},
+		{
+			name:   "offensive when caster cannot give damage",
+			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			def:    modelskill.Definition{Offensive: true},
+		},
+		{
+			name:   "buff when caster cannot give damage still lands",
+			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			want:   1,
+		},
+		{
+			name:   "offensive when caster may give damage",
+			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			def:    modelskill.Definition{Offensive: true},
+			want:   1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			applyEffects(tt.caster, tt.target, tt.def, landing)
+			if got := len(tt.target.list.All()); got != tt.want {
+				t.Fatalf("landed effects = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -416,6 +498,7 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 type continuousFake struct {
 	id                int32
 	dead, invul       bool
+	denyDamage        bool
 	playable          bool
 	attackableFlag    bool
 	cursed            bool
@@ -454,6 +537,7 @@ func (f *continuousFake) ObjectID() int32                { return f.id }
 func (*continuousFake) CharacterName() string            { return "Target" }
 func (f *continuousFake) Dead() bool                     { return f.dead }
 func (f *continuousFake) Invul() bool                    { return f.invul }
+func (f *continuousFake) CanGiveDamage() bool            { return !f.denyDamage }
 func (f *continuousFake) Playable() bool                 { return f.playable }
 func (f *continuousFake) Attackable() bool               { return f.attackableFlag }
 func (f *continuousFake) CursedWeaponEquipped() bool     { return f.cursed }
@@ -529,6 +613,62 @@ func TestContinuousRegistryHasAllHandledTypes(t *testing.T) {
 		if _, ok := registry.Handler(typ); !ok {
 			t.Errorf("continuous handler missing registered skill type %q", typ)
 		}
+	}
+}
+
+func TestContinuousDebuffSkipsInvulnerableTargetWithoutAttackFailed(t *testing.T) {
+	caster := newContinuousFake(1)
+	target := newContinuousFake(2)
+	target.invul = true
+	result := continuousHandler{}.UseResult(Cast{
+		Caster: caster,
+		Skill: modelskill.Definition{
+			SkillType: "DEBUFF", Debuff: true, Offensive: true,
+			IgnoreResists: true, BaseLandRate: 100,
+			Effects: buffEffect(),
+		},
+		Targets: []Actor{target},
+	})
+	if result.AttackFailed != 0 {
+		t.Fatalf("AttackFailed = %d, want 0 (land roll succeeded; apply refused)", result.AttackFailed)
+	}
+	if got := len(target.list.All()); got != 0 {
+		t.Fatalf("invulnerable target received %d effects, want 0", got)
+	}
+}
+
+func TestContinuousBuffLandsOnInvulnerableTarget(t *testing.T) {
+	caster := newContinuousFake(1)
+	target := newContinuousFake(2)
+	target.invul = true
+	continuousHandler{}.UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "BUFF", Effects: buffEffect()},
+		Targets: []Actor{target},
+	})
+	if got := len(target.list.All()); got != 1 {
+		t.Fatalf("buff on invulnerable target landed %d effects, want 1", got)
+	}
+}
+
+func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
+	caster := newContinuousFake(1)
+	caster.denyDamage = true
+	target := newContinuousFake(2)
+	result := continuousHandler{}.UseResult(Cast{
+		Caster: caster,
+		Skill: modelskill.Definition{
+			SkillType: "DEBUFF", Debuff: true,
+			IgnoreResists: true, BaseLandRate: 100,
+			Effects: buffEffect(),
+		},
+		Targets: []Actor{target},
+	})
+	if result.AttackFailed != 0 {
+		t.Fatalf("AttackFailed = %d, want 0 (land roll succeeded; apply refused)", result.AttackFailed)
+	}
+	if got := len(target.list.All()); got != 0 {
+		t.Fatalf("denied-damage caster landed %d effects, want 0", got)
 	}
 }
 
