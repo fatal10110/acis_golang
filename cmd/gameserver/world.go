@@ -45,10 +45,10 @@ func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
 // provideSpawns loads the spawnlist XML and restores dynamic spawn_data
 // rows, returning the store alongside so it can be reused to persist state
 // back at shutdown.
-func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger, multiplier spawnMultiplier) (*manager.Spawns, *gamesql.SpawnStore, error) {
+func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger, gameplay gameplayConfig) (*manager.Spawns, *gamesql.SpawnStore, error) {
 	store := gamesql.NewSpawnStore(pool)
 	dir := filepath.Join(paths.DataRoot, "data", "xml", "spawnlist")
-	spawns, err := manager.LoadSpawns(context.Background(), dir, store, log, float64(multiplier))
+	spawns, err := manager.LoadSpawns(context.Background(), dir, store, log, float64(gameplay.SpawnMultiplier))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -64,12 +64,12 @@ func provideSpawns(paths gameServerPaths, pool *sql.DB, log zerolog.Logger, mult
 // then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
-func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, buffSlots maxBuffsAmount, walkRate randomWalkRate, failCap maxGeoPathFailCount, log zerolog.Logger, walker *task.Walker) (*manager.Npcs, error) {
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker) (*manager.Npcs, error) {
 	// castTargets/castHandlers are a boot-owned instance for the hostile-NPC
 	// AI cast seam (issue #1612), built the same way NewGameClientLink builds
 	// its own per-connection instance — NPCs are spawned before any client
 	// connects, so they cannot share that one.
-	npc.SetMaxGeoPathFailCount(int(failCap))
+	npc.SetMaxGeoPathFailCount(int(gameplay.MaxGeoPathFailCount))
 	castTargets := skilltarget.NewRegistry(skilltarget.WorldKnown{State: state})
 	castHandlers := handlerskill.NewDefaultRegistryWithSignet(data.Skills, handlerskill.SignetDeps{
 		Templates: data.NPCs,
@@ -78,7 +78,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 		Log:       log,
 	})
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers}, walker, int(buffSlots), int(walkRate), data.Zones)
+		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers}, walker, int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), data.Zones)
 	if err != nil {
 		return nil, err
 	}

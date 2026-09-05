@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func TestIntPairsMalformedValueReturnsEmptyList(t *testing.T) {
@@ -52,9 +51,9 @@ func TestMissingPropertyLogsWarning(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	previous := log.Logger
-	log.Logger = zerolog.New(&output)
-	t.Cleanup(func() { log.Logger = previous })
+	previous := warnLog.Load()
+	SetLogger(zerolog.New(&output))
+	t.Cleanup(func() { warnLog.Store(previous) })
 
 	if got := p.String("missing", "fallback"); got != "fallback" {
 		t.Fatalf("String() = %q, want fallback", got)

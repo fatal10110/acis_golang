@@ -158,7 +158,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	geo, err := loadGeodata(paths)
+	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func loadCrestCache(paths gameServerPaths) (*datacache.Crests, error) {
 	return crests, nil
 }
 
-func loadGeodata(paths gameServerPaths) (*geodata, error) {
+func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func loadGeodata(paths gameServerPaths) (*geodata, error) {
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
 	}
-	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type, geo.EngineOptions)
+	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type, log, geo.EngineOptions)
 	if err != nil {
 		return nil, err
 	}

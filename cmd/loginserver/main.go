@@ -172,6 +172,9 @@ func provideLoginServerLogger(lc fx.Lifecycle, paths loginServerPaths) (zerolog.
 		return zerolog.Logger{}, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
+	// Config warnings are raised lazily while properties are read, so route
+	// them here rather than leaving them on the unconfigured stderr logger.
+	config.SetLogger(rt.Logger)
 	return rt.Logger, nil
 }
 

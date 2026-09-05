@@ -762,7 +762,7 @@ MaxObstacleHeight = 48
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}
@@ -806,7 +806,7 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}

@@ -10,8 +10,31 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rs/zerolog/log"
+	"sync/atomic"
+
+	"github.com/rs/zerolog"
 )
+
+// warnLog receives the missing-key and malformed-value warnings raised while
+// reading properties. It starts as an unconfigured stderr logger so tools
+// that never build one still report, and SetLogger swaps in the process
+// logger so the warnings reach its configured sinks and levels.
+var warnLog atomic.Pointer[zerolog.Logger]
+
+// SetLogger routes config warnings to l. A composition root calls it once,
+// as soon as its logger exists and before it reads any property value.
+func SetLogger(l zerolog.Logger) {
+	warnLog.Store(&l)
+}
+
+func logger() *zerolog.Logger {
+	if l := warnLog.Load(); l != nil {
+		return l
+	}
+	return &defaultWarnLog
+}
+
+var defaultWarnLog = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 // DefaultDelimiters is the split pattern used by the legacy typed array getters.
 const DefaultDelimiters = `[\s,;]+`
@@ -195,7 +218,7 @@ func (p *Properties) Lookup(key string) (string, bool) {
 }
 
 func warnMissing(key string, def any) {
-	log.Warn().Str("key", key).Interface("default", def).Msg("config property missing; using default value")
+	logger().Warn().Str("key", key).Interface("default", def).Msg("config property missing; using default value")
 }
 
 // String returns a string property or def when key is missing.
@@ -367,7 +390,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 		if len(bounds) != 2 {
 			err := fmt.Errorf("parse %s[%d]: want first-second", key, i)
 			if tolerant {
-				log.Warn().Err(err).Str("key", key).Msg("config item pair malformed; using empty list")
+				logger().Warn().Err(err).Str("key", key).Msg("config item pair malformed; using empty list")
 				return nil, nil
 			}
 			return nil, err
@@ -376,7 +399,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] first: %w", key, i, err)
 			if tolerant {
-				log.Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
+				logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
 				return nil, nil
 			}
 			return nil, err
@@ -385,7 +408,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] second: %w", key, i, err)
 			if tolerant {
-				log.Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
+				logger().Error().Err(err).Str("key", key).Msg("config item pair has non-numeric value; using empty list")
 				return nil, nil
 			}
 			return nil, err
