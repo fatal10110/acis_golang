@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"time"
 
@@ -11,12 +12,31 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 )
 
-// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
-// stop hook in turn: draining connections, persisting ground items and npcs,
-// and finally flushing pending item rows. fx's 15s default leaves that last
-// flush able to be cut short by the process exiting rather than by its own
-// itemInstanceShutdownSaveTimeout budget.
-const gameServerStopTimeout = 30 * time.Second
+const (
+	// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
+	// stop hook in turn: draining connections, persisting ground items and npcs,
+	// and finally flushing pending item rows. fx's 15s default leaves that last
+	// flush able to be cut short by the process exiting rather than by its own
+	// item-instance save timeout budget.
+	gameServerStopTimeout = 30 * time.Second
+	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
+	// restore, spawn-state load). fx's 15s start default would otherwise cut
+	// this off while queries still used context.Background().
+	gameServerBootTimeout = 30 * time.Second
+)
+
+// bootContext is the constructor-time I/O deadline. Named so fx cannot inject
+// it into an unrelated context.Context parameter.
+type bootContext struct{ context.Context }
+
+func provideBootContext(lc fx.Lifecycle) bootContext {
+	ctx, cancel := context.WithTimeout(context.Background(), gameServerBootTimeout)
+	lc.Append(fx.Hook{OnStop: func(context.Context) error {
+		cancel()
+		return nil
+	}})
+	return bootContext{ctx}
+}
 
 type gameServerPaths struct {
 	ConfigPath        string
@@ -52,9 +72,11 @@ func parseGameServerFlags() gameServerPaths {
 
 func newGameServerApp(paths gameServerPaths) *fx.App {
 	return fx.New(
+		fx.StartTimeout(gameServerBootTimeout),
 		fx.StopTimeout(gameServerStopTimeout),
 		fx.Supply(paths),
 		fx.Provide(
+			provideBootContext,
 			loadGameServerProperties,
 			loadGameplayConfig,
 			loadPvPFlagOptions,

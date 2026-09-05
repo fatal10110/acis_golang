@@ -14,8 +14,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
-// ItemInstanceTick is the fixed cadence for lazy item persistence.
-const ItemInstanceTick = time.Minute
+const (
+	// ItemInstanceTick is the fixed cadence for lazy item persistence.
+	ItemInstanceTick = time.Minute
+	// ItemInstanceSaveTimeout bounds one persistence flush so a hung DB
+	// cannot wedge the ticker, and then shutdown's StopAndWait, indefinitely.
+	ItemInstanceSaveTimeout = 10 * time.Second
+)
 
 // ItemFlusher atomically persists one flush batch: either every change in
 // it lands, or, on error, none of it does.
@@ -49,7 +54,9 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances
 // Start launches the fixed item persistence task.
 func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(ItemInstanceTick, func() {
-		if err := i.Save(context.Background()); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), ItemInstanceSaveTimeout)
+		defer cancel()
+		if err := i.Save(ctx); err != nil {
 			log.Error().Err(err).Msg("task: save item instances")
 		}
 	}, log)
@@ -87,22 +94,33 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	}
 }
 
-// Save flushes every pending item and, only once the flush actually
-// succeeds, clears them from the pending set. UpdateItems is all-or-nothing,
-// so on error nothing was written; keeping the whole snapshot pending hands
-// it to the next tick or the shutdown flush instead of losing it.
+// Save flushes every pending item. The pending map is swapped out before
+// the flush so a concurrent Add during I/O lands in the new map and is not
+// dropped when the flush succeeds. UpdateItems is all-or-nothing; on error
+// inflight ids are merged back so the next tick or shutdown flush retries
+// them. RemoveItems cannot see inflight (its only caller is logout after a
+// successful container flush), so a failed flush re-pends items that path
+// already saved — one redundant write next tick.
 func (i *ItemInstances) Save(ctx context.Context) error {
-	items := i.snapshotPending()
-	if err := i.UpdateItems(ctx, items); err != nil {
-		return err
-	}
-
 	i.mu.Lock()
-	for _, inst := range items {
-		delete(i.pending, inst.ObjectID)
-	}
+	inflight := i.pending
+	i.pending = make(map[int32]*item.Instance)
 	i.mu.Unlock()
 
+	items := make([]*item.Instance, 0, len(inflight))
+	for _, inst := range inflight {
+		items = append(items, inst)
+	}
+	if err := i.UpdateItems(ctx, items); err != nil {
+		i.mu.Lock()
+		for id, inst := range inflight {
+			if _, ok := i.pending[id]; !ok {
+				i.pending[id] = inst
+			}
+		}
+		i.mu.Unlock()
+		return err
+	}
 	return nil
 }
 
@@ -126,16 +144,6 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		i.addToBatch(&batch, inst)
 	}
 	return i.flusher.Flush(ctx, batch)
-}
-
-func (i *ItemInstances) snapshotPending() []*item.Instance {
-	i.mu.RLock()
-	defer i.mu.RUnlock()
-	items := make([]*item.Instance, 0, len(i.pending))
-	for _, inst := range i.pending {
-		items = append(items, inst)
-	}
-	return items
 }
 
 // addToBatch resolves inst's persistence effect and appends it to batch,

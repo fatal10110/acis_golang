@@ -61,18 +61,18 @@ func provideWorldState() *world.State {
 // provideGroundItems restores dropped items persisted at the previous
 // shutdown before the world starts, returning the store alongside so it can
 // be reused to persist state back at the next shutdown.
-func provideGroundItems(state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
+func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
 	store := gamesql.NewGroundItemStore(pool)
 	items := task.NewGroundItems(state, opts, time.Now)
 
-	rows, err := store.Load(context.Background())
+	rows, err := store.Load(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := items.Load(rows, data.Items); err != nil {
 		return nil, nil, err
 	}
-	if err := store.Clear(context.Background()); err != nil {
+	if err := store.Clear(ctx); err != nil {
 		return nil, nil, err
 	}
 
@@ -337,11 +337,6 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 	startTicker(lc, log, updates.Start)
 }
 
-// itemInstanceShutdownSaveTimeout bounds the final flush of pending item
-// rows independently of however much of fx's stop timeout the earlier stop
-// hooks have already spent.
-const itemInstanceShutdownSaveTimeout = 10 * time.Second
-
 // provideItemInstances builds the lazy item persistence task over the real
 // items, augmentations and pets tables, flushed atomically as one batch.
 func provideItemInstances(pool *sql.DB, data *gameData) *task.ItemInstances {
@@ -363,7 +358,7 @@ func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, log zerolog.
 			// (earlier stop hooks draining player containers can have
 			// consumed most of fx's stop timeout by now) and is reported
 			// rather than swallowed.
-			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), itemInstanceShutdownSaveTimeout)
+			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), task.ItemInstanceSaveTimeout)
 			defer cancel()
 			if err := items.Save(saveCtx); err != nil {
 				log.Error().Err(err).Msg("save pending item instances")

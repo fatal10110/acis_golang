@@ -1294,6 +1294,89 @@ func TestItemInstancesSaveDeletesVoidItemsWithoutDeletingAugmentation(t *testing
 	}
 }
 
+func TestItemInstancesSaveKeepsConcurrentAddDuringFlush(t *testing.T) {
+	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
+	flusher := newBlockingItemFlusher(nil)
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}))
+	instances.Add(inst)
+
+	done := make(chan error, 1)
+	go func() { done <- instances.Save(context.Background()) }()
+
+	select {
+	case <-flusher.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Flush did not start")
+	}
+	instances.Add(inst)
+	close(flusher.release)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Save() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Save blocked")
+	}
+	if !instances.Contains(inst) {
+		t.Fatal("Add during a successful flush must stay pending")
+	}
+}
+
+func TestItemInstancesSaveRestoresPendingWhenFlushErrors(t *testing.T) {
+	t.Run("error", func(t *testing.T) {
+		assertSaveKeepsPendingOnFlushResult(t, errors.New("flush failed"), false)
+	})
+	t.Run("deadline", func(t *testing.T) {
+		assertSaveKeepsPendingOnFlushResult(t, context.DeadlineExceeded, true)
+	})
+}
+
+func assertSaveKeepsPendingOnFlushResult(t *testing.T, flushErr error, waitForCtx bool) {
+	t.Helper()
+	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
+	flusher := newBlockingItemFlusher(flushErr)
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}))
+	instances.Add(inst)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if waitForCtx {
+		var expire context.CancelFunc
+		ctx, expire = context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer expire()
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- instances.Save(ctx) }()
+
+	select {
+	case <-flusher.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Flush did not start")
+	}
+	instances.Add(inst)
+	if !waitForCtx {
+		close(flusher.release)
+	}
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("Save() error = nil, want flush failure")
+		}
+		if waitForCtx && !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Save() error = %v, want context.DeadlineExceeded", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Save blocked")
+	}
+	if !instances.Contains(inst) {
+		t.Fatal("failed flush must keep the item pending, including a concurrent Add")
+	}
+}
+
 func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 	tmpl := &item.Template{ID: 10, Kind: item.KindEtcItem, Stackable: true, Duration: 100000, EtcItem: &item.EtcItemDetail{}}
 	templates := item.NewTable([]*item.Template{tmpl})
@@ -1362,6 +1445,30 @@ func (s *itemFlusherStub) last() item.FlushBatch {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.batch
+}
+
+type blockingItemFlusher struct {
+	started chan struct{}
+	release chan struct{}
+	err     error
+}
+
+func newBlockingItemFlusher(err error) *blockingItemFlusher {
+	return &blockingItemFlusher{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+		err:     err,
+	}
+}
+
+func (f *blockingItemFlusher) Flush(ctx context.Context, _ item.FlushBatch) error {
+	close(f.started)
+	select {
+	case <-f.release:
+		return f.err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func savedIDs(saves []item.InstanceState) []int32 {
