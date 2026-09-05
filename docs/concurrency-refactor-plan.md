@@ -152,7 +152,7 @@ can block on the DB.
   effect list. `ReduceHP`/`ReduceMP`/`Die`/`Revive`/effect apply/remove mutate under it and return;
   every hook they fire today moves to a post on the owner's queue after unlock.
 - Atomics for HP/MP/CP, position, dead, target id; `atomic.Pointer` stat snapshot republished on
-  recalculation (reuse `ResourceValues`, `ProgressionValues`, `NPCInfoSnapshot`).
+  recalculation (reuse `player.Vitals`, `npcinfo.Snapshot`, `attack.Snapshot`).
 - Observers: `world.Observer.Discover/Forget` implementations post to the observer's queue
   (contract at [world/visibility.go:18](internal/gameserver/world/visibility.go#L18) already
   forbids blocking); zone enter/exit watchers and region `OnActive/OnInactiveRegion` likewise.
