@@ -131,6 +131,7 @@ type Character struct {
 	broadcastDie              func()
 	broadcastStatus           func()
 	broadcastMPStatus         func()
+	notifyBowDraw             func(gaugeMs int)
 	broadcastStance           func(Stance)
 	broadcastFakeDeathRevive  func()
 	updateAbnormalEffect      func()

@@ -109,6 +109,7 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	live.Character.SetFrameSender(nil)
 	live.Character.SetBroadcastFrameSender(nil)
 	live.Character.SetAttackBroadcaster(nil)
+	live.Character.SetBowDrawNotifier(nil)
 	live.Character.SetDieBroadcaster(nil)
 	// The herb consumer reaches skill reuse and effect application without
 	// going through SendFrame, so a kill reward resolving against an already
