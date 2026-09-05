@@ -34,6 +34,10 @@ type PlayerSkillRequest struct {
 	// StopMovement cancels an in-flight walk before final cast validation
 	// when the skill's template hit time is long enough to freeze the caster.
 	StopMovement func() error
+	// AfterCanCast runs after cost/reuse validation succeeds and before the
+	// caster faces a non-self target. Ground skills use it for signet LOS,
+	// peace-zone, heading, and ValidateLocation.
+	AfterCanCast func() error
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -70,7 +74,7 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget, req.StopMovement)
+	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget, req.StopMovement, req.AfterCanCast)
 	started.Ctrl = req.Ctrl
 	started.Shift = req.Shift
 	return started, err
@@ -103,13 +107,13 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil, req.StopMovement)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil, req.StopMovement, nil)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection), stopMovement func() error) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection), stopMovement func() error, afterCanCast func() error) (StartedSkill, error) {
 	var target Target
 	var rejection skilltarget.CastRejection
 	var ok bool
@@ -133,6 +137,11 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	}
 	if rejection != skilltarget.CastRejectNone {
 		return started, ErrInvalidTarget
+	}
+	if afterCanCast != nil {
+		if err := afterCanCast(); err != nil {
+			return started, err
+		}
 	}
 	faceCastTarget(caster, target, def)
 

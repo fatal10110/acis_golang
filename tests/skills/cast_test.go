@@ -412,6 +412,53 @@ func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestWalkingGroundCastStopsThenValidatesLocation walks the caster off spawn,
+// then starts a second walk and casts a long-hit-time in-range ground skill
+// before arrival. StopMove must land with the pre-face heading, then
+// ValidateLocation faces the signet.
+func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
+	const skillID = 5
+	const groundX, groundY, groundZ = 1000, 2000, 300
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	walk := c.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
+	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
+	waitForPlayerPosition(t, srv, objID, standAt)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
+
+	c.Send(encodeRequestExMagicSkillUseGround(groundX, groundY, groundZ, skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "ground cast stop")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+
+	casterX, casterY, casterZ := srv.PlayerPosition(t, objID)
+	wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: groundX, Y: groundY, Z: groundZ})
+	if got := playerHeading(t, srv, objID); got != wantHeading {
+		t.Fatalf("caster heading after walking ground cast = %d, want %d", got, wantHeading)
+	}
+}
+
 // TestGroundCastShiftOutOfRangeRejected verifies the shift-click variant
 // refuses a ground point beyond cast range with the target-too-far message.
 func TestGroundCastShiftOutOfRangeRejected(t *testing.T) {
