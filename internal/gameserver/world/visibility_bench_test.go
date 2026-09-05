@@ -67,6 +67,41 @@ func setupRelocateBench(n int) (s *State, p *relocateBenchPlayer, x0, y, x1 int)
 	return s, p, x0, y, x1
 }
 
+func TestRelocatePlayerRegionCrossingAllocs(t *testing.T) {
+	// Bound is loose on purpose: it must catch a regression back to
+	// grow-from-nil (11+ allocs at 300, 17+ at 1500) without depending on
+	// exact inlining or GC timing. 300 pins the notifications pre-size;
+	// 1500 also pins the per-region objects buffer (stack [32] overflows
+	// there without the widest-region make).
+	for _, tt := range []struct {
+		n   int
+		max float64
+	}{
+		{300, 4},
+		{1500, 3},
+	} {
+		t.Run(fmt.Sprintf("nearby=%d", tt.n), func(t *testing.T) {
+			s, p, x0, y, x1 := setupRelocateBench(tt.n)
+			i := 0
+			var moveErr error
+			got := testing.AllocsPerRun(100, func() {
+				i++
+				dst := x1
+				if i%2 == 1 {
+					dst = x0
+				}
+				moveErr = s.Move(p, dst, y, 0)
+			})
+			if moveErr != nil {
+				t.Fatal(moveErr)
+			}
+			if got > tt.max {
+				t.Fatalf("relocate allocations per player region crossing = %v, want <= %v (grow-from-nil was 11 at 300 / 17 at 1500)", got, tt.max)
+			}
+		})
+	}
+}
+
 func BenchmarkRelocatePlayerRegionCrossing(b *testing.B) {
 	for _, n := range []int{50, 300, 1500} {
 		b.Run(fmt.Sprintf("nearby=%d", n), func(b *testing.B) {
