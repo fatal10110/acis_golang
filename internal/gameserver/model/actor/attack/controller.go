@@ -86,6 +86,8 @@ type PlayerActor interface {
 	CheckAndEquipArrows() bool
 	WeaponMPConsume() int
 	MP() int
+	ConsumeBowShot()
+	NotifyBowDraw(gaugeMs int)
 	ClearRecentFakeDeath()
 	ClientActionFailed()
 }
@@ -301,6 +303,9 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 			{hits: hits[1:], delay: attackTime},
 		}
 	case item.WeaponBow:
+		if c.player != nil {
+			c.player.ConsumeBowShot()
+		}
 		hits = []Hit{c.makeHit(target, false)}
 		landings = []scheduledHit{{hits: hits, delay: attackTime}}
 	case item.WeaponPole:
@@ -347,6 +352,9 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	}
 
 	c.start(attackType, attackTime, landings)
+	if attackType == item.WeaponBow && c.player != nil {
+		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(c.scaledBowReuse()/time.Millisecond))
+	}
 	err := c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
