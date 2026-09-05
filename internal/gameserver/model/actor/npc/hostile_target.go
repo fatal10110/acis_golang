@@ -229,18 +229,7 @@ func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
 		return nil, false
 	}
 
-	chosen, ok := h.pickAggroCandidate(rangeVal, valid)
-	if !ok {
-		return nil, false
-	}
-	h.brain.AddDamageHate(chosen, 0, 1)
-	return chosen, true
-}
-
-func (h *Hostile) pickAggroCandidate(rangeVal int, valid func(attackable.Combatant) bool) (attackable.Combatant, bool) {
-	h.scanMu.Lock()
-	defer h.scanMu.Unlock()
-	candidates := h.scanScratch[:0]
+	var candidates []attackable.Combatant
 	h.world.ForEachKnownInRadius(h, h.Instance.Template.AggroRange, func(obj world.Tracked) {
 		other, ok := obj.(attackable.Combatant)
 		if !ok {
@@ -254,7 +243,6 @@ func (h *Hostile) pickAggroCandidate(rangeVal int, valid func(attackable.Combata
 		}
 		candidates = append(candidates, other)
 	})
-	h.scanScratch = candidates
 	if len(candidates) == 0 {
 		return nil, false
 	}
@@ -262,7 +250,7 @@ func (h *Hostile) pickAggroCandidate(rangeVal int, valid func(attackable.Combata
 		return int(a.ObjectID() - b.ObjectID())
 	})
 	chosen := candidates[0]
-	clear(candidates)
+	h.brain.AddDamageHate(chosen, 0, 1)
 	return chosen, true
 }
 

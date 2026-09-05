@@ -35,6 +35,8 @@ func BenchmarkRandomNearbyMonster(b *testing.B) {
 				other.SetWorld(state)
 				state.Spawn(other, x, y, 0, 0)
 			}
+			// Radius -1 is the unfiltered worst case (match every object in
+			// the searched regions). Production distrustStart passes 600.
 			if _, ok := scanner.RandomNearbyMonster(-1); !ok {
 				b.Fatal("warmup: RandomNearbyMonster: ok = false")
 			}

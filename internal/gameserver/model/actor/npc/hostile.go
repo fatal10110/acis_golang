@@ -65,9 +65,9 @@ type Hostile struct {
 	known world.KnownBuffer
 
 	// scanMu guards scanScratch, a reusable candidate list for
-	// RandomNearbyMonster, RandomNearbyCombatant, and ReconsiderTarget.
-	// Those run from the AI tick and from effect-start hooks, which are
-	// different goroutines.
+	// RandomNearbyMonster and RandomNearbyCombatant. Those run from
+	// effect-start hooks on different goroutines. The mutex is held across
+	// the world-scan callback; re-entry on the same Hostile is not permitted.
 	scanMu      sync.Mutex
 	scanScratch []attackable.Combatant
 
@@ -563,12 +563,13 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 		}
 		candidates = append(candidates, other)
 	})
-	h.scanScratch = candidates
 	if len(candidates) == 0 {
+		h.scanScratch = candidates
 		return nil, false
 	}
 	chosen := candidates[h.roll(len(candidates))]
 	clear(candidates)
+	h.scanScratch = candidates[:0]
 	return chosen, true
 }
 
@@ -594,12 +595,13 @@ func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
 		}
 		candidates = append(candidates, other)
 	})
-	h.scanScratch = candidates
 	if len(candidates) == 0 {
+		h.scanScratch = candidates
 		return nil, false
 	}
 	chosen := candidates[h.roll(len(candidates))]
 	clear(candidates)
+	h.scanScratch = candidates[:0]
 	return chosen, true
 }
 

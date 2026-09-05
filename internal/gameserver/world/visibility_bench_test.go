@@ -5,9 +5,9 @@ import (
 )
 
 func BenchmarkForEachKnownInRadius(b *testing.B) {
-	// inCap places 63 neighbors + the origin in one region. crowded spreads
-	// 1500 neighbors across the 3x3 known neighborhood, matching the #2256
-	// measurement. Both stay inside knownInRadiusObjectCap.
+	// inCap: 63 neighbors + origin in one region (fits the stack buffer).
+	// crowded: 1500 neighbors spread across the 3x3 known neighborhood.
+	// spill: 400 neighbors in one region, above knownInRadiusObjectCap.
 	for _, tc := range []struct {
 		name   string
 		n      int
@@ -15,6 +15,7 @@ func BenchmarkForEachKnownInRadius(b *testing.B) {
 	}{
 		{"inCap", 63, false},
 		{"crowded", 1500, true},
+		{"spill", 400, false},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
 			s := New()
