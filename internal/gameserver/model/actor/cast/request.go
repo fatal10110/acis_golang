@@ -15,21 +15,10 @@ type Definitions interface {
 	Definition(modelskill.Ref) (modelskill.Definition, bool)
 }
 
-// PlayerSkillRequest is one live player skill-cast request after the network
-// packet has been decoded. Ctrl and Shift are the client's cast modifiers,
-// carried through unconsumed for the domain cast-condition check and the
-// post-cast offensive-follow decision to read once those rules exist; today
-// neither consumer exists, so StartPlayerSkill only copies them onto
-// StartedSkill.
-type PlayerSkillRequest struct {
-	Now           time.Time
-	Controller    *Controller
-	Caster        *player.Character
-	Selected      world.Tracked
-	SkillID       int
-	Definitions   Definitions
-	Ctrl          bool
-	Shift         bool
+// StartHooks are the phase callbacks StartPlayerSkill / StartItemSkill
+// invoke while accepting a cast. Schedule uses Hooks for Launch / Hit /
+// Finish after the cast has already started.
+type StartHooks struct {
 	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
 	// StopMovement cancels an in-flight walk before final cast validation
 	// when the skill's template hit time is long enough to freeze the caster.
@@ -38,6 +27,24 @@ type PlayerSkillRequest struct {
 	// caster faces a non-self target. Ground skills use it for signet LOS,
 	// peace-zone, heading, and ValidateLocation.
 	AfterCanCast func() error
+}
+
+// PlayerSkillRequest is one live player skill-cast request after the network
+// packet has been decoded. Ctrl and Shift are the client's cast modifiers,
+// carried through unconsumed for the domain cast-condition check and the
+// post-cast offensive-follow decision to read once those rules exist; today
+// neither consumer exists, so StartPlayerSkill only copies them onto
+// StartedSkill.
+type PlayerSkillRequest struct {
+	Now         time.Time
+	Controller  *Controller
+	Caster      *player.Character
+	Selected    world.Tracked
+	SkillID     int
+	Definitions Definitions
+	Ctrl        bool
+	Shift       bool
+	Hooks       StartHooks
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -74,7 +81,7 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget, req.StopMovement, req.AfterCanCast)
+	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.Hooks)
 	started.Ctrl = req.Ctrl
 	started.Shift = req.Shift
 	return started, err
@@ -85,13 +92,13 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 // the definition directly (an item's own attached-skill entry), instead of
 // being looked up from the caster's learned skill list.
 type ItemSkillRequest struct {
-	Now          time.Time
-	Controller   *Controller
-	Caster       *player.Character
-	Selected     world.Tracked
-	Skill        modelskill.Ref
-	Definitions  Definitions
-	StopMovement func() error
+	Now         time.Time
+	Controller  *Controller
+	Caster      *player.Character
+	Selected    world.Tracked
+	Skill       modelskill.Ref
+	Definitions Definitions
+	Hooks       StartHooks
 }
 
 // StartItemSkill validates and starts an item-carried skill cast: the same
@@ -107,18 +114,18 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil, req.StopMovement, nil)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, req.Hooks)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection), stopMovement func() error, afterCanCast func() error) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, hooks StartHooks) (StartedSkill, error) {
 	var target Target
 	var rejection skilltarget.CastRejection
 	var ok bool
-	if resolveTarget != nil {
-		target, rejection = resolveTarget(caster, selected, def, ctrl)
+	if hooks.ResolveTarget != nil {
+		target, rejection = hooks.ResolveTarget(caster, selected, def, ctrl)
 		ok = target != nil
 	} else {
 		target, ok = SelectTarget(caster, selected, def)
@@ -130,7 +137,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if err := controller.CanAttemptCast(target, def); err != nil {
 		return started, err
 	}
-	stopForCast(def, stopMovement)
+	stopForCast(def, hooks.StopMovement)
 	if err := controller.CanCast(target, def); err != nil {
 		started.CanCastFailure = true
 		return started, err
@@ -138,8 +145,8 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if rejection != skilltarget.CastRejectNone {
 		return started, ErrInvalidTarget
 	}
-	if afterCanCast != nil {
-		if err := afterCanCast(); err != nil {
+	if hooks.AfterCanCast != nil {
+		if err := hooks.AfterCanCast(); err != nil {
 			return started, err
 		}
 	}

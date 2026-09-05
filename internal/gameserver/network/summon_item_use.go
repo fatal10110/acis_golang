@@ -113,13 +113,15 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
-		Now:          time.Now(),
-		Controller:   controller,
-		Caster:       live.Character,
-		Selected:     live.Character,
-		Skill:        summonCreatureSkillRef,
-		Definitions:  l.skills,
-		StopMovement: l.stopMovementForCast(live),
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    live.Character,
+		Skill:       summonCreatureSkillRef,
+		Definitions: l.skills,
+		Hooks: actorcast.StartHooks{
+			StopMovement: l.stopMovementForCast(live),
+		},
 	})
 	if err != nil {
 		sendMagicCastFailure(live, started.Definition, err)

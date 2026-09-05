@@ -55,17 +55,19 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		afterCanCast = l.groundCastAfterCanCast(live, def)
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
-		Now:           time.Now(),
-		Controller:    controller,
-		Caster:        live.Character,
-		Selected:      live.Target(),
-		SkillID:       int(req.SkillID),
-		Definitions:   l.skills,
-		Ctrl:          req.CtrlPressed,
-		Shift:         req.ShiftPressed,
-		ResolveTarget: l.resolveMagicSkillTarget,
-		StopMovement:  l.stopMovementForCast(live),
-		AfterCanCast:  afterCanCast,
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    live.Target(),
+		SkillID:     int(req.SkillID),
+		Definitions: l.skills,
+		Ctrl:        req.CtrlPressed,
+		Shift:       req.ShiftPressed,
+		Hooks: actorcast.StartHooks{
+			ResolveTarget: l.resolveMagicSkillTarget,
+			StopMovement:  l.stopMovementForCast(live),
+			AfterCanCast:  afterCanCast,
+		},
 	})
 	if err != nil {
 		if errors.Is(err, errGroundCastRejected) {
