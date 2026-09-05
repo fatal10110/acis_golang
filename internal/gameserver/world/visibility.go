@@ -271,6 +271,30 @@ func (s *State) relocate(t Tracked, next *Region) {
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
 	var notifications []visibilityNotification
+	if tIsPlayer {
+		// Same unshared-region skip as the Discover/Forget scans below.
+		n, widest := 0, 0
+		for _, r := range oldAreas {
+			if containsRegion(newAreas, r) {
+				continue
+			}
+			c := r.objectCount()
+			n += c
+			widest = max(widest, c)
+		}
+		for _, r := range newAreas {
+			if containsRegion(oldAreas, r) {
+				continue
+			}
+			c := r.objectCount()
+			n += c
+			widest = max(widest, c)
+		}
+		notifications = make([]visibilityNotification, 0, n*2)
+		if widest > cap(objects) {
+			objects = make([]Tracked, 0, widest)
+		}
+	}
 
 	var toggleBuf [18]regionToggle
 	toggles := toggleBuf[:0]
