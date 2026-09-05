@@ -123,6 +123,9 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if !ok {
 		return started, ErrInvalidTarget
 	}
+	if err := controller.CanAttemptCast(target, def); err != nil {
+		return started, err
+	}
 	stopForCast(def, stopMovement)
 	if err := controller.CanCast(target, def); err != nil {
 		started.CanCastFailure = true
@@ -158,8 +161,8 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 }
 
 // stopForCast cancels an in-flight walk when the skill's template hit time
-// is long enough that the caster must stand still, before the final
-// resource and condition checks.
+// is long enough that the caster must stand still. Callers must already
+// have passed the pre-movement reuse and disable gates.
 func stopForCast(def modelskill.Definition, stopMovement func() error) {
 	if def.HitTime <= 50 || stopMovement == nil {
 		return

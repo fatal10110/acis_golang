@@ -115,6 +115,45 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestWalkingReuseRejectionDoesNotStopMovement recasts a long-hit-time
+// skill while the caster is still walking. Reuse is a pre-movement gate, so
+// the recast must answer with the prepared-for-reuse message and leave the
+// walk's StopMove unsent.
+func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+					HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "DUMMY",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 3, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	readCastStartFrames(t, c, objID, 3, 1, 500, 60_000, objID)
+	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	reply := c.Read()
+	if reply[0] == serverpackets.OpcodeStopMove {
+		t.Fatal("reuse rejection broadcast StopMove, want walk to continue")
+	}
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "walking recast rejection")
+}
+
 // TestSuccessfulTargetedCastStopsMovementAndFacesTarget walks the caster
 // off spawn, then starts a second walk and casts a long-hit-time targeted
 // skill before arrival. The live RequestMagicSkillUse path must stop that
