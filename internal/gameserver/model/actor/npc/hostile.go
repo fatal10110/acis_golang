@@ -64,6 +64,13 @@ type Hostile struct {
 
 	known world.KnownBuffer
 
+	// scanMu guards scanScratch, a reusable candidate list for
+	// RandomNearbyMonster, RandomNearbyCombatant, and ReconsiderTarget.
+	// Those run from the AI tick and from effect-start hooks, which are
+	// different goroutines.
+	scanMu      sync.Mutex
+	scanScratch []attackable.Combatant
+
 	// rewards computes this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until SetRewarder is called, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
@@ -546,7 +553,9 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 	if h.world == nil {
 		return nil, false
 	}
-	var candidates []attackable.Combatant
+	h.scanMu.Lock()
+	defer h.scanMu.Unlock()
+	candidates := h.scanScratch[:0]
 	h.world.ForEachKnownInRadius(h, radius, func(obj world.Tracked) {
 		other, ok := obj.(*Hostile)
 		if !ok || !other.MonsterKind() || other.chestKind() {
@@ -554,10 +563,13 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 		}
 		candidates = append(candidates, other)
 	})
+	h.scanScratch = candidates
 	if len(candidates) == 0 {
 		return nil, false
 	}
-	return candidates[h.roll(len(candidates))], true
+	chosen := candidates[h.roll(len(candidates))]
+	clear(candidates)
+	return chosen, true
 }
 
 // RandomNearbyCombatant returns a random other attackable NPC known within
@@ -572,7 +584,9 @@ func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
 	if h.world == nil {
 		return nil, false
 	}
-	var candidates []attackable.Combatant
+	h.scanMu.Lock()
+	defer h.scanMu.Unlock()
+	candidates := h.scanScratch[:0]
 	h.world.ForEachKnownInPlainRadius(h, radius, func(obj world.Tracked) {
 		other, ok := obj.(*Hostile)
 		if !ok || other.chestKind() {
@@ -580,10 +594,13 @@ func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool)
 		}
 		candidates = append(candidates, other)
 	})
+	h.scanScratch = candidates
 	if len(candidates) == 0 {
 		return nil, false
 	}
-	return candidates[h.roll(len(candidates))], true
+	chosen := candidates[h.roll(len(candidates))]
+	clear(candidates)
+	return chosen, true
 }
 
 // StopMostHatedTarget clears this NPC's physical threat against whichever
