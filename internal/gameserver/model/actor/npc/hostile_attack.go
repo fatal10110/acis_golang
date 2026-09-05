@@ -153,6 +153,14 @@ func (h *Hostile) WeaponReuseDelay() time.Duration {
 	return time.Duration(h.weapon.ReuseDelay) * time.Millisecond
 }
 
+// ConsumeBowMP spends the right-hand weapon's MP cost at bow fire time.
+func (h *Hostile) ConsumeBowMP() {
+	if h.weapon == nil || h.weapon.MPConsume <= 0 {
+		return
+	}
+	h.ReduceMP(float64(h.weapon.MPConsume))
+}
+
 // WeaponGrade returns this NPC's resolved right-hand weapon's crystal
 // grade, recorded by SetWeapon. Zero (CrystalNone) when unarmed. Reference:
 // Npc.getActiveWeaponItem, Npc.java:371-375.

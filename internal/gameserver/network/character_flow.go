@@ -534,6 +534,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
 		l.broadcastAttack(live, snapshot)
 	})
+	c.SetBowDrawNotifier(func(gaugeMs int) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageGettingReadyToShootAnArrow))
+		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeRed, gaugeMs, gaugeMs))
+	})
 	c.SetMagicSkillUseBroadcaster(func(use creature.MagicSkillUse) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillUse(

@@ -224,6 +224,31 @@ func ItemTemplates() *item.Table {
 			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
 		},
 		{
+			ID:            14,
+			Name:          "Bow",
+			Kind:          item.KindWeapon,
+			Slot:          item.SlotLRHand,
+			Duration:      -1,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			Weapon: &item.WeaponDetail{
+				Type:       item.WeaponBow,
+				MPConsume:  1,
+				ReuseDelay: 1500,
+			},
+		},
+		{
+			ID:            17,
+			Name:          "Wooden Arrow",
+			Kind:          item.KindEtcItem,
+			Slot:          item.SlotLHand,
+			Duration:      -1,
+			Stackable:     true,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemArrow},
+		},
+		{
 			// Demonic Sword Zariche, the reference server's cursed weapon
 			// item id, kept minimal so cursed-weapon-exclusion tests can
 			// seed a real ground drop without loading cursedWeapons.xml.

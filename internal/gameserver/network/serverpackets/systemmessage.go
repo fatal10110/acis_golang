@@ -57,6 +57,7 @@ const (
 	SystemMessageCounteredS1Attack                 = 1998
 	SystemMessageS1DodgesAttack                    = 1999
 	SystemMessageAvoidedS1Attack                   = 42
+	SystemMessageGettingReadyToShootAnArrow        = 41
 	SystemMessageLethalStrike                      = 1667
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
