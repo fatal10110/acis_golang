@@ -51,6 +51,13 @@ func (a *AIController) CastingNow() bool {
 	return a.Controller != nil && a.Controller.CastingNow()
 }
 
+// Stop aborts an in-flight AI cast.
+func (a *AIController) Stop() {
+	if a.Controller != nil {
+		a.Controller.Stop()
+	}
+}
+
 // Range returns ref's cast range, used to decide whether the actor must
 // close distance on the target before attempting the cast.
 func (a *AIController) Range(ref modelskill.Ref) int {

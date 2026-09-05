@@ -19,17 +19,18 @@ const nothingDesireDecay = 0.5
 // is dropped when the actor can still choose a new intention.
 const attackDesireRange = 1500
 
-// staleThreatAge is NpcAI.java's out-of-territory stale-hate threshold
-// (NpcAI.java:319): a threat entry whose last damage is at least this old
-// gets its hate stopped and its queued attack desire dropped while the
-// owner is out of territory.
+// staleThreatAge is the out-of-territory stale-hate threshold: a threat
+// entry whose last damage is at least this old gets its hate stopped and
+// its queued attack desire dropped while the owner is out of territory.
 const staleThreatAge = 90 * time.Second
 
-// staleThreatSweepTicks approximates NpcAI.java's 10-second out-of-territory
-// sweep period (NpcAI.java:311-325) in AITick (task.AITick, 1 second)
-// units, since Tick already runs once per AITick rather than on its own
-// fixed-rate timer.
-const staleThreatSweepTicks = 10
+// ootSweepInitialDelay is the delay before the first out-of-territory
+// stale-hate sweep after an arrival that found the owner outside territory.
+const ootSweepInitialDelay = 100 * time.Millisecond
+
+// ootSweepPeriod is the interval between later out-of-territory stale-hate
+// sweeps. In-territory firings skip the sweep but keep this phase.
+const ootSweepPeriod = 10 * time.Second
 
 // AttackableActor is the actor state used by the hostile NPC intention loop.
 type AttackableActor interface {
@@ -62,6 +63,8 @@ type AttackController interface {
 	AttackingNow() bool
 	CanAttack(attackable.Combatant) bool
 	DoAttack(attackable.Combatant) error
+	// Stop aborts an in-flight attack, including a pending hit task.
+	Stop()
 }
 
 // CastController controls skill-cast requests emitted by the AI loop,
@@ -100,6 +103,8 @@ type CastController interface {
 	// Cast starts the cast against target. Delayed scheduling and effect
 	// application are the implementation's responsibility.
 	Cast(target attackable.Combatant, ref skill.Ref)
+	// Stop aborts an in-flight cast.
+	Stop()
 }
 
 type intention struct {
@@ -133,7 +138,12 @@ type Attackable struct {
 	current intention
 	next    intention
 	step    int
-	ootStep int
+	// ootSweep is armed only by Arrived while the owner is out of territory
+	// and cancelled by Arrived back in territory. Tick never arms or
+	// cancels it, so a stationary out-of-territory mob does not decay hate
+	// and a brief in-territory tick does not reset the sweep phase.
+	ootSweep     bool
+	nextOOTSweep time.Time
 	// lastKind is the intention kind Think was running before the latest
 	// promote, used so escort follow can tell a fresh FOLLOW from a
 	// continuing one.
@@ -142,9 +152,9 @@ type Attackable struct {
 	// odd pulses (about once every two seconds at the 1s AI tick).
 	followPulse int
 
-	// now returns the current time; tickOutOfTerritory reads it instead of
-	// calling time.Now directly so tests can simulate staleThreatAge
-	// elapsing without a real 90-second wait.
+	// now returns the current time; the out-of-territory sweep reads it
+	// instead of calling time.Now directly so tests can simulate
+	// staleThreatAge elapsing without a real 90-second wait.
 	now func() time.Time
 
 	// lastDesire is the intention kind of the last executed desire, used so
@@ -158,6 +168,9 @@ type Attackable struct {
 	randomWalkRate int
 	// roll draws a uniform integer in [0, n) for the wander-rate check.
 	roll func(n int) int
+	// lifeTime is the number of completed periodic AI cycles. Empty-queue
+	// idle abort runs only after the first cycle.
+	lifeTime int
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
@@ -345,6 +358,18 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 	})
 }
 
+func (a *Attackable) thinkIdle() {
+	_ = a.move.Stop()
+	a.attack.Stop()
+	if a.cast != nil {
+		a.cast.Stop()
+	}
+	if actor, ok := a.actor.(stanceActor); ok {
+		actor.ForceWalkStance()
+	}
+	a.current = intention{kind: IntentionIdle}
+}
+
 func (a *Attackable) queueIdleFollow() {
 	follower, ok := a.actor.(idleFollower)
 	if !ok {
@@ -357,8 +382,17 @@ type idleWanderer interface {
 	ShouldIdleWander() bool
 }
 
-type wanderMover interface {
+type stanceActor interface {
 	ForceWalkStance()
+	ForceRunStance()
+}
+
+type headingRestorer interface {
+	RestoreSpawnHeadingIfAtHome()
+}
+
+type wanderMover interface {
+	stanceActor
 	RealMoveSpeed() float64
 	MoveFromSpawnUsingRandomOffset(offset int)
 }
@@ -460,17 +494,9 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 	a.hates.AddDefault(attacker, a.actor.InTerritory())
 }
 
-// SetWander makes the next Think process wander/return-home behavior.
-func (a *Attackable) SetWander() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
-	a.wanderReady = time.Time{}
-}
-
-// SetBackToPeace clears combat memory and cancels the current action. If the
-// actor is outside its spawn territory, the next Think runs the return-home
-// path instead of leaving it idle off leash.
+// SetBackToPeace clears combat memory and cancels the current action. It
+// does not start a return-home walk; an out-of-territory owner stays idle
+// until a later Think queues a new desire.
 func (a *Attackable) SetBackToPeace() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -502,9 +528,6 @@ func (a *Attackable) setBackToPeaceLocked() {
 	a.next = intention{}
 	a.current = intention{kind: IntentionIdle}
 	a.wanderReady = time.Time{}
-	if !a.actor.InTerritory() {
-		a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
-	}
 	a.move.Stop()
 }
 
@@ -566,22 +589,46 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 	return a.next.kind, a.next.target, true
 }
 
-// Think advances the current intention once. Safe to call from the periodic
-// AI task as well as from a movement-arrived or attack-finished hook. A
-// non-nil return reports that an intention step ran but a broadcast within
-// it failed; the intention itself still advanced.
+// Think advances the current intention once. Event-driven callers (arrival,
+// attack-finished, first hate) use this path: it does not run empty-queue
+// idle abort. A non-nil return reports that an intention step ran but a
+// broadcast within it failed; the intention itself still advanced.
 func (a *Attackable) Think() error {
+	return a.think(false)
+}
+
+// TickThink is the periodic AI cycle. Empty-queue idle abort runs after
+// the first cycle and does not promote a follow or wander queued in that
+// same cycle.
+func (a *Attackable) TickThink() error {
+	return a.think(true)
+}
+
+func (a *Attackable) think(updateTick bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	a.refreshCombatMemory()
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
-	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleFollow()
-	}
-	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleWander()
+	if updateTick {
+		idled := false
+		if _, ok := a.desires.Peek(); !ok {
+			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+				a.thinkIdle()
+				a.queueIdleFollow()
+				idled = true
+			}
+		}
+		if _, ok := a.desires.Peek(); !ok {
+			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+				a.queueIdleWander()
+			}
+		}
+		a.lifeTime++
+		if idled {
+			return nil
+		}
 	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()
@@ -670,27 +717,27 @@ func (a *Attackable) Tick() {
 	a.step = 0
 }
 
-// tickOutOfTerritory ports NpcAI.java's out-of-territory fixed-rate task
-// (NpcAI.java:298-339): while the owner is outside its spawn territory, it
-// periodically stops hate and drops the queued attack desire for any threat
-// entry that hasn't dealt damage in staleThreatAge, so a mob that briefly
-// loses and reacquires an out-of-territory attacker doesn't keep hate the
-// reference would already have expired. It is a no-op back in territory,
-// which also resets the sweep counter so a later territory exit restarts
-// the cadence, matching the reference cancelling and recreating the task on
-// each isInMyTerritory() transition.
+// tickOutOfTerritory runs the arrival-armed out-of-territory stale-hate
+// sweep. Arrived starts the schedule (100ms then every 10s) when the owner
+// is outside territory and cancels it on an in-territory arrival. A Tick
+// while in territory skips that firing but keeps the phase, so oscillating
+// across the territory edge still sweeps. A stationary out-of-territory
+// owner that never arrives never arms the sweep.
 func (a *Attackable) tickOutOfTerritory() {
-	if a.actor.InTerritory() {
-		a.ootStep = 0
+	if !a.ootSweep {
 		return
 	}
-	a.ootStep++
-	if a.ootStep < staleThreatSweepTicks {
-		return
-	}
-	a.ootStep = 0
-
 	now := a.now()
+	if now.Before(a.nextOOTSweep) {
+		return
+	}
+	for !a.nextOOTSweep.After(now) {
+		a.nextOOTSweep = a.nextOOTSweep.Add(ootSweepPeriod)
+	}
+	if a.actor.InTerritory() {
+		return
+	}
+
 	for _, t := range a.threats.Snapshot() {
 		if now.Sub(t.Timestamp) < staleThreatAge {
 			continue
@@ -698,6 +745,19 @@ func (a *Attackable) tickOutOfTerritory() {
 		a.desires.Remove(IntentionAttack, t.Attacker)
 		a.threats.StopHate(t.Attacker)
 	}
+}
+
+func (a *Attackable) syncOOTSweepLocked() {
+	if a.actor.InTerritory() {
+		a.ootSweep = false
+		a.nextOOTSweep = time.Time{}
+		return
+	}
+	if a.ootSweep {
+		return
+	}
+	a.ootSweep = true
+	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
 }
 
 func (a *Attackable) pruneDesires() {
@@ -821,6 +881,9 @@ func (a *Attackable) thinkCast() (bool, error) {
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref))
 	if following {
+		if actor, ok := a.actor.(stanceActor); ok {
+			actor.ForceRunStance()
+		}
 		return false, err
 	}
 
@@ -865,10 +928,20 @@ func (a *Attackable) thinkMoveTo() {
 // idles immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while an
 // attack or cast is in flight, so leaving those kinds current would
 // restart the same walk on the Think that production arrival hooks run.
+// Escort FOLLOW returns without restoring spawn heading or arming the
+// out-of-territory stale-hate sweep; combat chase stays ATTACK and still
+// runs both.
 func (a *Attackable) Arrived() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.current.kind == IntentionFollow {
+		return
+	}
 	a.clearArrivalDesire()
+	if restorer, ok := a.actor.(headingRestorer); ok {
+		restorer.RestoreSpawnHeadingIfAtHome()
+	}
+	a.syncOOTSweepLocked()
 }
 
 // ArrivedBlocked clears MOVE_TO, FLEE, and WANDER when an in-flight walk

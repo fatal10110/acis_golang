@@ -655,12 +655,22 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// Think runs one hostile AI decision cycle.
+// Think runs one hostile AI decision cycle (event-driven: arrival, swing
+// finished, first hate). Empty-queue idle abort belongs on TickThink.
 func (h *Hostile) Think() error {
 	if !h.canRunAI() {
 		return nil
 	}
 	return h.brain.Think()
+}
+
+// TickThink runs one periodic AI cycle, including empty-queue idle abort
+// after the first cycle.
+func (h *Hostile) TickThink() error {
+	if !h.canRunAI() {
+		return nil
+	}
+	return h.brain.TickThink()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset that aCis runs when the
@@ -886,6 +896,20 @@ func hostileKind(inst *Instance) InstanceKind {
 func (h *Hostile) location() location.Location {
 	x, y, z := h.Position()
 	return location.Location{X: x, Y: y, Z: z}
+}
+
+// RestoreSpawnHeadingIfAtHome faces the spawn heading when this NPC has
+// landed exactly on its spawn point. Escort FOLLOW arrivals skip the
+// caller, so a minion whose master is standing on the minion spawn keeps
+// the heading it had while following.
+func (h *Hostile) RestoreSpawnHeadingIfAtHome() {
+	if h.Instance == nil || !h.Instance.HasHome {
+		return
+	}
+	if h.location() != h.Instance.Home {
+		return
+	}
+	h.SetHeading(h.Instance.SpawnHeading)
 }
 
 // IsMoving reports whether this NPC has an in-flight movement request.

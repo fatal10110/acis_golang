@@ -1122,6 +1122,7 @@ func (disablerHostileAttack) BowCoolingDown() bool                { return false
 func (disablerHostileAttack) AttackingNow() bool                  { return false }
 func (disablerHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (disablerHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (disablerHostileAttack) Stop()                               {}
 
 func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *testing.T) {
 	registry := NewDefaultRegistry()

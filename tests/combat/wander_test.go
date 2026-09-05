@@ -12,6 +12,24 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
+func tickThinkIdle(t *testing.T, h interface{ TickThink() error }) {
+	t.Helper()
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+}
+
+func tickThinkWander(t *testing.T, h interface{ TickThink() error }) {
+	t.Helper()
+	tickThinkIdle(t, h)
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+}
+
 // TestIdleHostileWanderBroadcastsWalkThenMove pins AttackableAI.thinkWander's
 // first idle step: walk stance, then a MoveToLocation offset from the spawn
 // home (offset = walk speed * 3) on each axis.
@@ -27,9 +45,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
@@ -66,9 +82,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 	minion.SetMaster(master)
 	drainUntilQuiet(t, c)
 
-	if err := minion.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, minion)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
@@ -111,9 +125,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 
-	if err := minion.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, minion)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander after master death", got)
 	}
@@ -164,9 +176,7 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Guard", home, home)
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
 	}
@@ -177,9 +187,9 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 
 // TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
 // WANDER arm: finishing a wander step drops that desire and idles, then
-// the production follow-up Think re-queues idle wander without walking
-// again — lastDesire is still wander, so thinkWander arms the timer
-// instead of MoveFromSpawnUsingRandomOffset.
+// the next TickThink re-queues idle wander without promoting it; the
+// cycle after that promotes wander. lastDesire is still wander, so
+// thinkWander arms the timer instead of MoveFromSpawnUsingRandomOffset.
 func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
 	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
 		hostile.AI().Arrived()
@@ -207,9 +217,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after Think = %v, want wander", got)
 	}
@@ -234,14 +242,24 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 		t.Fatal("wander desire still queued after arrival")
 	}
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() after arrival: %v", err)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() after arrival: %v", err)
 	}
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
-		t.Fatalf("CurrentIntention() after arrival Think = %v, want wander re-queued", got)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival TickThink = %v, want idle (wander queued, not promoted)", got)
 	}
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
-		t.Fatal("wander desire missing after arrival Think")
+		t.Fatal("wander desire missing after arrival TickThink")
+	}
+	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
+		t.Fatalf("unexpected packet after arrival queue tick: %#x", f[0])
+	}
+
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() promote after arrival: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after promote = %v, want wander", got)
 	}
 	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
 		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
@@ -271,9 +289,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	hostile.Instance.Maker = maker
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	if !poly.Contains(dest.X, dest.Y, dest.Z) {
@@ -314,9 +330,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	want := geometry.Point{X: (55 + 65 + 60) / 3, Y: (15 + 15 + 28) / 3}
@@ -348,9 +362,7 @@ func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
 	}

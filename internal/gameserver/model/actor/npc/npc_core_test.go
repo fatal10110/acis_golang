@@ -1225,6 +1225,29 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
 }
 
+func TestRestoreSpawnHeadingIfAtHome(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	w := world.New()
+	w.Spawn(hostile, 100, 0, 0, 0)
+	hostile.SetWorld(w)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.SpawnHeading = 40000
+	hostile.SetHeading(1)
+
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 40000 {
+		t.Fatalf("Heading() at home = %d, want spawn heading 40000", got)
+	}
+
+	hostile.SetXYZ(200, 0, 0)
+	hostile.SetHeading(1)
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 1 {
+		t.Fatalf("Heading() off home = %d, want unchanged 1", got)
+	}
+}
+
 func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	movement := &hostileMove{moved: make(chan location.Location, 1)}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
@@ -1235,10 +1258,12 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	hostile.SetHeading(0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if movement.home != (location.Location{X: 100, Y: 0, Z: 0}) {
+		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
 	}
 
 	select {
@@ -1263,7 +1288,6 @@ func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = true, want false for GrandBoss")
@@ -1287,7 +1311,6 @@ func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
 	hostile.Instance.Template.RunSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside drift range")
@@ -1307,11 +1330,11 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 200
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
 	}
+
 	select {
 	case <-movement.moved:
 		t.Fatal("wander recheck fired before the scaled delay")
@@ -1785,7 +1808,13 @@ func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
-	if err := minion.Think(); err != nil {
+	if err := minion.TickThink(); err != nil {
+		t.Fatal(err)
+	}
+	if err := minion.TickThink(); err != nil {
+		t.Fatal(err)
+	}
+	if err := minion.TickThink(); err != nil {
 		t.Fatal(err)
 	}
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {
