@@ -32,11 +32,9 @@ type inventoryUpdateEntry struct {
 // mu guards order, owners and epoch. Inventories keep their own update
 // queue and weight state under their own lock. order tracks registration
 // order (oldest first) so a tick with several newly-registered inventories
-// sends them in a deterministic sequence rather than map iteration order.
-// A live pet's collar-level sync registers the owner's inventory at spawn,
-// so a later give-to-pet in that same window is owner-then-pet
-// (InventoryUpdate then PetInventoryUpdate) until an empty tick drops the
-// owner entry.
+// — a give-to-pet touching both the player's and the pet's — sends them in
+// a deterministic sequence, matching the reference manager's list-based
+// visitation instead of Go map iteration order.
 //
 // epoch closes a check-then-remove race Tick would otherwise have: Add
 // bumps an inventory's epoch, and Tick only drops an entry found empty or

@@ -249,13 +249,15 @@ func (h *petWorld) ownerItemCount(t *testing.T, templateID int32) int {
 
 // giveToPet hands an owner inventory stack (or part of it) to the active
 // pet through the give flow, syncing on a RequestItemList round-trip before
-// the batching tick so the transfer has settled. After a collar-level sync
-// the owner inventory is already registered, so the transfer tick is
-// owner-side InventoryUpdate then pet-side PetInventoryUpdate.
+// the batching tick so the transfer has settled, then consuming both
+// inventory-update frames in wire order.
 func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	t.Helper()
-	// Spawn queues a collar InventoryUpdate on the owner inventory. Flush
-	// it so the transfer tick is not mixed with that leftover.
+	h.srv.InventoryUpdates.Tick()
+	drainFrames(t, h.client)
+	// Second, idle tick: the 333ms production ticker drops the
+	// spawn-registered owner entry, reaching the steady state a real
+	// give-to-pet happens in.
 	h.srv.InventoryUpdates.Tick()
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestGiveItemToPet(objectID, count))
@@ -265,7 +267,7 @@ func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
 	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "give to pet",
-		serverpackets.OpcodeInventoryUpdate, serverpackets.OpcodePetInventoryUpdate)
+		serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate)
 }
 
 func petCtx() context.Context { return context.Background() }
