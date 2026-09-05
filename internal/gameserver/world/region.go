@@ -9,14 +9,16 @@ import (
 // currently visible within its bounds, and whether it is active — see
 // Active.
 //
-// mu guards objects. playersCount and active are updated outside mu (by
-// State, which coordinates across several regions at once during a
-// relocation) so they are atomics rather than fields mu also guards.
+// mu guards objects and index as one unit. playersCount and active are
+// updated outside mu (by State, which coordinates across several regions
+// at once during a relocation) so they are atomics rather than fields mu
+// also guards.
 type Region struct {
 	tileX, tileY int
 
 	mu      sync.RWMutex
-	objects map[int32]Tracked
+	objects []Tracked
+	index   map[int32]int
 
 	activityMu      sync.Mutex
 	activityVersion uint64
@@ -40,9 +42,9 @@ type inactiveRegionActor interface {
 
 func newRegion(tileX, tileY int) *Region {
 	return &Region{
-		tileX:   tileX,
-		tileY:   tileY,
-		objects: make(map[int32]Tracked),
+		tileX: tileX,
+		tileY: tileY,
+		index: make(map[int32]int),
 	}
 }
 
@@ -101,12 +103,19 @@ func notifyObjectActivity(obj Tracked, active bool) {
 	}
 }
 
-// Add registers obj as visible within r.
+// Add registers obj as visible within r. A second Add under the same id
+// replaces the occupant; the set stays unique by id.
 func (r *Region) Add(obj Tracked) regionActivityArrival {
 	r.activityMu.Lock()
 	defer r.activityMu.Unlock()
 	r.mu.Lock()
-	r.objects[obj.ObjectID()] = obj
+	id := obj.ObjectID()
+	if i, ok := r.index[id]; ok {
+		r.objects[i] = obj
+	} else {
+		r.index[id] = len(r.objects)
+		r.objects = append(r.objects, obj)
+	}
 	r.mu.Unlock()
 	if _, ok := obj.(Player); ok {
 		r.playersCount.Add(1)
@@ -117,9 +126,11 @@ func (r *Region) Add(obj Tracked) regionActivityArrival {
 // Remove drops the object with the given id from r, if present.
 func (r *Region) Remove(id int32) {
 	r.mu.Lock()
-	obj, ok := r.objects[id]
+	i, ok := r.index[id]
+	var obj Tracked
 	if ok {
-		delete(r.objects, id)
+		obj = r.objects[i]
+		r.removeAtLocked(i)
 	}
 	r.mu.Unlock()
 	if ok {
@@ -135,17 +146,29 @@ func (r *Region) Remove(id int32) {
 // safe no-op instead of evicting the object that legitimately owns id now.
 func (r *Region) removeIfSame(id int32, obj Tracked) bool {
 	r.mu.Lock()
-	cur, ok := r.objects[id]
-	if !ok || cur != obj {
+	i, ok := r.index[id]
+	if !ok || r.objects[i] != obj {
 		r.mu.Unlock()
 		return false
 	}
-	delete(r.objects, id)
+	r.removeAtLocked(i)
 	r.mu.Unlock()
 	if _, isPlayer := obj.(Player); isPlayer {
 		r.playersCount.Add(-1)
 	}
 	return true
+}
+
+func (r *Region) removeAtLocked(i int) {
+	last := len(r.objects) - 1
+	delete(r.index, r.objects[i].ObjectID())
+	if i != last {
+		moved := r.objects[last]
+		r.objects[i] = moved
+		r.index[moved.ObjectID()] = i
+	}
+	r.objects[last] = nil
+	r.objects = r.objects[:last]
 }
 
 // Objects returns a snapshot of every object currently visible within r.
@@ -159,20 +182,15 @@ func (r *Region) Objects() []Tracked {
 func (r *Region) AppendObjects(out []Tracked) []Tracked {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	for _, o := range r.objects {
-		out = append(out, o)
-	}
-	return out
+	return append(out, r.objects...)
 }
 
 func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	for id, o := range r.objects {
-		if id == except {
-			continue
-		}
-		out = append(out, o)
+	i, ok := r.index[except]
+	if !ok {
+		return append(out, r.objects...)
 	}
-	return out
+	return append(append(out, r.objects[:i]...), r.objects[i+1:]...)
 }
