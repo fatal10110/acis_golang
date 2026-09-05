@@ -153,6 +153,15 @@ func (r *Region) Objects() []Tracked {
 	return r.AppendObjects(nil)
 }
 
+// objectCount returns how many objects currently sit in r. relocate uses it
+// to pre-size the Discover/Forget notification slice before scanning.
+func (r *Region) objectCount() int {
+	r.mu.RLock()
+	n := len(r.objects)
+	r.mu.RUnlock()
+	return n
+}
+
 // AppendObjects appends a snapshot of every object currently visible within
 // r to out and returns the extended slice. Callers that repeatedly scan
 // regions can reuse out to avoid one allocation per region.

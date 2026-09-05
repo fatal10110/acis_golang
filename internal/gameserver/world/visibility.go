@@ -271,6 +271,20 @@ func (s *State) relocate(t Tracked, next *Region) {
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
 	var notifications []visibilityNotification
+	if tIsPlayer {
+		n := 0
+		for _, r := range oldAreas {
+			if !containsRegion(newAreas, r) {
+				n += r.objectCount()
+			}
+		}
+		for _, r := range newAreas {
+			if !containsRegion(oldAreas, r) {
+				n += r.objectCount()
+			}
+		}
+		notifications = make([]visibilityNotification, 0, n*2)
+	}
 
 	var toggleBuf [18]regionToggle
 	toggles := toggleBuf[:0]
