@@ -235,8 +235,7 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 		sendMagicActionFailed(live)
 		return true
 	}
-	live.takePickup()
-	live.takePetInteract()
+	live.clearParkedApproaches()
 	live.deferMagicSkill(req)
 	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
 	if err != nil {

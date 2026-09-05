@@ -22,6 +22,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -29,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -84,6 +86,7 @@ type options struct {
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
 	log                    zerolog.Logger
+	geo                    move.Geo
 }
 
 type characterSpec struct {
@@ -257,6 +260,17 @@ func WithLevels(levels *player.LevelTable) Option {
 
 // WithLog sets the link logger (default zero-logger).
 func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log } }
+
+// WithGeo supplies the movement geodata collaborator wired into live
+// players. The default is the always-passable Geo double.
+func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
+
+func bootGeo(geo move.Geo) move.Geo {
+	if geo != nil {
+		return geo
+	}
+	return Geo{}
+}
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
@@ -474,6 +488,61 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
 	}
 	holder.Inventory().SlotLimit = limit
+}
+
+// PlayerMove returns the live player's movement state so suites can drive
+// interpolation ticks and fire the blocked-arrival path.
+func (s *Server) PlayerMove(tb testing.TB, objID int32) *move.CreatureMove {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	mover, ok := obj.(interface{ Move() *move.CreatureMove })
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T does not expose Move", objID, obj)
+	}
+	return mover.Move()
+}
+
+// TickPlayerBlocked advances two interpolation ticks then closes geo so the
+// next tick fires the blocked-arrival hook. Returns the cell the walk had
+// reached before the path closed.
+func (s *Server) TickPlayerBlocked(tb testing.TB, objID int32, geo *GateGeo) location.Location {
+	tb.Helper()
+	mover := s.PlayerMove(tb, objID)
+	for i := 0; i < 2; i++ {
+		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
+			tb.Fatalf("UpdatePosition() tick %d moving = false, want origin to leave start", i+1)
+		}
+	}
+	advanced := mover.Position()
+	geo.Block()
+	if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); moving {
+		tb.Fatal("UpdatePosition() moving = true after path closed, want blocked stop")
+	}
+	return advanced
+}
+
+// ReadMoveToLocationCoords decodes object id, destination, and origin from a
+// MoveToLocation frame (opcode byte included).
+func ReadMoveToLocationCoords(tb testing.TB, frame []byte) (objectID int32, dest, origin location.Location) {
+	tb.Helper()
+	if len(frame) < 1 {
+		tb.Fatal("MoveToLocation frame empty")
+	}
+	r := wire.NewReader(frame[1:])
+	objectID = r.ReadInt32()
+	dest.X = int(r.ReadInt32())
+	dest.Y = int(r.ReadInt32())
+	dest.Z = int(r.ReadInt32())
+	origin.X = int(r.ReadInt32())
+	origin.Y = int(r.ReadInt32())
+	origin.Z = int(r.ReadInt32())
+	if err := r.Err(); err != nil {
+		tb.Fatalf("read MoveToLocation: %v", err)
+	}
+	return objectID, dest, origin
 }
 
 // PlayerPosition reports the live player's current world position.
@@ -858,7 +927,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		NPCs:             o.npcs,
 		SummonItems:      o.summonItems,
 		PetStore:         petStore,
-		Geo:              Geo{},
+		Geo:              bootGeo(o.geo),
 		IDs:              ids,
 		GroundItems:      groundItems,
 		Positions:        task.NewPositionUpdates(state),
