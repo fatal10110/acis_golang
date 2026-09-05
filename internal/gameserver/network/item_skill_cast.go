@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -55,7 +56,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		}
 		selected := live.Target()
 		if run != nil || itemAICastBusy(live) {
-			if _, ok := actorcast.SelectTarget(live.Character, selected, def); !ok {
+			if target, _ := l.resolveMagicSkillTarget(live.Character, selected, def, false); target == nil {
 				sendMagicActionFailed(live)
 				continue
 			}
@@ -94,14 +95,20 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
-		Now:         time.Now(),
-		Controller:  controller,
-		Caster:      live.Character,
-		Selected:    selected,
-		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
-		Definitions: l.skills,
+		Now:           time.Now(),
+		Controller:    controller,
+		Caster:        live.Character,
+		Selected:      selected,
+		Skill:         modelskill.Ref{ID: def.ID, Level: def.Level},
+		Definitions:   l.skills,
+		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
+		if started.Rejection != skilltarget.CastRejectNone {
+			sendTargetCastRejection(live, started.Rejection, started.Definition)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return nil, true, false
+		}
 		sendMagicCastFailure(live, started.Definition, err)
 		return nil, true, false
 	}

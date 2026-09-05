@@ -409,6 +409,9 @@ func (h *Hostile) ObjectID() int32 {
 	return h.Instance.ObjectID
 }
 
+// Unlockable reports whether this hostile NPC is a chest.
+func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }
+
 // Master returns the NPC that spawned this minion, if any.
 func (h *Hostile) Master() *Hostile {
 	h.minionsMu.RLock()

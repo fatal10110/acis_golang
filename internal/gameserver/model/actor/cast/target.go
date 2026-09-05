@@ -17,7 +17,7 @@ func SelectTarget(caster Target, selected world.Tracked, def modelskill.Definiti
 	switch def.Target {
 	case modelskill.TargetNone, modelskill.TargetSelf, modelskill.TargetGround:
 		return caster, caster != nil
-	case modelskill.TargetOne:
+	case modelskill.TargetOne, modelskill.TargetUnlockable:
 		target, ok := selected.(Target)
 		return target, ok
 	}

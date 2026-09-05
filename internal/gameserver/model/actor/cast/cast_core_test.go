@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -1520,6 +1523,110 @@ func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
 	}
 }
 
+type castDoorShape struct{}
+
+func (castDoorShape) GeoX() int               { return 0 }
+func (castDoorShape) GeoY() int               { return 0 }
+func (castDoorShape) GeoZ() int               { return 0 }
+func (castDoorShape) Height() int             { return 1 }
+func (castDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{block.AllDirections}} }
+
+type castHostileMove struct{}
+
+func (castHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
+}
+func (castHostileMove) MoveHome(location.Location) error { return nil }
+func (castHostileMove) Stop() error                      { return nil }
+
+type castHostileAttack struct{}
+
+func (castHostileAttack) BowCoolingDown() bool                { return false }
+func (castHostileAttack) AttackingNow() bool                  { return false }
+func (castHostileAttack) CanAttack(attackable.Combatant) bool { return false }
+func (castHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+
+func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile, err := npc.NewHostile(&npc.Instance{ObjectID: id, Template: &npc.Template{ID: int(id), Type: kind}, Kind: npc.InstanceKind(kind)}, live, castHostileMove{}, castHostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hostile
+}
+
+func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	recorder := &recordingSkillHandler{}
+	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", recorder)
+
+	unlockableDoor, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenSkill}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockedDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenClick}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	chest := newCastHostile(t, 4, "Chest")
+	monster := newCastHostile(t, 5, "Monster")
+	for _, tc := range []struct {
+		name   string
+		target world.Tracked
+		def    modelskill.Definition
+		want   bool
+	}{
+		{"skill door", unlockableDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, true},
+		{"click door rejected", lockedDoor, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
+		{"chest", chest, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, true},
+		{"monster rejected", monster, modelskill.Definition{Target: modelskill.TargetUnlockable, SkillType: "DUMMY"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			selected, ok := SelectTarget(caster, tc.target, tc.def)
+			if !ok {
+				t.Fatal("SelectTarget() ok = false, want true")
+			}
+			_, got := ResolveAffected(handlers, caster, selected, tc.def)
+			if got != tc.want {
+				t.Fatalf("ResolveAffected() ok = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) {
+	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	skillDoor, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenSkill}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockedDoor, err := door.NewObject(3, &door.Template{ID: 3, OpenKind: door.OpenClick}, castDoorShape{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	monster := newCastHostile(t, 4, "Monster")
+
+	if got := skilltarget.CastRejectionFor(modelskill.TargetOne, caster, skillDoor, &modelskill.Definition{Offensive: true}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("TargetOne skill door rejection = %v, want invalid target", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, lockedDoor, &modelskill.Definition{}, false); got != skilltarget.CastRejectSilent {
+		t.Fatalf("locked door rejection = %v, want silent", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, nil, &modelskill.Definition{}, false); got != skilltarget.CastRejectNone {
+		t.Fatalf("nil unlockable rejection = %v, want none", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetUnlockable, caster, monster, &modelskill.Definition{}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("monster unlockable rejection = %v, want invalid target", got)
+	}
+	if got := skilltarget.CastRejectionFor(modelskill.TargetHoly, caster, monster, &modelskill.Definition{}, false); got != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("monster holy rejection = %v, want invalid target", got)
+	}
+}
+
 // ---- from launch_revalidate_test.go ----
 // launchActor is a minimal fixture implementing every optional surface
 // RevalidateLaunch's gates consult, each independently controllable so
@@ -2248,6 +2355,29 @@ func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 	}
 	if ctrl.CastingNow() {
 		t.Fatal("controller CastingNow() = true after invalid target")
+	}
+}
+
+func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
+	ch := newRequestCharacter(10)
+	target := &requestTarget{id: 20}
+	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	defs := requestDefinitions{
+		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable},
+	}
+
+	started, err := StartItemSkill(ItemSkillRequest{
+		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch, Selected: target,
+		Skill: modelskill.Ref{ID: 7, Level: 1}, Definitions: defs,
+		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+			return target, skilltarget.CastRejectInvalidTarget
+		},
+	})
+	if !errors.Is(err, ErrInvalidTarget) {
+		t.Fatalf("StartItemSkill() error = %v, want ErrInvalidTarget", err)
+	}
+	if started.Target != target || started.Rejection != skilltarget.CastRejectInvalidTarget {
+		t.Fatalf("started = %+v, want preserved invalid target", started)
 	}
 }
 
