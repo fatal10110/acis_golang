@@ -100,6 +100,9 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		Selected:    selected,
 		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
 		Definitions: l.skills,
+		Hooks: actorcast.StartHooks{
+			StopMovement: l.stopMovementForCast(live),
+		},
 	})
 	if err != nil {
 		sendMagicCastFailure(live, started.Definition, err)

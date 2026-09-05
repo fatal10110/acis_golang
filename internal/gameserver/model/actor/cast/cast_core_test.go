@@ -1992,8 +1992,10 @@ func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 	started, err := StartPlayerSkill(PlayerSkillRequest{
 		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
 		Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
-		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
-			return nil, skilltarget.CastRejectInvalidTarget
+		Hooks: StartHooks{
+			ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+				return nil, skilltarget.CastRejectInvalidTarget
+			},
 		},
 	})
 	if !errors.Is(err, ErrInvalidTarget) {

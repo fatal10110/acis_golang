@@ -47,38 +47,32 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, def.CastRange) {
 		return
 	}
-	if def.Target == modelskill.TargetGround {
-		x, y, z := live.GroundTarget()
-		switch skilltarget.GroundCastFailureFor(live.Character, &def) {
-		case skilltarget.GroundCastNoLineOfSight:
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
-			sendMagicActionFailed(live)
-			return
-		case skilltarget.GroundCastPeaceZone:
-			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
-			sendMagicActionFailed(live)
-			return
-		}
-		live.Character.SetHeading(live.CurrentLocation().HeadingTo(location.Location{X: x, Y: y, Z: z}))
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
-		})
-	}
 
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
+	var afterCanCast func() error
+	if known && def.Target == modelskill.TargetGround {
+		afterCanCast = l.groundCastAfterCanCast(live, def)
+	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
-		Now:           time.Now(),
-		Controller:    controller,
-		Caster:        live.Character,
-		Selected:      live.Target(),
-		SkillID:       int(req.SkillID),
-		Definitions:   l.skills,
-		Ctrl:          req.CtrlPressed,
-		Shift:         req.ShiftPressed,
-		ResolveTarget: l.resolveMagicSkillTarget,
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    live.Target(),
+		SkillID:     int(req.SkillID),
+		Definitions: l.skills,
+		Ctrl:        req.CtrlPressed,
+		Shift:       req.ShiftPressed,
+		Hooks: actorcast.StartHooks{
+			ResolveTarget: l.resolveMagicSkillTarget,
+			StopMovement:  l.stopMovementForCast(live),
+			AfterCanCast:  afterCanCast,
+		},
 	})
 	if err != nil {
+		if errors.Is(err, errGroundCastRejected) {
+			return
+		}
 		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)
 			l.rejectMagicCast(live, started.Definition, started.Target)
@@ -182,19 +176,25 @@ func magicCastFailureMovesToPawn(err error) bool {
 		errors.Is(err, actorcast.ErrNotEnoughItems)
 }
 
+func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() error {
+	return func() error {
+		if live == nil || live.move == nil {
+			return nil
+		}
+		if err := live.move.Stop(); err != nil {
+			l.log.Warn().Err(err).Msg("move: stop before cast")
+			return err
+		}
+		return nil
+	}
+}
+
 func (l *GameClientLink) rejectMagicCast(live *livePlayer, def modelskill.Definition, target actorcast.Target) {
 	if live == nil || target == nil {
 		return
 	}
-	if def.HitTime > 50 {
-		if live.move != nil {
-			if err := live.move.Stop(); err != nil {
-				l.log.Warn().Err(err).Msg("move: stop before rejected cast")
-			}
-		}
-		if target.ObjectID() != live.ObjectID() {
-			live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
-		}
+	if def.HitTime > 50 && target.ObjectID() != live.ObjectID() {
+		live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
 	}
 	if target.ObjectID() == live.ObjectID() {
 		return
@@ -218,6 +218,29 @@ func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
 	case skilltarget.CorpseCastSweepNotMonster:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	}
+}
+
+var errGroundCastRejected = errors.New("ground cast rejected")
+
+func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def modelskill.Definition) func() error {
+	return func() error {
+		x, y, z := live.GroundTarget()
+		switch skilltarget.GroundCastFailureFor(live.Character, &def) {
+		case skilltarget.GroundCastNoLineOfSight:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
+			sendMagicActionFailed(live)
+			return errGroundCastRejected
+		case skilltarget.GroundCastPeaceZone:
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+			sendMagicActionFailed(live)
+			return errGroundCastRejected
+		}
+		live.Character.SetHeading(live.CurrentLocation().HeadingTo(location.Location{X: x, Y: y, Z: z}))
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
+		})
+		return nil
 	}
 }
 
@@ -263,7 +286,12 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
-	if finalTarget == nil || !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
+	if finalTarget == nil {
+		return nil, skilltarget.CastRejectNone
+	}
+	// Ground LOS/peace/heading run after cost validation via AfterCanCast.
+	// handler.CanCast here would drop the caster target and skip those messages.
+	if def.Target != modelskill.TargetGround && !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
 		return nil, skilltarget.CastRejectNone
 	}
 	return finalTarget, skilltarget.CastRejectNone

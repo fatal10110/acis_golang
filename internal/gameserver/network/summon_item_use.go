@@ -119,6 +119,9 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		Selected:    live.Character,
 		Skill:       summonCreatureSkillRef,
 		Definitions: l.skills,
+		Hooks: actorcast.StartHooks{
+			StopMovement: l.stopMovementForCast(live),
+		},
 	})
 	if err != nil {
 		sendMagicCastFailure(live, started.Definition, err)
