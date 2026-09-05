@@ -1814,6 +1814,9 @@ func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	if err := minion.TickThink(); err != nil {
 		t.Fatal(err)
 	}
+	if err := minion.TickThink(); err != nil {
+		t.Fatal(err)
+	}
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionFollow)
 	}

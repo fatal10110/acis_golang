@@ -28,6 +28,13 @@ func tickThinkIdle(ai *Attackable) error {
 	return ai.TickThink()
 }
 
+func tickThinkPromote(ai *Attackable) error {
+	if err := tickThinkIdle(ai); err != nil {
+		return err
+	}
+	return ai.TickThink()
+}
+
 func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -1583,19 +1590,25 @@ func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
 	owner.moveSpeed = 40
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	if err := ai.TickThink(); err != nil {
+	if err := tickThinkIdle(ai); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
-	if err := ai.TickThink(); err != nil {
-		t.Fatalf("TickThink() error: %v", err)
-	}
-
-	if got := ai.CurrentIntention(); got != IntentionWander {
-		t.Fatalf("CurrentIntention() = %v, want wander", got)
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after idle abort = %v, want idle", got)
 	}
 	got, ok := ai.Desires().Peek()
 	if !ok || got.Kind != IntentionWander || got.Timer != 5 || got.Weight != 5 {
 		t.Fatalf("queued wander = (%v %+v), want timer 5 weight 5", ok, got)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d after queue tick, want 0 (promote next cycle)", owner.wanderCalls)
+	}
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("promote TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
 	if owner.wanderCalls != 1 || owner.wanderOffset != 120 {
 		t.Fatalf("wander move = %d offset %d, want 1 call offset 120", owner.wanderCalls, owner.wanderOffset)
@@ -2604,7 +2617,7 @@ func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
 	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	if err := tickThinkIdle(brain); err != nil {
+	if err := tickThinkPromote(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
@@ -2627,7 +2640,7 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewAttackable(owner, &recordingMove{}, strike)
 
-	if err := tickThinkIdle(brain); err != nil {
+	if err := tickThinkPromote(brain); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {

@@ -605,8 +605,9 @@ func (a *Attackable) Think() error {
 	return a.think(false)
 }
 
-// TickThink is the periodic AI cycle: empty-queue idle abort, then one
-// intention step. The first cycle skips the abort.
+// TickThink is the periodic AI cycle. Empty-queue idle abort runs after
+// the first cycle and does not promote a follow or wander queued in that
+// same cycle.
 func (a *Attackable) TickThink() error {
 	return a.think(true)
 }
@@ -619,10 +620,12 @@ func (a *Attackable) think(updateTick bool) error {
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
 	if updateTick {
+		idled := false
 		if _, ok := a.desires.Peek(); !ok {
 			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
 				a.thinkIdle()
 				a.queueIdleFollow()
+				idled = true
 			}
 		}
 		if _, ok := a.desires.Peek(); !ok {
@@ -631,6 +634,9 @@ func (a *Attackable) think(updateTick bool) error {
 			}
 		}
 		a.lifeTime++
+		if idled {
+			return nil
+		}
 	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()
