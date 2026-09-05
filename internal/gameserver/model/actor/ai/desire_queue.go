@@ -135,6 +135,18 @@ func (q *DesireQueue) RemoveIf(drop func(*Desire) bool) {
 	q.removeLocked(drop)
 }
 
+// hasKind reports whether any queued Desire has the given kind.
+func (q *DesireQueue) hasKind(kind Intention) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	for _, d := range q.desires {
+		if d.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
 // Has reports whether a queued Desire is Equal to probe.
 func (q *DesireQueue) Has(probe *Desire) bool {
 	if probe == nil {
