@@ -288,6 +288,7 @@ type Server struct {
 	GroundItems      *task.GroundItems
 	ShadowItems      *task.ShadowItems
 	AttackStance     *task.AttackStance
+	Effects          *task.Effects
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -838,6 +839,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(func() { loginLink.Close() })
 
 	state := world.New()
+	taskEffects := task.NewEffects()
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)
@@ -1053,6 +1055,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GroundItems:      groundItems,
 		ShadowItems:      shadowItems,
 		AttackStance:     attackStance,
+		Effects:          taskEffects,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,

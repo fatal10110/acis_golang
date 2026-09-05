@@ -383,8 +383,8 @@ func startPositionUpdates(lc fx.Lifecycle, positions *task.PositionUpdates, log 
 	startTicker(lc, log, positions.Start)
 }
 
-func provideEffects(state *world.State) *task.Effects {
-	return task.NewEffects(state)
+func provideEffects() *task.Effects {
+	return task.NewEffects()
 }
 
 func startEffects(lc fx.Lifecycle, effects *task.Effects, log zerolog.Logger) {

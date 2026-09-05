@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -18,8 +19,13 @@ type npcRegenActor interface {
 }
 
 // NPCRegen runs periodic HP/MP regeneration for spawned attackable NPCs.
+//
+// scratch is a per-tick scan buffer reused across calls instead of
+// reallocated: Tick only ever runs on the scheduler ticker's single
+// goroutine, so nothing else touches it between ticks.
 type NPCRegen struct {
-	state *world.State
+	state   *world.State
+	scratch []worldobject.Object
 }
 
 // NewNPCRegen returns an NPC regen ticker over state's spawned actors.
@@ -37,9 +43,14 @@ func (r *NPCRegen) Tick() {
 	if r == nil || r.state == nil {
 		return
 	}
-	for _, obj := range r.state.Objects() {
+	r.scratch = r.state.AppendObjects(r.scratch)
+	for _, obj := range r.scratch {
 		if actor, ok := obj.(npcRegenActor); ok {
 			actor.TickRegen()
 		}
 	}
+	// Drop references past this tick's length so a shrinking population
+	// doesn't keep despawned objects reachable through unused capacity.
+	clear(r.scratch[:cap(r.scratch)])
+	r.scratch = r.scratch[:0]
 }

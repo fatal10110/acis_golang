@@ -75,6 +75,13 @@ func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.g
 // Objects returns a snapshot of every tracked object.
 func (s *State) Objects() []worldobject.Object { return s.objects.all() }
 
+// AppendObjects copies every tracked object onto dst and returns the
+// extended slice, reusing dst's backing array across repeat calls instead
+// of allocating a fresh snapshot each time. See registry.appendAll.
+func (s *State) AppendObjects(dst []worldobject.Object) []worldobject.Object {
+	return s.objects.appendAll(dst)
+}
+
 // AddPlayer marks obj online, unless a player with the same id is already
 // tracked, and indexes its name for PlayerByName lookups. The registry and
 // name-index updates happen under one lock so a concurrent RemovePlayer for

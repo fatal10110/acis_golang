@@ -40,11 +40,16 @@ func (l *List) Add(e *Effect) {
 	}
 	var pending []func()
 	l.mu.Lock()
+	wasEmpty := l.emptyLocked()
 	l.add(e, &pending)
+	becameActive := wasEmpty && !l.emptyLocked()
 	l.mu.Unlock()
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
+	if becameActive && activityHook != nil {
+		activityHook(l, true)
+	}
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -55,11 +60,16 @@ func (l *List) Remove(e *Effect) {
 	}
 	var pending []func()
 	l.mu.Lock()
+	wasEmpty := l.emptyLocked()
 	l.remove(e, &pending)
+	becameEmpty := !wasEmpty && l.emptyLocked()
 	l.mu.Unlock()
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
+	if becameEmpty && activityHook != nil {
+		activityHook(l, false)
+	}
 }
 
 // StopByType removes every active effect of the given type, running each

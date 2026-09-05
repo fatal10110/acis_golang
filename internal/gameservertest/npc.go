@@ -145,7 +145,7 @@ func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at 
 // production one-second effect sweep — so buff expiry and damage-over-time
 // ticks are deterministic instead of wall-clock driven.
 func (s *Server) TickEffects() {
-	task.NewEffects(s.State).Tick()
+	s.Effects.Tick()
 }
 
 // parkedMove is a MoveController that never moves.

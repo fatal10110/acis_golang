@@ -37,6 +37,25 @@ func WithCancelLesser(cancel bool) Option {
 	}
 }
 
+// activityHook is the process-wide registrar of lists that currently hold at
+// least one effect, wired once at boot (task.Effects) before any List is
+// constructed. It lets the periodic effect tick iterate only lists with
+// something to tick instead of scanning every tracked world object every
+// second. A nil hook (tests, tools that never call SetActivityHook) leaves
+// Add/Remove exactly as before.
+var activityHook func(list *List, active bool)
+
+// SetActivityHook installs the process-wide list-activity registrar.
+func SetActivityHook(hook func(list *List, active bool)) {
+	activityHook = hook
+}
+
+// emptyLocked reports whether l currently holds no buff or debuff. Caller
+// must hold l.mu.
+func (l *List) emptyLocked() bool {
+	return len(l.buffs) == 0 && len(l.debuffs) == 0
+}
+
 // List owns one creature's active buffs and debuffs. All methods are safe for
 // concurrent use; mu guards buffs, debuffs, stacks, and callbacks into owner.
 type List struct {
