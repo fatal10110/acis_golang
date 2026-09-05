@@ -45,6 +45,10 @@ Use for a new package boundary, public API, concurrency ownership model, persist
 significant dependency, lifecycle framework, major cross-system design, redesign, or conflicting
 behavioral evidence.
 
+A requested port whose Java mechanism is a system Go does not have yet (Quest event registry,
+script hooks, and similar) is a deferral to that system's milestone, not a generated ID table or
+fake dispatcher. Retag the issue; do not implement a stand-in.
+
 Complete bounded research, invoke brainstorming, present 2–3 realistic approaches, and apply
 Ponytail Full to remove unnecessary abstraction and scope. Obtain approval for the direction, use
 writing-plans when implementation has dependent stages, apply TDD to behavior-critical portions,
