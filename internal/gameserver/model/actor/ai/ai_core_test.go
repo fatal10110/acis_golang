@@ -1419,10 +1419,17 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
 	ai.SetWander()
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
 	ai.Think()
 
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle outside territory without return home", got)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire still queued after out-of-territory thinkWander, want it dropped")
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0 after out-of-territory wander clear", got)
 	}
 }
 

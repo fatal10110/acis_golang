@@ -932,6 +932,7 @@ func (a *Attackable) doWanderMove() {
 		return
 	}
 	if !a.actor.InTerritory() {
+		a.clearCurrentDesire()
 		a.current = intention{kind: IntentionIdle}
 		return
 	}
