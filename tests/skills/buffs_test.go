@@ -84,6 +84,103 @@ func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestDebuffDoesNotLandOnInvulnerableNPC casts a guaranteed-land debuff at
+// an invulnerable monster: the cast still plays, AttackFailed stays silent
+// (the land roll succeeded), and the NPC receives no effect.
+func TestDebuffDoesNotLandOnInvulnerableNPC(t *testing.T) {
+	srv, c, _ := bootOneShotDebuff(t, 6)
+	hostile := srv.SpawnHostileNPC(t)
+	hostile.SetInvul(true)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(6, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 6, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	drainAssertingNoAttackFailed(t, c)
+
+	if got := len(hostile.EffectList().All()); got != 0 {
+		t.Fatalf("invulnerable NPC effects = %d, want 0", got)
+	}
+}
+
+// TestDebuffDoesNotLandWhenCasterCannotGiveDamage is the access-level
+// sibling of invulnerability: a caster forbidden to deal damage still
+// completes the cast without AttackFailed, but the debuff does not apply.
+func TestDebuffDoesNotLandWhenCasterCannotGiveDamage(t *testing.T) {
+	srv, c, objID := bootOneShotDebuff(t, 7)
+	denyCasterDamage(t, srv, objID)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(7, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 7, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	drainAssertingNoAttackFailed(t, c)
+
+	if got := len(hostile.EffectList().All()); got != 0 {
+		t.Fatalf("NPC effects after denied-damage caster = %d, want 0", got)
+	}
+}
+
+func bootOneShotDebuff(t *testing.T, skillID modelskill.ID) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 0, StaticHitTime: true,
+				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+				BaseLandRate: 100, IgnoreResists: true,
+				Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, int(skillID), 1)
+	startInWorld(t, c)
+	return srv, c, objID
+}
+
+func denyCasterDamage(t *testing.T, srv *gameservertest.Server, objID int32) {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	denied, ok := obj.(interface{ SetCanGiveDamage(bool) })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no SetCanGiveDamage", objID, obj)
+	}
+	denied.SetCanGiveDamage(false)
+}
+
+func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
+	t.Helper()
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			return
+		}
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		if id := wireReader(frame[1:]).ReadInt32(); id == int32(serverpackets.SystemMessageAttackFailed) {
+			t.Fatal("got AttackFailed; invul/permission refuse is silent")
+		}
+	}
+	t.Fatal("client kept receiving frames after 100 drains")
+}
+
 // TestStunBlocksCastingAndMovement lands a stun through a self-cast skill
 // and verifies both blanket locks the reference applies to a CC'd caster:
 // further casts get ActionFailed only — no reason message — and walk

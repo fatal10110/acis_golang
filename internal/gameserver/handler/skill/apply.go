@@ -24,6 +24,10 @@ type positionedActor interface {
 	Position() (int, int, int)
 }
 
+type invulnerableEffected interface {
+	Invul() bool
+}
+
 // applyEffects instantiates each of templates and adds it to effected's
 // effect list, attributed to effector. def carries the owning skill's
 // identity and stacking classification. A template naming an effect core
@@ -43,6 +47,9 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 		return 0
 	}
 	if !withinEffectRange(effector, effected, def.EffectRange) {
+		return 0
+	}
+	if offensiveEffectApplyBlocked(effector, effected, def) {
 		return 0
 	}
 	target, ok := effected.(effectListTarget)
@@ -112,6 +119,22 @@ func withinEffectRange(effector, effected Actor, effectRange int) bool {
 	ax, ay, az := effectorPos.Position()
 	bx, by, bz := effectedPos.Position()
 	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
+}
+
+// offensiveEffectApplyBlocked is the landing-time refuse for offensive and
+// debuff skills aimed at someone else: target invulnerability, or a caster
+// not permitted to deal damage. Self-applies skip both.
+func offensiveEffectApplyBlocked(effector, effected Actor, def modelskill.Definition) bool {
+	if !def.Offensive && !def.Debuff {
+		return false
+	}
+	if effector != nil && effected != nil && effector.ObjectID() == effected.ObjectID() {
+		return false
+	}
+	if inv, ok := effected.(invulnerableEffected); ok && inv.Invul() {
+		return true
+	}
+	return !creature.CanDealDamage(effector)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
