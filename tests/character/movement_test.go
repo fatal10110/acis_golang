@@ -88,3 +88,46 @@ func TestMoveBackwardToLocationRejectsBeyond9900Units(t *testing.T) {
 		t.Fatalf("opcode = %#x, want ActionFailed (%#x)", reply[0], serverpackets.OpcodeActionFailed)
 	}
 }
+
+// TestBlockedWalkBroadcastsSameCellMoveToLocation pins the player MOVE_TO
+// blocked-arrival branch: observers get MoveToLocation to the cell the
+// walk actually stopped on, not StopMove.
+func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
+	geo := &gameservertest.GateGeo{}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithGeo(geo),
+	)
+	c := srv.Client
+	c.Send(encodeRequestGameStart(0))
+	c.Read()
+	c.Read()
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+	objID := srv.SoleObjectID(t)
+
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
+	target := location.Location{X: 80, Y: 20, Z: 30}
+	c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	frame := c.Read()
+	if frame[0] == serverpackets.OpcodeStopMove {
+		t.Fatalf("blocked arrival opcode = StopMove (%#x), want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
+	}
+	if frame[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("blocked arrival opcode = %#x, want MoveToLocation (%#x)", frame[0], serverpackets.OpcodeMoveToLocation)
+	}
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, frame)
+	if objectID != objID {
+		t.Fatalf("MoveToLocation object id = %d, want %d", objectID, objID)
+	}
+	if dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+}

@@ -221,11 +221,13 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}
 	})
-	moveCtl.SetBlocked(func() {
+	moveCtl.SetBlocked(func() bool {
+		moveCtl.BroadcastBlockedCorrection()
 		hostile.AI().ArrivedBlocked()
 		if err := hostile.Think(); err != nil {
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}
+		return true
 	})
 	attackCtl.SetFinished(func() {
 		if err := hostile.Think(); err != nil {
