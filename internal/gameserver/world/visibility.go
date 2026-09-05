@@ -468,7 +468,10 @@ func (s *State) ForEachKnownInPlainRadius(t Tracked, radius int, fn func(Tracked
 // knownInRadiusObjectCap is the stack buffer for one region's objects during
 // a radius scan. 256 covers a crowded single region without spilling; a
 // region holding more than 256 objects falls back to a heap slice, reused
-// across the remaining regions of the same scan.
+// across the remaining regions of the same scan. The array is zeroed per
+// call (4 KiB), which costs a sparse scan ~70 ns against a 32-entry buffer
+// — paid back from roughly 300 objects up, where the heap spill it
+// replaces costs more.
 const knownInRadiusObjectCap = 256
 
 func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(Tracked)) {
