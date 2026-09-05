@@ -606,27 +606,25 @@ func (a *Attackable) TickThink() error {
 	return a.think(true)
 }
 
-func (a *Attackable) canPromote(updateTick bool) bool {
+func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
 	if a.cast != nil && a.cast.CastingNow() {
 		return false
 	}
 	if !updateTick {
 		return true
 	}
-	if a.lifeTime > 0 {
-		return true
-	}
-	return a.desires.hasKind(IntentionAttack)
+	return a.lifeTime > 0 || instantRun
 }
 
 func (a *Attackable) think(updateTick bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
 	a.refreshCombatMemory()
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
-	canPromote := a.canPromote(updateTick)
+	canPromote := a.canPromote(updateTick, instantRun)
 	if updateTick {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {

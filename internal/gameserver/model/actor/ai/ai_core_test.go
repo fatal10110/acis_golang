@@ -1696,6 +1696,29 @@ func TestAttackableAIFirstTickPromotesHighestWeightWhenAttackOpensGate(t *testin
 	}
 }
 
+func TestAttackableAIFirstTickPromotesAfterAttackDesirePruned(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.moveSpeed = 40
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 10})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander (ATTACK presence latched before prune)", got)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d, want 1", owner.wanderCalls)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
+		t.Fatal("ATTACK desire still queued after empty-threat prune")
+	}
+}
+
 func TestAttackableAIDoesNotPromoteWhileCasting(t *testing.T) {
 	owner := actor(1)
 	owner.moveSpeed = 40
