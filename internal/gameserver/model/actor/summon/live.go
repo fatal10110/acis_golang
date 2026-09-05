@@ -77,26 +77,27 @@ type Actor struct {
 	maxBuffsAmount int
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
-	// lifetime, combat stat bases, invul, and
-	// statusUpdater:
+	// lifetime, combat stat bases, invul, statusUpdater, and
+	// ownerInfoRefresher:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
 	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
 	// the owner-connection and tick goroutines write them, per
 	// world.Observer's concurrency contract
 	// (internal/gameserver/world/visibility.go).
-	statusMu       sync.RWMutex
-	invul          bool
-	level          int
-	name           string
-	named          bool
-	lifetime       LifetimeState
-	statusUpdater  func()
-	damageNotifier func(string, int32)
-	expNotifier    func(int64)
-	dead           bool
-	disabled       bool
-	brain          AI
-	onDespawn      func()
+	statusMu           sync.RWMutex
+	invul              bool
+	level              int
+	name               string
+	named              bool
+	lifetime           LifetimeState
+	statusUpdater      func()
+	ownerInfoRefresher func()
+	damageNotifier     func(string, int32)
+	expNotifier        func(int64)
+	dead               bool
+	disabled           bool
+	brain              AI
+	onDespawn          func()
 	// frames is the network-owned packet builder installed via
 	// SetFrameBuilder before SpawnBesideOwner publishes this summon into
 	// world.State; that publish takes a registry mutex, giving every other
@@ -249,6 +250,7 @@ type PetConfig struct {
 	ObjectID        int32
 	Owner           Owner
 	ControlItemID   int32
+	OwnerInventory  *itemcontainer.Inventory
 	NPCID           int
 	CollisionRadius float64
 	CollisionHeight float64
@@ -377,6 +379,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		petConfig:      petCfg,
 		growth:         cfg.Growth,
 		controlItemID:  cfg.ControlItemID,
+		ownerInventory: cfg.OwnerInventory,
 		exp:            cfg.Exp,
 		sp:             cfg.SP,
 		expType:        cfg.ExpType,

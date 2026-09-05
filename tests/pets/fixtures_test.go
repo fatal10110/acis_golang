@@ -32,9 +32,12 @@ const (
 	wyvernNPCID    = 12621
 	treeNPCID      = 13006
 
-	// wolfLevelRow is the single pet-level stat row the wolf template
+	// wolfLevelRow is the spawn pet-level stat row the wolf template
 	// carries; every spawn starts (and every save round-trips) through it.
+	// wolfNextLevel is the growth row a driven level-up crosses.
 	wolfLevel        = 10
+	wolfNextLevel    = 11
+	wolfNextLevelExp = int64(1000)
 	wolfMaxHP        = 400
 	wolfMaxMP        = 80
 	wolfMaxMeal      = 3000
@@ -68,9 +71,18 @@ func wolfTemplate() *npc.Template {
 			Food1:         int(wolfFoodID),
 			AutoFeedLimit: 0.55, HungryLimit: 0.3, UnsummonLimit: 0.1,
 			Levels: map[int]npc.PetLevelStats{
-				wolfLevel: {MaxHP: wolfMaxHP, MaxMP: wolfMaxMP, PAtk: 100, PDef: 90, MAtk: 20, MDef: 40, MaxMeal: wolfMaxMeal, MealInNormal: 5, MealInBattle: 10, SSCount: 1},
+				wolfLevel:     wolfLevelStats(0),
+				wolfNextLevel: wolfLevelStats(wolfNextLevelExp),
 			},
 		},
+	}
+}
+
+func wolfLevelStats(maxExp int64) npc.PetLevelStats {
+	return npc.PetLevelStats{
+		MaxExp: maxExp, MaxHP: wolfMaxHP, MaxMP: wolfMaxMP,
+		PAtk: 100, PDef: 90, MAtk: 20, MDef: 40,
+		MaxMeal: wolfMaxMeal, MealInNormal: 5, MealInBattle: 10, SSCount: 1,
 	}
 }
 
@@ -241,18 +253,17 @@ func (h *petWorld) ownerItemCount(t *testing.T, templateID int32) int {
 // inventory-update frames in wire order.
 func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	t.Helper()
+	// Spawn queues a collar InventoryUpdate on the owner inventory. Flush
+	// it so the transfer tick is not mixed with that leftover.
+	h.srv.InventoryUpdates.Tick()
+	drainFrames(t, h.client)
 	h.client.Send(encodeRequestGiveItemToPet(objectID, count))
 	testsupport.SyncBarrier(t, h.client, func() {
 		h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
 	}, serverpackets.OpcodeItemList)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
-	frames := drainFrames(t, h.client)
-	if len(frames) < 2 {
-		t.Fatalf("transfer frames = %d, want PetInventoryUpdate then InventoryUpdate", len(frames))
-	}
-	assertFrameOpcode(t, frames[0], serverpackets.OpcodePetInventoryUpdate, "pet-side update")
-	assertFrameOpcode(t, frames[1], serverpackets.OpcodeInventoryUpdate, "owner-side update")
+	requirePetAndOwnerInventoryUpdates(t, drainFrames(t, h.client), "give to pet")
 }
 
 func petCtx() context.Context { return context.Background() }
@@ -429,6 +440,25 @@ func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	}
 	t.Fatal("client kept receiving frames after 100 drains")
 	return nil
+}
+
+func requirePetAndOwnerInventoryUpdates(t *testing.T, frames [][]byte, what string) {
+	t.Helper()
+	var pet, owner bool
+	for _, frame := range frames {
+		if len(frame) == 0 {
+			continue
+		}
+		switch frame[0] {
+		case serverpackets.OpcodePetInventoryUpdate:
+			pet = true
+		case serverpackets.OpcodeInventoryUpdate:
+			owner = true
+		}
+	}
+	if !pet || !owner {
+		t.Fatalf("%s frames = opcodes %x, want PetInventoryUpdate and InventoryUpdate", what, frameOpcodes(frames))
+	}
 }
 
 // readUntilOpcode collects frames until one carries want, returning every

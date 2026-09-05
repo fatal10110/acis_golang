@@ -10,23 +10,80 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// TestAutosaveSyncsCollarEnchantToPetLevel saves a live wolf whose collar
-// still shows enchant 0: the periodic save writes pets.level and lifts the
-// control item to that level, persisting the row and sending a modified
-// InventoryUpdate.
+// TestFirstSpawnSyncsCollarEnchantToPetLevel lifts a fresh collar (enchant 0)
+// as soon as the pet's level is applied: live item, queued InventoryUpdate,
+// persisted row, and PetInfo, without waiting for autosave or return.
+func TestFirstSpawnSyncsCollarEnchantToPetLevel(t *testing.T) {
+	h := bootOwnerWithCollar(t)
+	actor, burst := h.spawnWolf(t)
+	if actor.Level() != wolfLevel {
+		t.Fatalf("pet level = %d, want %d", actor.Level(), wolfLevel)
+	}
+	if countOpcode(burst, serverpackets.OpcodePetInfo) == 0 {
+		t.Fatalf("spawn burst missing PetInfo: opcodes %x", frameOpcodes(burst))
+	}
+	h.assertCollarEnchantedTo(t, wolfLevel)
+}
+
+// TestLevelUpSyncsCollarEnchantToNewLevel drives a kill-reward level-up:
+// the live setter lifts the collar to the new level, queues InventoryUpdate,
+// and refreshes the owner with PetInfo at that moment.
+func TestLevelUpSyncsCollarEnchantToNewLevel(t *testing.T) {
+	h := bootOwnerWithCollar(t)
+	actor, _ := h.spawnWolf(t)
+	h.assertCollarEnchantedTo(t, wolfLevel)
+	drainUntilQuiet(t, h.client)
+
+	actor.AddExpAndSp(wolfNextLevelExp, 0)
+	if actor.Level() != wolfNextLevel {
+		t.Fatalf("pet level after exp = %d, want %d", actor.Level(), wolfNextLevel)
+	}
+
+	frames := drainFrames(t, h.client)
+	if countOpcode(frames, serverpackets.OpcodePetInfo) == 0 {
+		t.Fatalf("level-up frames missing PetInfo: opcodes %x", frameOpcodes(frames))
+	}
+	h.assertCollarEnchantedTo(t, wolfNextLevel)
+}
+
+// TestMatchingCollarEnchantSendsNoExtraPackets respawns a pet whose collar
+// already shows the saved level: no InventoryUpdate and no extra PetInfo
+// beyond the spawn announcement.
+func TestMatchingCollarEnchantSendsNoExtraPackets(t *testing.T) {
+	h := bootOwnerWithCollar(t)
+	h.spawnWolf(t)
+	h.returnPet(t)
+	if _, ok := h.findCollarInventoryUpdate(t); !ok {
+		t.Fatal("expected collar InventoryUpdate from the first level apply")
+	}
+	drainUntilQuiet(t, h.client)
+
+	_, burst := h.spawnWolf(t)
+	if got := h.liveCollarEnchant(t); got != wolfLevel {
+		t.Fatalf("live collar enchant on respawn = %d, want %d", got, wolfLevel)
+	}
+	if countOpcode(burst, serverpackets.OpcodePetInfo) != 1 {
+		t.Fatalf("matching spawn PetInfo count = %d, want 1 Discover announcement; opcodes %x",
+			countOpcode(burst, serverpackets.OpcodePetInfo), frameOpcodes(burst))
+	}
+	if _, ok := h.findCollarInventoryUpdate(t); ok {
+		t.Fatal("matching collar sent InventoryUpdate")
+	}
+}
+
+// TestAutosaveSyncsCollarEnchantToPetLevel keeps the save-path lift: a
+// periodic save still writes the pets row and leaves the control item at
+// the saved level after the live setter has already applied it.
 func TestAutosaveSyncsCollarEnchantToPetLevel(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	actor, _ := h.spawnWolf(t)
-	if got := h.liveCollarEnchant(t); got != 0 {
-		t.Fatalf("collar enchant before save = %d, want 0", got)
-	}
 	if actor.Level() != wolfLevel {
 		t.Fatalf("pet level = %d, want %d", actor.Level(), wolfLevel)
 	}
 
 	h.srv.TickAutosave()
 
-	h.assertCollarEnchantedToPetLevel(t)
+	h.assertCollarEnchantedTo(t, wolfLevel)
 }
 
 // TestReturnPetSyncsCollarEnchantToPetLevel covers the unsummon save: the
@@ -38,7 +95,7 @@ func TestReturnPetSyncsCollarEnchantToPetLevel(t *testing.T) {
 
 	h.returnPet(t)
 
-	h.assertCollarEnchantedToPetLevel(t)
+	h.assertCollarEnchantedTo(t, wolfLevel)
 }
 
 // TestLogoutSyncsCollarEnchantToPetLevel covers detachLivePlayer: the
@@ -49,9 +106,6 @@ func TestReturnPetSyncsCollarEnchantToPetLevel(t *testing.T) {
 func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
-	if got := h.liveCollarEnchant(t); got != 0 {
-		t.Fatalf("collar enchant before logout = %d, want 0", got)
-	}
 
 	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
 	assertFrameOpcode(t, mustRead(t, h.client, "LeaveWorld"), serverpackets.OpcodeLeaveWorld, "LeaveWorld")
@@ -68,20 +122,23 @@ func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
 	}
 }
 
-func (h *petWorld) assertCollarEnchantedToPetLevel(t *testing.T) {
+func (h *petWorld) assertCollarEnchantedTo(t *testing.T, level int) {
 	t.Helper()
-	if got := h.liveCollarEnchant(t); got != wolfLevel {
-		t.Fatalf("live collar enchant = %d, want pet level %d", got, wolfLevel)
+	if got := h.liveCollarEnchant(t); got != level {
+		t.Fatalf("live collar enchant = %d, want pet level %d", got, level)
 	}
-	entry := h.flushCollarInventoryUpdate(t)
+	entry, ok := h.findCollarInventoryUpdate(t)
+	if !ok {
+		t.Fatalf("no InventoryUpdate for collar %d", h.collarID)
+	}
 	if entry.state != uint16(itemcontainer.UpdateModified) {
 		t.Fatalf("InventoryUpdate state = %d, want modified (%d)", entry.state, itemcontainer.UpdateModified)
 	}
-	if int(entry.enchant) != wolfLevel {
-		t.Fatalf("InventoryUpdate enchant = %d, want %d", entry.enchant, wolfLevel)
+	if int(entry.enchant) != level {
+		t.Fatalf("InventoryUpdate enchant = %d, want %d", entry.enchant, level)
 	}
-	if got := h.persistedCollarEnchant(t); got != wolfLevel {
-		t.Fatalf("persisted collar enchant = %d, want %d", got, wolfLevel)
+	if got := h.persistedCollarEnchant(t); got != level {
+		t.Fatalf("persisted collar enchant = %d, want %d", got, level)
 	}
 }
 
@@ -115,7 +172,7 @@ func (h *petWorld) ownerInventory(t *testing.T) *itemcontainer.Inventory {
 	return holder.Inventory()
 }
 
-func (h *petWorld) flushCollarInventoryUpdate(t *testing.T) collarUpdate {
+func (h *petWorld) findCollarInventoryUpdate(t *testing.T) (collarUpdate, bool) {
 	t.Helper()
 	h.srv.InventoryUpdates.Tick()
 	frames := drainFrames(t, h.client)
@@ -125,12 +182,21 @@ func (h *petWorld) flushCollarInventoryUpdate(t *testing.T) collarUpdate {
 		}
 		for _, e := range readCollarUpdates(t, frame) {
 			if e.objID == h.collarID {
-				return e
+				return e, true
 			}
 		}
 	}
-	t.Fatalf("no InventoryUpdate for collar %d in opcodes %x", h.collarID, frameOpcodes(frames))
-	return collarUpdate{}
+	return collarUpdate{}, false
+}
+
+func countOpcode(frames [][]byte, opcode byte) int {
+	n := 0
+	for _, frame := range frames {
+		if len(frame) > 0 && frame[0] == opcode {
+			n++
+		}
+	}
+	return n
 }
 
 type collarUpdate struct {
