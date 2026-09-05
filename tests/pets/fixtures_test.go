@@ -35,8 +35,13 @@ const (
 	// wolfLevelRow is the spawn pet-level stat row the wolf template
 	// carries; every spawn starts (and every save round-trips) through it.
 	// wolfNextLevel is the growth row a driven level-up crosses.
-	wolfLevel        = 10
-	wolfNextLevel    = 11
+	wolfLevel     = 10
+	wolfNextLevel = 11
+	// wolfLevelExp is the spawn-row MaxExp: current-level floor, not the
+	// next-level threshold. Zero collapses that floor into the unsaved
+	// spawn seed and hides #2246; a driven level-up still only needs
+	// wolfNextLevelExp.
+	wolfLevelExp     = int64(500)
 	wolfNextLevelExp = int64(1000)
 	wolfMaxHP        = 400
 	wolfMaxMP        = 80
@@ -71,7 +76,7 @@ func wolfTemplate() *npc.Template {
 			Food1:         int(wolfFoodID),
 			AutoFeedLimit: 0.55, HungryLimit: 0.3, UnsummonLimit: 0.1,
 			Levels: map[int]npc.PetLevelStats{
-				wolfLevel:     wolfLevelStats(0),
+				wolfLevel:     wolfLevelStats(wolfLevelExp),
 				wolfNextLevel: wolfLevelStats(wolfNextLevelExp),
 			},
 		},
