@@ -1621,6 +1621,101 @@ func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
 	}
 }
 
+func TestAttackableAIFirstTickDoesNotPromoteWander(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 40
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after first TickThink = %v, want idle", got)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d on first TickThink, want 0", owner.wanderCalls)
+	}
+	if !ai.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire dropped on first TickThink, want it kept")
+	}
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("second TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after second TickThink = %v, want wander", got)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d after second TickThink, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIFirstTickPromotesWhenAttackQueued(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.Threats().AddDamage(target, 0, 10)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 10})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after first TickThink = %v, want attack", got)
+	}
+	if strike.target != target {
+		t.Fatalf("attacked target = %v, want queued attacker", strike.target)
+	}
+}
+
+func TestAttackableAIFirstTickPromotesHighestWeightWhenAttackOpensGate(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.moveSpeed = 40
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.Threats().AddDamage(target, 0, 1)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 1})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 100})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander (highest weight, gate opened by queued attack)", got)
+	}
+	if strike.target != nil {
+		t.Fatalf("attacked target = %v, want none while wander outranks attack", strike.target)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIDoesNotPromoteWhileCasting(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 40
+	cast := &recordingCast{casting: true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.SetCastController(cast)
+	ai.lifeTime = 1
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() while casting = %v, want idle", got)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d while casting, want 0", owner.wanderCalls)
+	}
+}
+
 func TestAttackableAIIdleHoldPositionForcesWalkStance(t *testing.T) {
 	owner := actor(1)
 	move := &recordingMove{}

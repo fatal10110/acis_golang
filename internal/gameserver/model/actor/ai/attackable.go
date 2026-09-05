@@ -169,7 +169,8 @@ type Attackable struct {
 	// roll draws a uniform integer in [0, n) for the wander-rate check.
 	roll func(n int) int
 	// lifeTime is the number of completed periodic AI cycles. Empty-queue
-	// idle abort runs only after the first cycle.
+	// idle abort and non-attack promotion run only after the first cycle.
+	// A queued ATTACK desire opens the first-cycle promotion gate.
 	lifeTime int
 }
 
@@ -599,9 +600,23 @@ func (a *Attackable) Think() error {
 
 // TickThink is the periodic AI cycle. Empty-queue idle abort runs after
 // the first cycle and does not promote a follow or wander queued in that
-// same cycle.
+// same cycle. Promotion itself also waits for that first cycle unless an
+// ATTACK desire is already queued, and is skipped while a cast is in flight.
 func (a *Attackable) TickThink() error {
 	return a.think(true)
+}
+
+func (a *Attackable) canPromote(updateTick bool) bool {
+	if a.cast != nil && a.cast.CastingNow() {
+		return false
+	}
+	if !updateTick {
+		return true
+	}
+	if a.lifeTime > 0 {
+		return true
+	}
+	return a.desires.hasKind(IntentionAttack)
 }
 
 func (a *Attackable) think(updateTick bool) error {
@@ -611,6 +626,7 @@ func (a *Attackable) think(updateTick bool) error {
 	a.refreshCombatMemory()
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
+	canPromote := a.canPromote(updateTick)
 	if updateTick {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {
@@ -629,6 +645,9 @@ func (a *Attackable) think(updateTick bool) error {
 		if idled {
 			return nil
 		}
+	}
+	if !canPromote {
+		return nil
 	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()

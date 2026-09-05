@@ -35,9 +35,10 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 }
 
 // TestSiegeGuardReturnHomeBroadcastsRunThenMove pins SiegeGuard.returnHome:
-// forceRunStance immediately, then a MOVE_TO home desire that the next
-// TickThink promotes and walks. Arrival at spawn idles (SiegeGuard does
-// not idle-wander).
+// forceRunStance immediately, then a MOVE_TO home desire that TickThink
+// promotes and walks. Spawn cycle 0 does not promote a non-attack desire,
+// so the first TickThink may only open the gate. Arrival at spawn idles
+// (SiegeGuard does not idle-wander).
 func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -62,6 +63,11 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		if err := hostile.TickThink(); err != nil {
+			t.Fatalf("promote TickThink() error: %v", err)
+		}
 	}
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
 		t.Fatalf("CurrentIntention() after TickThink = %v, want move_to", got)
