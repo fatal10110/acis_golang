@@ -77,6 +77,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		Ctrl:          req.CtrlPressed,
 		Shift:         req.ShiftPressed,
 		ResolveTarget: l.resolveMagicSkillTarget,
+		StopMovement:  l.stopMovementForCast(live),
 	})
 	if err != nil {
 		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
@@ -182,19 +183,25 @@ func magicCastFailureMovesToPawn(err error) bool {
 		errors.Is(err, actorcast.ErrNotEnoughItems)
 }
 
+func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() error {
+	return func() error {
+		if live == nil || live.move == nil {
+			return nil
+		}
+		if err := live.move.Stop(); err != nil {
+			l.log.Warn().Err(err).Msg("move: stop before cast")
+			return err
+		}
+		return nil
+	}
+}
+
 func (l *GameClientLink) rejectMagicCast(live *livePlayer, def modelskill.Definition, target actorcast.Target) {
 	if live == nil || target == nil {
 		return
 	}
-	if def.HitTime > 50 {
-		if live.move != nil {
-			if err := live.move.Stop(); err != nil {
-				l.log.Warn().Err(err).Msg("move: stop before rejected cast")
-			}
-		}
-		if target.ObjectID() != live.ObjectID() {
-			live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
-		}
+	if def.HitTime > 50 && target.ObjectID() != live.ObjectID() {
+		live.Character.SetHeading(live.CurrentLocation().HeadingTo(skillCastObject(target).Location))
 	}
 	if target.ObjectID() == live.ObjectID() {
 		return

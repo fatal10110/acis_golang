@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -112,6 +113,91 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast rejection")
 	drainUntilQuiet(t, c)
+}
+
+// TestSuccessfulTargetedCastStopsMovementAndFacesTarget walks the caster
+// off spawn, then starts a second walk and casts a long-hit-time targeted
+// skill before arrival. The live RequestMagicSkillUse path must stop that
+// walk and store a heading toward the non-self target before MagicSkillUse.
+func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
+	const skillID = 4
+	defs := []modelskill.Definition{
+		{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			CastRange: 600, SkillType: "DUMMY",
+		},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, defs)),
+	)
+	caster := srv.Client
+	casterID := srv.SoleObjectID(t)
+	patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
+	patient := srv.DialClient(t, "player2", 1)
+	seedKnownSkill(t, srv, casterID, int(skillID), 1)
+
+	startInWorld(t, caster)
+	startInWorldAmongPlayers(t, patient)
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	patientX, patientY, patientZ := srv.PlayerPosition(t, patientID)
+	caster.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	walk := caster.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
+	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
+	waitForPlayerPosition(t, srv, casterID, standAt)
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	px, py, pz := srv.PlayerPosition(t, patientID)
+	caster.Send(encodeAction(patientID, int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	caster.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
+
+	caster.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeStopMove, "cast stop")
+	readCastStartFrames(t, caster, casterID, skillID, 1, 500, 60_000, patientID)
+
+	casterX, casterY, casterZ := srv.PlayerPosition(t, casterID)
+	wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: patientX, Y: patientY, Z: patientZ})
+	if got := playerHeading(t, srv, casterID); got != wantHeading {
+		t.Fatalf("caster heading after successful targeted cast = %d, want %d", got, wantHeading)
+	}
+}
+
+func waitForPlayerPosition(t *testing.T, srv *gameservertest.Server, objID int32, want location.Location) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		x, y, z := srv.PlayerPosition(t, objID)
+		if x == want.X && y == want.Y && z == want.Z {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("player position after walk = (%d,%d,%d), want %+v", x, y, z, want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func playerHeading(t *testing.T, srv *gameservertest.Server, objID int32) int {
+	t.Helper()
+	state, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("caster state missing")
+	}
+	heading, ok := state.(interface{ CurrentHeading() int })
+	if !ok {
+		t.Fatalf("caster state %T does not expose CurrentHeading", state)
+	}
+	return heading.CurrentHeading()
 }
 
 func TestCastSkillMasteryCooldownBypass(t *testing.T) {

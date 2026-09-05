@@ -5,6 +5,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -30,6 +31,9 @@ type PlayerSkillRequest struct {
 	Ctrl          bool
 	Shift         bool
 	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
+	// StopMovement cancels an in-flight walk before final cast validation
+	// when the skill's template hit time is long enough to freeze the caster.
+	StopMovement func() error
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
@@ -66,7 +70,7 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget)
+	started, err := startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.ResolveTarget, req.StopMovement)
 	started.Ctrl = req.Ctrl
 	started.Shift = req.Shift
 	return started, err
@@ -77,12 +81,13 @@ func StartPlayerSkill(req PlayerSkillRequest) (StartedSkill, error) {
 // the definition directly (an item's own attached-skill entry), instead of
 // being looked up from the caster's learned skill list.
 type ItemSkillRequest struct {
-	Now         time.Time
-	Controller  *Controller
-	Caster      *player.Character
-	Selected    world.Tracked
-	Skill       modelskill.Ref
-	Definitions Definitions
+	Now          time.Time
+	Controller   *Controller
+	Caster       *player.Character
+	Selected     world.Tracked
+	Skill        modelskill.Ref
+	Definitions  Definitions
+	StopMovement func() error
 }
 
 // StartItemSkill validates and starts an item-carried skill cast: the same
@@ -98,13 +103,13 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, nil, req.StopMovement)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
 // sequence once a caller has already resolved def, regardless of whether
 // def came from the caster's own skill list or an item's attached skill.
-func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)) (StartedSkill, error) {
+func startResolvedSkill(now time.Time, controller *Controller, caster *player.Character, selected world.Tracked, def modelskill.Definition, ctrl bool, resolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection), stopMovement func() error) (StartedSkill, error) {
 	var target Target
 	var rejection skilltarget.CastRejection
 	var ok bool
@@ -118,6 +123,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if !ok {
 		return started, ErrInvalidTarget
 	}
+	stopForCast(def, stopMovement)
 	if err := controller.CanCast(target, def); err != nil {
 		started.CanCastFailure = true
 		return started, err
@@ -125,6 +131,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if rejection != skilltarget.CastRejectNone {
 		return started, ErrInvalidTarget
 	}
+	faceCastTarget(caster, target, def)
 
 	if now.IsZero() {
 		now = time.Now()
@@ -148,6 +155,26 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 		caster.ClearRecentFakeDeath()
 	}
 	return started, nil
+}
+
+// stopForCast cancels an in-flight walk when the skill's template hit time
+// is long enough that the caster must stand still, before the final
+// resource and condition checks.
+func stopForCast(def modelskill.Definition, stopMovement func() error) {
+	if def.HitTime <= 50 || stopMovement == nil {
+		return
+	}
+	_ = stopMovement()
+}
+
+// faceCastTarget orients the caster toward a non-self target after the
+// cast has been accepted.
+func faceCastTarget(caster *player.Character, target Target, def modelskill.Definition) {
+	if caster == nil || target == nil || def.HitTime <= 50 || target.ObjectID() == caster.ObjectID() {
+		return
+	}
+	tx, ty, _ := target.Position()
+	caster.SetHeading(caster.CurrentLocation().HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
 // PlayerToggleRequest is one live player toggle-skill request after the
