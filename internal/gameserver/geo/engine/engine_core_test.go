@@ -162,6 +162,102 @@ func TestEngineConcurrentDoorToggleAndQueries(t *testing.T) {
 	if !e.CanMove(doorOriginX, doorOriginY, 0, doorTargetX, doorTargetY, 0) {
 		t.Fatal("CanMove() = false after every toggling goroutine finished on Remove, want the door left open")
 	}
+	assertDynamicMaskMatchesBlocks(t, e)
+}
+
+// TestEngineDynamicMaskGatesUncoveredBlocks covers #2251: a door registered
+// anywhere on the map must not change what a query on an uncovered block
+// resolves to, and the bitmap that lets those queries skip the map must stay
+// in step with the map through add and remove.
+func TestEngineDynamicMaskGatesUncoveredBlocks(t *testing.T) {
+	e := New()
+	cell := func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+	// Block index 1 is blockX 0, blockY 1, so it covers geoY 8..15 while the
+	// queried cells stay in block index 0.
+	region, err := block.NewRegionFromBlocks([]block.Block{complexBlock(cell), complexBlock(cell)})
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(): %v", err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+		t.Fatalf("SetRegion(): %v", err)
+	}
+
+	if mask := e.dynamicMask[0][0].Load(); mask != nil {
+		t.Fatal("dynamicMask allocated for a region with no dynamic object")
+	}
+
+	obj := &dynamicStub{
+		x:      0,
+		y:      block.CellsY,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	}
+	e.AddObject(obj)
+	assertDynamicMaskMatchesBlocks(t, e)
+
+	// The uncovered block must still resolve through static geodata, and its
+	// bit must stay clear so blockAtGeo never reaches the map for it.
+	if mask := e.dynamicMask[0][0].Load(); mask == nil || mask.has(0, 0) {
+		t.Fatal("dynamicMask bit set for a block with no dynamic overlay")
+	}
+	if !e.CanMove(worldX(0), worldY(0), 0, worldX(1), worldY(0), 0) {
+		t.Fatal("CanMove() = false on an uncovered block while a door exists elsewhere")
+	}
+	// The covered block keeps its overlay.
+	if e.CanMove(worldX(0), worldY(block.CellsY), 0, worldX(1), worldY(block.CellsY), 0) {
+		t.Fatal("CanMove() = true through the closed dynamic object")
+	}
+
+	e.RemoveObject(obj)
+	assertDynamicMaskMatchesBlocks(t, e)
+	if mask := e.dynamicMask[0][0].Load(); mask != nil && mask.has(0, 1) {
+		t.Fatal("dynamicMask bit still set after the last object was removed")
+	}
+	if !e.CanMove(worldX(0), worldY(block.CellsY), 0, worldX(1), worldY(block.CellsY), 0) {
+		t.Fatal("CanMove() = false after removing the dynamic object")
+	}
+}
+
+// assertDynamicMaskMatchesBlocks checks the gate invariant: a bit is set for
+// exactly the blocks dynamicBlocks holds an overlay for. A missing bit hides a
+// live overlay from every query; a stale bit only wastes a lookup, but either
+// way it means the clone-and-swap discipline leaked.
+func assertDynamicMaskMatchesBlocks(t *testing.T, e *Engine) {
+	t.Helper()
+
+	want := map[blockKey]bool{}
+	if current := e.dynamicBlocks.Load(); current != nil {
+		for key := range *current {
+			want[key] = true
+		}
+	}
+	set := 0
+	for tileX := range regionTilesX {
+		for tileY := range regionTilesY {
+			mask := e.dynamicMask[tileX][tileY].Load()
+			if mask == nil {
+				continue
+			}
+			for blockX := range block.RegionBlocksX {
+				for blockY := range block.RegionBlocksY {
+					if !mask.has(blockX, blockY) {
+						continue
+					}
+					set++
+					key := blockKey{tileX*block.RegionBlocksX + blockX, tileY*block.RegionBlocksY + blockY}
+					if !want[key] {
+						t.Errorf("dynamicMask bit set for %+v, which has no dynamic block", key)
+					}
+				}
+			}
+		}
+	}
+	if set != len(want) {
+		t.Errorf("dynamicMask has %d bits set, want %d (one per dynamic block)", set, len(want))
+	}
 }
 
 func dynamicBlockCount(e *Engine) int {
@@ -502,4 +598,59 @@ func TestValidLocation(t *testing.T) {
 			t.Fatalf("ValidLocation() = %+v, want %+v", got, want)
 		}
 	})
+}
+
+// BenchmarkQueriesWithDynamicObject is the production shape #2251 targets: a
+// dynamic (door) block exists somewhere on the map, but the queried cells are
+// not covered by it. Every cell step still has to decide "is there an overlay
+// here?", and that decision must not cost a map hash.
+func BenchmarkQueriesWithDynamicObject(b *testing.B) {
+	e := newTestEngineWithDoorElsewhere(b)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = e.Height(worldX(0), worldY(0), 0)
+		_ = e.CanMove(worldX(0), worldY(0), 0, worldX(1), worldY(0), 0)
+		_ = e.CanSee(worldX(0), worldY(0), 0, worldX(3), worldY(0), 0)
+	}
+}
+
+func BenchmarkHeightWithDynamicObject(b *testing.B) {
+	e := newTestEngineWithDoorElsewhere(b)
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = e.Height(worldX(0), worldY(0), 0)
+	}
+}
+
+// newTestEngineWithDoorElsewhere builds a two-block region and registers a
+// dynamic object on the second block, leaving the first block — the one the
+// benchmarks query — without an overlay.
+func newTestEngineWithDoorElsewhere(b testing.TB) *Engine {
+	b.Helper()
+
+	cell := func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+	e := New()
+	// Block index 1 is blockX 0, blockY 1, so it covers geoY 8..15.
+	region, err := block.NewRegionFromBlocks([]block.Block{complexBlock(cell), complexBlock(cell)})
+	if err != nil {
+		b.Fatalf("NewRegionFromBlocks(): %v", err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+		b.Fatalf("SetRegion(): %v", err)
+	}
+	e.AddObject(&dynamicStub{
+		x:      0,
+		y:      block.CellsY,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections}},
+	})
+	if got := dynamicBlockCount(e); got != 1 {
+		b.Fatalf("dynamic block count = %d, want 1", got)
+	}
+	return e
 }

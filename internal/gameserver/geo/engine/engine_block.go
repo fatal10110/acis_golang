@@ -19,22 +19,26 @@ func (e *Engine) blockAtGeo(geoX, geoY int) engineBlock {
 	if geoX < 0 || geoY < 0 || regionX < TileXMin || regionX > TileXMax || regionY < TileYMin || regionY > TileYMax {
 		return engineBlock{}
 	}
-	blockX := geoX / block.CellsX
-	blockY := geoY / block.CellsY
+	tileX := regionX - TileXMin
+	tileY := regionY - TileYMin
+	blockX := (geoX % regionCellsX) / block.CellsX
+	blockY := (geoY % regionCellsY) / block.CellsY
 
-	if p := e.dynamicBlocks.Load(); p != nil {
-		if b := (*p)[blockKey{blockX, blockY}]; b != nil {
-			return engineBlock{dyn: b}
+	// dynamicMask gates dynamicBlocks: a block can only carry an overlay if
+	// its bit is set, so the overwhelmingly common no-overlay cell resolves
+	// with an atomic load and a bit test instead of a map hash.
+	if mask := e.dynamicMask[tileX][tileY].Load(); mask != nil && mask.has(blockX, blockY) {
+		if p := e.dynamicBlocks.Load(); p != nil {
+			if b := (*p)[blockKey{geoX / block.CellsX, geoY / block.CellsY}]; b != nil {
+				return engineBlock{dyn: b}
+			}
 		}
 	}
-	region := e.regions[regionX-TileXMin][regionY-TileYMin]
+	region := e.regions[tileX][tileY]
 	if region == nil {
 		return engineBlock{}
 	}
-
-	localGeoX := geoX % regionCellsX
-	localGeoY := geoY % regionCellsY
-	return engineBlock{region: region, blockX: localGeoX / block.CellsX, blockY: localGeoY / block.CellsY}
+	return engineBlock{region: region, blockX: blockX, blockY: blockY}
 }
 
 type engineBlock struct {

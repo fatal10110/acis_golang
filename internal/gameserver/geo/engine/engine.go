@@ -43,12 +43,20 @@ const (
 // *dynamic.Block in place, under that block's own internal lock, without
 // touching the map at all. dynamicBlocksMu only serializes concurrent
 // writers against each other; no read path ever acquires it.
+//
+// dynamicMask gates that map. Any live door makes dynamicBlocks non-empty,
+// so without the gate every cell step in the world would pay a hash lookup
+// to discover it has no overlay. One bit per block of a region answers that
+// question instead; the map is touched only where a bit is set. Region
+// bitmaps are allocated lazily (regions with no door keep a nil pointer)
+// and published by clone-and-swap, the same discipline as dynamicBlocks.
 type Engine struct {
 	regionsMu sync.Mutex
 	regions   [regionTilesX][regionTilesY]*block.Region
 
 	dynamicBlocksMu sync.Mutex
 	dynamicBlocks   atomic.Pointer[map[blockKey]*dynamic.Block]
+	dynamicMask     [regionTilesX][regionTilesY]atomic.Pointer[regionMask]
 
 	maxObstacleHeight     int
 	partOfCharacterHeight int
