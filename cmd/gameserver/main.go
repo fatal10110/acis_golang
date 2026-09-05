@@ -20,8 +20,10 @@ const (
 	// item-instance save timeout budget.
 	gameServerStopTimeout = 30 * time.Second
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
-	// restore, spawn-state load). fx's 15s start default would otherwise cut
-	// this off while queries still used context.Background().
+	// restore, spawn-state load). These run inside fx.New's constructor graph,
+	// before fx.StartTimeout applies and before Run installs signal handling,
+	// so with context.Background() a stuck database hung the process with no
+	// way to interrupt it.
 	gameServerBootTimeout = 30 * time.Second
 )
 
@@ -72,7 +74,6 @@ func parseGameServerFlags() gameServerPaths {
 
 func newGameServerApp(paths gameServerPaths) *fx.App {
 	return fx.New(
-		fx.StartTimeout(gameServerBootTimeout),
 		fx.StopTimeout(gameServerStopTimeout),
 		fx.Supply(paths),
 		fx.Provide(

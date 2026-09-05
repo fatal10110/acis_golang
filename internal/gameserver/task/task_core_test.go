@@ -1377,6 +1377,42 @@ func assertSaveKeepsPendingOnFlushResult(t *testing.T, flushErr error, waitForCt
 	}
 }
 
+// TestItemInstancesSaveDoesNotResurrectRemovedItemsOnFlushError mirrors
+// network.GameClientLink.flushItemPersistence: a container write succeeds
+// and calls RemoveItems while a separate, unrelated flush of the same
+// object id is still in flight and later fails. The failed flush's
+// merge-back must not put the removed item back into pending.
+func TestItemInstancesSaveDoesNotResurrectRemovedItemsOnFlushError(t *testing.T) {
+	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
+	flusher := newBlockingItemFlusher(errors.New("flush failed"))
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}))
+	instances.Add(inst)
+
+	done := make(chan error, 1)
+	go func() { done <- instances.Save(context.Background()) }()
+
+	select {
+	case <-flusher.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Flush did not start")
+	}
+
+	instances.RemoveItems([]*item.Instance{inst})
+	close(flusher.release)
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("Save() error = nil, want flush failure")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Save blocked")
+	}
+	if instances.Contains(inst) {
+		t.Fatal("RemoveItems during a flush must not be undone by that flush's error merge-back")
+	}
+}
+
 func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 	tmpl := &item.Template{ID: 10, Kind: item.KindEtcItem, Stackable: true, Duration: 100000, EtcItem: &item.EtcItemDetail{}}
 	templates := item.NewTable([]*item.Template{tmpl})

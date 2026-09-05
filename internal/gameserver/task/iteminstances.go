@@ -37,6 +37,11 @@ type ItemInstances struct {
 
 	mu      sync.RWMutex
 	pending map[int32]*item.Instance
+	// removedInflight is non-nil only while a Save flush is in progress. It
+	// records ids RemoveItems dropped during that window so a failed flush's
+	// merge-back does not resurrect a container that already tore down and
+	// wrote its own final state (see RemoveItems and Save).
+	removedInflight map[int32]struct{}
 }
 
 // NewItemInstances returns an empty item persistence task.
@@ -83,13 +88,21 @@ func (i *ItemInstances) Contains(inst *item.Instance) bool {
 	return ok
 }
 
-// RemoveItems removes every provided item from the pending set.
+// RemoveItems removes every provided item from the pending set. If a Save
+// flush is currently in progress, the removed ids are also recorded so that
+// flush's merge-back does not put them back on error: this container tore
+// down and wrote its own final state (network.flushItemPersistence), and
+// that write must not be undone by a stale inflight copy.
 func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	for _, inst := range items {
-		if inst != nil {
-			delete(i.pending, inst.ObjectID)
+		if inst == nil {
+			continue
+		}
+		delete(i.pending, inst.ObjectID)
+		if i.removedInflight != nil {
+			i.removedInflight[inst.ObjectID] = struct{}{}
 		}
 	}
 }
@@ -98,30 +111,41 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // the flush so a concurrent Add during I/O lands in the new map and is not
 // dropped when the flush succeeds. UpdateItems is all-or-nothing; on error
 // inflight ids are merged back so the next tick or shutdown flush retries
-// them. RemoveItems cannot see inflight (its only caller is logout after a
-// successful container flush), so a failed flush re-pends items that path
-// already saved — one redundant write next tick.
+// them, except ids RemoveItems dropped during the flush — those already got
+// their own successful write and must not be resurrected.
+//
+// Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
+// not expected. The shutdown hook is appended before the ticker's, so fx's
+// reverse stop order runs the final Save only after the ticker has stopped.
 func (i *ItemInstances) Save(ctx context.Context) error {
 	i.mu.Lock()
 	inflight := i.pending
 	i.pending = make(map[int32]*item.Instance)
+	i.removedInflight = make(map[int32]struct{})
 	i.mu.Unlock()
 
 	items := make([]*item.Instance, 0, len(inflight))
 	for _, inst := range inflight {
 		items = append(items, inst)
 	}
-	if err := i.UpdateItems(ctx, items); err != nil {
-		i.mu.Lock()
+	err := i.UpdateItems(ctx, items)
+
+	i.mu.Lock()
+	removed := i.removedInflight
+	i.removedInflight = nil
+	if err != nil {
 		for id, inst := range inflight {
+			if _, wasRemoved := removed[id]; wasRemoved {
+				continue
+			}
 			if _, ok := i.pending[id]; !ok {
 				i.pending[id] = inst
 			}
 		}
-		i.mu.Unlock()
-		return err
 	}
-	return nil
+	i.mu.Unlock()
+
+	return err
 }
 
 // UpdateItems persists the provided item instances immediately, as one
