@@ -21,6 +21,13 @@ func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate f
 	ai.AddAttackDesire(attacker, hate)
 }
 
+func tickThinkIdle(ai *Attackable) error {
+	if err := ai.TickThink(); err != nil {
+		return err
+	}
+	return ai.TickThink()
+}
+
 func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -1576,8 +1583,11 @@ func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
 	owner.moveSpeed = 40
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
 	}
 
 	if got := ai.CurrentIntention(); got != IntentionWander {
@@ -1597,8 +1607,8 @@ func TestAttackableAIIdleHoldPositionForcesWalkStance(t *testing.T) {
 	move := &recordingMove{}
 	ai := NewAttackable(owner, move, &recordingAttack{})
 
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
 	}
 
 	if got := ai.CurrentIntention(); got != IntentionIdle {
@@ -1632,6 +1642,13 @@ func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
 	if err := ai.Think(); err != nil {
 		t.Fatalf("empty-queue Think() error: %v", err)
 	}
+	if strike.stopCalls != 0 {
+		t.Fatalf("attack Stop calls = %d after event Think, want 0", strike.stopCalls)
+	}
+
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 
 	if strike.stopCalls != 1 {
 		t.Fatalf("attack Stop calls = %d, want 1", strike.stopCalls)
@@ -1641,6 +1658,36 @@ func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
 	}
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle after empty-queue abort", got)
+	}
+}
+
+func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
+	owner := actor(1)
+	move := &recordingMove{}
+	strike := &recordingAttack{attackingNow: true}
+	ai := NewAttackable(owner, move, strike)
+	ai.SetWander()
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	ai.Arrived()
+	stops := strike.stopCalls
+	walk := owner.walkStanceCalls
+	if err := ai.Think(); err != nil {
+		t.Fatalf("arrival Think() error: %v", err)
+	}
+	if strike.stopCalls != stops {
+		t.Fatalf("attack Stop calls = %d on arrival Think, want %d", strike.stopCalls, stops)
+	}
+	if owner.walkStanceCalls != walk {
+		t.Fatalf("walk stance calls = %d on arrival Think, want %d", owner.walkStanceCalls, walk)
+	}
+
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if strike.stopCalls != stops+1 {
+		t.Fatalf("attack Stop calls = %d after TickThink, want %d", strike.stopCalls, stops+1)
 	}
 }
 
@@ -1661,8 +1708,8 @@ func TestAttackableAIIdleSkipsAbortWhileCasting(t *testing.T) {
 	ai.Desires().Clear()
 	cast.casting = true
 	walkBefore := owner.walkStanceCalls
-	if err := ai.Think(); err != nil {
-		t.Fatalf("casting Think() error: %v", err)
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("casting TickThink() error: %v", err)
 	}
 	if strike.stopCalls != 0 {
 		t.Fatalf("attack Stop calls = %d, want 0 while casting", strike.stopCalls)
@@ -2557,7 +2604,9 @@ func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
 	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	brain.Think()
+	if err := tickThinkIdle(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionFollow)
 	}
@@ -2578,7 +2627,9 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewAttackable(owner, &recordingMove{}, strike)
 
-	brain.Think()
+	if err := tickThinkIdle(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() after idle = %v, want %v", got, IntentionFollow)
 	}

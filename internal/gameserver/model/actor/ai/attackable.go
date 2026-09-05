@@ -168,6 +168,9 @@ type Attackable struct {
 	randomWalkRate int
 	// roll draws a uniform integer in [0, n) for the wander-rate check.
 	roll func(n int) int
+	// lifeTime is the number of completed periodic AI cycles. Empty-queue
+	// idle abort runs only after the first cycle.
+	lifeTime int
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
@@ -497,12 +500,6 @@ func (a *Attackable) SetWander() {
 	defer a.mu.Unlock()
 	a.current = intention{kind: IntentionWander, timer: defaultWanderTimer}
 	a.wanderReady = time.Time{}
-	a.desires.AddOrUpdate(&Desire{
-		Kind:     IntentionWander,
-		Timer:    defaultWanderTimer,
-		Weight:   defaultWanderWeight,
-		QueuedAt: time.Now(),
-	})
 }
 
 // SetBackToPeace clears combat memory and cancels the current action. It
@@ -600,27 +597,40 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 	return a.next.kind, a.next.target, true
 }
 
-// Think advances the current intention once. Safe to call from the periodic
-// AI task as well as from a movement-arrived or attack-finished hook. A
-// non-nil return reports that an intention step ran but a broadcast within
-// it failed; the intention itself still advanced.
+// Think advances the current intention once. Event-driven callers (arrival,
+// attack-finished, first hate) use this path: it does not run empty-queue
+// idle abort. A non-nil return reports that an intention step ran but a
+// broadcast within it failed; the intention itself still advanced.
 func (a *Attackable) Think() error {
+	return a.think(false)
+}
+
+// TickThink is the periodic AI cycle: empty-queue idle abort, then one
+// intention step. The first cycle skips the abort.
+func (a *Attackable) TickThink() error {
+	return a.think(true)
+}
+
+func (a *Attackable) think(updateTick bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
 	a.refreshCombatMemory()
 	a.pruneDesires()
 	a.dropCurrentIfUnqueued()
-	if _, ok := a.desires.Peek(); !ok {
-		if a.cast == nil || !a.cast.CastingNow() {
-			a.thinkIdle()
-			a.queueIdleFollow()
+	if updateTick {
+		if _, ok := a.desires.Peek(); !ok {
+			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+				a.thinkIdle()
+				a.queueIdleFollow()
+			}
 		}
-	}
-	if _, ok := a.desires.Peek(); !ok {
-		if a.cast == nil || !a.cast.CastingNow() {
-			a.queueIdleWander()
+		if _, ok := a.desires.Peek(); !ok {
+			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+				a.queueIdleWander()
+			}
 		}
+		a.lifeTime++
 	}
 	for attempts := 0; attempts <= maxDesires; attempts++ {
 		a.promoteNext()

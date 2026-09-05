@@ -655,12 +655,22 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// Think runs one hostile AI decision cycle.
+// Think runs one hostile AI decision cycle (event-driven: arrival, swing
+// finished, first hate). Empty-queue idle abort belongs on TickThink.
 func (h *Hostile) Think() error {
 	if !h.canRunAI() {
 		return nil
 	}
 	return h.brain.Think()
+}
+
+// TickThink runs one periodic AI cycle, including empty-queue idle abort
+// after the first cycle.
+func (h *Hostile) TickThink() error {
+	if !h.canRunAI() {
+		return nil
+	}
+	return h.brain.TickThink()
 }
 
 // OnInactiveRegion applies the hostile-NPC reset that aCis runs when the

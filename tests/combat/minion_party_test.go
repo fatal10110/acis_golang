@@ -56,9 +56,7 @@ func TestPartyPrivateFollowsMasterWhenIdle(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
-	if err := minion.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkIdle(t, minion)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionFollow)
 	}

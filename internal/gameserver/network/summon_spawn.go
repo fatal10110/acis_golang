@@ -451,7 +451,7 @@ type summonAIActor struct {
 
 func (summonAIActor) Tick() {}
 
-func (a summonAIActor) Think() error {
+func (a summonAIActor) TickThink() error {
 	a.brain.Think()
 	return nil
 }

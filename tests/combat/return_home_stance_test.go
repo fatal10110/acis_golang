@@ -66,11 +66,6 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
 		t.Fatalf("CurrentIntention() after Think = %v, want move_to", got)
 	}
-	// SetWander queued a wander timer so ReturnHome could leave current
-	// wander until Think. Drop it once MOVE_TO is current: SiegeGuard does
-	// not idle-wander, and a leftover wander desire would re-promote after
-	// arrival.
-	hostile.AI().Desires().RemoveKind(ai.IntentionWander)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 
 	// Production MoveToLocation snaps destination Z through geo.Height, so
@@ -83,12 +78,10 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
 	}
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() after idle error: %v", err)
-	}
-	// Empty-queue idle Think matches thinkIdle: abort leftover movement
-	// (StopMove) and force walk stance. SiegeGuard return-home had switched
-	// to run, so observers then see ChangeMoveType(walk) and nothing else.
+	tickThinkIdle(t, hostile)
+	// Periodic idle abort matches thinkIdle: leftover movement StopMove
+	// and walk stance. SiegeGuard return-home had switched to run, so
+	// observers then see ChangeMoveType(walk) and nothing else.
 	assertFrameOpcode(t, mustRead(t, c, "idle StopMove"), serverpackets.OpcodeStopMove, "StopMove")
 	assertChangeMoveType(t, mustRead(t, c, "idle walk stance"), hostile.ObjectID(), false)
 	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
