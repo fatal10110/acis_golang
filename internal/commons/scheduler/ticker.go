@@ -66,8 +66,20 @@ func tickerName(fn func()) string {
 	return path.Base(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
+// statsMu serializes the check-then-set in statsFor. expvar.Map's own Get
+// and Set are each safe, but without this lock two concurrent Start calls
+// for the same ticker name both allocate and both Set: the loser's ticker
+// then writes into a *tickStat nothing publishes, and the winning Set
+// rebinds the key to a zeroed struct, resetting the max high-water mark.
+// Reachable today: every summon derives the same key from the
+// s.recheckOffensiveFollow method value, and StartOffensiveFollowTicker
+// runs on a per-player network goroutine.
+var statsMu sync.Mutex
+
 func statsFor(fn func()) *tickStat {
 	name := tickerName(fn)
+	statsMu.Lock()
+	defer statsMu.Unlock()
 	if v := tickerVars.Get(name); v != nil {
 		if s, ok := v.(*tickStat); ok {
 			return s
