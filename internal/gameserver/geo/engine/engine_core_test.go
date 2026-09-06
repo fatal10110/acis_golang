@@ -260,6 +260,81 @@ func assertDynamicMaskMatchesBlocks(t *testing.T, e *Engine) {
 	}
 }
 
+// TestEngineDynamicMaskAcrossRegionSeam exercises rebuildMasks' multi-region
+// path: an object spanning the geo-cell seam between two adjacent regions
+// touches blocks in two different tiles in one toggleObject call, which is
+// the only input that can catch tileX/tileY transposed with local blockX/
+// blockY, or the dedupe loop in rebuildMasks matching the wrong tile.
+// Regressed against a reviewer finding on #2292: every other test in this
+// file builds its engine at a single tile (TileXMin, TileYMin), so blockX ==
+// blockX % block.RegionBlocksX and blockX / block.RegionBlocksX == 0
+// everywhere they touch — an identity that would hide a transposed index or
+// a divisor/modulus swap.
+func TestEngineDynamicMaskAcrossRegionSeam(t *testing.T) {
+	e := New()
+	cell := func(x, y int) block.Cell {
+		return block.Cell{Height: 0, NSWE: block.AllDirections}
+	}
+	flatComplex := func() block.Block { return complexBlock(cell) }
+
+	var blocksA, blocksB [block.RegionBlocksX * block.RegionBlocksY]block.Block
+	for i := range blocksA {
+		blocksA[i] = flatComplex()
+		blocksB[i] = flatComplex()
+	}
+	regionA, err := block.NewRegionFromBlocks(blocksA[:])
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(A): %v", err)
+	}
+	regionB, err := block.NewRegionFromBlocks(blocksB[:])
+	if err != nil {
+		t.Fatalf("NewRegionFromBlocks(B): %v", err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin, regionA); err != nil {
+		t.Fatalf("SetRegion(A): %v", err)
+	}
+	if err := e.SetRegion(TileXMin, TileYMin+1, regionB); err != nil {
+		t.Fatalf("SetRegion(B): %v", err)
+	}
+
+	// Global block index crosses from region A's last block row (255) into
+	// region B's first (256) at geo-cell regionCellsY; a 2-cell-tall object
+	// straddling that boundary touches one block on each side.
+	seamGeoY := regionCellsY - 1
+	obj := &dynamicStub{
+		x:      0,
+		y:      seamGeoY,
+		z:      0,
+		height: 32,
+		data:   [][]block.NSWE{{block.NoDirections, block.NoDirections}},
+	}
+
+	e.AddObject(obj)
+	if got := dynamicBlockCount(e); got != 2 {
+		t.Fatalf("dynamic block count after cross-seam AddObject = %d, want 2", got)
+	}
+	assertDynamicMaskMatchesBlocks(t, e)
+
+	if mask := e.dynamicMask[0][0].Load(); mask == nil || !mask.has(0, block.RegionBlocksY-1) {
+		t.Fatal("dynamicMask bit not set on region A's last block row after cross-seam AddObject")
+	}
+	if mask := e.dynamicMask[0][1].Load(); mask == nil || !mask.has(0, 0) {
+		t.Fatal("dynamicMask bit not set on region B's first block row after cross-seam AddObject")
+	}
+
+	e.RemoveObject(obj)
+	if got := dynamicBlockCount(e); got != 0 {
+		t.Fatalf("dynamic block count after cross-seam RemoveObject = %d, want 0", got)
+	}
+	assertDynamicMaskMatchesBlocks(t, e)
+	if mask := e.dynamicMask[0][0].Load(); mask != nil && mask.has(0, block.RegionBlocksY-1) {
+		t.Fatal("dynamicMask bit still set on region A after cross-seam RemoveObject")
+	}
+	if mask := e.dynamicMask[0][1].Load(); mask != nil && mask.has(0, 0) {
+		t.Fatal("dynamicMask bit still set on region B after cross-seam RemoveObject")
+	}
+}
+
 func dynamicBlockCount(e *Engine) int {
 	current := e.dynamicBlocks.Load()
 	if current == nil {

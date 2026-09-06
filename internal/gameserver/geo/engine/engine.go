@@ -48,8 +48,11 @@ const (
 // so without the gate every cell step in the world would pay a hash lookup
 // to discover it has no overlay. One bit per block of a region answers that
 // question instead; the map is touched only where a bit is set. Region
-// bitmaps are allocated lazily (regions with no door keep a nil pointer)
-// and published by clone-and-swap, the same discipline as dynamicBlocks.
+// bitmaps are allocated lazily on a region's first door (regions with no
+// door keep a nil pointer) and published by clone-and-swap, the same
+// discipline as dynamicBlocks; once allocated, a bitmap is never freed even
+// after its region's last door closes, at 8 KB per region and ~1.4 MB for
+// the whole tile grid, well inside the issue's budget.
 type Engine struct {
 	regionsMu sync.Mutex
 	regions   [regionTilesX][regionTilesY]*block.Region
