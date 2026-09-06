@@ -14,9 +14,13 @@ import (
 // Config is the MariaDB connection setup read from a server's Database
 // section (the URL, Login, and Password keys).
 type Config struct {
-	URL            string
-	Login          string
-	Password       string
+	URL      string
+	Login    string
+	Password string
+	// MaxConnections is the pool size. Zero means "unset": Open uses
+	// defaultMaxOpenConns. A negative value is rejected rather than
+	// silently treated as unset, so a typo'd pool size is not
+	// indistinguishable from an absent key.
 	MaxConnections int
 }
 
@@ -36,6 +40,10 @@ const (
 // database/sql's usual behavior. *sql.DB is already a connection pool, so no
 // extra pooling layer is built on top of it.
 func Open(cfg Config) (*sql.DB, error) {
+	if cfg.MaxConnections < 0 {
+		return nil, fmt.Errorf("MaxConnections %d must be at least 1", cfg.MaxConnections)
+	}
+
 	dsn, err := dataSourceName(cfg)
 	if err != nil {
 		return nil, err
@@ -47,7 +55,7 @@ func Open(cfg Config) (*sql.DB, error) {
 	}
 
 	maxOpen := cfg.MaxConnections
-	if maxOpen <= 0 {
+	if maxOpen == 0 {
 		maxOpen = defaultMaxOpenConns
 	}
 	pool.SetMaxOpenConns(maxOpen)
@@ -101,19 +109,6 @@ func dataSourceName(cfg Config) (string, error) {
 	}
 
 	return driverCfg.FormatDSN(), nil
-}
-
-// ParseMaxConnections reads the optional MaxConnections property. A missing
-// key yields 0, which Open treats as the default pool size.
-func ParseMaxConnections(value string, present bool) (int, error) {
-	if !present {
-		return 0, nil
-	}
-	n, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, fmt.Errorf("parse MaxConnections as int: %w", err)
-	}
-	return n, nil
 }
 
 // applyConnectorOption translates one MariaDB Connector/J URL option

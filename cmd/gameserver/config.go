@@ -371,7 +371,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
-	maxConnections, err := db.ParseMaxConnections(serverProps.Lookup("MaxConnections"))
+	maxConnections, _, err := serverProps.OptionalInt("MaxConnections")
 	if err != nil {
 		return gameServerConfig{}, err
 	}

@@ -131,7 +131,7 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
-	maxConnections, err := db.ParseMaxConnections(props.Lookup("MaxConnections"))
+	maxConnections, _, err := props.OptionalInt("MaxConnections")
 	if err != nil {
 		return loginServerConfig{}, err
 	}

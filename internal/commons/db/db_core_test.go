@@ -163,16 +163,11 @@ func TestOpenRejectsMalformedURL(t *testing.T) {
 	}
 }
 
-func TestParseMaxConnections(t *testing.T) {
-	got, err := ParseMaxConnections("", false)
-	if err != nil || got != 0 {
-		t.Fatalf("missing key: got %d, %v; want 0, nil", got, err)
-	}
-	got, err = ParseMaxConnections("16", true)
-	if err != nil || got != 16 {
-		t.Fatalf("present key: got %d, %v; want 16, nil", got, err)
-	}
-	if _, err := ParseMaxConnections("nope", true); err == nil {
-		t.Fatal("malformed value: want error")
+// A negative MaxConnections is a typo, not an "unset" marker: it must be
+// rejected rather than silently falling back to defaultMaxOpenConns, which
+// would make a misconfigured pool size indistinguishable from an absent key.
+func TestOpenRejectsNegativeMaxConnections(t *testing.T) {
+	if _, err := Open(Config{URL: "jdbc:mariadb://localhost/acis", Login: "root", MaxConnections: -5}); err == nil {
+		t.Fatal("Open() with MaxConnections = -5: want error, got nil")
 	}
 }
