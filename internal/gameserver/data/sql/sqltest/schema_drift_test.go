@@ -8,46 +8,38 @@ import (
 	"testing"
 )
 
-// datapackSchemas maps each hand-copied CREATE TABLE constant above to the
-// shipped .sql file it was copied from, so a datapack schema change that
-// this package never picked up fails here instead of silently letting
-// integration tests run against a stale table definition.
-var datapackSchemas = map[string]string{
-	"characters.sql":            charactersSchema,
-	"items.sql":                 itemsSchema,
-	"augmentations.sql":         augmentationsSchema,
-	"spawn_data.sql":            spawnDataSchema,
-	"items_on_ground.sql":       itemsOnGroundSchema,
-	"character_skills.sql":      characterSkillsSchema,
-	"character_shortcuts.sql":   characterShortcutsSchema,
-	"character_hennas.sql":      characterHennasSchema,
-	"pets.sql":                  petsSchema,
-	"character_skills_save.sql": characterSkillsSaveSchema,
-	"seven_signs_status.sql":    sevenSignsStatusSchema,
-}
-
 func TestSchemaMatchesDatapack(t *testing.T) {
 	dir := datapackSQLDir()
 	if dir == "" {
 		t.Skip("datapack sql directory not present; skipping schema drift check")
 	}
 
-	for name, schema := range datapackSchemas {
-		t.Run(name, func(t *testing.T) {
-			data, err := os.ReadFile(filepath.Join(dir, name))
+	// Drive the check from schemaStmts itself (sqltest.go), rather than a
+	// separate name-to-constant map, so a constant added there without a
+	// matching entry here can't go unchecked. sevenSignsStatusSeed is an
+	// INSERT, not a CREATE TABLE, and is skipped below.
+	for _, stmt := range schemaStmts {
+		copySchema, ok := createTableStatement(stmt)
+		if !ok {
+			continue
+		}
+		table, ok := tableName(copySchema)
+		if !ok {
+			t.Fatalf("no table name in CREATE TABLE statement: %s", copySchema)
+		}
+
+		t.Run(table, func(t *testing.T) {
+			file := table + ".sql"
+			data, err := os.ReadFile(filepath.Join(dir, file))
 			if err != nil {
 				t.Fatalf("read shipped schema: %v", err)
 			}
 			shipped, ok := createTableStatement(string(data))
 			if !ok {
-				t.Fatalf("no CREATE TABLE statement in %s", name)
+				t.Fatalf("no CREATE TABLE statement in %s", file)
 			}
-			got, ok := createTableStatement(schema)
-			if !ok {
-				t.Fatalf("no CREATE TABLE statement in the copy of %s", name)
-			}
-			if got != shipped {
-				t.Fatalf("schema drifted from %s\n copy    = %s\n shipped = %s", name, got, shipped)
+			if copySchema != shipped {
+				t.Fatalf("schema drifted from %s\n copy    = %s\n shipped = %s", file, copySchema, shipped)
 			}
 		})
 	}
@@ -82,13 +74,18 @@ var (
 	sqlBlockComment = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	sqlWhitespace   = regexp.MustCompile(`\s+`)
 	sqlIfNotExists  = regexp.MustCompile(`(?i)\bIF NOT EXISTS\b`)
+	sqlTableName    = regexp.MustCompile(`(?i)^CREATE TABLE\s+(\S+)\s*\(`)
 )
 
-// createTableStatement reduces a .sql file, or one of the constants above,
-// to its single CREATE TABLE statement in a form that ignores differences
-// the copies deliberately carry: comments, indentation and line breaks,
-// backtick quoting, a statement terminator, and the IF NOT EXISTS clause
-// the test copies add so repeated setup is idempotent.
+// createTableStatement reduces a .sql file, or one of the schemaStmts
+// constants, to its single CREATE TABLE statement in a form that ignores
+// differences the copies deliberately carry: comments, indentation and line
+// breaks, backtick quoting, a statement terminator (including a trailing
+// INSERT such as seven_signs_status ships after its CREATE TABLE), and the
+// IF NOT EXISTS clause the test copies add so repeated setup is idempotent.
+// It does not ignore table options (ENGINE, CHARSET, ...) — none of the
+// shipped tables carry any today, and silently dropping them would let a
+// real divergence there pass unnoticed.
 func createTableStatement(text string) (string, bool) {
 	text = sqlBlockComment.ReplaceAllString(text, " ")
 	text = sqlLineComment.ReplaceAllString(text, " ")
@@ -99,15 +96,56 @@ func createTableStatement(text string) (string, bool) {
 		return "", false
 	}
 	text = text[start:]
-	// Stop at the statement terminator so a trailing INSERT (seven_signs_status
-	// ships a seed row after its CREATE TABLE) isn't folded into the compare.
 	if semi := strings.Index(text, ";"); semi >= 0 {
 		text = text[:semi]
-	}
-	if end := strings.LastIndex(text, ")"); end >= 0 {
-		text = text[:end+1]
 	}
 
 	text = sqlIfNotExists.ReplaceAllString(text, " ")
 	return strings.TrimSpace(sqlWhitespace.ReplaceAllString(text, " ")), true
+}
+
+// tableName extracts the identifier from a createTableStatement result
+// (e.g. "characters" from "CREATE TABLE characters ( ... )").
+func tableName(statement string) (string, bool) {
+	m := sqlTableName.FindStringSubmatch(statement)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// TestCreateTableStatementDetectsTableOptionDrift guards the review finding
+// on PR #2293 (fatal10110/acis_golang): an earlier version of
+// createTableStatement truncated at the last ")" in the statement, which
+// discarded any trailing table options (ENGINE, CHARSET, ...) along with
+// the intended terminator. Two schemas differing only in a table option
+// then normalized to the same string and TestSchemaMatchesDatapack could
+// not have caught a real drift there. None of the shipped tables carry
+// table options today, but the comparison must still see them.
+func TestCreateTableStatementDetectsTableOptionDrift(t *testing.T) {
+	base, ok := createTableStatement("CREATE TABLE `x` (`a` INT);")
+	if !ok {
+		t.Fatal("createTableStatement: no CREATE TABLE found")
+	}
+	withEngine, ok := createTableStatement("CREATE TABLE `x` (`a` INT) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;")
+	if !ok {
+		t.Fatal("createTableStatement: no CREATE TABLE found")
+	}
+	if base == withEngine {
+		t.Fatalf("createTableStatement ignored table options: both normalized to %q", base)
+	}
+}
+
+func TestTableNameExtractsFromCreateTable(t *testing.T) {
+	stmt, ok := createTableStatement("CREATE TABLE IF NOT EXISTS `character_hennas` (\n `char_obj_id` INT\n);")
+	if !ok {
+		t.Fatal("createTableStatement: no CREATE TABLE found")
+	}
+	name, ok := tableName(stmt)
+	if !ok {
+		t.Fatalf("tableName: no match in %q", stmt)
+	}
+	if name != "character_hennas" {
+		t.Fatalf("tableName = %q, want character_hennas", name)
+	}
 }

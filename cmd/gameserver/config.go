@@ -322,7 +322,10 @@ func loadServerBypassDelay(paths gameServerPaths) (serverBypassDelay, error) {
 	return serverBypassDelay(time.Duration(config.NewFields(props, "server bypass reuse delay").Int("ServerBypassTime", 100)) * time.Millisecond), nil
 }
 
-func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
+// loadPetConfig takes the process logger for the same reason as
+// loadPvPFlagOptions above: to order it after the composition root's logger
+// is built and installed via config.SetLogger.
+func loadPetConfig(paths gameServerPaths, _ zerolog.Logger) (pet.Config, error) {
 	serverProps, err := config.LoadFile(paths.ConfigPath)
 	if err != nil {
 		return pet.Config{}, err
@@ -388,7 +391,10 @@ func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
 	return raidCursesDisabled(config.NewFields(props, "disable raid curse").Bool("DisableRaidCurse", false)), nil
 }
 
-func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
+// loadPvPFlagOptions takes the process logger so the fx graph builds it
+// before players.properties is read; config warnings then reach the
+// configured sinks instead of the unconfigured default logger.
+func loadPvPFlagOptions(paths gameServerPaths, _ zerolog.Logger) (task.PvPFlagOptions, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
 		return task.PvPFlagOptions{}, err

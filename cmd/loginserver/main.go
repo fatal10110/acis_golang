@@ -85,7 +85,10 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 	)
 }
 
-func loadLoginServerProperties(paths loginServerPaths) (*config.Properties, error) {
+// loadLoginServerProperties takes the process logger so the fx graph builds
+// it before server.properties is read; config warnings then reach the
+// configured sinks instead of the unconfigured default logger.
+func loadLoginServerProperties(paths loginServerPaths, _ zerolog.Logger) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
 }
 
