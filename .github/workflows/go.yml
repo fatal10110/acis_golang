@@ -34,7 +34,13 @@ jobs:
           cache: true
 
       - name: Format
-        run: test -z "$(gofmt -l internal cmd)"
+        run: |
+          out="$(gofmt -l cmd internal ops tests)"
+          if [ -n "$out" ]; then
+            echo "gofmt needs to be run on:"
+            echo "$out"
+            exit 1
+          fi
 
       - name: Build
         run: go build ./...
