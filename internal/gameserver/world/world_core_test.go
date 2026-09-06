@@ -280,6 +280,18 @@ func BenchmarkAppendKnown(b *testing.B) {
 	}
 }
 
+func TestForEachKnownInRadius_DeepSearchNoAlloc(t *testing.T) {
+	s, observer := knownListFixture(t, 50)
+	// radius 4097 -> searchDepth 3 -> (2*3+1)^2 = 49 regions, the deepest
+	// live radius (issue #2286): regionBuf must not spill to the heap.
+	allocs := testing.AllocsPerRun(20, func() {
+		s.ForEachKnownInRadius(observer, 4097, func(Tracked) {})
+	})
+	if allocs != 0 {
+		t.Fatalf("ForEachKnownInRadius at searchDepth 3: got %v allocs/op, want 0", allocs)
+	}
+}
+
 func BenchmarkForEachKnownInRadius(b *testing.B) {
 	for _, n := range []int{50, 300, 1500} {
 		b.Run(fmt.Sprintf("%d", n), func(b *testing.B) {
