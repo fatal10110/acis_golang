@@ -252,6 +252,22 @@ func (p *Properties) Int(key string, def int) (int, error) {
 	return def, nil
 }
 
+// OptionalInt returns an int property and whether the key was present. An
+// absent key yields (0, false, nil) with no missing-property warning, for
+// keys that are genuinely optional and absent from every shipped
+// .properties file — Int would log on every boot for those.
+func (p *Properties) OptionalInt(key string) (int, bool, error) {
+	value, ok := p.Lookup(key)
+	if !ok {
+		return 0, false, nil
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, false, fmt.Errorf("parse %s as int: %w", key, err)
+	}
+	return n, true, nil
+}
+
 // Int64 returns an int64 property or def when key is missing.
 func (p *Properties) Int64(key string, def int64) (int64, error) {
 	if value, ok := p.Lookup(key); ok {

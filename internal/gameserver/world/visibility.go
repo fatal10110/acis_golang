@@ -504,9 +504,10 @@ func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(
 		return
 	}
 
-	// regionBuf holds the depth-1 neighborhood (9 regions). searchDepth > 1
-	// (radius > regionSize) spills it to the heap on every call.
-	var regionBuf [9]*Region
+	// regionBuf covers searchDepth up to 3 ((2*3+1)^2 = 49 regions), the
+	// deepest live radius today (aggroRange 4096 in the NPC data). A radius
+	// beyond that still works via append's normal heap growth.
+	var regionBuf [49]*Region
 	var objectBuf [knownInRadiusObjectCap]Tracked
 	objects := objectBuf[:0]
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, searchDepth(radius)) {
