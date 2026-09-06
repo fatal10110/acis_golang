@@ -144,8 +144,30 @@ func TestOpenConfiguresPoolWithoutDialing(t *testing.T) {
 	}
 }
 
+func TestOpenHonorsMaxConnections(t *testing.T) {
+	pool, err := Open(Config{URL: "jdbc:mariadb://localhost/acis", Login: "root", MaxConnections: 16})
+	if err != nil {
+		t.Fatalf("Open() unexpected error: %v", err)
+	}
+	defer pool.Close()
+
+	stats := pool.Stats()
+	if stats.MaxOpenConnections != 16 {
+		t.Errorf("MaxOpenConnections = %d, want 16", stats.MaxOpenConnections)
+	}
+}
+
 func TestOpenRejectsMalformedURL(t *testing.T) {
 	if _, err := Open(Config{URL: "not-a-jdbc-url"}); err == nil {
 		t.Fatal("Open() with malformed url: want error, got nil")
+	}
+}
+
+// A negative MaxConnections is a typo, not an "unset" marker: it must be
+// rejected rather than silently falling back to defaultMaxOpenConns, which
+// would make a misconfigured pool size indistinguishable from an absent key.
+func TestOpenRejectsNegativeMaxConnections(t *testing.T) {
+	if _, err := Open(Config{URL: "jdbc:mariadb://localhost/acis", Login: "root", MaxConnections: -5}); err == nil {
+		t.Fatal("Open() with MaxConnections = -5: want error, got nil")
 	}
 }
