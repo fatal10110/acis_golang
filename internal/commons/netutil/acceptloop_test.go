@@ -1,9 +1,11 @@
 package netutil
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -263,3 +265,74 @@ type temporaryError struct{ error }
 
 func (temporaryError) Temporary() bool { return true }
 func (temporaryError) Timeout() bool   { return false }
+
+// TestAcceptLoopLogsAndRetriesPermanentAcceptError pins the two properties
+// the backoff rewrite left uncovered: a listener that only ever returns a
+// non-net.ErrClosed error is retried indefinitely rather than returning,
+// and every retry is reported through the logger. Without the Warn call in
+// AcceptLoop a wedged listener leaves the log file completely empty.
+func TestAcceptLoopLogsAndRetriesPermanentAcceptError(t *testing.T) {
+	var logMu sync.Mutex
+	var logged bytes.Buffer
+	log := zerolog.New(&lockedWriter{mu: &logMu, w: &logged})
+
+	acceptErr := errors.New("accept wedged")
+	var mu sync.Mutex
+	calls := 0
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	ln := &recordingErrorListener{
+		accept: func() (net.Conn, error) {
+			mu.Lock()
+			calls++
+			n := calls
+			mu.Unlock()
+			if n >= 3 {
+				cancel()
+			}
+			return nil, acceptErr
+		},
+	}
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- AcceptLoop(ctx, ln, func(net.Conn) {}, log) }()
+
+	select {
+	case err := <-errCh:
+		// The permanent error must never propagate: only ctx cancellation
+		// (nil) or net.ErrClosed ends the loop.
+		if err != nil {
+			t.Fatalf("AcceptLoop error = %v, want nil after ctx cancellation", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("AcceptLoop did not return after ctx cancellation")
+	}
+
+	mu.Lock()
+	got := calls
+	mu.Unlock()
+	if got < 3 {
+		t.Fatalf("Accept calls = %d, want >= 3 (error must be retried, not returned)", got)
+	}
+
+	logMu.Lock()
+	out := logged.String()
+	logMu.Unlock()
+	if !strings.Contains(out, acceptErr.Error()) {
+		t.Fatalf("accept error %q not logged; log = %q", acceptErr, out)
+	}
+	if !strings.Contains(out, "retry_in") {
+		t.Fatalf("retry delay not logged; log = %q", out)
+	}
+}
+
+type lockedWriter struct {
+	mu *sync.Mutex
+	w  *bytes.Buffer
+}
+
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}

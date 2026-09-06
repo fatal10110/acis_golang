@@ -23,9 +23,13 @@ const (
 // AcceptLoop accepts connections on ln until ctx is canceled or the
 // listener is closed, running handle on its own goroutine per connection.
 // On cancellation it closes the listener and every accepted connection,
-// then waits for all handlers to return. Transient Accept errors retry
-// with exponential backoff from 5ms to 1s. AcceptLoop applies no timeout
-// of its own, so callers that need a bounded shutdown must impose one.
+// then waits for all handlers to return. Every Accept error other than
+// net.ErrClosed is logged at Warn and retried indefinitely, with
+// exponential backoff from 5ms to 1s: AcceptLoop never gives up on a
+// listener that is still open, so an unrecoverable listener keeps the
+// process alive and reports itself once per retry rather than returning.
+// AcceptLoop applies no timeout of its own, so callers that need a bounded
+// shutdown must impose one.
 // Accepted TCP connections have TCP_NODELAY enabled, matching the selector
 // configuration shared by both servers. A panic in either the shutdown
 // watcher or a connection's handle is recovered and logged rather than taking
@@ -83,6 +87,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 					retryDelay = acceptRetryMax
 				}
 			}
+			log.Warn().Err(err).Dur("retry_in", retryDelay).Msg("accept loop accept error; retrying")
 			timer := time.NewTimer(retryDelay)
 			select {
 			case <-ctx.Done():
