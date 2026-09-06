@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 type StatOwner interface {
@@ -43,11 +44,38 @@ func WithCancelLesser(cancel bool) Option {
 // something to tick instead of scanning every tracked world object every
 // second. A nil hook (tests, tools that never call SetActivityHook) leaves
 // Add/Remove exactly as before.
-var activityHook func(list *List, active bool)
+//
+// Stored behind an atomic.Pointer because Add/Remove/Untrack read it from
+// every goroutine that applies an effect, concurrently with SetActivityHook
+// being called from whichever goroutine boots the process (or, in tests,
+// boots a server).
+var activityHook atomic.Pointer[func(list *List, active bool)]
 
 // SetActivityHook installs the process-wide list-activity registrar.
 func SetActivityHook(hook func(list *List, active bool)) {
-	activityHook = hook
+	activityHook.Store(&hook)
+}
+
+// callActivityHook invokes the installed activity hook, if any.
+func callActivityHook(list *List, active bool) {
+	if hook := activityHook.Load(); hook != nil && *hook != nil {
+		(*hook)(list, active)
+	}
+}
+
+// Untrack unconditionally deregisters l from the process-wide activity
+// registry, regardless of whether it currently holds an effect. Call it
+// when l's owner leaves the world for good (logout, NPC decay, unsummon,
+// signet expiry) so a list that still holds an effect doesn't keep ticking
+// a detached actor forever. This mirrors the pre-registry behavior, where
+// an actor leaving world.State silently dropped out of the tick scan: it
+// does not run any effect's exit hook or otherwise touch buffs/debuffs,
+// only stops future Tick calls from reaching this list.
+func (l *List) Untrack() {
+	if l == nil {
+		return
+	}
+	callActivityHook(l, false)
 }
 
 // emptyLocked reports whether l currently holds no buff or debuff. Caller

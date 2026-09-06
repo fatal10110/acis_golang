@@ -106,6 +106,11 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
 	}
+	// Stop the periodic effect sweep from reaching this character's list:
+	// it left world.State above, but a still-held buff/debuff keeps the
+	// list registered with task.Effects (see effect.List.Untrack) until
+	// something tells it the owner is gone.
+	live.Character.EffectList().Untrack()
 	live.Character.SetFrameSender(nil)
 	live.Character.SetBroadcastFrameSender(nil)
 	live.Character.SetAttackBroadcaster(nil)

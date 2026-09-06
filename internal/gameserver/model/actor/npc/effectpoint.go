@@ -93,6 +93,11 @@ func (ep *EffectPoint) Despawn() {
 		return
 	}
 	ep.world.Despawn(ep)
+	// Stop the periodic effect sweep from reaching this signet point's
+	// list: it exists only to host that list, so leaving the list
+	// registered after Despawn would tick a signet forever past its
+	// caster's control.
+	ep.effects.Untrack()
 }
 
 // ForEachNearby calls fn for every world object within radius units of

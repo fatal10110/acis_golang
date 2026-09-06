@@ -42,14 +42,11 @@ func (l *List) Add(e *Effect) {
 	l.mu.Lock()
 	wasEmpty := l.emptyLocked()
 	l.add(e, &pending)
-	becameActive := wasEmpty && !l.emptyLocked()
 	l.mu.Unlock()
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
-	if becameActive && activityHook != nil {
-		activityHook(l, true)
-	}
+	l.notifyActivityTransition(wasEmpty)
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -62,13 +59,32 @@ func (l *List) Remove(e *Effect) {
 	l.mu.Lock()
 	wasEmpty := l.emptyLocked()
 	l.remove(e, &pending)
-	becameEmpty := !wasEmpty && l.emptyLocked()
 	l.mu.Unlock()
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
-	if becameEmpty && activityHook != nil {
-		activityHook(l, false)
+	l.notifyActivityTransition(wasEmpty)
+}
+
+// notifyActivityTransition fires the activity hook if l's emptiness
+// changed from wasEmpty to its current, settled state. It re-reads
+// emptiness after runHooks has already run, rather than deciding the
+// transition immediately after add/remove: a queued OnStart hook can still
+// reject the effect (removeFromVisible), draining a list that looked
+// active right back to empty before the caller returns. Reading the
+// settled state here means a rejected effect never registers a phantom
+// empty list, and a hook that reactivates a stack member never
+// deregisters a list that's actually still live.
+func (l *List) notifyActivityTransition(wasEmpty bool) {
+	l.mu.Lock()
+	nowEmpty := l.emptyLocked()
+	l.mu.Unlock()
+
+	switch {
+	case wasEmpty && !nowEmpty:
+		callActivityHook(l, true)
+	case !wasEmpty && nowEmpty:
+		callActivityHook(l, false)
 	}
 }
 

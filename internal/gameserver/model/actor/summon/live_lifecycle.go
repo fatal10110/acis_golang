@@ -177,6 +177,9 @@ func (a *Actor) despawn(state *world.State) {
 	// client has been told it's gone.
 	state.RemoveSummon(a.OwnerID())
 	state.Despawn(a)
+	// Stop the periodic effect sweep from reaching this summon's list once
+	// it leaves the world for good, even if it still holds a buff.
+	a.EffectList().Untrack()
 	if a.onDespawn != nil {
 		a.onDespawn()
 	}
