@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -16,30 +15,33 @@ const (
 	l2offTypeComplex = 0x0040
 )
 
-// ReadL2OFF loads a little-endian L2OFF _conv.dat geodata region.
-func ReadL2OFF(path string) (*block.Region, error) {
+// ReadL2OFF loads a little-endian L2OFF _conv.dat geodata region. It also
+// reports how many bytes of the file the block table left unread, which is
+// zero for a well-formed region; the caller owns reporting a non-zero count
+// through its own logger.
+func ReadL2OFF(path string) (*block.Region, int, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read L2OFF region %s: %w", path, err)
+		return nil, 0, fmt.Errorf("read L2OFF region %s: %w", path, err)
 	}
-	blocks, err := decodeL2OFF(data)
+	blocks, trailing, err := decodeL2OFF(data)
 	if err != nil {
-		return nil, fmt.Errorf("read L2OFF region %s: %w", path, err)
+		return nil, 0, fmt.Errorf("read L2OFF region %s: %w", path, err)
 	}
-	return blocks, nil
+	return blocks, trailing, nil
 }
 
-func decodeL2OFF(data []byte) (*block.Region, error) {
+func decodeL2OFF(data []byte) (*block.Region, int, error) {
 	r := l2offReader{data: data}
 	if !r.skip(l2offHeaderSize) {
-		return nil, shortL2OFF(-1, "header", r.pos)
+		return nil, 0, shortL2OFF(-1, "header", r.pos)
 	}
 
 	region := block.NewRegion()
 	for i := 0; i < block.RegionBlockCount; i++ {
 		typ, ok := r.u16()
 		if !ok {
-			return nil, shortL2OFF(i, "block type", r.pos)
+			return nil, 0, shortL2OFF(i, "block type", r.pos)
 		}
 
 		var err error
@@ -52,13 +54,10 @@ func decodeL2OFF(data []byte) (*block.Region, error) {
 			err = r.multilayer(region, i)
 		}
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
-	if r.pos != len(data) {
-		log.Warn().Int("trailing_bytes", len(data)-r.pos).Msg("geo/reader: L2OFF region has trailing bytes")
-	}
-	return region, nil
+	return region, len(data) - r.pos, nil
 }
 
 type l2offReader struct {

@@ -192,7 +192,7 @@ KarmaPlayerCanShop = False
 		t.Fatal(err)
 	}
 
-	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath})
+	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPvPFlagOptions() error = %v", err)
 	}
@@ -641,7 +641,7 @@ WeightLimit = 1.25
 		t.Fatal(err)
 	}
 
-	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath})
+	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPetConfig() error = %v", err)
 	}
@@ -789,7 +789,7 @@ MaxObstacleHeight = 48
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}
@@ -833,7 +833,7 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}

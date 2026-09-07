@@ -89,7 +89,10 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 	)
 }
 
-func loadLoginServerProperties(paths loginServerPaths) (*config.Properties, error) {
+// loadLoginServerProperties takes the process logger so the fx graph builds
+// it before server.properties is read; config warnings then reach the
+// configured sinks instead of the unconfigured default logger.
+func loadLoginServerProperties(paths loginServerPaths, _ zerolog.Logger) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
 }
 
@@ -181,6 +184,9 @@ func provideLoginServerLogger(lc fx.Lifecycle, paths loginServerPaths) (zerolog.
 		return zerolog.Logger{}, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
+	// Config warnings are raised lazily while properties are read, so route
+	// them here rather than leaving them on the unconfigured stderr logger.
+	config.SetLogger(rt.Logger)
 	return rt.Logger, nil
 }
 

@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"bytes"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -9,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 func TestReadL2OFF(t *testing.T) {
@@ -39,7 +36,7 @@ func TestReadL2OFF(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blocks, err := ReadL2OFF(path)
+	blocks, _, err := ReadL2OFF(path)
 	if err != nil {
 		t.Fatalf("ReadL2OFF: %v", err)
 	}
@@ -104,7 +101,7 @@ func TestReadL2OFFMultilayerLayerOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	blocks, err := ReadL2OFF(path)
+	blocks, _, err := ReadL2OFF(path)
 	if err != nil {
 		t.Fatalf("ReadL2OFF: %v", err)
 	}
@@ -125,7 +122,7 @@ func TestReadL2OFFMultilayerLayerOrder(t *testing.T) {
 }
 
 func TestDecodeL2OFFRejectsShortHeader(t *testing.T) {
-	_, err := decodeL2OFF(make([]byte, l2offHeaderSize-1))
+	_, _, err := decodeL2OFF(make([]byte, l2offHeaderSize-1))
 	if err == nil || !strings.Contains(err.Error(), "header") {
 		t.Fatalf("decodeL2OFF(short header) error = %v, want header error", err)
 	}
@@ -136,7 +133,7 @@ func TestDecodeL2OFFRejectsTruncatedBlock(t *testing.T) {
 	data = put16(data, l2offTypeFlat)
 	data = put16(data, 80)
 
-	_, err := decodeL2OFF(data)
+	_, _, err := decodeL2OFF(data)
 	if err == nil || !strings.Contains(err.Error(), "flat dummy") {
 		t.Fatalf("decodeL2OFF(truncated flat) error = %v, want flat dummy error", err)
 	}
@@ -147,28 +144,39 @@ func TestDecodeL2OFFRejectsBadLayerCount(t *testing.T) {
 	data = put16(data, 1)
 	data = put16(data, 0)
 
-	_, err := decodeL2OFF(data)
+	_, _, err := decodeL2OFF(data)
 	if err == nil || !strings.Contains(err.Error(), "invalid layer count 0") {
 		t.Fatalf("decodeL2OFF(bad layer count) error = %v, want invalid layer count", err)
 	}
 }
 
-func TestReadL2OFFWarnsAboutTrailingBytes(t *testing.T) {
+func TestReadL2OFFReportsTrailingBytes(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "20_18_conv.dat")
 	if err := os.WriteFile(path, append(l2offRegion(nil), 0xff), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	var output bytes.Buffer
-	previous := log.Logger
-	log.Logger = zerolog.New(&output)
-	t.Cleanup(func() { log.Logger = previous })
-
-	if _, err := ReadL2OFF(path); err != nil {
+	_, trailing, err := ReadL2OFF(path)
+	if err != nil {
 		t.Fatalf("ReadL2OFF(trailing data): %v", err)
 	}
-	if !strings.Contains(output.String(), "trailing_bytes") {
-		t.Fatalf("ReadL2OFF(trailing data) log = %q, want trailing-byte warning", output.String())
+	if trailing != 1 {
+		t.Fatalf("ReadL2OFF(trailing data) trailing = %d, want 1", trailing)
+	}
+}
+
+func TestReadL2OFFReportsNoTrailingBytesForExactRegion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "20_18_conv.dat")
+	if err := os.WriteFile(path, l2offRegion(nil), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, trailing, err := ReadL2OFF(path)
+	if err != nil {
+		t.Fatalf("ReadL2OFF: %v", err)
+	}
+	if trailing != 0 {
+		t.Fatalf("ReadL2OFF trailing = %d, want 0", trailing)
 	}
 }
 
