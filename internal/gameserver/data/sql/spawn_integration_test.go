@@ -82,7 +82,7 @@ func TestSpawnStoreSaveStatesKeepsValidRowsWhenOneStateIsInvalid(t *testing.T) {
 	store := NewSpawnStore(sqltest.SharedDB(t))
 
 	err := store.SaveStates(ctx, map[string]*spawn.State{
-		"valid": {Name: "valid", Status: spawn.StatusAlive, CurrentHP: 120},
+		"valid":   {Name: "valid", Status: spawn.StatusAlive, CurrentHP: 120},
 		"invalid": {Status: spawn.StatusAlive},
 	})
 	if err == nil {

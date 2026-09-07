@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -201,6 +203,28 @@ func playerAuthResponseHandler(links *loginLinkState, validator *network.Session
 		}
 		validator.Resolve(account, ok)
 	}
+}
+
+func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, log zerolog.Logger) {
+	debughttp.SetPlayersOnlineFunc(func() int { return len(state.Players()) })
+	if paths.DebugAddr == "" {
+		return
+	}
+	var srv *http.Server
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			var err error
+			srv, err = debughttp.Listen(paths.DebugAddr)
+			if err != nil {
+				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
+			}
+			log.Info().Str("addr", paths.DebugAddr).Msg("debug http listening")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return debughttp.Shutdown(ctx, srv)
+		},
+	})
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {

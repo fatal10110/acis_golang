@@ -240,14 +240,27 @@ func sameIDs(got, want []int32) bool {
 
 func knownListFixture(tb testing.TB, n int) (*State, Tracked) {
 	tb.Helper()
+	return knownListCrowd(tb, n, true)
+}
+
+func knownListFixtureOneRegion(tb testing.TB, n int) (*State, Tracked) {
+	tb.Helper()
+	return knownListCrowd(tb, n, false)
+}
+
+func knownListCrowd(tb testing.TB, n int, spread bool) (*State, Tracked) {
+	tb.Helper()
 	s := New()
 	observer := &regionTestObject{id: 1}
 	s.Spawn(observer, 0, 0, 0, 0)
 	for i := 0; i < n; i++ {
 		o := &regionTestObject{id: int32(i + 2)}
-		bucket := i % 9
-		x := (bucket%3 - 1) * regionSize
-		y := (bucket/3 - 1) * regionSize
+		x, y := 0, 0
+		if spread {
+			bucket := i % 9
+			x = (bucket%3 - 1) * regionSize
+			y = (bucket/3 - 1) * regionSize
+		}
 		s.Spawn(o, x, y, 0, 0)
 	}
 	return s, observer
@@ -267,10 +280,39 @@ func BenchmarkAppendKnown(b *testing.B) {
 	}
 }
 
+func TestForEachKnownInRadius_DeepSearchNoAlloc(t *testing.T) {
+	s, observer := knownListFixture(t, 50)
+	// radius 4097 -> searchDepth 3 -> (2*3+1)^2 = 49 regions, the deepest
+	// live radius (issue #2286): regionBuf must not spill to the heap.
+	allocs := testing.AllocsPerRun(20, func() {
+		s.ForEachKnownInRadius(observer, 4097, func(Tracked) {})
+	})
+	if allocs != 0 {
+		t.Fatalf("ForEachKnownInRadius at searchDepth 3: got %v allocs/op, want 0", allocs)
+	}
+}
+
 func BenchmarkForEachKnownInRadius(b *testing.B) {
 	for _, n := range []int{50, 300, 1500} {
 		b.Run(fmt.Sprintf("%d", n), func(b *testing.B) {
 			s, observer := knownListFixture(b, n)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				s.ForEachKnownInRadius(observer, -1, func(Tracked) {})
+			}
+		})
+	}
+	// inCap fits knownInRadiusObjectCap in one region; spill is one region over the cap.
+	for _, tc := range []struct {
+		name string
+		n    int
+	}{
+		{"inCap", 63},
+		{"spill", 400},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			s, observer := knownListFixtureOneRegion(b, tc.n)
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
