@@ -72,6 +72,11 @@ structure.
   mechanism, and do not launch unowned goroutines.
 - Define focused interfaces at consumption points, return concrete types, and do not add speculative
   abstractions.
+- If Java implements the requested behavior through a system Go does not have yet (script event
+  registry, quest/AI hooks, spawn makers, …), do not compile that system into a hardcoded ID table,
+  generated eligibility slice, or fake dispatcher. Move the issue to the milestone that owns the
+  real mechanism and keep the current approximation. Issue text that says "table the set" is not
+  authority — Java has no such file.
 - Classify each lookup before running it: `rg --files` for filenames, `rg` for known exact text,
   grepai for behavior or an unknown location, `gopls` for Go symbols/relationships, ast-grep for
   syntax structure, and the native file-read tool for a known range. Do not use `find`, `grep`, or

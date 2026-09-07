@@ -96,13 +96,16 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
-		Now:           time.Now(),
-		Controller:    controller,
-		Caster:        live.Character,
-		Selected:      selected,
-		Skill:         modelskill.Ref{ID: def.ID, Level: def.Level},
-		Definitions:   l.skills,
-		ResolveTarget: l.resolveMagicSkillTarget,
+		Now:         time.Now(),
+		Controller:  controller,
+		Caster:      live.Character,
+		Selected:    selected,
+		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
+		Definitions: l.skills,
+		Hooks: actorcast.StartHooks{
+			ResolveTarget: l.resolveMagicSkillTarget,
+			StopMovement:  l.stopMovementForCast(live),
+		},
 	})
 	if err != nil {
 		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {

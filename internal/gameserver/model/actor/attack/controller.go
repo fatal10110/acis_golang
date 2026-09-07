@@ -69,6 +69,7 @@ type CreatureActor interface {
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(Snapshot) error
+	ConsumeBowMP()
 }
 
 // PlayableActor is a creature controlled by a player or owned by one.
@@ -86,6 +87,8 @@ type PlayerActor interface {
 	CheckAndEquipArrows() bool
 	WeaponMPConsume() int
 	MP() int
+	ConsumeBowShot()
+	NotifyBowDraw(gaugeMs int)
 	ClearRecentFakeDeath()
 	ClientActionFailed()
 }
@@ -293,6 +296,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 
 	var hits []Hit
 	var landings []scheduledHit
+	var bowReuse time.Duration
 	switch attackType {
 	case item.WeaponDual, item.WeaponDualFist:
 		hits = []Hit{c.makeHit(target, true), c.makeHit(target, true)}
@@ -301,8 +305,13 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 			{hits: hits[1:], delay: attackTime},
 		}
 	case item.WeaponBow:
+		if c.player != nil {
+			c.player.ConsumeBowShot()
+		}
+		c.actor.ConsumeBowMP()
 		hits = []Hit{c.makeHit(target, false)}
 		landings = []scheduledHit{{hits: hits, delay: attackTime}}
+		bowReuse = c.scaledBowReuse()
 	case item.WeaponPole:
 		hits = []Hit{c.makeHit(target, false)}
 		maxTargets := c.actor.PoleAttackCountMax()
@@ -346,7 +355,10 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	}
 
-	c.start(attackType, attackTime, landings)
+	c.start(attackType, attackTime, landings, bowReuse)
+	if attackType == item.WeaponBow && c.player != nil {
+		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(bowReuse/time.Millisecond))
+	}
 	err := c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
@@ -383,7 +395,7 @@ type scheduledHit struct {
 	delay time.Duration
 }
 
-func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit) {
+func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit, bowReuse time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -401,7 +413,7 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	finishAt := attackTime
 	finish := func() { c.finishAttack(seq) }
 	if weapon == item.WeaponBow {
-		finish = func() { c.finishBow(seq) }
+		finish = func() { c.finishBow(seq, bowReuse) }
 	}
 	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
 		finishAt = attackTime * 3 / 2
@@ -527,7 +539,7 @@ func (c *Controller) deliverHit(hit Hit) {
 	target.TakeDamage(hit.Damage, c.actor)
 }
 
-func (c *Controller) finishBow(seq uint64) {
+func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	c.mu.Lock()
 	if seq != c.attackSeq {
 		c.mu.Unlock()
@@ -536,7 +548,6 @@ func (c *Controller) finishBow(seq uint64) {
 
 	c.attacking = false
 
-	reuse := c.scaledBowReuse()
 	if reuse > 0 {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 		c.mu.Unlock()

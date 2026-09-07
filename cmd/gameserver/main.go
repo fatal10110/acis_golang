@@ -27,6 +27,7 @@ type gameServerPaths struct {
 	NpcsConfigPath    string
 	DataRoot          string
 	LogRoot           string
+	DebugAddr         string
 }
 
 func main() {
@@ -44,6 +45,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
+	flag.StringVar(&paths.DebugAddr, "debug-addr", "", "optional host:port serving pprof and expvar")
 	flag.Parse()
 	return paths
 }
@@ -54,27 +56,9 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 		fx.Supply(paths),
 		fx.Provide(
 			loadGameServerProperties,
+			loadGameplayConfig,
 			loadPvPFlagOptions,
-			loadRespawnRestoreHP,
-			loadDeathPenaltyChance,
-			loadMaxBuffsAmount,
-			loadPerfectShieldBlockRate,
-			loadMagicFailures,
-			loadCancelLesserEffect,
-			loadStoreSkillCooltime,
-			loadPlayerSpawnProtection,
-			loadSkillEnchantSPBookNeeded,
-			loadAutoLearnSkills,
-			loadWeightLimitMultiplier,
-			loadKarmaPlayerCanTeleport,
-			loadAllowDelevel,
-			loadRateKarmaExpLost,
-			loadCharacterSelectDelay,
-			loadServerBypassDelay,
 			loadPetConfig,
-			loadSpawnMultiplier,
-			loadRandomWalkRate,
-			loadDisableRaidCurse,
 			loadHexIDProperties,
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
@@ -121,6 +105,6 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startGameServer),
+		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
 	)
 }

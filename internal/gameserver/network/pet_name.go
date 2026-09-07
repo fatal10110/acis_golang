@@ -123,8 +123,6 @@ func (l *GameClientLink) handleRequestChangePetName(ctx context.Context, live *l
 	case petRenameNameTaken:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingAlreadyInUseByAnotherPet))
 	case petRenameApplied:
-		if snap, ok := petInfoSnapshot(actor, live, live.npcs); ok {
-			live.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
-		}
+		sendSummonInfosToOwner(actor)
 	}
 }

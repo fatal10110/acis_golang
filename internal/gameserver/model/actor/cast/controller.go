@@ -243,6 +243,25 @@ func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
 	return c.current, true
 }
 
+// CanAttemptCast is the pre-movement gate: already casting, every skill
+// disabled, and per-skill reuse. Callers that stop a walk for a long hit
+// time must run this first so those rejections leave movement alone.
+func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) error {
+	if c.actor == nil || target == nil {
+		return ErrInvalidTarget
+	}
+	if c.CastingNow() {
+		return ErrAlreadyCasting
+	}
+	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+		return ErrAllSkillsDisabled
+	}
+	if c.actor.SkillDisabled(ReuseKey(def)) {
+		return ErrSkillDisabled
+	}
+	return nil
+}
+
 // CanCast validates the reusable pre-cast checks for target, reuse, current
 // MP/HP, mute state, and required skill items.
 func (c *Controller) CanCast(target Target, def modelskill.Definition) error {

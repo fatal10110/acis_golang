@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/rs/zerolog"
 )
 
 func main() {
@@ -101,7 +102,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	e, err := probe.LoadEngine(dir, geoType)
+	e, err := probe.LoadEngine(dir, geoType, zerolog.New(stderr).With().Timestamp().Logger())
 	if err != nil {
 		fmt.Fprintf(stderr, "geoprobe: %v\n", err)
 		return exitError

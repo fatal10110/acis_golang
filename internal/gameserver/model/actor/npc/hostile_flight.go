@@ -18,9 +18,12 @@ func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
 }
 
 // TeleportTo snaps the NPC to target and broadcasts the forced correction.
+// A teleport clears the geo-path fail streak: the next pathfinding attempt
+// is from a new cell, not a continuation of the stall that triggered recovery.
 func (h *Hostile) TeleportTo(target location.Location) {
 	h.SetXYZ(target.X, target.Y, target.Z)
 	h.BroadcastPosition()
+	h.ResetGeoPathFailCount()
 }
 
 // SetXYZ moves the NPC immediately and reseeds its ordinary movement state.

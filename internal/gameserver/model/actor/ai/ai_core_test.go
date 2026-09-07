@@ -21,6 +21,25 @@ func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate f
 	ai.AddAttackDesire(attacker, hate)
 }
 
+func tickThinkIdle(ai *Attackable) error {
+	if err := ai.TickThink(); err != nil {
+		return err
+	}
+	return ai.TickThink()
+}
+
+func tickThinkPromote(ai *Attackable) error {
+	if err := tickThinkIdle(ai); err != nil {
+		return err
+	}
+	return ai.TickThink()
+}
+
+func thinkWanderOnce(ai *Attackable) error {
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+	return ai.Think()
+}
+
 func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
@@ -285,6 +304,9 @@ func TestAttackableAICastStartsOffensiveFollowBeforeCasting(t *testing.T) {
 	if move.followTarget != target || move.followRange != 400 {
 		t.Fatalf("follow check = (%v, %d), want (%v, 400)", move.followTarget, move.followRange, target)
 	}
+	if owner.runStanceCalls != 1 {
+		t.Fatalf("run stance calls = %d, want 1 (cast-approach follow switches to run)", owner.runStanceCalls)
+	}
 }
 
 func TestAttackableAICastRespectsPreMovementCooldownGate(t *testing.T) {
@@ -448,6 +470,8 @@ type fakeActor struct {
 	wanderCalls     int
 	wanderOffset    int
 	walkStanceCalls int
+	runStanceCalls  int
+	headingRestores int
 	x, y, z         int
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
@@ -485,9 +509,11 @@ func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	a.moveToPawnTo = target
 	return a.moveToPawnErr
 }
-func (a *fakeActor) ShouldIdleWander() bool { return a.idleWander }
-func (a *fakeActor) ForceWalkStance()       { a.walkStanceCalls++ }
-func (a *fakeActor) RealMoveSpeed() float64 { return a.moveSpeed }
+func (a *fakeActor) ShouldIdleWander() bool       { return a.idleWander }
+func (a *fakeActor) ForceWalkStance()             { a.walkStanceCalls++ }
+func (a *fakeActor) ForceRunStance()              { a.runStanceCalls++ }
+func (a *fakeActor) RestoreSpawnHeadingIfAtHome() { a.headingRestores++ }
+func (a *fakeActor) RealMoveSpeed() float64       { return a.moveSpeed }
 func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {
 	a.wanderCalls++
 	a.wanderOffset = offset
@@ -540,6 +566,7 @@ type recordingAttack struct {
 	target          attackable.Combatant
 	doAttackCalls   int
 	doAttackErr     error
+	stopCalls       int
 }
 
 func (a *recordingAttack) BowCoolingDown() bool { return a.bowCooling }
@@ -554,6 +581,10 @@ func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
 	a.doAttackCalls++
 	a.target = target
 	return a.doAttackErr
+}
+func (a *recordingAttack) Stop() {
+	a.stopCalls++
+	a.attackingNow = false
 }
 
 type recordingCast struct {
@@ -570,6 +601,7 @@ type recordingCast struct {
 	castCalls    int
 	castedTarget attackable.Combatant
 	castedRef    skill.Ref
+	stopCalls    int
 }
 
 func (c *recordingCast) Disabled() bool               { return c.disabled }
@@ -595,6 +627,11 @@ func (c *recordingCast) Cast(target attackable.Combatant, ref skill.Ref) {
 	c.castCalls++
 	c.castedTarget = target
 	c.castedRef = ref
+}
+
+func (c *recordingCast) Stop() {
+	c.stopCalls++
+	c.casting = false
 }
 
 // ---- from attackable_threat_test.go ----
@@ -833,24 +870,30 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	}
 }
 
-// TestAttackableAITickClearsStaleThreatOutOfTerritory ports NpcAI.java's
-// out-of-territory fixed-rate task (NpcAI.java:298-339): a threat entry
+func armOOTSweep(ai *Attackable, owner *fakeActor) {
+	owner.inTerritory = false
+	ai.Arrived()
+}
+
+func tickOOTSweepDue(ai *Attackable, at time.Time) {
+	ai.now = func() time.Time { return at }
+	ai.Tick()
+}
+
+// TestAttackableAITickClearsStaleThreatOutOfTerritory: a threat entry
 // whose last damage is at least staleThreatAge old gets its hate stopped
-// and its queued attack desire dropped once the owner has been out of
-// territory for staleThreatSweepTicks.
+// and its queued attack desire dropped on the first due firing after an
+// out-of-territory arrival arms the sweep.
 func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
 	owner := actor(1)
-	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	addAttackHate(ai, target, 0, 20)
 
-	future := time.Now().Add(91 * time.Second)
-	ai.now = func() time.Time { return future }
-
-	for i := 0; i < staleThreatSweepTicks; i++ {
-		ai.Tick()
-	}
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	armOOTSweep(ai, owner)
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
 
 	if got := ai.Threats().Hate(target); got != 0 {
 		t.Fatalf("hate after stale sweep = %v, want 0 (stopped)", got)
@@ -868,17 +911,14 @@ func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
 // dealing damage within staleThreatAge keeps its desire queued.
 func TestAttackableAITickKeepsFreshThreatOutOfTerritory(t *testing.T) {
 	owner := actor(1)
-	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	addAttackHate(ai, target, 0, 20)
 
-	future := time.Now().Add(10 * time.Second)
-	ai.now = func() time.Time { return future }
-
-	for i := 0; i < staleThreatSweepTicks; i++ {
-		ai.Tick()
-	}
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	armOOTSweep(ai, owner)
+	tickOOTSweepDue(ai, start.Add(10*time.Second))
 
 	if got := ai.Desires().Len(); got != 1 {
 		t.Fatalf("desires len = %d, want 1 (fresh attack desire kept)", got)
@@ -886,58 +926,90 @@ func TestAttackableAITickKeepsFreshThreatOutOfTerritory(t *testing.T) {
 }
 
 // TestAttackableAITickSkipsStaleSweepInTerritory confirms the sweep never
-// runs while the owner is in its territory, matching NpcAI.java only
-// starting the task on the isInMyTerritory() false transition and
-// cancelling it back to territory.
+// runs while the owner is in its territory.
 func TestAttackableAITickSkipsStaleSweepInTerritory(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	addAttackHate(ai, target, 0, 20)
 
-	future := time.Now().Add(91 * time.Second)
-	ai.now = func() time.Time { return future }
-
-	for i := 0; i < staleThreatSweepTicks; i++ {
-		ai.Tick()
-	}
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	ai.Arrived()
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
 
 	if got := ai.Desires().Len(); got != 1 {
 		t.Fatalf("desires len = %d, want 1 (in-territory owner never runs the OOT sweep)", got)
 	}
 }
 
-// TestAttackableAITickOutOfTerritorySweepRestartsOnReentry confirms
-// returning to territory resets the sweep countdown, matching NpcAI.java
-// cancelling the fixed-rate task on return and recreating it fresh (with
-// its own initial delay) the next time the owner leaves territory.
-func TestAttackableAITickOutOfTerritorySweepRestartsOnReentry(t *testing.T) {
+// TestAttackableAITickSkipsStaleSweepWithoutArrival confirms a stationary
+// out-of-territory owner never arms the sweep, so stale hate is kept.
+func TestAttackableAITickSkipsStaleSweepWithoutArrival(t *testing.T) {
 	owner := actor(1)
 	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	// A large hate value keeps the attack desire alive through the regular
-	// per-3-tick decay (Attackable.Tick, attackHateDecay) across this
-	// test's 19 total ticks, isolating the OOT-sweep-restart behavior under
-	// test from that unrelated decay path.
 	addAttackHate(ai, target, 0, 1000)
 
 	future := time.Now().Add(91 * time.Second)
 	ai.now = func() time.Time { return future }
-
-	for i := 0; i < staleThreatSweepTicks-1; i++ {
-		ai.Tick()
-	}
-	owner.inTerritory = true
-	ai.Tick()
-	owner.inTerritory = false
-
-	for i := 0; i < staleThreatSweepTicks-1; i++ {
+	for range 10 {
 		ai.Tick()
 	}
 
 	if got := ai.Desires().Len(); got != 1 {
-		t.Fatalf("desires len = %d, want 1 (sweep countdown restarted on territory reentry)", got)
+		t.Fatalf("desires len = %d, want 1 (no arrival means no OOT sweep)", got)
+	}
+}
+
+// TestAttackableAITickOutOfTerritorySweepKeepsPhaseAcrossInTerritoryTicks
+// confirms an in-territory Tick skips that firing but does not cancel the
+// schedule, so a later out-of-territory Tick still sweeps.
+func TestAttackableAITickOutOfTerritorySweepKeepsPhaseAcrossInTerritoryTicks(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	addAttackHate(ai, target, 0, 1000)
+
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	armOOTSweep(ai, owner)
+
+	owner.inTerritory = true
+	tickOOTSweepDue(ai, start.Add(ootSweepInitialDelay))
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len after in-territory firing = %d, want 1", got)
+	}
+
+	owner.inTerritory = false
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
+
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("desires len = %d, want 0 (phase kept across in-territory tick)", got)
+	}
+}
+
+// TestAttackableAIArrivedInTerritoryCancelsOOTSweep confirms only an
+// in-territory arrival cancels the schedule; later out-of-territory ticks
+// without a new arrival do not sweep.
+func TestAttackableAIArrivedInTerritoryCancelsOOTSweep(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	addAttackHate(ai, target, 0, 1000)
+
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	armOOTSweep(ai, owner)
+
+	owner.inTerritory = true
+	ai.Arrived()
+	owner.inTerritory = false
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
+
+	if got := ai.Desires().Len(); got != 1 {
+		t.Fatalf("desires len = %d, want 1 (in-territory arrival cancelled the sweep)", got)
 	}
 }
 
@@ -998,8 +1070,8 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 	if got := ai.Desires().Len(); got != 0 {
 		t.Fatalf("desires len = %d, want 0", got)
 	}
-	if got := ai.CurrentIntention(); got != IntentionWander {
-		t.Fatalf("CurrentIntention() after reset = %v, want %v", got, IntentionWander)
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after reset = %v, want %v", got, IntentionIdle)
 	}
 	if _, _, ok := ai.NextIntention(); ok {
 		t.Fatal("NextIntention() ok = true after reset, want false")
@@ -1259,7 +1331,6 @@ func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1287,7 +1358,6 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1318,7 +1388,6 @@ func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1345,7 +1414,6 @@ func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
 	brain := NewAttackable(owner, mv, atk)
 	home := location.Location{}
 
-	brain.SetWander()
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -1368,6 +1436,73 @@ func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
 	}
 }
 
+func TestAttackableAIArrivedRestoresSpawnHeading(t *testing.T) {
+	owner := actor(1)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.Arrived()
+
+	if owner.headingRestores != 1 {
+		t.Fatalf("heading restores = %d, want 1", owner.headingRestores)
+	}
+}
+
+func TestAttackableAIFollowArrivedSkipsSpawnHeadingAndOOTSweep(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionFollow, FinalTarget: target, Weight: 5})
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want follow", got)
+	}
+
+	addAttackHate(ai, target, 0, 20)
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	owner.inTerritory = false
+	ai.Arrived()
+
+	if owner.headingRestores != 0 {
+		t.Fatalf("heading restores = %d, want 0 on FOLLOW arrival", owner.headingRestores)
+	}
+
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); !got {
+		t.Fatal("FOLLOW arrival armed the OOT sweep, want it skipped")
+	}
+}
+
+func TestAttackableAIAttackArrivedRestoresHeadingAndArmsOOTSweep(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
+	addAttackHate(ai, target, 0, 1000)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack", got)
+	}
+
+	start := time.Now()
+	ai.now = func() time.Time { return start }
+	owner.inTerritory = false
+	ai.Arrived()
+
+	if owner.headingRestores != 1 {
+		t.Fatalf("heading restores = %d, want 1 on ATTACK arrival", owner.headingRestores)
+	}
+
+	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); got {
+		t.Fatal("ATTACK arrival did not arm the OOT sweep")
+	}
+}
+
 func TestAttackableAIAddMoveToDesireSkipsUnreachable(t *testing.T) {
 	owner := actor(1)
 	move := &recordingMove{denyMove: true}
@@ -1387,8 +1522,9 @@ func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner.returnHome = true
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if owner.returnHomeCalls != 1 {
 		t.Fatalf("ReturnHome calls = %d, want 1", owner.returnHomeCalls)
@@ -1405,8 +1541,9 @@ func TestAttackableAIWanderSkipsReturnHomeWhileMoving(t *testing.T) {
 	owner.moving = true
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if owner.returnHomeCalls != 0 {
 		t.Fatalf("ReturnHome calls = %d, want 0 while moving", owner.returnHomeCalls)
@@ -1418,11 +1555,18 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 	owner.inTerritory = false
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	ai.Think()
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
 
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle outside territory without return home", got)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire still queued after out-of-territory thinkWander, want it dropped")
+	}
+	if got := ai.Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0 after out-of-territory wander clear", got)
 	}
 }
 
@@ -1431,8 +1575,7 @@ func TestAttackableAIWanderWalksFromSpawnOnFirstStep(t *testing.T) {
 	owner.moveSpeed = 50
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
 
@@ -1453,19 +1596,265 @@ func TestAttackableAIIdleQueuesWanderAndWalks(t *testing.T) {
 	owner.moveSpeed = 40
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
 	}
-
-	if got := ai.CurrentIntention(); got != IntentionWander {
-		t.Fatalf("CurrentIntention() = %v, want wander", got)
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after idle abort = %v, want idle", got)
 	}
 	got, ok := ai.Desires().Peek()
 	if !ok || got.Kind != IntentionWander || got.Timer != 5 || got.Weight != 5 {
 		t.Fatalf("queued wander = (%v %+v), want timer 5 weight 5", ok, got)
 	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d after queue tick, want 0 (promote next cycle)", owner.wanderCalls)
+	}
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("promote TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander", got)
+	}
 	if owner.wanderCalls != 1 || owner.wanderOffset != 120 {
 		t.Fatalf("wander move = %d offset %d, want 1 call offset 120", owner.wanderCalls, owner.wanderOffset)
+	}
+}
+
+func TestAttackableAIFirstTickDoesNotPromoteWander(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 40
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after first TickThink = %v, want idle", got)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d on first TickThink, want 0", owner.wanderCalls)
+	}
+	if !ai.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire dropped on first TickThink, want it kept")
+	}
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("second TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after second TickThink = %v, want wander", got)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d after second TickThink, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIFirstTickPromotesWhenAttackQueued(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.Threats().AddDamage(target, 0, 10)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 10})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after first TickThink = %v, want attack", got)
+	}
+	if strike.target != target {
+		t.Fatalf("attacked target = %v, want queued attacker", strike.target)
+	}
+}
+
+func TestAttackableAIFirstTickPromotesHighestWeightWhenAttackOpensGate(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.moveSpeed = 40
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.Threats().AddDamage(target, 0, 1)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 1})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 100})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander (highest weight, gate opened by queued attack)", got)
+	}
+	if strike.target != nil {
+		t.Fatalf("attacked target = %v, want none while wander outranks attack", strike.target)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d, want 1", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIFirstTickPromotesAfterAttackDesirePruned(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.moveSpeed = 40
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 10})
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander (ATTACK presence latched before prune)", got)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander move = %d, want 1", owner.wanderCalls)
+	}
+	if ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
+		t.Fatal("ATTACK desire still queued after empty-threat prune")
+	}
+}
+
+func TestAttackableAIDoesNotPromoteWhileCasting(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 40
+	cast := &recordingCast{casting: true}
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	ai.SetCastController(cast)
+	ai.lifeTime = 1
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
+
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() while casting = %v, want idle", got)
+	}
+	if owner.wanderCalls != 0 {
+		t.Fatalf("wander move = %d while casting, want 0", owner.wanderCalls)
+	}
+}
+
+func TestAttackableAIIdleHoldPositionForcesWalkStance(t *testing.T) {
+	owner := actor(1)
+	move := &recordingMove{}
+	ai := NewAttackable(owner, move, &recordingAttack{})
+
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle (no wander queue)", got)
+	}
+	if owner.walkStanceCalls != 1 {
+		t.Fatalf("walk stance calls = %d, want 1", owner.walkStanceCalls)
+	}
+	if move.stopCount != 1 {
+		t.Fatalf("stop count = %d, want 1", move.stopCount)
+	}
+}
+
+func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true, attackingNow: true}
+	ai := NewAttackable(owner, move, strike)
+	addAttackHate(ai, target, 0, 20)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack", got)
+	}
+
+	ai.Desires().Clear()
+	strike.attackingNow = true
+	if err := ai.Think(); err != nil {
+		t.Fatalf("empty-queue Think() error: %v", err)
+	}
+	if strike.stopCalls != 0 {
+		t.Fatalf("attack Stop calls = %d after event Think, want 0", strike.stopCalls)
+	}
+
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+
+	if strike.stopCalls != 1 {
+		t.Fatalf("attack Stop calls = %d, want 1", strike.stopCalls)
+	}
+	if owner.walkStanceCalls != 1 {
+		t.Fatalf("walk stance calls = %d, want 1", owner.walkStanceCalls)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle after empty-queue abort", got)
+	}
+}
+
+func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
+	owner := actor(1)
+	move := &recordingMove{}
+	strike := &recordingAttack{attackingNow: true}
+	ai := NewAttackable(owner, move, strike)
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	ai.Arrived()
+	stops := strike.stopCalls
+	walk := owner.walkStanceCalls
+	if err := ai.Think(); err != nil {
+		t.Fatalf("arrival Think() error: %v", err)
+	}
+	if strike.stopCalls != stops {
+		t.Fatalf("attack Stop calls = %d on arrival Think, want %d", strike.stopCalls, stops)
+	}
+	if owner.walkStanceCalls != walk {
+		t.Fatalf("walk stance calls = %d on arrival Think, want %d", owner.walkStanceCalls, walk)
+	}
+
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if strike.stopCalls != stops+1 {
+		t.Fatalf("attack Stop calls = %d after TickThink, want %d", strike.stopCalls, stops+1)
+	}
+}
+
+func TestAttackableAIIdleSkipsAbortWhileCasting(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true}
+	cast := &recordingCast{canAttempt: true, canCast: true, casting: true}
+	ai := NewAttackable(owner, move, strike)
+	ai.SetCastController(cast)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 10})
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+
+	ai.Desires().Clear()
+	cast.casting = true
+	walkBefore := owner.walkStanceCalls
+	if err := tickThinkIdle(ai); err != nil {
+		t.Fatalf("casting TickThink() error: %v", err)
+	}
+	if strike.stopCalls != 0 {
+		t.Fatalf("attack Stop calls = %d, want 0 while casting", strike.stopCalls)
+	}
+	if cast.stopCalls != 0 {
+		t.Fatalf("cast Stop calls = %d, want 0 while casting", cast.stopCalls)
+	}
+	if owner.walkStanceCalls != walkBefore {
+		t.Fatalf("walk stance calls = %d, want %d while casting", owner.walkStanceCalls, walkBefore)
 	}
 }
 
@@ -1479,8 +1868,7 @@ func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
 	ai.SetRandomWalkRate(100)
 	ai.roll = func(int) int { return 0 }
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("first Think() error: %v", err)
 	}
 	owner.wanderCalls = 0
@@ -1518,8 +1906,7 @@ func TestAttackableAIWanderRateZeroReschedulesWithoutWalking(t *testing.T) {
 	ai.now = func() time.Time { return now }
 	ai.SetRandomWalkRate(0)
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("first Think() error: %v", err)
 	}
 	owner.wanderCalls = 0
@@ -1552,8 +1939,7 @@ func TestAttackableAIAttackInterruptsWander(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 
-	ai.SetWander()
-	if err := ai.Think(); err != nil {
+	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("wander Think() error: %v", err)
 	}
 
@@ -2351,7 +2737,9 @@ func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
 	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
-	brain.Think()
+	if err := tickThinkPromote(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionFollow)
 	}
@@ -2372,7 +2760,9 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewAttackable(owner, &recordingMove{}, strike)
 
-	brain.Think()
+	if err := tickThinkPromote(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 	if got := brain.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() after idle = %v, want %v", got, IntentionFollow)
 	}

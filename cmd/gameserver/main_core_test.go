@@ -97,6 +97,9 @@ HexID = -7fff
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
 	}
+	if cfg.Database.MaxConnections != 0 {
+		t.Errorf("Database.MaxConnections = %d, want 0 (default pool size)", cfg.Database.MaxConnections)
+	}
 	if cfg.AllowCursedWeapons {
 		t.Error("AllowCursedWeapons = true, want false")
 	}
@@ -108,6 +111,30 @@ HexID = -7fff
 	}
 	if cfg.TownCombatRule != 2 {
 		t.Errorf("TownCombatRule = %d, want ZoneTown 2", cfg.TownCombatRule)
+	}
+}
+
+func TestGameServerConfigFromPropertiesMaxConnections(t *testing.T) {
+	serverProps, err := config.ParseString(`
+URL = jdbc:mariadb://localhost/acis
+MaxConnections = 16
+`)
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+	hexProps, err := config.ParseString(`
+ServerID = 3
+HexID = -7fff
+`)
+	if err != nil {
+		t.Fatalf("ParseString hexid: %v", err)
+	}
+	cfg, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, hexProps)
+	if err != nil {
+		t.Fatalf("gameServerConfigFromProperties: %v", err)
+	}
+	if cfg.Database.MaxConnections != 16 {
+		t.Errorf("Database.MaxConnections = %d, want 16", cfg.Database.MaxConnections)
 	}
 }
 
@@ -165,7 +192,7 @@ KarmaPlayerCanShop = False
 		t.Fatal(err)
 	}
 
-	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath})
+	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPvPFlagOptions() error = %v", err)
 	}
@@ -309,6 +336,51 @@ func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
 	}
 	if got {
 		t.Fatal("loadDisableRaidCurse() = true, want false")
+	}
+}
+
+func TestLoadMaxGeoPathFailCountUsesGeoengineProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 80\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 80 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 80", got)
+	}
+}
+
+func TestLoadMaxGeoPathFailCountDefaultsToFifty(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 50 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 50", got)
+	}
+}
+
+func TestLoadMaxGeoPathFailCountFloorsAtFifteen(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
+	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadMaxGeoPathFailCount(gameServerPaths{GeoConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadMaxGeoPathFailCount() error = %v", err)
+	}
+	if got != 15 {
+		t.Fatalf("loadMaxGeoPathFailCount() = %d, want 15", got)
 	}
 }
 
@@ -569,7 +641,7 @@ WeightLimit = 1.25
 		t.Fatal(err)
 	}
 
-	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath})
+	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPetConfig() error = %v", err)
 	}
@@ -717,7 +789,7 @@ MaxObstacleHeight = 48
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}
@@ -761,7 +833,7 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}

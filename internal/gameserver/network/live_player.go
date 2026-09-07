@@ -180,6 +180,8 @@ func (p *livePlayer) stopCubics() {
 func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
+	p.deferredMagic = nil
+	p.deferredItem = nil
 	p.pickup = &pickupIntention{ctx: ctx, target: target}
 }
 
@@ -251,6 +253,14 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 	pet := p.petInteract
 	p.petInteract = nil
 	return pet
+}
+
+// clearParkedApproaches drops pickup, pet-interact, and deferred-magic
+// approach slots so a later walk or chase cannot inherit them.
+func (p *livePlayer) clearParkedApproaches() {
+	p.takePickup()
+	p.takePetInteract()
+	p.takeDeferredMagicSkill()
 }
 
 // pickupLockActive has no production caller: livePickupBlockedDeferrable

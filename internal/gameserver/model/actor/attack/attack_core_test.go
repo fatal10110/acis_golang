@@ -142,6 +142,78 @@ func TestControllerStopIsSilent(t *testing.T) {
 	}
 }
 
+func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
+	// Independent oracle: sAtk = max(100, 500000/500) = 1000; scaled reuse
+	// = 1500*345/500 = 1035; gauge = 2035.
+	const wantGauge = 2035
+
+	actor := &timingPlayer{timingActor: timingActor{
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		reuse:       1500 * time.Millisecond,
+	}}
+	target := &timingTarget{id: 2}
+	ctrl := NewPlayer(actor)
+	ctrl.afterFunc = (&timingClock{}).AfterFunc
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	if got, want := actor.events, []string{"consume", "mp", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
+		t.Fatalf("bow fire events = %v, want %v", got, want)
+	}
+	if actor.drawMs != wantGauge {
+		t.Fatalf("NotifyBowDraw ms = %d, want %d", actor.drawMs, wantGauge)
+	}
+}
+
+func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
+	actor := &timingActor{attackType: item.WeaponBow, attackSpeed: 500}
+	target := &timingTarget{id: 2}
+	ctrl := NewCreature(actor)
+	ctrl.afterFunc = (&timingClock{}).AfterFunc
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	if got, want := actor.events, []string{"mp", "hit", "broadcast"}; !slices.Equal(got, want) {
+		t.Fatalf("creature bow events = %v, want %v", got, want)
+	}
+}
+
+func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
+	// Independent oracle at fire time: sAtk = 1000; scaled reuse
+	// = 1500*345/500 = 1035. After the draw window, AttackSpeed 350 would
+	// recompute reuse as 1478; the cooldown must stay 1035.
+	actor := &timingPlayer{timingActor: timingActor{
+		attackType:  item.WeaponBow,
+		attackSpeed: 500,
+		reuse:       1500 * time.Millisecond,
+	}}
+	target := &timingTarget{id: 2}
+	clock := &timingClock{}
+	ctrl := NewPlayer(actor)
+	ctrl.afterFunc = clock.AfterFunc
+
+	if err := ctrl.DoAttack(target); err != nil {
+		t.Fatalf("DoAttack() error: %v", err)
+	}
+	if actor.drawMs != 2035 {
+		t.Fatalf("NotifyBowDraw ms = %d, want 2035", actor.drawMs)
+	}
+
+	actor.attackSpeed = 350
+	clock.fire(time.Second)
+	clock.fire(time.Second)
+
+	if got := clock.activeCount(2035 * time.Millisecond); got != 1 {
+		t.Fatalf("frozen reuse timers at 2035ms = %d, want 1", got)
+	}
+	if got := clock.activeCount(2478 * time.Millisecond); got != 0 {
+		t.Fatalf("live-recomputed reuse timers at 2478ms = %d, want 0", got)
+	}
+}
+
 func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	var landed []int32
 	primary := &timingTarget{id: 2, x: 40, attackable: true, landed: &landed}
@@ -300,11 +372,13 @@ func (t *timingTimer) Stop() bool {
 type timingActor struct {
 	attackType       item.WeaponType
 	attackSpeed      int
+	reuse            time.Duration
 	poleMax          int
 	known            []attackable.Combatant
 	queryRadius      int
 	snapshot         Snapshot
 	broadcasts       int
+	events           []string
 	dead             bool
 	movementDisabled bool
 	outOfRange       bool
@@ -314,6 +388,7 @@ type timingPlayer struct {
 	timingActor
 	idles        int
 	actionFailed int
+	drawMs       int
 }
 
 type curseTimingPlayer struct {
@@ -332,8 +407,15 @@ func (a *timingPlayer) TryToIdle()                { a.idles++ }
 func (a *timingPlayer) CheckAndEquipArrows() bool { return true }
 func (a *timingPlayer) WeaponMPConsume() int      { return 0 }
 func (a *timingPlayer) MP() int                   { return 1 }
-func (a *timingPlayer) ClearRecentFakeDeath()     {}
-func (a *timingPlayer) ClientActionFailed()       { a.actionFailed++ }
+func (a *timingPlayer) ConsumeBowShot() {
+	a.events = append(a.events, "consume")
+}
+func (a *timingPlayer) NotifyBowDraw(gaugeMs int) {
+	a.drawMs = gaugeMs
+	a.events = append(a.events, "draw")
+}
+func (a *timingPlayer) ClearRecentFakeDeath() {}
+func (a *timingPlayer) ClientActionFailed()   { a.actionFailed++ }
 
 func (a *timingActor) ObjectID() int32                         { return 1 }
 func (a *timingActor) SiegeGuard() bool                        { return false }
@@ -345,7 +427,7 @@ func (a *timingActor) Knows(attackable.Combatant) bool         { return true }
 func (a *timingActor) CanSee(attackable.Combatant) bool        { return true }
 func (a *timingActor) AttackType() item.WeaponType             { return a.attackType }
 func (a *timingActor) AttackSpeed() int                        { return a.attackSpeed }
-func (a *timingActor) WeaponReuseDelay() time.Duration         { return 0 }
+func (a *timingActor) WeaponReuseDelay() time.Duration         { return a.reuse }
 func (a *timingActor) WeaponGrade() int                        { return 0 }
 func (a *timingActor) SoulshotCharged() bool                   { return false }
 func (a *timingActor) SetChargedShot(item.ShotKind, bool)      {}
@@ -372,11 +454,14 @@ func (a *timingActor) ForEachKnownCombatantInRadius(radius int, fn func(attackab
 	}
 }
 func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
+	a.events = append(a.events, "hit")
 	return Hit{Target: t, Damage: 1}
 }
+func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
 func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
 	a.snapshot = snapshot
 	a.broadcasts++
+	a.events = append(a.events, "broadcast")
 	return nil
 }
 

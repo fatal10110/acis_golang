@@ -98,8 +98,7 @@ func (r *walkerActorRef) MoveToLocation(target location.Location) (move.Event, e
 }
 
 func (r *walkerActorRef) TeleportTo(target location.Location) {
-	r.Hostile.SetXYZ(target.X, target.Y, target.Z)
-	r.Hostile.BroadcastPosition()
+	r.Hostile.TeleportTo(target)
 }
 
 // routeAwareMoveController wraps a Hostile's ai.MoveController so that any
@@ -209,12 +208,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	moveCtl.SetArrived(func() {
 		pos := moveCtl.Position()
 		hostile.SyncPosition(pos)
-		// aCis NpcAI.onEvtArrived: an arrival that lands exactly back on the
-		// spawn point restores the spawn heading, regardless of what the NPC
-		// last faced while moving.
-		if inst.HasHome && pos == inst.Home {
-			hostile.SetHeading(inst.SpawnHeading)
-		}
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome fire this
 		// same hook and must not advance/reissue the patrol route.
@@ -228,11 +221,13 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}
 	})
-	moveCtl.SetBlocked(func() {
+	moveCtl.SetBlocked(func() bool {
+		moveCtl.BroadcastBlockedCorrection()
 		hostile.AI().ArrivedBlocked()
 		if err := hostile.Think(); err != nil {
 			log.Warn().Err(err).Msg("ai: hostile think")
 		}
+		return true
 	})
 	attackCtl.SetFinished(func() {
 		if err := hostile.Think(); err != nil {

@@ -307,6 +307,49 @@ func (c *Character) SetMPStatusBroadcaster(broadcast func()) {
 	c.broadcastMPStatus = broadcast
 }
 
+// SetBowDrawNotifier records the packet-layer hook that tells this player's
+// own client a bow shot is drawing: the ready-to-shoot system message and
+// the red setup gauge covering attack time plus reuse.
+func (c *Character) SetBowDrawNotifier(notify func(gaugeMs int)) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.notifyBowDraw = notify
+}
+
+// NotifyBowDraw delivers the bow-draw client packets through the runtime
+// hook. A nil hook is a silent no-op so domain tests need no packet layer.
+func (c *Character) NotifyBowDraw(gaugeMs int) {
+	c.stateMu.RLock()
+	notify := c.notifyBowDraw
+	c.stateMu.RUnlock()
+	if notify != nil {
+		notify(gaugeMs)
+	}
+}
+
+// ConsumeBowShot spends one equipped arrow at fire time. A missing
+// off-hand stack is a silent no-op.
+func (c *Character) ConsumeBowShot() {
+	if c.inventory == nil {
+		return
+	}
+	if arrows := c.inventory.ItemAt(itemcontainer.LHand); arrows != nil {
+		c.inventory.DestroyItem(arrows, 1)
+	}
+}
+
+// ConsumeBowMP spends the active bow's MP at fire time. A zero cost
+// skips the status broadcast.
+func (c *Character) ConsumeBowMP() {
+	mp := c.WeaponMPConsume()
+	if mp <= 0 {
+		return
+	}
+	if c.ReduceMP(float64(mp)) > 0 {
+		c.BroadcastMPStatus()
+	}
+}
+
 // BroadcastMPStatus sends this character's current HP and MP through the
 // runtime packet hook.
 func (c *Character) BroadcastMPStatus() {

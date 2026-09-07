@@ -1545,6 +1545,7 @@ func (castHostileAttack) BowCoolingDown() bool                { return false }
 func (castHostileAttack) AttackingNow() bool                  { return false }
 func (castHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (castHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (castHostileAttack) Stop()                               {}
 
 func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
 	t.Helper()
@@ -2099,8 +2100,10 @@ func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 	started, err := StartPlayerSkill(PlayerSkillRequest{
 		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch,
 		Selected: &requestTarget{id: 20}, SkillID: 3, Definitions: defs,
-		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
-			return nil, skilltarget.CastRejectInvalidTarget
+		Hooks: StartHooks{
+			ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+				return nil, skilltarget.CastRejectInvalidTarget
+			},
 		},
 	})
 	if !errors.Is(err, ErrInvalidTarget) {
@@ -2369,8 +2372,10 @@ func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
 	started, err := StartItemSkill(ItemSkillRequest{
 		Now: time.Unix(1000, 0), Controller: ctrl, Caster: ch, Selected: target,
 		Skill: modelskill.Ref{ID: 7, Level: 1}, Definitions: defs,
-		ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
-			return target, skilltarget.CastRejectInvalidTarget
+		Hooks: StartHooks{
+			ResolveTarget: func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection) {
+				return target, skilltarget.CastRejectInvalidTarget
+			},
 		},
 	})
 	if !errors.Is(err, ErrInvalidTarget) {

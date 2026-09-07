@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/reader"
+	"github.com/rs/zerolog"
 )
 
 // GeoType selects which geodata region-file format LoadEngine reads.
@@ -23,7 +24,7 @@ const (
 // named per geoType's convention (L2OFF: "x_y_conv.dat"; L2J: "x_y.l2j").
 // A region tile with no file on disk is left unloaded, answered by the
 // engine's Null-block fallback, the same as any never-configured region.
-func LoadEngine(dir string, geoType GeoType, options ...engine.Options) (*engine.Engine, error) {
+func LoadEngine(dir string, geoType GeoType, log zerolog.Logger, options ...engine.Options) (*engine.Engine, error) {
 	if geoType != L2OFF && geoType != L2J {
 		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
 	}
@@ -31,12 +32,15 @@ func LoadEngine(dir string, geoType GeoType, options ...engine.Options) (*engine
 	e := engine.New(options...)
 	for x := engine.TileXMin; x <= engine.TileXMax; x++ {
 		for y := engine.TileYMin; y <= engine.TileYMax; y++ {
-			blocks, err := readRegion(regionPath(dir, geoType, x, y), geoType)
+			blocks, trailing, err := readRegion(regionPath(dir, geoType, x, y), geoType)
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			if err != nil {
 				return nil, fmt.Errorf("probe: load region %d_%d: %w", x, y, err)
+			}
+			if trailing > 0 {
+				log.Warn().Int("region_x", x).Int("region_y", y).Int("trailing_bytes", trailing).Msg("geodata region has trailing bytes")
 			}
 			if err := e.SetRegion(x, y, blocks); err != nil {
 				return nil, fmt.Errorf("probe: load region %d_%d: %w", x, y, err)
@@ -53,14 +57,17 @@ func regionPath(dir string, geoType GeoType, x, y int) string {
 	return filepath.Join(dir, fmt.Sprintf("%d_%d_conv.dat", x, y))
 }
 
-func readRegion(path string, geoType GeoType) (*block.Region, error) {
+// readRegion returns the region alongside the count of unread trailing bytes
+// in its file, which only the L2OFF format reports.
+func readRegion(path string, geoType GeoType) (*block.Region, int, error) {
 	if geoType == L2J {
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		defer f.Close()
-		return reader.ReadL2J(f)
+		region, err := reader.ReadL2J(f)
+		return region, 0, err
 	}
 	return reader.ReadL2OFF(path)
 }

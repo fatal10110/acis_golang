@@ -65,12 +65,24 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	}
 }
 
-func refreshSummonAbnormalEffect(a *summon.Actor) {
-	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
-		if snap, ok := petInfoSnapshot(a, owner, owner.npcs); ok {
-			owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
-		}
+// sendSummonInfosToOwner republishes the owner-only pet window. PetInfo
+// wipes PartySpelled icons; re-push is deferred with #1268 — that issue's
+// notifyAbnormalUpdate wiring does not cover this trigger.
+func sendSummonInfosToOwner(a *summon.Actor) {
+	if a == nil {
+		return
 	}
+	owner, ok := a.ActingPlayer().(*livePlayer)
+	if !ok {
+		return
+	}
+	if snap, ok := petInfoSnapshot(a, owner, owner.npcs); ok {
+		owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
+	}
+}
+
+func refreshSummonAbnormalEffect(a *summon.Actor) {
+	sendSummonInfosToOwner(a)
 	a.ForEachKnown(func(obj world.Tracked) {
 		p, ok := obj.(*livePlayer)
 		if !ok || p.ObjectID() == a.OwnerID() {

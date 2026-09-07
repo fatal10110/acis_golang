@@ -195,6 +195,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(stanceTimeoutDummySkill, false, false))
+	assertFrameOpcode(t, mustRead(t, c, "cast stop"), serverpackets.OpcodeStopMove, "cast stop")
 	assertFrameOpcode(t, mustRead(t, c, "MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	assertFrameOpcode(t, mustRead(t, c, "cast message"), serverpackets.OpcodeSystemMessage, "cast message")
 	assertFrameOpcode(t, mustRead(t, c, "SetupGauge"), serverpackets.OpcodeSetupGauge, "SetupGauge")

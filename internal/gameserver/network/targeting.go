@@ -139,12 +139,7 @@ func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlay
 		return true
 	}
 	x, y, z := ground.Position()
-	// This walk redirects live.move's single in-flight target away from any
-	// pending pet-interact approach (showOwnedPetStatus) — drop it, or its
-	// stale SetArrived callback would fire a range recheck against wherever
-	// this walk actually lands instead of the pet it was originally aimed
-	// at.
-	live.takePetInteract()
+	live.clearParkedApproaches()
 	live.setPickup(ctx, ground)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
@@ -237,10 +232,7 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 		return true
 	}
 	px, py, pz := pet.Position()
-	// Symmetric to walkOrForwardPickup's cancellation above: this walk also
-	// redirects live.move's single in-flight target, so any pending pickup
-	// walk that target was still driving toward has to go too.
-	live.takePickup()
+	live.clearParkedApproaches()
 	live.setPetInteract(pet)
 	accepted, err := live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz})
 	if err != nil {
@@ -260,21 +252,74 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 
 // finishPetInteract fires once an approach walk started by showOwnedPetStatus
 // arrives (wired through move.Controller.SetArrived), mirroring
-// thinkInteract's post-move canDoInteract recheck (PlayerAI.java:445): the
-// owner or pet may have moved again meanwhile, so the range and ownership
-// gates run again before the status window opens.
+// thinkInteract's post-move canDoInteract recheck: the owner or pet may have
+// moved again meanwhile, so the range and ownership gates run again before
+// the status window opens.
 func (l *GameClientLink) finishPetInteract(live *livePlayer) {
-	pet := live.takePetInteract()
+	l.applyOwnedPetInteract(live, live.takePetInteract())
+}
+
+// applyOwnedPetInteract is the onInteract half of an owned-pet INTERACT:
+// world/owner checks plus the shared canDoInteract gate, then PetStatusShow.
+func (l *GameClientLink) applyOwnedPetInteract(live *livePlayer, pet *summon.Actor) {
 	if pet == nil {
 		return
 	}
 	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) {
 		return
 	}
-	if pet.OwnerID() != live.ObjectID() || !summonInRange(live, pet, summonInteractRange) {
+	if pet.OwnerID() != live.ObjectID() {
+		return
+	}
+	if !l.playerCanDoInteract(live, pet) {
 		return
 	}
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+}
+
+// onPlayerArrivedBlocked is the player blocked-arrival arm: INTERACT in
+// range broadcasts StopMove and finishes the interact; CAST sends
+// DIST_TOO_FAR_CASTING_STOPPED then the base same-cell MoveToLocation;
+// every other intention uses that base correction.
+func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
+	if live == nil {
+		return false
+	}
+	if live.move != nil {
+		pos := live.move.Position()
+		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+	}
+	if pet := live.takePetInteract(); pet != nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		if !l.playerCanDoInteract(live, pet) {
+			return false
+		}
+		if err := live.BroadcastStop(); err != nil {
+			l.log.Warn().Err(err).Msg("move: blocked interact stop")
+		}
+		// onInteract has no world-presence check: PetStatusShow uses the
+		// snapshot summon even if it has already left the world.
+		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+		return true
+	}
+	if live.takeDeferredMagicSkill() != nil {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
+	}
+	return false
+}
+
+// playerCanDoInteract is operating / active trade / 150 3D range. Blocked
+// INTERACT uses this as the single StopMove+PetStatusShow gate. Arrived
+// INTERACT also requires the pet still in world before the same gate
+// (thinkInteract's isTargetLost check).
+func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
+	if live == nil || pet == nil || live.Operating() {
+		return false
+	}
+	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
+		return false
+	}
+	return summonInRange(live, pet, summonInteractRange)
 }
 
 // requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
@@ -434,14 +479,14 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// The reference's single intention slot drops PICK_UP on any subsequent
-	// attack click regardless of which thinkAttack branch it takes — most
-	// branches here also cancel or redirect the move itself (chase redirect,
-	// immediate-swing move.Stop(), a rejection's stopLocked), but even the
-	// bow-cooldown branch that leaves the move untouched still replaces the
-	// intention. Clear it unconditionally, or a parked ground-pickup
-	// approach fires stale against whatever arrival comes next (#1155).
-	live.takePickup()
+	// The reference's single intention slot drops PICK_UP, INTERACT, and
+	// CAST on any subsequent attack click regardless of which thinkAttack
+	// branch it takes — most branches here also cancel or redirect the move
+	// itself (chase redirect, immediate-swing move.Stop(), a rejection's
+	// stopLocked), but even the bow-cooldown branch that leaves the move
+	// untouched still replaces the intention. Clear every parked approach,
+	// or a geo close mid-chase still takes INTERACT/CAST.
+	live.clearParkedApproaches()
 	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false

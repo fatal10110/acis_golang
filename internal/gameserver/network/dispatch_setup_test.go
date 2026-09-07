@@ -411,3 +411,4 @@ func (testHostileAttack) BowCoolingDown() bool                { return false }
 func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (testHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (testHostileAttack) Stop()                               {}

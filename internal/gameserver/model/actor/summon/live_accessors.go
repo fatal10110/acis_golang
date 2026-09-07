@@ -102,6 +102,43 @@ func (a *Actor) SetExpNotifier(notify func(int64)) {
 	a.expNotifier = notify
 }
 
+// SetOwnerInfoRefresher records the runtime hook that republishes this
+// summon's owner-only info window after a control-item enchant change.
+func (a *Actor) SetOwnerInfoRefresher(refresh func()) {
+	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	a.ownerInfoRefresher = refresh
+}
+
+func (a *Actor) refreshOwnerInfo() {
+	a.statusMu.RLock()
+	refresh := a.ownerInfoRefresher
+	a.statusMu.RUnlock()
+	if refresh != nil {
+		refresh()
+	}
+}
+
+// SyncControlItemEnchant lifts the owner's control item to this pet's
+// current level when they differ. It refreshes the owner info window first,
+// then persists the item through the inventory pipeline. A matching
+// enchant is a no-op.
+func (a *Actor) SyncControlItemEnchant() bool {
+	if a == nil || !a.isPet || a.ownerInventory == nil || a.controlItemID == 0 {
+		return false
+	}
+	inst := a.ownerInventory.ItemByObjectID(a.controlItemID)
+	if inst == nil {
+		return false
+	}
+	level := a.Level()
+	if inst.Snapshot().EnchantLevel == level {
+		return false
+	}
+	a.refreshOwnerInfo()
+	return a.ownerInventory.SetEnchantLevel(inst, level)
+}
+
 func (a *Actor) notifyDamage(attacker any, amount float64) {
 	named, ok := attacker.(interface{ CharacterName() string })
 	if !ok {
@@ -259,6 +296,7 @@ func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	a.statusMu.Unlock()
 	if leveled {
 		a.resetVitals()
+		a.SyncControlItemEnchant()
 	}
 	a.UpdateStatus()
 	a.statusMu.RLock()

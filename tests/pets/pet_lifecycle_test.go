@@ -78,12 +78,8 @@ func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
 	}, serverpackets.OpcodeItemList)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
-	frames := drainFrames(t, h.client)
-	if len(frames) < 2 {
-		t.Fatalf("take-back frames = %d, want PetInventoryUpdate then InventoryUpdate", len(frames))
-	}
-	assertFrameOpcode(t, frames[0], serverpackets.OpcodePetInventoryUpdate, "pet-side update")
-	assertFrameOpcode(t, frames[1], serverpackets.OpcodeInventoryUpdate, "owner-side update")
+	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "take from pet",
+		serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate)
 
 	if got := h.ownerItemCount(t, item.AdenaID); got != 85 {
 		t.Fatalf("owner adena count = %d, want 85", got)

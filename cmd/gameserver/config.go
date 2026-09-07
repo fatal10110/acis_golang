@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -17,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
+	"github.com/rs/zerolog"
 )
 
 type gameServerConfig struct {
@@ -30,7 +32,108 @@ type gameServerConfig struct {
 	TownCombatRule     int
 }
 
-func loadGameServerProperties(paths gameServerPaths) (*config.Properties, error) {
+// gameplayConfig aggregates the gameplay knobs read from the properties
+// files. The composition root provides one value instead of one provider per
+// key, and consumers take this struct instead of a parameter per knob.
+type gameplayConfig struct {
+	RespawnRestoreHP         respawnRestoreHP
+	DeathPenaltyChance       deathPenaltyChance
+	MaxBuffsAmount           maxBuffsAmount
+	PerfectShieldBlockRate   perfectShieldBlockRate
+	MagicFailures            magicFailures
+	CancelLesserEffect       cancelLesserEffect
+	StoreSkillCooltime       storeSkillCooltime
+	SpawnProtection          playerSpawnProtection
+	SkillEnchantSPBookNeeded skillEnchantSPBookNeeded
+	AutoLearnSkills          autoLearnSkills
+	WeightLimitMultiplier    weightLimitMultiplier
+	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
+	AllowDelevel             allowDelevel
+	RateKarmaExpLost         rateKarmaExpLost
+	CharacterSelectDelay     characterSelectDelay
+	ServerBypassDelay        serverBypassDelay
+	SpawnMultiplier          spawnMultiplier
+	RandomWalkRate           randomWalkRate
+	MaxGeoPathFailCount      maxGeoPathFailCount
+	DisableRaidCurse         raidCursesDisabled
+}
+
+// loadGameplayConfig reads every gameplay knob through the loader that owns
+// its key, so a missing or malformed value still fails boot at the same
+// point it did when each knob had its own provider.
+//
+// It takes the process logger so the fx graph builds the logger before any
+// property file is read, letting config warnings reach the configured sinks.
+func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig, error) {
+	var cfg gameplayConfig
+	var err error
+	if cfg.RespawnRestoreHP, err = loadRespawnRestoreHP(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.DeathPenaltyChance, err = loadDeathPenaltyChance(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.MaxBuffsAmount, err = loadMaxBuffsAmount(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.PerfectShieldBlockRate, err = loadPerfectShieldBlockRate(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.MagicFailures, err = loadMagicFailures(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.CancelLesserEffect, err = loadCancelLesserEffect(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.StoreSkillCooltime, err = loadStoreSkillCooltime(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SpawnProtection, err = loadPlayerSpawnProtection(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SkillEnchantSPBookNeeded, err = loadSkillEnchantSPBookNeeded(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.AutoLearnSkills, err = loadAutoLearnSkills(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.WeightLimitMultiplier, err = loadWeightLimitMultiplier(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.KarmaPlayerCanTeleport, err = loadKarmaPlayerCanTeleport(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.AllowDelevel, err = loadAllowDelevel(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.RateKarmaExpLost, err = loadRateKarmaExpLost(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.CharacterSelectDelay, err = loadCharacterSelectDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ServerBypassDelay, err = loadServerBypassDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.RandomWalkRate, err = loadRandomWalkRate(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.MaxGeoPathFailCount, err = loadMaxGeoPathFailCount(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.DisableRaidCurse, err = loadDisableRaidCurse(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	return cfg, nil
+}
+
+// loadGameServerProperties takes the process logger so the fx graph builds
+// it before server.properties is read; config warnings then reach the
+// configured sinks instead of zerolog's default global logger.
+func loadGameServerProperties(paths gameServerPaths, _ zerolog.Logger) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
 }
 
@@ -219,7 +322,10 @@ func loadServerBypassDelay(paths gameServerPaths) (serverBypassDelay, error) {
 	return serverBypassDelay(time.Duration(config.NewFields(props, "server bypass reuse delay").Int("ServerBypassTime", 100)) * time.Millisecond), nil
 }
 
-func loadPetConfig(paths gameServerPaths) (pet.Config, error) {
+// loadPetConfig takes the process logger for the same reason as
+// loadPvPFlagOptions above: to order it after the composition root's logger
+// is built and installed via config.SetLogger.
+func loadPetConfig(paths gameServerPaths, _ zerolog.Logger) (pet.Config, error) {
 	serverProps, err := config.LoadFile(paths.ConfigPath)
 	if err != nil {
 		return pet.Config{}, err
@@ -255,6 +361,24 @@ func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
 	return randomWalkRate(config.NewFields(props, "random walk rate").Int("RandomWalkRate", 30)), nil
 }
 
+// maxGeoPathFailCount is the consecutive pathfinding-fail overflow
+// threshold from geoengine.properties MaxGeopathFailCount. Values below
+// 15 floor at 15 so script AI gates still observe the count.
+type maxGeoPathFailCount int
+
+func loadMaxGeoPathFailCount(paths gameServerPaths) (maxGeoPathFailCount, error) {
+	props, err := config.LoadFile(paths.GeoConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	f := config.NewFields(props, "max geopath fail count")
+	n := npc.ClampMaxGeoPathFailCount(f.Int("MaxGeopathFailCount", npc.DefaultMaxGeoPathFailCount))
+	if err := f.Err(); err != nil {
+		return 0, err
+	}
+	return maxGeoPathFailCount(n), nil
+}
+
 // raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from
 // npcs.properties DisableRaidCurse.
 type raidCursesDisabled bool
@@ -267,7 +391,10 @@ func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
 	return raidCursesDisabled(config.NewFields(props, "disable raid curse").Bool("DisableRaidCurse", false)), nil
 }
 
-func loadPvPFlagOptions(paths gameServerPaths) (task.PvPFlagOptions, error) {
+// loadPvPFlagOptions takes the process logger so the fx graph builds it
+// before players.properties is read; config warnings then reach the
+// configured sinks instead of the unconfigured default logger.
+func loadPvPFlagOptions(paths gameServerPaths, _ zerolog.Logger) (task.PvPFlagOptions, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
 		return task.PvPFlagOptions{}, err
@@ -352,6 +479,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	maxConnections, _, err := serverProps.OptionalInt("MaxConnections")
+	if err != nil {
+		return gameServerConfig{}, err
+	}
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -372,9 +503,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			},
 		},
 		Database: db.Config{
-			URL:      serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
-			Login:    serverProps.String("Login", "root"),
-			Password: serverProps.String("Password", ""),
+			URL:            serverProps.String("URL", "jdbc:mariadb://localhost/acis"),
+			Login:          serverProps.String("Login", "root"),
+			Password:       serverProps.String("Password", ""),
+			MaxConnections: maxConnections,
 		},
 		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:         serverProps.Bool("AllowWater", true),

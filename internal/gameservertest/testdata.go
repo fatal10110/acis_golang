@@ -21,6 +21,18 @@ type Geo struct{}
 func (Geo) CanMove(int, int, int, int, int, int) bool { return true }
 func (Geo) Height(_, _, z int) int16                  { return int16(z) }
 
+// GateGeo is an always-passable Geo until Block closes every straight-line
+// walk, so a suite can start a move then fire the in-flight blocked path.
+type GateGeo struct {
+	Geo
+	blocked bool
+}
+
+// Block makes later CanMove checks fail.
+func (g *GateGeo) Block() { g.blocked = true }
+
+func (g *GateGeo) CanMove(int, int, int, int, int, int) bool { return !g.blocked }
+
 func (Geo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (Geo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
@@ -213,6 +225,31 @@ func ItemTemplates() *item.Table {
 			Destroyable:  true,
 			Depositable:  true,
 			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
+		},
+		{
+			ID:            14,
+			Name:          "Bow",
+			Kind:          item.KindWeapon,
+			Slot:          item.SlotLRHand,
+			Duration:      -1,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			Weapon: &item.WeaponDetail{
+				Type:       item.WeaponBow,
+				MPConsume:  1,
+				ReuseDelay: 1500,
+			},
+		},
+		{
+			ID:            17,
+			Name:          "Wooden Arrow",
+			Kind:          item.KindEtcItem,
+			Slot:          item.SlotLHand,
+			Duration:      -1,
+			Stackable:     true,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemArrow},
 		},
 		{
 			// Demonic Sword Zariche, the reference server's cursed weapon

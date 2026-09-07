@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
@@ -10,6 +11,24 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
+
+func tickThinkIdle(t *testing.T, h interface{ TickThink() error }) {
+	t.Helper()
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+}
+
+func tickThinkWander(t *testing.T, h interface{ TickThink() error }) {
+	t.Helper()
+	tickThinkIdle(t, h)
+	if err := h.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+}
 
 // TestIdleHostileWanderBroadcastsWalkThenMove pins AttackableAI.thinkWander's
 // first idle step: walk stance, then a MoveToLocation offset from the spawn
@@ -26,9 +45,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
@@ -65,9 +82,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 	minion.SetMaster(master)
 	drainUntilQuiet(t, c)
 
-	if err := minion.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, minion)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
@@ -110,9 +125,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 
-	if err := minion.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, minion)
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander after master death", got)
 	}
@@ -163,14 +176,93 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 	hostile := srv.SpawnMovingHostileNPCAt(t, "Guard", home, home)
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
 	}
 	if hostile.IsMoving() {
 		t.Fatal("IsMoving() = true for idle Guard, want no wander")
+	}
+}
+
+// TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
+// WANDER arm: finishing a wander step drops that desire and idles, then
+// the next TickThink re-queues idle wander without promoting it; the
+// cycle after that promotes wander. lastDesire is still wander, so
+// thinkWander arms the timer instead of MoveFromSpawnUsingRandomOffset.
+func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().Arrived()
+	})
+}
+
+// TestIdleHostileWanderArrivedBlockedClearsDesire pins
+// NpcAI.onEvtArrivedBlocked: a blocked wander step also drops WANDER.
+func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
+	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
+		hostile.AI().ArrivedBlocked()
+	})
+}
+
+func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+
+	tickThinkWander(t, hostile)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after Think = %v, want wander", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after Think, want it queued before arrival")
+	}
+	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	_ = mustRead(t, c, "MoveToLocation")
+	if !hostile.IsMoving() {
+		t.Fatal("IsMoving() = false after wander Think, want an in-flight walk")
+	}
+	hostile.Move().CancelMove()
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true after CancelMove, want the walk finished before arrival")
+	}
+
+	arrive(hostile)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	}
+	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire still queued after arrival")
+	}
+
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() after arrival: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after arrival TickThink = %v, want idle (wander queued, not promoted)", got)
+	}
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire missing after arrival TickThink")
+	}
+	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
+		t.Fatalf("unexpected packet after arrival queue tick: %#x", f[0])
+	}
+
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() promote after arrival: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after promote = %v, want wander", got)
+	}
+	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
+		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
 	}
 }
 
@@ -197,9 +289,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	hostile.Instance.Maker = maker
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	if !poly.Contains(dest.X, dest.Y, dest.Z) {
@@ -240,9 +330,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	want := geometry.Point{X: (55 + 65 + 60) / 3, Y: (15 + 15 + 28) / 3}
@@ -254,7 +342,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 // TestMakerIdleWanderOutOfTerritoryStaysIdle pins AttackableAI.thinkWander
 // when the maker NPC is outside the polygon but still at spawn: returnHome
 // is a no-op (inside 2D drift) and random walk is skipped, so intention
-// drops to idle.
+// drops to idle and the wander desire leaves the queue.
 func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -274,11 +362,12 @@ func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	hostile.Instance.Maker = &spawn.Maker{Territories: []*spawn.Territory{poly}}
 	drainUntilQuiet(t, c)
 
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
-	}
+	tickThinkWander(t, hostile)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	}
+	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire still queued after out-of-territory Think, want it dropped")
 	}
 	if hostile.IsMoving() {
 		t.Fatal("IsMoving() = true for out-of-territory maker NPC at home, want idle")
@@ -289,12 +378,20 @@ func wanderPoly(nodes ...spawn.Node) *spawn.Territory {
 	return &spawn.Territory{Name: "wander", MinZ: 0, MaxZ: 100, Nodes: nodes}
 }
 
-func moveToLocationDest(t *testing.T, frame []byte) location.Location {
+func moveToLocationCoords(t *testing.T, frame []byte) (objectID int32, dest, origin location.Location) {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	r := wireReader(frame[1:])
-	_ = r.ReadInt32()
-	return location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	objectID = r.ReadInt32()
+	dest = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	origin = location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	return objectID, dest, origin
+}
+
+func moveToLocationDest(t *testing.T, frame []byte) location.Location {
+	t.Helper()
+	_, dest, _ := moveToLocationCoords(t, frame)
+	return dest
 }
 
 func absInt(n int) int {

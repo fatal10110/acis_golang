@@ -905,6 +905,82 @@ func TestInTerritoryMakerBannedOverridesAllowed(t *testing.T) {
 	}
 }
 
+// A private with a living master uses the master's territory, not its own
+// spawn sphere. ReturnHome's walk-back still requires the minion to be
+// outside its own 2D drift range, so that assertion cannot share a
+// placement with the "follows master's false" pin.
+func TestInTerritoryMinionFollowsMaster(t *testing.T) {
+	home := location.Location{X: 100, Y: 0, Z: 0}
+	cases := []struct {
+		name            string
+		masterOff       int
+		minionOff       int
+		deadMaster      bool
+		wantInTerritory bool
+		wantReturnHome  bool
+	}{
+		{
+			name:            "master in sphere, minion at exclusive edge",
+			minionOff:       defaultDriftRange,
+			wantInTerritory: true,
+		},
+		{
+			name:      "master outside, minion at own home",
+			masterOff: defaultDriftRange,
+		},
+		{
+			name:           "both outside own sphere",
+			masterOff:      defaultDriftRange,
+			minionOff:      defaultDriftRange,
+			wantReturnHome: true,
+		},
+		{
+			name:            "dead master, minion at exclusive edge",
+			masterOff:       defaultDriftRange,
+			minionOff:       defaultDriftRange,
+			deadMaster:      true,
+			wantInTerritory: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			minionMove := &hostileMove{}
+			master := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			minion := newTestHostile(t, minionMove, &hostileAttack{})
+			minion.Instance.ObjectID = 102
+			master.Instance.HasHome = true
+			master.Instance.Home = home
+			minion.Instance.HasHome = true
+			minion.Instance.Home = home
+			master.AddMinion(minion)
+			minion.SetMaster(master)
+
+			w := world.New()
+			w.Spawn(master, home.X+tc.masterOff, home.Y, home.Z, 0)
+			w.Spawn(minion, home.X+tc.minionOff, home.Y, home.Z, 0)
+			if tc.deadMaster {
+				if !master.MarkDead() {
+					t.Fatal("MarkDead() = false, want a fresh death")
+				}
+			}
+
+			if got := minion.InTerritory(); got != tc.wantInTerritory {
+				t.Fatalf("InTerritory() = %v, want %v", got, tc.wantInTerritory)
+			}
+			if got := minion.ReturnHome(); got != tc.wantReturnHome {
+				t.Fatalf("ReturnHome() = %v, want %v", got, tc.wantReturnHome)
+			}
+			if tc.wantReturnHome {
+				if minionMove.home != home {
+					t.Fatalf("MoveHome destination = %#v, want %#v", minionMove.home, home)
+				}
+			} else if minionMove.home != (location.Location{}) {
+				t.Fatalf("MoveHome destination = %#v, want no walk-back", minionMove.home)
+			}
+		})
+	}
+}
+
 func makerPoly() *spawn.Territory {
 	return &spawn.Territory{
 		Name: "maker",
@@ -1077,6 +1153,51 @@ func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
 	}
 }
 
+func TestAddGeoPathFailCountOverflowResetsWithoutIncrement(t *testing.T) {
+	const max = 2
+	prev := MaxGeoPathFailCount()
+	SetMaxGeoPathFailCount(max)
+	t.Cleanup(func() { SetMaxGeoPathFailCount(prev) })
+
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	for i := 1; i <= max; i++ {
+		hostile.AddGeoPathFailCount()
+		if got := hostile.GeoPathFailCount(); got != i {
+			t.Fatalf("GeoPathFailCount() = %d after %d fails, want %d", got, i, i)
+		}
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != max+1 {
+		t.Fatalf("GeoPathFailCount() after max+1 = %d, want %d", got, max+1)
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after overflow reset = %d, want 0", got)
+	}
+	hostile.AddGeoPathFailCount()
+	if got := hostile.GeoPathFailCount(); got != 1 {
+		t.Fatalf("GeoPathFailCount() after reset increment = %d, want 1", got)
+	}
+}
+
+func TestHostileTeleportToClearsGeoPathFailCount(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	w := world.New()
+	w.Spawn(hostile, 0, 0, 0, 0)
+	hostile.SetWorld(w)
+	for range 7 {
+		hostile.AddGeoPathFailCount()
+	}
+	hostile.TeleportTo(location.Location{X: 50, Y: 0, Z: 0})
+	if got := hostile.GeoPathFailCount(); got != 0 {
+		t.Fatalf("GeoPathFailCount() after TeleportTo = %d, want 0", got)
+	}
+	x, y, z := hostile.Position()
+	if got := (location.Location{X: x, Y: y, Z: z}); got != (location.Location{X: 50, Y: 0, Z: 0}) {
+		t.Fatalf("Position() = %+v, want teleported cell", got)
+	}
+}
+
 func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
@@ -1104,6 +1225,29 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
 }
 
+func TestRestoreSpawnHeadingIfAtHome(t *testing.T) {
+	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	w := world.New()
+	w.Spawn(hostile, 100, 0, 0, 0)
+	hostile.SetWorld(w)
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.SpawnHeading = 40000
+	hostile.SetHeading(1)
+
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 40000 {
+		t.Fatalf("Heading() at home = %d, want spawn heading 40000", got)
+	}
+
+	hostile.SetXYZ(200, 0, 0)
+	hostile.SetHeading(1)
+	hostile.RestoreSpawnHeadingIfAtHome()
+	if got := hostile.Heading(); got != 1 {
+		t.Fatalf("Heading() off home = %d, want unchanged 1", got)
+	}
+}
+
 func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	movement := &hostileMove{moved: make(chan location.Location, 1)}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
@@ -1114,10 +1258,12 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	hostile.SetHeading(0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if movement.home != (location.Location{X: 100, Y: 0, Z: 0}) {
+		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
 	}
 
 	select {
@@ -1142,7 +1288,6 @@ func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = true, want false for GrandBoss")
@@ -1166,7 +1311,6 @@ func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
 	hostile.Instance.Template.RunSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
 
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside drift range")
@@ -1186,11 +1330,11 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 200
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
-	hostile.AI().SetWander()
-
-	if !hostile.ReturnHome() {
-		t.Fatal("ReturnHome() = false, want true outside drift range")
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
 	}
+
 	select {
 	case <-movement.moved:
 		t.Fatal("wander recheck fired before the scaled delay")
@@ -1664,7 +1808,13 @@ func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
-	if err := minion.Think(); err != nil {
+	if err := minion.TickThink(); err != nil {
+		t.Fatal(err)
+	}
+	if err := minion.TickThink(); err != nil {
+		t.Fatal(err)
+	}
+	if err := minion.TickThink(); err != nil {
 		t.Fatal(err)
 	}
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionFollow {

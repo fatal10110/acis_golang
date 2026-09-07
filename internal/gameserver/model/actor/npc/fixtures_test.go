@@ -132,6 +132,7 @@ func (a *hostileAttack) DoAttack(target attackable.Combatant) error {
 	a.target = target
 	return nil
 }
+func (a *hostileAttack) Stop() {}
 
 // hostileEffectTarget satisfies the flee hook a Fear effect's runtime needs,
 // so it activates regardless of what its actual effected actor is.

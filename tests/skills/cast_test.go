@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -112,6 +113,130 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast rejection")
 	drainUntilQuiet(t, c)
+}
+
+// TestWalkingReuseRejectionDoesNotStopMovement recasts a long-hit-time
+// skill while the caster is still walking. Reuse is a pre-movement gate, so
+// the recast must answer with the prepared-for-reuse message and leave the
+// walk's StopMove unsent.
+func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+					HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "DUMMY",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 3, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	readCastStartFrames(t, c, objID, 3, 1, 500, 60_000, objID)
+	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	reply := c.Read()
+	if reply[0] == serverpackets.OpcodeStopMove {
+		t.Fatal("reuse rejection broadcast StopMove, want walk to continue")
+	}
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "walking recast rejection")
+}
+
+// TestSuccessfulTargetedCastStopsMovementAndFacesTarget walks the caster
+// off spawn, then starts a second walk and casts a long-hit-time targeted
+// skill before arrival. The live RequestMagicSkillUse path must stop that
+// walk and store a heading toward the non-self target before MagicSkillUse.
+func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
+	const skillID = 4
+	defs := []modelskill.Definition{
+		{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			CastRange: 600, SkillType: "DUMMY",
+		},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, defs)),
+	)
+	caster := srv.Client
+	casterID := srv.SoleObjectID(t)
+	patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
+	patient := srv.DialClient(t, "player2", 1)
+	seedKnownSkill(t, srv, casterID, int(skillID), 1)
+
+	startInWorld(t, caster)
+	startInWorldAmongPlayers(t, patient)
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	patientX, patientY, patientZ := srv.PlayerPosition(t, patientID)
+	caster.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	walk := caster.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
+	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
+	waitForPlayerPosition(t, srv, casterID, standAt)
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	px, py, pz := srv.PlayerPosition(t, patientID)
+	caster.Send(encodeAction(patientID, int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, patient)
+
+	caster.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
+
+	caster.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeStopMove, "cast stop")
+	readCastStartFrames(t, caster, casterID, skillID, 1, 500, 60_000, patientID)
+
+	casterX, casterY, casterZ := srv.PlayerPosition(t, casterID)
+	wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: patientX, Y: patientY, Z: patientZ})
+	if got := playerHeading(t, srv, casterID); got != wantHeading {
+		t.Fatalf("caster heading after successful targeted cast = %d, want %d", got, wantHeading)
+	}
+}
+
+func waitForPlayerPosition(t *testing.T, srv *gameservertest.Server, objID int32, want location.Location) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		x, y, z := srv.PlayerPosition(t, objID)
+		if x == want.X && y == want.Y && z == want.Z {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("player position after walk = (%d,%d,%d), want %+v", x, y, z, want)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func playerHeading(t *testing.T, srv *gameservertest.Server, objID int32) int {
+	t.Helper()
+	state, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("caster state missing")
+	}
+	heading, ok := state.(interface{ CurrentHeading() int })
+	if !ok {
+		t.Fatalf("caster state %T does not expose CurrentHeading", state)
+	}
+	return heading.CurrentHeading()
 }
 
 func TestCastSkillMasteryCooldownBypass(t *testing.T) {
@@ -284,6 +409,86 @@ func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
 	if !found {
 		t.Fatalf("ground-cast AbnormalStatusUpdate icons = %+v, want skill 5", icons)
 	}
+	drainUntilQuiet(t, c)
+}
+
+// TestWalkingGroundCastStopsThenValidatesLocation walks the caster off spawn,
+// then starts a second walk and casts a long-hit-time in-range ground skill
+// before arrival. StopMove must land with the pre-face heading, then
+// ValidateLocation faces the signet.
+func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
+	const skillID = 5
+	const groundX, groundY, groundZ = 1000, 2000, 300
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	walk := c.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
+	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
+	waitForPlayerPosition(t, srv, objID, standAt)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
+
+	c.Send(encodeRequestExMagicSkillUseGround(groundX, groundY, groundZ, skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "ground cast stop")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+
+	casterX, casterY, casterZ := srv.PlayerPosition(t, objID)
+	wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: groundX, Y: groundY, Z: groundZ})
+	if got := playerHeading(t, srv, objID); got != wantHeading {
+		t.Fatalf("caster heading after walking ground cast = %d, want %d", got, wantHeading)
+	}
+}
+
+// blindGeo is passable movement geo whose line-of-sight query always fails,
+// so a ground-click point is in range but occluded.
+type blindGeo struct{ gameservertest.Geo }
+
+func (blindGeo) CanSeeActor(int, int, int, float64, int, int, int, float64) bool { return false }
+
+// TestGroundCastNoLineOfSightSendsCantSeeTarget pins that an in-range ground
+// click behind terrain still emits CANT_SEE_TARGET then ActionFailed, instead
+// of collapsing to a bare ActionFailed via the nil-target path.
+func TestGroundCastNoLineOfSightSendsCantSeeTarget(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithGeo(blindGeo{}),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, StaticHitTime: true, SkillType: "SIGNET",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 5, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCantSeeTarget)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "ground LOS rejection")
 	drainUntilQuiet(t, c)
 }
 
