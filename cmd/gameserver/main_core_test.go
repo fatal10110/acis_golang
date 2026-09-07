@@ -21,7 +21,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
+	"go.uber.org/fx"
 )
+
+// TestGameServerGraphValidates checks the fx constructor graph resolves
+// without a database: every provider's dependencies are satisfied by some
+// other provider, with no missing or duplicate types. go build only proves
+// the Go code compiles, not that dig can wire it; this runs on every
+// change to newGameServerAppOptions instead of only failing at boot.
+func TestGameServerGraphValidates(t *testing.T) {
+	if err := fx.ValidateApp(newGameServerAppOptions(gameServerPaths{})...); err != nil {
+		t.Fatalf("fx graph does not resolve: %v", err)
+	}
+}
 
 func TestGameServerConfigFromProperties(t *testing.T) {
 	serverProps, err := config.ParseString(`
