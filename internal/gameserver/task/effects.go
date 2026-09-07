@@ -45,6 +45,19 @@ func (e *Effects) trackActivity(list *effect.List, active bool) {
 	}
 }
 
+// Reset clears every currently registered list without touching any list's
+// own contents or l.tracked state, so Tick visits nothing until something
+// registers again. Production never calls this — it is the mop-up
+// gameservertest runs between test servers that share one Effects instance
+// per process (see NewEffects), for whatever a test left registered
+// without a clean despawn/logout/Untrack (a spawned NPC or EffectPoint the
+// test never killed, decayed, or explicitly tore down).
+func (e *Effects) Reset() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	clear(e.entries)
+}
+
 // Start launches the fixed live-effect task.
 func (e *Effects) Start(log zerolog.Logger) *scheduler.Ticker {
 	e.log = log

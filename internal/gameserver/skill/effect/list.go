@@ -71,10 +71,21 @@ func callActivityHook(list *List, active bool) {
 // an actor leaving world.State silently dropped out of the tick scan: it
 // does not run any effect's exit hook or otherwise touch buffs/debuffs,
 // only stops future Tick calls from reaching this list.
+//
+// Like notifyActivityTransition, it decides and applies under one hold of
+// l.mu so it can't race a concurrent Add/Remove on the same list into
+// re-registering it right after Untrack deregisters it, or vice versa.
 func (l *List) Untrack() {
 	if l == nil {
 		return
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if !l.tracked {
+		return
+	}
+	l.tracked = false
 	callActivityHook(l, false)
 }
 
@@ -85,7 +96,8 @@ func (l *List) emptyLocked() bool {
 }
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, and callbacks into owner.
+// concurrent use; mu guards buffs, debuffs, stacks, tracked, and callbacks
+// into owner.
 type List struct {
 	mu sync.Mutex
 
@@ -96,6 +108,12 @@ type List struct {
 	buffs   []*Effect
 	debuffs []*Effect
 	stacks  map[string][]*Effect
+
+	// tracked records whether l is currently registered with the
+	// process-wide activity hook, so notifyActivityTransition can
+	// reconcile against l's own last-known state instead of a value a
+	// caller captured before releasing mu — see notifyActivityTransition.
+	tracked bool
 }
 
 // NewList returns an empty effect list.

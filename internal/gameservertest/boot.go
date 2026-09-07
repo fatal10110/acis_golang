@@ -744,6 +744,11 @@ func (s *Server) Shutdown(tb testing.TB) {
 		tb.Fatalf("shutdown ground-item save: %v", err)
 	}
 	s.Close()
+	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
+	// whole test function, not between two Boot calls a restart test makes
+	// within one function — reset explicitly here too, so the second
+	// Boot's Effects.Tick doesn't also carry this server's leftovers.
+	s.Effects.Reset()
 }
 
 // TickAutosave advances the harness clock past the next autosave deadline
@@ -859,6 +864,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 
 	state := world.New()
 	taskEffects := sharedTaskEffects()
+	// Registered early so it runs last (t.Cleanup is LIFO): everything
+	// else this Boot registers for cleanup — including the connection
+	// teardown that Untracks a logged-out player's effect list — gets to
+	// run first, and Reset only needs to mop up whatever a test left
+	// registered without a clean teardown (an NPC or EffectPoint the test
+	// never decayed or despawned), so the next Boot in this process starts
+	// from an empty registry instead of also ticking this test's leftovers.
+	t.Cleanup(taskEffects.Reset)
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)

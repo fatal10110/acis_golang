@@ -28,6 +28,7 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	const activeFraction = 100 // 1 in 100 carries a live effect
 
 	e := NewEffects()
+	b.Cleanup(func() { effect.SetActivityHook(nil) })
 	lists := make([]*effect.List, total)
 	for i := 0; i < total; i++ {
 		list := effect.NewList(benchNoopStatOwner{})
