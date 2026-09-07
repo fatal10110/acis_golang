@@ -60,7 +60,8 @@ func provideWorldState() *world.State {
 
 // provideGroundItems restores dropped items persisted at the previous
 // shutdown before the world starts, returning the store alongside so it can
-// be reused to persist state back at the next shutdown.
+// be reused to persist state back at the next shutdown. It deliberately
+// does not clear items_on_ground itself: see startGroundItems.
 func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
 	store := gamesql.NewGroundItemStore(pool)
 	items := task.NewGroundItems(state, opts, time.Now)
@@ -72,15 +73,28 @@ func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundIte
 	if err := items.Load(rows, data.Items); err != nil {
 		return nil, nil, err
 	}
-	if err := store.Clear(ctx); err != nil {
-		return nil, nil, err
-	}
 
 	log.Info().Int("restored_ground_items", items.Len()).Msg("ground items restored")
 	return items, store, nil
 }
 
-func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
+// startGroundItems clears the previous shutdown's items_on_ground snapshot
+// once fx confirms every constructor in the graph succeeded, then starts
+// the ticker. Clearing inside provideGroundItems instead would run even
+// when a later constructor (e.g. provideSpawns) fails: fx never runs
+// OnStart/OnStop hooks after a constructor-graph failure, since app.err
+// short-circuits both Start and Stop, so the rows would be gone with
+// nothing written back and no restart able to recover them. Clearing here
+// means a boot that fails for any reason leaves items_on_ground intact for
+// the next attempt; clearing again on a later successful boot is harmless
+// since items.Load already copied the rows into memory and the shutdown
+// hook rewrites the table wholesale.
+func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, log zerolog.Logger) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return store.Clear(ctx)
+		},
+	})
 	startTicker(lc, log, items.Start)
 }
 
