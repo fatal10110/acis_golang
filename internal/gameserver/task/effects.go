@@ -45,17 +45,34 @@ func (e *Effects) trackActivity(list *effect.List, active bool) {
 	}
 }
 
-// Reset clears every currently registered list without touching any list's
-// own contents or l.tracked state, so Tick visits nothing until something
-// registers again. Production never calls this — it is the mop-up
-// gameservertest runs between test servers that share one Effects instance
-// per process (see NewEffects), for whatever a test left registered
-// without a clean despawn/logout/Untrack (a spawned NPC or EffectPoint the
-// test never killed, decayed, or explicitly tore down).
+// Reset deregisters every currently registered list, so Tick visits
+// nothing until something registers again. Production never calls this —
+// it is the mop-up gameservertest runs between test servers that share one
+// Effects instance per process (see NewEffects), for whatever a test left
+// registered without a clean despawn/logout/Untrack (a spawned NPC or
+// EffectPoint the test never killed, decayed, or explicitly tore down).
+//
+// It goes through each list's own Untrack rather than clearing e.entries
+// directly: a list tracks its own registration state (List.tracked) so
+// notifyActivityTransition can decide+apply atomically, and a bare
+// clear(e.entries) would leave that state out of sync for any list that
+// survives the reset — the list would believe itself still registered and
+// silently refuse to re-register on its next Add. Untrack keeps the two in
+// sync by clearing List.tracked itself. The snapshot is taken and released
+// before calling Untrack, not held across the calls: Untrack ends in
+// callActivityHook -> trackActivity -> e.remove, which needs e.mu itself,
+// so calling it while still holding e.mu here would deadlock.
 func (e *Effects) Reset() {
 	e.mu.Lock()
-	defer e.mu.Unlock()
-	clear(e.entries)
+	lists := make([]*effect.List, 0, len(e.entries))
+	for list := range e.entries {
+		lists = append(lists, list)
+	}
+	e.mu.Unlock()
+
+	for _, list := range lists {
+		list.Untrack()
+	}
 }
 
 // Start launches the fixed live-effect task.

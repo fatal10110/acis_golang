@@ -111,6 +111,19 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 		t.Fatalf("Reset touched leftover's contents: %d effects, want 1", len(leftover.All()))
 	}
 
+	// leftover's owner is still alive in this scenario (Reset only fires
+	// because a *different* server tore down; this list's actor keeps
+	// playing) and lands another effect. Since leftover was already
+	// active going into Reset, this Add doesn't cross an empty->active
+	// transition on its own — the regression this guards against is
+	// Reset clearing the registry without also clearing List.tracked,
+	// which leaves a survivor believing it's still registered and makes
+	// every later Add on it a permanent no-op.
+	leftover.Add(newEffect(3))
+	if !e.contains(leftover) {
+		t.Fatal("a list that survived Reset never re-registered on its next Add")
+	}
+
 	// A fresh owner (the next test server's own NPC) must still be able to
 	// register normally: Reset must not have wedged the hook or the
 	// registry into a state that rejects further registrations.
