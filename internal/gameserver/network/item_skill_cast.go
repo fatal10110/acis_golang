@@ -1,6 +1,7 @@
 package network
 
 import (
+	"errors"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -104,9 +105,19 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		ResolveTarget: l.resolveMagicSkillTarget,
 	})
 	if err != nil {
-		if started.Rejection != skilltarget.CastRejectNone {
+		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
+			sendMagicCastFailureReason(live, started.Definition, err)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return nil, true, false
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Rejection != skilltarget.CastRejectNone {
 			sendTargetCastRejection(live, started.Rejection, started.Definition)
 			l.rejectMagicCast(live, started.Definition, started.Target)
+			return nil, true, false
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
+			sendCorpseCastFailure(live, started.Definition)
+			sendMagicActionFailed(live)
 			return nil, true, false
 		}
 		sendMagicCastFailure(live, started.Definition, err)
