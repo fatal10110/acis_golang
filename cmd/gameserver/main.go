@@ -28,6 +28,13 @@ const (
 	// budget is minutes rather than seconds: generous enough that only a
 	// genuinely hung database ever trips it, not a large but healthy one.
 	gameServerBootTimeout = 5 * time.Minute
+	// gameServerStartTimeout bounds the OnStart phase, which fx runs with one
+	// shared context across every hook: pool.PingContext, sevensigns.State's
+	// Restore, clearing the previous shutdown's items_on_ground snapshot
+	// (startGroundItems), and the game listener bind. fx's 15s default was
+	// sized before any of these touched the database; explicit and separate
+	// from gameServerBootTimeout so this budget can be tuned on its own.
+	gameServerStartTimeout = 30 * time.Second
 )
 
 // bootContext is the constructor-time I/O deadline. Named so fx cannot inject
@@ -85,6 +92,7 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 	return []fx.Option{
 		fx.StopTimeout(gameServerStopTimeout),
+		fx.StartTimeout(gameServerStartTimeout),
 		fx.Supply(paths),
 		fx.Provide(
 			provideBootContext,
