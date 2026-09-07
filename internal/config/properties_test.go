@@ -73,9 +73,9 @@ func TestOptionalInt(t *testing.T) {
 	}
 
 	var output bytes.Buffer
-	previous := log.Logger
-	log.Logger = zerolog.New(&output)
-	t.Cleanup(func() { log.Logger = previous })
+	previous := warnLog.Load()
+	SetLogger(zerolog.New(&output))
+	t.Cleanup(func() { warnLog.Store(previous) })
 
 	if n, ok, err := p.OptionalInt("Absent"); n != 0 || ok || err != nil {
 		t.Errorf("OptionalInt(absent) = (%d, %v, %v), want (0, false, nil)", n, ok, err)
