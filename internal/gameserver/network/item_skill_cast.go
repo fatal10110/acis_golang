@@ -1,10 +1,12 @@
 package network
 
 import (
+	"errors"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -55,7 +57,7 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		}
 		selected := live.Target()
 		if run != nil || itemAICastBusy(live) {
-			if _, ok := actorcast.SelectTarget(live.Character, selected, def); !ok {
+			if target, _ := l.resolveMagicSkillTarget(live.Character, selected, def, false); target == nil {
 				sendMagicActionFailed(live)
 				continue
 			}
@@ -101,10 +103,26 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
 		Definitions: l.skills,
 		Hooks: actorcast.StartHooks{
-			StopMovement: l.stopMovementForCast(live),
+			ResolveTarget: l.resolveMagicSkillTarget,
+			StopMovement:  l.stopMovementForCast(live),
 		},
 	})
 	if err != nil {
+		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
+			sendMagicCastFailureReason(live, started.Definition, err)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return nil, true, false
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Rejection != skilltarget.CastRejectNone {
+			sendTargetCastRejection(live, started.Rejection, started.Definition)
+			l.rejectMagicCast(live, started.Definition, started.Target)
+			return nil, true, false
+		}
+		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
+			sendCorpseCastFailure(live, started.Definition)
+			sendMagicActionFailed(live)
+			return nil, true, false
+		}
 		sendMagicCastFailure(live, started.Definition, err)
 		return nil, true, false
 	}

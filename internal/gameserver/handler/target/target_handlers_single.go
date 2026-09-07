@@ -53,8 +53,7 @@ func (holyHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Cre
 }
 
 func (holyHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
-	holy, ok := target.(HolyTarget)
-	return ok && holy.Holy()
+	return target != nil && holyCastRejection(target) == CastRejectNone
 }
 
 type unlockableHandler struct{}
@@ -70,8 +69,7 @@ func (unlockableHandler) FinalTarget(_, target Creature, _ *modelskill.Definitio
 }
 
 func (unlockableHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
-	unlockable, ok := target.(UnlockableTarget)
-	return ok && unlockable.Unlockable()
+	return target != nil && unlockableCastRejection(target) == CastRejectNone
 }
 
 type undeadHandler struct{}

@@ -739,6 +739,9 @@ func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 	if holy.CanCast(caster, lockedDoor, skill, false) {
 		t.Fatal("holy CanCast on non-holy target = true, want false")
 	}
+	if holy.CanCast(caster, nil, skill, false) {
+		t.Fatal("holy CanCast on nil target = true, want false")
+	}
 
 	unlockable := mustHandler(t, registry, modelskill.TargetUnlockable)
 	if got := unlockable.FinalTarget(caster, unlockableDoor, skill); got != unlockableDoor {
@@ -752,6 +755,9 @@ func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 	}
 	if unlockable.CanCast(caster, lockedDoor, skill, false) {
 		t.Fatal("unlockable CanCast on locked target = true, want false")
+	}
+	if unlockable.CanCast(caster, nil, skill, false) {
+		t.Fatal("unlockable CanCast on nil target = true, want false")
 	}
 
 	undead := mustHandler(t, registry, modelskill.TargetUndead)
