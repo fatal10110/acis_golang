@@ -34,31 +34,40 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 		if target == nil {
 			return CastRejectNone
 		}
-		holy, ok := target.(HolyTarget)
-		if !ok || !holy.Holy() {
-			return CastRejectInvalidTarget
-		}
+		return holyCastRejection(target)
 	case modelskill.TargetUnlockable:
 		if target == nil {
 			return CastRejectNone
 		}
-		unlockable, ok := target.(UnlockableTarget)
-		if !ok {
-			return CastRejectInvalidTarget
-		}
-		if unlockable.Unlockable() {
-			return CastRejectNone
-		}
-		if door, ok := target.(DoorTarget); ok && door.Door() {
-			return CastRejectSilent
-		}
-		return CastRejectInvalidTarget
+		return unlockableCastRejection(target)
 	case modelskill.TargetCorpsePlayer:
 		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
 		return corpsePetCastRejection(target)
 	}
 	return CastRejectNone
+}
+
+func holyCastRejection(target Creature) CastRejection {
+	holy, ok := target.(HolyTarget)
+	if !ok || !holy.Holy() {
+		return CastRejectInvalidTarget
+	}
+	return CastRejectNone
+}
+
+func unlockableCastRejection(target Creature) CastRejection {
+	unlockable, ok := target.(UnlockableTarget)
+	if !ok {
+		return CastRejectInvalidTarget
+	}
+	if unlockable.Unlockable() {
+		return CastRejectNone
+	}
+	if door, ok := target.(DoorTarget); ok && door.Door() {
+		return CastRejectSilent
+	}
+	return CastRejectInvalidTarget
 }
 
 func oneCastRejection(caster, target Creature, skill *modelskill.Definition, ctrl bool) CastRejection {
