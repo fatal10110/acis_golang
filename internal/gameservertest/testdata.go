@@ -124,6 +124,9 @@ func duelistTemplate() *player.Template {
 // only way to drive the later-skill next-intention path.
 const TwoSkillScrollID int32 = 9700
 
+// UnlockableKeyID is a non-potion ItemSkills fixture for target-validation tests.
+const UnlockableKeyID int32 = 9701
+
 // ItemTemplates builds the item catalog shared by the behavior suites: adena,
 // potions, shots, a weapon, crystals, enchant scrolls, escape scrolls, quest
 // and summon items.
@@ -355,6 +358,16 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2014, Level: 1}, {ID: 2015, Level: 1}},
+		},
+		{
+			ID:             UnlockableKeyID,
+			Name:           "Unlockable Key",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2236, Level: 1}},
 		},
 		{
 			ID:        9001,
