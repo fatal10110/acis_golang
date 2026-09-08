@@ -17,9 +17,36 @@ import (
 const (
 	// ItemInstanceTick is the fixed cadence for lazy item persistence.
 	ItemInstanceTick = time.Minute
-	// ItemInstanceSaveTimeout bounds one persistence flush so a hung DB
-	// cannot wedge the ticker, and then shutdown's StopAndWait, indefinitely.
+	// ItemInstanceSaveTimeout bounds one Save call: both the periodic
+	// tick's outer ctx (Start) and the shutdown hook's outer ctx
+	// (cmd/gameserver/tasks.go) wrap with this same constant, and Save
+	// gives each chunk its own fresh budget derived from it (see Save) so
+	// a hung DB cannot wedge the ticker, and then shutdown's StopAndWait,
+	// past this bound.
+	//
+	// This is a real coupling, not just a shared default: raising it to
+	// give a chunk more room also raises how long the ticker's OnStop hook
+	// can block (scheduler.Ticker.StopAndWait has no ctx of its own — see
+	// Start) inside cmd/gameserver's gameServerStopTimeout budget for the
+	// whole shutdown sequence. cmd/gameserver/main_core_test.go pins
+	// ItemInstanceSaveTimeout staying comfortably under that budget;
+	// check it before changing either constant.
 	ItemInstanceSaveTimeout = 10 * time.Second
+	// ItemInstanceSaveChunkSize bounds how many items one Save transaction
+	// covers. Save commits chunks independently, so a batch that grew past
+	// what fits in one ItemInstanceSaveTimeout window still makes monotonic
+	// progress each tick instead of retrying the whole thing and never
+	// converging (see the constant's use in Save).
+	//
+	// No measured per-item write cost backs this number (same caveat as
+	// itemFlushChunkSize in data/sql/itemflush.go, which bounds placeholder
+	// count rather than time and so doesn't need one). It is kept well
+	// below what a full chunk's worth of rows could plausibly take inside
+	// ItemInstanceSaveTimeout, so that a degraded-but-not-hung DB has room
+	// to actually commit a chunk rather than losing the whole ceiling to a
+	// transaction that was too big to ever finish in time; see Save's doc
+	// for the residual risk this doesn't remove.
+	ItemInstanceSaveChunkSize = 100
 )
 
 // ItemFlusher atomically persists one flush batch: either every change in
@@ -56,7 +83,16 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances
 	}
 }
 
-// Start launches the fixed item persistence task.
+// Start launches the fixed item persistence task. The tick's outer ctx is
+// bounded by ItemInstanceSaveTimeout, the same constant the shutdown hook
+// uses (cmd/gameserver/tasks.go) — not a longer, tick-only ceiling: this
+// budget also bounds how long the ticker's own OnStop can block a shutdown
+// in progress (scheduler.Ticker.StopAndWait has no ctx of its own, so it
+// simply waits for whatever Save call is currently in flight), and that
+// wait has to fit inside cmd/gameserver's gameServerStopTimeout alongside
+// every other stop hook, including the final Save. A longer per-tick
+// budget would drain more of a backlog per tick, but only by taking that
+// same risk away from shutdown; see ItemInstanceSaveTimeout's doc.
 func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(ItemInstanceTick, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), ItemInstanceSaveTimeout)
@@ -107,12 +143,54 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	}
 }
 
-// Save flushes every pending item. The pending map is swapped out before
-// the flush so a concurrent Add during I/O lands in the new map and is not
-// dropped when the flush succeeds. UpdateItems is all-or-nothing; on error
-// inflight ids are merged back so the next tick or shutdown flush retries
-// them, except ids RemoveItems dropped during the flush — those already got
-// their own successful write and must not be resurrected.
+// Save flushes every pending item in chunks of at most
+// ItemInstanceSaveChunkSize, each committed by its own UpdateItems call
+// under its own fresh ItemInstanceSaveTimeout (bounded by whatever remains
+// of ctx). The pending map is swapped out before the flush so a concurrent
+// Add during I/O lands in the new map and is not dropped when the flush
+// succeeds. Chunking makes progress monotonic: a batch that has grown past
+// what one ItemInstanceSaveTimeout window can write still gets its earlier
+// chunks committed, and only the chunks that failed or were never attempted
+// (ctx already expired) go back to pending. A single unbounded flush would
+// retry the whole growing batch every tick and never converge. On error,
+// ids RemoveItems dropped during the flush are not merged back — those
+// already got their own successful write and must not be resurrected.
+//
+// Save no longer gives callers UpdateItems's whole-batch atomicity: two
+// items that must land together (e.g. both legs of a trade reaching pending
+// through itemcontainer's SetItemPersister hook) can now fall on either
+// side of a chunk boundary and commit, or fail, independently. This
+// narrows what a Save tick previously promised, but not past what the
+// Java reference already does: ItemInstanceTaskManager.updateItems commits
+// five sequential executeBatch calls on an autocommit connection with no
+// transaction at all, so per-statement partial visibility on error is
+// already the oracle's behavior, at a finer grain than one chunk here.
+// flushItemPersistence (network/lifecycle.go) is the caller that still
+// needs, and gets, whole-container atomicity: it calls UpdateItems
+// directly for one container's items, bypassing Save's chunking entirely.
+//
+// items is sorted by ObjectID before chunking purely to fix which items
+// land in which chunk deterministically (tests rely on this); it is not an
+// ordering guarantee for callers and must not be read as a write-priority
+// policy.
+//
+// Residual risk this does not remove: ItemInstanceSaveChunkSize and
+// ItemInstanceSaveTimeout are a fixed, unmeasured size:time ratio. A chunk
+// whose real write cost exceeds that ratio still fails every attempt at
+// that size, the same way the pre-chunking flush did at the whole-batch
+// size — chunking only lowers how much of one tick's ItemInstanceSaveTimeout
+// budget such a chunk can waste, it does not guarantee any given chunk fits
+// its budget.
+//
+// One Save call's total DB-write time is still capped near
+// ItemInstanceSaveTimeout, same as before chunking existed — chunking buys
+// smaller, independently-committing units inside that one window, not a
+// bigger window. A backlog that needs more than that per tick still only
+// drains it gradually, one tick's worth at a time. Widening the per-tick
+// budget itself needs the flush to be cancelable when shutdown starts
+// (today's Start/StopAndWait pair cannot do that — see Start's doc); until
+// that exists, a longer per-tick ceiling would trade shutdown safety for
+// throughput instead of buying both.
 //
 // Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
 // not expected. The shutdown hook is appended before the ticker's, so fx's
@@ -128,30 +206,57 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	for _, inst := range inflight {
 		items = append(items, inst)
 	}
-	err := i.UpdateItems(ctx, items)
+	// Fixes chunk boundaries so they don't depend on map iteration order;
+	// see the chunk-boundary note above.
+	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+
+	var firstErr error
+	failed := make([]*item.Instance, 0)
+	for chunk := range slices.Chunk(items, ItemInstanceSaveChunkSize) {
+		if ctx.Err() != nil {
+			failed = append(failed, chunk...)
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			continue
+		}
+		chunkCtx, cancel := context.WithTimeout(ctx, ItemInstanceSaveTimeout)
+		err := i.UpdateItems(chunkCtx, chunk)
+		cancel()
+		if err != nil {
+			failed = append(failed, chunk...)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
 
 	i.mu.Lock()
 	removed := i.removedInflight
 	i.removedInflight = nil
-	if err != nil {
-		for id, inst := range inflight {
-			if _, wasRemoved := removed[id]; wasRemoved {
-				continue
-			}
-			if _, ok := i.pending[id]; !ok {
-				i.pending[id] = inst
-			}
+	for _, inst := range failed {
+		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
+			continue
+		}
+		if _, ok := i.pending[inst.ObjectID]; !ok {
+			i.pending[inst.ObjectID] = inst
 		}
 	}
 	i.mu.Unlock()
 
-	return err
+	return firstErr
 }
 
 // UpdateItems persists the provided item instances immediately, as one
 // atomic flush: either every row lands, or, on error, none of them do. A
 // non-nil error means nothing was written, so callers must keep their
 // items pending for a retry rather than dropping them.
+//
+// This per-call guarantee is unchanged by Save's chunking (Save simply
+// calls UpdateItems once per chunk); network.flushItemPersistence relies on
+// it directly, calling UpdateItems for one container's items outside of
+// Save, and needs it to stay whole-batch atomic. Do not chunk that call
+// site too without checking its callers still get what they need.
 func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance) error {
 	if len(items) == 0 {
 		return nil
