@@ -62,25 +62,16 @@ func (r *registry) get(key int32) (worldobject.Object, bool) {
 	return obj, ok
 }
 
-func (r *registry) all() []worldobject.Object {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]worldobject.Object, 0, len(r.entries))
-	for _, obj := range r.entries {
-		out = append(out, obj)
-	}
-	return out
-}
-
-// appendAll copies every tracked object onto dst and returns the extended
-// slice, reusing dst's backing array instead of allocating a fresh one. A
-// caller that keeps dst across repeat calls (e.g. a per-tick scratch buffer
-// owned by a single goroutine) pays the allocation only until the buffer's
-// capacity stabilizes at the tracked population size.
+// appendAll appends every tracked object to dst and returns the extended
+// slice, matching Region.AppendObjects' append (not replace) contract: the
+// caller truncates first (dst[:0]) if it wants a fresh scan rather than an
+// accumulation. A caller that keeps dst across repeat calls (e.g. a
+// per-tick scratch buffer owned by a single goroutine) pays the allocation
+// only until the buffer's capacity stabilizes at the tracked population
+// size.
 func (r *registry) appendAll(dst []worldobject.Object) []worldobject.Object {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	dst = dst[:0]
 	for _, obj := range r.entries {
 		dst = append(dst, obj)
 	}
