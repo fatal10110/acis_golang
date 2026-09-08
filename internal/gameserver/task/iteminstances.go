@@ -17,11 +17,20 @@ import (
 const (
 	// ItemInstanceTick is the fixed cadence for lazy item persistence.
 	ItemInstanceTick = time.Minute
-	// ItemInstanceSaveTimeout bounds one chunk's persistence transaction
-	// (see ItemInstanceSaveChunkSize) so a hung DB cannot wedge the ticker,
-	// and then shutdown's StopAndWait, indefinitely. Save gives each chunk
-	// its own fresh ItemInstanceSaveTimeout budget rather than sharing one
-	// deadline across the whole flush.
+	// ItemInstanceSaveTimeout bounds one Save call: both the periodic
+	// tick's outer ctx (Start) and the shutdown hook's outer ctx
+	// (cmd/gameserver/tasks.go) wrap with this same constant, and Save
+	// gives each chunk its own fresh budget derived from it (see Save) so
+	// a hung DB cannot wedge the ticker, and then shutdown's StopAndWait,
+	// past this bound.
+	//
+	// This is a real coupling, not just a shared default: raising it to
+	// give a chunk more room also raises how long the ticker's OnStop hook
+	// can block (scheduler.Ticker.StopAndWait has no ctx of its own — see
+	// Start) inside cmd/gameserver's gameServerStopTimeout budget for the
+	// whole shutdown sequence. cmd/gameserver/main_core_test.go pins
+	// ItemInstanceSaveTimeout staying comfortably under that budget;
+	// check it before changing either constant.
 	ItemInstanceSaveTimeout = 10 * time.Second
 	// ItemInstanceSaveChunkSize bounds how many items one Save transaction
 	// covers. Save commits chunks independently, so a batch that grew past
@@ -38,15 +47,6 @@ const (
 	// transaction that was too big to ever finish in time; see Save's doc
 	// for the residual risk this doesn't remove.
 	ItemInstanceSaveChunkSize = 100
-	// itemInstanceSaveTickCeiling bounds one periodic Save call (see Start)
-	// so a backlog that needs many chunks can use most of the tick period
-	// to drain — not just ItemInstanceSaveTimeout's single chunk budget —
-	// while still returning in bounded time: an unbounded Save would let a
-	// large-enough backlog block the next tick, and shutdown's StopAndWait,
-	// indefinitely, the exact wedge ItemInstanceSaveTimeout exists to
-	// prevent. The shutdown flush keeps its own, shorter, explicit budget
-	// (cmd/gameserver/tasks.go) rather than this one.
-	itemInstanceSaveTickCeiling = ItemInstanceTick
 )
 
 // ItemFlusher atomically persists one flush batch: either every change in
@@ -83,13 +83,19 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances
 	}
 }
 
-// Start launches the fixed item persistence task. The tick's own budget is
-// itemInstanceSaveTickCeiling, not ItemInstanceSaveTimeout: Save spends that
-// budget across as many freshly-timed chunks as fit, rather than one shared
-// ItemInstanceSaveTimeout window for the whole flush.
+// Start launches the fixed item persistence task. The tick's outer ctx is
+// bounded by ItemInstanceSaveTimeout, the same constant the shutdown hook
+// uses (cmd/gameserver/tasks.go) — not a longer, tick-only ceiling: this
+// budget also bounds how long the ticker's own OnStop can block a shutdown
+// in progress (scheduler.Ticker.StopAndWait has no ctx of its own, so it
+// simply waits for whatever Save call is currently in flight), and that
+// wait has to fit inside cmd/gameserver's gameServerStopTimeout alongside
+// every other stop hook, including the final Save. A longer per-tick
+// budget would drain more of a backlog per tick, but only by taking that
+// same risk away from shutdown; see ItemInstanceSaveTimeout's doc.
 func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(ItemInstanceTick, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), itemInstanceSaveTickCeiling)
+		ctx, cancel := context.WithTimeout(context.Background(), ItemInstanceSaveTimeout)
 		defer cancel()
 		if err := i.Save(ctx); err != nil {
 			log.Error().Err(err).Msg("task: save item instances")
@@ -172,8 +178,19 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // ItemInstanceSaveTimeout are a fixed, unmeasured size:time ratio. A chunk
 // whose real write cost exceeds that ratio still fails every attempt at
 // that size, the same way the pre-chunking flush did at the whole-batch
-// size — chunking only lowers how much of the tick's throughput one such
-// chunk can waste, it does not guarantee any given chunk fits its budget.
+// size — chunking only lowers how much of one tick's ItemInstanceSaveTimeout
+// budget such a chunk can waste, it does not guarantee any given chunk fits
+// its budget.
+//
+// One Save call's total DB-write time is still capped near
+// ItemInstanceSaveTimeout, same as before chunking existed — chunking buys
+// smaller, independently-committing units inside that one window, not a
+// bigger window. A backlog that needs more than that per tick still only
+// drains it gradually, one tick's worth at a time. Widening the per-tick
+// budget itself needs the flush to be cancelable when shutdown starts
+// (today's Start/StopAndWait pair cannot do that — see Start's doc); until
+// that exists, a longer per-tick ceiling would trade shutdown safety for
+// throughput instead of buying both.
 //
 // Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
 // not expected. The shutdown hook is appended before the ticker's, so fx's

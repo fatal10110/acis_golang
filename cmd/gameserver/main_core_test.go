@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
@@ -933,5 +934,29 @@ func TestLogUnsupportedSkillEffectsStaysQuietForAnUnresolvedTableName(t *testing
 
 	if got := buf.String(); got != "" {
 		t.Fatalf("log output = %q, want no warning for the #1516 unresolved-table-name defect", got)
+	}
+}
+
+// TestItemInstanceSaveTimeoutFitsShutdownBudget pins a coupling that has no
+// compiler-visible link between the two constants: startItemInstances
+// (tasks.go) wraps both the periodic tick's ctx and the shutdown hook's ctx
+// with task.ItemInstanceSaveTimeout, and scheduler.Ticker.StopAndWait has
+// no ctx of its own, so the ticker's OnStop hook can block a shutdown for
+// up to that long waiting on an in-flight tick. That wait, plus the
+// shutdown hook's own ItemInstanceSaveTimeout-bounded final Save, plus
+// whatever every earlier stop hook takes, all have to fit inside
+// gameServerStopTimeout — fx aborts any stop hook it hasn't started yet the
+// moment that budget is gone (go.uber.org/fx's Stop loop checks ctx.Err()
+// before each hook), so a shutdown that runs out of budget mid-sequence
+// drops the remaining hooks, including the final item save, rather than
+// running them late. Raising ItemInstanceSaveTimeout without raising
+// gameServerStopTimeout (or vice versa) would silently reopen that gap.
+func TestItemInstanceSaveTimeoutFitsShutdownBudget(t *testing.T) {
+	if task.ItemInstanceSaveTimeout >= gameServerStopTimeout {
+		t.Fatalf("task.ItemInstanceSaveTimeout (%s) >= gameServerStopTimeout (%s): "+
+			"the ticker's OnStop can block that long with no ctx of its own, leaving no "+
+			"room for the other stop hooks (including the final item-instance save) "+
+			"before fx's Stop loop starts refusing to run them",
+			task.ItemInstanceSaveTimeout, gameServerStopTimeout)
 	}
 }
