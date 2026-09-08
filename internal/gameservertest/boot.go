@@ -51,6 +51,25 @@ import (
 // HexID is the fixed server hex id every booted server registers under.
 var HexID = []byte{0x01, 0x02, 0x03, 0x04}
 
+// sharedEffects is the one task.Effects instance every Boot in this test
+// binary reuses. effect.SetActivityHook is a process-wide registrar: a
+// fresh instance per Boot would make each new server silently steal every
+// later effect.List registration away from servers already running in the
+// same process (see effect.SetActivityHook). Test servers only ever run
+// sequentially in this package, and each Boot's t.Cleanup tears its
+// connections down (triggering the network-layer Despawn/Untrack path)
+// before the next Boot runs, so one shared instance never mixes live
+// registrations from two servers at once.
+var (
+	sharedEffectsOnce sync.Once
+	sharedEffects     *task.Effects
+)
+
+func sharedTaskEffects() *task.Effects {
+	sharedEffectsOnce.Do(func() { sharedEffects = task.NewEffects() })
+	return sharedEffects
+}
+
 // Option customizes Boot.
 type Option func(*options)
 
@@ -288,6 +307,7 @@ type Server struct {
 	GroundItems      *task.GroundItems
 	ShadowItems      *task.ShadowItems
 	AttackStance     *task.AttackStance
+	Effects          *task.Effects
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -724,6 +744,11 @@ func (s *Server) Shutdown(tb testing.TB) {
 		tb.Fatalf("shutdown ground-item save: %v", err)
 	}
 	s.Close()
+	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
+	// whole test function, not between two Boot calls a restart test makes
+	// within one function — reset explicitly here too, so the second
+	// Boot's Effects.Tick doesn't also carry this server's leftovers.
+	s.Effects.Reset()
 }
 
 // TickAutosave advances the harness clock past the next autosave deadline
@@ -838,6 +863,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(func() { loginLink.Close() })
 
 	state := world.New()
+	taskEffects := sharedTaskEffects()
+	// Registered early so it runs last (t.Cleanup is LIFO): everything
+	// else this Boot registers for cleanup — including the connection
+	// teardown that Untracks a logged-out player's effect list — gets to
+	// run first, and Reset only needs to mop up whatever a test left
+	// registered without a clean teardown (an NPC or EffectPoint the test
+	// never decayed or despawned), so the next Boot in this process starts
+	// from an empty registry instead of also ticking this test's leftovers.
+	t.Cleanup(taskEffects.Reset)
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)
@@ -1053,6 +1087,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GroundItems:      groundItems,
 		ShadowItems:      shadowItems,
 		AttackStance:     attackStance,
+		Effects:          taskEffects,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,

@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"sync/atomic"
 )
 
 type StatOwner interface {
@@ -37,8 +38,66 @@ func WithCancelLesser(cancel bool) Option {
 	}
 }
 
+// activityHook is the process-wide registrar of lists that currently hold at
+// least one effect, wired once at boot (task.Effects) before any List is
+// constructed. It lets the periodic effect tick iterate only lists with
+// something to tick instead of scanning every tracked world object every
+// second. A nil hook (tests, tools that never call SetActivityHook) leaves
+// Add/Remove exactly as before.
+//
+// Stored behind an atomic.Pointer because Add/Remove/Untrack read it from
+// every goroutine that applies an effect, concurrently with SetActivityHook
+// being called from whichever goroutine boots the process (or, in tests,
+// boots a server).
+var activityHook atomic.Pointer[func(list *List, active bool)]
+
+// SetActivityHook installs the process-wide list-activity registrar.
+func SetActivityHook(hook func(list *List, active bool)) {
+	activityHook.Store(&hook)
+}
+
+// callActivityHook invokes the installed activity hook, if any.
+func callActivityHook(list *List, active bool) {
+	if hook := activityHook.Load(); hook != nil && *hook != nil {
+		(*hook)(list, active)
+	}
+}
+
+// Untrack unconditionally deregisters l from the process-wide activity
+// registry, regardless of whether it currently holds an effect. Call it
+// when l's owner leaves the world for good (logout, NPC decay, unsummon,
+// signet expiry) so a list that still holds an effect doesn't keep ticking
+// a detached actor forever. This mirrors the pre-registry behavior, where
+// an actor leaving world.State silently dropped out of the tick scan: it
+// does not run any effect's exit hook or otherwise touch buffs/debuffs,
+// only stops future Tick calls from reaching this list.
+//
+// Like notifyActivityTransition, it decides and applies under one hold of
+// l.mu so it can't race a concurrent Add/Remove on the same list into
+// re-registering it right after Untrack deregisters it, or vice versa.
+func (l *List) Untrack() {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if !l.tracked {
+		return
+	}
+	l.tracked = false
+	callActivityHook(l, false)
+}
+
+// emptyLocked reports whether l currently holds no buff or debuff. Caller
+// must hold l.mu.
+func (l *List) emptyLocked() bool {
+	return len(l.buffs) == 0 && len(l.debuffs) == 0
+}
+
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, and callbacks into owner.
+// concurrent use; mu guards buffs, debuffs, stacks, tracked, and callbacks
+// into owner.
 type List struct {
 	mu sync.Mutex
 
@@ -49,6 +108,12 @@ type List struct {
 	buffs   []*Effect
 	debuffs []*Effect
 	stacks  map[string][]*Effect
+
+	// tracked records whether l is currently registered with the
+	// process-wide activity hook, so notifyActivityTransition can
+	// reconcile against l's own last-known state instead of a value a
+	// caller captured before releasing mu — see notifyActivityTransition.
+	tracked bool
 }
 
 // NewList returns an empty effect list.

@@ -73,7 +73,17 @@ func (s *State) RemoveObjects(ids []int32) { s.objects.removeAll(ids) }
 func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.get(id) }
 
 // Objects returns a snapshot of every tracked object.
-func (s *State) Objects() []worldobject.Object { return s.objects.all() }
+func (s *State) Objects() []worldobject.Object { return s.AppendObjects(nil) }
+
+// AppendObjects appends every tracked object to dst and returns the
+// extended slice, matching Region.AppendObjects' append (not replace)
+// contract — pass dst[:0] for a fresh scan. A caller that keeps dst across
+// repeat calls (e.g. a per-tick scratch buffer owned by a single
+// goroutine) pays the allocation only until the buffer's capacity
+// stabilizes at the tracked population size.
+func (s *State) AppendObjects(dst []worldobject.Object) []worldobject.Object {
+	return s.objects.appendAll(dst)
+}
 
 // AddPlayer marks obj online, unless a player with the same id is already
 // tracked, and indexes its name for PlayerByName lookups. The registry and
@@ -127,7 +137,7 @@ func (s *State) PlayerByName(name string) (worldobject.Object, bool) {
 }
 
 // Players returns a snapshot of every online player.
-func (s *State) Players() []worldobject.Object { return s.players.all() }
+func (s *State) Players() []worldobject.Object { return s.players.appendAll(nil) }
 
 // AddPet marks pet as ownerID's active pet, unless that owner already has
 // one tracked.

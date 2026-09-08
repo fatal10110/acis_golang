@@ -1,6 +1,7 @@
 package world
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -62,12 +63,28 @@ func (r *registry) get(key int32) (worldobject.Object, bool) {
 	return obj, ok
 }
 
-func (r *registry) all() []worldobject.Object {
+// appendAll appends every tracked object to dst and returns the extended
+// slice, matching Region.AppendObjects' append (not replace) contract: the
+// caller truncates first (dst[:0]) if it wants a fresh scan rather than an
+// accumulation. A caller that keeps dst across repeat calls (e.g. a
+// per-tick scratch buffer owned by a single goroutine) pays the allocation
+// only until the buffer's capacity stabilizes at the tracked population
+// size.
+//
+// slices.Grow reserves capacity for the whole scan up front instead of
+// letting append's doubling growth reallocate and copy repeatedly as dst
+// crosses each power-of-two boundary — the difference between one
+// allocation and ~log2(len(r.entries)) of them for a nil or undersized
+// dst (State.Objects and State.Players both call this with nil). It is a
+// no-op once dst already has enough spare capacity, so a reused scratch
+// buffer that has already grown to the population size stays at 0
+// allocations.
+func (r *registry) appendAll(dst []worldobject.Object) []worldobject.Object {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	out := make([]worldobject.Object, 0, len(r.entries))
+	dst = slices.Grow(dst, len(r.entries))
 	for _, obj := range r.entries {
-		out = append(out, obj)
+		dst = append(dst, obj)
 	}
-	return out
+	return dst
 }

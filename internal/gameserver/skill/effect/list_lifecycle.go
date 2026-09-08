@@ -45,6 +45,7 @@ func (l *List) Add(e *Effect) {
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
+	l.notifyActivityTransition()
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -60,6 +61,47 @@ func (l *List) Remove(e *Effect) {
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
+	l.notifyActivityTransition()
+}
+
+// notifyActivityTransition reconciles l's recorded registration state
+// (l.tracked) against its actual current emptiness and calls the activity
+// hook if they disagree, in one critical section under l.mu.
+//
+// It is called after runHooks has already run, rather than deciding the
+// transition immediately after add/remove: a queued OnStart hook can still
+// reject the effect (removeFromVisible), draining a list that looked
+// active right back to empty before the caller returns. Reading the
+// settled state here means a rejected effect never registers a phantom
+// empty list, and a hook that reactivates a stack member never
+// deregisters a list that's actually still live.
+//
+// Comparing against l.tracked instead of a wasEmpty value the caller
+// captured before releasing mu — and calling the hook without releasing
+// mu in between — matters because Add and Remove run concurrently on the
+// same list in the ordinary case (Effects.Tick draining an expiring
+// effect on its own goroutine while a skill lands a new one on another).
+// Two independently-locked "decide, then apply" halves can interleave so
+// the later apply overwrites the earlier one's registry state with a
+// stale decision, permanently registering an empty list or, worse,
+// leaving a live one unregistered forever. Deciding and applying inside
+// one lock hold serializes concurrent transitions through l.mu itself, so
+// whichever call enters second always reconciles against the first call's
+// already-applied result instead of a snapshot taken before it ran.
+// callActivityHook only takes the registry's own separate mutex and never
+// re-enters List, so calling it here does not risk l.mu deadlocking
+// against itself — but it does establish an l.mu -> registry.mu lock
+// order that any future caller on the registry side must not invert.
+func (l *List) notifyActivityTransition() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	active := !l.emptyLocked()
+	if active == l.tracked {
+		return
+	}
+	l.tracked = active
+	callActivityHook(l, active)
 }
 
 // StopByType removes every active effect of the given type, running each

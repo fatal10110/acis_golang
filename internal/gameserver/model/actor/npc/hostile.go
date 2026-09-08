@@ -811,6 +811,11 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	if worldState != nil {
 		worldState.Despawn(h)
 	}
+	// Stop the periodic effect sweep from reaching this corpse's list: it
+	// left the world above, but a buff/debuff that persists through death
+	// (StopAllExceptThoseThatLastThroughDeath is player-only) would
+	// otherwise keep the list registered with task.Effects forever.
+	h.EffectList().Untrack()
 	if respawn != nil {
 		respawn()
 	}
