@@ -14,7 +14,7 @@ import (
 )
 
 type soulCrystalFile struct {
-	Crystals []soulCrystalElement `xml:"crystals>crystal"`
+	Crystals []soulCrystalElement    `xml:"crystals>crystal"`
 	NPCs     []soulCrystalNPCElement `xml:"npcs>npc"`
 }
 

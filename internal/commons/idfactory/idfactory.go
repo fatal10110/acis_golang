@@ -146,7 +146,12 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 
 // cleanup runs the boot-time database repair pass. Each statement is
 // independent: one failing (a table that doesn't exist yet, a transient
-// lock) is logged at warn and the rest still run.
+// lock) is logged at warn and the rest still run. ctx expiring mid-pass is
+// not one of those independent per-statement failures: every remaining
+// ExecContext would fail the same way, and running them anyway would bury
+// the boot-deadline cause under one warn line per statement plus whatever
+// unrelated error loadUsedIDs surfaces next. So each stage checks ctx.Err()
+// once before starting and stops the whole pass there instead.
 func (a *Allocator) cleanup(ctx context.Context, db *sql.DB) {
 	cleanCount := int64(0)
 
@@ -159,6 +164,10 @@ func (a *Allocator) cleanup(ctx context.Context, db *sql.DB) {
 	a.log.Info().Msg("idfactory: updated characters online status")
 
 	for _, stmt := range orphanCleanupStatements {
+		if ctx.Err() != nil {
+			a.log.Warn().Err(ctx.Err()).Msg("idfactory: boot deadline hit during orphan cleanup, skipping remaining statements")
+			return
+		}
 		res, err := db.ExecContext(ctx, stmt)
 		if err != nil {
 			a.log.Warn().Err(err).Str("statement", stmt).Msg("idfactory: couldn't cleanup database row orphans")
@@ -167,12 +176,20 @@ func (a *Allocator) cleanup(ctx context.Context, db *sql.DB) {
 		logRowsAffected(res, &cleanCount)
 	}
 	for _, stmt := range orphanRepairStatements {
+		if ctx.Err() != nil {
+			a.log.Warn().Err(ctx.Err()).Msg("idfactory: boot deadline hit during orphan repair, skipping remaining statements")
+			return
+		}
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
 			a.log.Warn().Err(err).Str("statement", stmt).Msg("idfactory: couldn't repair database orphans")
 		}
 	}
 	a.log.Info().Int64("cleaned", cleanCount).Msg("idfactory: cleaned elements from database")
 
+	if ctx.Err() != nil {
+		a.log.Warn().Err(ctx.Err()).Msg("idfactory: boot deadline hit before expired-timestamp cleanup, skipping")
+		return
+	}
 	res, err = db.ExecContext(ctx, "DELETE FROM character_skills_save WHERE restore_type = 1 AND systime <= ?", time.Now().UnixMilli())
 	if err != nil {
 		a.log.Warn().Err(err).Msg("idfactory: couldn't cleanup expired timestamps")

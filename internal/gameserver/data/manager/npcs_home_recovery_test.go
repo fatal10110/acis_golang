@@ -18,7 +18,7 @@ import (
 type blockedHomeGeo struct{}
 
 func (blockedHomeGeo) CanMove(_, _, _, _, _, _ int) bool { return false }
-func (blockedHomeGeo) Height(_, _, z int) int16           { return int16(z) }
+func (blockedHomeGeo) Height(_, _, z int) int16          { return int16(z) }
 func (blockedHomeGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
@@ -44,10 +44,10 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 	inst := &npc.Instance{
 		ObjectID: 1,
 		Template: &npc.Template{
-			ID:         9001,
-			Type:       "Monster",
-			RunSpeed:   100,
-			AIParams:   commons.NewStatSet(),
+			ID:          9001,
+			Type:        "Monster",
+			RunSpeed:    100,
+			AIParams:    commons.NewStatSet(),
 			NoSleepMode: true,
 		},
 		Kind:    "SiegeGuard",

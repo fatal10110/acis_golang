@@ -21,7 +21,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
 	"github.com/rs/zerolog"
+	"go.uber.org/fx"
 )
+
+// TestGameServerGraphValidates checks the fx constructor graph resolves
+// without a database: every provider's dependencies are satisfied by some
+// other provider, with no missing or duplicate types. go build only proves
+// the Go code compiles, not that dig can wire it; this runs on every
+// change to newGameServerAppOptions instead of only failing at boot.
+func TestGameServerGraphValidates(t *testing.T) {
+	if err := fx.ValidateApp(newGameServerAppOptions(gameServerPaths{})...); err != nil {
+		t.Fatalf("fx graph does not resolve: %v", err)
+	}
+}
 
 func TestGameServerConfigFromProperties(t *testing.T) {
 	serverProps, err := config.ParseString(`
@@ -97,6 +109,9 @@ HexID = -7fff
 	if cfg.Database.URL != "jdbc:mariadb://db.example/acis" || cfg.Database.Login != "acis" || cfg.Database.Password != "secret" {
 		t.Errorf("Database = %+v, want parsed database credentials", cfg.Database)
 	}
+	if cfg.Database.MaxConnections != 0 {
+		t.Errorf("Database.MaxConnections = %d, want 0 (default pool size)", cfg.Database.MaxConnections)
+	}
 	if cfg.AllowCursedWeapons {
 		t.Error("AllowCursedWeapons = true, want false")
 	}
@@ -108,6 +123,30 @@ HexID = -7fff
 	}
 	if cfg.TownCombatRule != 2 {
 		t.Errorf("TownCombatRule = %d, want ZoneTown 2", cfg.TownCombatRule)
+	}
+}
+
+func TestGameServerConfigFromPropertiesMaxConnections(t *testing.T) {
+	serverProps, err := config.ParseString(`
+URL = jdbc:mariadb://localhost/acis
+MaxConnections = 16
+`)
+	if err != nil {
+		t.Fatalf("ParseString server: %v", err)
+	}
+	hexProps, err := config.ParseString(`
+ServerID = 3
+HexID = -7fff
+`)
+	if err != nil {
+		t.Fatalf("ParseString hexid: %v", err)
+	}
+	cfg, err := gameServerConfigFromProperties(gameServerPaths{}, serverProps, hexProps)
+	if err != nil {
+		t.Fatalf("gameServerConfigFromProperties: %v", err)
+	}
+	if cfg.Database.MaxConnections != 16 {
+		t.Errorf("Database.MaxConnections = %d, want 16", cfg.Database.MaxConnections)
 	}
 }
 
@@ -165,7 +204,7 @@ KarmaPlayerCanShop = False
 		t.Fatal(err)
 	}
 
-	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath})
+	opts, err := loadPvPFlagOptions(gameServerPaths{PlayersConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPvPFlagOptions() error = %v", err)
 	}
@@ -614,7 +653,7 @@ WeightLimit = 1.25
 		t.Fatal(err)
 	}
 
-	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath})
+	cfg, err := loadPetConfig(gameServerPaths{ConfigPath: serverPath, PlayersConfigPath: playersPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadPetConfig() error = %v", err)
 	}
@@ -762,7 +801,7 @@ MaxObstacleHeight = 48
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}
@@ -806,7 +845,7 @@ func TestLoadGeodataDefaultsToDatapackGeodata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath})
+	geo, err := loadGeodata(gameServerPaths{DataRoot: dataRoot, GeoConfigPath: configPath}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadGeodata: %v", err)
 	}

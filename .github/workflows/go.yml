@@ -33,6 +33,15 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Format
+        run: |
+          out="$(gofmt -l cmd internal ops tests)"
+          if [ -n "$out" ]; then
+            echo "gofmt needs to be run on:"
+            echo "$out"
+            exit 1
+          fi
+
       - name: Build
         run: go build ./...
 

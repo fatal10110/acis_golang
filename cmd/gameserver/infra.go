@@ -27,6 +27,9 @@ func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Lo
 		return zerolog.Logger{}, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
+	// Config warnings are raised lazily while properties are read, so route
+	// them here rather than leaving them on the unconfigured stderr logger.
+	config.SetLogger(rt.Logger)
 	return rt.Logger, nil
 }
 
@@ -42,6 +45,6 @@ func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, 
 	return pool, nil
 }
 
-func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
-	return idfactory.New(context.Background(), pool, log)
+func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
+	return idfactory.New(ctx, pool, log)
 }

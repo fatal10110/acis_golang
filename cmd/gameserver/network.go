@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"net"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -77,44 +79,29 @@ func provideGameClientLink(
 	shadowItems *task.ShadowItems,
 	autosave *task.Autosave,
 	effects *network.TaskEffects,
-	respawnHP respawnRestoreHP,
-	deathPenalty deathPenaltyChance,
-	buffSlots maxBuffsAmount,
-	shieldBlockRate perfectShieldBlockRate,
-	mf magicFailures,
-	cle cancelLesserEffect,
-	spawnProtection playerSpawnProtection,
-	spBookNeeded skillEnchantSPBookNeeded,
-	autoLearn autoLearnSkills,
-	weightLimit weightLimitMultiplier,
-	karmaTeleport karmaPlayerCanTeleport,
-	delevel allowDelevel,
-	karmaExpLost rateKarmaExpLost,
-	charSelect characterSelectDelay,
-	bypassDelay serverBypassDelay,
+	gameplay gameplayConfig,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
-	curses raidCursesDisabled,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	formulas.SetMagicFailures(bool(mf))
-	effect.SetCancelLesser(bool(cle))
+	formulas.SetMagicFailures(bool(gameplay.MagicFailures))
+	effect.SetCancelLesser(bool(gameplay.CancelLesserEffect))
 	playerConfig := network.PlayerConfig{
-		RespawnRestoreHP:         float64(respawnHP),
-		DeathPenaltyChance:       int(deathPenalty),
-		MaxBuffsAmount:           int(buffSlots),
-		PerfectShieldBlockRate:   int(shieldBlockRate),
-		SpawnProtection:          time.Duration(spawnProtection),
-		SkillEnchantSPBookNeeded: bool(spBookNeeded),
-		AutoLearnSkills:          bool(autoLearn),
-		WeightLimitMultiplier:    float64(weightLimit),
-		KarmaPlayerCanTeleport:   bool(karmaTeleport),
+		RespawnRestoreHP:         float64(gameplay.RespawnRestoreHP),
+		DeathPenaltyChance:       int(gameplay.DeathPenaltyChance),
+		MaxBuffsAmount:           int(gameplay.MaxBuffsAmount),
+		PerfectShieldBlockRate:   int(gameplay.PerfectShieldBlockRate),
+		SpawnProtection:          time.Duration(gameplay.SpawnProtection),
+		SkillEnchantSPBookNeeded: bool(gameplay.SkillEnchantSPBookNeeded),
+		AutoLearnSkills:          bool(gameplay.AutoLearnSkills),
+		WeightLimitMultiplier:    float64(gameplay.WeightLimitMultiplier),
+		KarmaPlayerCanTeleport:   bool(gameplay.KarmaPlayerCanTeleport),
 		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,
-		AllowDelevel:             bool(delevel),
-		RateKarmaExpLost:         float64(karmaExpLost),
-		CharacterSelectDelay:     time.Duration(charSelect),
-		ServerBypassDelay:        time.Duration(bypassDelay),
+		AllowDelevel:             bool(gameplay.AllowDelevel),
+		RateKarmaExpLost:         float64(gameplay.RateKarmaExpLost),
+		CharacterSelectDelay:     time.Duration(gameplay.CharacterSelectDelay),
+		ServerBypassDelay:        time.Duration(gameplay.ServerBypassDelay),
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -159,7 +146,7 @@ func provideGameClientLink(
 		Admin:            data.Admin,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
-		DisableRaidCurse: bool(curses),
+		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		Log:              log,
 	})
 	if effects != nil {
@@ -168,8 +155,8 @@ func provideGameClientLink(
 	return link
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData, storeCooltime storeSkillCooltime) *skillstate.Persistence {
-	return skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(storeCooltime), gamesql.NewCharacterSkillStore(pool))
+func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig) *skillstate.Persistence {
+	return skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(gameplay.StoreSkillCooltime), gamesql.NewCharacterSkillStore(pool))
 }
 
 // onlineAccounts collects the account names of every player currently in
@@ -201,6 +188,28 @@ func playerAuthResponseHandler(links *loginLinkState, validator *network.Session
 		}
 		validator.Resolve(account, ok)
 	}
+}
+
+func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, log zerolog.Logger) {
+	debughttp.SetPlayersOnlineFunc(func() int { return len(state.Players()) })
+	if paths.DebugAddr == "" {
+		return
+	}
+	var srv *http.Server
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			var err error
+			srv, err = debughttp.Listen(paths.DebugAddr)
+			if err != nil {
+				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
+			}
+			log.Info().Str("addr", paths.DebugAddr).Msg("debug http listening")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return debughttp.Shutdown(ctx, srv)
+		},
+	})
 }
 
 func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {

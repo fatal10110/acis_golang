@@ -9,6 +9,8 @@ type CastRejection uint8
 const (
 	CastRejectNone CastRejection = iota
 	CastRejectInvalidTarget
+	// CastRejectSilent preserves a rejected target without a system message.
+	CastRejectSilent
 	CastRejectCantAttackPeaceZone
 	CastRejectTargetInPeaceZone
 	CastRejectCannotUseSkill
@@ -28,12 +30,44 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetHoly:
+		if target == nil {
+			return CastRejectNone
+		}
+		return holyCastRejection(target)
+	case modelskill.TargetUnlockable:
+		if target == nil {
+			return CastRejectNone
+		}
+		return unlockableCastRejection(target)
 	case modelskill.TargetCorpsePlayer:
 		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
 		return corpsePetCastRejection(target)
 	}
 	return CastRejectNone
+}
+
+func holyCastRejection(target Creature) CastRejection {
+	holy, ok := target.(HolyTarget)
+	if !ok || !holy.Holy() {
+		return CastRejectInvalidTarget
+	}
+	return CastRejectNone
+}
+
+func unlockableCastRejection(target Creature) CastRejection {
+	unlockable, ok := target.(UnlockableTarget)
+	if !ok {
+		return CastRejectInvalidTarget
+	}
+	if unlockable.Unlockable() {
+		return CastRejectNone
+	}
+	if door, ok := target.(DoorTarget); ok && door.Door() {
+		return CastRejectSilent
+	}
+	return CastRejectInvalidTarget
 }
 
 func oneCastRejection(caster, target Creature, skill *modelskill.Definition, ctrl bool) CastRejection {

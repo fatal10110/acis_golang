@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	sqltest "github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	sqltest "github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 

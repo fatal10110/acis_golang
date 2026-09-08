@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
+	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/commons/netutil"
 	"github.com/fatal10110/acis_golang/internal/config"
@@ -30,6 +32,7 @@ type loginServerPaths struct {
 	ServerNamesPath string
 	BannedIPsPath   string
 	LogRoot         string
+	DebugAddr       string
 }
 
 type loginServerConfig struct {
@@ -56,6 +59,7 @@ func parseLoginServerFlags() loginServerPaths {
 	flag.StringVar(&paths.ServerNamesPath, "server-names", "serverNames.xml", "server id/name list file")
 	flag.StringVar(&paths.BannedIPsPath, "banned-ips", "config/banned_ips.properties", "banned IP list file")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
+	flag.StringVar(&paths.DebugAddr, "debug-addr", "", "optional host:port serving pprof and expvar")
 	flag.Parse()
 	return paths
 }
@@ -81,11 +85,14 @@ func newLoginServerApp(paths loginServerPaths) *fx.App {
 			provideGameServerLink,
 			provideClientLink,
 		),
-		fx.Invoke(startLoginServer),
+		fx.Invoke(startDebugHTTP, startLoginServer),
 	)
 }
 
-func loadLoginServerProperties(paths loginServerPaths) (*config.Properties, error) {
+// loadLoginServerProperties takes the process logger so the fx graph builds
+// it before server.properties is read; config warnings then reach the
+// configured sinks instead of the unconfigured default logger.
+func loadLoginServerProperties(paths loginServerPaths, _ zerolog.Logger) (*config.Properties, error) {
 	return config.LoadFile(paths.ConfigPath)
 }
 
@@ -127,6 +134,10 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 	if err != nil {
 		return loginServerConfig{}, err
 	}
+	maxConnections, _, err := props.OptionalInt("MaxConnections")
+	if err != nil {
+		return loginServerConfig{}, err
+	}
 
 	return loginServerConfig{
 		ClientAddr:          listenAddress(props.String("LoginserverHostname", "*"), clientPort),
@@ -144,9 +155,10 @@ func loginServerConfigFromProperties(_ loginServerPaths, props *config.Propertie
 			MaxConnectionsPerIP:  maxConnectionsPerIP,
 		},
 		Database: db.Config{
-			URL:      props.String("URL", "jdbc:mariadb://localhost/acis"),
-			Login:    props.String("Login", "root"),
-			Password: props.String("Password", ""),
+			URL:            props.String("URL", "jdbc:mariadb://localhost/acis"),
+			Login:          props.String("Login", "root"),
+			Password:       props.String("Password", ""),
+			MaxConnections: maxConnections,
 		},
 	}, nil
 }
@@ -172,6 +184,9 @@ func provideLoginServerLogger(lc fx.Lifecycle, paths loginServerPaths) (zerolog.
 		return zerolog.Logger{}, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
+	// Config warnings are raised lazily while properties are read, so route
+	// them here rather than leaving them on the unconfigured stderr logger.
+	config.SetLogger(rt.Logger)
 	return rt.Logger, nil
 }
 
@@ -247,6 +262,27 @@ func provideClientLink(
 	log zerolog.Logger,
 ) *loginserver.ClientLink {
 	return loginserver.NewClientLink(accounts, servers, sessions, bans, keys, roster, cfg.AutoCreateAccounts, cfg.ShowLicence, cfg.LoginTryBeforeBan, cfg.LoginBlockAfterBan, log)
+}
+
+func startDebugHTTP(lc fx.Lifecycle, paths loginServerPaths, log zerolog.Logger) {
+	if paths.DebugAddr == "" {
+		return
+	}
+	var srv *http.Server
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			var err error
+			srv, err = debughttp.Listen(paths.DebugAddr)
+			if err != nil {
+				return fmt.Errorf("listen for debug http on %s: %w", paths.DebugAddr, err)
+			}
+			log.Info().Str("addr", paths.DebugAddr).Msg("debug http listening")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			return debughttp.Shutdown(ctx, srv)
+		},
+	})
 }
 
 func startLoginServer(lc fx.Lifecycle, cfg loginServerConfig, link *loginserver.GameServerLink, clients *loginserver.ClientLink, log zerolog.Logger) {
