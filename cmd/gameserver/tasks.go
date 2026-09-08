@@ -352,7 +352,8 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 }
 
 // provideItemInstances builds the lazy item persistence task over the real
-// items, augmentations and pets tables, flushed atomically as one batch.
+// items, augmentations and pets tables, flushed in chunks that each commit
+// atomically (task.ItemInstanceSaveChunkSize).
 func provideItemInstances(pool *sql.DB, data *gameData) *task.ItemInstances {
 	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items)
 }

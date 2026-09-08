@@ -20,6 +20,12 @@ const (
 	// ItemInstanceSaveTimeout bounds one persistence flush so a hung DB
 	// cannot wedge the ticker, and then shutdown's StopAndWait, indefinitely.
 	ItemInstanceSaveTimeout = 10 * time.Second
+	// ItemInstanceSaveChunkSize bounds how many items one Save transaction
+	// covers. Save commits chunks independently, so a batch that grew past
+	// what fits in one ItemInstanceSaveTimeout window still makes monotonic
+	// progress each tick instead of retrying the whole thing and never
+	// converging (see the constant's use in Save).
+	ItemInstanceSaveChunkSize = 500
 )
 
 // ItemFlusher atomically persists one flush batch: either every change in
@@ -107,12 +113,17 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 	}
 }
 
-// Save flushes every pending item. The pending map is swapped out before
-// the flush so a concurrent Add during I/O lands in the new map and is not
-// dropped when the flush succeeds. UpdateItems is all-or-nothing; on error
-// inflight ids are merged back so the next tick or shutdown flush retries
-// them, except ids RemoveItems dropped during the flush — those already got
-// their own successful write and must not be resurrected.
+// Save flushes every pending item in chunks of at most
+// ItemInstanceSaveChunkSize, each committed by its own UpdateItems call. The
+// pending map is swapped out before the flush so a concurrent Add during I/O
+// lands in the new map and is not dropped when the flush succeeds. Chunking
+// makes progress monotonic: a batch that has grown past what one
+// ItemInstanceSaveTimeout window can write still gets its earlier chunks
+// committed, and only the chunks that failed or were never attempted (ctx
+// already expired) go back to pending. A single unbounded flush would retry
+// the whole growing batch every tick and never converge. On error, ids
+// RemoveItems dropped during the flush are not merged back — those already
+// got their own successful write and must not be resurrected.
 //
 // Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
 // not expected. The shutdown hook is appended before the ticker's, so fx's
@@ -128,24 +139,40 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	for _, inst := range inflight {
 		items = append(items, inst)
 	}
-	err := i.UpdateItems(ctx, items)
+	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+
+	var firstErr error
+	failed := make([]*item.Instance, 0)
+	for chunk := range slices.Chunk(items, ItemInstanceSaveChunkSize) {
+		if ctx.Err() != nil {
+			failed = append(failed, chunk...)
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			continue
+		}
+		if err := i.UpdateItems(ctx, chunk); err != nil {
+			failed = append(failed, chunk...)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
 
 	i.mu.Lock()
 	removed := i.removedInflight
 	i.removedInflight = nil
-	if err != nil {
-		for id, inst := range inflight {
-			if _, wasRemoved := removed[id]; wasRemoved {
-				continue
-			}
-			if _, ok := i.pending[id]; !ok {
-				i.pending[id] = inst
-			}
+	for _, inst := range failed {
+		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
+			continue
+		}
+		if _, ok := i.pending[inst.ObjectID]; !ok {
+			i.pending[inst.ObjectID] = inst
 		}
 	}
 	i.mu.Unlock()
 
-	return err
+	return firstErr
 }
 
 // UpdateItems persists the provided item instances immediately, as one
