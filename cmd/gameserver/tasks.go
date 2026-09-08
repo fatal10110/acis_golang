@@ -60,19 +60,17 @@ func provideWorldState() *world.State {
 
 // provideGroundItems restores dropped items persisted at the previous
 // shutdown before the world starts, returning the store alongside so it can
-// be reused to persist state back at the next shutdown.
-func provideGroundItems(state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
+// be reused to persist state back at the next shutdown. It deliberately
+// does not clear items_on_ground itself: see startGroundItems.
+func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundItemOptions, pool *sql.DB, data *gameData, log zerolog.Logger) (*task.GroundItems, *gamesql.GroundItemStore, error) {
 	store := gamesql.NewGroundItemStore(pool)
 	items := task.NewGroundItems(state, opts, time.Now)
 
-	rows, err := store.Load(context.Background())
+	rows, err := store.Load(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	if err := items.Load(rows, data.Items); err != nil {
-		return nil, nil, err
-	}
-	if err := store.Clear(context.Background()); err != nil {
 		return nil, nil, err
 	}
 
@@ -80,7 +78,23 @@ func provideGroundItems(state *world.State, opts task.GroundItemOptions, pool *s
 	return items, store, nil
 }
 
-func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, log zerolog.Logger) {
+// startGroundItems clears the previous shutdown's items_on_ground snapshot
+// once fx confirms every constructor in the graph succeeded, then starts
+// the ticker. Clearing inside provideGroundItems instead would run even
+// when a later constructor (e.g. provideSpawns) fails: fx never runs
+// OnStart/OnStop hooks after a constructor-graph failure, since app.err
+// short-circuits both Start and Stop, so the rows would be gone with
+// nothing written back and no restart able to recover them. Clearing here
+// means a boot that fails for any reason leaves items_on_ground intact for
+// the next attempt; clearing again on a later successful boot is harmless
+// since items.Load already copied the rows into memory and the shutdown
+// hook rewrites the table wholesale.
+func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, log zerolog.Logger) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return store.Clear(ctx)
+		},
+	})
 	startTicker(lc, log, items.Start)
 }
 
@@ -337,11 +351,6 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 	startTicker(lc, log, updates.Start)
 }
 
-// itemInstanceShutdownSaveTimeout bounds the final flush of pending item
-// rows independently of however much of fx's stop timeout the earlier stop
-// hooks have already spent.
-const itemInstanceShutdownSaveTimeout = 10 * time.Second
-
 // provideItemInstances builds the lazy item persistence task over the real
 // items, augmentations and pets tables, flushed atomically as one batch.
 func provideItemInstances(pool *sql.DB, data *gameData) *task.ItemInstances {
@@ -363,7 +372,7 @@ func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, log zerolog.
 			// (earlier stop hooks draining player containers can have
 			// consumed most of fx's stop timeout by now) and is reported
 			// rather than swallowed.
-			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), itemInstanceShutdownSaveTimeout)
+			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), task.ItemInstanceSaveTimeout)
 			defer cancel()
 			if err := items.Save(saveCtx); err != nil {
 				log.Error().Err(err).Msg("save pending item instances")

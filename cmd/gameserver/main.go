@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"time"
 
@@ -11,12 +12,43 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 )
 
-// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
-// stop hook in turn: draining connections, persisting ground items and npcs,
-// and finally flushing pending item rows. fx's 15s default leaves that last
-// flush able to be cut short by the process exiting rather than by its own
-// itemInstanceShutdownSaveTimeout budget.
-const gameServerStopTimeout = 30 * time.Second
+const (
+	// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
+	// stop hook in turn: draining connections, persisting ground items and npcs,
+	// and finally flushing pending item rows. fx's 15s default leaves that last
+	// flush able to be cut short by the process exiting rather than by its own
+	// item-instance save timeout budget.
+	gameServerStopTimeout = 30 * time.Second
+	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
+	// restore, spawn-state load). These run inside fx.New's constructor graph,
+	// before fx.StartTimeout applies and before Run installs signal handling,
+	// so with context.Background() a stuck database hung the process with no
+	// way to interrupt it. idfactory.New alone runs six full-table scans plus
+	// dozens of orphan-cleanup DELETEs against unindexed owner columns, so the
+	// budget is minutes rather than seconds: generous enough that only a
+	// genuinely hung database ever trips it, not a large but healthy one.
+	gameServerBootTimeout = 5 * time.Minute
+	// gameServerStartTimeout bounds the OnStart phase, which fx runs with one
+	// shared context across every hook: pool.PingContext, sevensigns.State's
+	// Restore, clearing the previous shutdown's items_on_ground snapshot
+	// (startGroundItems), and the game listener bind. fx's 15s default was
+	// sized before any of these touched the database; explicit and separate
+	// from gameServerBootTimeout so this budget can be tuned on its own.
+	gameServerStartTimeout = 30 * time.Second
+)
+
+// bootContext is the constructor-time I/O deadline. Named so fx cannot inject
+// it into an unrelated context.Context parameter.
+type bootContext struct{ context.Context }
+
+func provideBootContext(lc fx.Lifecycle) bootContext {
+	ctx, cancel := context.WithTimeout(context.Background(), gameServerBootTimeout)
+	lc.Append(fx.Hook{OnStop: func(context.Context) error {
+		cancel()
+		return nil
+	}})
+	return bootContext{ctx}
+}
 
 type gameServerPaths struct {
 	ConfigPath        string
@@ -51,10 +83,19 @@ func parseGameServerFlags() gameServerPaths {
 }
 
 func newGameServerApp(paths gameServerPaths) *fx.App {
-	return fx.New(
+	return fx.New(newGameServerAppOptions(paths)...)
+}
+
+// newGameServerAppOptions is the fx option list for the game server's
+// constructor graph, split out from newGameServerApp so fx.ValidateApp can
+// check it resolves without a database (see TestGameServerGraphValidates).
+func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
+	return []fx.Option{
 		fx.StopTimeout(gameServerStopTimeout),
+		fx.StartTimeout(gameServerStartTimeout),
 		fx.Supply(paths),
 		fx.Provide(
+			provideBootContext,
 			loadGameServerProperties,
 			loadGameplayConfig,
 			loadPvPFlagOptions,
@@ -106,5 +147,5 @@ func newGameServerApp(paths gameServerPaths) *fx.App {
 			provideGameClientLink,
 		),
 		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
-	)
+	}
 }

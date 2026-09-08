@@ -45,6 +45,6 @@ func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, 
 	return pool, nil
 }
 
-func provideIDAllocator(pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
-	return idfactory.New(context.Background(), pool, log)
+func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
+	return idfactory.New(ctx, pool, log)
 }
