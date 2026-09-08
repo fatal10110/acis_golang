@@ -29,6 +29,9 @@ func TestCollarUseSpawnsWolfBesideOwner(t *testing.T) {
 	if got := pet.Level(); got != wolfLevel {
 		t.Fatalf("fresh pet Level() = %d, want template level %d", got, wolfLevel)
 	}
+	if got := pet.Exp(); got != wolfLevelExp {
+		t.Fatalf("fresh pet Exp() = %d, want current-level floor %d", got, wolfLevelExp)
+	}
 	if pet.PetInventory() == nil {
 		t.Fatal("spawned pet has no carried-item inventory")
 	}
@@ -140,11 +143,20 @@ func TestRespawnAfterSaveRestoresSavedName(t *testing.T) {
 	if got := pet.Name(); got != "Fenrir" {
 		t.Fatalf("renamed actor Name() = %q, want Fenrir", got)
 	}
+	pet.AddExpAndSp(wolfLevelExp, 0)
+	wantExp := pet.Exp()
 	h.returnPet(t)
+
+	if state := h.savedPetState(t); state.Exp != wantExp {
+		t.Fatalf("saved pets.exp = %d, want %d", state.Exp, wantExp)
+	}
 
 	respawned, burst := h.spawnWolf(t)
 	if got := respawned.Name(); got != "Fenrir" {
 		t.Fatalf("respawned pet Name() = %q, want restored Fenrir", got)
+	}
+	if got := respawned.Exp(); got != wantExp {
+		t.Fatalf("respawned pet Exp() = %d, want restored saved value %d", got, wantExp)
 	}
 	for _, frame := range burst {
 		if frame[0] == serverpackets.OpcodePetInfo {
