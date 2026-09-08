@@ -9,6 +9,26 @@ type blockKey struct {
 	x, y int
 }
 
+// regionMask is one bit per block of a single region, set when
+// dynamicBlocks holds an overlay for that block; see Engine.dynamicMask.
+type regionMask [block.RegionBlockCount / 64]uint64
+
+func maskBit(blockX, blockY int) (word int, bit uint64) {
+	i := blockX*block.RegionBlocksY + blockY
+	return i >> 6, 1 << (uint(i) & 63)
+}
+
+func (m *regionMask) has(blockX, blockY int) bool {
+	word, bit := maskBit(blockX, blockY)
+	return m[word]&bit != 0
+}
+
+// maskUpdate is one region's rebuilt bitmap, not yet published.
+type maskUpdate struct {
+	tileX, tileY int
+	mask         *regionMask
+}
+
 func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 	if obj == nil {
 		return
@@ -64,8 +84,69 @@ func (e *Engine) toggleObject(obj dynamic.Object, add bool) {
 			}
 		}
 	}
-	if next != nil {
+	if next == nil {
+		return
+	}
+
+	// A bit visible before its map entry only costs a wasted hash lookup; a
+	// map entry visible before its bit would hide a live overlay from
+	// concurrent readers. So publish the mask first when adding and last
+	// when removing.
+	updates := e.rebuildMasks(next, minBX, maxBX, minBY, maxBY)
+	if add {
+		e.storeMasks(updates)
 		e.dynamicBlocks.Store(&next)
+		return
+	}
+	e.dynamicBlocks.Store(&next)
+	e.storeMasks(updates)
+}
+
+// rebuildMasks returns a fresh bitmap for every region the given block span
+// touches, cloned from the current one so concurrent readers keep reading a
+// consistent snapshot. Only blocks inside the span can have changed, so
+// every other bit is carried over untouched.
+func (e *Engine) rebuildMasks(next map[blockKey]*dynamic.Block, minBX, maxBX, minBY, maxBY int) []maskUpdate {
+	var updates []maskUpdate
+	for bx := minBX; bx <= maxBX; bx++ {
+		for by := minBY; by <= maxBY; by++ {
+			if bx < 0 || by < 0 {
+				continue
+			}
+			tileX := bx / block.RegionBlocksX
+			tileY := by / block.RegionBlocksY
+			if tileX >= regionTilesX || tileY >= regionTilesY {
+				continue
+			}
+			i := -1
+			for u := range updates {
+				if updates[u].tileX == tileX && updates[u].tileY == tileY {
+					i = u
+					break
+				}
+			}
+			if i < 0 {
+				mask := new(regionMask)
+				if current := e.dynamicMask[tileX][tileY].Load(); current != nil {
+					*mask = *current
+				}
+				updates = append(updates, maskUpdate{tileX: tileX, tileY: tileY, mask: mask})
+				i = len(updates) - 1
+			}
+			word, bit := maskBit(bx%block.RegionBlocksX, by%block.RegionBlocksY)
+			if next[blockKey{bx, by}] != nil {
+				updates[i].mask[word] |= bit
+			} else {
+				updates[i].mask[word] &^= bit
+			}
+		}
+	}
+	return updates
+}
+
+func (e *Engine) storeMasks(updates []maskUpdate) {
+	for _, u := range updates {
+		e.dynamicMask[u.tileX][u.tileY].Store(u.mask)
 	}
 }
 

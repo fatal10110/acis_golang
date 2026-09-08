@@ -10,7 +10,7 @@ type spawnOrderObject struct {
 	on func(obj Tracked)
 }
 
-func (o *spawnOrderObject) ObjectID() int32   { return o.id }
+func (o *spawnOrderObject) ObjectID() int32 { return o.id }
 func (o *spawnOrderObject) Discover(t Tracked) {
 	if o.on != nil {
 		o.on(t)

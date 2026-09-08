@@ -53,6 +53,10 @@ func consumableSkills(t *testing.T) *skillstate.Persistence {
 			ID: 2015, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
 		},
+		{
+			ID: 2236, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable,
+			SkillType: "UNLOCK_SPECIAL", StaticHitTime: true, HitTime: 500, StaticReuse: true,
+		},
 	}), known)
 }
 
@@ -200,6 +204,33 @@ func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
 	srv.FlushItems(t)
 	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 2 {
 		t.Fatalf("persisted scroll count = %d, want 2", inst.Count)
+	}
+}
+
+func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	key := srv.GiveItem(t, objID, gameservertest.UnlockableKeyID, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeAction(hostile.ObjectID(), 40, 20, 30, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "select ValidateLocation")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMyTargetSelected, "select MyTargetSelected")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "select StatusUpdate")
+	c.Send(encodeUseItem(key, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "unlockable key rejection rotation")
+	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+		t.Fatalf("unlockable key rejection extra opcode = %#x, want none", frame[0])
+	}
+	srv.FlushItems(t)
+	if inst := mustFindItem(t, srv, objID, key); inst.Count != 1 {
+		t.Fatalf("persisted key count = %d, want 1", inst.Count)
 	}
 }
 

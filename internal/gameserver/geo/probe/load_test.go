@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/rs/zerolog"
 )
 
 func TestLoadEngine(t *testing.T) {
@@ -15,7 +16,7 @@ func TestLoadEngine(t *testing.T) {
 		dir := t.TempDir()
 		writeFlatL2OFF(t, dir, engine.TileXMin, engine.TileYMin, 80)
 
-		e, err := LoadEngine(dir, L2OFF)
+		e, err := LoadEngine(dir, L2OFF, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadEngine(): %v", err)
 		}
@@ -34,7 +35,7 @@ func TestLoadEngine(t *testing.T) {
 		dir := t.TempDir()
 		writeFlatL2J(t, dir, engine.TileXMin, engine.TileYMin, -40)
 
-		e, err := LoadEngine(dir, L2J)
+		e, err := LoadEngine(dir, L2J, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadEngine(): %v", err)
 		}
@@ -46,7 +47,7 @@ func TestLoadEngine(t *testing.T) {
 	})
 
 	t.Run("no region files loads an all-null engine", func(t *testing.T) {
-		e, err := LoadEngine(t.TempDir(), L2OFF)
+		e, err := LoadEngine(t.TempDir(), L2OFF, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("LoadEngine(): %v", err)
 		}
@@ -56,7 +57,7 @@ func TestLoadEngine(t *testing.T) {
 	})
 
 	t.Run("unknown geo type errors", func(t *testing.T) {
-		if _, err := LoadEngine(t.TempDir(), "bogus"); err == nil {
+		if _, err := LoadEngine(t.TempDir(), "bogus", zerolog.Nop()); err == nil {
 			t.Fatal("LoadEngine() error = nil, want error")
 		}
 	})
@@ -67,7 +68,7 @@ func TestLoadEngine(t *testing.T) {
 		if err := os.WriteFile(path, []byte("too short"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := LoadEngine(dir, L2OFF); err == nil {
+		if _, err := LoadEngine(dir, L2OFF, zerolog.Nop()); err == nil {
 			t.Fatal("LoadEngine() error = nil, want error")
 		}
 	})
