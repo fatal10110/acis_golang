@@ -373,6 +373,10 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // matching PlayerCast.doToggleCast broadcasting before either callSkill or
 // effect.exit() (PlayerCast.java:127 vs 135-137).
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+	if err := l.stopMovementForCast(live)(); err != nil {
+		sendMagicActionFailed(live)
+		return
+	}
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,

@@ -596,6 +596,41 @@ func TestToggleActivatesThenDeactivates(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestTogglingSkillWhileWalkingStopsMovement reproduces PlayerAI.thinkCast
+// (PlayerAI.java:273-276): a toggle always calls getMove().stop() before
+// doToggleCast, with no hitTime gate, unlike the timed-cast StopMovement
+// hook. Activating a toggle mid-walk must broadcast StopMove before the
+// instantaneous MagicSkillUse ack.
+func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
+	const skillID = 288
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+					MPConsume: 12, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "toggle stop")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle activation")
+	assertAbnormalStatusUpdate(t, c, skillID, 1, 0)
+	drainUntilQuiet(t, c)
+}
+
 // TestToggleCostFailureBroadcastsCastAbort verifies a toggle the caster
 // cannot afford still broadcasts its instant ack, then the cost-failure
 // message, the cast-cancel broadcast, and the pending-action release.
