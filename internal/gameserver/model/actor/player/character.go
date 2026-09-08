@@ -34,6 +34,7 @@ var _ world.Player = (*Character)(nil)
 // needed once that row enters the live world.
 type Character struct {
 	world.Presence
+	world.RelocateScratch
 	*creature.Live
 
 	ID          int32

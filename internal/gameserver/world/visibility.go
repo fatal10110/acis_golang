@@ -271,7 +271,11 @@ func (s *State) relocate(t Tracked, next *Region) {
 	var objectBuf [32]Tracked
 	objects := objectBuf[:0]
 	var notifications []visibilityNotification
+	var scratch *RelocateScratch
 	if tIsPlayer {
+		if owner, ok := t.(relocateScratchOwner); ok {
+			scratch = owner.relocateScratch()
+		}
 		// Same unshared-region skip as the Discover/Forget scans below.
 		n, widest := 0, 0
 		for _, r := range oldAreas {
@@ -290,7 +294,13 @@ func (s *State) relocate(t Tracked, next *Region) {
 			n += c
 			widest = max(widest, c)
 		}
-		notifications = make([]visibilityNotification, 0, n*2)
+		if scratch != nil {
+			notifications = scratch.notifications[:0]
+			objects = scratch.objects[:0]
+		}
+		if cap(notifications) < n*2 {
+			notifications = make([]visibilityNotification, 0, n*2)
+		}
 		if widest > cap(objects) {
 			objects = make([]Tracked, 0, widest)
 		}
@@ -366,6 +376,13 @@ func (s *State) relocate(t Tracked, next *Region) {
 	}
 	for _, notification := range notifications {
 		notification.notify()
+	}
+
+	if scratch != nil {
+		clear(notifications)
+		scratch.notifications = notifications[:0]
+		clear(objects)
+		scratch.objects = objects[:0]
 	}
 }
 

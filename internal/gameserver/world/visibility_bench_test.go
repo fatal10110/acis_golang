@@ -10,6 +10,7 @@ import (
 // own allocations.
 type relocateBenchPlayer struct {
 	Presence
+	RelocateScratch
 	id int32
 }
 
@@ -68,17 +69,20 @@ func setupRelocateBench(n int) (s *State, p *relocateBenchPlayer, x0, y, x1 int)
 }
 
 func TestRelocatePlayerRegionCrossingAllocs(t *testing.T) {
-	// Bound is loose on purpose: it must catch a regression back to
-	// grow-from-nil (11+ allocs at 300, 17+ at 1500) without depending on
-	// exact inlining or GC timing. 300 pins the notifications pre-size;
-	// 1500 also pins the per-region objects buffer (stack [32] overflows
-	// there without the widest-region make).
+	// p embeds RelocateScratch, so relocate reuses its notifications and
+	// objects buffers across crossings instead of making fresh ones per
+	// call. Bound is loose on purpose: it must catch a regression back to
+	// grow-from-nil (11+ allocs at 300, 17+ at 1500) or back to a
+	// per-crossing make (2 at 300/1500, see #2288) without depending on
+	// exact inlining or GC timing. The residual 1 alloc/op is a baseline
+	// relocate cost unrelated to the notifications/objects scratch —
+	// present even at nearby=50 before this issue's change.
 	for _, tt := range []struct {
 		n   int
 		max float64
 	}{
-		{300, 4},
-		{1500, 3},
+		{300, 1},
+		{1500, 1},
 	} {
 		t.Run(fmt.Sprintf("nearby=%d", tt.n), func(t *testing.T) {
 			s, p, x0, y, x1 := setupRelocateBench(tt.n)
