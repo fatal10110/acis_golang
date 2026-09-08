@@ -1,6 +1,7 @@
 package world
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -46,5 +47,54 @@ func TestRegistryAppendAllFreshScanNeedsExplicitTruncation(t *testing.T) {
 
 	if len(buf) != 1 {
 		t.Fatalf("appendAll(buf[:0]) len = %d, want 1 (truncated before the second scan)", len(buf))
+	}
+}
+
+// TestRegistryAppendAllPresizesFromNil is the regression case for the
+// pre-sizing registry.all had before it was folded into appendAll:
+// without reserving capacity up front, appendAll(nil) grows through
+// append's doubling ladder as it scans a large registry — 13 reallocations
+// at this test's 4096-entry population, measured directly below, versus
+// the single allocation slices.Grow now reserves. State.Objects and
+// State.Players both call appendAll(nil) this way, so this regressed
+// every caller of either.
+//
+// The threshold is <= 4, not the 1 the fix actually achieves (confirmed
+// separately via `go test -bench -benchmem`): a single runtime.MemStats
+// snapshot around one call is noisy enough in a shared test binary
+// (background GC, other goroutines) to occasionally read 2, and
+// testing.AllocsPerRun's own repeated-call bookkeeping measured as high
+// as 2 for a call independently confirmed to make exactly 1. <= 4 keeps
+// a wide margin below that noise floor while still failing hard on the
+// doubling-growth regression's 13.
+func TestRegistryAppendAllPresizesFromNil(t *testing.T) {
+	r := newRegistry()
+	for i := int32(1); i <= 4096; i++ {
+		r.add(i, &registryTestObject{id: i})
+	}
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	_ = r.appendAll(nil)
+	runtime.ReadMemStats(&after)
+
+	if allocs := after.Mallocs - before.Mallocs; allocs > 4 {
+		t.Fatalf("appendAll(nil) allocations = %d, want <= 4 (slices.Grow should reserve capacity up front; the pre-fix doubling growth makes 13 at this population)", allocs)
+	}
+}
+
+// BenchmarkRegistryAppendAllFromNil tracks the cost the pre-sizing fix
+// above targets, at a population size matching #2253's own benchmarks.
+func BenchmarkRegistryAppendAllFromNil(b *testing.B) {
+	r := newRegistry()
+	for i := int32(1); i <= 30000; i++ {
+		r.add(i, &registryTestObject{id: i})
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = r.appendAll(nil)
 	}
 }

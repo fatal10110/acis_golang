@@ -1,6 +1,7 @@
 package world
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
@@ -69,9 +70,19 @@ func (r *registry) get(key int32) (worldobject.Object, bool) {
 // per-tick scratch buffer owned by a single goroutine) pays the allocation
 // only until the buffer's capacity stabilizes at the tracked population
 // size.
+//
+// slices.Grow reserves capacity for the whole scan up front instead of
+// letting append's doubling growth reallocate and copy repeatedly as dst
+// crosses each power-of-two boundary — the difference between one
+// allocation and ~log2(len(r.entries)) of them for a nil or undersized
+// dst (State.Objects and State.Players both call this with nil). It is a
+// no-op once dst already has enough spare capacity, so a reused scratch
+// buffer that has already grown to the population size stays at 0
+// allocations.
 func (r *registry) appendAll(dst []worldobject.Object) []worldobject.Object {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+	dst = slices.Grow(dst, len(r.entries))
 	for _, obj := range r.entries {
 		dst = append(dst, obj)
 	}
