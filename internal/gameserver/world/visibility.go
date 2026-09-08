@@ -276,6 +276,22 @@ func (s *State) relocate(t Tracked, next *Region) {
 		if owner, ok := t.(relocateScratchOwner); ok {
 			scratch = owner.relocateScratch()
 		}
+		if scratch != nil {
+			// Deferred so scratch is reset to zero-value-clean, empty slices
+			// on every return path, including a panic propagating out of an
+			// Observer callback below (relocate's doc comment: panics
+			// propagate and skip remaining callbacks). clear zeroes the full
+			// capacity, not just the length this call used, so a shrinking
+			// crossing (widest cap held over from a crowded earlier region)
+			// can't keep stale Tracked references reachable from the
+			// player's scratch past their despawn.
+			defer func() {
+				clear(notifications[:cap(notifications)])
+				scratch.notifications = notifications[:0]
+				clear(scratch.objects[:cap(scratch.objects)])
+				scratch.objects = scratch.objects[:0]
+			}()
+		}
 		// Same unshared-region skip as the Discover/Forget scans below.
 		n, widest := 0, 0
 		for _, r := range oldAreas {
@@ -296,13 +312,14 @@ func (s *State) relocate(t Tracked, next *Region) {
 		}
 		if scratch != nil {
 			notifications = scratch.notifications[:0]
-			objects = scratch.objects[:0]
 		}
 		if cap(notifications) < n*2 {
 			notifications = make([]visibilityNotification, 0, n*2)
 		}
-		if widest > cap(objects) {
+		if scratch == nil && widest > cap(objects) {
 			objects = make([]Tracked, 0, widest)
+		} else if scratch != nil && widest > cap(scratch.objects) {
+			scratch.objects = make([]Tracked, 0, widest)
 		}
 	}
 
@@ -313,7 +330,12 @@ func (s *State) relocate(t Tracked, next *Region) {
 		if containsRegion(newAreas, r) {
 			continue
 		}
-		objects = r.AppendObjects(objects[:0])
+		if scratch != nil {
+			scratch.objects = r.AppendObjects(scratch.objects[:0])
+			objects = scratch.objects
+		} else {
+			objects = r.AppendObjects(objects[:0])
+		}
 		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
@@ -342,7 +364,12 @@ func (s *State) relocate(t Tracked, next *Region) {
 		if containsRegion(oldAreas, r) {
 			continue
 		}
-		objects = r.AppendObjects(objects[:0])
+		if scratch != nil {
+			scratch.objects = r.AppendObjects(scratch.objects[:0])
+			objects = scratch.objects
+		} else {
+			objects = r.AppendObjects(objects[:0])
+		}
 		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
@@ -376,13 +403,6 @@ func (s *State) relocate(t Tracked, next *Region) {
 	}
 	for _, notification := range notifications {
 		notification.notify()
-	}
-
-	if scratch != nil {
-		clear(notifications)
-		scratch.notifications = notifications[:0]
-		clear(objects)
-		scratch.objects = objects[:0]
 	}
 }
 

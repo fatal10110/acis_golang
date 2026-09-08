@@ -74,15 +74,13 @@ func TestRelocatePlayerRegionCrossingAllocs(t *testing.T) {
 	// call. Bound is loose on purpose: it must catch a regression back to
 	// grow-from-nil (11+ allocs at 300, 17+ at 1500) or back to a
 	// per-crossing make (2 at 300/1500, see #2288) without depending on
-	// exact inlining or GC timing. The residual 1 alloc/op is a baseline
-	// relocate cost unrelated to the notifications/objects scratch —
-	// present even at nearby=50 before this issue's change.
+	// exact inlining or GC timing. Steady state is 0.
 	for _, tt := range []struct {
 		n   int
 		max float64
 	}{
-		{300, 1},
-		{1500, 1},
+		{300, 0},
+		{1500, 0},
 	} {
 		t.Run(fmt.Sprintf("nearby=%d", tt.n), func(t *testing.T) {
 			s, p, x0, y, x1 := setupRelocateBench(tt.n)
