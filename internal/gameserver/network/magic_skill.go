@@ -51,15 +51,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		// maybeMoveToLocation approach walk. Reject here first so a recast
 		// still on cooldown never starts walking toward the signet.
 		if err := controller.CanAttemptCast(live.Character, def); err != nil {
+			// CanAttemptCast also covers the unset-signet gate
+			// (PlayerCast.java:224) so it reaches every caller of
+			// startResolvedSkill, not just this handler.
 			sendMagicCastFailure(live, def, err)
-			return
-		}
-		if gx, gy, gz := live.GroundTarget(); gx == 0 && gy == 0 && gz == 0 {
-			// PlayerCast.canAttemptCast (PlayerCast.java:224): a GROUND cast
-			// whose signet point was never set (Location.DUMMY_LOC, the
-			// zero-value groundTarget before any RequestExMagicSkillUseGround)
-			// is rejected silently — no system message, no movement.
-			sendMagicActionFailed(live)
 			return
 		}
 		if l.walkToGroundCast(live, req, def.CastRange) {

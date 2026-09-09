@@ -145,6 +145,17 @@ func (a PlayerActor) ConsumeItem(itemID, count int) bool {
 	return a.Character.Inventory().DestroyByTemplateID(int32(itemID), count) != nil
 }
 
+// GroundTarget forwards the character's last recorded ground-click point,
+// satisfying groundTargeter for CanAttemptCast's unset-signet gate —
+// PlayerCast.canAttemptCast rejecting a GROUND cast while _signetLocation
+// is still Location.DUMMY_LOC (PlayerCast.java:224, :42).
+func (a PlayerActor) GroundTarget() (x, y, z int) {
+	if a.Character == nil {
+		return 0, 0, 0
+	}
+	return a.Character.GroundTarget()
+}
+
 // ExitSignetGround drops the first ground-signet effect the character
 // carries, ending the signet its cast placed. Only the caster-side signet
 // effect is held here; the ones living on the signet's own world actor are

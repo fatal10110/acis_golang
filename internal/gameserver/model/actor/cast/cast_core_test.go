@@ -2761,6 +2761,46 @@ func TestCanCastToggleRejectsAllSkillsDisabled(t *testing.T) {
 	}
 }
 
+// groundTestActor adds an optional GroundTarget surface on top of testActor,
+// matching the reference's Player-only _signetLocation (PlayerCast.java:42):
+// a non-player caster (plain *testActor) never implements this interface,
+// so the unset-signet gate only ever applies to a caster that can carry one.
+type groundTestActor struct {
+	*testActor
+	gx, gy, gz int
+}
+
+func (a *groundTestActor) GroundTarget() (x, y, z int) { return a.gx, a.gy, a.gz }
+
+// TestCanAttemptCastRejectsUnsetGroundTarget covers PlayerCast.canAttemptCast
+// (PlayerCast.java:224): a GROUND skill requested before any
+// RequestExMagicSkillUseGround recorded a signet point is rejected —
+// Location.DUMMY_LOC is (0,0,0), matching the zero-value GroundTarget here.
+func TestCanAttemptCastRejectsUnsetGroundTarget(t *testing.T) {
+	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
+	actor := &groundTestActor{testActor: &testActor{}}
+	if err := NewController(actor).CanAttemptCast(testTarget{}, def); !errors.Is(err, ErrGroundTargetUnset) {
+		t.Fatalf("CanAttemptCast() error = %v, want ErrGroundTargetUnset", err)
+	}
+
+	actor.gx, actor.gy, actor.gz = 1000, 2000, 300
+	if err := NewController(actor).CanAttemptCast(testTarget{}, def); err != nil {
+		t.Fatalf("CanAttemptCast() error = %v, want nil once the signet point is set", err)
+	}
+}
+
+// TestCanAttemptCastSkipsGroundGateForNonGroundTargeter covers a caster type
+// that cannot carry a signet point at all (a plain *testActor, standing in
+// for a non-player creature): the gate must not panic or misfire on a type
+// assertion failure, it simply doesn't apply.
+func TestCanAttemptCastSkipsGroundGateForNonGroundTargeter(t *testing.T) {
+	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
+	actor := &testActor{}
+	if err := NewController(actor).CanAttemptCast(testTarget{}, def); err != nil {
+		t.Fatalf("CanAttemptCast() error = %v, want nil for a caster with no GroundTarget surface", err)
+	}
+}
+
 func TestCanCastToggleRejectsNonToggleSkill(t *testing.T) {
 	def := toggleDef()
 	def.Activation = modelskill.ActivationActive

@@ -40,6 +40,11 @@ var (
 	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
 	// (crowd control, or Java's Duel-defeat lock once that lands).
 	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
+	// ErrGroundTargetUnset means a GROUND skill was requested before any
+	// RequestExMagicSkillUseGround recorded a signet point, matching
+	// PlayerCast.canAttemptCast's Location.DUMMY_LOC rejection
+	// (PlayerCast.java:224).
+	ErrGroundTargetUnset = errors.New("cast: ground target unset")
 )
 
 // cubicLister is the narrow surface a self-targeted cubic-granting skill
@@ -67,6 +72,14 @@ type signetGroundExiter interface {
 type allSkillsDisabler interface {
 	AllSkillsDisabled() bool
 	EnableAllSkills()
+}
+
+// groundTargeter is the optional owner surface for the GROUND signet point,
+// matching Java's Player-only _signetLocation (PlayerCast.java:42). An
+// owner that cannot hold one (a non-player caster) skips the unset-signet
+// gate entirely.
+type groundTargeter interface {
+	GroundTarget() (x, y, z int)
 }
 
 // chargeHolder is the optional owner surface for a skill's Force/Soul
@@ -258,6 +271,13 @@ func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) er
 	}
 	if c.actor.SkillDisabled(ReuseKey(def)) {
 		return ErrSkillDisabled
+	}
+	if def.Target == modelskill.TargetGround {
+		if gt, ok := c.actor.(groundTargeter); ok {
+			if x, y, z := gt.GroundTarget(); x == 0 && y == 0 && z == 0 {
+				return ErrGroundTargetUnset
+			}
+		}
 	}
 	return nil
 }
