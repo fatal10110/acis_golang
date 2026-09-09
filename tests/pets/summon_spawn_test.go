@@ -29,6 +29,9 @@ func TestCollarUseSpawnsWolfBesideOwner(t *testing.T) {
 	if got := pet.Level(); got != wolfLevel {
 		t.Fatalf("fresh pet Level() = %d, want template level %d", got, wolfLevel)
 	}
+	if got := pet.Exp(); got != wolfLevelExp {
+		t.Fatalf("fresh pet Exp() = %d, want current-level floor %d", got, wolfLevelExp)
+	}
 	if pet.PetInventory() == nil {
 		t.Fatal("spawned pet has no carried-item inventory")
 	}
@@ -140,11 +143,31 @@ func TestRespawnAfterSaveRestoresSavedName(t *testing.T) {
 	if got := pet.Name(); got != "Fenrir" {
 		t.Fatalf("renamed actor Name() = %q, want Fenrir", got)
 	}
+	// Gain less than wolfNextLevelExp - wolfLevelExp so the pet stays at
+	// wolfLevel: a gain landing exactly on a level's MaxExp would make the
+	// saved value indistinguishable from the fresh-spawn floor it's meant
+	// to be checked against.
+	const wolfExpGain = 100
+	pet.AddExpAndSp(wolfExpGain, 0)
+	wantExp := pet.Exp()
+	if wantExp == wolfLevelExp || wantExp == wolfNextLevelExp {
+		t.Fatalf("gained exp %d collides with a level floor (%d/%d); fixture retuned, pick a different gain", wantExp, wolfLevelExp, wolfNextLevelExp)
+	}
 	h.returnPet(t)
+
+	if state := h.savedPetState(t); state.Exp != wantExp {
+		t.Fatalf("saved pets.exp = %d, want %d", state.Exp, wantExp)
+	}
 
 	respawned, burst := h.spawnWolf(t)
 	if got := respawned.Name(); got != "Fenrir" {
 		t.Fatalf("respawned pet Name() = %q, want restored Fenrir", got)
+	}
+	if got := respawned.Level(); got != wolfLevel {
+		t.Fatalf("respawned pet Level() = %d, want unchanged %d", got, wolfLevel)
+	}
+	if got := respawned.Exp(); got != wantExp {
+		t.Fatalf("respawned pet Exp() = %d, want restored saved value %d", got, wantExp)
 	}
 	for _, frame := range burst {
 		if frame[0] == serverpackets.OpcodePetInfo {
