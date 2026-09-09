@@ -91,9 +91,12 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// Java's unsaved branch commits the seeded row immediately
 	// (Pet.java:554's pet.store()); Go defers that first write to the
 	// first savePet instead — a deliberate difference locked in by this
-	// suite's "no pets row until a save point" assertions. Everything
-	// else Pet.restore restores (Level/Name/Fed/HP/MP/Exp/SP) is applied
-	// here because summon.Actor already exposes somewhere to put it.
+	// suite's "no pets row until a save point" assertions. Level/Name/
+	// Fed/HP/MP/Exp/SP are restored here because summon.Actor already
+	// exposes somewhere to put them. Java's saved-row dead check
+	// (Pet.java:540-544: curHp < 0.5 restores dead and skips regen) has
+	// no Go counterpart yet — summon.Actor has no dead state or regen
+	// task at all — tracked as #2307.
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
 	if hasSaved {
 		level = state.Level
