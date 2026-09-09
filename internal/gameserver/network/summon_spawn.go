@@ -88,10 +88,12 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
-	// SP restore and persistence writeback (Pet.java's other saved fields)
-	// are deferred with the rest of the pet-relog-persistence follow-up —
-	// see this PR's linked issue. Level/Name/Fed/HP/MP/Exp are restored
-	// here because summon.Actor already exposes somewhere to put them.
+	// Java's unsaved branch commits the seeded row immediately
+	// (Pet.java:554's pet.store()); Go defers that first write to the
+	// first savePet instead — a deliberate difference locked in by this
+	// suite's "no pets row until a save point" assertions. Everything
+	// else Pet.restore restores (Level/Name/Fed/HP/MP/Exp/SP) is applied
+	// here because summon.Actor already exposes somewhere to put it.
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
 	if hasSaved {
 		level = state.Level
