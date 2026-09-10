@@ -495,3 +495,48 @@ func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
 	}
 	findSystemMessage(t, vc, int32(serverpackets.SystemMessageResistedS1Magic))
 }
+
+// TestResistedSkillReportsResistanceForNPCTarget repeats the resisted-skill
+// report against the fixture monster instead of another player. The fixture
+// template carries no name, mirroring the datapack's nameless dummy monsters
+// (npc ids 27201-27213): the report is still owed, with an empty name in the
+// message's first parameter, because the reference builds it from the target
+// creature's name unconditionally rather than gating on a non-empty name.
+func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+				SkillType: "MDAM", Power: 1_000_000,
+				IgnoreResists: true, BaseLandRate: 0,
+				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 45, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(45, false, false))
+	readCastStartFrames(t, c, objID, 45, 1, 500, 60_000, hostile.ObjectID())
+
+	r := findSystemMessage(t, c, int32(serverpackets.SystemMessageS1ResistedYourS2))
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("resisted message params = %d, want 2", params)
+	}
+	if typ, name := r.ReadInt32(), r.ReadString(); typ != serverpackets.SystemMessageParamText || name != hostile.CharacterName() {
+		t.Fatalf("resisted message first parameter = (%d, %q), want text %q", typ, name, hostile.CharacterName())
+	}
+	if r.ReadInt32() != serverpackets.SystemMessageParamSkillName || r.ReadInt32() != 45 || r.ReadInt32() != 1 {
+		t.Fatalf("resisted message second parameter = skill 45 level 1")
+	}
+	drainUntilQuiet(t, c)
+}
