@@ -51,8 +51,8 @@ Rules:
   per-suite reimplementations of the handshake, no struct-literal surgery on production types.
 - Use `SyncBarrier` when a triggering request has no synchronous reply and you need ordering
   before driving a task tick.
-- Suites need Docker (MariaDB testcontainer); each suite package calls `sqltest.Main(m)` from
-  `TestMain`.
+- Suites need the shared MariaDB service (`make test-db-up`); each suite package calls
+  `sqltest.Main(m)` from `TestMain` to release its uniquely named database.
 
 ### Tier 2 — pure-function core tests (`<pkg>_core_test.go`)
 
@@ -115,11 +115,12 @@ handles. Apply the Rule of Three before extracting any new shared builder.
 
 Two entry points, both untagged:
 
-- `sqltest.SharedDB(tb)` — one MariaDB container per test binary, tables truncated between tests;
+- `sqltest.SharedDB(tb)` — one uniquely named database on the shared MariaDB service per test
+  binary, tables truncated between tests;
   pair with `TestMain(m) { os.Exit(sqltest.Main(m)) }`. This is what behavior suites and
   `gameservertest.Boot` use.
-- `sqltest.NewDB(t)` — a dedicated container per call; reserved for store-level tests that want
-  full isolation.
+- `sqltest.NewDB(t)` — a dedicated database per call on the shared MariaDB service; reserved for
+  store-level tests that want full isolation.
 
 Construct the real store (`sql.NewCharacterStore(db)`, ...) and assert on what it reads back, not
 on captured in-memory state.

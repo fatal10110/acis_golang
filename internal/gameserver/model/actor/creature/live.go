@@ -27,8 +27,8 @@ type Live struct {
 // movement validation. owner receives stat-function callbacks from this
 // creature's active effects; a nil owner (e.g. an actor whose stats aren't
 // driven by a calculator yet) leaves those callbacks unapplied.
-func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect.StatOwner) (*Live, error) {
-	live := &Live{effects: effect.NewList(owner)}
+func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect.StatOwner, effectOpts ...effect.Option) (*Live, error) {
+	live := &Live{effects: effect.NewList(owner, effectOpts...)}
 	if err := live.movement.Init(origin, speed, geo); err != nil {
 		return nil, err
 	}

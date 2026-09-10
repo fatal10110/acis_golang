@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
@@ -173,6 +174,7 @@ type GameClientLink struct {
 	water         *task.Water
 	shadowItems   *task.ShadowItems
 	autosave      *task.Autosave
+	clock         scheduler.Clock
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -290,6 +292,8 @@ type GameClientLinkConfig struct {
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
+	// Clock supplies game-action timing. Nil uses the real clock.
+	Clock scheduler.Clock
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -339,6 +343,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,
+		clock:         cfg.Clock,
 
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
@@ -366,6 +371,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		now:          cfg.Now,
 		newCipherKey: randomCipherKey,
 		noCipher:     cfg.NoCipher,
+	}
+	if link.clock == nil {
+		link.clock = scheduler.RealClock{}
 	}
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {
 		return time.AfterFunc(d, func() {

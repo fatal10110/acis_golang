@@ -344,6 +344,7 @@ func (p *livePlayer) attackController() *attack.Controller {
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
+		live.cast.SetClock(l.clock)
 		live.cast.SetLogger(live.log)
 		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
 		live.cast.SetOnStopAck(func() { sendMagicActionFailed(live) })

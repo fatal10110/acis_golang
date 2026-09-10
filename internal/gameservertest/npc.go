@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"testing"
+	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -146,6 +147,17 @@ func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at 
 // ticks are deterministic instead of wall-clock driven.
 func (s *Server) TickEffects() {
 	s.Effects.Tick()
+}
+
+// AdvanceTime moves an injected manual clock. It fails when the server was
+// booted with the default wall clock.
+func (s *Server) AdvanceTime(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	clock, ok := s.clock.(interface{ Advance(time.Duration) })
+	if !ok {
+		tb.Fatal("AdvanceTime requires gameservertest.WithClock")
+	}
+	clock.Advance(d)
 }
 
 // parkedMove is a MoveController that never moves.

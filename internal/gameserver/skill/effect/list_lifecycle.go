@@ -6,7 +6,7 @@ import (
 )
 
 func (l *List) Tick() {
-	l.tickAt(time.Now())
+	l.tickAt(l.clock.Now())
 }
 
 // tickAt claims a due action from every held effect, active or displaced —
@@ -236,7 +236,7 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 // while the flag is already active is rejected here rather than treated as
 // a replacement.
 func (l *List) add(e *Effect, pending *[]func()) {
-	e.startSchedule(time.Now())
+	e.startSchedule(l.clock.Now())
 
 	if e.RejectsIfAffected && l.flagsLocked()&e.Flag != 0 {
 		appendThunk(pending, e.stopTaskThunk())

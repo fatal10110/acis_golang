@@ -3,6 +3,8 @@ package effect
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 )
 
 type StatOwner interface {
@@ -16,6 +18,16 @@ type StatOwner interface {
 
 // Option changes List behavior.
 type Option func(*List)
+
+// WithClock supplies the time source used to schedule and tick effects.
+// The default remains the process clock.
+func WithClock(clock scheduler.Clock) Option {
+	return func(l *List) {
+		if clock != nil {
+			l.clock = clock
+		}
+	}
+}
 
 // cancelLesserEnabled is the process-wide CancelLesserEffect switch
 // (default true). The composition root sets this once at boot from
@@ -99,7 +111,8 @@ func (l *List) emptyLocked() bool {
 // concurrent use; mu guards buffs, debuffs, stacks, tracked, and callbacks
 // into owner.
 type List struct {
-	mu sync.Mutex
+	mu    sync.Mutex
+	clock scheduler.Clock
 
 	owner           StatOwner
 	cancelLesser    bool
@@ -118,7 +131,7 @@ type List struct {
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {
-	l := &List{owner: owner}
+	l := &List{owner: owner, clock: scheduler.RealClock{}}
 	for _, opt := range opts {
 		opt(l)
 	}

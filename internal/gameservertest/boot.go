@@ -17,6 +17,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -106,6 +107,7 @@ type options struct {
 	levels                 *player.LevelTable
 	log                    zerolog.Logger
 	geo                    move.Geo
+	clock                  scheduler.Clock
 }
 
 type characterSpec struct {
@@ -284,6 +286,10 @@ func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log 
 // players. The default is the always-passable Geo double.
 func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
 
+// WithClock supplies deterministic game-action time to a test server. Socket
+// and database deadlines remain wall-clock based.
+func WithClock(clock scheduler.Clock) Option { return func(o *options) { o.clock = clock } }
+
 func bootGeo(geo move.Geo) move.Geo {
 	if geo != nil {
 		return geo
@@ -319,6 +325,7 @@ type Server struct {
 	cursedWeapons    *entity.CursedWeaponTable
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
+	clock            scheduler.Clock
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
@@ -980,6 +987,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Log:              o.log,
+		Clock:            o.clock,
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
@@ -1094,6 +1102,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		addr:             ln.Addr(),
 		sessions:         sessions,
 		groundStore:      gamesql.NewGroundItemStore(db),
+		clock:            o.clock,
 		cursedWeapons:    cursed,
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
