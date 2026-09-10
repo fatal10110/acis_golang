@@ -396,6 +396,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			SkillID:     int(req.SkillID),
 			Definitions: l.skills,
 		},
+		l.stopMovementForCast(live),
 	)
 	broadcast := func() {
 		selfObject := skillCastObject(live)
