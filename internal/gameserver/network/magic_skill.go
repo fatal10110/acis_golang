@@ -44,12 +44,25 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	}
 
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
-	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, def.CastRange) {
-		return
+	controller := l.castController(live)
+	if def.Target == modelskill.TargetGround {
+		// PlayerAI.thinkCast (PlayerAI.java:242-257) runs canAttemptCast
+		// (already casting / all-skills-disabled / reuse) before the GROUND
+		// maybeMoveToLocation approach walk. Reject here first so a recast
+		// still on cooldown never starts walking toward the signet.
+		if err := controller.CanAttemptCast(live.Character, def); err != nil {
+			// CanAttemptCast also covers the unset-signet gate
+			// (PlayerCast.java:224) so it reaches every caller of
+			// startResolvedSkill, not just this handler.
+			sendMagicCastFailure(live, def, err)
+			return
+		}
+		if l.walkToGroundCast(live, req, def.CastRange) {
+			return
+		}
 	}
 
 	beforeVitals := live.Vitals()
-	controller := l.castController(live)
 	var afterCanCast func() error
 	if known && def.Target == modelskill.TargetGround {
 		afterCanCast = l.groundCastAfterCanCast(live, def)

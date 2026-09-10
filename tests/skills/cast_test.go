@@ -412,6 +412,84 @@ func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestGroundCastReuseRejectionDoesNotStartApproachWalk recasts a
+// GROUND skill still on cooldown at a signet point outside cast range.
+// PlayerAI.thinkCast (PlayerAI.java:242-257) runs canAttemptCast before the
+// GROUND maybeMoveToLocation approach walk, so the recast must answer with
+// the prepared-for-reuse message and never start a MoveToLocation approach.
+func TestGroundCastReuseRejectionDoesNotStartApproachWalk(t *testing.T) {
+	const skillID = 5
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(10000, 2000, 300, skillID, false, false))
+	reply := c.Read()
+	if reply[0] == serverpackets.OpcodeMoveToLocation {
+		t.Fatal("ground-cast reuse rejection started an approach walk, want no MoveToLocation")
+	}
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, skillID, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "ground recast rejection")
+	drainUntilQuiet(t, c)
+}
+
+// TestGroundCastWithUnsetSignetIsRejectedSilently sends a bare
+// RequestMagicSkillUse for a GROUND skill without ever sending
+// RequestExMagicSkillUseGround first, so the signet point stays the
+// zero-value groundTarget (0,0,0) — Java's Location.DUMMY_LOC.
+// PlayerCast.canAttemptCast (PlayerCast.java:224) rejects this silently:
+// no system message, no movement, no cast.
+func TestGroundCastWithUnsetSignetIsRejectedSilently(t *testing.T) {
+	const skillID = 5
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: 3000, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	reply := c.Read()
+	assertFrameOpcode(t, reply, serverpackets.OpcodeActionFailed, "unset-signet ground cast rejection")
+	c.ExpectNoFrame()
+
+	x, y, z := srv.PlayerPosition(t, objID)
+	if x == 0 && y == 0 && z == 0 {
+		t.Fatal("test setup: caster spawned at world origin, can't distinguish reject from same-point cast")
+	}
+}
+
 // TestWalkingGroundCastStopsThenValidatesLocation walks the caster off spawn,
 // then starts a second walk and casts a long-hit-time in-range ground skill
 // before arrival. StopMove must land with the pre-face heading, then
