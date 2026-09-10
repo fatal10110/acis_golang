@@ -70,12 +70,15 @@ type cpHealTarget interface {
 // cpDamagePercentTarget is a player-only contract: CPDAMPERCENT skips every
 // non-player target before the dead/invulnerable checks, so IsPlayer keeps
 // creatures that merely happen to expose CP accessors out of the assertion.
+// The cast-break roll is part of the contract, not an optional extra: it runs
+// unconditionally on every accepted target.
 type cpDamagePercentTarget interface {
 	Actor
 	IsPlayer() bool
 	Invulnerable() bool
 	CP() float64
 	SetCP(float64)
+	BreakCastOnDamage(damage float64)
 }
 
 // Compile-time proof that a real player still satisfies the narrowed contract.
@@ -218,13 +221,6 @@ func notifyRestored(target, caster Actor, amount float64, resource restoredResou
 	}
 }
 
-// castBreakTarget is implemented by targets that carry their own live cast
-// to interrupt (player.Character.BreakCastOnDamage); other CPDAMPERCENT
-// targets have no cast to break.
-type castBreakTarget interface {
-	BreakCastOnDamage(damage float64)
-}
-
 type cpDamagePercentHandler struct{}
 
 func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
@@ -239,11 +235,8 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
-		// Formulas.calcCastBreak(targetPlayer, damage) runs before the
-		// effects/CP-reduction that follow it (CpDamPercent.java:44,48).
-		if breakable, ok := obj.(castBreakTarget); ok {
-			breakable.BreakCastOnDamage(float64(damage))
-		}
+		// The cast-break roll runs before the CP reduction that follows it.
+		target.BreakCastOnDamage(float64(damage))
 		if damage > 0 {
 			target.SetCP(target.CP() - float64(damage))
 		}
