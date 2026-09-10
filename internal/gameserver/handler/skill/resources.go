@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -66,12 +67,19 @@ type cpHealTarget interface {
 	SetCP(float64)
 }
 
+// cpDamagePercentTarget is a player-only contract: CPDAMPERCENT skips every
+// non-player target before the dead/invulnerable checks, so IsPlayer keeps
+// creatures that merely happen to expose CP accessors out of the assertion.
 type cpDamagePercentTarget interface {
 	Actor
+	IsPlayer() bool
 	Invulnerable() bool
 	CP() float64
 	SetCP(float64)
 }
+
+// Compile-time proof that a real player still satisfies the narrowed contract.
+var _ cpDamagePercentTarget = (*player.Character)(nil)
 
 type balanceLifeTarget interface {
 	Actor
@@ -227,7 +235,7 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 	}
 	for _, obj := range cast.Targets {
 		target, ok := obj.(cpDamagePercentTarget)
-		if !ok || target.Dead() || target.Invulnerable() {
+		if !ok || !target.IsPlayer() || target.Dead() || target.Invulnerable() {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
