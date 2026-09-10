@@ -380,18 +380,21 @@ func raidCurseSkills() curseSkills {
 func TestCursesOnAttackEffectRangeBoundary(t *testing.T) {
 	cases := []struct {
 		name    string
-		x, y    int
+		x, y, z int
 		applied bool
 	}{
-		{name: "axis aligned at exact range", x: 2000, y: 0, applied: false},
+		{name: "axis aligned at exact range", x: 2000, applied: false},
 		{name: "pythagorean at exact range", x: 1200, y: 1600, applied: false},
-		{name: "one unit inside range", x: 1999, y: 0, applied: true},
-		{name: "beyond range", x: 2001, y: 0, applied: false},
+		{name: "z axis at exact range", z: 2000, applied: false},
+		{name: "one unit inside range", x: 1999, applied: true},
+		{name: "inside range on all three axes", x: 1000, y: 1000, z: 1000, applied: true},
+		{name: "beyond range", x: 2001, applied: false},
+		{name: "beyond range on the z axis", z: 2001, applied: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			attacker := newCursePlayable(t, 80)
-			target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, x: tc.x, y: tc.y}
+			target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, x: tc.x, y: tc.y, z: tc.z}
 			blocked := TestCursesOnAttack(RaidCurseInput{
 				Attacker:  attacker,
 				Target:    target,
