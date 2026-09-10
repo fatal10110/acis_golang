@@ -89,10 +89,28 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 // when activated is true, or StopEffect(req.Caster, def.ID) when it is
 // false and err is nil. The on/off rule CastToggle documents lives
 // entirely inside this package, not in whatever is decoding the request.
-func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest) (def modelskill.Definition, target Target, activated bool, err error) {
+//
+// stopMovement, when non-nil, runs only after target resolution and
+// CanCastToggle both pass — matching PlayerAI.thinkCast, which reaches its
+// unconditional getMove().stop() (PlayerAI.java:273-276) only after
+// denyAiAction()/isCastingNow() (PlayableAI.java:299-303, PlayerAI.java:219-241)
+// and the reuse-delay gate in canAttemptCast. A rejected toggle — blanket
+// lock, on cooldown, dead, unknown skill — must never stop a walk that
+// Java leaves running. Any error it returns is discarded, matching
+// stopForCast's `_ = stopMovement()`: movement is already cancelled inside
+// Controller.Stop before the fallible broadcast, and Java's stop cannot
+// fail at all.
+func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func() error) (def modelskill.Definition, target Target, activated bool, err error) {
 	def, target, err = ResolvePlayerToggle(req)
 	if err != nil {
 		return def, target, false, err
+	}
+	if err := controller.CanCastToggle(def); err != nil {
+		return def, target, false, err
+	}
+
+	if stopMovement != nil {
+		_ = stopMovement()
 	}
 
 	alreadyActive := handlerskill.ActiveEffect(req.Caster, def.ID)

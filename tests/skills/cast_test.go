@@ -596,6 +596,92 @@ func TestToggleActivatesThenDeactivates(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestTogglingSkillWhileWalkingStopsMovement reproduces PlayerAI.thinkCast
+// (PlayerAI.java:273-276): a toggle always calls getMove().stop() before
+// doToggleCast, with no hitTime gate, unlike the timed-cast StopMovement
+// hook. Activating a toggle mid-walk must broadcast StopMove before the
+// instantaneous MagicSkillUse ack.
+func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
+	const skillID = 288
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+					MPConsume: 12, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "toggle stop")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle activation")
+	assertAbnormalStatusUpdate(t, c, skillID, 1, 0)
+	drainUntilQuiet(t, c)
+}
+
+// TestSkillDisabledToggleRejectionDoesNotStopMovement reproduces the
+// ordering Java keeps ahead of the toggle stop: PlayerAI.thinkCast's
+// canAttemptCast reuse gate (CreatureCast.java:324-327, wired through
+// PlayerAI.java:219-241) rejects with S1_PREPARED_FOR_REUSE before
+// PlayerAI.thinkCast ever reaches skill.isToggle()'s unconditional
+// getMove().stop() (PlayerAI.java:273-276). A shared-reuse-group cast
+// disables the toggle's reuse key without touching movement — reuse has
+// no movement side effect at all — so a walking caster who presses a
+// toggle on cooldown must keep walking, not get halted by a press that
+// itself did nothing.
+func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
+	const blockerSkillID, toggleSkillID = 21, 288
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: blockerSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+					HitTime: 0, StaticHitTime: true, StaticReuse: true, ReuseDelay: 60_000, SkillType: "DUMMY",
+					SharedReuse: &modelskill.Ref{ID: toggleSkillID, Level: 1},
+				},
+				{
+					ID: toggleSkillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+					MPConsume: 12, SkillType: "BUFF",
+					Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, blockerSkillID, 1)
+	seedKnownSkill(t, srv, objID, toggleSkillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(blockerSkillID, false, false))
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk with toggle's reuse key disabled")
+
+	c.Send(encodeRequestMagicSkillUse(toggleSkillID, false, false))
+	reply := c.Read()
+	if reply[0] == serverpackets.OpcodeStopMove {
+		t.Fatal("toggle-on-cooldown rejection broadcast StopMove, want walk to continue")
+	}
+	assertSystemMessageSkillFrame(t, reply, serverpackets.SystemMessageS1PreparedForReuse, toggleSkillID, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "toggle rejected on cooldown")
+	drainUntilQuiet(t, c)
+}
+
 // TestToggleCostFailureBroadcastsCastAbort verifies a toggle the caster
 // cannot afford still broadcasts its instant ack, then the cost-failure
 // message, the cast-cancel broadcast, and the pending-action release.
