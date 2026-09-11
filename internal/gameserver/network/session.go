@@ -1,7 +1,6 @@
 package network
 
 import (
-	"runtime"
 	"sync"
 	"time"
 
@@ -16,10 +15,6 @@ import (
 // bounds the allocation ReadFrame makes for a frame's payload.
 const frameHeaderSize = wire.FrameHeaderSize
 
-// trySendLockAttempts lets brief healthy contention clear before the blocking
-// fallback; each retry checks for saturation and aborts a slow peer instead.
-const trySendLockAttempts = 64
-
 const (
 	clientReadHandshakeTimeout = time.Minute
 	clientReadIdleTimeout      = 15 * time.Minute
@@ -29,10 +24,8 @@ const (
 // a frame and queueing it for send must happen as one step in send order —
 // mu is the only thing allowed to call cipher.Encrypt or conn.SendFrame, so two
 // goroutines calling SendFrame concurrently can never queue frames in an order
-// that disagrees with the order their bytes were encrypted in. SendFrame is
-// the only path that can hold mu while blocking, and it can do so only after
-// the outbound queue is full; TrySendFrame checks that condition before it
-// waits for mu and aborts the connection instead.
+// that disagrees with the order their bytes were encrypted in. Queueing never
+// blocks, so mu is held only for one encrypt and one append.
 type Session struct {
 	conn   *Conn
 	cipher *gamecipher.Cipher
@@ -56,63 +49,10 @@ func NewSession(conn *Conn, cipher *gamecipher.Cipher) *Session {
 }
 
 // SendFrame encrypts and queues frame, which must already include the
-// little-endian length header. It takes ownership of frame and releases it
-// once the connection writer is done with it.
+// little-endian length header. It never blocks on the peer. It takes ownership
+// of frame and releases it once the connection writer is done with it, or
+// immediately when the connection is closed or aborted for a stalled peer.
 func (s *Session) SendFrame(frame wire.Frame) bool {
-	return s.sendFrame(frame, s.conn.SendFrame)
-}
-
-// TrySendFrame encrypts and queues frame only when the connection's outbound
-// queue has capacity. A full queue disconnects the client before encryption,
-// because dropping an ordered frame would desynchronize its cipher. It takes
-// ownership of frame in every outcome.
-func (s *Session) TrySendFrame(frame wire.Frame) bool {
-	return s.trySendFrame(frame)
-}
-
-func (s *Session) trySendFrame(frame wire.Frame) bool {
-	frameBytes := frame.Bytes()
-	if len(frameBytes) < frameHeaderSize {
-		frame.Release()
-		return false
-	}
-
-	if s.conn.queueFull() {
-		frame.Release()
-		s.conn.abort()
-		return false
-	}
-	for range trySendLockAttempts {
-		if s.mu.TryLock() {
-			defer s.mu.Unlock()
-			return s.encryptAndTrySend(frame, frameBytes)
-		}
-		if s.conn.queueFull() {
-			frame.Release()
-			s.conn.abort()
-			return false
-		}
-		runtime.Gosched()
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.encryptAndTrySend(frame, frameBytes)
-}
-
-// encryptAndTrySend runs with s.mu held.
-func (s *Session) encryptAndTrySend(frame wire.Frame, frameBytes []byte) bool {
-	if s.conn.queueFull() {
-		frame.Release()
-		s.conn.abort()
-		return false
-	}
-	if s.cryptEnabled {
-		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
-	}
-	return s.conn.trySendFrame(frame)
-}
-
-func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {
 		frame.Release()
@@ -125,7 +65,7 @@ func (s *Session) sendFrame(frame wire.Frame, send func(wire.Frame) bool) bool {
 	if s.cryptEnabled {
 		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
 	}
-	return send(frame)
+	return s.conn.SendFrame(frame)
 }
 
 // ReadFrame blocks for the next inbound frame, decrypts it, and returns its
