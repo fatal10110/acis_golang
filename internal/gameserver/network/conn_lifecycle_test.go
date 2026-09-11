@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
@@ -128,30 +129,35 @@ func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	}
 }
 
-// Tiny frames are charged the pooled buffer and queue slot they pin, not just
-// their wire bytes, so a stalled reader flooded with 3-byte replies is cut
-// off at the same memory bound as one fed large frames.
+// Tiny frames are charged the buffer and queue slot they pin, not just their
+// wire bytes, so a stalled reader flooded with 3-byte replies is cut off at
+// the same memory bound as one fed large frames. Each frame here is a grown
+// pooled writer (4 KiB) reused for a 3-byte reply; the expected count is
+// derived from that capacity, independently of how the Conn measures it.
 func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 	server, client := net.Pipe()
 	defer client.Close()
 	c := newConn(server, zerolog.Nop())
 
-	accepted, pinned := 0, 0
-	for {
-		frame := serverpackets.FrameActionFailed()
-		cost := frame.Footprint()
-		if !sendWithin(t, c, frame) {
+	const writerCap = 4096
+	tinyFrame := func() wire.Frame {
+		w := wire.NewFrameWriter(writerCap)
+		w.WriteUint8(serverpackets.OpcodeActionFailed)
+		return wire.OwnedFrame(w.Frame(), w, func(*wire.Writer) {})
+	}
+	perFrame := writerCap + int(unsafe.Sizeof(wire.Frame{}))
+	want := outboundHighWater / perFrame
+
+	accepted := 0
+	for sendWithin(t, c, tinyFrame()) {
+		accepted++
+		if accepted > want+1 {
 			break
 		}
-		accepted++
-		pinned += cost
-		if accepted > outboundHighWater {
-			t.Fatal("stalled reader never aborted")
-		}
 	}
-	if pinned > outboundHighWater {
-		t.Fatalf("accepted %d frames pinning %d bytes of buffers, want at most the %d-byte high-water mark",
-			accepted, pinned, outboundHighWater)
+	if accepted != want {
+		t.Fatalf("accepted %d 3-byte frames each pinning a %d-byte writer, want %d under the %d-byte high-water mark",
+			accepted, writerCap, want, outboundHighWater)
 	}
 	select {
 	case <-c.stopped:
@@ -161,9 +167,11 @@ func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
 }
 
 // Concurrent senders on one encrypted session queue frames in the order they
-// were encrypted: the peer decrypts every frame with a mirror cipher, and any
-// encrypt/queue reordering would roll the keys out of step and corrupt every
-// later frame. Frame lengths vary so a swap can't hide behind equal key rolls.
+// were encrypted. The peer decrypts every frame with a mirror cipher and
+// checks every byte: the rolling key advances only in bytes 8..11 of the
+// 16-byte key, so a frame decrypted out of step comes back corrupt only in
+// payload bytes 8..11 and 24..27 — payloads are long enough to cover both.
+// Frame lengths vary so a swap can't hide behind equal key rolls.
 func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	const senders, perSender = 8, 250
 	key := make([]byte, gamecipher.KeySize)
@@ -180,8 +188,11 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	}
 	peerCipher.Encrypt(nil) // arm it, as the client does once VersionCheck arrives
 	server, client := net.Pipe()
-	defer client.Close()
 	session := NewSession(newConn(server, zerolog.Nop()), serverCipher)
+	t.Cleanup(func() {
+		client.Close()
+		_ = session.conn.Close() // joins the writer goroutine
+	})
 	session.EnableCrypt()
 
 	received := make(chan error, 1)
@@ -199,6 +210,12 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 				received <- fmt.Errorf("decrypted frame sender=%d seq=%d len=%d; stream out of order or corrupt", sender, seq, len(payload))
 				return
 			}
+			for i := 5; i < len(payload); i++ {
+				if payload[i] != orderFill(sender, i) {
+					received <- fmt.Errorf("sender=%d seq=%d byte %d corrupt; encrypt/queue order diverged", sender, seq, i)
+					return
+				}
+			}
 			next[sender]++
 		}
 		received <- nil
@@ -211,6 +228,9 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 				payload := make([]byte, orderPayloadLen(seq))
 				payload[0] = byte(s)
 				binary.LittleEndian.PutUint32(payload[1:5], seq)
+				for i := 5; i < len(payload); i++ {
+					payload[i] = orderFill(byte(s), i)
+				}
 				bytes, err := wire.FrameBytes(payload)
 				if err != nil {
 					t.Error(err)
@@ -234,7 +254,11 @@ func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
 	}
 }
 
-func orderPayloadLen(seq uint32) int { return 5 + int(seq%13) }
+// orderPayloadLen covers payload bytes 24..27, the second span the key roll
+// reaches, in every frame.
+func orderPayloadLen(seq uint32) int { return 28 + int(seq%13) }
+
+func orderFill(sender byte, i int) byte { return byte(i*7) ^ sender }
 
 // BenchmarkSessionSendFrameParallel measures SendFrame when every CPU sends
 // to one session at once — the broadcast fan-out's worst case: all

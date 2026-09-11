@@ -80,8 +80,8 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 // Each iteration takes the whole backlog at once so a burst coalesces into
 // one vectored net.Buffers write instead of one Write syscall per frame.
 // batch and the queue swap backing arrays, so steady state allocates
-// nothing; an array a burst grew past retainedQueueCap is dropped once
-// drained.
+// nothing; once a burst grew them past retainedQueueCap, they and bufs are
+// dropped after it drains.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -127,7 +127,7 @@ func (c *Conn) writeLoop() {
 			return
 		}
 		if cap(batch) > retainedQueueCap {
-			batch = nil
+			batch, bufs = nil, nil
 		}
 	}
 }
