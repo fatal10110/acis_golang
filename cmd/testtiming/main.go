@@ -34,7 +34,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fprint(os.Stdout, output)
+	_, _ = io.WriteString(os.Stdout, output)
 }
 
 func summarize(input io.Reader, limit int) (string, error) {
@@ -71,12 +71,3 @@ func summarize(input io.Reader, limit int) (string, error) {
 	}
 	return out.String(), nil
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func fprint(w io.Writer, text string) { _, _ = io.WriteString(w, text) }

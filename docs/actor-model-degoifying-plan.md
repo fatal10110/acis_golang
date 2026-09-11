@@ -539,6 +539,7 @@ find acis_golang -name '*.go' -type f -exec gofmt -l {} +      # no output
 rtk go -C acis_golang vet ./...
 rtk go -C acis_golang build ./...
 make -C acis_golang test-unit
+make -C acis_golang test-internal                               # broader internal pass; may use DB/sockets
 make -C acis_golang test-race                                   # needs: make -C acis_golang test-db-up
 make -C acis_golang test
 ```

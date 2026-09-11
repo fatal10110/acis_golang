@@ -31,16 +31,7 @@ func seedKnownSkill(t *testing.T, srv *gameservertest.Server, objID int32, skill
 // timing fields along the way.
 func readCastStartFrames(t *testing.T, c clientReader, objID, skillID, level, hitTime, reuse, targetID int32) {
 	t.Helper()
-	assertCastStartFrames(t, [][]byte{c.Read(), c.Read(), c.Read()}, objID, skillID, level, hitTime, reuse, targetID)
-	assertMagicSkillLaunched(t, c.Read(), objID, skillID, level, targetID)
-}
-
-func assertCastStartFrames(t *testing.T, frames [][]byte, objID, skillID, level, hitTime, reuse, targetID int32) {
-	t.Helper()
-	if len(frames) != 3 {
-		t.Fatalf("cast start frames = %d, want 3", len(frames))
-	}
-	reply := frames[0]
+	reply := c.Read()
 	assertFrameOpcode(t, reply, serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	r := wireReader(reply[1:])
 	caster, gotTarget, sid, lvl := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
@@ -53,9 +44,9 @@ func assertCastStartFrames(t *testing.T, frames [][]byte, objID, skillID, level,
 		t.Fatalf("MagicSkillUse timing = hit %d reuse %d, want %d/%d", gotHit, gotReuse, hitTime, reuse)
 	}
 
-	assertSystemMessageSkillFrame(t, frames[1], serverpackets.SystemMessageUseS1, skillID, level)
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, level)
 
-	reply = frames[2]
+	reply = c.Read()
 	assertFrameOpcode(t, reply, serverpackets.OpcodeSetupGauge, "SetupGauge")
 	r = wireReader(reply[1:])
 	color, current, maxTime := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
@@ -66,12 +57,10 @@ func assertCastStartFrames(t *testing.T, frames [][]byte, objID, skillID, level,
 	if color != int32(serverpackets.GaugeBlue) || current != wantCurrent || maxTime != wantMax {
 		t.Fatalf("SetupGauge = color %d current %d max %d, want blue/%d/%d", color, current, maxTime, wantCurrent, wantMax)
 	}
-}
 
-func assertMagicSkillLaunched(t *testing.T, reply []byte, objID, skillID, level, targetID int32) {
-	t.Helper()
+	reply = c.Read()
 	assertFrameOpcode(t, reply, serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
-	r := wireReader(reply[1:])
+	r = wireReader(reply[1:])
 	launchedCaster, launchedSkill, launchedLevel, count, launchedTarget := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
 	if launchedCaster != objID || launchedSkill != skillID || launchedLevel != level || count != 1 || launchedTarget != targetID {
 		t.Fatalf("MagicSkillLaunched = caster %d skill %d level %d count %d target %d, want %d/%d/%d/1/%d",

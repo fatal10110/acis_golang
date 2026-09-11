@@ -10,7 +10,7 @@ test:
 
 # Fast DB-free pure-core pass for edit feedback.
 test-unit:
-	$(GO) test ./internal/config ./internal/commons/crypt ./internal/commons/wire ./internal/link ./internal/loginserver/crypt ./internal/gameserver/network/cipher ./internal/gameserver/network/clientpackets ./internal/gameserver/network/serverpackets ./internal/gameserver/skill/formulas ./internal/gameserver/skill/stat ./internal/gameserver/skill/statbonus
+	$(GO) test ./cmd/testtiming ./internal/config ./internal/commons/crypt ./internal/commons/wire ./internal/link ./internal/loginserver/crypt ./internal/gameserver/network/cipher ./internal/gameserver/network/clientpackets ./internal/gameserver/network/serverpackets ./internal/gameserver/skill/formulas ./internal/gameserver/skill/stat ./internal/gameserver/skill/statbonus
 
 # Broad internal pass, including DB and socket tests outside tests/.
 test-internal:

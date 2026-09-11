@@ -474,7 +474,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetLogger(l.log)
 
 	x, y, z := c.Position()
-	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c, effect.WithClock(l.clock))
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
@@ -150,11 +149,13 @@ type DamageInterrupt struct {
 
 // scheduledTimer is the subset of *time.Timer the delayed cast scheduler
 // needs, narrow enough for tests to substitute a fake clock.
-type scheduledTimer = scheduler.Timer
+type scheduledTimer interface {
+	Stop() bool
+}
 
 // afterFunc matches time.AfterFunc's signature, injectable for deterministic
 // tests.
-type afterFunc func(time.Duration, func()) scheduler.Timer
+type afterFunc func(time.Duration, func()) scheduledTimer
 
 // Controller coordinates validation, resource consumption, cooldowns and
 // interruption state for one actor's active cast.
@@ -189,18 +190,6 @@ type Controller struct {
 // NewController returns a cast controller for actor.
 func NewController(actor Actor) *Controller {
 	return &Controller{actor: actor}
-}
-
-// SetClock supplies the delayed-callback source used by Schedule. A nil clock
-// restores wall-clock scheduling.
-func (c *Controller) SetClock(clock scheduler.Clock) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if clock == nil {
-		c.afterFunc = nil
-		return
-	}
-	c.afterFunc = clock.AfterFunc
 }
 
 // SetLogger records where a panic recovered from a scheduled cast callback

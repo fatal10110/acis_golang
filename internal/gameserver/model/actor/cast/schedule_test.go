@@ -8,27 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/rs/zerolog"
 )
-
-func TestControllerSetClockSchedulesCallbacksWithoutWallTime(t *testing.T) {
-	clock := scheduler.NewManualClock(time.Unix(1000, 0))
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
-	ctrl.SetClock(clock)
-	plan, err := ctrl.Start(clock.Now(), testTarget{}, modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true})
-	if err != nil {
-		t.Fatalf("Start: %v", err)
-	}
-
-	fired := false
-	ctrl.Schedule(plan, Hooks{Hit: func() { fired = true }})
-	clock.Advance(2 * time.Second)
-	if !fired {
-		t.Fatal("hit callback did not run after advancing the injected clock")
-	}
-}
 
 // scalingActor and scalingDef are the exact fixture TestStartScalesTimingAndInstallsReuse
 // already verifies against the oracle formula: HitTime 1500ms scales to

@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
@@ -95,7 +96,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
-		Now:         l.clock.Now(),
+		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
 		Selected:    selected,
