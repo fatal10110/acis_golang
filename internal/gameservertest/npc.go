@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"testing"
+	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -72,6 +73,85 @@ func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Lo
 		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
+}
+
+// AttackingHostile is a stationary hostile NPC wired with a real
+// attack.Controller (see attack.NewAttackable), so a suite can trigger one
+// deterministic melee swing at a live target and observe the resulting
+// Attack frame and damage. Unlike SpawnMovingHostileNPCAtGeo it stays
+// parked: only DoAttack drives it, never the AI loop.
+type AttackingHostile struct {
+	*npc.Hostile
+	ctl *attack.Controller
+}
+
+// DoAttack starts one swing against target and blocks until it lands (the
+// hit is already delivered by the time the animation's finish callback
+// fires), so the caller can assert HP/CP state right after without a
+// wall-clock sleep. It fails the test if the swing does not finish within
+// timeout.
+func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant, timeout time.Duration) {
+	t.Helper()
+	done := make(chan struct{})
+	h.ctl.SetFinished(func() { close(done) })
+	if err := h.ctl.DoAttack(target); err != nil {
+		t.Fatalf("npc attack: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		t.Fatal("npc attack did not finish within timeout")
+	}
+}
+
+// SpawnAttackingHostileNPCAt seeds the fixture monster at an explicit point
+// with a real attack controller instead of SpawnHostileNPCAt's parked stub,
+// so a suite can drive AttackingHostile.DoAttack against a live target.
+func (s *Server) SpawnAttackingHostileNPCAt(t *testing.T, at location.Location) *AttackingHostile {
+	t.Helper()
+	tmpl := &npc.Template{
+		ID:         100,
+		TemplateID: 100,
+		Type:       "Monster",
+		Level:      1,
+		HPMax:      1000,
+		// PAtk is set well above a fixture player's PDef so a landed swing
+		// always deals non-zero damage: the parked-stub fixture template
+		// (SpawnHostileNPCAt) has no attack of its own to need this, but an
+		// attacking NPC's swing must be able to prove damage was blocked,
+		// not merely that it rolled zero anyway.
+		PAtk:            2000,
+		AtkSpd:          300,
+		RunSpeed:        120,
+		WalkSpeed:       60,
+		CollisionRadius: 8,
+		CollisionHeight: 20,
+	}
+	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil)
+	if err != nil {
+		t.Fatalf("new npc live: %v", err)
+	}
+	actorRef := &movingHostileActorRef{}
+	attackCtl := attack.NewAttackable(actorRef)
+	hostile, err := npc.NewHostile(inst, live, parkedMove{}, attackCtl)
+	if err != nil {
+		t.Fatalf("new hostile npc: %v", err)
+	}
+	actorRef.CreatureActor = hostile
+	// A deterministic zero roll always lands (misses evasion, avoids the
+	// crit/damage-spread rolls' variance) so DoAttack's swing reliably
+	// deals damage instead of occasionally missing or rolling near zero.
+	hostile.SetRollSource(func(int) int { return 0 })
+	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	hostile.SetWorld(s.State)
+	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
+	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
+	return &AttackingHostile{Hostile: hostile, ctl: attackCtl}
 }
 
 type movingHostileStatRef struct{ effect.StatOwner }
