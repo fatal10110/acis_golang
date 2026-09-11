@@ -43,16 +43,19 @@ const probeTimeout = 5 * time.Second
 // (default 30s) has every client run a two-second cycle of six clicks on its
 // monster (the first selects it, the rest attack) and two short walks around
 // it, one step every stepInterval. After each step the client sends
-// RequestManorList, whose ExSendManorList reply is self-only and stateless: a
-// connection handles requests in order, so the time from sending the step to
-// reading that reply is the step's server handling latency plus two loopback
-// hops.
-// Reported: process CPU time (server and clients share the process), step
+// RequestSkillList, whose SkillList reply is self-only and whose in-world
+// handler reads the character, so it runs wherever that character's actions
+// run: a character's requests are handled in order, so the time from sending
+// the step to reading that reply is the step's server handling latency plus
+// two loopback hops. A probe that needs no character (such as
+// RequestManorList) could be answered ahead of a step queued for the
+// character and would stop measuring it. Reported: process CPU time (server and clients share the process), step
 // latency p50/p99/max, GC count and pauses, frames received.
 //
 // The run fails unless every client stayed connected, never timed out, never
-// died, left the spawn point and landed an attack: a run that sheds load or
-// quietly drives a different workload is not a comparable baseline.
+// died, left the spawn point, landed an attack and got exactly one probe
+// reply per probe: a run that sheds load or quietly drives a different
+// workload is not a comparable baseline.
 func TestLoadBaseline(t *testing.T) {
 	clients := envInt(t, "ACIS_PERF_CLIENTS", 0)
 	if clients <= 0 {
@@ -132,7 +135,7 @@ func TestLoadBaseline(t *testing.T) {
 
 	var all []time.Duration
 	var frames int64
-	disconnected, died, stationary, noAttack := 0, 0, 0, 0
+	disconnected, died, stationary, noAttack, strayReplies := 0, 0, 0, 0, 0
 	for i, r := range readers {
 		all = append(all, samples[i]...)
 		frames += r.frames.Load()
@@ -147,6 +150,9 @@ func TestLoadBaseline(t *testing.T) {
 		}
 		if r.attacks.Load() == 0 {
 			noAttack++
+		}
+		if r.replies.Load() != r.probes.Load() {
+			strayReplies++
 		}
 	}
 	if len(all) == 0 {
@@ -165,6 +171,9 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	if died > 0 || stationary > 0 || noAttack > 0 {
 		t.Errorf("workload not driven: of %d clients %d died, %d never left the spawn point, %d never landed an attack", clients, died, stationary, noAttack)
+	}
+	if strayReplies > 0 {
+		t.Errorf("%d clients got a probe-reply count different from their probe count; an unsolicited SkillList would corrupt the latency samples", strayReplies)
 	}
 }
 
@@ -199,7 +208,8 @@ func runClient(srv *gameservertest.Server, c *testsupport.ScriptedClient, r *fra
 			target := location.Location{X: mx + rng.IntN(201) - 100, Y: my + rng.IntN(201) - 100, Z: origin.Z}
 			action = encodeMoveBackwardToLocation(target, origin)
 		}
-		if c.TrySend(action) != nil || c.TrySend(encodeRequestManorList()) != nil {
+		r.probes.Add(1)
+		if c.TrySend(action) != nil || c.TrySend(encodeRequestSkillList()) != nil {
 			r.lost.Store(true)
 			break
 		}
@@ -238,6 +248,8 @@ type frameReader struct {
 	probe   chan struct{}
 	frames  atomic.Int64
 	attacks atomic.Int64
+	probes  atomic.Int64
+	replies atomic.Int64
 	lost    atomic.Bool
 	died    atomic.Bool
 	moved   atomic.Bool
@@ -265,7 +277,8 @@ func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
 			if len(frame) >= 5 && frame[0] == serverpackets.OpcodeDie && int32(binary.LittleEndian.Uint32(frame[1:5])) == id {
 				r.died.Store(true)
 			}
-			if isManorListReply(frame) {
+			if frame[0] == serverpackets.OpcodeSkillList {
+				r.replies.Add(1)
 				r.probe <- struct{}{}
 			}
 		}
@@ -278,11 +291,6 @@ func (r *frameReader) stop() {
 	r.done.Store(true)
 	_ = r.client.Close()
 	<-r.stopped
-}
-
-func isManorListReply(frame []byte) bool {
-	return len(frame) >= 3 && frame[0] == serverpackets.OpcodeExtended &&
-		binary.LittleEndian.Uint16(frame[1:3]) == serverpackets.OpcodeExSendManorList
 }
 
 // enterWorld selects the account's only character and drains the EnterWorld
@@ -329,10 +337,8 @@ func encodeMoveBackwardToLocation(target, origin location.Location) []byte {
 	return w.Bytes()
 }
 
-func encodeRequestManorList() []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
-	w.WriteUint16(clientpackets.OpcodeRequestManorList)
-	return w.Bytes()
+func encodeRequestSkillList() []byte {
+	return wire.NewPacketWriter(clientpackets.OpcodeRequestSkillList).Bytes()
 }
 
 func percentile(sorted []time.Duration, p int) time.Duration {

@@ -150,12 +150,33 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
+	// The production event-driven Think hooks (data/manager newLiveHostile):
+	// without them a hostile re-thinks only once per AI tick, and its final
+	// arrival position never reaches world presence.
+	moveCtl.SetArrived(func() {
+		hostile.SyncPosition(moveCtl.Position())
+		hostile.AI().Arrived()
+		s.think(hostile)
+	})
+	moveCtl.SetBlocked(func() bool {
+		moveCtl.BroadcastBlockedCorrection()
+		hostile.AI().ArrivedBlocked()
+		s.think(hostile)
+		return true
+	})
+	attackCtl.SetFinished(func() { s.think(hostile) })
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWorld(s.State)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
+}
+
+func (s *Server) think(hostile *npc.Hostile) {
+	if err := hostile.Think(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: hostile think")
+	}
 }
 
 // TickEffects advances every spawned actor's live effect list once — the

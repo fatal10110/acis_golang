@@ -332,6 +332,7 @@ type Server struct {
 	cursedWeapons    *entity.CursedWeaponTable
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
+	log              zerolog.Logger
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
@@ -1136,6 +1137,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cursedWeapons:    cursed,
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
+		log:              o.log,
 		cancel:           cancel,
 	}
 }
