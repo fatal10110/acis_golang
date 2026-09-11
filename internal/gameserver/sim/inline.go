@@ -4,8 +4,6 @@ import (
 	"container/heap"
 	"sync"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 // Inline is a deterministic single-threaded executor for tests. Every queue
@@ -13,9 +11,11 @@ import (
 // follow a virtual clock that moves only on Advance. Post is safe from any
 // goroutine but never runs a task; Run and Advance run them on the calling
 // goroutine and must not be called from a task.
+//
+// Unlike Pool, Inline does not recover: a task's panic reaches the caller of
+// Run or Advance, so a test fails instead of logging it. The queue is left
+// idle and the tasks behind it run on the next call.
 type Inline struct {
-	log zerolog.Logger
-
 	mu     sync.Mutex
 	now    time.Time
 	tasks  []inlineTask
@@ -29,8 +29,8 @@ type inlineTask struct {
 }
 
 // NewInline returns an idle loop whose clock reads start.
-func NewInline(start time.Time, log zerolog.Logger) *Inline {
-	return &Inline{log: log, now: start}
+func NewInline(start time.Time) *Inline {
+	return &Inline{now: start}
 }
 
 // NewQueue returns an open queue run by in. id names it in logs.
@@ -58,7 +58,7 @@ func (in *Inline) Run() {
 		in.tasks[0] = inlineTask{}
 		in.tasks = in.tasks[1:]
 		in.mu.Unlock()
-		drainAs(t.q, func() { runTask(in.log, t.q.id, t.fn) })
+		drainAs(t.q, t.fn)
 	}
 }
 

@@ -3,14 +3,12 @@ package sim
 import (
 	"testing"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 var epoch = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 func TestInlineRunsAllQueuesInGlobalPostOrder(t *testing.T) {
-	in := NewInline(epoch, zerolog.Nop())
+	in := NewInline(epoch)
 	a, b := in.NewQueue("a"), in.NewQueue("b")
 	var order []string
 	a.Post(func() {
@@ -38,7 +36,7 @@ func TestInlineRunsAllQueuesInGlobalPostOrder(t *testing.T) {
 }
 
 func TestInlineAdvanceFiresExactlyTheDueTimers(t *testing.T) {
-	in := NewInline(epoch, zerolog.Nop())
+	in := NewInline(epoch)
 	q := in.NewQueue("q")
 	type fire struct {
 		name string
@@ -79,7 +77,7 @@ func TestInlineAdvanceFiresExactlyTheDueTimers(t *testing.T) {
 }
 
 func TestInlineTimerStopCancelsBeforeFire(t *testing.T) {
-	in := NewInline(epoch, zerolog.Nop())
+	in := NewInline(epoch)
 	q := in.NewQueue("q")
 	var n int
 	tm := q.After(time.Millisecond, func() { n++ })
@@ -96,6 +94,30 @@ func TestInlineTimerStopCancelsBeforeFire(t *testing.T) {
 	in.Advance(time.Second)
 	if n != 1 || tm.Stop() {
 		t.Fatalf("fired %d times, Stop after expiry must report false", n)
+	}
+}
+
+func TestInlinePropagatesTaskPanicsToTheCaller(t *testing.T) {
+	in := NewInline(epoch)
+	q := in.NewQueue("q")
+	ran := false
+	q.Post(func() { panic("boom") })
+	q.Post(func() { ran = true })
+
+	if !panics(in.Run) {
+		t.Fatal("Run swallowed a task panic")
+	}
+	if !panics(func() { AssertOwner(q) }) {
+		t.Fatal("queue still marked as draining after the panic")
+	}
+	in.Run()
+	if !ran {
+		t.Fatal("task queued behind the panic did not run on the next Run")
+	}
+
+	q.After(time.Millisecond, func() { panic("timer") })
+	if !panics(func() { in.Advance(time.Millisecond) }) {
+		t.Fatal("Advance swallowed a timer callback panic")
 	}
 }
 
