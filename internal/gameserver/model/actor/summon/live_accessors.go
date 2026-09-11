@@ -442,8 +442,8 @@ func (a *Actor) Immobilized() bool {
 
 // SetImmobilized sets or clears this summon's movement-lock flag. It reports
 // whether the flag actually changed. It does not yet save/restore follow
-// mode the way Summon.setIsImmobilized's override does — tracked as a
-// follow-up gap, not yet ported.
+// mode the way Summon.setIsImmobilized's override does — not yet ported,
+// see fatal10110/acis_golang#2319.
 func (a *Actor) SetImmobilized(v bool) bool {
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
