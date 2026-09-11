@@ -12,7 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // hostileNPCSpawn is the fixed spawn point every fixture NPC uses: inside
@@ -93,7 +92,14 @@ func (s *Server) SpawnMovingHostileNPCAt(t *testing.T, kind string, home, at loc
 // movement geo, so a suite can close the path after the walk starts.
 func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at location.Location, geo move.Geo) *npc.Hostile {
 	t.Helper()
-	tmpl := &npc.Template{
+	return s.spawnMovingHostile(t, MovingHostileTemplate(kind), home, at, geo)
+}
+
+// MovingHostileTemplate returns a fresh copy of the template
+// SpawnMovingHostileNPCAt spawns for kind, for a suite that tunes a field
+// and spawns it with SpawnMovingHostileNPCTemplate.
+func MovingHostileTemplate(kind string) *npc.Template {
+	return &npc.Template{
 		ID:              100,
 		TemplateID:      100,
 		Type:            kind,
@@ -106,11 +112,22 @@ func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at 
 		CollisionRadius: 8,
 		CollisionHeight: 20,
 	}
+}
+
+// SpawnMovingHostileNPCTemplate is SpawnMovingHostileNPCAt for a
+// caller-tuned template (see MovingHostileTemplate).
+func (s *Server) SpawnMovingHostileNPCTemplate(t *testing.T, tmpl *npc.Template, home, at location.Location) *npc.Hostile {
+	t.Helper()
+	return s.spawnMovingHostile(t, tmpl, home, at, Geo{})
+}
+
+func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at location.Location, geo move.Geo) *npc.Hostile {
+	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Kind = npc.InstanceKind(kind)
+	inst.Kind = npc.InstanceKind(tmpl.Type)
 	inst.HasHome = true
 	inst.Home = home
 	statRef := &movingHostileStatRef{}
@@ -123,7 +140,7 @@ func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at 
 	if err != nil {
 		t.Fatalf("new move controller: %v", err)
 	}
-	moveCtl.SetPositionUpdates(task.NewPositionUpdates(s.State))
+	moveCtl.SetPositionUpdates(s.positions)
 	actorRef := &movingHostileActorRef{}
 	attackCtl := attack.NewAttackable(actorRef)
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
@@ -133,12 +150,33 @@ func (s *Server) SpawnMovingHostileNPCAtGeo(t *testing.T, kind string, home, at 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
+	// The production event-driven Think hooks (data/manager newLiveHostile):
+	// without them a hostile re-thinks only once per AI tick, and its final
+	// arrival position never reaches world presence.
+	moveCtl.SetArrived(func() {
+		hostile.SyncPosition(moveCtl.Position())
+		hostile.AI().Arrived()
+		s.think(hostile)
+	})
+	moveCtl.SetBlocked(func() bool {
+		moveCtl.BroadcastBlockedCorrection()
+		hostile.AI().ArrivedBlocked()
+		s.think(hostile)
+		return true
+	})
+	attackCtl.SetFinished(func() { s.think(hostile) })
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWorld(s.State)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
+}
+
+func (s *Server) think(hostile *npc.Hostile) {
+	if err := hostile.Think(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: hostile think")
+	}
 }
 
 // TickEffects advances every spawned actor's live effect list once — the
