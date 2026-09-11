@@ -482,3 +482,96 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 		t.Fatalf("held effects after buff victim expiry = %v, want [301]", ids)
 	}
 }
+
+// TestMixedPolarityHeldVictimSurvivesNewcomerExpiry pins the dominant
+// ordering the issue's own example produces: the debuff newcomer (Block Wind
+// Walk, 120s) is far shorter than the buff victim it displaced (Wind Walk,
+// 1200s). When the newcomer expires first, remove() empties and deletes the
+// stack queue (list_stacking.go:195-196) before the victim's own natural
+// expiry ever runs, so the victim's later remove() call early-returns
+// (list_stacking.go:167-171, mirroring EffectList.java:533-539) and never
+// touches the visible list. The victim is never released by its own
+// schedule: it stays held, inactive, until relog.
+func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
+	blocker := modelskill.Definition{
+		ID: 302, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 0, StaticHitTime: true, StaticReuse: true,
+		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+		BaseLandRate: 100, IgnoreResists: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 2, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			stackedBuffDef(203, 1, 60), blocker,
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 203, 1)
+	seedKnownSkill(t, srv, objID, 302, 1)
+	startInWorld(t, c)
+
+	castSlotBuff(t, c, objID, 203)
+	castSlotBuff(t, c, objID, 302)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{203, 302}) {
+		t.Fatalf("held effects after same-stack debuff = %v, want buff victim still held [203 302]", ids)
+	}
+
+	time.Sleep(2200 * time.Millisecond)
+	srv.TickEffects()
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 302, 1)
+	drainUntilQuiet(t, c)
+
+	// The newcomer's own expiry emptied the stack queue; the long-lived
+	// victim (203, 60s) is still well inside its own duration but is
+	// permanently held now, not merely delayed.
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{203}) {
+		t.Fatalf("held effects after newcomer expiry = %v, want victim still held [203]", ids)
+	}
+}
+
+// TestMixedPolarityHeldVictimCountsForDoesStack is the regression case for
+// doesStack: once a cancel-lesser victim is held in l.buffs (this PR) rather
+// than dropped, doesStack must scan l.buffs like Java
+// (EffectList.java:240-259), not the stack queue — otherwise it stops
+// seeing the held victim's stack type and a later same-type cast wrongly
+// evicts an unrelated buff-slot buff instead of just cancelling itself.
+func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
+	blocker := modelskill.Definition{
+		ID: 306, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 0, StaticHitTime: true, StaticReuse: true,
+		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+		BaseLandRate: 100, IgnoreResists: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithMaxBuffsAmount(2),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			slotBuffDef(304), stackedBuffDef(305, 1, 60), blocker, stackedBuffDef(307, 2, 60),
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 304, 1)
+	seedKnownSkill(t, srv, objID, 305, 1)
+	seedKnownSkill(t, srv, objID, 306, 1)
+	seedKnownSkill(t, srv, objID, 307, 1)
+	startInWorld(t, c)
+
+	castSlotBuff(t, c, objID, 304)
+	castSlotBuff(t, c, objID, 305)
+	castSlotBuff(t, c, objID, 306)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{304, 305, 306}) {
+		t.Fatalf("held effects at cap = %v, want [304 305 306]", ids)
+	}
+
+	// 307 is weaker than the active blocker (306) in the same stack, so
+	// cancel-lesser cancels 307 itself. doesStack must see the held 305 and
+	// skip cap eviction — 304 (unrelated buff-slot buff) must survive.
+	castSlotBuff(t, c, objID, 307)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{304, 305, 306}) {
+		t.Fatalf("held effects after weaker same-stack cast = %v, want unrelated buff kept [304 305 306]", ids)
+	}
+}

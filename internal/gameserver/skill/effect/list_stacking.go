@@ -5,13 +5,17 @@ import (
 	"slices"
 )
 
+// doesStack mirrors Java's _buffs scan (EffectList.java:240-259), not the
+// stack queue: a cancel-lesser victim stays in l.buffs after leaving its
+// stack queue (see addStacked), and Java still counts it here so a same-type
+// buff doesn't trigger cap eviction it wouldn't otherwise need.
 func (l *List) doesStack(e *Effect) bool {
 	stackType := e.stackType()
 	if stackType == "none" {
 		return false
 	}
-	for _, existing := range l.stacks[stackType] {
-		if existing != nil && !existing.Skill.Debuff {
+	for _, existing := range l.buffs {
+		if existing != nil && existing.stackType() == stackType {
 			return true
 		}
 	}
@@ -98,7 +102,12 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			queue = slices.Delete(queue, 1, 2)
 			// The victim leaves the newcomer's visible list, not its own: a
 			// buff displaced by a same-stack debuff (or vice versa) stays held,
-			// inactive, until it ends on its own.
+			// inactive, counted by doesStack/buffCount, and OR'd into
+			// flagsLocked — for as long as this stack queue stays non-empty.
+			// remove() (below) early-returns once the queue is gone
+			// (EffectList.java:533-539), so if the newcomer's own duration
+			// ends first, the queue empties and the victim's later expiry
+			// never touches the visible list: it stays held until relog.
 			if e.Skill.Debuff {
 				removeEffect(&l.debuffs, victim)
 			} else {
