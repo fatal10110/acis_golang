@@ -249,7 +249,11 @@ func applyRaidCurseEffects(attacker RaidCurseAttacker, target RaidCurseTarget, d
 	if def.EffectRange > 0 {
 		ax, ay, az := attacker.Position()
 		tx, ty, tz := target.Position()
-		if !location.In3DRange(tx, ty, tz, ax, ay, az, def.EffectRange) {
+		from := location.Location{X: tx, Y: ty, Z: tz}
+		to := location.Location{X: ax, Y: ay, Z: az}
+		// The landing gate is a strict radius: a target exactly at
+		// EffectRange is outside it.
+		if !from.In3DRadius(to, def.EffectRange) {
 			return
 		}
 	}

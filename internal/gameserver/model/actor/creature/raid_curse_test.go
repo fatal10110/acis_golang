@@ -312,6 +312,7 @@ type curseNPC struct {
 	level       int
 	attackable  bool
 	raidRelated bool
+	x, y, z     int
 	hate        map[int32]float64
 	hateStops   int
 	stopped     attackable.Combatant
@@ -324,7 +325,7 @@ func (n *curseNPC) Dead() bool                { return false }
 func (n *curseNPC) Attackable() bool          { return n.attackable }
 func (n *curseNPC) Level() int                { return n.level }
 func (n *curseNPC) NpcID() int                { return n.npcID }
-func (n *curseNPC) Position() (int, int, int) { return 0, 0, 0 }
+func (n *curseNPC) Position() (int, int, int) { return n.x, n.y, n.z }
 func (n *curseNPC) RaidRelated() bool         { return n.raidRelated }
 func (n *curseNPC) AggroHate(c attackable.Combatant) float64 {
 	if n.hate == nil || c == nil {
@@ -373,5 +374,42 @@ func raidCurseSkills() curseSkills {
 				StackType: "speed_down", StackOrder: 99, EffectPower: -1,
 			}},
 		},
+	}
+}
+
+func TestCursesOnAttackEffectRangeBoundary(t *testing.T) {
+	cases := []struct {
+		name    string
+		x, y, z int
+		applied bool
+	}{
+		{name: "axis aligned at exact range", x: 2000, applied: false},
+		{name: "pythagorean at exact range", x: 1200, y: 1600, applied: false},
+		{name: "z axis at exact range", z: 2000, applied: false},
+		{name: "one unit inside range", x: 1999, applied: true},
+		{name: "inside range on all three axes", x: 1000, y: 1000, z: 1000, applied: true},
+		{name: "beyond range", x: 2001, applied: false},
+		{name: "beyond range on the z axis", z: 2001, applied: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			attacker := newCursePlayable(t, 80)
+			target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, x: tc.x, y: tc.y, z: tc.z}
+			blocked := TestCursesOnAttack(RaidCurseInput{
+				Attacker:  attacker,
+				Target:    target,
+				NPCID:     target.npcID,
+				Skills:    raidCurseSkills(),
+				Broadcast: func(MagicSkillUse) {},
+			})
+			if got := hasActiveSkill(attacker.EffectList(), modelskill.RaidCurse2SkillID); got != tc.applied {
+				t.Fatalf("petrification applied = %v, want %v", got, tc.applied)
+			}
+			// The curse fires and stops hate regardless of whether the
+			// effect lands; only the effect is range-gated.
+			if !blocked {
+				t.Fatal("TestCursesOnAttack() = false, want true")
+			}
+		})
 	}
 }
