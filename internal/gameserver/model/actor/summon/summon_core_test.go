@@ -407,6 +407,28 @@ func TestSummonMovementDisabledExcludesFear(t *testing.T) {
 	}
 }
 
+func TestSummonImmobilizedIsIndependentOfRooted(t *testing.T) {
+	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
+
+	if !summon.SetImmobilized(true) || !summon.MovementDisabled() {
+		t.Fatal("SetImmobilized(true) must set the flag and disable movement")
+	}
+	if summon.EffectList().IsAffected(effect.FlagRooted) {
+		t.Fatal("SetImmobilized must not set FlagRooted; the two are distinct states")
+	}
+	if !summon.SetImmobilized(false) || summon.MovementDisabled() {
+		t.Fatal("SetImmobilized(false) must clear the flag and re-enable movement")
+	}
+
+	summon.EffectList().Add(&effect.Effect{Flag: effect.FlagRooted})
+	if !summon.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false while rooted")
+	}
+	if summon.Immobilized() {
+		t.Fatal("Immobilized() must not report true from the unrelated FlagRooted effect")
+	}
+}
+
 // TestSummonOutOfControlHonorsBetrayedFlag is the regression test for the
 // review finding that OutOfControl only read a.disabled, so a betrayed
 // summon kept accepting owner commands instead of refusing them with

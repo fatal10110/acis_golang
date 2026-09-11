@@ -27,7 +27,7 @@ func (a *Actor) AttackDisabled() bool { return a.DenyAIAction() }
 // included: it is an out-of-control state, not a movement lock. Sit/stand
 // do not apply to summons.
 func (a *Actor) MovementDisabled() bool {
-	if a.AlikeDead() || a.Paralyzed() || a.Teleporting() {
+	if a.AlikeDead() || a.Paralyzed() || a.Teleporting() || a.Immobilized() {
 		return true
 	}
 	if a.effects == nil {
