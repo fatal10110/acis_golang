@@ -438,3 +438,47 @@ func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
 		t.Fatalf("icons after stronger expiry = %v, want lesser restored [201]", buffSlotIDs(entries))
 	}
 }
+
+// TestMixedPolarityCancelLesserKeepsBuffVictimHeld pins the cancel-lesser
+// list selection for a mixed stack (Wind Walk 1204 then Block Wind Walk 1359,
+// both "speed_up"): the displaced member is dropped from the newcomer's
+// visible list, so a buff victim of a debuff newcomer stays held, inactive
+// and icon-less, until it wears off on its own with S1_HAS_WORN_OFF.
+func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
+	blocker := modelskill.Definition{
+		ID: 301, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 0, StaticHitTime: true, StaticReuse: true,
+		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+		BaseLandRate: 100, IgnoreResists: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			stackedBuffDef(201, 1, 2), blocker,
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 201, 1)
+	seedKnownSkill(t, srv, objID, 301, 1)
+	startInWorld(t, c)
+
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 201)); !slices.Equal(icons, []int32{201}) {
+		t.Fatalf("icons after buff = %v, want [201]", icons)
+	}
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 301)); !slices.Equal(icons, []int32{301}) {
+		t.Fatalf("icons after same-stack debuff = %v, want only active [301]", icons)
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 301}) {
+		t.Fatalf("held effects after same-stack debuff = %v, want buff victim still held [201 301]", ids)
+	}
+
+	time.Sleep(2200 * time.Millisecond)
+	srv.TickEffects()
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 201, 1)
+	drainUntilQuiet(t, c)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{301}) {
+		t.Fatalf("held effects after buff victim expiry = %v, want [301]", ids)
+	}
+}

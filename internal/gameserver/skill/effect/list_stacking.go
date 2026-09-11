@@ -96,7 +96,14 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 		if l.shouldCancelLesser() && !e.Herb && len(queue) > 1 {
 			victim := queue[1]
 			queue = slices.Delete(queue, 1, 2)
-			l.removeFromVisible(victim)
+			// The victim leaves the newcomer's visible list, not its own: a
+			// buff displaced by a same-stack debuff (or vice versa) stays held,
+			// inactive, until it ends on its own.
+			if e.Skill.Debuff {
+				removeEffect(&l.debuffs, victim)
+			} else {
+				removeEffect(&l.buffs, victim)
+			}
 		}
 	} else {
 		queue = append(queue, e)
