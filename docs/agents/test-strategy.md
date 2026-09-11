@@ -61,6 +61,11 @@ formulas (`skill/formulas`, `stat*`), config/property parsing, crypt primitives,
 arithmetic. Table-driven, zero shared fixtures, no build tag. A new file outside `tests/` must fit
 one of these categories.
 
+Concurrency primitives (`internal/gameserver/sim`, `internal/commons/scheduler`) are the one other
+exception: their scheduling, ordering, and ownership contracts cannot be observed through packets,
+so they keep in-package `-race` tests. `sim`'s `simdebug`-tagged tests are the only allowed build
+tag.
+
 ### Legacy in-package tests
 
 Existing per-package tests remain until their domain's behavior suite covers them, then get
