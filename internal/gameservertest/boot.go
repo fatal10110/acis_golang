@@ -17,6 +17,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -106,6 +107,7 @@ type options struct {
 	levels                 *player.LevelTable
 	log                    zerolog.Logger
 	geo                    move.Geo
+	productionTickers      bool
 }
 
 type characterSpec struct {
@@ -284,6 +286,15 @@ func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log 
 // players. The default is the always-passable Geo double.
 func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
 
+// WithProductionTickers starts the recurring tasks the production boot runs
+// on the move/attack path — position updates, effects, attack stance,
+// inventory updates, item persistence, NPC AI and NPC regen — on their real
+// wall-clock tickers, stopped at cleanup, and exposes the AI registry as
+// Server.AI. Without it every one of them stays idle and suites drive them by
+// hand. Effects is the process-wide shared registry, so a suite using this
+// must not tick it by hand in parallel.
+func WithProductionTickers() Option { return func(o *options) { o.productionTickers = true } }
+
 func bootGeo(geo move.Geo) move.Geo {
 	if geo != nil {
 		return geo
@@ -308,17 +319,20 @@ type Server struct {
 	ShadowItems      *task.ShadowItems
 	AttackStance     *task.AttackStance
 	Effects          *task.Effects
+	AI               *task.AI
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
 	levelTable       *player.LevelTable
 	ids              *sequentialIDs
+	positions        *task.PositionUpdates
 	addr             net.Addr
 	sessions         *manager.SessionStore
 	groundStore      *gamesql.GroundItemStore
 	cursedWeapons    *entity.CursedWeaponTable
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
+	log              zerolog.Logger
 
 	closeOnce sync.Once
 	cancel    context.CancelFunc
@@ -941,6 +955,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("new autosave: %v", err)
 	}
+	positions := task.NewPositionUpdates(state)
+	var ai *task.AI
+	if o.productionTickers {
+		ai = task.NewAI(state, o.log)
+		if o.attackStance == nil && o.attackStanceNow == nil {
+			o.attackStanceNow = time.Now
+		}
+	}
 	gclConfig := network.GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        func() *network.LoginLink { return loginLink },
@@ -964,7 +986,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Geo:              bootGeo(o.geo),
 		IDs:              ids,
 		GroundItems:      groundItems,
-		Positions:        task.NewPositionUpdates(state),
+		Positions:        positions,
 		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
 		SevenSigns:       sevenSigns,
@@ -995,8 +1017,24 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if attackStance != nil {
 		gclConfig.AttackStance = attackStance
 	}
+	if ai != nil {
+		gclConfig.AI = ai
+	}
 	gcl := network.NewGameClientLink(gclConfig)
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	if o.productionTickers {
+		for _, start := range []func(zerolog.Logger) *scheduler.Ticker{
+			positions.Start,
+			taskEffects.Start,
+			attackStance.Start,
+			inventoryUpdates.Start,
+			itemInstances.Start,
+			ai.Start,
+			task.NewNPCRegen(state).Start,
+		} {
+			t.Cleanup(start(o.log).StopAndWait)
+		}
+	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -1088,15 +1126,18 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ShadowItems:      shadowItems,
 		AttackStance:     attackStance,
 		Effects:          taskEffects,
+		AI:               ai,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,
+		positions:        positions,
 		addr:             ln.Addr(),
 		sessions:         sessions,
 		groundStore:      gamesql.NewGroundItemStore(db),
 		cursedWeapons:    cursed,
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
+		log:              o.log,
 		cancel:           cancel,
 	}
 }

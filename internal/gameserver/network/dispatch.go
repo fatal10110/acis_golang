@@ -367,6 +367,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		newCipherKey: randomCipherKey,
 		noCipher:     cfg.NoCipher,
 	}
+	// Built here, not lazily: every client goroutine shares this link.
+	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
 	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {
 		return time.AfterFunc(d, func() {
 			defer func() {

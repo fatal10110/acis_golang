@@ -48,18 +48,29 @@ func Dial(t *testing.T, addr string) *ScriptedClient {
 // as a failure.
 func (f *ScriptedClient) ReadWithTimeout(d time.Duration) []byte {
 	f.t.Helper()
+	payload, err := f.TryRead(d)
+	if err != nil {
+		f.t.Fatalf("ReadFrame: %v", err)
+	}
+	return payload
+}
+
+// TryRead is ReadWithTimeout for drivers that count a failed connection
+// instead of failing the test: nil, nil on timeout, the read error otherwise.
+// Safe to call from a goroutine other than the test's.
+func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 	f.conn.SetReadDeadline(time.Now().Add(d))
 	payload, err := wire.ReadFrame(f.conn)
 	if err != nil {
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
-			return nil
+			return nil, nil
 		}
-		f.t.Fatalf("ReadFrame: %v", err)
+		return nil, err
 	}
 	if f.cipher != nil {
 		f.cipher.Decrypt(payload)
 	}
-	return payload
+	return payload, nil
 }
 
 // AwaitClose reports whether the server closes the connection within d,
@@ -123,13 +134,20 @@ func (f *ScriptedClient) Send(payload []byte) {
 	if !f.handshaken {
 		f.t.Fatal("send called before ProtocolVersion/VersionCheck handshake")
 	}
+	if err := f.TrySend(payload); err != nil {
+		f.t.Fatalf("WriteFrame: %v", err)
+	}
+}
+
+// TrySend is Send for drivers that count a failed connection instead of
+// failing the test. The handshake must already be done. Safe to call from a
+// goroutine other than the test's.
+func (f *ScriptedClient) TrySend(payload []byte) error {
 	buf := append([]byte(nil), payload...)
 	if f.cipher != nil {
 		f.cipher.Encrypt(buf)
 	}
-	if err := wire.WriteFrame(f.conn, buf); err != nil {
-		f.t.Fatalf("WriteFrame: %v", err)
-	}
+	return wire.WriteFrame(f.conn, buf)
 }
 
 // Read blocks until one frame arrives or the 5s deadline expires, returning
