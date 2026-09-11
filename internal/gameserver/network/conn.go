@@ -4,17 +4,34 @@ import (
 	"net"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/rs/zerolog"
 )
 
-// outboundHighWater is how many unwritten bytes a Conn tolerates before it
-// treats the peer as stalled and aborts the connection. Frames are never
+// outboundHighWater is how much memory a Conn's unwritten backlog may pin
+// before the peer is treated as stalled and the connection is aborted. Each
+// frame is charged what it holds until written — its pooled buffer's
+// capacity plus its queue slot (frameCost), not only its wire bytes — so a
+// flood of tiny replies is bounded like a few large frames. Frames are never
 // dropped individually: skipping one would desynchronize the client's cipher.
-// It is far above any healthy burst (an EnterWorld in a crowded town is a few
-// hundred KiB) and caps a stalled client's backlog at 16 maximum-size frames.
-const outboundHighWater = 1 << 20
+// 2 MiB is several thousand typical frames, well above a healthy burst such
+// as an EnterWorld in a crowded town.
+const outboundHighWater = 2 << 20
+
+// queuedFrameBytes is the queue slot each backlog frame occupies.
+const queuedFrameBytes = int(unsafe.Sizeof(wire.Frame{}))
+
+// retainedQueueCap is the largest queue backing array a Conn keeps after a
+// burst drains; larger ones are dropped so an idle connection doesn't hold
+// its peak backlog's slots for life.
+const retainedQueueCap = 1024
+
+// frameCost is what frame counts against outboundHighWater.
+func frameCost(frame wire.Frame) int {
+	return frame.Footprint() + queuedFrameBytes
+}
 
 // Conn is one accepted game-client connection: a net.Conn plus an
 // unbounded outbound FIFO drained by a single dedicated writer goroutine, so
@@ -29,7 +46,7 @@ type Conn struct {
 	// swap out the queue, never across I/O.
 	mu      sync.Mutex
 	queue   []wire.Frame
-	pending int // bytes queued or being written
+	pending int // frameCost of every frame queued or being written
 	closed  bool
 
 	wake     chan struct{} // capacity 1: queue gained frames or closed was set
@@ -62,6 +79,9 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 //
 // Each iteration takes the whole backlog at once so a burst coalesces into
 // one vectored net.Buffers write instead of one Write syscall per frame.
+// batch and the queue swap backing arrays, so steady state allocates
+// nothing; an array a burst grew past retainedQueueCap is dropped once
+// drained.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -77,8 +97,7 @@ func (c *Conn) writeLoop() {
 		close(c.stopped)
 	}()
 	// batch and bufs are reused across iterations — this loop is their only
-	// owner, so no other goroutine ever sees them. batch swaps backing arrays
-	// with c.queue, so steady state allocates nothing.
+	// owner, so no other goroutine ever sees them.
 	var batch []wire.Frame
 	var bufs net.Buffers
 	for {
@@ -97,15 +116,18 @@ func (c *Conn) writeLoop() {
 			}
 			continue
 		}
-		var written int
+		var cost int
 		var err error
-		bufs, written, err = c.writeBatch(batch, bufs)
+		bufs, cost, err = c.writeBatch(batch, bufs)
 		c.mu.Lock()
-		c.pending -= written
+		c.pending -= cost
 		c.mu.Unlock()
 		if err != nil {
 			c.log.Warn().Err(err).Msg("game connection write failed, closing")
 			return
+		}
+		if cap(batch) > retainedQueueCap {
+			batch = nil
 		}
 	}
 }
@@ -114,21 +136,21 @@ func (c *Conn) writeLoop() {
 // net.Buffers write and releases all of them (win or lose) once the
 // write attempt finishes. It reuses bufs' storage and returns it, possibly
 // grown, for the next batch; WriteTo consumes a separate slice header, so
-// the returned one keeps the whole backing array. size is the byte total the
-// batch held, so the caller can retire it from pending either way.
-func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, size int, _ error) {
+// the returned one keeps the whole backing array. cost is the batch's total
+// frameCost, so the caller can retire it from pending either way.
+func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, cost int, _ error) {
 	defer releaseFrames(batch)
 	bufs = bufs[:0]
 	for _, frame := range batch {
 		bufs = append(bufs, frame.Bytes())
-		size += len(frame.Bytes())
+		cost += frameCost(frame)
 	}
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
-		return bufs, size, err
+		return bufs, cost, err
 	}
 	send := bufs
 	_, err := send.WriteTo(c.Conn)
-	return bufs, size, err
+	return bufs, cost, err
 }
 
 // releaseFrames releases every frame and clears the slots so a reused
@@ -150,21 +172,21 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 		frame.Release()
 		return false
 	}
-	size := len(frame.Bytes())
+	cost := frameCost(frame)
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		frame.Release()
 		return false
 	}
-	if c.pending+size > outboundHighWater {
+	if c.pending+cost > outboundHighWater {
 		c.mu.Unlock()
 		frame.Release()
 		c.abort()
 		return false
 	}
 	c.queue = append(c.queue, frame)
-	c.pending += size
+	c.pending += cost
 	c.mu.Unlock()
 	c.signal()
 	return true

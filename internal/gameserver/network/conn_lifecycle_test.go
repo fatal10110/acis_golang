@@ -2,12 +2,17 @@ package network
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/rs/zerolog"
 )
 
@@ -76,7 +81,7 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 }
 
 // A peer that never reads is disconnected once its unwritten backlog would
-// pass the byte high-water mark; no send ever blocks and every frame is
+// pass the high-water mark; no send ever blocks and every frame is
 // released exactly once.
 func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	server, client := net.Pipe()
@@ -84,18 +89,21 @@ func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	c := newConn(server, zerolog.Nop())
 
 	const frameSize = wire.MaxFrameLength
+	// These frames own no pooled writer, so each costs its bytes plus its
+	// queue slot.
+	want := outboundHighWater / (frameSize + queuedFrameBytes)
 	var released atomic.Int64
 	sent, accepted := 0, 0
-	for ; sent <= outboundHighWater/frameSize+1; sent++ {
+	for ; sent <= want+1; sent++ {
 		if !sendWithin(t, c, countedFrame(t, frameSize, uint32(sent), &released)) {
 			break
 		}
 		accepted++
 	}
 	sent++ // the rejected frame
-	if accepted != outboundHighWater/frameSize {
+	if accepted != want {
 		t.Fatalf("accepted %d frames of %d bytes, want %d under the %d-byte high-water mark",
-			accepted, frameSize, outboundHighWater/frameSize, outboundHighWater)
+			accepted, frameSize, want, outboundHighWater)
 	}
 	if sendWithin(t, c, countedFrame(t, 64, 0, &released)) {
 		t.Fatal("send after abort succeeded")
@@ -117,5 +125,150 @@ func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	}
 	if got := released.Load(); got != int64(sent) {
 		t.Fatalf("released %d frames, want %d", got, sent)
+	}
+}
+
+// Tiny frames are charged the pooled buffer and queue slot they pin, not just
+// their wire bytes, so a stalled reader flooded with 3-byte replies is cut
+// off at the same memory bound as one fed large frames.
+func TestConnChargesSmallFramesTheirPinnedMemory(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+	c := newConn(server, zerolog.Nop())
+
+	accepted, pinned := 0, 0
+	for {
+		frame := serverpackets.FrameActionFailed()
+		cost := frame.Footprint()
+		if !sendWithin(t, c, frame) {
+			break
+		}
+		accepted++
+		pinned += cost
+		if accepted > outboundHighWater {
+			t.Fatal("stalled reader never aborted")
+		}
+	}
+	if pinned > outboundHighWater {
+		t.Fatalf("accepted %d frames pinning %d bytes of buffers, want at most the %d-byte high-water mark",
+			accepted, pinned, outboundHighWater)
+	}
+	select {
+	case <-c.stopped:
+	case <-time.After(time.Second):
+		t.Fatal("aborted connection writer did not stop")
+	}
+}
+
+// Concurrent senders on one encrypted session queue frames in the order they
+// were encrypted: the peer decrypts every frame with a mirror cipher, and any
+// encrypt/queue reordering would roll the keys out of step and corrupt every
+// later frame. Frame lengths vary so a swap can't hide behind equal key rolls.
+func TestSessionConcurrentSendsKeepEncryptOrder(t *testing.T) {
+	const senders, perSender = 8, 250
+	key := make([]byte, gamecipher.KeySize)
+	for i := range key {
+		key[i] = byte(i*31 + 7)
+	}
+	serverCipher, err := gamecipher.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerCipher, err := gamecipher.NewCipher(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	peerCipher.Encrypt(nil) // arm it, as the client does once VersionCheck arrives
+	server, client := net.Pipe()
+	defer client.Close()
+	session := NewSession(newConn(server, zerolog.Nop()), serverCipher)
+	session.EnableCrypt()
+
+	received := make(chan error, 1)
+	go func() {
+		next := make([]uint32, senders)
+		for range senders * perSender {
+			payload, err := wire.ReadFrame(client)
+			if err != nil {
+				received <- err
+				return
+			}
+			peerCipher.Decrypt(payload)
+			sender, seq := payload[0], binary.LittleEndian.Uint32(payload[1:5])
+			if int(sender) >= senders || seq != next[sender] || len(payload) != orderPayloadLen(seq) {
+				received <- fmt.Errorf("decrypted frame sender=%d seq=%d len=%d; stream out of order or corrupt", sender, seq, len(payload))
+				return
+			}
+			next[sender]++
+		}
+		received <- nil
+	}()
+
+	var wg sync.WaitGroup
+	for s := range senders {
+		wg.Go(func() {
+			for seq := range uint32(perSender) {
+				payload := make([]byte, orderPayloadLen(seq))
+				payload[0] = byte(s)
+				binary.LittleEndian.PutUint32(payload[1:5], seq)
+				bytes, err := wire.FrameBytes(payload)
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				if !session.SendFrame(wire.BorrowedFrame(bytes)) {
+					t.Error("SendFrame rejected a frame on a healthy connection")
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	select {
+	case err := <-received:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("peer did not receive every frame")
+	}
+}
+
+func orderPayloadLen(seq uint32) int { return 5 + int(seq%13) }
+
+// BenchmarkSessionSendFrameParallel measures SendFrame when every CPU sends
+// to one session at once — the broadcast fan-out's worst case: all
+// contention is Session.mu (one encrypt + one append) and Conn.mu (the
+// append, and the writer's once-per-batch swap).
+func BenchmarkSessionSendFrameParallel(b *testing.B) {
+	session := benchmarkSession(b)
+	session.EnableCrypt()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for i := 0; pb.Next(); i++ {
+			if i%64 == 0 {
+				awaitDrain(session.conn)
+			}
+			if !session.SendFrame(serverpackets.FrameActionFailed()) {
+				b.Error("SendFrame rejected a frame")
+				return
+			}
+		}
+	})
+}
+
+// awaitDrain yields until c's writer has worked its backlog below half the
+// high-water mark. Benchmarks offer unbounded load, which would otherwise
+// outrun the writer and trip the stalled-peer abort; pacing them to the
+// drain rate measures SendFrame itself.
+func awaitDrain(c *Conn) {
+	for {
+		c.mu.Lock()
+		pending := c.pending
+		c.mu.Unlock()
+		if pending < outboundHighWater/2 {
+			return
+		}
+		runtime.Gosched()
 	}
 }
