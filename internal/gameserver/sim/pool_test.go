@@ -212,7 +212,7 @@ func TestTickerDropsTicksWhileOneIsQueued(t *testing.T) {
 }
 
 func TestPoolWatchdogAndPanicContainment(t *testing.T) {
-	var buf bytes.Buffer
+	var buf lockedBuffer // the worker and the watchdog both log
 	p := NewPool(1, zerolog.New(&buf))
 	p.Start(context.Background())
 	q := p.NewQueue("npc-42")
@@ -235,6 +235,48 @@ func TestPoolWatchdogAndPanicContainment(t *testing.T) {
 	if strings.Count(out, "slow task") != 1 {
 		t.Fatalf("want exactly one slow-task line:\n%s", out)
 	}
+}
+
+func TestPoolWatchdogReportsAStuckTaskWhileItRuns(t *testing.T) {
+	var log lockedBuffer
+	p := startPool(t, 1, zerolog.New(&log))
+	q := p.NewQueue("npc-hung")
+	release := make(chan struct{})
+	defer close(release) // before the Cleanup that stops the pool
+	q.Post(func() { <-release })
+
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(log.String(), "sim: task still running") {
+		if time.Now().After(deadline) {
+			t.Fatalf("no log for a task blocked past the deadline:\n%s", log.String())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if out := log.String(); !strings.Contains(out, `"queue":"npc-hung"`) {
+		t.Fatalf("stuck-task log does not name the queue:\n%s", out)
+	}
+	time.Sleep(3 * slowTask)
+	if n := strings.Count(log.String(), "still running"); n != 1 {
+		t.Fatalf("stuck task reported %d times, want once:\n%s", n, log.String())
+	}
+}
+
+// lockedBuffer is a log sink the test can read while workers write to it.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
 }
 
 func TestAssertOwner(t *testing.T) {

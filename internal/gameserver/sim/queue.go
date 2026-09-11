@@ -7,17 +7,7 @@ package sim
 import (
 	"sync"
 	"time"
-
-	"github.com/rs/zerolog"
 )
-
-// drainSlice bounds how many tasks one drain runs from a queue before the
-// queue goes to the back of the run queue, so one busy owner cannot starve
-// the rest.
-const drainSlice = 64
-
-// slowTask is the task duration above which the watchdog logs the queue.
-const slowTask = 50 * time.Millisecond
 
 // Clock reports the current time. Inline's clock moves only on Advance.
 type Clock interface {
@@ -196,20 +186,6 @@ func AssertOwner(q *Queue) {
 		panic("sim: state of queue " + q.id + " touched off its queue")
 	}
 	assertDrainer(q)
-}
-
-// runTask runs fn for queue, containing a panic and logging a slow task.
-func runTask(log zerolog.Logger, queue string, fn func()) {
-	start := time.Now()
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error().Str("queue", queue).Interface("panic", r).Msg("sim: recovered panic in queued task")
-		}
-		if d := time.Since(start); d > slowTask {
-			log.Warn().Str("queue", queue).Dur("elapsed", d).Msg("sim: slow task")
-		}
-	}()
-	fn()
 }
 
 // drainAs runs fn as q's owner: q.draining is held and, under simdebug, the
