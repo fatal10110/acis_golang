@@ -445,13 +445,17 @@ func deliverMagicFailure(caster, target Actor, def modelskill.Definition, failur
 	}
 }
 
+// appendResisted records the caster-facing resisted-your-skill report for
+// target. The name is taken from whatever name the target exposes and is
+// never gated on being non-empty: every reference call site builds the
+// message from the target creature's name unconditionally, and the datapack
+// ships nameless targetable monsters (npc ids 27201-27213), so an empty name
+// still owes the caster the report.
 func appendResisted(result *Result, target Actor, def modelskill.Definition) {
 	if result == nil {
 		return
 	}
-	if name := actorName(target); name != "" {
-		result.Resisted = append(result.Resisted, Resisted{TargetName: name, SkillID: def.ID, SkillLevel: def.Level})
-	}
+	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: def.Level})
 }
 
 func appendResistedCount(result *Result, target Actor, def modelskill.Definition, count int) {
