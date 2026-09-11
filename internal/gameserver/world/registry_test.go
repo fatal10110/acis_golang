@@ -12,8 +12,8 @@ type registryTestObject struct{ id int32 }
 func (o *registryTestObject) ObjectID() int32 { return o.id }
 
 // TestRegistryAppendAllAppendsRatherThanReplaces is the regression case for
-// appendAll shadowing Region.AppendObjects with the opposite contract:
-// Region.AppendObjects appends to its out parameter, so appendAll must too
+// appendAll shadowing Region.appendObjects with the opposite contract:
+// Region.appendObjects appends to its out parameter, so appendAll must too
 // — a caller reusing a buffer across registries by the same append+return
 // convention would otherwise silently lose whatever it already put there.
 func TestRegistryAppendAllAppendsRatherThanReplaces(t *testing.T) {
@@ -37,7 +37,7 @@ func TestRegistryAppendAllAppendsRatherThanReplaces(t *testing.T) {
 // TestRegistryAppendAllFreshScanNeedsExplicitTruncation documents the other
 // half of the same contract: a caller that wants a snapshot rather than an
 // accumulation must truncate dst itself, exactly like every
-// Region.AppendObjects caller in this package does (r.AppendObjects(buf[:0])).
+// Region.appendObjects caller in this package does (r.appendObjects(buf[:0])).
 func TestRegistryAppendAllFreshScanNeedsExplicitTruncation(t *testing.T) {
 	r := newRegistry()
 	r.add(1, &registryTestObject{id: 1})

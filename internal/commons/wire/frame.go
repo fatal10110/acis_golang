@@ -65,6 +65,15 @@ func (f Frame) Bytes() []byte {
 	return f.bytes
 }
 
+// Footprint is the memory the frame pins until it is released: the capacity
+// of the pooled writer it owns, or its own bytes when it owns none.
+func (f Frame) Footprint() int {
+	if f.writer != nil {
+		return max(f.writer.Cap(), len(f.bytes))
+	}
+	return len(f.bytes)
+}
+
 // Release returns owned backing storage to its pool, if any.
 func (f Frame) Release() {
 	if f.release != nil {

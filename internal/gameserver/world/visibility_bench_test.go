@@ -2,6 +2,7 @@ package world
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 )
 
@@ -121,4 +122,68 @@ func BenchmarkRelocatePlayerRegionCrossing(b *testing.B) {
 			}
 		})
 	}
+}
+
+// parallelWorld spreads 512 non-player objects over 64 regions, 8 per
+// region, so each parallel benchmark worker owns one object in its own
+// region: the hot spot is shared world state, not the objects themselves.
+func parallelWorld() (*State, []*regionTestObject, []int) {
+	s := New()
+	var objs []*regionTestObject
+	var xs []int
+	for r := range 64 {
+		x, y := regionCenter(10+(r%8)*3, 10+(r/8)*3)
+		for i := range 8 {
+			o := &regionTestObject{id: int32(r*8 + i + 1)}
+			s.Spawn(o, x+i, y, 0, 0)
+			objs = append(objs, o)
+			xs = append(xs, x)
+		}
+	}
+	return s, objs, xs
+}
+
+// BenchmarkParallel* run every CPU against the world at once; run with
+// -cpu 1,8 to see how the same-region Move and known-list scan paths scale.
+func BenchmarkParallelSameRegionMove(b *testing.B) {
+	s, objs, xs := parallelWorld()
+	var next atomic.Int32
+	b.RunParallel(func(pb *testing.PB) {
+		w := int(next.Add(1)-1) * 8 % len(objs)
+		o, x := objs[w], xs[w]
+		y := o.Y()
+		for i := 0; pb.Next(); i++ {
+			_ = s.Move(o, x+i%64, y, 0)
+		}
+	})
+}
+
+func BenchmarkParallelAppendKnown(b *testing.B) {
+	s, objs, _ := parallelWorld()
+	var next atomic.Int32
+	b.RunParallel(func(pb *testing.PB) {
+		o := objs[int(next.Add(1)-1)*8%len(objs)]
+		var buf []Tracked
+		for pb.Next() {
+			buf = s.AppendKnown(buf[:0], o)
+		}
+	})
+}
+
+func BenchmarkParallelMoveAndAppendKnown(b *testing.B) {
+	s, objs, xs := parallelWorld()
+	var next atomic.Int32
+	b.RunParallel(func(pb *testing.PB) {
+		w := int(next.Add(1)-1) * 8 % len(objs)
+		o, x := objs[w], xs[w]
+		y := o.Y()
+		var buf []Tracked
+		for i := 0; pb.Next(); i++ {
+			if i%4 == 0 {
+				buf = s.AppendKnown(buf[:0], o)
+			} else {
+				_ = s.Move(o, x+i%64, y, 0)
+			}
+		}
+	})
 }

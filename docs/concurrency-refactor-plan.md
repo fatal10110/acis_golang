@@ -45,7 +45,8 @@ State splits into three kinds:
   atomics; derived combat stats and abnormal-effect flags are an `atomic.Pointer` snapshot
   republished by the owner queue on recalculation (equip/buff/level), not per hit.
 - **Containers** (mutex, short critical section, no call-outs): `world.State` (collapsed from 5
-  lock kinds to 1), `zone.Index`/`Zone`, `task.GroundItems`, `trade.Book`, **`Inventory`**
+  lock kinds to `State.mu` plus leaf `Region.mu`/`Presence.latch`, see Phase 0),
+  `zone.Index`/`Zone`, `task.GroundItems`, `trade.Book`, **`Inventory`**
   (it crosses actors: trade, pickup, pet, warehouse, persistence), `idfactory`,
   `activeRegistry`/`deadlineRegistry`, `ClientRegistry`, `Session`/`Conn` send path, `LoginLink`,
   `netutil.FloodGuard`, `logging`. Target: ~135 → ~25.
@@ -120,6 +121,11 @@ Two-actor item flows use the inventory container, not snapshots:
   ([visibility.go:243–337](internal/gameserver/world/visibility.go#L243)) and `DespawnAll` sorts
   and holds N `transitionMu` at once ([visibility.go:126–137](internal/gameserver/world/visibility.go#L126)).
   Needs nothing from `sim`.
+  *Landed (#2324) as:* `State.mu` serializes every change of region membership and activity, and
+  every callback runs after it is released. Two per-object/per-region locks remain, both leaves
+  held only around a few stores or a slice update: `Presence.latch` (a CAS) lets a `Move` that stays
+  in its region skip `State.mu`, and `Region.mu` lets known-list scans read a region without it.
+  A single world lock measured 4–14x slower at 8 cores on same-region `Move` and `AppendKnown`.
 - **Perf baseline harness.** N scripted clients through the `tests/` boot path (real packets, real
   MariaDB) in one region doing move + attack for a fixed duration; record CPU, p50/p99 handler
   latency, GC pause on #2268. Run on `main` before Phase 2; re-run after Phases 2, 3 and 5.
