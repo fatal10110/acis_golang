@@ -50,3 +50,6 @@ jobs:
 
       - name: Test
         run: go test -race ./...
+
+      - name: Test (simdebug)
+        run: go test -race -tags simdebug ./internal/gameserver/sim/...
