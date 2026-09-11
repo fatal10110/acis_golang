@@ -10,11 +10,14 @@ import (
 // in any type that enters the world; the zero value is unplaced and
 // invisible.
 //
-// Position, visibility and region are written only by State under State.mu
-// and read lock-free from anywhere, so hot distance and known-list checks
-// never contend on the world lock. busy is guarded by State.mu: it marks a
-// placement whose callbacks are still being delivered, so a later placement
-// of the same object waits instead of interleaving its notifications.
+// Position, visibility and region are read lock-free from anywhere, so hot
+// distance and known-list checks never contend on the world lock. They are
+// written only by whoever holds latch: State.Move's lock-free path for a
+// move that stays in its region, or a placement holding State.mu for
+// everything else. busy marks a placement whose callbacks are still being
+// delivered, so a later placement of the same object waits instead of
+// interleaving its notifications; it is written under State.mu with latch
+// held (set) or under State.mu alone (cleared).
 type Presence struct {
 	// posSeq is odd while a position write is in progress; readers retry
 	// until they see the same even value on both sides of their loads.
@@ -24,7 +27,8 @@ type Presence struct {
 	visible atomic.Bool
 	region  atomic.Pointer[Region]
 
-	busy bool
+	latch atomic.Bool
+	busy  atomic.Bool
 }
 
 // presence exposes the embedded footprint to State. Embedding *Presence
@@ -46,14 +50,32 @@ func (p *Presence) Position() (x, y, z int) {
 	}
 }
 
-// setPosition publishes new coordinates. The caller holds State.mu, which
-// is what keeps position writers to one at a time.
+// setPosition publishes new coordinates. The caller holds latch, which is
+// what keeps position writers to one at a time.
 func (p *Presence) setPosition(x, y, z int) {
 	p.posSeq.Add(1)
 	p.x.Store(int64(x))
 	p.y.Store(int64(y))
 	p.z.Store(int64(z))
 	p.posSeq.Add(1)
+}
+
+// tryLatch takes the exclusive right to write p's placement if it is free.
+// A holder never blocks and never takes State.mu while holding it.
+func (p *Presence) tryLatch() bool {
+	return p.latch.CompareAndSwap(false, true)
+}
+
+// acquireLatch takes the placement latch, waiting out a lock-free Move that
+// holds it for a few stores. The caller holds State.mu.
+func (p *Presence) acquireLatch() {
+	for !p.tryLatch() {
+		runtime.Gosched()
+	}
+}
+
+func (p *Presence) releaseLatch() {
+	p.latch.Store(false)
 }
 
 // X returns the current world X coordinate.

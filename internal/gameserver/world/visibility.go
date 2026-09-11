@@ -19,12 +19,13 @@ type Tracked interface {
 // around their own. Callbacks run after the subject has entered its destination
 // region or left the grid, with the world lock released. Discover and Forget run
 // on whichever goroutine drives the region transition, so implementations must
-// be safe to call concurrently and return promptly without blocking. While they
-// run, the subject's placement is still being delivered: a callback must not
-// reposition the subject, or another object whose placement is being
-// delivered, since that would wait on itself. Read-only queries such as Knows,
-// AppendKnown and RegionActivity are safe. Panics propagate and skip remaining
-// callbacks, but region membership remains consistent.
+// be safe to call concurrently and return promptly without blocking. They must
+// not call State's transition methods (Spawn, Move, Despawn, or DespawnAll)
+// from a callback: the subject's placement is still being delivered, and two
+// callbacks repositioning each other's subjects would wait on each other.
+// Read-only queries such as Knows, AppendKnown and RegionActivity are safe.
+// Panics propagate and skip remaining callbacks, but region membership remains
+// consistent.
 type Observer interface {
 	// Discover tells the observer that obj just became visible to it.
 	Discover(obj Tracked)
@@ -57,6 +58,7 @@ func (s *State) Spawn(t Tracked, x, y, z, heading int) {
 	p := t.presence()
 	s.mu.Lock()
 	s.awaitIdleLocked(p)
+	p.acquireLatch()
 	p.setPosition(x, y, z)
 	p.heading.Store(int64(heading))
 	p.visible.Store(true)
@@ -69,22 +71,47 @@ func (s *State) Spawn(t Tracked, x, y, z, heading int) {
 // left its surroundings. An object that is not visible only gets its
 // position updated. The position is updated even when the move fails
 // because a visible object was sent outside the world bounds.
+//
+// A move that stays in t's region, or of an object off the grid, changes no
+// region and delivers nothing, so it only takes t's placement latch — never
+// the world lock — unless a placement of t is still delivering callbacks.
 func (s *State) Move(t Tracked, x, y, z int) error {
 	p := t.presence()
+	if p.tryLatch() {
+		if !p.busy.Load() {
+			region := p.region.Load()
+			stays := region == nil || !p.visible.Load()
+			if !stays {
+				next, ok := s.RegionAt(x, y)
+				stays = ok && next == region
+			}
+			if stays {
+				p.setPosition(x, y, z)
+				p.releaseLatch()
+				return nil
+			}
+		}
+		p.releaseLatch()
+	}
+
 	s.mu.Lock()
 	s.awaitIdleLocked(p)
+	p.acquireLatch()
 	p.setPosition(x, y, z)
 	prev := p.region.Load()
 	if prev == nil || !p.visible.Load() {
+		p.releaseLatch()
 		s.mu.Unlock()
 		return nil
 	}
 	next, ok := s.RegionAt(x, y)
 	if !ok {
+		p.releaseLatch()
 		s.mu.Unlock()
 		return fmt.Errorf("move object %d: (%d, %d) is outside the world bounds", t.ObjectID(), x, y)
 	}
 	if next == prev {
+		p.releaseLatch()
 		s.mu.Unlock()
 		return nil
 	}
@@ -99,6 +126,7 @@ func (s *State) Despawn(t Tracked) {
 	p := t.presence()
 	s.mu.Lock()
 	s.awaitIdleLocked(p)
+	p.acquireLatch()
 	p.visible.Store(false)
 	s.relocateAndUnlock(t, nil, func() { s.removeObjectIfSame(t) })
 }
@@ -117,15 +145,21 @@ func (s *State) Despawn(t Tracked) {
 // never observe), revisit if a future caller despawns Observers in bulk.
 func (s *State) DespawnAll(ts []Tracked) {
 	s.mu.Lock()
-	for slices.ContainsFunc(ts, func(t Tracked) bool { return t.presence().busy }) {
+	for slices.ContainsFunc(ts, func(t Tracked) bool { return t.presence().busy.Load() }) {
 		s.idle.Wait()
 	}
 
+	// Each object's latch is held only around its own writes, never several
+	// at once, so a batch listing an object twice can't wait on itself. A
+	// lock-free Move landing between them only updates the position of an
+	// object that is already invisible.
 	byRegion := make(map[*Region][]Tracked, len(ts))
 	for _, t := range ts {
 		p := t.presence()
+		p.acquireLatch()
 		p.visible.Store(false)
 		region := p.region.Load()
+		p.releaseLatch()
 		byRegion[region] = append(byRegion[region], t)
 	}
 
@@ -172,15 +206,17 @@ func (s *State) DespawnAll(ts []Tracked) {
 	}
 	for _, t := range ts {
 		p := t.presence()
+		p.acquireLatch()
 		p.region.Store(nil)
-		p.busy = true
+		p.busy.Store(true)
+		p.releaseLatch()
 	}
 	s.mu.Unlock()
 
 	defer func() {
 		s.mu.Lock()
 		for _, t := range ts {
-			t.presence().busy = false
+			t.presence().busy.Store(false)
 		}
 		s.idle.Broadcast()
 		s.mu.Unlock()
@@ -200,16 +236,17 @@ func (s *State) DespawnAll(ts []Tracked) {
 // its callbacks, so two placements of one object never interleave their
 // notifications. The caller holds s.mu for writing; waiting releases it.
 func (s *State) awaitIdleLocked(p *Presence) {
-	for p.busy {
+	for p.busy.Load() {
 		s.idle.Wait()
 	}
 }
 
 // relocateAndUnlock moves t between grid regions: out of its current one, if
-// any, and into next, unless nil. The caller holds s.mu for writing and has
-// already updated t's position and visibility under it; relocateAndUnlock
-// finishes the grid update, releases s.mu, and only then delivers callbacks
-// and runs after (when non-nil), keeping t busy until they finish.
+// any, and into next, unless nil. The caller holds s.mu for writing and t's
+// latch, and has already updated t's position and visibility under them;
+// relocateAndUnlock finishes the grid update, releases both, and only then
+// delivers callbacks and runs after (when non-nil), keeping t busy until
+// they finish.
 //
 // Every object in a region that leaves t's surroundings exchanges Forget
 // notifications with t, and every object in a region that enters them
@@ -290,10 +327,12 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 	}
 
 	if !notifyArrival && len(toggles) == 0 && len(notifications) == 0 && after == nil {
+		p.releaseLatch()
 		s.mu.Unlock()
 		return
 	}
-	p.busy = true
+	p.busy.Store(true)
+	p.releaseLatch()
 	s.mu.Unlock()
 
 	// Deferred so t leaves busy and scratch is reset to zero-value-clean,
@@ -309,7 +348,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 			scratch.notifications = scratch.notifications[:0]
 		}
 		s.mu.Lock()
-		p.busy = false
+		p.busy.Store(false)
 		s.idle.Broadcast()
 		s.mu.Unlock()
 	}()
@@ -475,8 +514,6 @@ func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
 // hot broadcast paths keep one grown snapshot buffer instead of allocating a
 // fresh known-list slice per event.
 func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	r := t.presence().currentRegion()
 	if r == nil {
 		return out
@@ -527,9 +564,7 @@ func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(
 	var objectBuf [knownInRadiusObjectCap]Tracked
 	objects := objectBuf[:0]
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, searchDepth(radius)) {
-		s.mu.RLock()
 		objects = region.appendObjects(objects[:0])
-		s.mu.RUnlock()
 		for _, o := range objects {
 			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o, widen) {
 				continue

@@ -1,16 +1,23 @@
 package world
 
-import "sync/atomic"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 // Region is one cell of the world grid. It tracks which objects are
 // currently visible within its bounds, and whether it is active — see
 // Active.
 //
 // State.mu guards every field except active, which State writes under
-// State.mu and anyone may read lock-free through Active.
+// State.mu and anyone may read lock-free through Active. objects and index
+// are also guarded by mu, a leaf lock that lets known-list scans read one
+// region without the world lock: writers hold State.mu and then mu, readers
+// hold either. mu is never held across a call out of the package.
 type Region struct {
 	tileX, tileY int
 
+	mu      sync.RWMutex
 	objects []Tracked
 	index   map[int32]int
 
@@ -77,12 +84,14 @@ func notifyObjectActivity(obj Tracked, active bool) {
 // State.mu.
 func (r *Region) add(obj Tracked) regionActivityArrival {
 	id := obj.ObjectID()
+	r.mu.Lock()
 	if i, ok := r.index[id]; ok {
 		r.objects[i] = obj
 	} else {
 		r.index[id] = len(r.objects)
 		r.objects = append(r.objects, obj)
 	}
+	r.mu.Unlock()
 	if _, ok := obj.(Player); ok {
 		r.playersCount++
 	}
@@ -97,7 +106,9 @@ func (r *Region) remove(id int32) {
 		return
 	}
 	obj := r.objects[i]
+	r.mu.Lock()
 	r.removeAt(i)
+	r.mu.Unlock()
 	if _, isPlayer := obj.(Player); isPlayer {
 		r.playersCount--
 	}
@@ -113,7 +124,9 @@ func (r *Region) removeIfSame(id int32, obj Tracked) bool {
 	if !ok || r.objects[i] != obj {
 		return false
 	}
+	r.mu.Lock()
 	r.removeAt(i)
+	r.mu.Unlock()
 	if _, isPlayer := obj.(Player); isPlayer {
 		r.playersCount--
 	}
@@ -133,14 +146,19 @@ func (r *Region) removeAt(i int) {
 }
 
 // appendObjects appends every object currently visible within r to out and
-// returns the extended slice. The caller holds State.mu for reading.
+// returns the extended slice. It takes only r's own lock, so a caller need
+// not hold State.mu.
 func (r *Region) appendObjects(out []Tracked) []Tracked {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return append(out, r.objects...)
 }
 
 // appendObjectsExcept is appendObjects without the object registered under
-// except. The caller holds State.mu for reading.
+// except.
 func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	i, ok := r.index[except]
 	if !ok {
 		return append(out, r.objects...)

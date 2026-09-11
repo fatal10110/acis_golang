@@ -25,11 +25,13 @@ type State struct {
 	playersMu   sync.RWMutex
 	playerNames map[string]int32
 
-	// mu is the world lock. It guards every Region's contents and activity
-	// bookkeeping and every Presence's placement (written under it, read
-	// lock-free). It is held only for the in-memory update of one placement
-	// — Discover/Forget and region-activity callbacks always run after it is
-	// released — and never nests with any other lock.
+	// mu is the world lock. It serializes every change of region membership
+	// and region activity, and every placement except a Move that stays in
+	// its region (see Move). It is held only for the in-memory update of one
+	// placement — Discover/Forget and region-activity callbacks always run
+	// after it is released. Region.mu is the only lock taken under it, and
+	// only around a region's slice update; known-list scans take Region.mu
+	// alone, never mu.
 	mu sync.RWMutex
 	// idle is signaled whenever a placement finishes delivering its
 	// callbacks; a placement of a busy object waits on it (see

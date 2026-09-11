@@ -418,8 +418,22 @@ func TestPlacementWaitsForSameObjectCallbacksOnly(t *testing.T) {
 	}()
 	<-observer.entered
 
+	// A move that stays in the subject's region normally skips the world
+	// lock; while the subject is busy it must wait like any placement.
+	moved := make(chan struct{})
+	go func() {
+		_ = s.Move(subject, 5, 5, 0)
+		close(moved)
+	}()
+	select {
+	case <-moved:
+		t.Fatal("same-region Move finished while the object's Spawn callbacks were still running")
+	case <-time.After(20 * time.Millisecond):
+	}
+
 	despawned := make(chan struct{})
 	go func() {
+		<-moved
 		s.Despawn(subject)
 		close(despawned)
 	}()
@@ -433,13 +447,9 @@ func TestPlacementWaitsForSameObjectCallbacksOnly(t *testing.T) {
 	s.Despawn(other)
 	_ = s.AppendKnown(nil, observer)
 
-	select {
-	case <-despawned:
-		t.Fatal("Despawn finished while the same object's Spawn callbacks were still running")
-	case <-time.After(20 * time.Millisecond):
-	}
 	close(observer.gate)
 	<-spawned
+	<-moved
 	<-despawned
 
 	observer.mu.Lock()
@@ -495,6 +505,27 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 			}
 		}()
 	}
+	// Players walk back and forth across region borders, so region
+	// activation races between concurrent player relocations; two goroutines
+	// move the same walker, one within its region and one across borders.
+	walkers := make([]*relocateBenchPlayer, 4)
+	for i := range walkers {
+		x, y := regionCenter(9+i, 11)
+		walkers[i] = &relocateBenchPlayer{id: int32(2000 + i)}
+		s.Spawn(walkers[i], x, y, 0, 0)
+	}
+	for i, walker := range walkers {
+		for lane := range 2 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for r := range rounds * 2 {
+					x, y := regionCenter(9+(i+r)%4, 11+(r%3)*lane)
+					_ = s.Move(walker, x+lane*r%100, y, 0)
+				}
+			}()
+		}
+	}
 	for _, watcher := range watchers {
 		wg.Add(1)
 		go func() {
@@ -527,6 +558,14 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 			}
 		}
 	}
+	for x := range RegionsX {
+		for y := range RegionsY {
+			r := s.regions[x][y]
+			if want := !s.regionNeighborhoodEmpty(r); r.Active() != want {
+				t.Errorf("region (%d,%d) Active() = %v, want %v from its neighborhood's players", x, y, r.Active(), want)
+			}
+		}
+	}
 	registered := 0
 	for _, o := range s.Objects() {
 		if _, ok := o.(Tracked); ok && o.(Tracked).presence().currentRegion() != nil {
@@ -535,5 +574,97 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 	}
 	if placed != registered {
 		t.Errorf("grid holds %d objects, registry tracks %d placed ones", placed, registered)
+	}
+}
+
+// DespawnAll of an object whose Spawn callbacks are still running waits for
+// them, so its Forget never overtakes the Discover.
+func TestDespawnAllWaitsForBusyBatchMember(t *testing.T) {
+	s := New()
+	observer := &gatedObserver{gatedID: 2, entered: make(chan struct{}), gate: make(chan struct{})}
+	s.Spawn(observer, 0, 0, 0, 0)
+
+	subject := &regionTestObject{id: 2}
+	spawned := make(chan struct{})
+	go func() {
+		s.Spawn(subject, 0, 0, 0, 0)
+		close(spawned)
+	}()
+	<-observer.entered
+
+	bystander := &regionTestObject{id: 3}
+	s.Spawn(bystander, 0, 0, 0, 0)
+	despawned := make(chan struct{})
+	go func() {
+		s.DespawnAll([]Tracked{bystander, subject})
+		close(despawned)
+	}()
+	select {
+	case <-despawned:
+		t.Fatal("DespawnAll finished while a batch member's Spawn callbacks were still running")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(observer.gate)
+	<-spawned
+	<-despawned
+
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	if !slices.Equal(observer.events, []string{"discover", "forget"}) {
+		t.Fatalf("observer events = %v, want [discover forget]", observer.events)
+	}
+}
+
+// blockingForgetObserver blocks inside the first Forget until gate closes.
+type blockingForgetObserver struct {
+	Presence
+	entered chan struct{}
+	gate    chan struct{}
+	once    sync.Once
+}
+
+func (o *blockingForgetObserver) ObjectID() int32  { return 1 }
+func (o *blockingForgetObserver) Discover(Tracked) {}
+func (o *blockingForgetObserver) Forget(Tracked) {
+	o.once.Do(func() {
+		close(o.entered)
+		<-o.gate
+	})
+}
+
+// A placement of an object DespawnAll is still delivering Forgets for waits
+// until the batch is done, so the respawn's Discover comes after the Forget.
+func TestPlacementWaitsForDespawnAllBatch(t *testing.T) {
+	s := New()
+	observer := &blockingForgetObserver{entered: make(chan struct{}), gate: make(chan struct{})}
+	s.Spawn(observer, 0, 0, 0, 0)
+	member := &regionTestObject{id: 2}
+	s.Spawn(member, 0, 0, 0, 0)
+
+	despawned := make(chan struct{})
+	go func() {
+		s.DespawnAll([]Tracked{member})
+		close(despawned)
+	}()
+	<-observer.entered
+
+	respawned := make(chan struct{})
+	go func() {
+		s.Spawn(member, 0, 0, 0, 0)
+		close(respawned)
+	}()
+	select {
+	case <-respawned:
+		t.Fatal("Spawn of a batch member finished while DespawnAll was still delivering its Forgets")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(observer.gate)
+	<-despawned
+	<-respawned
+	if _, ok := s.Object(member.id); !ok {
+		t.Fatal("respawned member not registered")
+	}
+	if !Knows(observer, member) {
+		t.Fatal("respawned member not placed next to the observer")
 	}
 }
