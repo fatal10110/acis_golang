@@ -161,7 +161,9 @@ type afterFunc func(time.Duration, func()) scheduledTimer
 // interruption state for one actor's active cast.
 //
 // mu guards every mutable field below, including the scheduled timers
-// Schedule installs.
+// Schedule installs. It is never held while the actor pays a cast cost
+// (item, reuse, MP, HP, charges): paying one can end the cast, which calls
+// back into the controller.
 type Controller struct {
 	actor Actor
 
@@ -355,13 +357,28 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.casting {
+		c.mu.Unlock()
 		return Plan{}, ErrAlreadyCasting
 	}
-
 	plan := c.buildPlan(def)
+	c.casting = true
+	c.current = def
+	c.target = target
+	c.plan = plan
+	c.startedAt = now
+	c.interruptUntil = now.Add(plan.InterruptAfter)
+	seq := c.castSeq
+	c.mu.Unlock()
+
+	// The cast is claimed above so a concurrent Start is rejected; a failed
+	// item consume releases the claim unless the cast was already ended.
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount) {
+		c.mu.Lock()
+		if c.castingLocked(seq) {
+			c.clearLocked()
+		}
+		c.mu.Unlock()
 		return Plan{}, ErrNotEnoughItems
 	}
 
@@ -377,39 +394,28 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 	if initialMP := c.actor.MPInitialCost(def); initialMP > 0 {
 		c.actor.ReduceMP(initialMP)
 	}
-
-	c.casting = true
-	c.current = def
-	c.target = target
-	c.plan = plan
-	c.startedAt = now
-	c.interruptUntil = now.Add(plan.InterruptAfter)
 	return plan, nil
 }
 
 // Hit applies the final MP and HP costs for the active cast. It leaves an
 // unaffordable cast in flight for the caller to abort through Stop, so the
 // caller can report why the cast failed before the abort funnel cancels it
-// — the packet order the reference produces.
+// — the packet order the reference produces. A lethal HP cost may stop the
+// cast from inside ReduceHP; Hit still reports success for the cost paid.
 func (c *Controller) Hit() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.hitLocked()
-}
-
-func (c *Controller) hitLocked() error {
-	if !c.casting {
+	def, casting := c.CurrentSkill()
+	if !casting {
 		return ErrNotCasting
 	}
 
-	if mp := c.actor.MPCost(c.current); mp > 0 {
+	if mp := c.actor.MPCost(def); mp > 0 {
 		if mp > c.actor.MP() {
 			return ErrNotEnoughMP
 		}
 		c.actor.ReduceMP(mp)
 	}
 
-	if hp := c.current.HPConsume; hp > 0 {
+	if hp := def.HPConsume; hp > 0 {
 		if hp > c.actor.HP() {
 			return ErrNotEnoughHP
 		}
@@ -419,12 +425,12 @@ func (c *Controller) hitLocked() error {
 	// Force/Soul charge apply, matching CreatureCast.onMagicHitTimer
 	// (CreatureCast.java:276-282): runs after the MP/HP consume above and
 	// before the caller's Hooks.Hit applies the skill's effects.
-	if c.current.NumCharges > 0 {
+	if def.NumCharges > 0 {
 		if ch, ok := c.actor.(chargeHolder); ok {
-			if c.current.MaxCharges > 0 {
-				ch.IncreaseCharges(c.current.NumCharges, c.current.MaxCharges)
+			if def.MaxCharges > 0 {
+				ch.IncreaseCharges(def.NumCharges, def.MaxCharges)
 			} else {
-				ch.DecreaseCharges(c.current.NumCharges)
+				ch.DecreaseCharges(def.NumCharges)
 			}
 		}
 	}
