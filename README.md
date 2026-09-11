@@ -45,3 +45,7 @@ go run ./cmd/datadiff -category=skill -expected-dump=skill.dump
 ## Testing
 
 Tests are behavior-first: full-flow scenarios in `tests/<domain>/` drive real packets against a real MariaDB, with only a small pure-function core unit-tested directly. See the [Testing section in AGENTS.md](AGENTS.md#testing) for the policy, allowed pure-unit categories, harness usage, and run commands.
+
+For edit feedback, `make test-unit` runs the DB-free pure-core selection. `make test-internal`
+runs the broader non-behavior packages, which can still use sockets and MariaDB. `make test` and
+`make test-race` remain the complete gates; start the shared database first with `make test-db-up`.
