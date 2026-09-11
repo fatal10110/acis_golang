@@ -36,15 +36,23 @@ const stepInterval = 250 * time.Millisecond
 // probeTimeout bounds one step; a step that exceeds it counts as a timeout.
 const probeTimeout = 5 * time.Second
 
-// TestLoadBaseline boots one server, enters ACIS_PERF_CLIENTS characters at
-// the same spot, gives each its own monster next to it, and for
-// ACIS_PERF_DURATION (default 30s) has every client cycle target → attack →
-// walk → walk, one step every stepInterval. After each step the client sends
-// RequestManorList, whose ExSendManorList reply is self-only and stateless:
-// a connection handles requests in order, so the time from sending the step
-// to reading that reply is the step's server handling latency plus two
-// loopback hops. Reported: process CPU time (server and clients share the
-// process), step latency p50/p99/max, GC count and pauses, frames received.
+// TestLoadBaseline boots one server with the production tickers running
+// (movement, effects, attack stance, inventory, NPC AI and regen), enters
+// ACIS_PERF_CLIENTS characters at the same spot, gives each its own monster
+// with real move/attack controllers under AI, and for ACIS_PERF_DURATION
+// (default 30s) has every client run a two-second cycle of six clicks on its
+// monster (the first selects it, the rest attack) and two short walks around
+// it, one step every stepInterval. After each step the client sends
+// RequestManorList, whose ExSendManorList reply is self-only and stateless: a
+// connection handles requests in order, so the time from sending the step to
+// reading that reply is the step's server handling latency plus two loopback
+// hops.
+// Reported: process CPU time (server and clients share the process), step
+// latency p50/p99/max, GC count and pauses, frames received.
+//
+// The run fails unless every client stayed connected, never timed out, never
+// died, left the spawn point and landed an attack: a run that sheds load or
+// quietly drives a different workload is not a comparable baseline.
 func TestLoadBaseline(t *testing.T) {
 	clients := envInt(t, "ACIS_PERF_CLIENTS", 0)
 	if clients <= 0 {
@@ -55,18 +63,20 @@ func TestLoadBaseline(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Perf0", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithProductionTickers(),
 	)
 	conns := []*testsupport.ScriptedClient{srv.Client}
+	ids := []int32{srv.SoleObjectID(t)}
 	for i := 1; i < clients; i++ {
 		account := fmt.Sprintf("perf%d", i)
-		srv.SeedCharacterFor(t, account, fmt.Sprintf("Perf%d", i), 5, 0)
+		ids = append(ids, srv.SeedCharacterFor(t, account, fmt.Sprintf("Perf%d", i), 5, 0).ID)
 		conns = append(conns, srv.DialClient(t, account, 1))
 	}
 
 	readers := make([]*frameReader, clients)
 	for i, c := range conns {
 		enterWorld(t, c)
-		readers[i] = startReader(c)
+		readers[i] = startReader(c, ids[i])
 	}
 	defer func() {
 		for _, r := range readers {
@@ -74,13 +84,20 @@ func TestLoadBaseline(t *testing.T) {
 		}
 	}()
 
-	x, y, z := srv.PlayerPosition(t, srv.SoleObjectID(t))
+	x, y, z := srv.PlayerPosition(t, ids[0])
 	origin := location.Location{X: x, Y: y, Z: z}
+	// The test class has 36 max HP at every level and the fixture monster
+	// hits for ~80 at its default attack, so each counter-attack would be a
+	// one-shot. A quarter point of PAtk (~6 per hit) keeps every swing, hate
+	// and broadcast real while the per-step heal below keeps the character
+	// in the fight.
+	tmpl := gameservertest.MovingHostileTemplate("Monster")
+	tmpl.PAtk = 0.25
 	monsters := make([]*npc.Hostile, clients)
 	for i := range monsters {
-		// ponytail: one 1000-HP monster per client, never respawned; a dead
-		// one still costs a rejected attack step. Respawn if runs outlive it.
-		monsters[i] = srv.SpawnHostileNPCAt(t, location.Location{X: x + 40 + i%10*20, Y: y + i/10*20, Z: z})
+		at := location.Location{X: x + 40 + i%10*20, Y: y + i/10*20, Z: z}
+		monsters[i] = srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
+		srv.AI.Add(monsters[i])
 	}
 
 	var before syscall.Rusage
@@ -100,7 +117,7 @@ func TestLoadBaseline(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range conns {
 		wg.Go(func() {
-			samples[i] = runClient(conns[i], readers[i], monsters[i], origin, i, deadline, &timeouts)
+			samples[i] = runClient(srv, conns[i], readers[i], monsters[i], origin, i, deadline, &timeouts)
 		})
 	}
 	wg.Wait()
@@ -115,12 +132,21 @@ func TestLoadBaseline(t *testing.T) {
 
 	var all []time.Duration
 	var frames int64
-	disconnected := 0
-	for i := range samples {
+	disconnected, died, stationary, noAttack := 0, 0, 0, 0
+	for i, r := range readers {
 		all = append(all, samples[i]...)
-		frames += readers[i].frames.Load()
-		if readers[i].lost.Load() {
+		frames += r.frames.Load()
+		if r.lost.Load() {
 			disconnected++
+		}
+		if r.died.Load() {
+			died++
+		}
+		if !r.moved.Load() {
+			stationary++
+		}
+		if r.attacks.Load() == 0 {
+			noAttack++
 		}
 	}
 	if len(all) == 0 {
@@ -134,29 +160,43 @@ func TestLoadBaseline(t *testing.T) {
 	t.Logf("  step latency p50=%s p99=%s max=%s", percentile(all, 50), percentile(all, 99), all[len(all)-1])
 	t.Logf("  process CPU=%s (%.2f cores)", cpu.Round(time.Millisecond), cpu.Seconds()/elapsed.Seconds())
 	t.Logf("  GC count=%d pause_total=%s pause_max=%s", gcs, time.Duration(memAfter.PauseTotalNs-memBefore.PauseTotalNs), maxPause(&memAfter, gcs))
+	if disconnected > 0 || timeouts.Load() > 0 {
+		t.Errorf("%d clients disconnected and %d steps timed out; the numbers above are not a full-load baseline", disconnected, timeouts.Load())
+	}
+	if died > 0 || stationary > 0 || noAttack > 0 {
+		t.Errorf("workload not driven: of %d clients %d died, %d never left the spawn point, %d never landed an attack", clients, died, stationary, noAttack)
+	}
 }
 
-// runClient drives one client until deadline, or until its connection is
-// lost, and returns its step latencies. A lost client just stops; the
-// disconnected count reports it.
-func runClient(c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
+// runClient drives one client until deadline and returns its step latencies.
+// A client stops early when its connection is lost or a step times out: a
+// probe reply arriving after its step gave up would otherwise be credited to
+// the next step. Both fail the run.
+func runClient(srv *gameservertest.Server, c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hostile, origin location.Location, index int, deadline time.Time, timeouts *atomic.Int64) []time.Duration {
 	rng := rand.New(rand.NewPCG(uint64(index), 2285))
 	tick := time.NewTicker(stepInterval)
 	defer tick.Stop()
 	var latencies []time.Duration
 	for step := index; time.Now().Before(deadline) && !r.lost.Load(); step++ {
 		<-tick.C
-		select { // a reply that outlived its step's timeout
-		case <-r.probe:
-		default:
+		// ponytail: harness-side heals, not packet flows, keep both sides of
+		// every fight alive so each attack step is a real attack.
+		if obj, ok := srv.State.Player(r.id); ok {
+			if p, ok := obj.(vitals); ok && p.HP() < p.MaxHPValue()/2 {
+				p.AddHP(p.MaxHPValue())
+			}
 		}
 		sent := time.Now()
 		var action []byte
-		switch step % 4 {
-		case 0, 1: // first click targets, the second attacks
+		switch step % 8 {
+		case 0, 1, 2, 3, 4, 5: // the first click selects, the rest attack
+			if monster.CurrentHP() < monster.MaxHP()/2 {
+				monster.SetCurrentHP(monster.MaxHP())
+			}
 			action = encodeAction(monster.ObjectID(), origin)
-		default:
-			target := location.Location{X: origin.X + rng.IntN(601) - 300, Y: origin.Y + rng.IntN(601) - 300, Z: origin.Z}
+		default: // a short walk near the monster keeps the next approach inside the attack window
+			mx, my, _ := monster.Position()
+			target := location.Location{X: mx + rng.IntN(201) - 100, Y: my + rng.IntN(201) - 100, Z: origin.Z}
 			action = encodeMoveBackwardToLocation(target, origin)
 		}
 		if c.TrySend(action) != nil || c.TrySend(encodeRequestManorList()) != nil {
@@ -168,26 +208,45 @@ func runClient(c *testsupport.ScriptedClient, r *frameReader, monster *npc.Hosti
 			latencies = append(latencies, time.Since(sent))
 		case <-time.After(probeTimeout):
 			timeouts.Add(1)
+			return latencies
+		}
+		if obj, ok := srv.State.Player(r.id); ok && !r.moved.Load() {
+			if px, py, _ := obj.(interface{ Position() (int, int, int) }).Position(); px != origin.X || py != origin.Y {
+				r.moved.Store(true)
+			}
 		}
 	}
 	return latencies
 }
 
+// vitals is the live character's HP surface the harness heals through.
+type vitals interface {
+	HP() float64
+	MaxHPValue() float64
+	AddHP(amount float64) float64
+}
+
 // frameReader drains one client's stream on its own goroutine so broadcast
-// traffic never backs up, counting frames and signaling each probe reply.
-// lost is set once the server closed the connection. The read never uses a
-// short deadline: one expiring mid-frame would drop the partial frame.
+// traffic never backs up, counting frames and the Attack frames its own
+// character (id) sent, and signaling each probe reply. lost is set once the
+// server closed the connection, died once the character's Die arrived, moved
+// once the character left the spawn point. The read never uses a short
+// deadline: one expiring mid-frame would drop the partial frame.
 type frameReader struct {
 	client  *testsupport.ScriptedClient
+	id      int32
 	probe   chan struct{}
 	frames  atomic.Int64
+	attacks atomic.Int64
 	lost    atomic.Bool
+	died    atomic.Bool
+	moved   atomic.Bool
 	done    atomic.Bool
 	stopped chan struct{}
 }
 
-func startReader(c *testsupport.ScriptedClient) *frameReader {
-	r := &frameReader{client: c, probe: make(chan struct{}, 16), stopped: make(chan struct{})}
+func startReader(c *testsupport.ScriptedClient, id int32) *frameReader {
+	r := &frameReader{client: c, id: id, probe: make(chan struct{}, 16), stopped: make(chan struct{})}
 	go func() {
 		defer close(r.stopped)
 		for {
@@ -200,6 +259,12 @@ func startReader(c *testsupport.ScriptedClient) *frameReader {
 				continue
 			}
 			r.frames.Add(1)
+			if len(frame) >= 5 && frame[0] == serverpackets.OpcodeAttack && int32(binary.LittleEndian.Uint32(frame[1:5])) == id {
+				r.attacks.Add(1)
+			}
+			if len(frame) >= 5 && frame[0] == serverpackets.OpcodeDie && int32(binary.LittleEndian.Uint32(frame[1:5])) == id {
+				r.died.Store(true)
+			}
 			if isManorListReply(frame) {
 				r.probe <- struct{}{}
 			}
