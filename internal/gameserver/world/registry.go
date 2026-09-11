@@ -64,7 +64,7 @@ func (r *registry) get(key int32) (worldobject.Object, bool) {
 }
 
 // appendAll appends every tracked object to dst and returns the extended
-// slice, matching Region.AppendObjects' append (not replace) contract: the
+// slice, matching Region.appendObjects' append (not replace) contract: the
 // caller truncates first (dst[:0]) if it wants a fresh scan rather than an
 // accumulation. A caller that keeps dst across repeat calls (e.g. a
 // per-tick scratch buffer owned by a single goroutine) pays the allocation
