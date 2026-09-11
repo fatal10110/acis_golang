@@ -165,18 +165,27 @@ func (h *Hostile) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceHP applies skill HP damage and runs the once-only death path.
+// ReduceHP applies skill HP damage and runs the once-only death path. Hate,
+// the shot-recharge roll, and the party/minion attacked call always run for
+// a live hit with positive amount, mirroring Npc.reduceCurrentHp
+// (Npc.java:390-464), which runs unconditionally one layer above the
+// invul/damage-permission guard (CreatureStatus.java:209-226): an
+// invulnerable NPC, or one hit by an attacker without damage permission,
+// still aggroes and calls its party, but takes no damage.
 func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ modelskill.Definition) {
 	if h.AlikeDead() {
 		return
 	}
 	h.testOverhit(attacker, amount)
+	if amount > 0 {
+		if combatant, ok := attacker.(attackable.Combatant); ok {
+			h.AddCombatDamageHate(combatant, amount)
+			h.RollAttackedShotRecharge()
+			h.propagatePartyAttacked(h, combatant, int(amount), false)
+		}
+	}
 	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
-	}
-	if combatant, ok := attacker.(attackable.Combatant); ok {
-		h.AddCombatDamageHate(combatant, amount)
-		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(false)
 	newlyDead := h.health.DamageValue(amount)
@@ -204,13 +213,16 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isD
 		killer = a
 	}
 	h.testOverhit(killer, amount)
+	if amount > 0 {
+		if combatant, ok := attacker.(attackable.Combatant); ok {
+			h.AddDamageHate(combatant, amount, 0)
+			h.AddAttackDesire(combatant, 200)
+			h.RollAttackedShotRecharge()
+			h.propagatePartyAttacked(h, combatant, int(amount), false)
+		}
+	}
 	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
-	}
-	if combatant, ok := attacker.(attackable.Combatant); ok {
-		h.AddDamageHate(combatant, amount, 0)
-		h.AddAttackDesire(combatant, 200)
-		h.RollAttackedShotRecharge()
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
 	newlyDead := h.health.DamageValue(amount)
