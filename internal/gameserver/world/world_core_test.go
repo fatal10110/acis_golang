@@ -425,18 +425,18 @@ func TestPlacementWaitsForSameObjectCallbacksOnly(t *testing.T) {
 		_ = s.Move(subject, 5, 5, 0)
 		close(moved)
 	}()
-	select {
-	case <-moved:
-		t.Fatal("same-region Move finished while the object's Spawn callbacks were still running")
-	case <-time.After(20 * time.Millisecond):
-	}
-
 	despawned := make(chan struct{})
 	go func() {
-		<-moved
 		s.Despawn(subject)
 		close(despawned)
 	}()
+	select {
+	case <-moved:
+		t.Fatal("same-region Move finished while the object's Spawn callbacks were still running")
+	case <-despawned:
+		t.Fatal("Despawn finished while the object's Spawn callbacks were still running")
+	case <-time.After(20 * time.Millisecond):
+	}
 
 	farX, farY := regionCenter(40, 40)
 	other := &regionTestObject{id: 3}
@@ -506,8 +506,9 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 		}()
 	}
 	// Players walk back and forth across region borders, so region
-	// activation races between concurrent player relocations; two goroutines
-	// move the same walker, one within its region and one across borders.
+	// activation races between concurrent player relocations. A second
+	// goroutine per walker jitters it in place, racing the lock-free
+	// same-region Move against the crossings.
 	walkers := make([]*relocateBenchPlayer, 4)
 	for i := range walkers {
 		x, y := regionCenter(9+i, 11)
@@ -520,8 +521,13 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for r := range rounds * 2 {
-					x, y := regionCenter(9+(i+r)%4, 11+(r%3)*lane)
-					_ = s.Move(walker, x+lane*r%100, y, 0)
+					if lane == 0 {
+						x, y := regionCenter(9+(i+r)%4, 11)
+						_ = s.Move(walker, x, y, 0)
+					} else {
+						x, y, _ := walker.Position()
+						_ = s.Move(walker, x+1-2*(r%2), y, 0)
+					}
 				}
 			}()
 		}
@@ -666,5 +672,53 @@ func TestPlacementWaitsForDespawnAllBatch(t *testing.T) {
 	}
 	if !Knows(observer, member) {
 		t.Fatal("respawned member not placed next to the observer")
+	}
+}
+
+// A lock-free Move and a locked placement of the same object never
+// interleave: both need the object's placement latch. With the latch held
+// from here, a crossing Move must stall before writing anything, and a
+// same-region Move must fall back to the locked path and stall the same way;
+// each completes consistently once the latch is released.
+func TestMoveWaitsForPlacementLatch(t *testing.T) {
+	s := New()
+	x0, y := regionCenter(10, 10)
+	x1, _ := regionCenter(12, 10)
+	o := &regionTestObject{id: 1}
+	s.Spawn(o, x0, y, 0, 0)
+
+	for _, tc := range []struct {
+		name string
+		x    int
+	}{
+		{"crossing", x1},
+		{"same region", x1 + 50},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before, _, _ := o.Position()
+			if !o.tryLatch() {
+				t.Fatal("placement latch already held")
+			}
+			done := make(chan error, 1)
+			go func() { done <- s.Move(o, tc.x, y, 0) }()
+			select {
+			case <-done:
+				o.releaseLatch()
+				t.Fatal("Move finished while another writer held the object's placement latch")
+			case <-time.After(20 * time.Millisecond):
+			}
+			if x, _, _ := o.Position(); x != before {
+				o.releaseLatch()
+				t.Fatalf("Move wrote x=%d while the latch was held, want %d untouched", x, before)
+			}
+			o.releaseLatch()
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
+			want, _ := s.RegionAt(tc.x, y)
+			if x, _, _ := o.Position(); x != tc.x || o.currentRegion() != want {
+				t.Fatalf("after release: x=%d in region %p, want x=%d in region %p", x, o.currentRegion(), tc.x, want)
+			}
+		})
 	}
 }
