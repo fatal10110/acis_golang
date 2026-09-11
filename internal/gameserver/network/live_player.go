@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -68,8 +69,7 @@ type livePlayer struct {
 	// narrowing it.
 	saveMu         sync.Mutex
 	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
-	fusionMu       sync.Mutex // guards fusionTargetID
-	fusionTargetID int32
+	fusionTargetID atomic.Int32
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	deferredMagic  *clientpackets.RequestMagicSkillUse
@@ -312,23 +312,15 @@ func (p *livePlayer) exitPickupLock(gen uint64) bool {
 }
 
 func (p *livePlayer) setFusionTarget(id int32) {
-	p.fusionMu.Lock()
-	p.fusionTargetID = id
-	p.fusionMu.Unlock()
+	p.fusionTargetID.Store(id)
 }
 
 func (p *livePlayer) clearFusionTarget(id int32) {
-	p.fusionMu.Lock()
-	if p.fusionTargetID == id {
-		p.fusionTargetID = 0
-	}
-	p.fusionMu.Unlock()
+	p.fusionTargetID.CompareAndSwap(id, 0)
 }
 
 func (p *livePlayer) fusesTarget(id int32) bool {
-	p.fusionMu.Lock()
-	defer p.fusionMu.Unlock()
-	return p.fusionTargetID == id
+	return p.fusionTargetID.Load() == id
 }
 
 func (p *livePlayer) attackController() *attack.Controller {

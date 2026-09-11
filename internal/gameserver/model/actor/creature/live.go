@@ -1,7 +1,7 @@
 package creature
 
 import (
-	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -15,12 +15,12 @@ type Live struct {
 	movement move.CreatureMove
 	effects  *effect.List
 
-	// stateMu guards paralyzed, immobilized, invul and teleporting.
-	stateMu     sync.RWMutex
-	paralyzed   bool
-	immobilized bool
-	invul       bool
-	teleporting bool
+	// Status flags are independent of each other and settable from any
+	// goroutine; no reader needs two of them to change together.
+	paralyzed   atomic.Bool
+	immobilized atomic.Bool
+	invul       atomic.Bool
+	teleporting atomic.Bool
 }
 
 // NewLive creates runtime state at origin with speed and geodata-bound
@@ -134,10 +134,7 @@ func (l *Live) Paralyzed() bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.RLock()
-	manual := l.paralyzed
-	l.stateMu.RUnlock()
-	return manual || l.effects.IsAffected(effect.FlagParalyzed)
+	return l.paralyzed.Load() || l.effects.IsAffected(effect.FlagParalyzed)
 }
 
 // SetParalyzed sets or clears this creature's transient paralysis lock and
@@ -147,13 +144,7 @@ func (l *Live) SetParalyzed(v bool) bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.Lock()
-	defer l.stateMu.Unlock()
-	if l.paralyzed == v {
-		return false
-	}
-	l.paralyzed = v
-	return true
+	return l.paralyzed.CompareAndSwap(!v, v)
 }
 
 // Invul reports whether this creature is currently invulnerable.
@@ -161,9 +152,7 @@ func (l *Live) Invul() bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.RLock()
-	defer l.stateMu.RUnlock()
-	return l.invul || l.teleporting
+	return l.invul.Load() || l.teleporting.Load()
 }
 
 // SetInvul sets or clears this creature's invulnerability flag and reports
@@ -172,13 +161,7 @@ func (l *Live) SetInvul(v bool) bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.Lock()
-	defer l.stateMu.Unlock()
-	if l.invul == v {
-		return false
-	}
-	l.invul = v
-	return true
+	return l.invul.CompareAndSwap(!v, v)
 }
 
 // Immobilized reports whether this creature's movement-lock flag is set.
@@ -186,9 +169,7 @@ func (l *Live) Immobilized() bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.RLock()
-	defer l.stateMu.RUnlock()
-	return l.immobilized
+	return l.immobilized.Load()
 }
 
 // SetImmobilized sets or clears this creature's movement-lock flag and
@@ -197,13 +178,7 @@ func (l *Live) SetImmobilized(v bool) bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.Lock()
-	defer l.stateMu.Unlock()
-	if l.immobilized == v {
-		return false
-	}
-	l.immobilized = v
-	return true
+	return l.immobilized.CompareAndSwap(!v, v)
 }
 
 // Teleporting reports whether this creature is in the client-visible
@@ -212,9 +187,7 @@ func (l *Live) Teleporting() bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.RLock()
-	defer l.stateMu.RUnlock()
-	return l.teleporting
+	return l.teleporting.Load()
 }
 
 // SetTeleporting sets or clears this creature's teleport transition flag
@@ -223,11 +196,5 @@ func (l *Live) SetTeleporting(v bool) bool {
 	if l == nil {
 		return false
 	}
-	l.stateMu.Lock()
-	defer l.stateMu.Unlock()
-	if l.teleporting == v {
-		return false
-	}
-	l.teleporting = v
-	return true
+	return l.teleporting.CompareAndSwap(!v, v)
 }

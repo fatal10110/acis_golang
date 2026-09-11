@@ -23,15 +23,14 @@ type SummonSpawner interface {
 // SetSummonSpawner wires c's live summon spawner, called once by the
 // network layer when it creates one for c.
 func (c *Character) SetSummonSpawner(spawner SummonSpawner) {
-	c.summonSpawnMu.Lock()
-	defer c.summonSpawnMu.Unlock()
-	c.summonSpawner = spawner
+	c.summonSpawner.Store(&spawner)
 }
 
 func (c *Character) summonSpawnerLocked() SummonSpawner {
-	c.summonSpawnMu.RLock()
-	defer c.summonSpawnMu.RUnlock()
-	return c.summonSpawner
+	if p := c.summonSpawner.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // SummonCreature is the SUMMON_CREATURE skill handler's entry point
