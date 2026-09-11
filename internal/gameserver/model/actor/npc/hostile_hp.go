@@ -56,12 +56,18 @@ func (h *Hostile) SetCurrentMP(mp int) {
 // reaches zero — runs this NPC's death sequence, passing the reward hook
 // set via SetRewarder (nil if none was set). It reports whether this call
 // newly killed the NPC. A hit against an already-dead NPC is a no-op: no
-// damage is applied and no status is broadcast.
+// damage is applied and no status is broadcast. An invulnerable NPC, or an
+// attacker without damage permission, takes no damage; the overhit test
+// still runs first (AttackableStatus.reduceHp tests overhit, then the invul
+// guard, CreatureStatus.java:209-226).
 func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if h.AlikeDead() {
 		return false
 	}
 	h.testOverhit(attacker, float64(dmg))
+	if h.Invul() || !creature.CanDealDamage(attacker) {
+		return false
+	}
 	if dmg > 0 {
 		if combatant, ok := attacker.(attackable.Combatant); ok {
 			h.AddCombatDamageHate(combatant, float64(dmg))
