@@ -109,8 +109,6 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		PetConfig:        petmodel.DefaultConfig(),
 		Log:              zerolog.Nop(),
 	})
-	registerTestInventoryUpdates(t, state, inventoryUpdates)
-
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
