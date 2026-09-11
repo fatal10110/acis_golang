@@ -3,6 +3,8 @@ package sim
 import (
 	"bytes"
 	"context"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -259,6 +261,107 @@ func TestPoolWatchdogReportsAStuckTaskWhileItRuns(t *testing.T) {
 	if n := strings.Count(log.String(), "still running"); n != 1 {
 		t.Fatalf("stuck task reported %d times, want once:\n%s", n, log.String())
 	}
+}
+
+func TestPoolSurvivesATaskThatCallsGoexit(t *testing.T) {
+	var log lockedBuffer
+	p := startPool(t, 1, zerolog.New(&log)) // the only worker is the one that exits
+	q := p.NewQueue("npc-goexit")
+
+	var order []int // queue-owned
+	done := make(chan []int)
+	q.Post(func() { order = append(order, 0) })
+	q.Post(func() { runtime.Goexit() })
+	q.Post(func() { order = append(order, 2) }) // same batch, behind the Goexit
+	q.Post(func() { order = append(order, 3); done <- order })
+
+	select {
+	case got := <-done:
+		if want := []int{0, 2, 3}; !slices.Equal(got, want) {
+			t.Fatalf("ran %v, want %v", got, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("tasks accepted behind a Goexit never ran")
+	}
+	other := make(chan struct{})
+	p.NewQueue("other").Post(func() { close(other) })
+	select {
+	case <-other:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pool lost its worker to a Goexit")
+	}
+	if out := log.String(); !strings.Contains(out, "runtime.Goexit") || !strings.Contains(out, `"queue":"npc-goexit"`) {
+		t.Fatalf("Goexit not logged with its queue:\n%s", out)
+	}
+}
+
+func TestPoolStopReleasesItsStartContext(t *testing.T) {
+	ctx := &countingCtx{Context: t.Context()}
+	for range 3 {
+		p := NewPool(1, zerolog.Nop())
+		p.Start(ctx)
+		stopPool(t, p)
+	}
+	if n := ctx.live.Load(); n != 0 {
+		t.Fatalf("%d stopped pools still registered on the live Start context", n)
+	}
+}
+
+// countingCtx counts live context.AfterFunc registrations on it.
+type countingCtx struct {
+	context.Context
+	live atomic.Int32
+}
+
+// Value hides the embedded cancelCtx so AfterFunc registers through c.
+func (c *countingCtx) Value(any) any { return nil }
+
+func (c *countingCtx) AfterFunc(func()) func() bool {
+	c.live.Add(1)
+	var stopped atomic.Bool
+	return func() bool {
+		if stopped.Swap(true) {
+			return false
+		}
+		c.live.Add(-1)
+		return true
+	}
+}
+
+func TestTickerKeepsAFixedRate(t *testing.T) {
+	m := &manualExec{at: epoch}
+	q := &Queue{id: "q", exec: m}
+	tick := (*Timer)(q.Every(10*time.Millisecond, func() {}))
+
+	m.at = epoch.Add(13 * time.Millisecond) // expiry delivered 3 ms late
+	tick.fire()
+	m.at = epoch.Add(47 * time.Millisecond) // then blocked past the 20 and 30 ms deadlines
+	tick.fire()
+
+	// Deadlines stay on the 10 ms grid: 10, then 20, then 50 (30 and 40 dropped).
+	want := []time.Duration{10 * time.Millisecond, 7 * time.Millisecond, 3 * time.Millisecond}
+	if !slices.Equal(m.arms, want) {
+		t.Fatalf("armed %v, want %v", m.arms, want)
+	}
+}
+
+// manualExec is an executor whose clock and expiries the test drives; it
+// records every delay the timer is armed with and runs nothing.
+type manualExec struct {
+	at   time.Time
+	arms []time.Duration
+}
+
+func (m *manualExec) enqueue(*Queue, func()) bool { return true }
+func (m *manualExec) Now() time.Time              { return m.at }
+func (m *manualExec) afterFunc(d time.Duration, _ func()) clockTimer {
+	m.arms = append(m.arms, d)
+	return m
+}
+func (m *manualExec) Stop() bool { return true }
+func (m *manualExec) Reset(d time.Duration) bool {
+	m.arms = append(m.arms, d)
+	return true
 }
 
 // lockedBuffer is a log sink the test can read while workers write to it.

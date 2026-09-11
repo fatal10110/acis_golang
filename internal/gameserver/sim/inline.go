@@ -17,7 +17,7 @@ import (
 // idle and the tasks behind it run on the next call.
 type Inline struct {
 	mu     sync.Mutex
-	now    time.Time
+	at     time.Time // the virtual now
 	tasks  []inlineTask
 	timers vtimerHeap
 	seq    uint64
@@ -30,7 +30,7 @@ type inlineTask struct {
 
 // NewInline returns an idle loop whose clock reads start.
 func NewInline(start time.Time) *Inline {
-	return &Inline{now: start}
+	return &Inline{at: start}
 }
 
 // NewQueue returns an open queue run by in. id names it in logs.
@@ -42,7 +42,7 @@ func (in *Inline) NewQueue(id string) *Queue {
 func (in *Inline) Now() time.Time {
 	in.mu.Lock()
 	defer in.mu.Unlock()
-	return in.now
+	return in.at
 }
 
 // Run runs posted tasks in post order, including the ones they post, until
@@ -68,18 +68,18 @@ func (in *Inline) Run() {
 func (in *Inline) Advance(d time.Duration) {
 	in.Run()
 	in.mu.Lock()
-	end := in.now.Add(d)
+	end := in.at.Add(d)
 	for len(in.timers) > 0 && !in.timers[0].at.After(end) {
 		v := heap.Pop(&in.timers).(*vtimer)
-		if v.at.After(in.now) { // a negative delay fires now, not in the past
-			in.now = v.at
+		if v.at.After(in.at) { // a negative delay fires now, not in the past
+			in.at = v.at
 		}
 		in.mu.Unlock()
 		v.fn()
 		in.Run()
 		in.mu.Lock()
 	}
-	in.now = end
+	in.at = end
 	in.mu.Unlock()
 }
 
@@ -124,7 +124,7 @@ func (v *vtimer) Reset(d time.Duration) bool {
 		heap.Remove(&in.timers, v.index)
 	}
 	in.seq++
-	v.at, v.seq = in.now.Add(d), in.seq
+	v.at, v.seq = in.at.Add(d), in.seq
 	heap.Push(&in.timers, v)
 	return armed
 }

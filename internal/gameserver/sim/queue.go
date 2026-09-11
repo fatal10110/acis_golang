@@ -20,8 +20,10 @@ type SystemClock struct{}
 // Now returns time.Now().
 func (SystemClock) Now() time.Time { return time.Now() }
 
-// executor is what a Queue runs on: a Pool or an Inline loop.
+// executor is what a Queue runs on: a Pool or an Inline loop. Now is the
+// clock its timers run on.
 type executor interface {
+	Clock
 	// enqueue accepts fn for q. It is called with q.mu held.
 	enqueue(q *Queue, fn func()) bool
 	afterFunc(d time.Duration, fn func()) clockTimer
@@ -76,9 +78,11 @@ func (q *Queue) After(d time.Duration, fn func()) *Timer {
 	return q.arm(d, 0, fn)
 }
 
-// Every posts fn to q every d until the ticker is stopped or q is closed. A
-// tick that comes due while the previous one is still waiting in the queue
-// is dropped, as with time.Ticker.
+// Every posts fn to q every d until the ticker is stopped or q is closed.
+// Ticks keep a fixed rate: deadlines stay on the grid of the first one
+// however late an expiry is handled. As with time.Ticker, a tick that comes
+// due while the previous one is still waiting in the queue is dropped, and
+// deadlines missed entirely are skipped.
 func (q *Queue) Every(d time.Duration, fn func()) *Ticker {
 	if d <= 0 {
 		panic("sim: non-positive interval for Queue.Every")
@@ -95,6 +99,7 @@ func (q *Queue) arm(d, period time.Duration, fn func()) *Timer {
 		return t
 	}
 	// Arming under q.mu orders the ct write before fire, which takes q.mu.
+	t.next = q.exec.Now().Add(d)
 	t.ct = q.exec.afterFunc(d, t.fire)
 	if q.timers == nil {
 		q.timers = make(map[*Timer]struct{})
@@ -108,6 +113,7 @@ type Timer struct {
 	q      *Queue
 	fn     func()
 	period time.Duration // 0 for a one-shot
+	next   time.Time     // deadline of the armed expiry
 	ct     clockTimer
 	done   bool // stopped, cancelled by Close, or a one-shot that ran
 	queued bool // an expiry is posted and has not run yet
@@ -137,9 +143,12 @@ func (t *Timer) fire() {
 		return
 	}
 	if t.period > 0 {
-		// ponytail: re-armed from the expiry, so each tick drifts by the
-		// callback latency (µs); anchor to the first deadline if it matters.
-		t.ct.Reset(t.period)
+		now := q.exec.Now()
+		t.next = t.next.Add(t.period)
+		if !t.next.After(now) {
+			t.next = t.next.Add((now.Sub(t.next)/t.period + 1) * t.period)
+		}
+		t.ct.Reset(t.next.Sub(now))
 	}
 	if t.queued {
 		return

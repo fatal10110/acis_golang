@@ -3,6 +3,7 @@ package sim
 import (
 	"context"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,11 +70,12 @@ func (p *Pool) Start(ctx context.Context) {
 	for i := range p.slots {
 		go p.work(&p.slots[i], idle)
 	}
+	release := context.AfterFunc(ctx, p.shutdown)
 	go func() {
 		p.watch(idle)
+		release() // a stopped pool must not stay reachable from a live ctx
 		close(p.exited)
 	}()
-	context.AfterFunc(ctx, p.shutdown)
 }
 
 // Stop refuses further posts, lets the workers finish every task already
@@ -117,6 +119,9 @@ func (p *Pool) enqueue(q *Queue, fn func()) bool {
 	return true
 }
 
+// Now returns time.Now(), the clock the pool's timers run on.
+func (p *Pool) Now() time.Time { return time.Now() }
+
 func (p *Pool) afterFunc(d time.Duration, fn func()) clockTimer {
 	return time.AfterFunc(d, fn)
 }
@@ -124,7 +129,14 @@ func (p *Pool) afterFunc(d time.Duration, fn func()) clockTimer {
 // work drains runnable queues until the pool stops and the run queue is
 // empty. The last worker to exit closes idle.
 func (p *Pool) work(s *slot, idle chan<- struct{}) {
+	stopped := false
 	defer func() {
+		if !stopped {
+			// A task called runtime.Goexit and took this goroutine with it;
+			// drain has already put its queue back. Replace the worker.
+			go p.work(s, idle)
+			return
+		}
 		if p.live.Add(-1) == 0 {
 			close(idle)
 		}
@@ -135,6 +147,7 @@ func (p *Pool) work(s *slot, idle chan<- struct{}) {
 		for len(p.runq) == 0 {
 			if p.stopped.Load() {
 				p.mu.Unlock()
+				stopped = true
 				return
 			}
 			p.wake.Wait()
@@ -158,46 +171,60 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 	q.tasks = q.tasks[n:]
 	q.mu.Unlock()
 
+	i := 0
+	// Deferred so it also runs when a task calls runtime.Goexit: the tasks
+	// behind that one go back to the head of q, and q is requeued as usual.
+	defer func() {
+		q.mu.Lock()
+		if i < n {
+			q.tasks = append(slices.Clone(batch[i+1:n]), q.tasks...)
+			clear(batch[i+1 : n])
+		}
+		more := len(q.tasks) > 0
+		q.scheduled = more
+		q.mu.Unlock()
+		if more {
+			p.mu.Lock()
+			p.runq = append(p.runq, q)
+			p.mu.Unlock()
+			p.wake.Signal()
+		}
+	}()
 	drainAs(q, func() {
-		for i, fn := range batch[:n] {
+		for ; i < n; i++ {
+			fn := batch[i]
 			batch[i] = nil
 			p.run(s, q.id, fn)
 		}
 	})
-
-	q.mu.Lock()
-	more := len(q.tasks) > 0
-	q.scheduled = more
-	q.mu.Unlock()
-	if more {
-		p.mu.Lock()
-		p.runq = append(p.runq, q)
-		p.mu.Unlock()
-		p.wake.Signal()
-	}
 }
 
 // run runs fn for queue on the worker owning s. A panic is logged and
-// contained so the worker survives; a slow task is logged with its final
-// duration once it returns.
+// contained so the worker survives; runtime.Goexit is logged and costs the
+// worker goroutine, which work replaces. A slow task is logged with its
+// final duration once it returns.
 func (p *Pool) run(s *slot, queue string, fn func()) {
 	start := time.Now()
 	s.mu.Lock()
 	s.queue, s.start = queue, start
 	s.seq++
 	s.mu.Unlock()
+	returned := false
 	defer func() {
 		s.mu.Lock()
 		s.start = time.Time{}
 		s.mu.Unlock()
 		if r := recover(); r != nil {
 			p.log.Error().Str("queue", queue).Interface("panic", r).Msg("sim: recovered panic in queued task")
+		} else if !returned {
+			p.log.Error().Str("queue", queue).Msg("sim: queued task called runtime.Goexit; worker replaced")
 		}
 		if d := time.Since(start); d > slowTask {
 			p.log.Warn().Str("queue", queue).Dur("elapsed", d).Msg("sim: slow task")
 		}
 	}()
 	fn()
+	returned = true
 }
 
 // watch logs, once per task, every task still running past slowTask, until
