@@ -432,6 +432,28 @@ func (a *Actor) SetParalyzed(v bool) bool {
 	return true
 }
 
+// Immobilized reports whether this summon's movement-lock flag is set, e.g.
+// by ImobilePetBuff. Distinct from the FlagRooted effect.
+func (a *Actor) Immobilized() bool {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.immobilized
+}
+
+// SetImmobilized sets or clears this summon's movement-lock flag. It reports
+// whether the flag actually changed. It does not yet save/restore follow
+// mode the way Summon.setIsImmobilized's override does — not yet ported,
+// see fatal10110/acis_golang#2319.
+func (a *Actor) SetImmobilized(v bool) bool {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	if a.immobilized == v {
+		return false
+	}
+	a.immobilized = v
+	return true
+}
+
 // Teleporting reports whether this summon is in a teleport transition.
 func (a *Actor) Teleporting() bool {
 	a.stateMu.RLock()

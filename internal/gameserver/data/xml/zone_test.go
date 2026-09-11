@@ -19,7 +19,12 @@ func TestLoadZonesDatapack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadZones: %v", err)
 	}
+	t.Run("counts", func(t *testing.T) { assertZoneDatapackCounts(t, index) })
+	t.Run("fields", func(t *testing.T) { assertZoneDatapackFields(t, index) })
+}
 
+func assertZoneDatapackCounts(t *testing.T, index *zone.Index) {
+	t.Helper()
 	wantCounts := map[string]int{
 		"arena": 4, "boss": 17, "castleTeleport": 9, "castle": 9,
 		"clanHall": 45, "damage": 35, "derbyTrack": 8, "effect": 167,
@@ -65,13 +70,10 @@ func TestLoadZonesDatapack(t *testing.T) {
 	}
 }
 
-// TestLoadZonesDatapackFields spot-checks parsed settings against values
-// pinned from the datapack files themselves.
-func TestLoadZonesDatapackFields(t *testing.T) {
-	index, err := LoadZones(datapackPath(t, filepath.Join("data", "xml", "zones")))
-	if err != nil {
-		t.Fatalf("LoadZones: %v", err)
-	}
+// assertZoneDatapackFields spot-checks parsed settings against values pinned
+// from the datapack files themselves.
+func assertZoneDatapackFields(t *testing.T, index *zone.Index) {
+	t.Helper()
 
 	// Files load in sorted name order, so the first file's dynamic ids
 	// start at 1000; arena zones carry no explicit id.

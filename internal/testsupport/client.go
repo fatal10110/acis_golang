@@ -172,10 +172,31 @@ func (f *ScriptedClient) ExpectNoFrame() {
 // block on.
 func SyncBarrier(t *testing.T, c *ScriptedClient, send func(), wantOpcode byte) {
 	t.Helper()
-	send()
-	if reply := c.Read(); reply[0] != wantOpcode {
-		t.Fatalf("sync barrier opcode = %#x, want %#x", reply[0], wantOpcode)
+	if frames := SyncBarrierFrames(t, c, send, wantOpcode); len(frames) != 0 {
+		t.Fatalf("sync barrier received %d frame(s) before reply: %x", len(frames), frames)
 	}
+}
+
+// SyncBarrierFrames sends a request guaranteed to be answered with wantOpcode
+// and returns every earlier frame in wire order. Callers must assert the
+// returned frames; the helper never discards them. It is only safe when no
+// earlier request can itself produce wantOpcode.
+func SyncBarrierFrames(t *testing.T, c *ScriptedClient, send func(), wantOpcode byte) [][]byte {
+	t.Helper()
+	send()
+	var frames [][]byte
+	for i := 0; i < 100; i++ {
+		frame := c.Read()
+		if len(frame) == 0 {
+			t.Fatal("sync barrier received an empty frame")
+		}
+		if frame[0] == wantOpcode {
+			return frames
+		}
+		frames = append(frames, frame)
+	}
+	t.Fatal("sync barrier did not receive its reply within 100 frames")
+	return nil
 }
 
 // Conn exposes the underlying connection for tests that need raw socket

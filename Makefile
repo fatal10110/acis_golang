@@ -1,6 +1,6 @@
 GO ?= go
 
-.PHONY: test test-unit test-one test-race test-db-up test-db-down
+.PHONY: test test-unit test-internal test-one test-race test-db-up test-db-down
 
 # Full test run: core + behavior suites. Behavior suites read/write a single
 # shared MariaDB instance (see docker-compose.test.yml, internal/dbtest) and
@@ -8,14 +8,18 @@ GO ?= go
 test:
 	$(GO) test ./...
 
-# Fast core-only pass: everything except the tests/ behavior suites.
+# Fast DB-free pure-core pass for edit feedback.
 test-unit:
+	$(GO) test ./cmd/testtiming ./internal/config ./internal/commons/crypt ./internal/commons/wire ./internal/link ./internal/loginserver/crypt ./internal/gameserver/network/cipher ./internal/gameserver/network/clientpackets ./internal/gameserver/network/serverpackets ./internal/gameserver/skill/formulas ./internal/gameserver/skill/stat ./internal/gameserver/skill/statbonus
+
+# Broad internal pass, including DB and socket tests outside tests/.
+test-internal:
 	$(GO) test $$($(GO) list ./... | grep -v '/tests')
 
 # Single behavior suite: make test-one PKG=tests/items
 test-one:
 	@test -n "$(PKG)" || { echo "usage: make test-one PKG=<package under tests/, e.g. tests/items>"; exit 1; }
-	$(GO) test ./$(PKG)/ -run . -count=1
+	$(GO) test ./$(PKG)/ -run '$(or $(RUN),.)' -count=1
 
 # Full run with the race detector enabled.
 test-race:
