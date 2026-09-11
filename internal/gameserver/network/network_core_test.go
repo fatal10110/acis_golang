@@ -841,6 +841,9 @@ func BenchmarkSessionSendAuthLoginFailFrame(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
+		if i%64 == 0 {
+			awaitDrain(session.conn)
+		}
 		frame := serverpackets.FrameAuthLoginFail(serverpackets.LoginFailSystemErrorTryLater)
 		if !session.SendFrame(frame) {
 			b.Fatal("SendFrame returned false")
@@ -875,6 +878,9 @@ func BenchmarkSessionSendUserInfoFrame(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
+		if i%64 == 0 {
+			awaitDrain(session.conn)
+		}
 		if !session.SendFrame(serverpackets.FrameUserInfo(snapshot)) {
 			b.Fatal("SendFrame returned false")
 		}

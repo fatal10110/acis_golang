@@ -489,3 +489,18 @@ func TestPacketHelpers(t *testing.T) {
 		t.Fatalf("NewPacketWriter() bytes = % X, want % X", got, want)
 	}
 }
+
+// Footprint charges an owned frame its writer's whole capacity — a grown
+// pooled writer reused for a tiny packet pins all of it — and a borrowed
+// frame only its bytes.
+func TestFrameFootprintCountsOwnedWriterCapacity(t *testing.T) {
+	w := NewFrameWriter(4096)
+	w.WriteUint8(0x25)
+	owned := OwnedFrame(w.Frame(), w, func(*Writer) {})
+	if got := owned.Footprint(); got != 4096 {
+		t.Fatalf("owned 3-byte frame on a 4096-byte writer: Footprint = %d, want 4096", got)
+	}
+	if got := BorrowedFrame(make([]byte, 40)).Footprint(); got != 40 {
+		t.Fatalf("borrowed 40-byte frame: Footprint = %d, want 40", got)
+	}
+}

@@ -117,7 +117,9 @@ The only `*_test.go` files allowed outside `tests/` are pure-unit tests in these
 - packet encode/decode round-trips (`network/serverpackets`, `link` codecs),
 - damage/stat formulas (`skill/formulas`, `stat*`),
 - config/property parsing,
-- crypt primitives.
+- crypt primitives,
+- concurrency primitives (`internal/gameserver/sim`, `internal/commons/scheduler`), including
+  `sim`'s `simdebug`-tagged tests.
 
 Harness usage (each suite package calls `sqltest.Main(m)` from `TestMain`; assertions target three
 surfaces — client-visible packets, world state, persisted DB rows):

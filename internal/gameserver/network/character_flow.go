@@ -470,7 +470,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		c.SetZones(l.zones)
 	}
 	c.SetFrameSender(client.Session.SendFrame)
-	c.SetBroadcastFrameSender(client.Session.TrySendFrame)
+	c.SetBroadcastFrameSender(client.Session.SendFrame)
 	c.SetLogger(l.log)
 
 	x, y, z := c.Position()
@@ -491,7 +491,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
-	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.TrySendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}
 	c.SetSummonConfirmSender(func(casterName string, casterID int32, x, y, z int, timeout time.Duration) {
