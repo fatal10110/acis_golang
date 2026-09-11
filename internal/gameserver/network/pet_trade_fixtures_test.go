@@ -14,10 +14,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -61,35 +58,6 @@ func petTestTemplates() *item.Table {
 			EtcItem:     &item.EtcItemDetail{},
 		},
 	})
-}
-
-func attachTestPet(t *testing.T, state *world.State, live *livePlayer, templates *item.Table, npcID int, items []*item.Instance) (*summon.Actor, *itemcontainer.Inventory) {
-	t.Helper()
-	petInv := itemcontainer.NewPetInventory(0x20000001, templates)
-	petInv.Restore(items)
-	pet, err := summon.NewPet(summon.PetConfig{
-		ObjectID:  0x20000001,
-		Owner:     live,
-		NPCID:     npcID,
-		Level:     1,
-		Inventory: petInv,
-		Fed:       100,
-		MaxMeal:   100,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	summon.SpawnBesideOwner(state, pet, live, location.Location{X: 10})
-	// The dial-based tests already have a batching task registered for
-	// state (from the login flow) by the time they attach a pet; wire the
-	// pet's inventory into it here, the same attach-point wiring newPet
-	// does in production. Tests that build *GameClientLink directly instead
-	// run this before the task exists — lookup finds nothing yet, and
-	// wireInventoryUpdates picks the pet up once it does.
-	if updates, ok := lookupTestInventoryUpdates(state); ok {
-		wirePetInventoryUpdates(updates, pet, live, zerolog.Nop())
-	}
-	return pet, petInv
 }
 
 func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *testsupport.FrameCapture, *testsupport.FrameCapture, *livePlayer, *livePlayer) {

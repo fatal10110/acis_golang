@@ -45,49 +45,6 @@ func (staticSevenSignsStore) SaveStatus(context.Context, sevensigns.StatusRow) e
 
 // --- test server setup ---
 
-// testInventoryUpdates maps each test's *world.State to the
-// *task.InventoryUpdates wired into its GameClientLink, so a test that
-// otherwise only gets back state (not gcl) can still drive the batching
-// task's tick deterministically instead of waiting on its real cadence.
-var (
-	testInventoryUpdatesMu sync.Mutex
-	testInventoryUpdates   = map[*world.State]*task.InventoryUpdates{}
-)
-
-func registerTestInventoryUpdates(t *testing.T, state *world.State, updates *task.InventoryUpdates) {
-	t.Helper()
-	testInventoryUpdatesMu.Lock()
-	testInventoryUpdates[state] = updates
-	testInventoryUpdatesMu.Unlock()
-	t.Cleanup(func() {
-		testInventoryUpdatesMu.Lock()
-		delete(testInventoryUpdates, state)
-		testInventoryUpdatesMu.Unlock()
-	})
-}
-
-// inventoryUpdatesFor returns the batching task registered for state by
-// registerTestInventoryUpdates.
-func inventoryUpdatesFor(t *testing.T, state *world.State) *task.InventoryUpdates {
-	t.Helper()
-	u, ok := lookupTestInventoryUpdates(state)
-	if !ok {
-		t.Fatal("no inventory update task registered for this test link")
-	}
-	return u
-}
-
-// lookupTestInventoryUpdates is inventoryUpdatesFor without the test
-// failure, for callers like attachTestPet that run before some test setups
-// have registered a task yet and need to treat that as "nothing to wire
-// here" rather than a failure.
-func lookupTestInventoryUpdates(state *world.State) (*task.InventoryUpdates, bool) {
-	testInventoryUpdatesMu.Lock()
-	defer testInventoryUpdatesMu.Unlock()
-	u, ok := testInventoryUpdates[state]
-	return u, ok
-}
-
 // assertSystemMessageStringFrame checks a single-param text SystemMessage.
 func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, text string) {
 	t.Helper()
@@ -198,8 +155,6 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		Log:              log,
 		Now:              testLinkNow,
 	})
-	registerTestInventoryUpdates(t, state, inventoryUpdates)
-
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
