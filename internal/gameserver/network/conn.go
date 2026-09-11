@@ -3,42 +3,47 @@ package network
 import (
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/rs/zerolog"
 )
 
-// outboundBuffer is how many pending writes a Conn queues before SendFrame
-// starts blocking the caller.
-const outboundBuffer = 64
+// outboundHighWater is how many unwritten bytes a Conn tolerates before it
+// treats the peer as stalled and aborts the connection. Frames are never
+// dropped individually: skipping one would desynchronize the client's cipher.
+// It is far above any healthy burst (an EnterWorld in a crowded town is a few
+// hundred KiB) and caps a stalled client's backlog at 16 maximum-size frames.
+const outboundHighWater = 1 << 20
 
 // Conn is one accepted game-client connection: a net.Conn plus an
-// outbound queue drained by a single dedicated writer goroutine, so
-// nothing but that goroutine ever calls Write on the underlying
-// net.Conn. The read side belongs to whatever handler Serve invokes.
+// unbounded outbound FIFO drained by a single dedicated writer goroutine, so
+// nothing but that goroutine ever calls Write on the underlying net.Conn and
+// no sender ever blocks on a slow peer. The read side belongs to whatever
+// handler Serve invokes.
 type Conn struct {
 	net.Conn
-	log      zerolog.Logger
-	mu       sync.RWMutex
-	out      chan queuedWrite
-	closed   atomic.Bool
+	log zerolog.Logger
+
+	// mu guards queue, pending and closed. It is held only to append to or
+	// swap out the queue, never across I/O.
+	mu      sync.Mutex
+	queue   []wire.Frame
+	pending int // bytes queued or being written
+	closed  bool
+
+	wake     chan struct{} // capacity 1: queue gained frames or closed was set
 	stopping chan struct{}
 	stopOnce sync.Once
 	stopped  chan struct{}
 	closeErr error
 }
 
-type queuedWrite struct {
-	frame wire.Frame
-}
-
 func newConn(c net.Conn, log zerolog.Logger) *Conn {
 	conn := &Conn{
 		Conn:     c,
 		log:      log,
-		out:      make(chan queuedWrite, outboundBuffer),
+		wake:     make(chan struct{}, 1),
 		stopping: make(chan struct{}),
 		stopped:  make(chan struct{}),
 	}
@@ -53,12 +58,10 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 // cleanup still runs so Close never blocks forever waiting on stopped.
 //
 // Once this loop exits early on a write error, later SendFrame calls fail
-// without queueing because nothing drains c.out any more.
+// without queueing because closed is set.
 //
-// Each iteration greedily drains c.out (bounded by outboundBuffer) after
-// its first queued frame so a burst coalesces into one vectored
-// net.Buffers write instead of one Write syscall per frame. Idle
-// behavior is unchanged: with nothing queued, the loop blocks in its select.
+// Each iteration takes the whole backlog at once so a burst coalesces into
+// one vectored net.Buffers write instead of one Write syscall per frame.
 func (c *Conn) writeLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -66,178 +69,132 @@ func (c *Conn) writeLoop() {
 		}
 		c.stop()
 		c.mu.Lock()
-		c.releaseQueued()
+		c.closed = true
+		releaseFrames(c.queue)
+		c.queue = nil
 		c.mu.Unlock()
 		c.closeErr = c.Conn.Close()
 		close(c.stopped)
 	}()
 	// batch and bufs are reused across iterations — this loop is their only
-	// owner, so no other goroutine ever sees them.
-	var batch []queuedWrite
+	// owner, so no other goroutine ever sees them. batch swaps backing arrays
+	// with c.queue, so steady state allocates nothing.
+	var batch []wire.Frame
 	var bufs net.Buffers
 	for {
-		var queued queuedWrite
-		var ok bool
-		select {
-		case <-c.stopping:
-			return
-		case queued, ok = <-c.out:
-			if !ok {
+		c.mu.Lock()
+		batch, c.queue = c.queue, batch[:0]
+		closed := c.closed
+		c.mu.Unlock()
+		if len(batch) == 0 {
+			if closed {
 				return
 			}
+			select {
+			case <-c.stopping:
+				return
+			case <-c.wake:
+			}
+			continue
 		}
-		batch = c.drainBatch(batch[:0], queued)
+		var written int
 		var err error
-		if bufs, err = c.writeBatch(batch, bufs); err != nil {
+		bufs, written, err = c.writeBatch(batch, bufs)
+		c.mu.Lock()
+		c.pending -= written
+		c.mu.Unlock()
+		if err != nil {
 			c.log.Warn().Err(err).Msg("game connection write failed, closing")
 			return
 		}
 	}
 }
 
-// drainBatch appends first plus any further queued frames already
-// sitting in c.out, without blocking, up to outboundBuffer total so one
-// slow reader can't build an unbounded batch.
-func (c *Conn) drainBatch(batch []queuedWrite, first queuedWrite) []queuedWrite {
-	batch = append(batch, first)
-	for len(batch) < outboundBuffer {
-		select {
-		case queued, ok := <-c.out:
-			if !ok {
-				return batch
-			}
-			batch = append(batch, queued)
-		default:
-			return batch
-		}
-	}
-	return batch
-}
-
 // writeBatch writes every frame in batch as a single vectored
 // net.Buffers write and releases all of them (win or lose) once the
 // write attempt finishes. It reuses bufs' storage and returns it, possibly
 // grown, for the next batch; WriteTo consumes a separate slice header, so
-// the returned one keeps the whole backing array.
-func (c *Conn) writeBatch(batch []queuedWrite, bufs net.Buffers) (net.Buffers, error) {
-	defer func() {
-		for _, queued := range batch {
-			queued.frame.Release()
-		}
-	}()
+// the returned one keeps the whole backing array. size is the byte total the
+// batch held, so the caller can retire it from pending either way.
+func (c *Conn) writeBatch(batch []wire.Frame, bufs net.Buffers) (_ net.Buffers, size int, _ error) {
+	defer releaseFrames(batch)
 	bufs = bufs[:0]
-	for _, queued := range batch {
-		bufs = append(bufs, queued.frame.Bytes())
+	for _, frame := range batch {
+		bufs = append(bufs, frame.Bytes())
+		size += len(frame.Bytes())
 	}
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(time.Minute)); err != nil {
-		return bufs, err
+		return bufs, size, err
 	}
 	send := bufs
 	_, err := send.WriteTo(c.Conn)
-	return bufs, err
+	return bufs, size, err
 }
 
-func (c *Conn) releaseQueued() {
-	for {
-		select {
-		case queued, ok := <-c.out:
-			if !ok {
-				return
-			}
-			queued.frame.Release()
-		default:
-			return
-		}
+// releaseFrames releases every frame and clears the slots so a reused
+// backing array does not pin released buffers.
+func releaseFrames(frames []wire.Frame) {
+	for _, frame := range frames {
+		frame.Release()
 	}
+	clear(frames)
 }
 
-// SendFrame queues a frame and calls release exactly once after the frame is
-// written or dropped because the connection is closed.
+// SendFrame queues a frame without blocking and calls release exactly once
+// after the frame is written or dropped. It reports false when the
+// connection is closed, or when this frame would push the unwritten backlog
+// past outboundHighWater — the connection is aborted then, because dropping
+// one ordered frame would desynchronize the client.
 func (c *Conn) SendFrame(frame wire.Frame) bool {
 	if frame.Err() != nil {
 		frame.Release()
 		return false
 	}
-	if c.send(queuedWrite{frame: frame}) {
-		return true
-	}
-	frame.Release()
-	return false
-}
-
-// trySendFrame queues a frame only when the outbound queue has capacity. It
-// takes ownership of frame and releases it when the queue is full or closed.
-func (c *Conn) trySendFrame(frame wire.Frame) bool {
-	if frame.Err() != nil {
+	size := len(frame.Bytes())
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
 		frame.Release()
 		return false
 	}
-	if c.trySend(queuedWrite{frame: frame}) {
-		return true
+	if c.pending+size > outboundHighWater {
+		c.mu.Unlock()
+		frame.Release()
+		c.abort()
+		return false
 	}
-	frame.Release()
-	return false
+	c.queue = append(c.queue, frame)
+	c.pending += size
+	c.mu.Unlock()
+	c.signal()
+	return true
+}
+
+func (c *Conn) signal() {
+	select {
+	case c.wake <- struct{}{}:
+	default:
+	}
 }
 
 // abort closes a connection without waiting for its writer to drain. It is
-// used when a client can no longer decode its ordered packet stream.
+// used when a client stopped reading its ordered packet stream. A connection
+// already closing is left to finish its own drain.
 func (c *Conn) abort() {
-	if c.closed.CompareAndSwap(false, true) {
-		c.log.Warn().Msg("outbound queue full, aborting connection")
-		c.stop()
-		_ = c.Conn.Close()
+	c.mu.Lock()
+	wasClosed := c.closed
+	c.closed = true
+	c.mu.Unlock()
+	if wasClosed {
+		return
 	}
+	c.log.Warn().Int("high_water_bytes", outboundHighWater).Msg("outbound backlog over high-water mark, aborting connection")
+	c.stop()
+	_ = c.Conn.Close()
 }
 
 func (c *Conn) stop() {
 	c.stopOnce.Do(func() { close(c.stopping) })
-}
-
-func (c *Conn) send(queued queuedWrite) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if c.closed.Load() {
-		return false
-	}
-	select {
-	case <-c.stopping:
-		return false
-	default:
-	}
-	select {
-	case c.out <- queued:
-		return true
-	case <-c.stopping:
-		return false
-	}
-}
-
-func (c *Conn) trySend(queued queuedWrite) bool {
-	// Only Close writes c.mu. If it wins this race, the connection is already
-	// being torn down, so dropping an encrypted frame cannot desynchronize a
-	// live client.
-	if !c.mu.TryRLock() {
-		return false
-	}
-	defer c.mu.RUnlock()
-	if c.closed.Load() {
-		return false
-	}
-	select {
-	case <-c.stopping:
-		return false
-	default:
-	}
-	select {
-	case c.out <- queued:
-		return true
-	default:
-		return false
-	}
-}
-
-func (c *Conn) queueFull() bool {
-	return c.closed.Load() || len(c.out) == cap(c.out)
 }
 
 // Close stops accepting new sends, flushes any already queued, then
@@ -245,11 +202,9 @@ func (c *Conn) queueFull() bool {
 // call blocks until the underlying connection is actually closed.
 func (c *Conn) Close() error {
 	c.mu.Lock()
-	if !c.closed.Load() {
-		c.closed.Store(true)
-		close(c.out)
-	}
+	c.closed = true
 	c.mu.Unlock()
+	c.signal()
 	<-c.stopped
 	return c.closeErr
 }
