@@ -7,19 +7,25 @@ import (
 
 // TakeDamage applies physical damage, broadcasts the resulting HP to nearby
 // observers, and runs the once-only death path when HP reaches zero. A hit
-// against an already-dead character is a no-op: no damage is applied and no
-// status is broadcast. An invulnerable target (spawn protection, GM invul,
-// mid-teleport) or an attacker without damage permission takes no damage
-// (PlayerStatus.java:106-116, CreatureStatus.java:209-226). A Playable
-// attacker other than the actor itself drains CP before HP
-// (CreatureAttack.java:263 -> PlayerStatus.reduceHp, PlayerStatus.java:166-184);
-// melee never sets ignoreCP (Player.java:6154).
+// against an already-dead or invulnerable (spawn protection, GM invul,
+// mid-teleport) character is a no-op before any change (PlayerStatus.java:
+// 103-116). Otherwise the sleep/immobile-stop, stand-up, and stun-break side
+// effects always run for a live hit (PlayerStatus.java:118-134) before the
+// damage-permission check (:136-140): an attacker without damage permission
+// still wakes/interrupts the target and can still break its cast — only the
+// HP/CP change itself is dropped. A Playable attacker other than the actor
+// itself drains CP before HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
+// PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
 func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
-	if c.AlikeDead() || c.Invul() || !creature.CanDealDamage(attacker) {
+	if c.AlikeDead() || c.Invul() {
 		return false
 	}
 	if dmg > 0 {
 		c.applyNonConsumptionDamageEffects(false)
+	}
+	if !creature.CanDealDamage(attacker) {
+		c.breakCastOnDamage(float64(dmg))
+		return false
 	}
 	c.vitalsMu.Lock()
 	newlyDead := c.absorbCPThenReduceHP(float64(dmg), attacker, false)
