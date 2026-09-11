@@ -440,8 +440,10 @@ func (a *Actor) Immobilized() bool {
 	return a.immobilized
 }
 
-// SetImmobilized sets or clears this summon's movement-lock flag, matching
-// Summon.setIsImmobilized. It reports whether the flag actually changed.
+// SetImmobilized sets or clears this summon's movement-lock flag. It reports
+// whether the flag actually changed. It does not yet save/restore follow
+// mode the way Summon.setIsImmobilized's override does — tracked as a
+// follow-up gap, not yet ported.
 func (a *Actor) SetImmobilized(v bool) bool {
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()

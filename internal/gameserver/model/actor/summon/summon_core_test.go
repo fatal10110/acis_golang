@@ -429,6 +429,65 @@ func TestSummonImmobilizedIsIndependentOfRooted(t *testing.T) {
 	}
 }
 
+// fakePlayerEffector is a minimal cast-effector satisfying the Participant,
+// objectIDTarget, and playerTarget surfaces immobilizePetBuffStart checks
+// (isPlayer(e.Effector), e.Effector.(objectIDTarget)).
+type fakePlayerEffector struct {
+	id int32
+}
+
+func (p *fakePlayerEffector) ObjectID() int32 { return p.id }
+func (p *fakePlayerEffector) Dead() bool      { return false }
+func (p *fakePlayerEffector) IsPlayer() bool  { return true }
+
+// TestSummonImobilePetBuffHookAppliesAndClearsImmobilized is the regression
+// test for #2198: ImobilePetBuff's start hook type-asserted e.Effected
+// against an interface summon.Actor never implemented, so the assertion two
+// lines after the ownership check always failed and the buff was a silent
+// no-op. This drives the real registered hook (immobilizePetBuffStart/Exit,
+// core.go's "ImobilePetBuff" -> TypeImmobilizePetBuff wiring) through
+// effect.New and EffectList().Add/Remove, rather than calling
+// SetImmobilized directly, so it would fail again if summon.Actor ever
+// stopped satisfying immobilizeTarget/summonOwnerTarget.
+func TestSummonImobilePetBuffHookAppliesAndClearsImmobilized(t *testing.T) {
+	owner := &fakeSummonOwner{id: 42}
+	summon := mustServitor(t, ServitorConfig{ObjectID: 1, Owner: owner})
+
+	newImobilePetBuff := func() *effect.Effect {
+		e, err := effect.New(effect.Skill{ID: 2181, Level: 1, SkillType: "BUFF"}, modelskill.EffectTemplate{Name: "ImobilePetBuff", Count: 1, Time: 30})
+		if err != nil {
+			t.Fatalf("effect.New(ImobilePetBuff) error = %v", err)
+		}
+		e.Effected = summon
+		return e
+	}
+
+	t.Run("owner cast sets and clears the flag", func(t *testing.T) {
+		e := newImobilePetBuff()
+		e.Effector = &fakePlayerEffector{id: owner.ObjectID()}
+
+		summon.EffectList().Add(e)
+		if !summon.Immobilized() || !summon.MovementDisabled() {
+			t.Fatal("owned ImobilePetBuff must set Immobilized() and disable movement")
+		}
+
+		summon.EffectList().Remove(e)
+		if summon.Immobilized() || summon.MovementDisabled() {
+			t.Fatal("removing ImobilePetBuff must clear Immobilized() and re-enable movement")
+		}
+	})
+
+	t.Run("non-owner cast is rejected", func(t *testing.T) {
+		e := newImobilePetBuff()
+		e.Effector = &fakePlayerEffector{id: owner.ObjectID() + 1}
+
+		summon.EffectList().Add(e)
+		if summon.Immobilized() {
+			t.Fatal("a non-owner's ImobilePetBuff must not set Immobilized()")
+		}
+	})
+}
+
 // TestSummonOutOfControlHonorsBetrayedFlag is the regression test for the
 // review finding that OutOfControl only read a.disabled, so a betrayed
 // summon kept accepting owner commands instead of refusing them with
