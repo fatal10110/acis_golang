@@ -1969,14 +1969,17 @@ func TestResourceHealNotificationsMatchCasterBranches(t *testing.T) {
 func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{}
-	target := &skillTarget{cp: 80, maxCP: 100}
-	dead := &skillTarget{cp: 80, maxCP: 100, dead: true}
-	invulnerable := &skillTarget{cp: 80, maxCP: 100, invulnerable: true}
+	target := &skillTarget{isPlayer: true, cp: 80, maxCP: 100}
+	dead := &skillTarget{isPlayer: true, cp: 80, maxCP: 100, dead: true}
+	invulnerable := &skillTarget{isPlayer: true, cp: 80, maxCP: 100, invulnerable: true}
+	// CpDamPercent.java:33 skips every non-Player target before the
+	// dead/invulnerable checks, even one carrying CP.
+	nonPlayer := &skillTarget{cp: 80, maxCP: 100}
 
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 35},
-		Targets: []Actor{target, dead, invulnerable, fakeActor{}},
+		Targets: []Actor{target, dead, invulnerable, nonPlayer, fakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for CPDAMPERCENT")
 	}
@@ -1985,6 +1988,9 @@ func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
 	}
 	if dead.cp != 80 || invulnerable.cp != 80 {
 		t.Fatalf("invalid target cp changed: dead=%v invulnerable=%v", dead.cp, invulnerable.cp)
+	}
+	if nonPlayer.cp != 80 || len(nonPlayer.castBreakDamage) != 0 {
+		t.Fatalf("non-player target hit: cp=%v castBreakDamage=%v", nonPlayer.cp, nonPlayer.castBreakDamage)
 	}
 	if len(target.castBreakDamage) != 1 || target.castBreakDamage[0] != 28 {
 		t.Fatalf("castBreakDamage = %v, want single call with 28 (CpDamPercent.java:44 calcCastBreak(targetPlayer, damage) before the CP reduction)", target.castBreakDamage)
