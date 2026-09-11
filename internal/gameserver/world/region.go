@@ -9,10 +9,11 @@ import (
 // currently visible within its bounds, and whether it is active — see
 // Active.
 //
-// mu guards objects and index as one unit. playersCount and active are
-// updated outside mu (by State, which coordinates across several regions
-// at once during a relocation) so they are atomics rather than fields mu
-// also guards.
+// State.mu guards every field except active, which State writes under
+// State.mu and anyone may read lock-free through Active. objects and index
+// are also guarded by mu, a leaf lock that lets known-list scans read one
+// region without the world lock: writers hold State.mu and then mu, readers
+// hold either. mu is never held across a call out of the package.
 type Region struct {
 	tileX, tileY int
 
@@ -20,10 +21,9 @@ type Region struct {
 	objects []Tracked
 	index   map[int32]int
 
-	activityMu      sync.Mutex
 	activityVersion uint64
 	activityPending uint64
-	playersCount    atomic.Int32
+	playersCount    int
 	active          atomic.Bool
 }
 
@@ -56,39 +56,15 @@ func (r *Region) Active() bool {
 }
 
 // setActive flips the active flag to value if it isn't already there,
-// reporting whether it changed. The caller decides when to run
-// notifyActivity for a change it reports — see relocate, which defers that
-// work until after releasing regionActivityMu.
+// reporting whether it changed. The caller holds State.mu and runs
+// notifyActivity for a reported change after releasing it.
 func (r *Region) setActive(value bool) bool {
-	r.activityMu.Lock()
-	defer r.activityMu.Unlock()
 	if !r.active.CompareAndSwap(!value, value) {
 		return false
 	}
 	r.activityVersion++
 	r.activityPending++
 	return true
-}
-
-func (r *Region) notifyActivity(active bool) {
-	r.activityMu.Lock()
-	objects := r.Objects()
-	r.activityPending--
-	r.activityMu.Unlock()
-	for _, obj := range objects {
-		notifyObjectActivity(obj, active)
-	}
-}
-
-func (r *Region) notifyArrivalActivity(obj Tracked, arrival regionActivityArrival) {
-	r.activityMu.Lock()
-	changed := r.activityVersion != arrival.version
-	pending := r.activityPending != 0
-	active := r.Active()
-	r.activityMu.Unlock()
-	if !arrival.pending && !changed && !pending {
-		notifyObjectActivity(obj, active)
-	}
 }
 
 func notifyObjectActivity(obj Tracked, active bool) {
@@ -103,13 +79,12 @@ func notifyObjectActivity(obj Tracked, active bool) {
 	}
 }
 
-// Add registers obj as visible within r. A second Add under the same id
-// replaces the occupant; the set stays unique by id.
-func (r *Region) Add(obj Tracked) regionActivityArrival {
-	r.activityMu.Lock()
-	defer r.activityMu.Unlock()
-	r.mu.Lock()
+// add registers obj as visible within r. A second add under the same id
+// replaces the occupant; the set stays unique by id. The caller holds
+// State.mu.
+func (r *Region) add(obj Tracked) regionActivityArrival {
 	id := obj.ObjectID()
+	r.mu.Lock()
 	if i, ok := r.index[id]; ok {
 		r.objects[i] = obj
 	} else {
@@ -118,25 +93,24 @@ func (r *Region) Add(obj Tracked) regionActivityArrival {
 	}
 	r.mu.Unlock()
 	if _, ok := obj.(Player); ok {
-		r.playersCount.Add(1)
+		r.playersCount++
 	}
 	return regionActivityArrival{r.activityVersion, r.activityPending != 0}
 }
 
-// Remove drops the object with the given id from r, if present.
-func (r *Region) Remove(id int32) {
-	r.mu.Lock()
+// remove drops the object with the given id from r, if present. The caller
+// holds State.mu.
+func (r *Region) remove(id int32) {
 	i, ok := r.index[id]
-	var obj Tracked
-	if ok {
-		obj = r.objects[i]
-		r.removeAtLocked(i)
+	if !ok {
+		return
 	}
+	obj := r.objects[i]
+	r.mu.Lock()
+	r.removeAt(i)
 	r.mu.Unlock()
-	if ok {
-		if _, isPlayer := obj.(Player); isPlayer {
-			r.playersCount.Add(-1)
-		}
+	if _, isPlayer := obj.(Player); isPlayer {
+		r.playersCount--
 	}
 }
 
@@ -144,22 +118,22 @@ func (r *Region) Remove(id int32) {
 // obj. A caller that lost a race — e.g. a deferred despawn firing after a
 // pickup-and-re-drop already reused id under a different object — gets a
 // safe no-op instead of evicting the object that legitimately owns id now.
+// The caller holds State.mu.
 func (r *Region) removeIfSame(id int32, obj Tracked) bool {
-	r.mu.Lock()
 	i, ok := r.index[id]
 	if !ok || r.objects[i] != obj {
-		r.mu.Unlock()
 		return false
 	}
-	r.removeAtLocked(i)
+	r.mu.Lock()
+	r.removeAt(i)
 	r.mu.Unlock()
 	if _, isPlayer := obj.(Player); isPlayer {
-		r.playersCount.Add(-1)
+		r.playersCount--
 	}
 	return true
 }
 
-func (r *Region) removeAtLocked(i int) {
+func (r *Region) removeAt(i int) {
 	last := len(r.objects) - 1
 	delete(r.index, r.objects[i].ObjectID())
 	if i != last {
@@ -171,30 +145,17 @@ func (r *Region) removeAtLocked(i int) {
 	r.objects = r.objects[:last]
 }
 
-// Objects returns a snapshot of every object currently visible within r.
-func (r *Region) Objects() []Tracked {
-	return r.AppendObjects(nil)
-}
-
-// objectCount returns how many objects currently sit in r. relocate uses it
-// to pre-size the Discover/Forget notification slice and the per-region
-// scan buffer before scanning.
-func (r *Region) objectCount() int {
-	r.mu.RLock()
-	n := len(r.objects)
-	r.mu.RUnlock()
-	return n
-}
-
-// AppendObjects appends a snapshot of every object currently visible within
-// r to out and returns the extended slice. Callers that repeatedly scan
-// regions can reuse out to avoid one allocation per region.
-func (r *Region) AppendObjects(out []Tracked) []Tracked {
+// appendObjects appends every object currently visible within r to out and
+// returns the extended slice. It takes only r's own lock, so a caller need
+// not hold State.mu.
+func (r *Region) appendObjects(out []Tracked) []Tracked {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return append(out, r.objects...)
 }
 
+// appendObjectsExcept is appendObjects without the object registered under
+// except.
 func (r *Region) appendObjectsExcept(out []Tracked, except int32) []Tracked {
 	r.mu.RLock()
 	defer r.mu.RUnlock()

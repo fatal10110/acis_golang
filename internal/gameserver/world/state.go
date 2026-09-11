@@ -25,25 +25,31 @@ type State struct {
 	playersMu   sync.RWMutex
 	playerNames map[string]int32
 
-	// regionActivityMu serializes a Player's region-activity accounting
-	// (relocate's playersCount updates plus the resulting Region.setActive
-	// calls) against every other concurrent Player relocation, closing the
-	// check-then-act race between one player's departure deactivating a
-	// region and another's arrival activating it. Only relocate calls for a
-	// Player take it; non-player traffic (the overwhelming majority —
-	// NPCs, ground items, doors) never touches it.
-	regionActivityMu sync.Mutex
+	// mu is the world lock. It serializes every change of region membership
+	// and region activity, and every placement except a Move that stays in
+	// its region (see Move). It is held only for the in-memory update of one
+	// placement — Discover/Forget and region-activity callbacks always run
+	// after it is released. Region.mu is the only lock taken under it, and
+	// only around a region's slice update; known-list scans take Region.mu
+	// alone, never mu.
+	mu sync.RWMutex
+	// idle is signaled whenever a placement finishes delivering its
+	// callbacks; a placement of a busy object waits on it (see
+	// Presence.busy). Its Locker is mu's write side.
+	idle sync.Cond
 }
 
 // New returns an empty State with a freshly built region grid.
 func New() *State {
-	return &State{
+	s := &State{
 		Grid:        NewGrid(),
 		objects:     newRegistry(),
 		players:     newRegistry(),
 		pets:        newRegistry(),
 		playerNames: make(map[string]int32),
 	}
+	s.idle.L = &s.mu
+	return s
 }
 
 // namedPlayer is implemented by every player registered through AddPlayer;
@@ -76,7 +82,7 @@ func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.g
 func (s *State) Objects() []worldobject.Object { return s.AppendObjects(nil) }
 
 // AppendObjects appends every tracked object to dst and returns the
-// extended slice, matching Region.AppendObjects' append (not replace)
+// extended slice, matching Region.appendObjects' append (not replace)
 // contract — pass dst[:0] for a fresh scan. A caller that keeps dst across
 // repeat calls (e.g. a per-tick scratch buffer owned by a single
 // goroutine) pays the allocation only until the buffer's capacity
