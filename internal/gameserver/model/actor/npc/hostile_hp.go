@@ -56,7 +56,14 @@ func (h *Hostile) SetCurrentMP(mp int) {
 // reaches zero — runs this NPC's death sequence, passing the reward hook
 // set via SetRewarder (nil if none was set). It reports whether this call
 // newly killed the NPC. A hit against an already-dead NPC is a no-op: no
-// damage is applied and no status is broadcast.
+// damage is applied and no status is broadcast. Hate, the shot-recharge
+// roll, and the party/minion attacked call always run for a live hit,
+// mirroring Npc.reduceCurrentHp (Npc.java:390-464), which runs unconditionally
+// one layer above the invul/damage-permission guard. The overhit test runs
+// first (AttackableStatus.reduceHp order), then that guard drops only the
+// HP change itself (CreatureStatus.java:209-226): an invulnerable NPC, or
+// one hit by an attacker without damage permission, still aggroes and calls
+// its party, but takes no damage.
 func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	if h.AlikeDead() {
 		return false
@@ -68,6 +75,11 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 			h.RollAttackedShotRecharge()
 			h.propagatePartyAttacked(h, combatant, dmg, false)
 		}
+	}
+	if h.Invul() || !creature.CanDealDamage(attacker) {
+		return false
+	}
+	if dmg > 0 {
 		h.applyNonConsumptionDamageEffects(false)
 	}
 	newlyDead := h.health.Damage(dmg)
