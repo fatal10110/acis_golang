@@ -5,7 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -17,7 +19,9 @@ import (
 // remaining duration, and the production effect sweep retires it on time,
 // clearing the icon list.
 func TestBuffIconPersistsUntilExpiry(t *testing.T) {
+	clock := scheduler.NewManualClock(time.Unix(1, 0))
 	srv := gameservertest.Boot(t,
+		gameservertest.WithClock(clock),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
@@ -34,7 +38,11 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(4, false, false))
-	readCastStartFrames(t, c, objID, 4, 1, 500, 60_000, objID)
+	frames := testsupport.SyncBarrierFrames(t, c, func() { c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
+	assertCastStartFrames(t, frames, objID, 4, 1, 500, 60_000, objID)
+	srv.AdvanceTime(t, 100*time.Millisecond)
+	assertMagicSkillLaunched(t, c.Read(), objID, 4, 1, objID)
+	srv.AdvanceTime(t, 400*time.Millisecond)
 	icons := readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 	found := false
 	for _, e := range icons {
@@ -45,15 +53,13 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 	if !found {
 		t.Fatalf("AbnormalStatusUpdate icons after buff cast = %+v, want skill 4", icons)
 	}
-	drainUntilQuiet(t, c)
 
-	time.Sleep(2200 * time.Millisecond)
+	srv.AdvanceTime(t, 2*time.Second)
 	srv.TickEffects()
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 4, 1)
 	if entries := readAbnormalStatusUpdateEntries(t, c); len(entries) != 0 {
 		t.Fatalf("AbnormalStatusUpdate entries after expiry = %+v, want none", entries)
 	}
-	drainUntilQuiet(t, c)
 }
 
 // TestDebuffThatFailsToLandSendsAttackFailed verifies a debuff with no land

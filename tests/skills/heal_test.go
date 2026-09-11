@@ -4,10 +4,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // damageToHealHeadroom drops the caster so its remaining HP sits exactly
@@ -178,7 +181,9 @@ func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
 // damaged caster and verifies each production effect sweep visibly restores
 // HP until the caster reaches full health, where the ticks fall silent.
 func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
+	clock := scheduler.NewManualClock(time.Unix(1, 0))
 	srv := gameservertest.Boot(t,
+		gameservertest.WithClock(clock),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t,
@@ -198,11 +203,15 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	_, maxHP := damageToHealHeadroom(t, srv, objID, 10)
 
 	c.Send(encodeRequestMagicSkillUse(1220, false, false))
-	readCastStartFrames(t, c, objID, 1220, 1, 500, 0, objID)
-	// Let the 500ms hit fire before draining, so the effect-start frames
-	// land inside this drain instead of the first tick's read.
-	time.Sleep(700 * time.Millisecond)
-	drainUntilQuiet(t, c)
+	frames := testsupport.SyncBarrierFrames(t, c, func() { c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList)) }, serverpackets.OpcodeItemList)
+	assertCastStartFrames(t, frames, objID, 1220, 1, 500, 0, objID)
+	srv.AdvanceTime(t, 100*time.Millisecond)
+	assertMagicSkillLaunched(t, c.Read(), objID, 1220, 1, objID)
+	srv.AdvanceTime(t, 400*time.Millisecond)
+	assertHOTRegenGauge(t, c.Read(), 3, 1, 66)
+	if entries := readAbnormalStatusUpdateEntries(t, c); len(entries) != 0 {
+		t.Fatalf("HOT icon entries = %+v, want none", entries)
+	}
 
 	before := srv.PlayerCurrentHP(t, objID)
 
@@ -210,7 +219,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	// first tick restores the whole remaining gap to the stat-computed max
 	// and reports both bounds; every later tick heals nothing and stays
 	// silent, matching the reference's bypass on a zero-amount setter.
-	time.Sleep(1100 * time.Millisecond)
+	srv.AdvanceTime(t, time.Second)
 	srv.TickEffects()
 	frame := c.ReadWithTimeout(time.Second)
 	if frame == nil {
@@ -224,7 +233,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 		t.Fatalf("tick 1: HP = %d, want restored to computed max %d (was %d)", got, maxHP, before)
 	}
 
-	time.Sleep(1100 * time.Millisecond)
+	srv.AdvanceTime(t, time.Second)
 	srv.TickEffects()
 	if frame := c.ReadWithTimeout(time.Second); frame != nil {
 		t.Fatalf("full-health tick frame opcode %#x, want silence", frame[0])
@@ -232,7 +241,18 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	if got := srv.PlayerCurrentHP(t, objID); got != maxHP {
 		t.Fatalf("HP after full-health tick = %d, want unchanged %d", got, maxHP)
 	}
-	drainUntilQuiet(t, c)
+}
+
+func assertHOTRegenGauge(t *testing.T, frame []byte, count, period int32, hpRegen float64) {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeExtended, "ExRegenMax")
+	r := wire.NewReader(frame[1:])
+	if sub := r.ReadUint16(); sub != serverpackets.OpcodeExRegenMax {
+		t.Fatalf("extended sub-opcode = %#x, want ExRegenMax (%#x)", sub, serverpackets.OpcodeExRegenMax)
+	}
+	if kind, gotCount, gotPeriod, gotRegen := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadFloat64(); kind != 1 || gotCount != count || gotPeriod != period || gotRegen != hpRegen {
+		t.Fatalf("ExRegenMax = %d/%d/%d/%g, want 1/%d/%d/%g", kind, gotCount, gotPeriod, gotRegen, count, period, hpRegen)
+	}
 }
 
 // TestHealEffectSelfCastSendsHPRestoredMessage lands a Heal effect on a
