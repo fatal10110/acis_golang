@@ -350,7 +350,10 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
-// Finish according to the returned Plan.
+// Finish according to the returned Plan. A cost that ends the cast by calling
+// back into Stop leaves the costs charged, as the reference charges them
+// before it claims the cast, and Start reports ErrNotCasting so the caller
+// does not announce a cast that is already cancelled.
 func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
@@ -393,6 +396,13 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 
 	if initialMP := c.actor.MPInitialCost(def); initialMP > 0 {
 		c.actor.ReduceMP(initialMP)
+	}
+
+	c.mu.RLock()
+	claimed := c.castingLocked(seq)
+	c.mu.RUnlock()
+	if !claimed {
+		return Plan{}, ErrNotCasting
 	}
 	return plan, nil
 }
