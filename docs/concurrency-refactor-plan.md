@@ -245,9 +245,9 @@ pool (Phase 2), so no queued task can block on the DB.
 1. `model/actor/player` + `network/live_player.go` (18 locks → `vitalsMu`; closes #2258 —
    progression is queue-owned, level-up hooks run on the queue with nothing held).
 2. `model/actor/npc` + `ai` + `summon` (16 → `vitalsMu`; summon state is owner-queue-owned).
-3. `move`/`attack`/`cast`/`cubic` (6 → 0). `cast.Controller.mu` is deleted; `hitLocked` runs on
-   the caster's queue and its `ReduceHP`/`ReduceMP`/`ConsumeItem` are the **caster's own** skill
-   cost under the caster's own `vitalsMu` — #2259 itself is fixed in Phase 0, this sweep removes
+3. `move`/`attack`/`cast`/`cubic` (6 → 0). `cast.Controller.mu` is deleted; `Start` and `Hit` run
+   on the caster's queue and their `ConsumeItem`/`ReduceMP`/`ReduceHP` are the **caster's own**
+   skill cost under the caster's own `vitalsMu` — #2259 itself is fixed in Phase 0, this sweep removes
    the lock it was about.
 4. `skill/effect`: `List`'s own mutex goes (guarded by its owner's `vitalsMu`); `Calculator` and
    the effect schedule become queue-owned (timers via `queue.After`).
