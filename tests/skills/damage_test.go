@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -539,4 +540,55 @@ func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
 		t.Fatalf("resisted message second parameter = skill 45 level 1")
 	}
 	drainUntilQuiet(t, c)
+}
+
+// TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage pins
+// Npc.reduceCurrentHp (Npc.java:390-464): a DOT tick against an invulnerable
+// NPC still registers hate (here observed via AddAttackDesire flipping the
+// AI to IntentionAttack) even though the invul guard
+// (CreatureStatus.java:209-219) drops the HP change itself. The fixture
+// monster has no master/minions, so this does not exercise
+// propagatePartyAttacked — see TestMinionAssistsWhenMasterReduceHPByDOT in
+// internal/gameserver/model/actor/npc/npc_core_test.go for that fan-out.
+// Driven through ReduceHPByDOT — hooks_dot.go's tick, unlike the
+// PDAM/MDAM/Blow/Mana formula-input resolvers, carries no pre-computed
+// damageBlocked short circuit, so it reaches ReduceHPByDOT even when the
+// target is invulnerable. Issue #2328.
+func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 0, StaticHitTime: true,
+				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
+				BaseLandRate: 100, IgnoreResists: true,
+				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 43, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(43, false, false))
+	drainUntilQuiet(t, c)
+
+	hostile.SetInvul(true)
+	beforeHP := hostile.CurrentHP()
+	time.Sleep(1100 * time.Millisecond)
+	srv.TickEffects()
+
+	waitFor(t, "invulnerable NPC registers DOT hate", func() bool {
+		return hostile.AI().CurrentIntention() == ai.IntentionAttack
+	})
+	if hp := hostile.CurrentHP(); hp != beforeHP {
+		t.Fatalf("invulnerable monster HP after DOT tick = %d, want unchanged %d", hp, beforeHP)
+	}
 }

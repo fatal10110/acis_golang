@@ -1511,6 +1511,50 @@ func TestMinionAssistsWhenMasterTakesDamage(t *testing.T) {
 	}
 }
 
+// TestMinionAssistsWhenMasterReduceHP repeats
+// TestMinionAssistsWhenMasterTakesDamage's minion fan-out for a skill hit
+// (ReduceHP) instead of melee (TakeDamage), pinning that
+// registerHit's propagatePartyAttacked call — added in #2328, previously
+// missing from ReduceHP/ReduceHPByDOT entirely — actually fires.
+func TestMinionAssistsWhenMasterReduceHP(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	master.ReduceHP(40, attacker, modelskill.Definition{})
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("minion desire = (%v, %v), want attack on attacker", ok, d)
+	}
+	if got := d.Weight; got != 40 {
+		t.Fatalf("minion attack weight = %v, want 40 (damage * party weight 1)", got)
+	}
+}
+
+// TestMinionAssistsWhenMasterReduceHPByDOT repeats the same fan-out for a
+// DOT tick (ReduceHPByDOT), the one direct-damage path #2328 actually made
+// reachable (see PR #2332's reachability note on damageBlocked).
+func TestMinionAssistsWhenMasterReduceHPByDOT(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	minion := partyHostile(t, 2, 1, &hostileMove{})
+	attacker := partyHostile(t, 3, 0, &hostileMove{})
+	master.AddMinion(minion)
+	minion.SetMaster(master)
+
+	master.ReduceHPByDOT(40, attacker, true)
+
+	d, ok := minion.AI().Desires().Peek()
+	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
+		t.Fatalf("minion desire = (%v, %v), want attack on attacker", ok, d)
+	}
+	if got := d.Weight; got != 40 {
+		t.Fatalf("minion attack weight = %v, want 40 (damage * party weight 1)", got)
+	}
+}
+
 func TestMasterDoesNotGainPartyDesireWhenMinionTakesDamage(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
