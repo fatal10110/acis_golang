@@ -2,8 +2,10 @@ package gameservertest
 
 import (
 	"testing"
+	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -54,6 +56,14 @@ func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Lo
 		CollisionRadius: 8,
 		CollisionHeight: 20,
 	}
+	return s.spawnHostile(t, tmpl, at, parkedAttack{})
+}
+
+// spawnHostile builds and world-spawns a stationary hostile NPC from tmpl at
+// at, wired with attackCtl. It is the parked-stub and real-attack fixtures'
+// shared construction path (SpawnHostileNPCKindAt, SpawnAttackingHostileNPCTemplate).
+func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Location, attackCtl ai.AttackController) *npc.Hostile {
+	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
@@ -62,7 +72,7 @@ func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Lo
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
-	hostile, err := npc.NewHostile(inst, live, parkedMove{}, parkedAttack{})
+	hostile, err := npc.NewHostile(inst, live, parkedMove{}, attackCtl)
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
@@ -74,9 +84,93 @@ func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Lo
 	return hostile
 }
 
+// AttackingHostile is a stationary hostile NPC wired with a real
+// attack.Controller (see attack.NewAttackable), so a suite can trigger one
+// deterministic melee swing at a live target and observe the resulting
+// Attack frame and damage. Unlike SpawnMovingHostileNPCAtGeo it stays
+// parked: only DoAttack drives it, never the AI loop.
+type AttackingHostile struct {
+	*npc.Hostile
+	ctl *attack.Controller
+}
+
+// DoAttack starts one swing against target and blocks until it lands (the
+// hit is already delivered by the time the animation's finish callback
+// fires), so the caller can assert HP/CP state right after without a
+// wall-clock sleep. It fails the test if the swing does not finish within
+// timeout.
+func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant, timeout time.Duration) {
+	t.Helper()
+	done := make(chan struct{})
+	h.ctl.SetFinished(func() { close(done) })
+	if err := h.ctl.DoAttack(target); err != nil {
+		t.Fatalf("npc attack: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		t.Fatal("npc attack did not finish within timeout")
+	}
+}
+
+// AttackingHostileTemplate returns a fresh copy of the template
+// SpawnAttackingHostileNPCAt spawns, for a suite that tunes a field (for
+// example a heavier or lighter PAtk) and spawns it with
+// SpawnAttackingHostileNPCTemplate.
+func AttackingHostileTemplate() *npc.Template {
+	return &npc.Template{
+		ID:         100,
+		TemplateID: 100,
+		Type:       "Monster",
+		Level:      1,
+		HPMax:      1000,
+		// PAtk deals roughly 20 damage against the
+		// WithCharacter("Newbie", 5, 0) fixture player (35 max HP) under
+		// the deterministic always-hit, never-crit roll
+		// SpawnAttackingHostileNPCTemplate installs: enough for a suite to
+		// tell a real, non-lethal landed hit apart from a miss, a
+		// zero-damage roll, or a one-shot kill that leaves no HP delta to
+		// assert.
+		PAtk:            1,
+		AtkSpd:          300,
+		RunSpeed:        120,
+		WalkSpeed:       60,
+		CollisionRadius: 8,
+		CollisionHeight: 20,
+	}
+}
+
+// SpawnAttackingHostileNPCAt is SpawnAttackingHostileNPCTemplate for
+// AttackingHostileTemplate's default template.
+func (s *Server) SpawnAttackingHostileNPCAt(t *testing.T, at location.Location) *AttackingHostile {
+	t.Helper()
+	return s.SpawnAttackingHostileNPCTemplate(t, AttackingHostileTemplate(), at)
+}
+
+// SpawnAttackingHostileNPCTemplate seeds a caller-tuned hostile NPC (see
+// AttackingHostileTemplate) at an explicit point with a real attack
+// controller instead of SpawnHostileNPCAt's parked stub, so a suite can
+// drive AttackingHostile.DoAttack against a live target.
+func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Template, at location.Location) *AttackingHostile {
+	t.Helper()
+	actorRef := &hostileActorRef{}
+	attackCtl := attack.NewAttackable(actorRef)
+	hostile := s.spawnHostile(t, tmpl, at, attackCtl)
+	actorRef.CreatureActor = hostile
+	// A deterministic zero roll always lands (misses evasion, avoids the
+	// crit/damage-spread rolls' variance) so DoAttack's swing reliably
+	// deals damage instead of occasionally missing or rolling near zero.
+	hostile.SetRollSource(func(int) int { return 0 })
+	return &AttackingHostile{Hostile: hostile, ctl: attackCtl}
+}
+
 type movingHostileStatRef struct{ effect.StatOwner }
 
-type movingHostileActorRef struct{ attack.CreatureActor }
+// hostileActorRef indirects a hostile NPC's attack.CreatureActor surface
+// for the attack.Controller constructed before the NPC itself exists (the
+// controller needs an actor at construction; the NPC needs the controller
+// at construction). Shared by the moving and stationary attacking fixtures.
+type hostileActorRef struct{ attack.CreatureActor }
 
 type movingHostileLocatedRef struct{ move.Actor }
 
@@ -141,7 +235,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new move controller: %v", err)
 	}
 	moveCtl.SetPositionUpdates(s.positions)
-	actorRef := &movingHostileActorRef{}
+	actorRef := &hostileActorRef{}
 	attackCtl := attack.NewAttackable(actorRef)
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
