@@ -26,7 +26,7 @@ func (c *Character) SetSummonSpawner(spawner SummonSpawner) {
 	c.summonSpawner.Store(&spawner)
 }
 
-func (c *Character) summonSpawnerLocked() SummonSpawner {
+func (c *Character) loadSummonSpawner() SummonSpawner {
 	if p := c.summonSpawner.Load(); p != nil {
 		return *p
 	}
@@ -39,7 +39,7 @@ func (c *Character) summonSpawnerLocked() SummonSpawner {
 // non-*item.Instance item (or no spawner attached) is a silent no-op, same
 // as Java's item==nil / getSummonItem==null early returns.
 func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
-	spawner := c.summonSpawnerLocked()
+	spawner := c.loadSummonSpawner()
 	if spawner == nil {
 		return
 	}
@@ -52,7 +52,7 @@ func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
 
 // SummonServitor is the non-cubic SUMMON skill handler's entry point.
 func (c *Character) SummonServitor(def modelskill.Definition) {
-	spawner := c.summonSpawnerLocked()
+	spawner := c.loadSummonSpawner()
 	if spawner != nil {
 		spawner.SpawnServitor(c, def)
 	}
