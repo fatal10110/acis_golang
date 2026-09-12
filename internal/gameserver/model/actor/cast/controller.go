@@ -377,6 +377,13 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 
 	// The cast is claimed above so a concurrent Start is rejected; a failed
 	// item consume releases the claim unless the cast was already ended.
+	//
+	// Deliberate divergence from the reference (issue #2336): the reference
+	// destroys the consume item after claiming the cast and ignores a failed
+	// destroy, so a race that empties the item mid-cast still casts uncharged.
+	// CanCast already verified the count here, so ConsumeItem can only fail on
+	// that same narrow race; releasing the claim and rejecting the cast in
+	// that case is preferred over silently casting an unpaid skill.
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount) {
 		c.mu.Lock()
 		if c.castingLocked(seq) {
