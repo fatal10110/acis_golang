@@ -544,13 +544,16 @@ func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
 
 // TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage pins
 // Npc.reduceCurrentHp (Npc.java:390-464): a DOT tick against an invulnerable
-// NPC still registers hate and party-attacked (here observed via the AI
-// switching to IntentionAttack) even though the invul guard
-// (CreatureStatus.java:209-219) drops the HP change itself. Driven through
-// ReduceHPByDOT — hooks_dot.go's tick, unlike the PDAM/MDAM/Blow/Mana
-// formula-input resolvers, carries no pre-computed damageBlocked short
-// circuit, so it reaches ReduceHPByDOT even when the target is invulnerable.
-// Issue #2328.
+// NPC still registers hate (here observed via AddAttackDesire flipping the
+// AI to IntentionAttack) even though the invul guard
+// (CreatureStatus.java:209-219) drops the HP change itself. The fixture
+// monster has no master/minions, so this does not exercise
+// propagatePartyAttacked — see TestMinionAssistsWhenMasterReduceHPByDOT in
+// internal/gameserver/model/actor/npc/npc_core_test.go for that fan-out.
+// Driven through ReduceHPByDOT — hooks_dot.go's tick, unlike the
+// PDAM/MDAM/Blow/Mana formula-input resolvers, carries no pre-computed
+// damageBlocked short circuit, so it reaches ReduceHPByDOT even when the
+// target is invulnerable. Issue #2328.
 func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),

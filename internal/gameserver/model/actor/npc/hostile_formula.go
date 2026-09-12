@@ -5,7 +5,6 @@ import (
 	"math/rand"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -178,11 +177,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ model
 	}
 	h.testOverhit(attacker, amount)
 	if amount > 0 {
-		if combatant, ok := attacker.(attackable.Combatant); ok {
-			h.AddCombatDamageHate(combatant, amount)
-			h.RollAttackedShotRecharge()
-			h.propagatePartyAttacked(h, combatant, int(amount), false)
-		}
+		h.registerHit(attacker, amount, false)
 	}
 	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return
@@ -214,12 +209,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isD
 	}
 	h.testOverhit(killer, amount)
 	if amount > 0 {
-		if combatant, ok := attacker.(attackable.Combatant); ok {
-			h.AddDamageHate(combatant, amount, 0)
-			h.AddAttackDesire(combatant, 200)
-			h.RollAttackedShotRecharge()
-			h.propagatePartyAttacked(h, combatant, int(amount), false)
-		}
+		h.registerHit(attacker, amount, true)
 	}
 	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
 		return

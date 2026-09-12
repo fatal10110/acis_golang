@@ -18,6 +18,32 @@ func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
 	h.propagatePartyAttacked(h, combatant, power, true)
 }
 
+// registerHit records hate, the shot-recharge roll, and the party/minion
+// attacked call for a live hit with positive amount — the block
+// TakeDamage, ReduceHP, and ReduceHPByDOT all run unconditionally one layer
+// above the invul/damage-permission guard, matching Npc.reduceCurrentHp
+// (Npc.java:390-464). isDOT selects ReduceHPByDOT's zero-weight hate call
+// plus its flat attack-desire (Npc.java:395's unconditional
+// addDamageHate(attacker, damage, 0)) instead of TakeDamage/ReduceHP's
+// damage-weighted combat hate. A no-op when attacker isn't a Combatant
+// (e.g. an environmental DOT source). Pulled out after this exact block
+// drifted out of order between copies twice (#2326, #2328) — one place to
+// keep the ordering right.
+func (h *Hostile) registerHit(attacker any, amount float64, isDOT bool) {
+	combatant, ok := attacker.(attackable.Combatant)
+	if !ok {
+		return
+	}
+	if isDOT {
+		h.AddDamageHate(combatant, amount, 0)
+		h.AddAttackDesire(combatant, 200)
+	} else {
+		h.AddCombatDamageHate(combatant, amount)
+	}
+	h.RollAttackedShotRecharge()
+	h.propagatePartyAttacked(h, combatant, int(amount), false)
+}
+
 func (h *Hostile) inParty() bool {
 	return h.IsMaster() || h.Master() != nil
 }
