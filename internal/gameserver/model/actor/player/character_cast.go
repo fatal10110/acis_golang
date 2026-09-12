@@ -26,15 +26,14 @@ type CastController interface {
 // SetCastController wires c's live cast controller, called once by the
 // network layer when it creates one for c.
 func (c *Character) SetCastController(cast CastController) {
-	c.castMu.Lock()
-	defer c.castMu.Unlock()
-	c.cast = cast
+	c.cast.Store(&cast)
 }
 
 func (c *Character) castController() CastController {
-	c.castMu.RLock()
-	defer c.castMu.RUnlock()
-	return c.cast
+	if p := c.cast.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // CastingNow reports whether c has an active cast in flight.

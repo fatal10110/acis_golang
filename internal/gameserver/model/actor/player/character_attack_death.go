@@ -40,9 +40,7 @@ func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 
 // Dead reports whether the player has died.
 func (c *Character) Dead() bool {
-	c.deathMu.Lock()
-	defer c.deathMu.Unlock()
-	return c.dead
+	return c.dead.Load()
 }
 
 // AlikeDead reports whether this player is dead or dead-equivalent,
@@ -53,26 +51,16 @@ func (c *Character) AlikeDead() bool {
 
 // MarkDead transitions this player into its dead state.
 func (c *Character) MarkDead() bool {
-	c.deathMu.Lock()
-	defer c.deathMu.Unlock()
-	if c.dead {
-		return false
-	}
-	c.dead = true
-	return true
+	return c.dead.CompareAndSwap(false, true)
 }
 
 // Revive clears this player's dead state and restores HP to fraction of
 // calculated max HP. It reports whether the player was dead and is now
 // revived; a call on a living player is a no-op.
 func (c *Character) Revive(fraction float64) bool {
-	c.deathMu.Lock()
-	if !c.dead {
-		c.deathMu.Unlock()
+	if !c.dead.CompareAndSwap(true, false) {
 		return false
 	}
-	c.dead = false
-	c.deathMu.Unlock()
 
 	maxHP := c.ResourceValues().MaxHP
 	c.vitalsMu.Lock()
