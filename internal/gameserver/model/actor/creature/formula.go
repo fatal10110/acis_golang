@@ -47,13 +47,16 @@ type shieldDefenseActor interface {
 	ShieldDefense(caster DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
-type invulnerableActor interface{ Invul() bool }
 type damagePermissionActor interface{ CanGiveDamage() bool }
 
-func damageBlocked(attacker, target any) bool {
-	if target, ok := target.(invulnerableActor); ok && target.Invul() {
-		return true
-	}
+// damageBlocked reports whether attacker lacks permission to deal damage.
+// Target invulnerability is deliberately not checked here: Java only gates
+// the attacker's permission before computing a skill-damage formula
+// (Formulas.java) and lets an invulnerable target's isInvul() check happen
+// inside reduceHp, after hate/party-attacked have already registered
+// (CreatureStatus.java:210-219). Gating on target.Invul() here would skip
+// the formula and the ReduceHP call entirely, dropping that hate.
+func damageBlocked(attacker any) bool {
 	return !CanDealDamage(attacker)
 }
 
@@ -93,7 +96,7 @@ func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def model
 	if !ok || attacker == nil || target == nil {
 		return formulas.PhysicalSkillInput{}, false
 	}
-	if damageBlocked(attacker, target) {
+	if damageBlocked(attacker) {
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -195,7 +198,7 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 	if !ok || attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
 	}
-	if damageBlocked(attacker, target) {
+	if damageBlocked(attacker) {
 		return formulas.MagicDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
@@ -261,7 +264,7 @@ func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Def
 	if !ok || attacker == nil || target == nil {
 		return formulas.BlowInput{}, false
 	}
-	if damageBlocked(attacker, target) {
+	if damageBlocked(attacker) {
 		return formulas.BlowInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -331,7 +334,7 @@ func ResolveManaDamageInput(caster DeathActor, target FormulaActor, maxMP float6
 	if !ok || attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false
 	}
-	if damageBlocked(attacker, target) {
+	if damageBlocked(attacker) {
 		return formulas.ManaDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
