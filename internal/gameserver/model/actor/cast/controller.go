@@ -351,9 +351,10 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
 // Finish according to the returned Plan. A cost that ends the cast by calling
-// back into Stop leaves the costs charged, as the reference charges them
-// before it claims the cast, and Start reports ErrNotCasting so the caller
-// does not announce a cast that is already cancelled.
+// back into Stop leaves the costs charged — the reference charges reuse and
+// the initial MP before it claims the cast, and charges the skill item after
+// it — and Start reports ErrNotCasting so the caller does not announce a cast
+// that is already cancelled.
 func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
@@ -398,6 +399,11 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 		c.actor.ReduceMP(initialMP)
 	}
 
+	// A Stop that ended the cast has already acknowledged the client's
+	// pending action, so the caller's rejection acknowledges it a second
+	// time. That is deliberate: the acknowledgement only releases the
+	// client's action lock, and skipping it here would leave that lock held
+	// whenever the cast ended through Finish rather than Stop.
 	c.mu.RLock()
 	claimed := c.castingLocked(seq)
 	c.mu.RUnlock()
