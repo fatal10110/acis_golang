@@ -3220,24 +3220,31 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 	}
 }
 
-func TestCharacterDamageInputsRejectInvulnerableTargetAndNoDamagePermission(t *testing.T) {
+// TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission
+// pins issue #2333: Java only gates a skill-damage formula on the attacker's
+// damage permission (Formulas.java), never on the target's own isInvul() —
+// that check runs inside reduceHp, after hate has already registered
+// (CreatureStatus.java:209-219). So an invulnerable target must still yield
+// a computed input (ok=true) letting the caller reach ReduceHP; only a
+// damage-denied attacker is rejected at this stage.
+func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
 	def := modelskill.Definition{Power: 100, Magic: true}
 
 	target.SetSpawnProtection(true)
-	if _, ok := target.PhysicalSkillInput(caster, def); ok {
-		t.Fatal("PhysicalSkillInput accepted an invulnerable target")
+	if _, ok := target.PhysicalSkillInput(caster, def); !ok {
+		t.Fatal("PhysicalSkillInput rejected an invulnerable target")
 	}
-	if _, ok := target.MagicDamageInput(caster, def); ok {
-		t.Fatal("MagicDamageInput accepted an invulnerable target")
+	if _, ok := target.MagicDamageInput(caster, def); !ok {
+		t.Fatal("MagicDamageInput rejected an invulnerable target")
 	}
-	if _, ok := target.BlowInput(caster, def); ok {
-		t.Fatal("BlowInput accepted an invulnerable target")
+	if _, ok := target.BlowInput(caster, def); !ok {
+		t.Fatal("BlowInput rejected an invulnerable target")
 	}
-	if _, ok := target.ManaDamageInput(caster, def); ok {
-		t.Fatal("ManaDamageInput accepted an invulnerable target")
+	if _, ok := target.ManaDamageInput(caster, def); !ok {
+		t.Fatal("ManaDamageInput rejected an invulnerable target")
 	}
 
 	target.SetSpawnProtection(false)

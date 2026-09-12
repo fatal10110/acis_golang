@@ -592,3 +592,84 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 		t.Fatalf("invulnerable monster HP after DOT tick = %d, want unchanged %d", hp, beforeHP)
 	}
 }
+
+// TestPdamOnInvulnerableNPCRegistersHateWithoutDamage pins issue #2333: a
+// PDAM cast against an invulnerable NPC must still reach ReduceHP so hate
+// registers (Npc.reduceCurrentHp, Npc.java:390-464), even though the invul
+// guard inside ReduceHP (matching CreatureStatus.java:209-219) drops the HP
+// change. Before the fix, damageBlocked's target-invul short circuit made
+// ResolvePhysicalSkillInput return ok=false, so pdamHandler never called
+// ReduceHP at all and no hate registered.
+func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 42, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+				MPInitialConsume: 2, MPConsume: 3, SkillType: "PDAM", Power: 1_000_000,
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 42, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	hostile.SetInvul(true)
+	beforeHP := hostile.CurrentHP()
+
+	c.Send(encodeRequestMagicSkillUse(42, false, false))
+	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+
+	waitFor(t, "invulnerable NPC registers PDAM hate", func() bool {
+		return hostile.AI().CurrentIntention() == ai.IntentionAttack
+	})
+	if hp := hostile.CurrentHP(); hp != beforeHP {
+		t.Fatalf("invulnerable monster HP after PDAM = %d, want unchanged %d", hp, beforeHP)
+	}
+}
+
+// TestMdamOnInvulnerableNPCRegistersHateWithoutDamage is the MDAM half of
+// issue #2333's coverage requirement, alongside
+// TestPdamOnInvulnerableNPCRegistersHateWithoutDamage: same fix, same
+// damageBlocked call site inside ResolveMagicDamageInput.
+func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+				SkillType: "MDAM", Power: 1_000_000,
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 45, 1)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	hostile.SetInvul(true)
+	beforeHP := hostile.CurrentHP()
+
+	c.Send(encodeRequestMagicSkillUse(45, false, false))
+	readCastStartFrames(t, c, objID, 45, 1, 500, 60_000, hostile.ObjectID())
+
+	waitFor(t, "invulnerable NPC registers MDAM hate", func() bool {
+		return hostile.AI().CurrentIntention() == ai.IntentionAttack
+	})
+	if hp := hostile.CurrentHP(); hp != beforeHP {
+		t.Fatalf("invulnerable monster HP after MDAM = %d, want unchanged %d", hp, beforeHP)
+	}
+}
