@@ -78,6 +78,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	}
 	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWorld(s.State)
+	hostile.SetWeapon(s.itemTable)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
@@ -126,11 +127,13 @@ func AttackingHostileTemplate() *npc.Template {
 		HPMax:      1000,
 		// PAtk deals roughly 20 damage against the
 		// WithCharacter("Newbie", 5, 0) fixture player (35 max HP) under
-		// the deterministic always-hit, never-crit roll
-		// SpawnAttackingHostileNPCTemplate installs: enough for a suite to
-		// tell a real, non-lethal landed hit apart from a miss, a
-		// zero-damage roll, or a one-shot kill that leaves no HP delta to
-		// assert.
+		// the deterministic always-hit roll SpawnAttackingHostileNPCTemplate
+		// installs: enough for a suite to tell a real, non-lethal landed
+		// hit apart from a miss, a zero-damage roll, or a one-shot kill
+		// that leaves no HP delta to assert. This template's own CritRate
+		// is 0, so that roll never crits here — but a suite that tunes
+		// CritRate above 0 should expect every landed hit to crit; see
+		// SpawnAttackingHostileNPCTemplate's roll-source comment.
 		PAtk:            1,
 		AtkSpd:          300,
 		RunSpeed:        120,
@@ -157,9 +160,13 @@ func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Templa
 	attackCtl := attack.NewAttackable(actorRef)
 	hostile := s.spawnHostile(t, tmpl, at, attackCtl)
 	actorRef.CreatureActor = hostile
-	// A deterministic zero roll always lands (misses evasion, avoids the
-	// crit/damage-spread rolls' variance) so DoAttack's swing reliably
-	// deals damage instead of occasionally missing or rolling near zero.
+	// A deterministic zero roll always lands (Missed's rate is never
+	// negative) so DoAttack's swing reliably deals damage instead of
+	// occasionally missing. It also always crits whenever the template's
+	// CritRate is above 0 (CritSucceeds(rate, 0) is rate > 0) — fine for
+	// the default template's CritRate 0, but a tuned template with a
+	// non-zero CritRate will see every landed hit crit, not the
+	// configured percentage.
 	hostile.SetRollSource(func(int) int { return 0 })
 	return &AttackingHostile{Hostile: hostile, ctl: attackCtl}
 }
