@@ -123,8 +123,11 @@ func (h *Hostile) queueMovingPartyAttack(target, top attackable.Combatant, weigh
 	}
 }
 
+// queuePartyAttack mirrors Npc.forceAttack: a single addAttackDesire call
+// (moveToTarget or hold) that feeds the threat table itself — matching the
+// reference's absence of any separate addDamageHate call in the party/minion
+// assist path.
 func (h *Hostile) queuePartyAttack(target attackable.Combatant, weight float64, hold bool) {
-	h.AddDamageHate(target, 0, weight)
 	if hold {
 		h.AddAttackDesireHold(target, weight)
 		return

@@ -342,13 +342,18 @@ func TestDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	}
 }
 
-// TestDamageOverTimeEffectRecordsZeroHateThreat pins Finding 1 of the #1088
-// closed-PR review: ReduceHPByDOT must record the caster in the threat
-// table at zero hate weight, matching Npc.reduceCurrentHp's unconditional
-// addDamageHate(attacker, damage, 0) (Npc.java:390-395) — DOT feeds the
-// AggroList's damage/timestamp bookkeeping even though it never raises
-// hate above zero (so target selection is unaffected).
-func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
+// TestDamageOverTimeEffectRecordsFlatHateFromAttackDesire updates Finding 1
+// of the #1088 closed-PR review for #2340: ReduceHPByDOT's own
+// addDamageHate(attacker, damage, 0) call (matching Npc.reduceCurrentHp,
+// Npc.java:390-395) still contributes zero hate — damage-only bookkeeping —
+// but the DOT registerHit path also queues a flat-weight attack Desire
+// (see TestDamageOverTimeEffectQueuesAttackDesire), and that Desire now
+// feeds the same weight into the threat table (addAttackDesireWithMove),
+// matching the reference's paired NpcAI.addAttackDesire(creature, 200) call
+// from the default AI's ATTACKED event handler (DefaultNpc.tryToAttack).
+// A DOT-only attacker therefore does reach positive hate and can become
+// most-hated, contrary to the #1088 review's now-corrected assumption.
+func TestDamageOverTimeEffectRecordsFlatHateFromAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
@@ -367,8 +372,11 @@ func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
 	if threat.Damage != 4 {
 		t.Fatalf("threat.Damage = %v, want 4", threat.Damage)
 	}
-	if threat.Hate != 0 {
-		t.Fatalf("threat.Hate = %v, want 0", threat.Hate)
+	if threat.Hate != 200 {
+		t.Fatalf("threat.Hate = %v, want 200 (flat attack-desire weight)", threat.Hate)
+	}
+	if most, ok := h.AI().Threats().MostHated(); !ok || most.Attacker != caster {
+		t.Fatalf("MostHated() = (%+v, %v), want DOT-only caster ranked most-hated", most, ok)
 	}
 }
 
