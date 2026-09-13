@@ -80,3 +80,34 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 		t.Fatalf("silent rejection opcodes = %x, want [MoveToPawn]", got)
 	}
 }
+
+// TestFusionTargetClearsOnlyTheChannelThatSetIt pins the clear-if-still-mine
+// rule the fusion target accessors carry: handleMagicSkillUse installs the
+// channel's target (magic_skill.go:129) and its finishFusion clears it by the
+// same id (magic_skill.go:132). When an earlier channel finishes after the
+// caster has started a new one, clearing must be a no-op, or
+// abortFusionTargeting (magic_skill.go:344) stops recognizing the caster as
+// fusing its current target.
+func TestFusionTargetClearsOnlyTheChannelThatSetIt(t *testing.T) {
+	const (
+		first  = int32(11)
+		second = int32(22)
+	)
+
+	var live livePlayer
+	live.setFusionTarget(first)
+	live.setFusionTarget(second)
+
+	live.clearFusionTarget(first)
+	if !live.fusesTarget(second) {
+		t.Fatal("fusesTarget(second) = false after the superseded channel cleared its own target, want true")
+	}
+	if live.fusesTarget(first) {
+		t.Fatal("fusesTarget(first) = true, want the superseded target gone")
+	}
+
+	live.clearFusionTarget(second)
+	if live.fusesTarget(second) {
+		t.Fatal("fusesTarget(second) = true after its own channel cleared it, want false")
+	}
+}
