@@ -69,13 +69,16 @@ type livePlayer struct {
 	// narrowing it.
 	saveMu         sync.Mutex
 	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
-	fusionTargetID atomic.Int32
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
 	deferredMagic  *clientpackets.RequestMagicSkillUse
 	deferredItem   *itemAICastIntention
 	pickupLocked   bool
 	pickupLockGen  uint64
+
+	// fusionTargetID is the object id of the target this player's active
+	// fusion channel holds, or 0; cleared only by the channel that set it.
+	fusionTargetID atomic.Int32
 
 	petInteractMu sync.Mutex
 	petInteract   *summon.Actor
