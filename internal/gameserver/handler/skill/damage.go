@@ -556,9 +556,15 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 		in, ok := target.ManaDamageInput(cast.Caster, cast.Skill)
 		if !ok {
+			if v, invOk := target.(lethalInvulnerableTarget); invOk && v.Invulnerable() {
+				result.ManaDamageMissed++
+			} else if v, invOk := target.(lethalInvulTarget); invOk && v.Invul() {
+				result.ManaDamageMissed++
+			}
 			continue
 		}
 		if !in.Affected {
+			result.ManaDamageMissed++
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
@@ -577,6 +583,16 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 		if mp > 0 {
 			target.ReduceMP(mp)
+		}
+		if _, ok := obj.(worldPlayerTarget); ok {
+			result.ManaDrains = append(result.ManaDrains, ManaDrain{
+				TargetID:   obj.ObjectID(),
+				CasterName: actorName(cast.Caster),
+				MP:         int32(mp),
+			})
+		}
+		if _, ok := cast.Caster.(worldPlayerTarget); ok {
+			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
 		// (pre-clamp) damage is positive, after the drain. No production
