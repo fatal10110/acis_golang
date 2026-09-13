@@ -351,24 +351,31 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	// Summon.sendPacket forwards every packet to the owner (base
 	// Creature.sendPacket is a no-op), but Java only calls sendPacket
-	// unconditionally for ATTACK_FAILED (Pdam.java:130, Manadam.java:44) and
-	// the Lethal Strike messages (Formulas.java:242-244); the target-side
-	// LETHAL_STRIKE message is itself Player-gated, so lethal.TargetID's
-	// lookup naturally covers only real targets. S1_DODGES_ATTACK and
-	// S1_PERFORMING_COUNTERATTACK (Blow.java:46-47,88-89) and the generic
-	// per-effect resisted message (L2Skill.java:1196-1197) are all gated
-	// `instanceof Player` on the caster/effector and never fire for a
-	// Summon at all in the reference — so only AttackFailed/Lethals are
-	// forwarded here; NPC casters leave OnHitResult unset and stay silent.
+	// unconditionally for ATTACK_FAILED (Pdam.java:130, Manadam.java:44),
+	// MISSED_TARGET (Manadam.java:44), and the Lethal Strike messages
+	// (Formulas.java:242-244); the target-side LETHAL_STRIKE message is
+	// itself Player-gated, so lethal.TargetID's lookup naturally covers only
+	// real targets. S1_DODGES_ATTACK and S1_PERFORMING_COUNTERATTACK
+	// (Blow.java:46-47,88-89) and the generic per-effect resisted message
+	// (L2Skill.java:1196-1197) are all gated `instanceof Player` on the
+	// caster/effector and never fire for a Summon at all in the reference —
+	// so AttackFailed/Lethals/MagicResists/ManaDamageMissed/ManaDrains are
+	// forwarded here (ManaDrains is itself gated `target instanceof Player`,
+	// Manadam.java:68, independent of caster type), but
+	// YOUR_OPPONENTS_MP_WAS_REDUCED_BY_S1 (Manadam.java:72) is gated
+	// `creature instanceof Player` on the caster and stays unforwarded; NPC
+	// casters leave OnHitResult unset and stay silent for these too.
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {
 			return
 		}
 		l.sendSkillHandlerResult(owner, actorcast.EffectResult{
-			AttackFailed: result.AttackFailed,
-			Lethals:      result.Lethals,
-			MagicResists: result.MagicResists,
+			AttackFailed:     result.AttackFailed,
+			Lethals:          result.Lethals,
+			MagicResists:     result.MagicResists,
+			ManaDamageMissed: result.ManaDamageMissed,
+			ManaDrains:       result.ManaDrains,
 		})
 	}
 	brain.SetCastController(aiController)

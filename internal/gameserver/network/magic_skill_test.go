@@ -4,12 +4,63 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
+
+// TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster pins the
+// nil-live-safe split (issue #2350): a caster with no live connection (a
+// hostile NPC's AIController.OnHitResult) still delivers target-addressed
+// messages resolved by ID lookup, while caster-addressed messages, which
+// have nowhere to go, are silently skipped instead of panicking on the nil
+// receiver.
+func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T) {
+	frames := &testsupport.FrameCapture{}
+	target := newTestLivePlayer(t, 42, frames)
+	state := world.New()
+	state.AddPlayer(target)
+	l := &GameClientLink{world: state}
+
+	l.sendSkillHandlerResult(nil, actorcast.EffectResult{
+		MagicResists:      []handlerskill.MagicResist{{TargetID: 42, AttackerName: "Orc"}},
+		ManaDrains:        []handlerskill.ManaDrain{{TargetID: 42, CasterName: "Orc", MP: 30}},
+		Resisted:          []handlerskill.Resisted{{TargetName: "Orc", SkillID: 1, SkillLevel: 1}},
+		AttackFailed:      1,
+		ManaDamageMissed:  1,
+		OpponentMPReduced: []int32{5},
+	})
+
+	got := frames.Frames()
+	opcodes := testsupport.FrameOpcodes(got)
+	if len(opcodes) != 2 || opcodes[0] != serverpackets.OpcodeSystemMessage || opcodes[1] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcodes = %x, want two SystemMessage frames (MagicResist, ManaDrain) and nothing else", opcodes)
+	}
+}
+
+// TestDeliverHitResultForwardsToSendSkillHandlerResult pins the exported
+// wrapper boot wiring uses to give a hostile NPC's OnHitResult a delivery
+// path with no live caster connection (issue #2350).
+func TestDeliverHitResultForwardsToSendSkillHandlerResult(t *testing.T) {
+	frames := &testsupport.FrameCapture{}
+	target := newTestLivePlayer(t, 43, frames)
+	state := world.New()
+	state.AddPlayer(target)
+	l := &GameClientLink{world: state}
+
+	l.DeliverHitResult(actorcast.EffectResult{
+		ManaDrains: []handlerskill.ManaDrain{{TargetID: 43, CasterName: "Orc", MP: 12}},
+	})
+
+	if opcodes := testsupport.FrameOpcodes(frames.Frames()); len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("opcodes = %x, want one SystemMessage frame (ManaDrain)", opcodes)
+	}
+}
 
 func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 	frames := &testsupport.FrameCapture{}

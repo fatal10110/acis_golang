@@ -529,10 +529,19 @@ func sendMagicActionFailed(live *livePlayer) {
 	}
 }
 
+// DeliverHitResult forwards a caster's target-addressed skill-handler
+// messages (MagicResist, ManaDrain, ...) to their online target when the
+// caster itself has no live connection to send caster-addressed messages
+// through — a hostile NPC's AIController.OnHitResult (issue #2350).
+func (l *GameClientLink) DeliverHitResult(result actorcast.EffectResult) {
+	l.sendSkillHandlerResult(nil, result)
+}
+
+// sendSkillHandlerResult delivers both caster-addressed messages (sent to
+// live, when connected) and target-addressed messages (resolved by ID
+// through l.livePlayerByID, independent of whether live is connected or
+// even nil) from a resolved skill-handler result.
 func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
-	if live == nil {
-		return
-	}
 	for _, counterattack := range result.Counterattacks {
 		attacker, attackerOnline := l.livePlayerByID(counterattack.AttackerID)
 		defender, defenderOnline := l.livePlayerByID(counterattack.DefenderID)
@@ -577,11 +586,13 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			attacker.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
 		}
 	}
-	for _, resisted := range result.Resisted {
-		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, resisted.TargetName, int32(resisted.SkillID), int32(resisted.SkillLevel)))
-	}
-	for i := 0; i < result.AttackFailed; i++ {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+	if live != nil {
+		for _, resisted := range result.Resisted {
+			live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, resisted.TargetName, int32(resisted.SkillID), int32(resisted.SkillLevel)))
+		}
+		for i := 0; i < result.AttackFailed; i++ {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+		}
 	}
 	for _, resist := range result.MagicResists {
 		target, online := l.livePlayerByID(resist.TargetID)
@@ -590,8 +601,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 		}
 		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, resist.AttackerName))
 	}
-	for i := 0; i < result.ManaDamageMissed; i++ {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+	if live != nil {
+		for i := 0; i < result.ManaDamageMissed; i++ {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+		}
 	}
 	for _, drain := range result.ManaDrains {
 		target, online := l.livePlayerByID(drain.TargetID)
@@ -600,8 +613,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 		}
 		target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, drain.CasterName, drain.MP))
 	}
-	for _, mp := range result.OpponentMPReduced {
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, mp))
+	if live != nil {
+		for _, mp := range result.OpponentMPReduced {
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, mp))
+		}
 	}
 }
 
