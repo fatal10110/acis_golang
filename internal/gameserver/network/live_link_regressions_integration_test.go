@@ -113,7 +113,7 @@ func TestGameClientLinkEnterWorldRestoresDeathPenaltyPassiveStats(t *testing.T) 
 		ch := seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 		ch.SetDeathPenaltyLevel(2)
 		basePAtk = ch.PAtk()
-		if err := chars.Save(context.Background(), ch); err != nil {
+		if err := chars.Save(context.Background(), ch.SaveState()); err != nil {
 			t.Fatalf("save death penalty: %v", err)
 		}
 	}, 1)
@@ -192,7 +192,7 @@ func TestGameClientLinkEnterWorldRebasesRestoredVitalBases(t *testing.T) {
 			MaxCP: tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON], CurrentCP: 0,
 			MaxMP: finalMP, CurrentMP: restoredMP,
 		})
-		if err := chars.Save(context.Background(), ch); err != nil {
+		if err := chars.Save(context.Background(), ch.SaveState()); err != nil {
 			t.Fatalf("save premultiplied vitals snapshot: %v", err)
 		}
 	}, 1)
@@ -227,7 +227,7 @@ func TestGameClientLinkEnterWorldRebasesRestoredVitalBases(t *testing.T) {
 
 	// The next save→load cycle must be a fixed point: same maxima, currents
 	// untouched.
-	if err := chars.Save(context.Background(), character); err != nil {
+	if err := chars.Save(context.Background(), character.SaveState()); err != nil {
 		t.Fatalf("save live character: %v", err)
 	}
 	reloaded, err := chars.Get(context.Background(), character.ID)

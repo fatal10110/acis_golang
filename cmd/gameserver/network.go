@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -82,6 +83,7 @@ func provideGameClientLink(
 	gameplay gameplayConfig,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
+	worker *persist.Worker,
 	log zerolog.Logger,
 ) *network.GameClientLink {
 	formulas.SetMagicFailures(bool(gameplay.MagicFailures))
@@ -141,6 +143,7 @@ func provideGameClientLink(
 
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
+		Persist:          worker,
 		Restarts:         data.Restarts,
 		Levels:           data.Levels,
 		Admin:            data.Admin,

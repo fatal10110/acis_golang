@@ -73,16 +73,33 @@ func (p *Persistence) SetStoreSkillCooltime(enabled bool) {
 	}
 }
 
-// Save replaces c's persisted skill state with its current active effects and
-// pending reuse timers.
-func (p *Persistence) Save(ctx context.Context, c *player.Character) error {
+// SaveState is a character's persisted skill state copied at one instant, so
+// the write can run later without reading the live character. The zero value
+// writes nothing.
+type SaveState struct {
+	charID     int32
+	classIndex int32
+	rows       []effect.SaveRow
+	ok         bool
+}
+
+// SaveState copies c's current active effects and pending reuse timers.
+func (p *Persistence) SaveState(c *player.Character) SaveState {
 	if p == nil || !p.storeSkillCooltime.Load() || p.store == nil || c == nil {
-		return nil
+		return SaveState{}
 	}
 	classIndex := c.SkillSaveClassIndex()
 	rows := effect.BuildSaveRows(p.liveActiveEffects(c), c.SkillReuseTimers(p.currentTime()), classIndex)
-	if err := p.store.Replace(ctx, c.ID, classIndex, rows); err != nil {
-		return fmt.Errorf("save skill state for character %d: %w", c.ID, err)
+	return SaveState{charID: c.ID, classIndex: classIndex, rows: rows, ok: true}
+}
+
+// Save replaces the character's persisted skill state with st.
+func (p *Persistence) Save(ctx context.Context, st SaveState) error {
+	if !st.ok {
+		return nil
+	}
+	if err := p.store.Replace(ctx, st.charID, st.classIndex, st.rows); err != nil {
+		return fmt.Errorf("save skill state for character %d: %w", st.charID, err)
 	}
 	return nil
 }

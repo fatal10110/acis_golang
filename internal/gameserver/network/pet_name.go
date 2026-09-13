@@ -83,12 +83,18 @@ func (l *GameClientLink) renamePet(ctx context.Context, live *livePlayer, name s
 		actor.SetNamed(oldNamed)
 		return petRenameIgnored
 	}
-	if err := l.petStore.Save(ctx, itemObjectID, state); err != nil {
-		actor.SetName(oldName)
-		actor.SetNamed(oldNamed)
-		l.log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet name")
-		return petRenameIgnored
-	}
+	// Written on the control item's lane, behind any pet save already queued,
+	// so an older copy cannot land after it. The rename does not wait for the write:
+	// the reference only renames in memory and stores the name with the pet's
+	// next save, so a failed write is logged, not rolled back.
+	pets, log := l.petStore, l.log
+	l.persist.Enqueue(itemObjectID, func() {
+		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := pets.Save(saveCtx, itemObjectID, state); err != nil {
+			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet name")
+		}
+	})
 	if inv := live.Inventory(); inv != nil {
 		if control := inv.ItemByObjectID(actor.ControlItemID()); control != nil {
 			control.SetCustomType2(1)

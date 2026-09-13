@@ -54,27 +54,23 @@ type livePlayer struct {
 	// set once at attach time. It is the server-initiated eviction path a
 	// duplicate character selection uses to take the character away from its
 	// previous session.
-	kick               func()
-	stopAttack         func(*livePlayer)
+	kick       func()
+	stopAttack func(*livePlayer)
+	// shadowExpiryMu guards detaching. Autosave enqueues its save while
+	// holding the read lock and detachLivePlayer sets detaching under the
+	// write lock before enqueuing its own, so every autosave job sits ahead
+	// of detach's offline write on the persistence lane.
 	shadowExpiryMu     sync.RWMutex
 	spawnProtectionMu  sync.Mutex
 	spawnProtectionGen uint64
 	detaching          bool
-	// saveMu serializes the online-status write both the periodic autosave
-	// (TaskEffects.Save) and detachLivePlayer's own save sequence make, so
-	// the two critical sections never interleave: whichever one acquires
-	// saveMu first runs to completion before the other's write can land.
-	// detaching alone is a check-then-act flag racing the DB round-trip it
-	// guards (#1948); saveMu closes that window structurally instead of
-	// narrowing it.
-	saveMu         sync.Mutex
-	pickupMu       sync.Mutex // guards deferred player intentions and pickup state
-	pickup         *pickupIntention
-	deferredPickup *pickupIntention
-	deferredMagic  *clientpackets.RequestMagicSkillUse
-	deferredItem   *itemAICastIntention
-	pickupLocked   bool
-	pickupLockGen  uint64
+	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
+	pickup             *pickupIntention
+	deferredPickup     *pickupIntention
+	deferredMagic      *clientpackets.RequestMagicSkillUse
+	deferredItem       *itemAICastIntention
+	pickupLocked       bool
+	pickupLockGen      uint64
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.

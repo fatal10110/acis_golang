@@ -32,6 +32,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -179,7 +180,12 @@ type GameClientLink struct {
 	// itemInstances lazily persists item rows whose live state changed,
 	// so a mutation made outside a client request still reaches the
 	// items table.
-	itemInstances    *task.ItemInstances
+	itemInstances *task.ItemInstances
+	// persist runs this link's database writes for detached players, pets
+	// and containers on per-owner lanes.
+	persist          *persist.Worker
+	persistWait      time.Duration
+	queuedPets       queuedPets
 	restarts         *restart.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
@@ -278,11 +284,16 @@ type GameClientLinkConfig struct {
 	InventoryUpdates *task.InventoryUpdates
 	// ItemInstances lazily persists item rows whose live state changed.
 	ItemInstances *task.ItemInstances
-	Restarts      *restart.Table
-	Levels        *player.LevelTable
-	Admin         *admin.Data
-	PlayerConfig  PlayerConfig
-	PetConfig     petmodel.Config
+	// Persist runs detach, pet and container saves; nil writes inline.
+	Persist *persist.Worker
+	// PersistWait bounds how long a connection waits for queued saves before
+	// reading rows back; zero means livePlayerPersistWait.
+	PersistWait  time.Duration
+	Restarts     *restart.Table
+	Levels       *player.LevelTable
+	Admin        *admin.Data
+	PlayerConfig PlayerConfig
+	PetConfig    petmodel.Config
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
@@ -342,6 +353,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
+		persist:          cfg.Persist,
+		persistWait:      cfg.PersistWait,
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
