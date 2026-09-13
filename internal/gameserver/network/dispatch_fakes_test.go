@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"testing"
@@ -66,6 +67,16 @@ func (s *fakeCharStore) Save(_ context.Context, st player.SaveState) error {
 	// online (`online = 1`) as part of the same UPDATE (#1948).
 	s.onlineSeq[st.ID] = append(s.onlineSeq[st.ID], "online")
 	return nil
+}
+
+func (s *fakeCharStore) Get(_ context.Context, id int32) (*player.Character, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.byID[id]
+	if !ok {
+		return nil, fmt.Errorf("character %d not found", id)
+	}
+	return c, nil
 }
 
 func (s *fakeCharStore) saves(id int32) int {

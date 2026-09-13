@@ -147,3 +147,24 @@ func TestNilWorkerRunsInline(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestFlushOwnersWaitsOnlyOnTheirLanes(t *testing.T) {
+	w := New(zerolog.Nop())
+	defer w.Close(context.Background())
+
+	release := make(chan struct{})
+	w.Enqueue(1, func() { <-release })
+
+	if err := w.Flush(context.Background(), 2, 6); err != nil {
+		t.Fatalf("Flush on other lanes = %v, want nil while owner 1's lane is blocked", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if err := w.Flush(ctx, 5); err == nil {
+		t.Fatal("Flush(5) returned nil while owner 1, on the same lane, was blocked")
+	}
+	close(release)
+	if err := w.Flush(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -80,6 +80,9 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
+	// An unsummon or autosave may have queued this pet's row on the owner's
+	// lane; restore only after it lands.
+	link.awaitPersistence(live.ObjectID())
 	restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 	defer cancel()
 	state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)

@@ -73,8 +73,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var live *livePlayer
 	defer func() {
 		if live != nil {
-			l.detachLivePlayer(live)
-			l.awaitPersistence()
+			l.awaitPersistence(l.detachLivePlayer(live)...)
 		}
 		if l.clients != nil {
 			l.clients.Release(client.AccountName(), client)
@@ -341,6 +340,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 			}
+			// A previous session of this character has left the world, so
+			// every save it queued is on the lane. Wait for them, then read
+			// the row fresh: the list above may predate those saves, and
+			// selection restores the character from its saved row.
+			l.awaitPersistence(c.ObjectID())
+			fresh, err := l.roster.Load(ctx, c.ObjectID())
+			if err != nil {
+				l.log.Error().Err(err).Int32("object_id", c.ObjectID()).Msg("select character: reload row")
+				continue
+			}
+			c = fresh
+			chars[req.Slot] = fresh
 			tmpl, ok := l.templates.Get(c.ClassID)
 			if !ok {
 				l.log.Error().Int("class_id", c.ClassID).Msg("select character: no template loaded")
@@ -876,8 +887,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.refuseExit(session, live, block, true)
 				continue
 			}
-			l.detachLivePlayer(live)
-			l.awaitPersistence()
+			l.awaitPersistence(l.detachLivePlayer(live)...)
 			live = nil
 			entering = nil
 			client.SetState(StateAuthed)

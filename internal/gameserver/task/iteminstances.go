@@ -246,10 +246,12 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 		}
 		if !i.worker.Enqueue(owner, job) {
 			pending.Done()
+			resultMu.Lock()
 			failed = append(failed, items...)
 			if firstErr == nil {
 				firstErr = errPersistClosed
 			}
+			resultMu.Unlock()
 		}
 	}
 	// ponytail: waits out every owner's lane, so a lane backed up behind

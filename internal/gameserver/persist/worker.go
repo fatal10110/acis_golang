@@ -60,13 +60,21 @@ func (w *Worker) Enqueue(ownerID int32, job func()) bool {
 	return true
 }
 
-// Flush waits until every job enqueued before the call has run, or ctx ends.
-func (w *Worker) Flush(ctx context.Context) error {
+// Flush waits until every job enqueued before the call on the lanes of
+// ownerIDs has run, or ctx ends. With no ownerIDs it waits on every lane.
+func (w *Worker) Flush(ctx context.Context, ownerIDs ...int32) error {
 	if w == nil {
 		return nil
 	}
+	var lanes [Lanes]bool
+	for _, id := range ownerIDs {
+		lanes[laneIndex(id)] = true
+	}
 	var pending sync.WaitGroup
 	for i := range w.lanes {
+		if len(ownerIDs) > 0 && !lanes[i] {
+			continue
+		}
 		pending.Add(1)
 		// A closed lane runs every job it accepted before exiting, and Close
 		// waits for that, so nothing is left to wait for.
@@ -94,7 +102,11 @@ func (w *Worker) Close(ctx context.Context) error {
 }
 
 func (w *Worker) lane(ownerID int32) *lane {
-	return &w.lanes[uint32(ownerID)%Lanes]
+	return &w.lanes[laneIndex(ownerID)]
+}
+
+func laneIndex(ownerID int32) uint32 {
+	return uint32(ownerID) % Lanes
 }
 
 func (l *lane) push(job func()) bool {

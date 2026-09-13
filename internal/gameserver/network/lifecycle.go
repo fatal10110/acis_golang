@@ -16,12 +16,15 @@ const livePlayerDetachSaveTimeout = 2 * time.Second
 // detachLivePlayer takes live out of the world and enqueues its final saves on
 // its persistence lane: the character row, position, death penalty and skill
 // state, then the offline mark, then the pet and container writes. Values
-// are copied before the teardown below changes them. Call
-// awaitPersistence afterwards, before anything reads those rows back.
-func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
+// are copied before the teardown below changes them, and every save is
+// enqueued before live leaves world state, so a later selection of the same
+// character that waits on the lane sees them. It returns the owner ids whose
+// lanes received saves; pass them to awaitPersistence.
+func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if live == nil {
-		return
+		return nil
 	}
+	owners := []int32{live.ObjectID()}
 	l.abortFusionTargeting(live)
 	// Stop any in-flight attack/movement timers before anything below nulls
 	// the hooks they call into (SetFrameSender/SetAttackBroadcaster) —
@@ -98,9 +101,17 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
 				if inv := pet.PetInventory(); inv != nil {
 					inv.SetUpdateNotifier(nil)
 					l.flushItemPersistence(inv)
+					owners = append(owners, inv.OwnerID())
 				}
 			}
 		}
+	}
+	if inv := live.Character.Inventory(); inv != nil {
+		inv.SetUpdateNotifier(nil)
+		inv.SetWeightNotifier(nil)
+		l.flushItemPersistence(inv)
+	}
+	if l.world != nil {
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
 	}
@@ -135,11 +146,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
 	live.Character.SetRelationBroadcaster(nil)
 	live.Character.SetLevelRefresher(nil)
 	live.Character.SetWeightPenaltyUpdater(nil)
-	if inv := live.Character.Inventory(); inv != nil {
-		inv.SetUpdateNotifier(nil)
-		inv.SetWeightNotifier(nil)
-		l.flushItemPersistence(inv)
-	}
+	return owners
 }
 
 // livePlayerPersistWait bounds how long a connection waits for a detached
@@ -147,14 +154,14 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
 // same lanes.
 const livePlayerPersistWait = 3 * livePlayerDetachSaveTimeout
 
-// awaitPersistence waits until every save enqueued so far has run, so a
-// character list or login that follows reads the rows a detach just wrote.
-// It runs on the connection goroutine, never on game-state paths.
-func (l *GameClientLink) awaitPersistence() {
+// awaitPersistence waits until every save already enqueued for owners has
+// run, so a read that follows sees the rows those saves write. It runs on
+// the connection goroutine, never on game-state paths.
+func (l *GameClientLink) awaitPersistence(owners ...int32) {
 	ctx, cancel := context.WithTimeout(context.Background(), livePlayerPersistWait)
 	defer cancel()
-	if err := l.persist.Flush(ctx); err != nil {
-		l.log.Error().Err(err).Msg("wait for detach saves")
+	if err := l.persist.Flush(ctx, owners...); err != nil {
+		l.log.Error().Err(err).Ints32("owner_ids", owners).Msg("wait for queued saves")
 	}
 }
 

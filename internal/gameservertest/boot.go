@@ -776,12 +776,36 @@ func (s *Server) Shutdown(tb testing.TB) {
 // so tests that need the periodic save path call this instead of waiting
 // AutosaveInitialDelay.
 func (s *Server) TickAutosave() {
+	s.QueueAutosave()
+	s.flushPersistence()
+}
+
+// QueueAutosave is TickAutosave without waiting for the sweep's queued
+// writes, so a suite can hold a lane and act while they are pending.
+func (s *Server) QueueAutosave() {
 	if s.autosave == nil || s.autosaveClock == nil {
 		return
 	}
 	s.autosaveClock.Advance(task.AutosaveInitialDelay)
 	s.autosave.Tick()
-	s.flushPersistence()
+}
+
+// HoldPersistenceLane blocks ownerID's persistence lane until the returned
+// release is called (also on cleanup), so a suite can prove a reader waits
+// for writes queued behind it.
+func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func()) {
+	tb.Helper()
+	held := make(chan struct{})
+	started := make(chan struct{})
+	s.persist.Enqueue(ownerID, func() {
+		close(started)
+		<-held
+	})
+	<-started
+	var once sync.Once
+	release = func() { once.Do(func() { close(held) }) }
+	tb.Cleanup(release)
+	return release
 }
 
 // FlushPersistence waits until every save already handed to the persistence

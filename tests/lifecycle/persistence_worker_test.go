@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -29,8 +30,11 @@ func TestStopSavesConnectedPlayer(t *testing.T) {
 }
 
 // TestRelogMidFightRestoresSavedHP drops the connection right after a monster
-// hit lands and logs the same character back in: the relogged character
-// carries the HP it had when the connection dropped, not its pre-fight HP.
+// hit lands while the player's persistence lane is backed up, and logs the
+// same character back in on a new connection. Selecting the character must
+// wait for the old session's queued saves and restore from the saved row, so
+// the relogged character carries the post-hit HP rather than the HP the
+// character list read before those saves landed.
 func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
@@ -49,6 +53,7 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 		t.Fatalf("HP after the hit = %d, want a survived hit below %d", hitHP, fullHP)
 	}
 
+	release := srv.HoldPersistenceLane(t, objID)
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -56,12 +61,17 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
-	srv.FlushPersistence(t)
+	if hp, _ := persistedHPAndOnline(t, srv, objID); hp == hitHP {
+		t.Fatalf("characters row already holds the post-hit HP %d while the lane is held", hp)
+	}
 
 	c := srv.DialClient(t, "player1", 1)
 	c.Send(encodeRequestGameStart(0))
-	c.Read() // SSQInfo
-	c.Read() // CharSelected
+	// Selection is parked on the held lane.
+	c.ExpectNoFrame()
+	release()
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
 	c.Send(encodeEnterWorld())
 	// The monster is still in range, so its NpcInfo interleaves the burst.
 	drainUntilQuiet(t, c)

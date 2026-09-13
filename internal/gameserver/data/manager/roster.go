@@ -66,6 +66,7 @@ type idAllocator interface {
 type characterStore interface {
 	Create(ctx context.Context, c *player.Character) error
 	Save(ctx context.Context, st player.SaveState) error
+	Get(ctx context.Context, objectID int32) (*player.Character, error)
 	ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error)
 	CountByAccount(ctx context.Context, accountName string) (int, error)
 	NameTaken(ctx context.Context, name string) (bool, error)
@@ -277,6 +278,12 @@ func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Charac
 		live = append(live, c)
 	}
 	return live, nil
+}
+
+// Load reads objectID's characters row, for a selection that must see the
+// row as last saved rather than as the character list read it.
+func (r *Roster) Load(ctx context.Context, objectID int32) (*player.Character, error) {
+	return r.characters.Get(ctx, objectID)
 }
 
 // purge deletes the character and every row it owns. The character store
