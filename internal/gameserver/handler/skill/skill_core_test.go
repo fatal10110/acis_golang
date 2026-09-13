@@ -2112,6 +2112,94 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 	}
 }
 
+// playerActor marks a skillTarget as a world player, satisfying
+// worldPlayerTarget so it is treated like a Player.Character for
+// player-gated system messages.
+type playerActor struct{ skillTarget }
+
+func (*playerActor) WorldPlayer() {}
+
+func TestManaDamageHandlerReportsSystemMessages(t *testing.T) {
+	registry := NewDefaultRegistry()
+	manaInput := formulas.ManaDamageInput{
+		MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
+		VulnMul: 1, Affected: true,
+	}
+
+	t.Run("missed target reports MissedTarget only", func(t *testing.T) {
+		caster := &skillTarget{name: "Caster"}
+		target := &skillTarget{
+			mp: 100, maxMP: 100,
+			manaInput: formulas.ManaDamageInput{Affected: false},
+			manaOK:    true,
+		}
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult ok = false")
+		}
+		if result.ManaDamageMissed != 1 {
+			t.Fatalf("ManaDamageMissed = %d, want 1", result.ManaDamageMissed)
+		}
+		if len(result.ManaDrains) != 0 || len(result.OpponentMPReduced) != 0 {
+			t.Fatalf("missed target must not drain or reduce: drains=%v reduced=%v", result.ManaDrains, result.OpponentMPReduced)
+		}
+	})
+
+	t.Run("player caster and player target report both drain messages", func(t *testing.T) {
+		caster := &playerActor{skillTarget{name: "Caster"}}
+		target := &playerActor{skillTarget{mp: 100, maxMP: 100, manaInput: manaInput, manaOK: true}}
+		target.objectID = 42
+
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult ok = false")
+		}
+		if len(result.ManaDrains) != 1 {
+			t.Fatalf("ManaDrains = %v, want 1 entry", result.ManaDrains)
+		}
+		drain := result.ManaDrains[0]
+		if drain.TargetID != 42 || drain.CasterName != "Caster" || drain.MP <= 0 {
+			t.Fatalf("ManaDrain = %+v, unexpected", drain)
+		}
+		if len(result.OpponentMPReduced) != 1 || result.OpponentMPReduced[0] != drain.MP {
+			t.Fatalf("OpponentMPReduced = %v, want [%v]", result.OpponentMPReduced, drain.MP)
+		}
+	})
+
+	t.Run("non-player target skips the drain message but caster still gets the reduce message", func(t *testing.T) {
+		caster := &playerActor{skillTarget{name: "Caster"}}
+		target := &skillTarget{mp: 100, maxMP: 100, manaInput: manaInput, manaOK: true}
+
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult ok = false")
+		}
+		if len(result.ManaDrains) != 0 {
+			t.Fatalf("ManaDrains = %v, want none for non-player target", result.ManaDrains)
+		}
+		if len(result.OpponentMPReduced) != 1 {
+			t.Fatalf("OpponentMPReduced = %v, want 1 entry (player caster)", result.OpponentMPReduced)
+		}
+	})
+
+	t.Run("non-player caster skips the reduce message but player target still gets the drain message", func(t *testing.T) {
+		caster := &skillTarget{name: "Caster"}
+		target := &playerActor{skillTarget{mp: 100, maxMP: 100, manaInput: manaInput, manaOK: true}}
+		target.objectID = 7
+
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult ok = false")
+		}
+		if len(result.ManaDrains) != 1 {
+			t.Fatalf("ManaDrains = %v, want 1 entry", result.ManaDrains)
+		}
+		if len(result.OpponentMPReduced) != 0 {
+			t.Fatalf("OpponentMPReduced = %v, want none (non-player caster)", result.OpponentMPReduced)
+		}
+	})
+}
+
 func TestMdamHalfFailureHalvesDamageAndReportsAttackFailed(t *testing.T) {
 	registry := NewDefaultRegistry()
 	target := &skillTarget{
