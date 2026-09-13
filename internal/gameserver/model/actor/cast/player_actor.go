@@ -193,7 +193,7 @@ func (a PlayerActor) AllSkillsDisabled() bool {
 func (PlayerActor) EnableAllSkills() {}
 
 // IncreaseCharges and DecreaseCharges satisfy the chargeHolder interface
-// Controller.hitLocked probes for, matching CreatureCast.onMagicHitTimer's
+// Controller.Hit probes for, matching CreatureCast.onMagicHitTimer's
 // `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
 // PlayerActor implements this, so an NPC/summon timed cast never applies
 // Force/Soul charges.
