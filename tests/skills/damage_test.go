@@ -720,3 +720,51 @@ func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
 		t.Fatalf("invulnerable monster MP after MANADAM = %d, want unchanged %d", mp, beforeMP)
 	}
 }
+
+// TestManadamDrainsMpDespiteDamageDeniedCaster pins issue #2339: unlike
+// PDAM/MDAM/Blow, Manadam.java's handler and Formulas.calcMagicAffected/
+// calcManaDam never call canGiveDamage() on the attacker, so a caster whose
+// access level forbids dealing damage still drains MP with a MANADAM skill.
+func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 46, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 0, StaticHitTime: true,
+				SkillType: "MANADAM", Power: 1_000_000, Offensive: true,
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 46, 1)
+	startInWorld(t, c)
+	denyCasterDamage(t, srv, objID)
+
+	tmpl := gameservertest.AttackingHostileTemplate()
+	tmpl.MPMax = 1000
+	hostile := srv.SpawnAttackingHostileNPCTemplate(t, tmpl, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	beforeMP := hostile.CurrentMP()
+	if beforeMP == 0 {
+		t.Fatal("fixture NPC MP = 0, want a real pool for this assertion to be meaningful")
+	}
+
+	// calcMagicAffected rolls a gaussian land chance independent of Power, so
+	// a single cast can occasionally miss; retry to isolate that noise from
+	// the MP-drain assertion under test.
+	drained := false
+	for i := 0; i < 20 && !drained; i++ {
+		c.Send(encodeRequestMagicSkillUse(46, false, false))
+		drainUntilQuiet(t, c)
+		drained = hostile.CurrentMP() != beforeMP
+	}
+	if !drained {
+		t.Fatal("MANADAM from damage-denied caster never drained MP across repeated casts")
+	}
+}
