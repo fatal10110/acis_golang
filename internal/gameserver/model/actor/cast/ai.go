@@ -25,9 +25,12 @@ type AIController struct {
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
-	// NPC casters leave it unset (Creature.sendPacket is a no-op in the
-	// reference); summon casters wire it to forward the result to the
-	// owner, mirroring Summon.sendPacket's owner-forward.
+	// Summon casters wire it to forward the result to the owner, mirroring
+	// Summon.sendPacket's owner-forward. Hostile NPC casters wire it to a
+	// nil-live-safe delivery hook so target-addressed messages (MagicResist,
+	// ManaDrain) still reach a real online target even though
+	// Creature.sendPacket is a no-op in the reference for caster-addressed
+	// ones (issue #2350).
 	OnHitResult func(EffectResult)
 }
 
