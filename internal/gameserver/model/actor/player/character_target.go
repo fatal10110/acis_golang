@@ -13,9 +13,11 @@ func (c *Character) Target() world.Tracked {
 	return c.target
 }
 
-// SetTargetTracked records t as the character's currently selected target.
-// A nil t clears the selection.
-func (c *Character) SetTargetTracked(t world.Tracked) {
+// StoreTarget records t as the character's currently selected target and
+// sends no packets. A nil t clears the selection. It is the raw state write
+// behind the network target funnel; domain retargets use SetTarget so the
+// client sees the selection change.
+func (c *Character) StoreTarget(t world.Tracked) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.target = t
@@ -38,7 +40,7 @@ func (c *Character) CurrentTarget() world.Tracked { return c.Target() }
 // 1353-1358) is only what the Summon runtime path hits, since no Playable
 // subclass overrides it. retargetTarget is the network-owned hook that
 // reproduces that funnel (see network.selectLiveTarget/clearLiveTarget);
-// SetTargetTracked is the fallback for callers with no live session wired
+// StoreTarget is the fallback for callers with no live session wired
 // (e.g. tests).
 func (c *Character) SetTarget(t world.Tracked) {
 	c.stateMu.RLock()
@@ -48,7 +50,7 @@ func (c *Character) SetTarget(t world.Tracked) {
 		retarget(t)
 		return
 	}
-	c.SetTargetTracked(t)
+	c.StoreTarget(t)
 }
 
 // SetRetargetHook records the packet-layer hook engaged when a domain

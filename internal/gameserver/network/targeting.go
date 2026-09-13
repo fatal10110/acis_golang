@@ -387,7 +387,7 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	if cur := live.Target(); cur != nil && cur.ObjectID() == target.ObjectID() {
 		return true
 	}
-	live.SetTargetTracked(target)
+	live.StoreTarget(target)
 	// Reference: Player.setTarget sends ValidateLocation for the new target
 	// before MyTargetSelected, skipped only when the target is the selecting
 	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
@@ -444,7 +444,7 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 		return
 	}
 	old := live.Target()
-	live.SetTargetTracked(nil)
+	live.StoreTarget(nil)
 	if live.combat != nil {
 		live.combat.Stop()
 	}
