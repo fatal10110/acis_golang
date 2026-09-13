@@ -301,6 +301,111 @@ func TestInventory_DropItem_FullyRemovesInstance(t *testing.T) {
 	}
 }
 
+func TestInventory_DestroyByTemplateID_QueuesUpdateAndUnequips(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+	stack := inv.AddNew(1, 10, 0x20000001)
+	inv.DrainUpdates()
+
+	if got := inv.DestroyByTemplateID(1, 3); got != stack || stack.Count != 7 {
+		t.Fatalf("DestroyByTemplateID() = %+v, Count = %d, want the stack with 7 left", got, stack.Count)
+	}
+	updates := inv.DrainUpdates()
+	if len(updates) != 1 || updates[0].State != UpdateModified || updates[0].ObjectID != stack.ObjectID || updates[0].Count != 7 {
+		t.Fatalf("updates after partial destroy = %+v, want one modified update with Count=7", updates)
+	}
+
+	weapon := inv.AddNew(2, 1, 0x20000002)
+	tmpl, _ := templates.Get(2)
+	inv.EquipItem(weapon, tmpl)
+	inv.DrainUpdates()
+
+	if got := inv.DestroyByObjectID(weapon.ObjectID, 1); got != weapon {
+		t.Fatalf("DestroyByObjectID() = %+v, want the weapon instance", got)
+	}
+	if inv.ItemAt(RHand) != nil {
+		t.Errorf("fully destroying an equipped item should unequip it first")
+	}
+	updates = inv.DrainUpdates()
+	if len(updates) != 2 || updates[0].State != UpdateModified || updates[1].State != UpdateRemoved || updates[1].ObjectID != weapon.ObjectID {
+		t.Fatalf("updates after full destroy = %+v, want an unequip-modified update then a removed update for the weapon", updates)
+	}
+}
+
+func TestInventory_DestroyAllAndDestroyAllItems_UnequipAndQueueUpdates(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+	stack := inv.AddNew(1, 10, 0x20000001)
+	weapon := inv.AddNew(2, 1, 0x20000002)
+	tmpl, _ := templates.Get(2)
+	inv.EquipItem(weapon, tmpl)
+	inv.DrainUpdates()
+
+	if got := inv.DestroyAll(weapon); got != weapon {
+		t.Fatalf("DestroyAll() = %+v, want the weapon instance", got)
+	}
+	if inv.ItemAt(RHand) != nil {
+		t.Errorf("DestroyAll on an equipped item should unequip it first")
+	}
+	updates := inv.DrainUpdates()
+	if len(updates) != 2 || updates[0].State != UpdateModified || updates[1].State != UpdateRemoved || updates[1].ObjectID != weapon.ObjectID {
+		t.Fatalf("updates after DestroyAll = %+v, want an unequip-modified update then a removed update", updates)
+	}
+
+	inv.DestroyAllItems()
+	if inv.Size() != 0 {
+		t.Errorf("Size() = %d after DestroyAllItems, want 0", inv.Size())
+	}
+	updates = inv.DrainUpdates()
+	if len(updates) != 1 || updates[0].State != UpdateRemoved || updates[0].ObjectID != stack.ObjectID {
+		t.Fatalf("updates after DestroyAllItems = %+v, want one removed update for the remaining stack", updates)
+	}
+}
+
+// TestInventory_DestroyAllItems_RaceWithAdd runs Add and DestroyAllItems
+// concurrently under -race so a snapshot-and-delete phase that isn't
+// actually atomic with Add's own map write (a plain data race on
+// Container.items, not just a logical ordering question) gets caught. It
+// also checks the functional postcondition once the concurrent Adds have
+// stopped: a final DestroyAllItems clears everything.
+func TestInventory_DestroyAllItems_RaceWithAdd(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for id := int32(0x20000001); ; id++ {
+			select {
+			case <-stop:
+				return
+			default:
+				inv.AddNew(1, 1, id)
+			}
+		}
+	}()
+
+	for range 100 {
+		inv.DestroyAllItems()
+	}
+	close(stop)
+	<-done
+
+	inv.DestroyAllItems()
+	if inv.Size() != 0 {
+		t.Fatalf("Size() = %d after a final DestroyAllItems, want 0", inv.Size())
+	}
+}
+
 func TestInventory_TransferItemPartialQueuesSourceAndTargetUpdates(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
