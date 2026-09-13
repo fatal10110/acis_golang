@@ -3226,7 +3226,10 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 // that check runs inside reduceHp, after hate has already registered
 // (CreatureStatus.java:209-219). So an invulnerable target must still yield
 // a computed input (ok=true) letting the caller reach ReduceHP; only a
-// damage-denied attacker is rejected at this stage.
+// damage-denied attacker is rejected at this stage. ManaDamageInput is the
+// one documented exception (Manadam.java:43-44 gates isInvul() up front,
+// with no reduceHp-style backstop afterward), so it alone still rejects an
+// invulnerable target here.
 func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
@@ -3243,8 +3246,8 @@ func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermissio
 	if _, ok := target.BlowInput(caster, def); !ok {
 		t.Fatal("BlowInput rejected an invulnerable target")
 	}
-	if _, ok := target.ManaDamageInput(caster, def); !ok {
-		t.Fatal("ManaDamageInput rejected an invulnerable target")
+	if _, ok := target.ManaDamageInput(caster, def); ok {
+		t.Fatal("ManaDamageInput accepted an invulnerable target")
 	}
 
 	target.SetSpawnProtection(false)

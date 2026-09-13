@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -671,5 +672,51 @@ func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	})
 	if hp := hostile.CurrentHP(); hp != beforeHP {
 		t.Fatalf("invulnerable monster HP after MDAM = %d, want unchanged %d", hp, beforeHP)
+	}
+}
+
+// TestManadamOnInvulnerableNPCDrainsNoMP pins MANADAM's Java exception
+// (Manadam.java:43-44): unlike PDAM/MDAM/Blow, the mana-damage handler gates
+// target.isInvul() up front and skips the MP drain entirely, with no
+// reduceHp-style backstop to fall through to afterward. There is no hate
+// signal to wait on here — Manadam.java never calls reduceCurrentHp — so
+// this only pins the MP side: an invulnerable NPC target loses no MP.
+func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 46, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 0, StaticHitTime: true,
+				SkillType: "MANADAM", Power: 1_000_000, Offensive: true,
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 46, 1)
+	startInWorld(t, c)
+	// SpawnHostileNPC's fixture template has no MP pool (MPMax defaults to
+	// 0), which would make an unchanged-MP assertion vacuous here — give
+	// this fixture a real pool via a custom template instead.
+	tmpl := gameservertest.AttackingHostileTemplate()
+	tmpl.MPMax = 1000
+	hostile := srv.SpawnAttackingHostileNPCTemplate(t, tmpl, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	hostile.SetInvul(true)
+	beforeMP := hostile.CurrentMP()
+	if beforeMP == 0 {
+		t.Fatal("fixture NPC MP = 0, want a real pool for this assertion to be meaningful")
+	}
+
+	c.Send(encodeRequestMagicSkillUse(46, false, false))
+	drainUntilQuiet(t, c)
+
+	if mp := hostile.CurrentMP(); mp != beforeMP {
+		t.Fatalf("invulnerable monster MP after MANADAM = %d, want unchanged %d", mp, beforeMP)
 	}
 }

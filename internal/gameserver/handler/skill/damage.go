@@ -558,7 +558,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
-		if invul, ok := target.(lethalInvulTarget); ok && invul.Invul() || !in.Affected {
+		if !in.Affected {
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
