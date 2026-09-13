@@ -3,8 +3,6 @@ package world
 import (
 	"runtime"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
 type registryTestObject struct{ id int32 }
@@ -17,19 +15,19 @@ func (o *registryTestObject) ObjectID() int32 { return o.id }
 // — a caller reusing a buffer across registries by the same append+return
 // convention would otherwise silently lose whatever it already put there.
 func TestRegistryAppendAllAppendsRatherThanReplaces(t *testing.T) {
-	r := newRegistry()
+	r := newRegistry[*registryTestObject]()
 	r.add(1, &registryTestObject{id: 1})
 	r.add(2, &registryTestObject{id: 2})
 
 	sentinel := &registryTestObject{id: 99}
-	dst := []worldobject.Object{sentinel}
+	dst := []*registryTestObject{sentinel}
 
 	got := r.appendAll(dst)
 
 	if len(got) != 3 {
 		t.Fatalf("appendAll len = %d, want 3 (1 pre-existing + 2 registered)", len(got))
 	}
-	if got[0] != worldobject.Object(sentinel) {
+	if got[0] != sentinel {
 		t.Fatalf("appendAll dropped dst's pre-existing entry: got[0] = %v, want sentinel", got[0])
 	}
 }
@@ -39,7 +37,7 @@ func TestRegistryAppendAllAppendsRatherThanReplaces(t *testing.T) {
 // accumulation must truncate dst itself, exactly like every
 // Region.appendObjects caller in this package does (r.appendObjects(buf[:0])).
 func TestRegistryAppendAllFreshScanNeedsExplicitTruncation(t *testing.T) {
-	r := newRegistry()
+	r := newRegistry[*registryTestObject]()
 	r.add(1, &registryTestObject{id: 1})
 
 	buf := r.appendAll(nil)
@@ -68,7 +66,7 @@ func TestRegistryAppendAllFreshScanNeedsExplicitTruncation(t *testing.T) {
 // a wide margin below that noise floor while still failing hard on the
 // doubling-growth regression's 13.
 func TestRegistryAppendAllPresizesFromNil(t *testing.T) {
-	r := newRegistry()
+	r := newRegistry[*registryTestObject]()
 	for i := int32(1); i <= 4096; i++ {
 		r.add(i, &registryTestObject{id: i})
 	}
@@ -87,7 +85,7 @@ func TestRegistryAppendAllPresizesFromNil(t *testing.T) {
 // BenchmarkRegistryAppendAllFromNil tracks the cost the pre-sizing fix
 // above targets, at a population size matching #2253's own benchmarks.
 func BenchmarkRegistryAppendAllFromNil(b *testing.B) {
-	r := newRegistry()
+	r := newRegistry[*registryTestObject]()
 	for i := int32(1); i <= 30000; i++ {
 		r.add(i, &registryTestObject{id: i})
 	}

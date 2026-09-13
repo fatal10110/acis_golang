@@ -189,18 +189,13 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 	if l.world == nil {
 		return nil
 	}
-	obj, ok := l.world.Object(objectID)
-	if !ok {
-		obj, ok = l.world.Player(objectID)
-		if !ok {
-			return nil
-		}
+	if obj, ok := l.world.Object(objectID); ok {
+		return obj
 	}
-	target, ok := obj.(world.Tracked)
-	if !ok {
-		return nil
+	if p, ok := l.world.Player(objectID); ok {
+		return p
 	}
-	return target
+	return nil
 }
 
 const (

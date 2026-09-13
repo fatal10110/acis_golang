@@ -3,14 +3,12 @@ package world
 import (
 	"fmt"
 	"slices"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
 // Tracked is anything that can be placed on the world grid: an
 // identifiable object carrying a Presence.
 type Tracked interface {
-	worldobject.Object
+	ObjectID() int32
 	presence() *Presence
 }
 
@@ -42,9 +40,12 @@ type Observer interface {
 // marker. Implementing it at all is what makes a type count as a Player —
 // there is no way to implement it and opt out, unlike a boolean-returning
 // method a caller might reasonably expect to report false sometimes.
+// CharacterName backs State.PlayerByName; it cannot double as the marker
+// because NPCs and summons implement it too.
 type Player interface {
 	Tracked
 	WorldPlayer()
+	CharacterName() string
 }
 
 // Spawn places t in the world at (x, y, z) facing heading, clamping x and

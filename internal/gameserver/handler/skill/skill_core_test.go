@@ -17,10 +17,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from actor_test.go ----
@@ -496,6 +496,7 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 // ---- from continuous_fixtures_test.go ----
 // reflect sources wired to a guaranteed-success roll by default.
 type continuousFake struct {
+	world.Presence
 	id                int32
 	dead, invul       bool
 	denyDamage        bool
@@ -518,9 +519,9 @@ type continuousFake struct {
 	// what arguments.
 	aggressionSource  any
 	aggressionPower   int
-	currentTarget     worldobject.Object
-	setTargetCalls    []worldobject.Object
-	attackTargetCalls []worldobject.Object
+	currentTarget     world.Tracked
+	setTargetCalls    []world.Tracked
+	attackTargetCalls []world.Tracked
 }
 
 func newContinuousFake(id int32) *continuousFake {
@@ -560,13 +561,13 @@ func (f *continuousFake) NotifyAggression(source creature.DeathActor, power int)
 	f.aggressionPower = power
 }
 
-func (f *continuousFake) CurrentTarget() worldobject.Object { return f.currentTarget }
+func (f *continuousFake) CurrentTarget() world.Tracked { return f.currentTarget }
 
-func (f *continuousFake) SetTarget(target worldobject.Object) {
+func (f *continuousFake) SetTarget(target world.Tracked) {
 	f.setTargetCalls = append(f.setTargetCalls, target)
 }
 
-func (f *continuousFake) AttackTarget(target worldobject.Object) {
+func (f *continuousFake) AttackTarget(target world.Tracked) {
 	f.attackTargetCalls = append(f.attackTargetCalls, target)
 }
 

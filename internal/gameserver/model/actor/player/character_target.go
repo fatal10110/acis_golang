@@ -1,7 +1,6 @@
 package player
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -25,15 +24,10 @@ func (c *Character) SetTargetTracked(t world.Tracked) {
 // CurrentTarget implements the retargetableOnAggression capability the
 // AGGDEBUFF continuous-effect handler consults to decide whether to retarget
 // or attack a playable target hit by a landed aggression-debuff effect.
-func (c *Character) CurrentTarget() worldobject.Object {
-	if t := c.Target(); t != nil {
-		return t
-	}
-	return nil
-}
+func (c *Character) CurrentTarget() world.Tracked { return c.Target() }
 
-// SetTarget implements retargetableOnAggression's setter. t must be a
-// world.Tracked (or nil); any other type is ignored.
+// SetTarget implements retargetableOnAggression's setter. A nil t clears
+// the selection.
 //
 // Reference: Player.setTarget (Player.java:2439-2510) is the single packet
 // funnel for every selection, click-driven or domain-driven alike — a
@@ -46,23 +40,15 @@ func (c *Character) CurrentTarget() worldobject.Object {
 // reproduces that funnel (see network.selectLiveTarget/clearLiveTarget);
 // SetTargetTracked is the fallback for callers with no live session wired
 // (e.g. tests).
-func (c *Character) SetTarget(t worldobject.Object) {
-	var tracked world.Tracked
-	if t != nil {
-		var ok bool
-		tracked, ok = t.(world.Tracked)
-		if !ok {
-			return
-		}
-	}
+func (c *Character) SetTarget(t world.Tracked) {
 	c.stateMu.RLock()
 	retarget := c.retargetTarget
 	c.stateMu.RUnlock()
 	if retarget != nil {
-		retarget(tracked)
+		retarget(t)
 		return
 	}
-	c.SetTargetTracked(tracked)
+	c.SetTargetTracked(t)
 }
 
 // SetRetargetHook records the packet-layer hook engaged when a domain
@@ -84,20 +70,19 @@ func (c *Character) SetAttackTargetHook(attack func(world.Tracked)) {
 }
 
 // AttackTarget implements retargetableOnAggression's attack trigger.
-func (c *Character) AttackTarget(t worldobject.Object) {
-	tracked, ok := t.(world.Tracked)
-	if !ok {
+func (c *Character) AttackTarget(t world.Tracked) {
+	if t == nil {
 		return
 	}
 	c.stateMu.RLock()
 	attack := c.attackTarget
 	c.stateMu.RUnlock()
 	if attack != nil {
-		attack(tracked)
+		attack(t)
 	}
 }
 
 // TryToAttack implements targetRedirectTarget's attack trigger.
-func (c *Character) TryToAttack(t worldobject.Object) {
+func (c *Character) TryToAttack(t world.Tracked) {
 	c.AttackTarget(t)
 }

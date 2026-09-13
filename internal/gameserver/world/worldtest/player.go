@@ -15,6 +15,9 @@ func (p *Player) ObjectID() int32 { return p.ID }
 // WorldPlayer marks Player as a world player.
 func (p *Player) WorldPlayer() {}
 
+// CharacterName returns an empty name; test players are not looked up by name.
+func (p *Player) CharacterName() string { return "" }
+
 // SpawnPlayer places a test player into state and returns it.
 func SpawnPlayer(state *world.State, id int32, x, y, z int) *Player {
 	player := &Player{ID: id}

@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -28,7 +27,7 @@ type npcRegenActor interface {
 // running when the guard is already held.
 type NPCRegen struct {
 	state   *world.State
-	scratch []worldobject.Object
+	scratch []world.Tracked
 	log     zerolog.Logger
 
 	tickGuard

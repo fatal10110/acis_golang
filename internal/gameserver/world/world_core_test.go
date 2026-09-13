@@ -107,7 +107,8 @@ type regionTestPlayer struct {
 	regionTestObject
 }
 
-func (p *regionTestPlayer) WorldPlayer() {}
+func (p *regionTestPlayer) WorldPlayer()          {}
+func (p *regionTestPlayer) CharacterName() string { return "" }
 
 func TestRegion_AddReplaceSameID(t *testing.T) {
 	r := newRegion(0, 0)
@@ -332,7 +333,8 @@ func (o *lockProbe) check(name string) {
 
 type lockProbePlayer struct{ lockProbe }
 
-func (*lockProbePlayer) WorldPlayer() {}
+func (*lockProbePlayer) WorldPlayer()          {}
+func (*lockProbePlayer) CharacterName() string { return "" }
 
 // Every placement path — player and non-player Spawn, Move, Despawn and
 // DespawnAll — delivers Discover/Forget and region-activity callbacks only

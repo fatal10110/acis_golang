@@ -7,7 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Desire is a weighted request for one action an actor's AI might take
@@ -23,7 +23,7 @@ type Desire struct {
 
 	// Target is the non-creature object this Desire acts on, e.g. an item
 	// to pick up or an object to interact with.
-	Target worldobject.Object
+	Target world.Tracked
 	// FinalTarget is the creature this Desire acts on: the attack, cast,
 	// flee or follow target.
 	FinalTarget attackable.Combatant

@@ -15,10 +15,11 @@ type relocateBenchPlayer struct {
 	id int32
 }
 
-func (p *relocateBenchPlayer) ObjectID() int32  { return p.id }
-func (p *relocateBenchPlayer) Discover(Tracked) {}
-func (p *relocateBenchPlayer) Forget(Tracked)   {}
-func (p *relocateBenchPlayer) WorldPlayer()     {}
+func (p *relocateBenchPlayer) ObjectID() int32       { return p.id }
+func (p *relocateBenchPlayer) Discover(Tracked)      {}
+func (p *relocateBenchPlayer) Forget(Tracked)        {}
+func (p *relocateBenchPlayer) WorldPlayer()          {}
+func (p *relocateBenchPlayer) CharacterName() string { return "" }
 
 type relocateBenchObserver struct {
 	Presence

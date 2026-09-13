@@ -3,8 +3,6 @@ package world
 import (
 	"slices"
 	"sync"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
 // registry is a concurrency-safe collection of world objects keyed by an
@@ -12,16 +10,16 @@ import (
 // given key, so the first registration for an id always wins.
 //
 // mu guards entries.
-type registry struct {
+type registry[T comparable] struct {
 	mu      sync.RWMutex
-	entries map[int32]worldobject.Object
+	entries map[int32]T
 }
 
-func newRegistry() *registry {
-	return &registry{entries: make(map[int32]worldobject.Object)}
+func newRegistry[T comparable]() *registry[T] {
+	return &registry[T]{entries: make(map[int32]T)}
 }
 
-func (r *registry) add(key int32, obj worldobject.Object) {
+func (r *registry[T]) add(key int32, obj T) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.entries[key]; !exists {
@@ -29,7 +27,7 @@ func (r *registry) add(key int32, obj worldobject.Object) {
 	}
 }
 
-func (r *registry) remove(key int32) {
+func (r *registry[T]) remove(key int32) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.entries, key)
@@ -38,7 +36,7 @@ func (r *registry) remove(key int32) {
 // removeIfSame drops the entry at key only if it is still obj, so a stale
 // caller racing a newer registration under the same key is a no-op instead
 // of evicting whatever legitimately occupies key now.
-func (r *registry) removeIfSame(key int32, obj worldobject.Object) bool {
+func (r *registry[T]) removeIfSame(key int32, obj T) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if cur, ok := r.entries[key]; !ok || cur != obj {
@@ -48,7 +46,7 @@ func (r *registry) removeIfSame(key int32, obj worldobject.Object) bool {
 	return true
 }
 
-func (r *registry) removeAll(keys []int32) {
+func (r *registry[T]) removeAll(keys []int32) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, key := range keys {
@@ -56,7 +54,7 @@ func (r *registry) removeAll(keys []int32) {
 	}
 }
 
-func (r *registry) get(key int32) (worldobject.Object, bool) {
+func (r *registry[T]) get(key int32) (T, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	obj, ok := r.entries[key]
@@ -79,7 +77,7 @@ func (r *registry) get(key int32) (worldobject.Object, bool) {
 // no-op once dst already has enough spare capacity, so a reused scratch
 // buffer that has already grown to the population size stays at 0
 // allocations.
-func (r *registry) appendAll(dst []worldobject.Object) []worldobject.Object {
+func (r *registry[T]) appendAll(dst []T) []T {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	dst = slices.Grow(dst, len(r.entries))

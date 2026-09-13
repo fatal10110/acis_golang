@@ -30,7 +30,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -432,19 +431,27 @@ func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsu
 	return c
 }
 
-// MarkPlayerDead transitions the live player's dead state without routing a
-// kill through the combat stack, which its own suites drive end to end; item
-// suites use it only to set up gate preconditions no single packet reaches.
-func (s *Server) MarkPlayerDead(tb testing.TB, objID int32) {
+// onlineCharacter resolves the online player objID to its character,
+// failing the test when no such player is in the world.
+func (s *Server) onlineCharacter(tb testing.TB, objID int32) *player.Character {
 	tb.Helper()
 	obj, ok := s.State.Player(objID)
 	if !ok {
 		tb.Fatalf("world.Player(%d) missing", objID)
 	}
-	marker, ok := obj.(interface{ MarkDead() bool })
+	c, ok := network.OnlineCharacter(obj)
 	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose MarkDead", objID, obj)
+		tb.Fatalf("world.Player(%d) = %T is not an online character", objID, obj)
 	}
+	return c
+}
+
+// MarkPlayerDead transitions the live player's dead state without routing a
+// kill through the combat stack, which its own suites drive end to end; item
+// suites use it only to set up gate preconditions no single packet reaches.
+func (s *Server) MarkPlayerDead(tb testing.TB, objID int32) {
+	tb.Helper()
+	marker := s.onlineCharacter(tb, objID)
 	marker.MarkDead()
 }
 
@@ -452,14 +459,7 @@ func (s *Server) MarkPlayerDead(tb testing.TB, objID int32) {
 // state, the precondition of the use-item storing gate.
 func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	setter, ok := obj.(interface{ SetOperating(bool) bool })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose SetOperating", objID, obj)
-	}
+	setter := s.onlineCharacter(tb, objID)
 	setter.SetOperating(operating)
 }
 
@@ -490,14 +490,7 @@ func (s *Server) SeedGroundItem(tb testing.TB, ownerID, templateID, count int32,
 // of the datapack's flying use conditions no single packet reaches.
 func (s *Server) SetPlayerFlying(tb testing.TB, objID int32, flying bool) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	setter, ok := obj.(interface{ SetFlying(bool) bool })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose SetFlying", objID, obj)
-	}
+	setter := s.onlineCharacter(tb, objID)
 	setter.SetFlying(flying)
 }
 
@@ -506,14 +499,7 @@ func (s *Server) SetPlayerFlying(tb testing.TB, objID int32, flying bool) {
 // set up gate preconditions no single packet reaches.
 func (s *Server) DisablePlayerItem(tb testing.TB, objID, objectID int32, delay time.Duration) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	disabler, ok := obj.(interface{ DisableItem(int32, time.Duration) })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose DisableItem", objID, obj)
-	}
+	disabler := s.onlineCharacter(tb, objID)
 	disabler.DisableItem(objectID, delay)
 }
 
@@ -521,16 +507,7 @@ func (s *Server) DisablePlayerItem(tb testing.TB, objID, objectID int32, delay t
 // full-inventory rejection is reachable without seeding dozens of rows.
 func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	holder, ok := obj.(interface {
-		Inventory() *itemcontainer.Inventory
-	})
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
-	}
+	holder := s.onlineCharacter(tb, objID)
 	holder.Inventory().SlotLimit = limit
 }
 
@@ -538,14 +515,7 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 // interpolation ticks and fire the blocked-arrival path.
 func (s *Server) PlayerMove(tb testing.TB, objID int32) *move.CreatureMove {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	mover, ok := obj.(interface{ Move() *move.CreatureMove })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose Move", objID, obj)
-	}
+	mover := s.onlineCharacter(tb, objID)
 	return mover.Move()
 }
 
@@ -592,30 +562,14 @@ func ReadMoveToLocationCoords(tb testing.TB, frame []byte) (objectID int32, dest
 // PlayerPosition reports the live player's current world position.
 func (s *Server) PlayerPosition(tb testing.TB, objID int32) (int, int, int) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	located, ok := obj.(interface{ Position() (int, int, int) })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose Position", objID, obj)
-	}
+	located := s.onlineCharacter(tb, objID)
 	return located.Position()
 }
 
 // PlayerTotalWeight reports the live inventory's last-computed total weight.
 func (s *Server) PlayerTotalWeight(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	holder, ok := obj.(interface {
-		Inventory() *itemcontainer.Inventory
-	})
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose Inventory", objID, obj)
-	}
+	holder := s.onlineCharacter(tb, objID)
 	return holder.Inventory().TotalWeight()
 }
 
@@ -623,42 +577,21 @@ func (s *Server) PlayerTotalWeight(tb testing.TB, objID int32) int {
 // flows have observable headroom no single packet creates.
 func (s *Server) DrainPlayerMP(tb testing.TB, objID int32, amount int) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reducer, ok := obj.(interface{ ReduceCurrentMP(int) })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose ReduceCurrentMP", objID, obj)
-	}
+	reducer := s.onlineCharacter(tb, objID)
 	reducer.ReduceCurrentMP(amount)
 }
 
 // PlayerCurrentMP reports the live player's current MP.
 func (s *Server) PlayerCurrentMP(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reader, ok := obj.(interface{ CurrentMP() int })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose CurrentMP", objID, obj)
-	}
+	reader := s.onlineCharacter(tb, objID)
 	return reader.CurrentMP()
 }
 
 // PlayerCurrentCP reports the live player's current CP.
 func (s *Server) PlayerCurrentCP(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reader, ok := obj.(interface{ CurrentCP() int })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose CurrentCP", objID, obj)
-	}
+	reader := s.onlineCharacter(tb, objID)
 	return reader.CurrentCP()
 }
 
@@ -666,56 +599,28 @@ func (s *Server) PlayerCurrentCP(tb testing.TB, objID int32) int {
 // flows have observable headroom no single packet creates.
 func (s *Server) DamagePlayerHP(tb testing.TB, objID int32, amount int) {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reducer, ok := obj.(interface{ ReduceCurrentHP(int) bool })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose ReduceCurrentHP", objID, obj)
-	}
+	reducer := s.onlineCharacter(tb, objID)
 	reducer.ReduceCurrentHP(amount)
 }
 
 // PlayerCurrentHP reports the live player's current HP.
 func (s *Server) PlayerCurrentHP(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reader, ok := obj.(interface{ CurrentHP() int })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose CurrentHP", objID, obj)
-	}
+	reader := s.onlineCharacter(tb, objID)
 	return reader.CurrentHP()
 }
 
 // PlayerMaxHP reports the live player's stat-computed maximum HP.
 func (s *Server) PlayerMaxHP(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reader, ok := obj.(interface{ MaxHPValue() float64 })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose MaxHPValue", objID, obj)
-	}
+	reader := s.onlineCharacter(tb, objID)
 	return int(reader.MaxHPValue())
 }
 
 // PlayerMaxCP reports the live player's stat-computed maximum CP.
 func (s *Server) PlayerMaxCP(tb testing.TB, objID int32) int {
 	tb.Helper()
-	obj, ok := s.State.Player(objID)
-	if !ok {
-		tb.Fatalf("world.Player(%d) missing", objID)
-	}
-	reader, ok := obj.(interface{ MaxCPValue() float64 })
-	if !ok {
-		tb.Fatalf("world.Player(%d) = %T does not expose MaxCPValue", objID, obj)
-	}
+	reader := s.onlineCharacter(tb, objID)
 	return int(reader.MaxCPValue())
 }
 
