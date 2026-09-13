@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -16,8 +18,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -959,4 +963,52 @@ func TestItemInstanceSaveTimeoutFitsShutdownBudget(t *testing.T) {
 			"before fx's Stop loop starts refusing to run them",
 			task.ItemInstanceSaveTimeout, gameServerStopTimeout)
 	}
+}
+
+// TestDrainItemInstancesOutlivesExpiredStopContext runs the shutdown item
+// drain with fx's stop ctx already expired and an owner's persistence lane
+// held longer than one step's budget. The first save gives up behind the
+// lane, and its owner job returns the item to pending when it runs. The drain
+// must then wait for the worker on its own budget and write the item in the
+// retry save: draining with the expired stop ctx returns at once and leaves
+// the item unwritten.
+func TestDrainItemInstancesOutlivesExpiredStopContext(t *testing.T) {
+	worker := persist.New(zerolog.Nop())
+	flusher := &countingItemFlusher{}
+	items := task.NewItemInstances(flusher, item.NewTable(nil), worker)
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	items.Add(inst)
+
+	const budget = 200 * time.Millisecond
+	worker.Enqueue(inst.OwnerID, func() { time.Sleep(budget + budget/2) })
+	stopCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := drainItemInstances(stopCtx, items, worker, zerolog.Nop(), budget); err != nil {
+		t.Fatalf("drain error = %v", err)
+	}
+	if got := flusher.count(); got != 1 {
+		t.Fatalf("item flushes = %d, want 1 from the retry save after the drain", got)
+	}
+	if items.Contains(inst) {
+		t.Fatal("item still pending after the drain")
+	}
+}
+
+type countingItemFlusher struct {
+	mu sync.Mutex
+	n  int
+}
+
+func (f *countingItemFlusher) Flush(context.Context, item.FlushBatch) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.n++
+	return nil
+}
+
+func (f *countingItemFlusher) count() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.n
 }

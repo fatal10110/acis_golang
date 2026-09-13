@@ -368,34 +368,42 @@ func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, worker *pers
 	// still draining.
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			// This is the last chance to write these rows, so each save
-			// gets its own budget (earlier stop hooks draining player
-			// containers can have consumed most of fx's stop timeout by now)
-			// and a failure is reported rather than swallowed.
-			save := func() error {
-				saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), task.ItemInstanceSaveTimeout)
-				defer cancel()
-				return items.Save(saveCtx)
-			}
-			firstErr := save()
-			// A save that gave up on a backed-up lane leaves owner jobs
-			// queued; they skip their writes and return their items to
-			// pending. Drain the worker, then write those on this goroutine.
-			if err := worker.Close(ctx); err != nil {
-				log.Error().Err(err).Msg("drain persistence worker")
-				return err
-			}
-			if err := save(); err != nil {
-				log.Error().Err(err).Msg("save pending item instances")
-				return err
-			}
-			if firstErr != nil {
-				log.Warn().Err(firstErr).Msg("final item save before drain; retried after it")
-			}
-			return nil
+			return drainItemInstances(ctx, items, worker, log, task.ItemInstanceSaveTimeout)
 		},
 	})
 	startTicker(lc, log, items.Start)
+}
+
+// drainItemInstances runs the shutdown item flush: a final save, a drain of
+// the persistence worker, then a second save for items that owner jobs which
+// gave up on a backed-up lane returned to pending. This is the last chance to
+// write these rows, and fx skips every later stop hook once its own ctx has
+// expired, so each step gets budget detached from ctx: earlier stop hooks
+// draining player containers can have consumed most of fx's stop timeout by
+// now. A failure is reported rather than swallowed.
+func drainItemInstances(ctx context.Context, items *task.ItemInstances, worker *persist.Worker, log zerolog.Logger, budget time.Duration) error {
+	detached := context.WithoutCancel(ctx)
+	save := func() error {
+		saveCtx, cancel := context.WithTimeout(detached, budget)
+		defer cancel()
+		return items.Save(saveCtx)
+	}
+	firstErr := save()
+	closeCtx, cancel := context.WithTimeout(detached, budget)
+	defer cancel()
+	if err := worker.Close(closeCtx); err != nil {
+		// Jobs are still running, so a save here could land ahead of them.
+		log.Error().Err(err).Msg("drain persistence worker")
+		return err
+	}
+	if err := save(); err != nil {
+		log.Error().Err(err).Msg("save pending item instances")
+		return err
+	}
+	if firstErr != nil {
+		log.Warn().Err(firstErr).Msg("final item save before drain; retried after it")
+	}
+	return nil
 }
 
 func providePositionUpdates(state *world.State) *task.PositionUpdates {
