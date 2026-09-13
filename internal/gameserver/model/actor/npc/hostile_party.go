@@ -22,13 +22,16 @@ func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
 // attacked call for a live hit with positive amount — the block
 // TakeDamage, ReduceHP, and ReduceHPByDOT all run unconditionally one layer
 // above the invul/damage-permission guard, matching Npc.reduceCurrentHp
-// (Npc.java:390-464). isDOT selects ReduceHPByDOT's zero-weight hate call
-// plus its flat attack-desire (Npc.java:395's unconditional
-// addDamageHate(attacker, damage, 0)) instead of TakeDamage/ReduceHP's
-// damage-weighted combat hate. A no-op when attacker isn't a Combatant
-// (e.g. an environmental DOT source). Pulled out after this exact block
-// drifted out of order between copies twice (#2326, #2328) — one place to
-// keep the ordering right.
+// (Npc.java:390-464). isDOT selects ReduceHPByDOT's existing
+// AddDamageHate/AddAttackDesire pair instead of TakeDamage/ReduceHP's
+// existing AddCombatDamageHate; this extraction only relocates each
+// branch's prior call, it does not change what either records (Java's
+// addDamageHate(attacker, damage, 0) at Npc.java:395 is the same call for
+// melee and DOT alike — the two Go branches' differing hate weights predate
+// this PR). A no-op when attacker isn't a Combatant (e.g. an environmental
+// DOT source). Pulled out after this exact block drifted out of order
+// between copies twice (#2326, #2328) — one place to keep the ordering
+// right.
 func (h *Hostile) registerHit(attacker any, amount float64, isDOT bool) {
 	combatant, ok := attacker.(attackable.Combatant)
 	if !ok {
