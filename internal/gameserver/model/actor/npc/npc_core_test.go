@@ -342,13 +342,20 @@ func TestDamageOverTimeEffectTargetsHostile(t *testing.T) {
 	}
 }
 
-// TestDamageOverTimeEffectRecordsZeroHateThreat pins Finding 1 of the #1088
-// closed-PR review: ReduceHPByDOT must record the caster in the threat
-// table at zero hate weight, matching Npc.reduceCurrentHp's unconditional
-// addDamageHate(attacker, damage, 0) (Npc.java:390-395) — DOT feeds the
-// AggroList's damage/timestamp bookkeeping even though it never raises
-// hate above zero (so target selection is unaffected).
-func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
+// TestDamageOverTimeEffectRecordsFlatHateFromAttackDesire updates Finding 1
+// of the #1088 closed-PR review for #2340: ReduceHPByDOT's own
+// addDamageHate(attacker, damage, 0) call (matching Npc.reduceCurrentHp,
+// Npc.java:390-395) still contributes zero hate — damage-only bookkeeping —
+// but the DOT registerHit path also queues an attack Desire via
+// attackedHateWeight (see TestDamageOverTimeEffectQueuesAttackDesire), and
+// that Desire now feeds the same weight into the threat table
+// (addAttackDesireWithMove). The caster here is a non-Playable Hostile, so
+// attackedHateWeight falls back to its flat pre-existing weight (#185, M10 —
+// the individual AI scripts that would derive a real per-caster formula
+// aren't ported). A DOT-only attacker therefore does reach positive hate and
+// can become most-hated, contrary to the #1088 review's now-corrected
+// assumption.
+func TestDamageOverTimeEffectRecordsFlatHateFromAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
@@ -367,8 +374,100 @@ func TestDamageOverTimeEffectRecordsZeroHateThreat(t *testing.T) {
 	if threat.Damage != 4 {
 		t.Fatalf("threat.Damage = %v, want 4", threat.Damage)
 	}
-	if threat.Hate != 0 {
-		t.Fatalf("threat.Hate = %v, want 0", threat.Hate)
+	if threat.Hate != flatAttackedHateWeight {
+		t.Fatalf("threat.Hate = %v, want flat fallback weight %v", threat.Hate, flatAttackedHateWeight)
+	}
+	if most, ok := h.AI().Threats().MostHated(); !ok || most.Attacker != caster {
+		t.Fatalf("MostHated() = (%+v, %v), want DOT-only caster ranked most-hated", most, ok)
+	}
+}
+
+// TestCombatDamageHateScalesWithDamageForPlayableAttacker pins #2340's
+// review finding that a flat per-hit weight breaks damage-proportional
+// ranking: for a Playable attacker, attackedHateWeight must scale with
+// damage (Warrior.onAttacked's core term, Warrior.java:394-396:
+// damage/(level+7)*100), not apply the same flat weight regardless of hit
+// size.
+func TestCombatDamageHateScalesWithDamageForPlayableAttacker(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 1000, MPMax: 50, Level: 20})
+	small := &hostileTarget{id: 2, playable: true}
+	big := &hostileTarget{id: 3, playable: true}
+
+	h.AI().AddCombatDamageHate(small, 10, h.attackedHateWeight(small, 10))
+	h.AI().AddCombatDamageHate(big, 300, h.attackedHateWeight(big, 300))
+
+	smallHate := h.AI().Threats().Hate(small)
+	bigHate := h.AI().Threats().Hate(big)
+	if smallHate <= 0 || bigHate <= smallHate*10 {
+		t.Fatalf("hate small=%v big=%v, want big roughly proportional to its 30x damage, not equal/flat", smallHate, bigHate)
+	}
+	wantBig := 300.0 / (20 + 7) * 100
+	if math.Abs(bigHate-wantBig) > 0.001 {
+		t.Fatalf("big hate = %v, want %v (damage/(level+7)*100)", bigHate, wantBig)
+	}
+}
+
+// TestMeleeAttackerOutranksDOTOnlyAttacker is #2340's own oracle scenario
+// (b), flagged by review as missing: a higher-damage melee (or single big
+// hit) attacker must outrank a low-damage-per-tick DOT-only attacker for
+// MostHated, matching Java's damage-proportional onAttacked weighting
+// instead of ranking by hit count.
+func TestMeleeAttackerOutranksDOTOnlyAttacker(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
+	melee := &hostileTarget{id: 2, playable: true}
+	dotCaster := &hostileTarget{id: 3, playable: true}
+
+	h.ReduceHP(300, melee, modelskill.Definition{})
+	for i := 0; i < 3; i++ {
+		h.ReduceHPByDOT(4, dotCaster, true)
+	}
+
+	most, ok := h.AI().Threats().MostHated()
+	if !ok || most.Attacker != melee {
+		t.Fatalf("MostHated() = (%+v, %v), want the higher-damage melee attacker, not the DOT-only ticker", most, ok)
+	}
+}
+
+// TestAggressionNotificationScalesLikeCombatHate pins the review's scale-
+// mismatch finding on PR #2346: NotifyAggression must route power through
+// the same attackedHateWeight scaling a real hit uses, matching
+// AttackableAI.onEvtAggression (AttackableAI.java:119-123), which feeds the
+// AGGRESSION event's aggro into the identical per-script onAttacked chain as
+// a hit's damage. Level-20 mob, a 300-damage DD hit (hate ≈ 300/27*100 ≈
+// 1111) vs a tank's power-500 AGGDEBUFF notification (hate ≈ 500/27*100 ≈
+// 1852) — the tank must outrank the DD, not merely match raw power against
+// scaled damage.
+func TestAggressionNotificationScalesLikeCombatHate(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
+	dd := &hostileTarget{id: 2, playable: true}
+	tank := &hostileTarget{id: 3, playable: true}
+
+	h.ReduceHP(300, dd, modelskill.Definition{})
+	h.NotifyAggression(tank, 500)
+
+	most, ok := h.AI().Threats().MostHated()
+	if !ok || most.Attacker != tank {
+		t.Fatalf("MostHated() = (%+v, %v), want the scaled-up AGGDEBUFF tank, not the DD", most, ok)
+	}
+}
+
+// TestSubOneDOTTickContributesZeroHate pins the review's truncation finding
+// on PR #2346: Npc.reduceCurrentHp truncates damage to an int before
+// dispatching it to the per-script onAttacked (Npc.java:403,
+// "quest.onAttacked(this, attacker, (int) damage, skill)"), so a sub-1 DOT
+// tick contributes zero ATTACKED hate in Java — attackedHateWeight must
+// truncate the same way, not turn a 0.6 tick into positive hate.
+func TestSubOneDOTTickContributesZeroHate(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
+	dotCaster := &hostileTarget{id: 2, playable: true}
+
+	h.ReduceHPByDOT(0.6, dotCaster, true)
+
+	if _, ok := h.AI().Threats().MostHated(); ok {
+		t.Fatal("MostHated() ok = true, want no ranked attacker from a truncated-to-zero DOT tick")
+	}
+	if got := h.AI().Threats().Hate(dotCaster); got != 0 {
+		t.Fatalf("hate = %v, want 0 (truncated damage/(level+7)*100 = 0)", got)
 	}
 }
 

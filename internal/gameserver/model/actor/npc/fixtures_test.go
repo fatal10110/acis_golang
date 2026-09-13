@@ -70,12 +70,15 @@ func (hostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 
 type hostileTarget struct {
 	world.Presence
-	id int32
+	id       int32
+	playable bool
 }
 
 func (t *hostileTarget) ObjectID() int32  { return t.id }
 func (t *hostileTarget) SiegeGuard() bool { return false }
 func (t *hostileTarget) AlikeDead() bool  { return false }
+func (t *hostileTarget) Playable() bool   { return t.playable }
+func (t *hostileTarget) Dead() bool       { return false }
 
 type hostileMove struct {
 	followTarget attackable.Combatant

@@ -16,9 +16,22 @@ import (
 )
 
 // ---- from attackable_attack_test.go ----
+// addAttackHate is test scaffolding for seeding multiple attackers' hate and
+// queued attack Desire before a test's own explicit Think()/TickThink()
+// call. It writes the threat table directly (AddDamageHate) and queues the
+// Desire directly, bypassing the public AddAttackDesire so bulk setup never
+// triggers that method's own "first reaction runs immediately" side effect
+// (see thinkIfNoMostHated and TestAttackableAIAddAttackDesireFeedsThreatTable
+// for that behavior in isolation).
 func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate float64) {
 	ai.AddDamageHate(attacker, damage, hate)
-	ai.AddAttackDesire(attacker, hate)
+	ai.Desires().AddOrUpdate(&Desire{
+		Kind:         IntentionAttack,
+		FinalTarget:  attacker,
+		Weight:       hate,
+		QueuedAt:     time.Now(),
+		MoveToTarget: true,
+	})
 }
 
 func tickThinkIdle(ai *Attackable) error {
@@ -52,6 +65,50 @@ func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
 	}
 	if got := ai.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires = %d, want 0", got)
+	}
+}
+
+// TestAttackableAIAddAttackDesireFeedsThreatTable pins #2340: Java's
+// NpcAI.addAttackDesire is the single choke point that both queues the
+// Desire and, under its updateAggro=true default, writes the same weight
+// into the AggroList/threat table (NpcAI.java:713-727). Every Go call site
+// currently uses that default, so AddAttackDesire alone must raise the
+// target's threat hate, not just queue a Desire.
+func TestAttackableAIAddAttackDesireFeedsThreatTable(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddAttackDesire(target, 200)
+
+	if got := ai.Threats().Hate(target); got != 200 {
+		t.Fatalf("hate = %v, want 200", got)
+	}
+	if threat, ok := ai.Threats().Get(target); !ok || threat.Damage != 0 {
+		t.Fatalf("threat = (%+v, %v), want damage 0 (weight-only convenience call)", threat, ok)
+	}
+}
+
+// TestAttackableAICombatDamageHateUsesCallerWeightNotDamage pins #2340:
+// Npc.reduceCurrentHp's own addDamageHate(attacker, damage, 0) call never
+// raises hate (Npc.java:395); real hate comes only from the ATTACKED-event
+// attack Desire queued alongside it, at whatever weight the caller derived
+// (the per-script onAttacked formula — see Hostile.attackedHateWeight, which
+// this generic AI layer does not know about). AddCombatDamageHate's
+// resulting threat hate must equal that caller-supplied weight, not the raw
+// damage passed for the threat table's damage bookkeeping.
+func TestAttackableAICombatDamageHateUsesCallerWeightNotDamage(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+
+	ai.AddCombatDamageHate(target, 9999, 42)
+
+	if got := ai.Threats().Hate(target); got != 42 {
+		t.Fatalf("hate = %v, want caller-supplied weight 42, not raw damage", got)
+	}
+	if threat, ok := ai.Threats().Get(target); !ok || threat.Damage != 9999 {
+		t.Fatalf("threat = (%+v, %v), want damage 9999 preserved", threat, ok)
 	}
 }
 
