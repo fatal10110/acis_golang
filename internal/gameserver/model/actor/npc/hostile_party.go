@@ -7,6 +7,30 @@ import (
 
 const partyAttackedWeight = 1.0
 
+// flatAttackedHateWeight is the fallback ATTACKED-event attack Desire
+// weight for a non-Playable attacker, or while the individual AI script
+// that would derive it hasn't landed yet (#185, M10 - Content port at
+// scale) — the pre-existing approximation, unchanged.
+const flatAttackedHateWeight = 200
+
+// attackedHateWeight approximates the reference's per-hit ATTACKED-event
+// hate weight. The reference derives this via the NPC's assigned
+// individual AI script (#185, M10): Warrior.onAttacked (Warrior.java:387-397)
+// computes damage/(level+7)*100 for a Playable attacker, further scaled by
+// a per-NPC "hateRatio" AI param that neither Go's Template nor the script
+// engine support yet — dropped here. Other script families (WizardBase,
+// MonsterBehavior, LV3Monster, …) use different formulas Go hasn't ported.
+// Until #185 lands that per-script dispatch, every Hostile uses this one
+// damage-proportional formula for Playable attackers instead, and falls
+// back to the flat pre-existing weight for everything else — an
+// approximation, not the full per-script behavior.
+func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float64) float64 {
+	if !creature.Playable(attacker) {
+		return flatAttackedHateWeight
+	}
+	return damage / (float64(h.Level()) + 7) * 100
+}
+
 // NotifyAggression records the incoming aggression on this NPC and fans it
 // out to the master/minion party so escorts assist the same target.
 func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
@@ -23,12 +47,12 @@ func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
 // TakeDamage, ReduceHP, and ReduceHPByDOT all run unconditionally one layer
 // above the invul/damage-permission guard, matching Npc.reduceCurrentHp
 // (Npc.java:390-464). isDOT selects ReduceHPByDOT's zero-weight hate call
-// plus its flat attack-desire (Npc.java:395's unconditional
-// addDamageHate(attacker, damage, 0)) instead of TakeDamage/ReduceHP's
-// damage-weighted combat hate. A no-op when attacker isn't a Combatant
-// (e.g. an environmental DOT source). Pulled out after this exact block
-// drifted out of order between copies twice (#2326, #2328) — one place to
-// keep the ordering right.
+// (Npc.java:395's unconditional addDamageHate(attacker, damage, 0)) plus its
+// own attackedHateWeight-derived attack Desire, instead of
+// AddCombatDamageHate's combined write for TakeDamage/ReduceHP. A no-op when
+// attacker isn't a Combatant (e.g. an environmental DOT source). Pulled out
+// after this exact block drifted out of order between copies twice (#2326,
+// #2328) — one place to keep the ordering right.
 func (h *Hostile) registerHit(attacker any, amount float64, isDOT bool) {
 	combatant, ok := attacker.(attackable.Combatant)
 	if !ok {
@@ -36,7 +60,7 @@ func (h *Hostile) registerHit(attacker any, amount float64, isDOT bool) {
 	}
 	if isDOT {
 		h.AddDamageHate(combatant, amount, 0)
-		h.AddAttackDesire(combatant, 200)
+		h.AddAttackDesire(combatant, h.attackedHateWeight(combatant, amount))
 	} else {
 		h.AddCombatDamageHate(combatant, amount)
 	}

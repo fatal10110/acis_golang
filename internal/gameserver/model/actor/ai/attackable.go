@@ -245,28 +245,26 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 	a.threats.AddDamage(attacker, damage, hate)
 }
 
-// combatAttackDesireWeight is the flat ATTACK desire weight queued for raw
-// combat damage, matching DefaultNpc.tryToAttack's scripted 200
-// (Npc.reduceCurrentHp never routes through addAttackDesire in the
-// reference; nothing there derives desire weight from damage dealt).
-const combatAttackDesireWeight = 200
-
 // AddCombatDamageHate records attacker's raw combat damage in the physical
 // threat table at zero hate weight, matching Npc.reduceCurrentHp's own
 // addDamageHate(attacker, damage, 0) call — the reference never derives hate
-// from damage dealt here. The flat-weight attack Desire queued below feeds
-// its own hate into the same threat table (see addAttackDesireWithMove),
-// matching the reference's separate addAttackDesire(creature, 200) call from
-// the default AI's ATTACKED event handler. When the threat table had no
+// from damage dealt here. weight is the ATTACKED-event attack Desire queued
+// alongside it, which feeds its own hate into the same threat table (see
+// addAttackDesireWithMove) — matching the reference's separate
+// addAttackDesire(attacker, weight) call from the NPC's assigned individual
+// AI script's onAttacked (e.g. Warrior.onAttacked, Warrior.java:387-397).
+// That per-script formula lives in the domain layer (see
+// Hostile.attackedHateWeight), not here: this generic AI plumbing only
+// applies whatever weight it is given. When the threat table had no
 // most-hated attacker, the AI loop runs immediately so the first reaction
 // does not wait for the next tick.
-func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
+func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage, weight float64) {
 	_, hadMostHated := a.threats.MostHated()
 	a.threats.AddDamage(attacker, damage, 0)
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
-	a.addAttackDesire(attacker, combatAttackDesireWeight)
+	a.addAttackDesire(attacker, weight)
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
