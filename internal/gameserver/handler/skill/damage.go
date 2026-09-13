@@ -556,6 +556,11 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 		in, ok := target.ManaDamageInput(cast.Caster, cast.Skill)
 		if !ok {
+			if v, invOk := target.(lethalInvulnerableTarget); invOk && v.Invulnerable() {
+				result.ManaDamageMissed++
+			} else if v, invOk := target.(lethalInvulTarget); invOk && v.Invul() {
+				result.ManaDamageMissed++
+			}
 			continue
 		}
 		if !in.Affected {

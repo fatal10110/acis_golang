@@ -2145,6 +2145,28 @@ func TestManaDamageHandlerReportsSystemMessages(t *testing.T) {
 		}
 	})
 
+	t.Run("invulnerable target reports MissedTarget, matching ManaDamageInput's ok=false shape", func(t *testing.T) {
+		caster := &skillTarget{name: "Caster"}
+		target := &skillTarget{
+			mp: 100, maxMP: 100,
+			invulnerable: true,
+			manaOK:       false,
+		}
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult ok = false")
+		}
+		if result.ManaDamageMissed != 1 {
+			t.Fatalf("ManaDamageMissed = %d, want 1", result.ManaDamageMissed)
+		}
+		if len(result.ManaDrains) != 0 || len(result.OpponentMPReduced) != 0 {
+			t.Fatalf("invulnerable target must not drain or reduce: drains=%v reduced=%v", result.ManaDrains, result.OpponentMPReduced)
+		}
+		if target.mp != 100 {
+			t.Fatalf("invulnerable target mp = %v, want unchanged 100", target.mp)
+		}
+	})
+
 	t.Run("player caster and player target report both drain messages", func(t *testing.T) {
 		caster := &playerActor{skillTarget{name: "Caster"}}
 		target := &playerActor{skillTarget{mp: 100, maxMP: 100, manaInput: manaInput, manaOK: true}}
