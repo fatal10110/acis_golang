@@ -251,6 +251,26 @@ func (inv *Inventory) DestroyByObjectID(objectID int32, count int) *item.Instanc
 	return inv.DestroyItem(inv.ItemByObjectID(objectID), count)
 }
 
+// DestroyAll destroys every unit of inst, per DestroyByTemplateID's
+// reasoning for going through Inventory.DestroyItem.
+func (inv *Inventory) DestroyAll(inst *item.Instance) *item.Instance {
+	if inst == nil {
+		return nil
+	}
+	return inv.DestroyItem(inst, inst.CountValue())
+}
+
+// DestroyAllItems destroys every item instance the inventory holds,
+// through Inventory.DestroyItem so each one is unequipped and queues a
+// removed update — the embedded Container's version deletes straight from
+// the item map, leaving destroyed instances behind in the paperdoll and
+// queuing nothing.
+func (inv *Inventory) DestroyAllItems() {
+	for _, inst := range inv.Items() {
+		inv.DestroyItem(inst, inst.CountValue())
+	}
+}
+
 // SetEnchantLevel changes inst's enchant level and queues a modified
 // inventory notification. It returns false when inst is absent from this
 // inventory or already has level.
