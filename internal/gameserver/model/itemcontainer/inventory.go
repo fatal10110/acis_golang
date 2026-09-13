@@ -235,6 +235,22 @@ func (inv *Inventory) DestroyItem(inst *item.Instance, count int) *item.Instance
 	})
 }
 
+// DestroyByTemplateID destroys count units of the first instance of
+// templateID found, going through the inventory's own DestroyItem — the
+// embedded Container's DestroyByTemplateID would call Container.DestroyItem
+// directly and bypass the update queue, notifier and unequip bookkeeping
+// Inventory.DestroyItem adds.
+func (inv *Inventory) DestroyByTemplateID(templateID int32, count int) *item.Instance {
+	return inv.DestroyItem(inv.ItemByTemplateID(templateID), count)
+}
+
+// DestroyByObjectID destroys count units of the instance identified by
+// objectID, per DestroyByTemplateID's reasoning for going through
+// Inventory.DestroyItem.
+func (inv *Inventory) DestroyByObjectID(objectID int32, count int) *item.Instance {
+	return inv.DestroyItem(inv.ItemByObjectID(objectID), count)
+}
+
 // SetEnchantLevel changes inst's enchant level and queues a modified
 // inventory notification. It returns false when inst is absent from this
 // inventory or already has level.

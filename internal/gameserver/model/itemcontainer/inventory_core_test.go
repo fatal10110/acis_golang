@@ -301,6 +301,40 @@ func TestInventory_DropItem_FullyRemovesInstance(t *testing.T) {
 	}
 }
 
+func TestInventory_DestroyByTemplateID_QueuesUpdateAndUnequips(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+	stack := inv.AddNew(1, 10, 0x20000001)
+	inv.DrainUpdates()
+
+	if got := inv.DestroyByTemplateID(1, 3); got != stack || stack.Count != 7 {
+		t.Fatalf("DestroyByTemplateID() = %+v, Count = %d, want the stack with 7 left", got, stack.Count)
+	}
+	updates := inv.DrainUpdates()
+	if len(updates) != 1 || updates[0].State != UpdateModified || updates[0].ObjectID != stack.ObjectID || updates[0].Count != 7 {
+		t.Fatalf("updates after partial destroy = %+v, want one modified update with Count=7", updates)
+	}
+
+	weapon := inv.AddNew(2, 1, 0x20000002)
+	tmpl, _ := templates.Get(2)
+	inv.EquipItem(weapon, tmpl)
+	inv.DrainUpdates()
+
+	if got := inv.DestroyByObjectID(weapon.ObjectID, 1); got != weapon {
+		t.Fatalf("DestroyByObjectID() = %+v, want the weapon instance", got)
+	}
+	if inv.ItemAt(RHand) != nil {
+		t.Errorf("fully destroying an equipped item should unequip it first")
+	}
+	updates = inv.DrainUpdates()
+	if len(updates) != 2 || updates[0].State != UpdateModified || updates[1].State != UpdateRemoved || updates[1].ObjectID != weapon.ObjectID {
+		t.Fatalf("updates after full destroy = %+v, want an unequip-modified update then a removed update for the weapon", updates)
+	}
+}
+
 func TestInventory_TransferItemPartialQueuesSourceAndTargetUpdates(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
