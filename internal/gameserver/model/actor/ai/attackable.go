@@ -222,6 +222,16 @@ func (a *Attackable) SetCastController(controller CastController) {
 	a.cast = controller
 }
 
+// CastController returns the currently wired skill-cast handler, or nil if
+// none was set. Exposed alongside Threats/Hates/Desires so tests can drive
+// or inspect the cast wiring directly instead of through full aggro
+// decision-making.
+func (a *Attackable) CastController() CastController {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cast
+}
+
 // Threats returns the physical-attack threat table.
 func (a *Attackable) Threats() *attackable.ThreatTable {
 	return a.threats

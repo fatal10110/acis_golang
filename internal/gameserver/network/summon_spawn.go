@@ -363,8 +363,10 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// forwarded here (ManaDrains is itself gated `target instanceof Player`,
 	// Manadam.java:68, independent of caster type), but
 	// YOUR_OPPONENTS_MP_WAS_REDUCED_BY_S1 (Manadam.java:72) is gated
-	// `creature instanceof Player` on the caster and stays unforwarded; NPC
-	// casters leave OnHitResult unset and stay silent for these too.
+	// `creature instanceof Player` on the caster and stays unforwarded; a
+	// hostile NPC caster routes through DeliverHitResult (nil live) instead:
+	// caster-addressed messages like this one are dropped there too, but
+	// target-addressed ones still reach an online target (issue #2350).
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {

@@ -37,10 +37,11 @@ func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T)
 	})
 
 	got := frames.Frames()
-	opcodes := testsupport.FrameOpcodes(got)
-	if len(opcodes) != 2 || opcodes[0] != serverpackets.OpcodeSystemMessage || opcodes[1] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("opcodes = %x, want two SystemMessage frames (MagicResist, ManaDrain) and nothing else", opcodes)
+	if len(got) != 2 {
+		t.Fatalf("frame count = %d, want 2 (MagicResist, ManaDrain) and nothing else", len(got))
 	}
+	assertSystemMessageStringFrame(t, got[0], serverpackets.SystemMessageResistedS1Magic, "Orc")
+	assertSystemMessageStringNumberFrame(t, got[1], serverpackets.SystemMessageS2MPHasBeenDrainedByS1, "Orc", 30)
 }
 
 // TestDeliverHitResultForwardsToSendSkillHandlerResult pins the exported
@@ -57,9 +58,11 @@ func TestDeliverHitResultForwardsToSendSkillHandlerResult(t *testing.T) {
 		ManaDrains: []handlerskill.ManaDrain{{TargetID: 43, CasterName: "Orc", MP: 12}},
 	})
 
-	if opcodes := testsupport.FrameOpcodes(frames.Frames()); len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeSystemMessage {
-		t.Fatalf("opcodes = %x, want one SystemMessage frame (ManaDrain)", opcodes)
+	got := frames.Frames()
+	if len(got) != 1 {
+		t.Fatalf("frame count = %d, want 1 (ManaDrain)", len(got))
 	}
+	assertSystemMessageStringNumberFrame(t, got[0], serverpackets.SystemMessageS2MPHasBeenDrainedByS1, "Orc", 12)
 }
 
 func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
