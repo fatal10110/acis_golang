@@ -227,6 +227,7 @@ func (h *petWorld) spawnWolf(t *testing.T) (*summon.Actor, [][]byte) {
 // savedPetState reads the persisted pets row for the collar.
 func (h *petWorld) savedPetState(t *testing.T) pet.State {
 	t.Helper()
+	h.srv.FlushPersistence(t)
 	state, ok, err := h.srv.Pets.Get(context.Background(), h.collarID)
 	if err != nil || !ok {
 		t.Fatalf("pets row for collar %d: ok=%v err=%v", h.collarID, ok, err)

@@ -11,6 +11,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -31,7 +32,7 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -51,7 +52,7 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -75,7 +76,7 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
 	effects.Save(live)
 
@@ -85,81 +86,54 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 	}
 }
 
-// TestAutosaveSaveDoesNotOutraceDetachOfflineWrite guards against #1948: the
-// detaching flag TestAutosaveSaveSkipsDetachingSession covers is a
-// check-then-act read, not atomic with the DB write it guards. If an
-// autosave write is already in flight (past the flag check, mid roster.Save)
-// when detachLivePlayer runs, the two writers' `online` column writes can
-// interleave and leave online stuck at 1 for a character that already fully
-// logged out.
+// TestAutosaveSaveDoesNotOutraceDetachOfflineWrite guards against #1948: an
+// autosave write already in flight when detachLivePlayer runs must not land
+// after detach's own offline write and leave online stuck at 1 for a
+// character that fully logged out.
 //
-// This reproduces that interleaving deterministically: a hook inside the
-// fake char store's Save blocks the first call in flight (simulating a slow
-// write), detachLivePlayer is started concurrently, and only then is the
-// blocked autosave write allowed to complete. live.saveMu (added by #1948's
-// fix) must serialize the two so detachLivePlayer's own offline write is
-// always the last one recorded, regardless of which writer reached the
-// store first.
+// A hook inside the fake char store's Save blocks the autosave write on its
+// persistence lane (a slow write), detachLivePlayer then runs to completion,
+// and only then is the autosave write released. Detach's saves share the
+// owner's lane, so they wait behind the blocked write and its offline write
+// is the last one recorded. A detach that wrote directly would record
+// "offline" while the autosave write was still blocked.
 func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	chars := newFakeCharStore()
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+	worker := persist.New(zerolog.Nop())
+	defer worker.Close(context.Background())
 
 	live := &livePlayer{Character: &player.Character{ID: 45}, log: zerolog.Nop()}
 	state.AddPlayer(live)
 
 	entered := make(chan struct{})
 	release := make(chan struct{})
-	// blocked is a lock-free CAS, not a sync.Once: sync.Once's internal
-	// mutex stays held (by the blocked first call) until Do's f returns, so
-	// a second concurrent Do call would block on that mutex too — silently
-	// serializing the two writers and masking the very race this test
-	// exists to reproduce. Only the first Save call for id 45 must block;
-	// every later call (detachLivePlayer's own, in the pre-fix code with no
-	// live.saveMu) must return immediately, uncontended.
-	var blocked int32
+	var blocked atomic.Bool
 	chars.saveHook = func(id int32) {
-		if id != 45 {
-			return
-		}
-		if atomic.CompareAndSwapInt32(&blocked, 0, 1) {
+		if id == 45 && blocked.CompareAndSwap(false, true) {
 			close(entered)
 			<-release
 		}
 	}
 
 	effects := NewTaskEffects(state)
-	effects.SetAutosave(roster, nil, nil, zerolog.Nop())
+	effects.SetAutosave(roster, nil, nil, worker, zerolog.Nop())
+	effects.Save(live)
+	<-entered // the autosave write is in flight on the lane
 
-	autosaveDone := make(chan struct{})
-	go func() {
-		effects.Save(live)
-		close(autosaveDone)
-	}()
+	link := &GameClientLink{roster: roster, log: zerolog.Nop(), persist: worker}
+	link.detachLivePlayer(live)
+	if seq := chars.onlineSequence(45); len(seq) != 0 {
+		t.Fatalf("online-status writes recorded while the autosave write was blocked = %v, want none", seq)
+	}
 
-	<-entered // autosave holds live.saveMu, blocked in chars.Save before its write is recorded
-
-	link := &GameClientLink{roster: roster, log: zerolog.Nop()}
-	detachDone := make(chan struct{})
-	go func() {
-		link.detachLivePlayer(context.Background(), live)
-		close(detachDone)
-	}()
-
-	// Give detachLivePlayer a window to run its own save sequence to
-	// completion before the blocked autosave write is released. With the
-	// #1948 fix, detachLivePlayer blocks on live.saveMu for the whole
-	// window instead (a no-op wait); without it, this reliably lets
-	// detachLivePlayer's unguarded writes land first, reproducing the
-	// interleaving deterministically rather than leaving it to scheduler luck.
-	time.Sleep(50 * time.Millisecond)
-	close(release) // let the blocked autosave write proceed
-
-	<-autosaveDone
-	<-detachDone
-
+	close(release)
+	if err := worker.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	seq := chars.onlineSequence(45)
-	if len(seq) == 0 || seq[len(seq)-1] != "offline" {
-		t.Fatalf("online-status write sequence for a fully detached character = %v, want it to end \"offline\"", seq)
+	if len(seq) != 3 || seq[0] != "online" || seq[1] != "online" || seq[2] != "offline" {
+		t.Fatalf("online-status write sequence = %v, want [online online offline]", seq)
 	}
 }

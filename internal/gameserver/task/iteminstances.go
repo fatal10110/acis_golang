@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 const (
@@ -61,25 +63,38 @@ type ItemFlusher interface {
 type ItemInstances struct {
 	flusher   ItemFlusher
 	templates *item.Table
+	worker    *persist.Worker
 
 	mu      sync.RWMutex
 	pending map[int32]*item.Instance
-	// removedInflight is non-nil only while a Save flush is in progress. It
-	// records ids RemoveItems dropped during that window so a failed flush's
-	// merge-back does not resurrect a container that already tore down and
-	// wrote its own final state (see RemoveItems and Save).
-	removedInflight map[int32]struct{}
+	// rounds holds every Save whose owner jobs have not all run yet. Each
+	// records the ids RemoveItems dropped while it was outstanding, so its
+	// failed items are not merged back over a container that already tore
+	// down and wrote its own final state (see RemoveItems and Save).
+	rounds map[*saveRound]struct{}
 }
 
-// NewItemInstances returns an empty item persistence task.
-func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances {
+// saveRound is one Save's outstanding owner jobs. Its fields are guarded by
+// ItemInstances.mu.
+type saveRound struct {
+	removed   map[int32]struct{}
+	remaining int
+	err       error
+	done      chan struct{}
+}
+
+// NewItemInstances returns an empty item persistence task whose writes run
+// on worker's lanes. A nil worker writes on the calling goroutine.
+func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
 	return &ItemInstances{
 		flusher:   flusher,
 		templates: templates,
+		worker:    worker,
 		pending:   make(map[int32]*item.Instance),
+		rounds:    make(map[*saveRound]struct{}),
 	}
 }
 
@@ -137,8 +152,8 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 			continue
 		}
 		delete(i.pending, inst.ObjectID)
-		if i.removedInflight != nil {
-			i.removedInflight[inst.ObjectID] = struct{}{}
+		for r := range i.rounds {
+			r.removed[inst.ObjectID] = struct{}{}
 		}
 	}
 }
@@ -146,7 +161,12 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // Save flushes every pending item in chunks of at most
 // ItemInstanceSaveChunkSize, each committed by its own UpdateItems call
 // under its own fresh ItemInstanceSaveTimeout (bounded by whatever remains
-// of ctx). The pending map is swapped out before the flush so a concurrent
+// of ctx). Items are grouped by owner and each owner's chunks run on that
+// owner's persistence lane. Save returns once every owner's job has run, or
+// when ctx ends: an owner job still queued then skips its writes when it runs
+// and puts its items back to pending, so the wait never outlasts ctx. Once
+// the worker is closed, Save writes on the calling goroutine. The
+// pending map is swapped out before the flush so a concurrent
 // Add during I/O lands in the new map and is not dropped when the flush
 // succeeds. Chunking makes progress monotonic: a batch that has grown past
 // what one ItemInstanceSaveTimeout window can write still gets its earlier
@@ -192,26 +212,107 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // that exists, a longer per-tick ceiling would trade shutdown safety for
 // throughput instead of buying both.
 //
-// Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
-// not expected. The shutdown hook is appended before the ticker's, so fx's
-// reverse stop order runs the final Save only after the ticker has stopped.
+// Concurrent callers of Add and RemoveItems are safe. A Save may overlap
+// the owner jobs of an earlier one that returned on its ctx; each keeps its
+// own record of removed ids. The shutdown hook is appended before the
+// ticker's, so fx's reverse stop order runs the final Save only after the
+// ticker has stopped.
 func (i *ItemInstances) Save(ctx context.Context) error {
 	i.mu.Lock()
 	inflight := i.pending
 	i.pending = make(map[int32]*item.Instance)
-	i.removedInflight = make(map[int32]struct{})
+	// Each owner's items are written on that owner's persistence lane, so
+	// they can never interleave with a container flush for the same owner
+	// (network.flushItemPersistence) and land an older snapshot after it.
+	byOwner := make(map[int32][]*item.Instance)
+	for _, inst := range inflight {
+		key := i.laneKey(inst.Snapshot())
+		byOwner[key] = append(byOwner[key], inst)
+	}
+	round := &saveRound{removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
+	if round.remaining == 0 {
+		i.mu.Unlock()
+		return nil
+	}
+	i.rounds[round] = struct{}{}
 	i.mu.Unlock()
 
-	items := make([]*item.Instance, 0, len(inflight))
-	for _, inst := range inflight {
-		items = append(items, inst)
+	for _, owner := range slices.Sorted(maps.Keys(byOwner)) {
+		items := byOwner[owner]
+		// Fixes chunk boundaries so they don't depend on map iteration
+		// order; see the chunk-boundary note above.
+		slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+		job := func() {
+			failed, err := i.saveChunks(ctx, items)
+			i.finishOwner(round, failed, err)
+		}
+		// A closed worker has already run every job it accepted, so writing
+		// here cannot land ahead of an older queued write.
+		if !i.worker.Enqueue(owner, job) {
+			job()
+		}
 	}
-	// Fixes chunk boundaries so they don't depend on map iteration order;
-	// see the chunk-boundary note above.
-	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
+	select {
+	case <-round.done:
+	case <-ctx.Done():
+		// The owner jobs still queued fail fast once they run and merge
+		// their items back to pending for a later Save.
+		select {
+		case <-round.done:
+		default:
+			return ctx.Err()
+		}
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return round.err
+}
+
+// finishOwner merges one owner job's failed items back to pending, skipping
+// any RemoveItems dropped while round was outstanding, and closes round once
+// its last owner job has run.
+func (i *ItemInstances) finishOwner(round *saveRound, failed []*item.Instance, err error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	for _, inst := range failed {
+		if _, wasRemoved := round.removed[inst.ObjectID]; wasRemoved {
+			continue
+		}
+		if _, ok := i.pending[inst.ObjectID]; !ok {
+			i.pending[inst.ObjectID] = inst
+		}
+	}
+	if round.err == nil {
+		round.err = err
+	}
+	round.remaining--
+	if round.remaining == 0 {
+		delete(i.rounds, round)
+		close(round.done)
+	}
+}
+
+// laneKey picks the persistence lane an item's write runs on: its owner's,
+// except a destroyed pet collar, whose write also deletes its pets row. That
+// one runs on the collar's own lane, where every pets-row save is queued, so
+// a save still waiting there cannot land after the delete and recreate the
+// row.
+func (i *ItemInstances) laneKey(st item.InstanceState) int32 {
+	if st.Count <= 0 {
+		if tmpl, _ := i.templates.Get(st.TemplateID); isPetCollar(tmpl) {
+			return st.ObjectID
+		}
+	}
+	return st.OwnerID
+}
+
+// saveChunks writes items in chunks of at most ItemInstanceSaveChunkSize,
+// each under its own ItemInstanceSaveTimeout, and returns the items whose
+// chunk failed or was never attempted because ctx had already ended.
+func (i *ItemInstances) saveChunks(ctx context.Context, items []*item.Instance) ([]*item.Instance, error) {
 	var firstErr error
-	failed := make([]*item.Instance, 0)
+	var failed []*item.Instance
 	for chunk := range slices.Chunk(items, ItemInstanceSaveChunkSize) {
 		if ctx.Err() != nil {
 			failed = append(failed, chunk...)
@@ -230,21 +331,7 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 			}
 		}
 	}
-
-	i.mu.Lock()
-	removed := i.removedInflight
-	i.removedInflight = nil
-	for _, inst := range failed {
-		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
-			continue
-		}
-		if _, ok := i.pending[inst.ObjectID]; !ok {
-			i.pending[inst.ObjectID] = inst
-		}
-	}
-	i.mu.Unlock()
-
-	return firstErr
+	return failed, firstErr
 }
 
 // UpdateItems persists the provided item instances immediately, as one

@@ -80,12 +80,18 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return false
 	}
 
-	restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
-	defer cancel()
-	state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
-	if err != nil {
-		link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
-		return false
+	// An unsummon or logout whose pets-row write is still queued restores
+	// from the state it queued; otherwise the row is current.
+	state, hasSaved := link.queuedPets.latest(controlItem.ObjectID)
+	if !hasSaved {
+		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
+		defer cancel()
+		var err error
+		state, hasSaved, err = link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		if err != nil {
+			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
+			return false
+		}
 	}
 
 	// Java's unsaved branch commits the seeded row immediately

@@ -38,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -91,6 +92,7 @@ type options struct {
 	allowDelevel           bool
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
+	persistWait            time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	storeSkillCooltime     bool
@@ -179,6 +181,12 @@ func WithAttackStanceClock(now func() time.Time) Option {
 // activated on teleport completion (default: disabled).
 func WithSpawnProtection(window time.Duration) Option {
 	return func(o *options) { o.spawnProtection = window }
+}
+
+// WithPersistWait bounds how long a connection waits for queued saves before
+// reading rows back, so a suite can drive the wait's timeout quickly.
+func WithPersistWait(d time.Duration) Option {
+	return func(o *options) { o.persistWait = d }
 }
 
 // WithReuseDelays overrides the server.properties CharacterSelectTime and
@@ -332,10 +340,12 @@ type Server struct {
 	cursedWeapons    *entity.CursedWeaponTable
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
+	persist          *persist.Worker
 	log              zerolog.Logger
 
-	closeOnce sync.Once
-	cancel    context.CancelFunc
+	closeOnce    sync.Once
+	cancel       context.CancelFunc
+	waitHandlers func()
 }
 
 // autosaveClock is the harness clock task.Autosave reads. EnterWorld's
@@ -754,6 +764,9 @@ func (s *Server) Shutdown(tb testing.TB) {
 	if err := s.ItemInstances.Save(ctx); err != nil {
 		tb.Fatalf("shutdown item flush: %v", err)
 	}
+	if err := s.persist.Flush(ctx); err != nil {
+		tb.Fatalf("shutdown persistence flush: %v", err)
+	}
 	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(s.skipCursedGroundItem)); err != nil {
 		tb.Fatalf("shutdown ground-item save: %v", err)
 	}
@@ -770,11 +783,52 @@ func (s *Server) Shutdown(tb testing.TB) {
 // so tests that need the periodic save path call this instead of waiting
 // AutosaveInitialDelay.
 func (s *Server) TickAutosave() {
+	s.QueueAutosave()
+	s.flushPersistence()
+}
+
+// QueueAutosave is TickAutosave without waiting for the sweep's queued
+// writes, so a suite can hold a lane and act while they are pending.
+func (s *Server) QueueAutosave() {
 	if s.autosave == nil || s.autosaveClock == nil {
 		return
 	}
 	s.autosaveClock.Advance(task.AutosaveInitialDelay)
 	s.autosave.Tick()
+}
+
+// HoldPersistenceLane blocks ownerID's persistence lane until the returned
+// release is called (also on cleanup), so a suite can prove a reader waits
+// for writes queued behind it.
+func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func()) {
+	tb.Helper()
+	held := make(chan struct{})
+	started := make(chan struct{})
+	s.persist.Enqueue(ownerID, func() {
+		close(started)
+		<-held
+	})
+	<-started
+	var once sync.Once
+	release = func() { once.Do(func() { close(held) }) }
+	tb.Cleanup(release)
+	return release
+}
+
+// FlushPersistence waits until every save already handed to the persistence
+// worker (autosave, detach, pet and container writes) has run, so a suite
+// can assert the rows those paths wrote.
+func (s *Server) FlushPersistence(tb testing.TB) {
+	tb.Helper()
+	if err := s.flushPersistence(); err != nil {
+		tb.Fatalf("flush persistence: %v", err)
+	}
+}
+
+func (s *Server) flushPersistence() error {
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+	defer cancel()
+	return s.persist.Flush(ctx)
 }
 
 // NewObjectID allocates the next object id from the server's id sequence.
@@ -784,6 +838,14 @@ func (s *Server) NewObjectID() int32 {
 		panic(err)
 	}
 	return id
+}
+
+// Stop stops serving the way the production listener stop hook does and
+// waits for every connection handler to return, so each connected player has
+// been detached and its saves have run.
+func (s *Server) Stop() {
+	s.Close()
+	s.waitHandlers()
 }
 
 // Close tears the stack down (also invoked via testing cleanup).
@@ -913,7 +975,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		}
 	}
 	inventoryUpdates := task.NewInventoryUpdates()
-	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates)
+	// Registered before the listener's cleanup, so it drains only after
+	// every connection's detach has enqueued its saves.
+	persistWorker := persist.New(o.log)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
+		defer cancel()
+		if err := persistWorker.Close(ctx); err != nil {
+			t.Errorf("close persistence worker: %v", err)
+		}
+	})
+	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker)
 	petStore := gamesql.NewPetStore(db)
 
 	// Mirror the production boot for the Seven Signs calendar: optional
@@ -949,7 +1021,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
-	effects.SetAutosave(roster, o.skills, petStore, zerolog.Nop())
+	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
 	if err != nil {
@@ -992,6 +1064,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
+		Persist:          persistWorker,
+		PersistWait:      o.persistWait,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
@@ -1046,14 +1120,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		count int
 	}
 	handlersDone := sync.NewCond(&handlers.Mutex)
-	t.Cleanup(func() {
-		cancel()
-		ln.Close()
+	waitHandlers := func() {
 		handlers.Lock()
 		defer handlers.Unlock()
 		for handlers.count > 0 {
 			handlersDone.Wait()
 		}
+	}
+	t.Cleanup(func() {
+		cancel()
+		ln.Close()
+		waitHandlers()
 	})
 	go network.Serve(ctx, ln, func(ctx context.Context, conn *network.Conn) {
 		handlers.Lock()
@@ -1137,8 +1214,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cursedWeapons:    cursed,
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
+		persist:          persistWorker,
 		log:              o.log,
 		cancel:           cancel,
+		waitHandlers:     waitHandlers,
 	}
 }
 
