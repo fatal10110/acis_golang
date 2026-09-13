@@ -65,7 +65,7 @@ type idAllocator interface {
 // Satisfied by *sql.CharacterStore.
 type characterStore interface {
 	Create(ctx context.Context, c *player.Character) error
-	Save(ctx context.Context, c *player.Character) error
+	Save(ctx context.Context, st player.SaveState) error
 	ListByAccount(ctx context.Context, accountName string) ([]*player.Character, error)
 	CountByAccount(ctx context.Context, accountName string) (int, error)
 	NameTaken(ctx context.Context, name string) (bool, error)
@@ -308,20 +308,20 @@ func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 // Save persists the live character's full in-memory stats (level, exp, sp,
 // cur/max HP/CP/MP), matching GameClient's periodic and disconnect
 // autosaves.
-func (r *Roster) Save(ctx context.Context, c *player.Character) error {
-	return r.characters.Save(ctx, c)
+func (r *Roster) Save(ctx context.Context, st player.SaveState) error {
+	return r.characters.Save(ctx, st)
 }
 
 // SavePosition persists the live character's latest world position and
 // heading for the next character-list, relog, or server restart load.
-func (r *Roster) SavePosition(ctx context.Context, c *player.Character) error {
-	return r.characters.SetPosition(ctx, c.ID, c.CurrentLocation(), c.CurrentHeading())
+func (r *Roster) SavePosition(ctx context.Context, st player.SaveState) error {
+	return r.characters.SetPosition(ctx, st.ID, st.Location, st.Heading)
 }
 
 // SaveDeathPenaltyLevel persists the live character's current death-penalty
 // debuff level for the next relog or server restart load.
-func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, c *player.Character) error {
-	return r.characters.SetDeathPenaltyLevel(ctx, c.ID, c.DeathPenaltyLevel())
+func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, st player.SaveState) error {
+	return r.characters.SetDeathPenaltyLevel(ctx, st.ID, st.DeathPenaltyLevel)
 }
 
 // SaveOnlineRecency marks the live character in game and stamps the

@@ -72,7 +72,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var entering *player.Character
 	var live *livePlayer
 	defer func() {
-		l.detachLivePlayer(ctx, live)
+		if live != nil {
+			l.detachLivePlayer(live)
+			l.awaitPersistence()
+		}
 		if l.clients != nil {
 			l.clients.Release(client.AccountName(), client)
 		}
@@ -873,7 +876,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.refuseExit(session, live, block, true)
 				continue
 			}
-			l.detachLivePlayer(ctx, live)
+			l.detachLivePlayer(live)
+			l.awaitPersistence()
 			live = nil
 			entering = nil
 			client.SetState(StateAuthed)

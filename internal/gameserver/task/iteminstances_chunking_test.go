@@ -74,7 +74,7 @@ func addSequentialPending(instances *ItemInstances, n int) []*item.Instance {
 // wall-clock deadline.
 func TestItemInstancesSaveDeadlineStopsUnattemptedChunksButKeepsEarlierCommits(t *testing.T) {
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil))
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil)
 
 	const total = 2 * ItemInstanceSaveChunkSize
 	items := addSequentialPending(instances, total)
@@ -118,7 +118,7 @@ func TestItemInstancesSaveDeadlineStopsUnattemptedChunksButKeepsEarlierCommits(t
 // both calls report the same (here: no) deadline and fail this assertion.
 func TestItemInstancesSaveGivesEachChunkAFreshTimeout(t *testing.T) {
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil))
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil)
 	addSequentialPending(instances, 2*ItemInstanceSaveChunkSize)
 
 	if err := instances.Save(context.Background()); err != nil {

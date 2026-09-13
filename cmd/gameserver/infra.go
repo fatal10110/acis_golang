@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/logging"
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
@@ -43,6 +44,16 @@ func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, 
 		OnStop:  func(context.Context) error { return pool.Close() },
 	})
 	return pool, nil
+}
+
+// providePersist starts the persistence worker that runs player, pet and item
+// writes. It takes the pool so fx builds the database first and therefore
+// closes it only after this worker has drained, and every hook appended later
+// (item flush, the game listener's detach saves) stops before the drain.
+func providePersist(lc fx.Lifecycle, _ *sql.DB, log zerolog.Logger) *persist.Worker {
+	worker := persist.New(log)
+	lc.Append(fx.Hook{OnStop: worker.Close})
+	return worker
 }
 
 func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {

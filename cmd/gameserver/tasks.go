@@ -11,6 +11,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -195,8 +196,8 @@ func startShadowItems(lc fx.Lifecycle, items *task.ShadowItems, log zerolog.Logg
 	startTicker(lc, log, items.Start)
 }
 
-func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, pets *gamesql.PetStore, log zerolog.Logger) (*task.Autosave, error) {
-	effects.SetAutosave(roster, skills, pets, log)
+func provideAutosave(effects *network.TaskEffects, roster *manager.Roster, skills *skillstate.Persistence, pets *gamesql.PetStore, worker *persist.Worker, log zerolog.Logger) (*task.Autosave, error) {
+	effects.SetAutosave(roster, skills, pets, worker, log)
 	return task.NewAutosave(effects, time.Now)
 }
 
@@ -354,8 +355,8 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 // provideItemInstances builds the lazy item persistence task over the real
 // items, augmentations and pets tables, flushed in chunks that each commit
 // atomically (task.ItemInstanceSaveChunkSize).
-func provideItemInstances(pool *sql.DB, data *gameData) *task.ItemInstances {
-	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items)
+func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker) *task.ItemInstances {
+	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items, worker)
 }
 
 // startItemInstances launches the persistence tick and flushes whatever is

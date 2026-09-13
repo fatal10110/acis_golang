@@ -104,6 +104,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gameServerConfigFromLoadedProperties,
 			provideGameServerLogger,
 			provideGameServerDatabase,
+			providePersist,
 			loadHTMLCache,
 			loadCrestCache,
 			loadGameData,

@@ -40,7 +40,7 @@ func seedKarmaCharacter(karma int) func(*gamesql.CharacterStore, *gamesql.ItemSt
 		if err := chars.Create(ctx, ch); err != nil {
 			panic(err)
 		}
-		if err := chars.Save(ctx, ch); err != nil {
+		if err := chars.Save(ctx, ch.SaveState()); err != nil {
 			panic(err)
 		}
 	}

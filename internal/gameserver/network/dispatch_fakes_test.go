@@ -55,16 +55,16 @@ func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
 	return nil
 }
 
-func (s *fakeCharStore) Save(_ context.Context, c *player.Character) error {
+func (s *fakeCharStore) Save(_ context.Context, st player.SaveState) error {
 	if s.saveHook != nil {
-		s.saveHook(c.ID)
+		s.saveHook(st.ID)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.saveCount[c.ID]++
+	s.saveCount[st.ID]++
 	// Mirrors character.go's CharacterStore.Save, which marks the row
 	// online (`online = 1`) as part of the same UPDATE (#1948).
-	s.onlineSeq[c.ID] = append(s.onlineSeq[c.ID], "online")
+	s.onlineSeq[st.ID] = append(s.onlineSeq[st.ID], "online")
 	return nil
 }
 

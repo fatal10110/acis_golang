@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 const (
@@ -61,6 +63,7 @@ type ItemFlusher interface {
 type ItemInstances struct {
 	flusher   ItemFlusher
 	templates *item.Table
+	worker    *persist.Worker
 
 	mu      sync.RWMutex
 	pending map[int32]*item.Instance
@@ -71,14 +74,20 @@ type ItemInstances struct {
 	removedInflight map[int32]struct{}
 }
 
-// NewItemInstances returns an empty item persistence task.
-func NewItemInstances(flusher ItemFlusher, templates *item.Table) *ItemInstances {
+// errPersistClosed reports items a Save could not hand to a closed
+// persistence worker; they stay pending.
+var errPersistClosed = errors.New("task: persistence worker closed")
+
+// NewItemInstances returns an empty item persistence task whose writes run
+// on worker's lanes. A nil worker writes on the calling goroutine.
+func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
 	return &ItemInstances{
 		flusher:   flusher,
 		templates: templates,
+		worker:    worker,
 		pending:   make(map[int32]*item.Instance),
 	}
 }
@@ -146,7 +155,9 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // Save flushes every pending item in chunks of at most
 // ItemInstanceSaveChunkSize, each committed by its own UpdateItems call
 // under its own fresh ItemInstanceSaveTimeout (bounded by whatever remains
-// of ctx). The pending map is swapped out before the flush so a concurrent
+// of ctx). Items are grouped by owner and each owner's chunks run on that
+// owner's persistence lane; Save returns once every owner's job has run. The
+// pending map is swapped out before the flush so a concurrent
 // Add during I/O lands in the new map and is not dropped when the flush
 // succeeds. Chunking makes progress monotonic: a batch that has grown past
 // what one ItemInstanceSaveTimeout window can write still gets its earlier
@@ -202,16 +213,72 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	i.removedInflight = make(map[int32]struct{})
 	i.mu.Unlock()
 
-	items := make([]*item.Instance, 0, len(inflight))
+	// Each owner's items are written on that owner's persistence lane, so
+	// they can never interleave with a container flush for the same owner
+	// (network.flushItemPersistence) and land an older snapshot after it.
+	byOwner := make(map[int32][]*item.Instance)
 	for _, inst := range inflight {
-		items = append(items, inst)
+		owner := inst.Snapshot().OwnerID
+		byOwner[owner] = append(byOwner[owner], inst)
 	}
-	// Fixes chunk boundaries so they don't depend on map iteration order;
-	// see the chunk-boundary note above.
-	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
+	var (
+		resultMu sync.Mutex
+		firstErr error
+		failed   []*item.Instance
+		pending  sync.WaitGroup
+	)
+	for _, owner := range slices.Sorted(maps.Keys(byOwner)) {
+		items := byOwner[owner]
+		// Fixes chunk boundaries so they don't depend on map iteration
+		// order; see the chunk-boundary note above.
+		slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+		pending.Add(1)
+		job := func() {
+			defer pending.Done()
+			ownerFailed, err := i.saveChunks(ctx, items)
+			resultMu.Lock()
+			defer resultMu.Unlock()
+			failed = append(failed, ownerFailed...)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+		if !i.worker.Enqueue(owner, job) {
+			pending.Done()
+			failed = append(failed, items...)
+			if firstErr == nil {
+				firstErr = errPersistClosed
+			}
+		}
+	}
+	// ponytail: waits out every owner's lane, so a lane backed up behind
+	// slow saves delays this tick; each queued job still fails fast once ctx
+	// has expired.
+	pending.Wait()
+
+	i.mu.Lock()
+	removed := i.removedInflight
+	i.removedInflight = nil
+	for _, inst := range failed {
+		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
+			continue
+		}
+		if _, ok := i.pending[inst.ObjectID]; !ok {
+			i.pending[inst.ObjectID] = inst
+		}
+	}
+	i.mu.Unlock()
+
+	return firstErr
+}
+
+// saveChunks writes items in chunks of at most ItemInstanceSaveChunkSize,
+// each under its own ItemInstanceSaveTimeout, and returns the items whose
+// chunk failed or was never attempted because ctx had already ended.
+func (i *ItemInstances) saveChunks(ctx context.Context, items []*item.Instance) ([]*item.Instance, error) {
 	var firstErr error
-	failed := make([]*item.Instance, 0)
+	var failed []*item.Instance
 	for chunk := range slices.Chunk(items, ItemInstanceSaveChunkSize) {
 		if ctx.Err() != nil {
 			failed = append(failed, chunk...)
@@ -230,21 +297,7 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 			}
 		}
 	}
-
-	i.mu.Lock()
-	removed := i.removedInflight
-	i.removedInflight = nil
-	for _, inst := range failed {
-		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
-			continue
-		}
-		if _, ok := i.pending[inst.ObjectID]; !ok {
-			i.pending[inst.ObjectID] = inst
-		}
-	}
-	i.mu.Unlock()
-
-	return firstErr
+	return failed, firstErr
 }
 
 // UpdateItems persists the provided item instances immediately, as one

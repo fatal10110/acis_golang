@@ -13,7 +13,12 @@ import (
 
 const livePlayerDetachSaveTimeout = 2 * time.Second
 
-func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer) {
+// detachLivePlayer takes live out of the world and enqueues its final saves on
+// its persistence lane: the character row, position, death penalty and skill
+// state, then the offline mark, then the pet and container writes. Values
+// are copied before the teardown below changes them. Call
+// awaitPersistence afterwards, before anything reads those rows back.
+func (l *GameClientLink) detachLivePlayer(live *livePlayer) {
 	if live == nil {
 		return
 	}
@@ -24,47 +29,40 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	// those writes.
 	live.Stop()
 	l.cancelActiveTrade(live)
+	// Excludes TaskEffects.Save's check-and-enqueue: every autosave job is
+	// already on the lane, or will never be, before the jobs below (#1948).
 	live.shadowExpiryMu.Lock()
 	live.detaching = true
 	live.shadowExpiryMu.Unlock()
 
-	// Serializes against TaskEffects.Save (the autosave tick), which takes
-	// the same mutex before writing the online column: whichever of the two
-	// gets here first runs its whole save sequence to completion before the
-	// other's write can start, so an autosave write already in flight can
-	// never land after SaveOfflineRecency below (#1948).
-	live.saveMu.Lock()
-	defer live.saveMu.Unlock()
-
-	// One budget for the whole detach, not one per store: a logout with an
-	// active pet writes the character row, the skill state, the player
-	// inventory and the pet inventory, and each of those taking its own
-	// timeout makes the worst case grow with however many things detach
-	// happens to save. WithoutCancel because a client that already
-	// disconnected cancels ctx, and these writes must still land.
-	saveCtx, cancelSave := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
-	defer cancelSave()
-
 	if l.roster != nil || l.skills != nil {
-		if l.roster != nil {
-			if err := l.roster.Save(saveCtx, live.Character); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player full stats")
+		roster, skills, log := l.roster, l.skills, l.log
+		character := live.Character
+		charState := character.SaveState()
+		skillState := skills.SaveState(character)
+		l.persist.Enqueue(live.ObjectID(), func() {
+			// One budget for the whole character save, not one per store,
+			// started when the job runs rather than when it was queued.
+			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+			defer cancel()
+			if roster != nil {
+				if err := roster.Save(ctx, charState); err != nil {
+					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player full stats")
+				}
+				if err := roster.SavePosition(ctx, charState); err != nil {
+					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player position")
+				}
+				if err := roster.SaveDeathPenaltyLevel(ctx, charState); err != nil {
+					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player death penalty level")
+				}
+				if err := roster.SaveOfflineRecency(ctx, character); err != nil {
+					log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player offline recency")
+				}
 			}
-			if err := l.roster.SavePosition(saveCtx, live.Character); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player position")
+			if err := skills.Save(ctx, skillState); err != nil {
+				log.Error().Err(err).Int32("object_id", charState.ID).Msg("save player skill state")
 			}
-			if err := l.roster.SaveDeathPenaltyLevel(saveCtx, live.Character); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player death penalty level")
-			}
-			if err := l.roster.SaveOfflineRecency(saveCtx, live.Character); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player offline recency")
-			}
-		}
-		if l.skills != nil {
-			if err := l.skills.Save(saveCtx, live.Character); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("save player skill state")
-			}
-		}
+		})
 	}
 	if l.playerClock != nil {
 		l.playerClock.Remove(live.ObjectID())
@@ -95,11 +93,11 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 		// detached player.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if pet, ok := obj.(*summon.Actor); ok {
-				l.savePet(saveCtx, pet, live.Inventory())
+				l.savePet(live.ObjectID(), pet, live.Inventory())
 				l.transferPetInventory(pet, live.Inventory())
 				if inv := pet.PetInventory(); inv != nil {
 					inv.SetUpdateNotifier(nil)
-					l.flushItemPersistence(saveCtx, inv)
+					l.flushItemPersistence(inv)
 				}
 			}
 		}
@@ -140,36 +138,56 @@ func (l *GameClientLink) detachLivePlayer(ctx context.Context, live *livePlayer)
 	if inv := live.Character.Inventory(); inv != nil {
 		inv.SetUpdateNotifier(nil)
 		inv.SetWeightNotifier(nil)
-		l.flushItemPersistence(saveCtx, inv)
+		l.flushItemPersistence(inv)
 	}
 }
 
-func (l *GameClientLink) savePet(ctx context.Context, actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
-	savePet(ctx, l.petStore, actor, ownerInv, l.log)
+// livePlayerPersistWait bounds how long a connection waits for a detached
+// player's saves: the detach budget plus room for jobs queued ahead on the
+// same lanes.
+const livePlayerPersistWait = 3 * livePlayerDetachSaveTimeout
+
+// awaitPersistence waits until every save enqueued so far has run, so a
+// character list or login that follows reads the rows a detach just wrote.
+// It runs on the connection goroutine, never on game-state paths.
+func (l *GameClientLink) awaitPersistence() {
+	ctx, cancel := context.WithTimeout(context.Background(), livePlayerPersistWait)
+	defer cancel()
+	if err := l.persist.Flush(ctx); err != nil {
+		l.log.Error().Err(err).Msg("wait for detach saves")
+	}
 }
 
-func savePet(ctx context.Context, store petStore, actor *summon.Actor, ownerInv *itemcontainer.Inventory, log zerolog.Logger) {
+func (l *GameClientLink) savePet(ownerID int32, actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
+	if write := savePet(l.petStore, actor, ownerInv, l.log); write != nil {
+		l.persist.Enqueue(ownerID, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+			defer cancel()
+			write(ctx)
+		})
+	}
+}
+
+// savePet copies actor's pets-row state, syncs the control item's enchant to
+// the pet's level, and returns the write for that row, or nil when there is
+// nothing to save. The control item's enchant is the pet's displayed level;
+// it is set whether or not the row write later succeeds.
+func savePet(store petStore, actor *summon.Actor, ownerInv *itemcontainer.Inventory, log zerolog.Logger) func(context.Context) {
 	if store == nil {
-		return
+		return nil
 	}
 	itemObjectID, state, ok := actor.PetState()
 	if !ok {
-		return
+		return nil
 	}
-	if err := store.Save(ctx, itemObjectID, state); err != nil {
-		log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
-		// A failed pets-row write is not a restore source of truth. Skip
-		// the live control-item lift and its inventory update until a
-		// later save actually lands.
-		return
+	if ownerInv != nil {
+		ownerInv.SetEnchantLevel(ownerInv.ItemByObjectID(itemObjectID), state.Level)
 	}
-	// The control item's enchant is the pet's displayed level. Lift it on
-	// the same save that writes the pets row so inventory, persistence, and
-	// a later restore all see the saved level.
-	if ownerInv == nil {
-		return
+	return func(ctx context.Context) {
+		if err := store.Save(ctx, itemObjectID, state); err != nil {
+			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
+		}
 	}
-	ownerInv.SetEnchantLevel(ownerInv.ItemByObjectID(itemObjectID), state.Level)
 }
 
 func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemcontainer.Inventory) {
@@ -212,31 +230,37 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 }
 
 // flushItemPersistence unwires inv's items from the lazy persistence task
-// and writes their current state straight to the database, matching the
+// and writes their state on the owner's persistence lane, matching the
 // reference's ItemContainer.deleteMe: a container that goes away drops out
-// of the pending set and is saved immediately, rather than leaving rows for
-// a tick that will never see the container again.
+// of the pending set and is saved at once, rather than leaving rows for a
+// tick that will never see the container again. The items are read when the
+// job runs, so a change made before it — such as a pet save's control item
+// enchant — is included.
 //
 // The items leave the pending set only once the write has actually
 // succeeded. UpdateItems writes the whole container as one atomic flush, so
 // a deadline expiring partway through leaves none of it written; keeping
 // the container pending hands all of it to the next tick, or to the
 // shutdown flush, instead of dropping it on the floor.
-func (l *GameClientLink) flushItemPersistence(ctx context.Context, inv *itemcontainer.Inventory) {
+func (l *GameClientLink) flushItemPersistence(inv *itemcontainer.Inventory) {
 	inv.SetItemPersister(nil)
 	if l.itemInstances == nil {
 		return
 	}
-	items := inv.Items()
-	if len(items) == 0 {
-		return
-	}
-
-	if err := l.itemInstances.UpdateItems(ctx, items); err != nil {
-		l.log.Error().Err(err).Int32("owner_id", inv.OwnerID()).Msg("save container items")
-		return
-	}
-	l.itemInstances.RemoveItems(items)
+	itemInstances, log := l.itemInstances, l.log
+	l.persist.Enqueue(inv.OwnerID(), func() {
+		items := inv.Items()
+		if len(items) == 0 {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := itemInstances.UpdateItems(ctx, items); err != nil {
+			log.Error().Err(err).Int32("owner_id", inv.OwnerID()).Msg("save container items")
+			return
+		}
+		itemInstances.RemoveItems(items)
+	})
 }
 
 func (l *GameClientLink) notifyPlayerLogout(account string) {

@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -108,11 +109,12 @@ type TaskEffects struct {
 	state *world.State
 	log   zerolog.Logger
 
-	mu     sync.RWMutex
-	expire func(*livePlayer, *item.Instance)
-	roster *manager.Roster
-	skills *skillstate.Persistence
-	pets   petStore
+	mu      sync.RWMutex
+	expire  func(*livePlayer, *item.Instance)
+	roster  *manager.Roster
+	skills  *skillstate.Persistence
+	pets    petStore
+	persist *persist.Worker
 }
 
 func NewTaskEffects(state *world.State) *TaskEffects {
@@ -127,15 +129,17 @@ func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instanc
 }
 
 // SetAutosave connects the periodic autosave task's Save effect to the
-// character and pet persistence, skill-state persistence, and error logger.
-// Autosave is wired after construction (like SetShadowItemExpiry above)
-// since TaskEffects itself is what task.Autosave needs to be built.
-func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, pets petStore, log zerolog.Logger) {
+// character and pet persistence, skill-state persistence, the persistence
+// worker its writes run on, and error logger. Autosave is wired after
+// construction (like SetShadowItemExpiry above) since TaskEffects itself is
+// what task.Autosave needs to be built.
+func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, pets petStore, worker *persist.Worker, log zerolog.Logger) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.roster = roster
 	e.skills = skills
 	e.pets = pets
+	e.persist = worker
 	e.log = log
 }
 
@@ -179,21 +183,19 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDrownDamage, int32(damage)))
 }
 
-// Save persists actor's full character stats, position, and live skill
-// state on each periodic autosave. It skips a session
-// mid-detach (detaching set but not yet removed from world state,
-// autosave.Remove not yet called):
-// detachLivePlayer also calls Roster.Save on the same columns and Roster.Save
-// now marks the row online, so a concurrent write here could land after
-// detachLivePlayer's own SaveOfflineRecency and leave online stuck at 1 for
-// a character that already logged out. The detaching check alone is
-// check-then-act; live.saveMu (held here and across detachLivePlayer's whole
-// save sequence) makes the two writers' critical sections mutually
-// exclusive, so no in-flight write here can still land after
-// detachLivePlayer's own offline write (#1948).
+// Save persists actor's full character stats, position, live skill state and
+// active pet on each periodic autosave. The values are copied here and written
+// on the owner's persistence lane.
+//
+// A session mid-detach is skipped: detachLivePlayer writes the same columns
+// and then marks the row offline, and Roster.Save marks it online. The
+// detaching check and the enqueue both run under shadowExpiryMu's read lock,
+// which detachLivePlayer's write lock excludes, so an autosave job either
+// sits ahead of detach's jobs on the lane or is never enqueued. Its online
+// write therefore cannot land after detach's offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
-	roster, skills, pets, log := e.roster, e.skills, e.pets, e.log
+	roster, skills, pets, worker, log := e.roster, e.skills, e.pets, e.persist, e.log
 	e.mu.RUnlock()
 	if actor == nil || e.state == nil || roster == nil {
 		return
@@ -206,29 +208,36 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	if !ok || live.detached() {
 		return
 	}
-	live.saveMu.Lock()
-	defer live.saveMu.Unlock()
-	if live.detached() {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
-	defer cancel()
-	if err := roster.Save(ctx, live.Character); err != nil {
-		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player stats")
-	}
-	if err := roster.SavePosition(ctx, live.Character); err != nil {
-		log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player position")
-	}
-	if skills != nil {
-		if err := skills.Save(ctx, live.Character); err != nil {
-			log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("autosave player skill state")
-		}
-	}
+	charState := live.Character.SaveState()
+	skillState := skills.SaveState(live.Character)
+	var savePetRow func(context.Context)
 	if obj, ok := e.state.Summon(live.ObjectID()); ok {
 		if actor, ok := obj.(*summon.Actor); ok {
-			savePet(ctx, pets, actor, live.Inventory(), log)
+			savePetRow = savePet(pets, actor, live.Inventory(), log)
 		}
 	}
+
+	live.shadowExpiryMu.RLock()
+	defer live.shadowExpiryMu.RUnlock()
+	if live.detaching {
+		return
+	}
+	worker.Enqueue(live.ObjectID(), func() {
+		ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
+		defer cancel()
+		if err := roster.Save(ctx, charState); err != nil {
+			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player stats")
+		}
+		if err := roster.SavePosition(ctx, charState); err != nil {
+			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player position")
+		}
+		if err := skills.Save(ctx, skillState); err != nil {
+			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player skill state")
+		}
+		if savePetRow != nil {
+			savePetRow(ctx)
+		}
+	})
 }
 
 func (e *TaskEffects) ManaThreshold(actorID int32, inst *item.Instance, secondsLeft int) {
