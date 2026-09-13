@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
@@ -70,11 +69,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
 	}
 	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
-		if combatant, ok := attacker.(attackable.Combatant); ok {
-			h.AddCombatDamageHate(combatant, float64(dmg))
-			h.RollAttackedShotRecharge()
-			h.propagatePartyAttacked(h, combatant, dmg, false)
-		}
+		h.registerHit(attacker, float64(dmg), false)
 	}
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return false

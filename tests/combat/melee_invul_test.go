@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -46,29 +48,87 @@ func livePlayer(t *testing.T, srv *gameservertest.Server, objID int32) interface
 	return victim
 }
 
+// assertLandedDamagingHit parses frame's first Attack hit and asserts it
+// targeted targetID with real, non-missed damage. Run before checking what
+// actually happened to the target's HP, it proves the swing itself could
+// have hurt the target — so a passing "HP unchanged" assertion afterward
+// means a guard blocked real damage, not that the swing missed or rolled
+// zero anyway.
+func assertLandedDamagingHit(t *testing.T, frame []byte, targetID int32) int32 {
+	t.Helper()
+	r := wireReader(frame[1:])
+	r.ReadInt32() // attacker id, already checked by assertAttackBy
+	if got := r.ReadInt32(); got != targetID {
+		t.Fatalf("Attack target id = %d, want %d", got, targetID)
+	}
+	damage := r.ReadInt32()
+	flags := r.ReadUint8()
+	if flags&attack.HitMiss != 0 {
+		t.Fatal("Attack hit missed, want a landed hit")
+	}
+	if damage <= 0 {
+		t.Fatalf("Attack hit damage = %d, want > 0", damage)
+	}
+	return damage
+}
+
+// TestNonInvulnerablePlayerTakesMeleeDamage is the positive control for
+// TestInvulnerablePlayerTakesNoMeleeDamage /
+// TestSpawnProtectedPlayerTakesNoMeleeDamage: the same NPC auto-attack
+// against a normal (non-invul) player deals its full landed damage,
+// non-lethally, so the invul tests' "HP unchanged" is proven to mean the
+// guard blocked a real hit rather than a miss or a zero-damage roll.
+func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	objID := srv.SoleObjectID(t)
+	victim := livePlayer(t, srv, objID)
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	beforeHP := srv.PlayerCurrentHP(t, objID)
+
+	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	frame := assertAttackBy(t, c, attacker.ObjectID())
+	damage := assertLandedDamagingHit(t, frame, objID)
+
+	afterHP := srv.PlayerCurrentHP(t, objID)
+	if want := beforeHP - int(damage); afterHP != want {
+		t.Fatalf("player HP after melee = %d, want %d (before %d minus landed damage %d)", afterHP, want, beforeHP, damage)
+	}
+	if afterHP <= 0 {
+		t.Fatalf("player HP after melee = %d, want a survived non-lethal hit", afterHP)
+	}
+}
+
 // TestInvulnerablePlayerTakesNoMeleeDamage pins PlayerStatus.java:106-116:
-// melee damage from another actor against an invulnerable player (GM invul,
-// mid-teleport) is dropped before any HP/CP change. Driven at the TakeDamage
-// entry point directly rather than through a live NPC auto-attack: the
-// gameservertest fixtures wire NPCs with a parked AttackController (see
-// SpawnHostileNPC's doc comment), so no packet-driven NPC-initiates-melee
-// path exists yet to drive this through Action/AttackRequest.
+// melee damage from a real NPC auto-attack against an invulnerable player
+// (GM invul, mid-teleport) is dropped before any HP/CP change, while the
+// Attack frame itself still goes out (PlayerStatus never suppresses the
+// swing, only its damage).
 func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	)
-	startInWorld(t, srv.Client)
+	c := srv.Client
+	startInWorld(t, c)
 	objID := srv.SoleObjectID(t)
 	victim := livePlayer(t, srv, objID)
-	attacker := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
 
 	victim.SetInvul(true)
 	beforeHP := srv.PlayerCurrentHP(t, objID)
 
-	if newlyDead := victim.TakeDamage(beforeHP*10+1000, attacker); newlyDead {
-		t.Fatal("invulnerable player died to melee damage")
-	}
+	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	frame := assertAttackBy(t, c, attacker.ObjectID())
+	assertLandedDamagingHit(t, frame, objID)
+
 	if got := srv.PlayerCurrentHP(t, objID); got != beforeHP {
 		t.Fatalf("invulnerable player HP after melee = %d, want unchanged %d", got, beforeHP)
 	}
@@ -77,7 +137,8 @@ func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 // TestSpawnProtectedPlayerTakesNoMeleeDamage covers the spawn-protection leg
 // of the same guard (Invul() also reports true for SpawnProtected(),
 // character_effects.go:82), using the real protection window activated by a
-// restart-point teleport rather than SetInvul directly.
+// restart-point teleport rather than SetInvul directly, driven through a
+// real NPC auto-attack.
 func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -86,15 +147,18 @@ func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
 		gameservertest.WithSpawnProtection(5*time.Second),
 	)
 	enterAfterRestart(t, srv)
+	c := srv.Client
 	objID := srv.SoleObjectID(t)
 	victim := livePlayer(t, srv, objID)
-	attacker := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
 
 	beforeHP := srv.PlayerCurrentHP(t, objID)
 
-	if newlyDead := victim.TakeDamage(beforeHP*10+1000, attacker); newlyDead {
-		t.Fatal("spawn-protected player died to melee damage")
-	}
+	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	frame := assertAttackBy(t, c, attacker.ObjectID())
+	assertLandedDamagingHit(t, frame, objID)
+
 	if got := srv.PlayerCurrentHP(t, objID); got != beforeHP {
 		t.Fatalf("spawn-protected player HP after melee = %d, want unchanged %d", got, beforeHP)
 	}
