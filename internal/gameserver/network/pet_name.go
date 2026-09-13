@@ -48,7 +48,6 @@ const (
 // Packet decoding, length/pattern validation, and the "already named" gate
 // belong to RequestChangePetName, which must run them in reference order
 // around this call.
-
 func (l *GameClientLink) renamePet(ctx context.Context, live *livePlayer, name string) petRenameResult {
 	if l == nil {
 		return petRenameIgnored
@@ -84,12 +83,12 @@ func (l *GameClientLink) renamePet(ctx context.Context, live *livePlayer, name s
 		actor.SetNamed(oldNamed)
 		return petRenameIgnored
 	}
-	// Written on the owner's lane, behind any pet save already queued, so an
-	// older copy cannot land after it. The rename does not wait for the write:
+	// Written on the control item's lane, behind any pet save already queued,
+	// so an older copy cannot land after it. The rename does not wait for the write:
 	// the reference only renames in memory and stores the name with the pet's
 	// next save, so a failed write is logged, not rolled back.
 	pets, log := l.petStore, l.log
-	l.persist.Enqueue(live.ObjectID(), func() {
+	l.persist.Enqueue(itemObjectID, func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if err := pets.Save(saveCtx, itemObjectID, state); err != nil {

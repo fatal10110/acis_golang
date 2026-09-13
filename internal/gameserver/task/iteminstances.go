@@ -67,16 +67,21 @@ type ItemInstances struct {
 
 	mu      sync.RWMutex
 	pending map[int32]*item.Instance
-	// removedInflight is non-nil only while a Save flush is in progress. It
-	// records ids RemoveItems dropped during that window so a failed flush's
-	// merge-back does not resurrect a container that already tore down and
-	// wrote its own final state (see RemoveItems and Save).
-	removedInflight map[int32]struct{}
+	// rounds holds every Save whose owner jobs have not all run yet. Each
+	// records the ids RemoveItems dropped while it was outstanding, so its
+	// failed items are not merged back over a container that already tore
+	// down and wrote its own final state (see RemoveItems and Save).
+	rounds map[*saveRound]struct{}
 }
 
-// errPersistClosed reports items a Save could not hand to a closed
-// persistence worker; they stay pending.
-var errPersistClosed = errors.New("task: persistence worker closed")
+// saveRound is one Save's outstanding owner jobs. Its fields are guarded by
+// ItemInstances.mu.
+type saveRound struct {
+	removed   map[int32]struct{}
+	remaining int
+	err       error
+	done      chan struct{}
+}
 
 // NewItemInstances returns an empty item persistence task whose writes run
 // on worker's lanes. A nil worker writes on the calling goroutine.
@@ -89,6 +94,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		templates: templates,
 		worker:    worker,
 		pending:   make(map[int32]*item.Instance),
+		rounds:    make(map[*saveRound]struct{}),
 	}
 }
 
@@ -146,8 +152,8 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 			continue
 		}
 		delete(i.pending, inst.ObjectID)
-		if i.removedInflight != nil {
-			i.removedInflight[inst.ObjectID] = struct{}{}
+		for r := range i.rounds {
+			r.removed[inst.ObjectID] = struct{}{}
 		}
 	}
 }
@@ -156,7 +162,10 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // ItemInstanceSaveChunkSize, each committed by its own UpdateItems call
 // under its own fresh ItemInstanceSaveTimeout (bounded by whatever remains
 // of ctx). Items are grouped by owner and each owner's chunks run on that
-// owner's persistence lane; Save returns once every owner's job has run. The
+// owner's persistence lane. Save returns once every owner's job has run, or
+// when ctx ends: an owner job still queued then skips its writes when it runs
+// and puts its items back to pending, so the wait never outlasts ctx. Once
+// the worker is closed, Save writes on the calling goroutine. The
 // pending map is swapped out before the flush so a concurrent
 // Add during I/O lands in the new map and is not dropped when the flush
 // succeeds. Chunking makes progress monotonic: a batch that has grown past
@@ -203,16 +212,15 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 // that exists, a longer per-tick ceiling would trade shutdown safety for
 // throughput instead of buying both.
 //
-// Concurrent callers of Add and RemoveItems are safe; concurrent Saves are
-// not expected. The shutdown hook is appended before the ticker's, so fx's
-// reverse stop order runs the final Save only after the ticker has stopped.
+// Concurrent callers of Add and RemoveItems are safe. A Save may overlap
+// the owner jobs of an earlier one that returned on its ctx; each keeps its
+// own record of removed ids. The shutdown hook is appended before the
+// ticker's, so fx's reverse stop order runs the final Save only after the
+// ticker has stopped.
 func (i *ItemInstances) Save(ctx context.Context) error {
 	i.mu.Lock()
 	inflight := i.pending
 	i.pending = make(map[int32]*item.Instance)
-	i.removedInflight = make(map[int32]struct{})
-	i.mu.Unlock()
-
 	// Each owner's items are written on that owner's persistence lane, so
 	// they can never interleave with a container flush for the same owner
 	// (network.flushItemPersistence) and land an older snapshot after it.
@@ -221,58 +229,68 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 		owner := inst.Snapshot().OwnerID
 		byOwner[owner] = append(byOwner[owner], inst)
 	}
+	round := &saveRound{removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
+	if round.remaining == 0 {
+		i.mu.Unlock()
+		return nil
+	}
+	i.rounds[round] = struct{}{}
+	i.mu.Unlock()
 
-	var (
-		resultMu sync.Mutex
-		firstErr error
-		failed   []*item.Instance
-		pending  sync.WaitGroup
-	)
 	for _, owner := range slices.Sorted(maps.Keys(byOwner)) {
 		items := byOwner[owner]
 		// Fixes chunk boundaries so they don't depend on map iteration
 		// order; see the chunk-boundary note above.
 		slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
-		pending.Add(1)
 		job := func() {
-			defer pending.Done()
-			ownerFailed, err := i.saveChunks(ctx, items)
-			resultMu.Lock()
-			defer resultMu.Unlock()
-			failed = append(failed, ownerFailed...)
-			if firstErr == nil {
-				firstErr = err
-			}
+			failed, err := i.saveChunks(ctx, items)
+			i.finishOwner(round, failed, err)
 		}
+		// A closed worker has already run every job it accepted, so writing
+		// here cannot land ahead of an older queued write.
 		if !i.worker.Enqueue(owner, job) {
-			pending.Done()
-			resultMu.Lock()
-			failed = append(failed, items...)
-			if firstErr == nil {
-				firstErr = errPersistClosed
-			}
-			resultMu.Unlock()
+			job()
 		}
 	}
-	// ponytail: waits out every owner's lane, so a lane backed up behind
-	// slow saves delays this tick; each queued job still fails fast once ctx
-	// has expired.
-	pending.Wait()
 
+	select {
+	case <-round.done:
+	case <-ctx.Done():
+		// The owner jobs still queued fail fast once they run and merge
+		// their items back to pending for a later Save.
+		select {
+		case <-round.done:
+		default:
+			return ctx.Err()
+		}
+	}
 	i.mu.Lock()
-	removed := i.removedInflight
-	i.removedInflight = nil
+	defer i.mu.Unlock()
+	return round.err
+}
+
+// finishOwner merges one owner job's failed items back to pending, skipping
+// any RemoveItems dropped while round was outstanding, and closes round once
+// its last owner job has run.
+func (i *ItemInstances) finishOwner(round *saveRound, failed []*item.Instance, err error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
 	for _, inst := range failed {
-		if _, wasRemoved := removed[inst.ObjectID]; wasRemoved {
+		if _, wasRemoved := round.removed[inst.ObjectID]; wasRemoved {
 			continue
 		}
 		if _, ok := i.pending[inst.ObjectID]; !ok {
 			i.pending[inst.ObjectID] = inst
 		}
 	}
-	i.mu.Unlock()
-
-	return firstErr
+	if round.err == nil {
+		round.err = err
+	}
+	round.remaining--
+	if round.remaining == 0 {
+		delete(i.rounds, round)
+		close(round.done)
+	}
 }
 
 // saveChunks writes items in chunks of at most ItemInstanceSaveChunkSize,

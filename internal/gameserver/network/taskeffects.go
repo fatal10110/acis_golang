@@ -210,10 +210,11 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	}
 	charState := live.Character.SaveState()
 	skillState := skills.SaveState(live.Character)
+	var petItemID int32
 	var savePetRow func(context.Context)
 	if obj, ok := e.state.Summon(live.ObjectID()); ok {
 		if actor, ok := obj.(*summon.Actor); ok {
-			_, _, savePetRow = savePet(pets, actor, live.Inventory(), log)
+			petItemID, _, savePetRow = savePet(pets, actor, live.Inventory(), log)
 		}
 	}
 
@@ -234,10 +235,16 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		if err := skills.Save(ctx, skillState); err != nil {
 			log.Error().Err(err).Int32("object_id", charState.ID).Msg("autosave player skill state")
 		}
-		if savePetRow != nil {
-			savePetRow(ctx)
-		}
 	})
+	if savePetRow != nil {
+		// The pets row is ordered on its control item's lane, with the
+		// unsummon, logout and rename writes of the same row.
+		worker.Enqueue(petItemID, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
+			defer cancel()
+			savePetRow(ctx)
+		})
+	}
 }
 
 func (e *TaskEffects) ManaThreshold(actorID int32, inst *item.Instance, secondsLeft int) {

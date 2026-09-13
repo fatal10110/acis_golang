@@ -46,15 +46,15 @@ func New(log zerolog.Logger) *Worker {
 	return w
 }
 
-// Enqueue appends job to ownerID's lane. It reports false, and drops job,
-// once the worker is closed.
+// Enqueue appends job to ownerID's lane. It reports false, without running
+// job, once the worker is closed.
 func (w *Worker) Enqueue(ownerID int32, job func()) bool {
 	if w == nil {
 		job()
 		return true
 	}
 	if !w.lane(ownerID).push(job) {
-		w.log.Error().Int32("owner_id", ownerID).Msg("persist: worker closed, dropping job")
+		w.log.Warn().Int32("owner_id", ownerID).Msg("persist: worker closed, job refused")
 		return false
 	}
 	return true

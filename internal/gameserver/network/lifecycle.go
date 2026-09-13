@@ -16,13 +16,14 @@ import (
 
 const livePlayerDetachSaveTimeout = 2 * time.Second
 
-// detachLivePlayer takes live out of the world and enqueues its final saves on
-// its persistence lane: the character row, position, death penalty and skill
-// state, then the offline mark, then the pet and container writes. Values
-// are copied before the teardown below changes them, and every save is
-// enqueued before live leaves world state, so a later selection of the same
-// character that waits on the lane sees them. It returns the owner ids whose
-// lanes received saves; pass them to awaitPersistence.
+// detachLivePlayer takes live out of the world and enqueues its final saves:
+// the character row, position, death penalty, offline mark and skill state,
+// then the container flushes, on the owners' lanes, and an active pet's row
+// on its control item's lane. Values are copied before the teardown below
+// changes them, and every save is enqueued before live leaves world state, so
+// a later selection of the same character that waits on the lane sees them.
+// It returns the container owner ids whose lanes received saves; pass them to
+// awaitPersistence. A summon does not wait for the pet row (see queuedPets).
 func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if live == nil {
 		return nil
@@ -99,7 +100,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// detached player.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if pet, ok := obj.(*summon.Actor); ok {
-				l.savePet(live.ObjectID(), pet, live.Inventory())
+				l.savePet(pet, live.Inventory())
 				l.transferPetInventory(pet, live.Inventory())
 				if inv := pet.PetInventory(); inv != nil {
 					inv.SetUpdateNotifier(nil)
@@ -172,13 +173,16 @@ func (l *GameClientLink) awaitPersistence(owners ...int32) error {
 	return err
 }
 
-func (l *GameClientLink) savePet(ownerID int32, actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
+// savePet queues actor's pets-row write on its control item's lane. Every
+// write of one pets row is keyed by that item, not by the player holding it,
+// so writes stay ordered when the collar changes hands.
+func (l *GameClientLink) savePet(actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
 	itemObjectID, state, write := savePet(l.petStore, actor, ownerInv, l.log)
 	if write == nil {
 		return
 	}
 	seq := l.queuedPets.add(itemObjectID, state)
-	l.persist.Enqueue(ownerID, func() {
+	l.persist.Enqueue(itemObjectID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		write(ctx)

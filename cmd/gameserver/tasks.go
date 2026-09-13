@@ -362,23 +362,35 @@ func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker) 
 // startItemInstances launches the persistence tick and flushes whatever is
 // still pending at shutdown, matching the reference's shutdown sequence
 // forcing one final ItemInstanceTaskManager save.
-func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, log zerolog.Logger) {
+func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, worker *persist.Worker, log zerolog.Logger) {
 	// Appended first so fx's reverse stop order runs it after the ticker
 	// has stopped: the final save then sees a pending set nothing else is
 	// still draining.
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			// This is the last chance to write these rows, and Save
-			// releases the pending set either way, so a failure here is
-			// lost data rather than a delay: it gets its own budget
-			// (earlier stop hooks draining player containers can have
-			// consumed most of fx's stop timeout by now) and is reported
-			// rather than swallowed.
-			saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), task.ItemInstanceSaveTimeout)
-			defer cancel()
-			if err := items.Save(saveCtx); err != nil {
+			// This is the last chance to write these rows, so each save
+			// gets its own budget (earlier stop hooks draining player
+			// containers can have consumed most of fx's stop timeout by now)
+			// and a failure is reported rather than swallowed.
+			save := func() error {
+				saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), task.ItemInstanceSaveTimeout)
+				defer cancel()
+				return items.Save(saveCtx)
+			}
+			firstErr := save()
+			// A save that gave up on a backed-up lane leaves owner jobs
+			// queued; they skip their writes and return their items to
+			// pending. Drain the worker, then write those on this goroutine.
+			if err := worker.Close(ctx); err != nil {
+				log.Error().Err(err).Msg("drain persistence worker")
+				return err
+			}
+			if err := save(); err != nil {
 				log.Error().Err(err).Msg("save pending item instances")
 				return err
+			}
+			if firstErr != nil {
+				log.Warn().Err(firstErr).Msg("final item save before drain; retried after it")
 			}
 			return nil
 		},

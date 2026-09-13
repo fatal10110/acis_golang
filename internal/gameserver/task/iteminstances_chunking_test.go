@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 // chunkTrackingFlusher records every Flush call's batch and the deadline its
@@ -137,5 +140,70 @@ func TestItemInstancesSaveGivesEachChunkAFreshTimeout(t *testing.T) {
 	if !deadlines[1].at.After(deadlines[0].at) {
 		t.Fatalf("chunk 2's deadline (%v) is not after chunk 1's (%v): chunks are not getting independent, freshly-started budgets",
 			deadlines[1].at, deadlines[0].at)
+	}
+}
+
+// TestItemInstancesSaveReturnsOnCtxWhileLaneIsBackedUp holds an owner's
+// persistence lane and runs a Save whose ctx is already cancelled. Save must
+// return on ctx instead of waiting for the lane, and the owner job that runs
+// after release must skip its write and leave the item pending for a later
+// Save.
+func TestItemInstancesSaveReturnsOnCtxWhileLaneIsBackedUp(t *testing.T) {
+	worker := persist.New(zerolog.Nop())
+	defer worker.Close(context.Background())
+	flusher := &chunkTrackingFlusher{}
+	instances := NewItemInstances(flusher, item.NewTable(nil), worker)
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	instances.Add(inst)
+
+	release := make(chan struct{})
+	worker.Enqueue(inst.OwnerID, func() { <-release })
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	done := make(chan error, 1)
+	go func() { done <- instances.Save(ctx) }()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Save() error = %v, want context.Canceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("Save waited on the held lane past its cancelled ctx")
+	}
+
+	close(release)
+	if err := worker.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(flusher.calls()); n != 0 {
+		t.Fatalf("Flush called %d times, want 0: the owner job ran after ctx ended", n)
+	}
+	if !instances.Contains(inst) {
+		t.Fatal("item must stay pending after its owner job skipped the write")
+	}
+}
+
+// TestItemInstancesSaveWritesInlineOnceWorkerIsClosed is the shutdown drain's
+// last step: after the worker has closed, Save still writes pending items.
+func TestItemInstancesSaveWritesInlineOnceWorkerIsClosed(t *testing.T) {
+	worker := persist.New(zerolog.Nop())
+	if err := worker.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	flusher := &chunkTrackingFlusher{}
+	instances := NewItemInstances(flusher, item.NewTable(nil), worker)
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	instances.Add(inst)
+
+	if err := instances.Save(context.Background()); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if n := len(flusher.calls()); n != 1 {
+		t.Fatalf("Flush called %d times, want 1", n)
+	}
+	if instances.Contains(inst) {
+		t.Fatal("written item must leave pending")
 	}
 }
