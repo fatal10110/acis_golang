@@ -368,6 +368,44 @@ func TestInventory_DestroyAllAndDestroyAllItems_UnequipAndQueueUpdates(t *testin
 	}
 }
 
+// TestInventory_DestroyAllItems_RaceWithAdd runs Add and DestroyAllItems
+// concurrently under -race so a snapshot-and-delete phase that isn't
+// actually atomic with Add's own map write (a plain data race on
+// Container.items, not just a logical ordering question) gets caught. It
+// also checks the functional postcondition once the concurrent Adds have
+// stopped: a final DestroyAllItems clears everything.
+func TestInventory_DestroyAllItems_RaceWithAdd(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPlayerInventory(0x10000001, templates)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for id := int32(0x20000001); ; id++ {
+			select {
+			case <-stop:
+				return
+			default:
+				inv.AddNew(1, 1, id)
+			}
+		}
+	}()
+
+	for range 100 {
+		inv.DestroyAllItems()
+	}
+	close(stop)
+	<-done
+
+	inv.DestroyAllItems()
+	if inv.Size() != 0 {
+		t.Fatalf("Size() = %d after a final DestroyAllItems, want 0", inv.Size())
+	}
+}
+
 func TestInventory_TransferItemPartialQueuesSourceAndTargetUpdates(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},

@@ -260,14 +260,36 @@ func (inv *Inventory) DestroyAll(inst *item.Instance) *item.Instance {
 	return inv.DestroyItem(inst, inst.CountValue())
 }
 
-// DestroyAllItems destroys every item instance the inventory holds,
-// through Inventory.DestroyItem so each one is unequipped and queues a
-// removed update — the embedded Container's version deletes straight from
-// the item map, leaving destroyed instances behind in the paperdoll and
-// queuing nothing.
+// DestroyAllItems destroys every item instance the inventory holds, clears
+// the paperdoll, and queues a removed update for each — the embedded
+// Container's version deletes straight from the item map, leaving destroyed
+// instances behind in the paperdoll and queuing nothing.
+//
+// The snapshot-and-delete runs under Container.mu, the same lock Add takes,
+// so an Add racing this call either lands before the snapshot (and is
+// destroyed with everything else) or blocks until after it (and survives as
+// a fresh item, not one this call missed) — never silently outliving a call
+// that ran concurrently with it.
 func (inv *Inventory) DestroyAllItems() {
-	for _, inst := range inv.Items() {
-		inv.DestroyItem(inst, inst.CountValue())
+	inv.Container.mu.Lock()
+	instances := make([]*item.Instance, 0, len(inv.Container.items))
+	for objectID, inst := range inv.Container.items {
+		delete(inv.Container.items, objectID)
+		instances = append(instances, inst)
+	}
+	inv.Container.mu.Unlock()
+
+	inv.mu.Lock()
+	for i := range inv.paperdoll {
+		inv.paperdoll[i] = nil
+	}
+	inv.wornMask = 0
+	inv.mu.Unlock()
+
+	for _, inst := range instances {
+		st := inst.Snapshot()
+		inst.DestroyState()
+		inv.queueUpdateRecord(st.ObjectID, st.TemplateID, st.Count, UpdateRemoved)
 	}
 }
 
