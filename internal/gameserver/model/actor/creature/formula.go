@@ -58,11 +58,13 @@ type invulnerableActor interface{ Invul() bool }
 // (CreatureStatus.java:210-219). Gating on target.Invul() here would skip
 // the formula and the ReduceHP call entirely, dropping that hate.
 //
-// MANADAM is a documented exception, alongside calcLethalHit: Manadam.java's
-// handler checks targetCreature.isInvul() up front (Manadam.java:43-44) and
-// skips the MP drain entirely, with no reduceHp-style backstop to fall
-// through to afterward — ResolveManaDamageInput applies that gate itself
-// instead of relying on damageBlocked.
+// This is not a blanket rule: MANADAM has no attacker-permission gate at
+// all in Java (issue #2339) — Manadam.java and Formulas.calcMagicAffected/
+// calcManaDam never call canGiveDamage(), unlike PDAM/MDAM/Blow's formulas
+// (Formulas.java:390,492,575) — so ResolveManaDamageInput does not call
+// damageBlocked. MANADAM does gate on target.Invul() up front instead
+// (Manadam.java:43-44), with no reduceHp-style backstop afterward, so
+// ResolveManaDamageInput applies that check itself.
 func damageBlocked(attacker any) bool {
 	return !CanDealDamage(attacker)
 }
@@ -339,12 +341,14 @@ func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Def
 // checked here: Manadam.java's handler gates targetCreature.isInvul() before
 // computing calcManaDam or draining MP at all (Manadam.java:43-44), and no
 // ReduceMP implementation applies its own invul guard afterward.
+//
+// It does not check the attacker's damage permission at all (issue #2339):
+// Manadam.java's handler and Formulas.calcMagicAffected/calcManaDam have no
+// canGiveDamage() gate, unlike the other three resolvers' formulas
+// (Formulas.java:390,492,575). A damage-denied attacker still drains MP.
 func ResolveManaDamageInput(caster DeathActor, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
-		return formulas.ManaDamageInput{}, false
-	}
-	if damageBlocked(attacker) {
 		return formulas.ManaDamageInput{}, false
 	}
 	if t, ok := target.(invulnerableActor); ok && t.Invul() {
