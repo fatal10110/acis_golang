@@ -181,22 +181,19 @@ type Character struct {
 	attackTarget              func(world.Tracked)
 	retargetTarget            func(world.Tracked)
 
-	deathMu sync.Mutex
-	dead    bool
+	dead atomic.Bool
 
-	// castMu guards cast, the network-owned live cast controller wired back
-	// onto this character so effect hooks (mute, silence, abort-cast,
-	// damage-break) can reach it without this domain package importing the
-	// cast package that already imports this one.
-	castMu sync.RWMutex
-	cast   CastController
+	// cast is the network-owned live cast controller wired back onto this
+	// character so effect hooks (mute, silence, abort-cast, damage-break)
+	// can reach it without this domain package importing the cast package
+	// that already imports this one.
+	cast atomic.Pointer[CastController]
 
-	// summonSpawnMu guards summonSpawner, the network-owned pet/servitor
-	// spawner wired back onto this character the same way cast is, so the
-	// SUMMON_CREATURE skill handler can reach it without this domain
-	// package importing the network package.
-	summonSpawnMu sync.RWMutex
-	summonSpawner SummonSpawner
+	// summonSpawner is the network-owned pet/servitor spawner wired back
+	// onto this character the same way cast is, so the SUMMON_CREATURE skill
+	// handler can reach it without this domain package importing the
+	// network package.
+	summonSpawner atomic.Pointer[SummonSpawner]
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
 	// teleport-confirm request state and its client-facing send hook,

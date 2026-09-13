@@ -244,6 +244,158 @@ func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
 	}
 }
 
+// reentrantCostActor calls back into its own controller from every cost it
+// pays: item and MP costs read the cast state, and the HP cost stops the cast
+// the way a caster killed by its own HP cost does.
+type reentrantCostActor struct {
+	*testActor
+	ctrl           *Controller
+	consumeFail    bool
+	stopOnConsume  bool
+	stopOnReduceMP bool
+}
+
+func (a *reentrantCostActor) ConsumeItem(itemID, count int) bool {
+	_ = a.ctrl.CastingNow()
+	if a.stopOnConsume {
+		a.ctrl.Stop()
+	}
+	return !a.consumeFail && a.testActor.ConsumeItem(itemID, count)
+}
+
+func (a *reentrantCostActor) ReduceMP(n int) {
+	_ = a.ctrl.CastingNow()
+	a.testActor.ReduceMP(n)
+	if a.stopOnReduceMP {
+		a.ctrl.Stop()
+	}
+}
+
+func (a *reentrantCostActor) ReduceHP(n int) {
+	a.testActor.ReduceHP(n)
+	a.ctrl.Stop()
+}
+
+func newReentrantCostController() (*Controller, *reentrantCostActor, modelskill.Definition) {
+	actor := &reentrantCostActor{testActor: scalingActor()}
+	actor.items = map[int]int{57: 5}
+	ctrl := NewController(actor)
+	actor.ctrl = ctrl
+	def := scalingDef
+	def.ItemConsumeID, def.ItemConsumeCount = 57, 1
+	def.MPConsume = 5
+	def.HPConsume = 3
+	return ctrl, actor, def
+}
+
+func TestCastCostsMayCallBackIntoTheController(t *testing.T) {
+	ctrl, actor, def := newReentrantCostController()
+	aborts := 0
+	ctrl.SetOnAbort(func(bool) { aborts++ })
+
+	done := make(chan error, 1)
+	go func() {
+		if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); err != nil {
+			done <- err
+			return
+		}
+		done <- ctrl.Hit()
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Start/Hit error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("cast controller deadlocked on a cost that calls back into it")
+	}
+
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true, want the HP cost's Stop to have ended the cast")
+	}
+	if aborts != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", aborts)
+	}
+	if actor.items[57] != 4 || actor.mp != 100-7-5 || actor.hp != 1000-3 {
+		t.Fatalf("items=%d mp=%d hp=%d, want 4/88/997", actor.items[57], actor.mp, actor.hp)
+	}
+}
+
+// TestStartRejectsACastItsOwnCostEnded pins that Start reports a failure for a
+// cast that one of its own costs cancelled through Stop. Reporting success
+// there would let the caller announce a cast the abort funnel already
+// cancelled, leaving the client playing an animation nothing ends.
+func TestStartRejectsACastItsOwnCostEnded(t *testing.T) {
+	ctrl, actor, def := newReentrantCostController()
+	actor.stopOnReduceMP = true
+	aborts := 0
+	ctrl.SetOnAbort(func(bool) { aborts++ })
+
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotCasting) {
+		t.Fatalf("Start() error = %v, want ErrNotCasting", err)
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true, want the cost's Stop to have ended the cast")
+	}
+	if aborts != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", aborts)
+	}
+	// The costs charged before the cast ended stay charged, matching a
+	// reference that pays reuse and the initial MP before it claims the cast.
+	if actor.items[57] != 4 || actor.mp != 100-7 || len(actor.disabled) != 1 {
+		t.Fatalf("items=%d mp=%d disabled=%v, want 4/93/one cooldown", actor.items[57], actor.mp, actor.disabled)
+	}
+}
+
+// TestStartItemFailureAfterTheCastEnded covers the rollback path when the cast
+// was already ended while ConsumeItem ran: the claim is gone, so Start must
+// leave it alone instead of clearing whatever cast came after, and still
+// report the item failure.
+func TestStartItemFailureAfterTheCastEnded(t *testing.T) {
+	ctrl, actor, def := newReentrantCostController()
+	actor.consumeFail, actor.stopOnConsume = true, true
+	aborts := 0
+	ctrl.SetOnAbort(func(bool) { aborts++ })
+
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotEnoughItems) {
+		t.Fatalf("Start() error = %v, want ErrNotEnoughItems", err)
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after a rejected Start, want cleared")
+	}
+	if aborts != 1 {
+		t.Fatalf("abort observer fired %d times, want 1 (the cost's own Stop)", aborts)
+	}
+	if actor.mp != 100 || len(actor.disabled) != 0 || len(actor.reuses) != 0 {
+		t.Fatalf("mp=%d disabled=%v reuses=%v, want nothing charged past the item failure", actor.mp, actor.disabled, actor.reuses)
+	}
+
+	actor.consumeFail, actor.stopOnConsume = false, false
+	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+		t.Fatalf("Start() after the rejected Start error: %v", err)
+	}
+}
+
+func TestStartThatCannotConsumeItsItemPaysNothing(t *testing.T) {
+	ctrl, actor, def := newReentrantCostController()
+	actor.consumeFail = true
+
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotEnoughItems) {
+		t.Fatalf("Start() error = %v, want ErrNotEnoughItems", err)
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after a rejected Start, want cleared")
+	}
+	if actor.mp != 100 || len(actor.disabled) != 0 || len(actor.reuses) != 0 {
+		t.Fatalf("mp=%d disabled=%v reuses=%v, want a rejected cast to pay nothing", actor.mp, actor.disabled, actor.reuses)
+	}
+
+	actor.consumeFail = false
+	if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+		t.Fatalf("Start() after a rejected Start error: %v", err)
+	}
+}
+
 func TestPlayerActorExitSignetGroundDropsOnlyTheSignetEffect(t *testing.T) {
 	ch := &player.Character{ID: 1}
 	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, ch)

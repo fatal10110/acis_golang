@@ -161,7 +161,9 @@ type afterFunc func(time.Duration, func()) scheduledTimer
 // interruption state for one actor's active cast.
 //
 // mu guards every mutable field below, including the scheduled timers
-// Schedule installs.
+// Schedule installs. It is never held while the actor pays a cast cost
+// (item, reuse, MP, HP, charges): paying one can end the cast, which calls
+// back into the controller.
 type Controller struct {
 	actor Actor
 
@@ -348,20 +350,39 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
-// Finish according to the returned Plan.
+// Finish according to the returned Plan. A cost that ends the cast by calling
+// back into Stop leaves the costs charged — the reference charges reuse and
+// the initial MP before it claims the cast, and charges the skill item after
+// it — and Start reports ErrNotCasting so the caller does not announce a cast
+// that is already cancelled.
 func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if c.casting {
+		c.mu.Unlock()
 		return Plan{}, ErrAlreadyCasting
 	}
-
 	plan := c.buildPlan(def)
+	c.casting = true
+	c.current = def
+	c.target = target
+	c.plan = plan
+	c.startedAt = now
+	c.interruptUntil = now.Add(plan.InterruptAfter)
+	seq := c.castSeq
+	c.mu.Unlock()
+
+	// The cast is claimed above so a concurrent Start is rejected; a failed
+	// item consume releases the claim unless the cast was already ended.
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount) {
+		c.mu.Lock()
+		if c.castingLocked(seq) {
+			c.clearLocked()
+		}
+		c.mu.Unlock()
 		return Plan{}, ErrNotEnoughItems
 	}
 
@@ -378,38 +399,39 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 		c.actor.ReduceMP(initialMP)
 	}
 
-	c.casting = true
-	c.current = def
-	c.target = target
-	c.plan = plan
-	c.startedAt = now
-	c.interruptUntil = now.Add(plan.InterruptAfter)
+	// A Stop that ended the cast has already acknowledged the client's
+	// pending action, so the caller's rejection acknowledges it a second
+	// time. That is deliberate: the acknowledgement only releases the
+	// client's action lock, and skipping it here would leave that lock held
+	// whenever the cast ended through Finish rather than Stop.
+	c.mu.RLock()
+	claimed := c.castingLocked(seq)
+	c.mu.RUnlock()
+	if !claimed {
+		return Plan{}, ErrNotCasting
+	}
 	return plan, nil
 }
 
 // Hit applies the final MP and HP costs for the active cast. It leaves an
 // unaffordable cast in flight for the caller to abort through Stop, so the
 // caller can report why the cast failed before the abort funnel cancels it
-// — the packet order the reference produces.
+// — the packet order the reference produces. A lethal HP cost may stop the
+// cast from inside ReduceHP; Hit still reports success for the cost paid.
 func (c *Controller) Hit() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.hitLocked()
-}
-
-func (c *Controller) hitLocked() error {
-	if !c.casting {
+	def, casting := c.CurrentSkill()
+	if !casting {
 		return ErrNotCasting
 	}
 
-	if mp := c.actor.MPCost(c.current); mp > 0 {
+	if mp := c.actor.MPCost(def); mp > 0 {
 		if mp > c.actor.MP() {
 			return ErrNotEnoughMP
 		}
 		c.actor.ReduceMP(mp)
 	}
 
-	if hp := c.current.HPConsume; hp > 0 {
+	if hp := def.HPConsume; hp > 0 {
 		if hp > c.actor.HP() {
 			return ErrNotEnoughHP
 		}
@@ -419,12 +441,12 @@ func (c *Controller) hitLocked() error {
 	// Force/Soul charge apply, matching CreatureCast.onMagicHitTimer
 	// (CreatureCast.java:276-282): runs after the MP/HP consume above and
 	// before the caller's Hooks.Hit applies the skill's effects.
-	if c.current.NumCharges > 0 {
+	if def.NumCharges > 0 {
 		if ch, ok := c.actor.(chargeHolder); ok {
-			if c.current.MaxCharges > 0 {
-				ch.IncreaseCharges(c.current.NumCharges, c.current.MaxCharges)
+			if def.MaxCharges > 0 {
+				ch.IncreaseCharges(def.NumCharges, def.MaxCharges)
 			} else {
-				ch.DecreaseCharges(c.current.NumCharges)
+				ch.DecreaseCharges(def.NumCharges)
 			}
 		}
 	}

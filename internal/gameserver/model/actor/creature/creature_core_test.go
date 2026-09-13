@@ -527,8 +527,8 @@ func TestAttackFacingPrefersCurrentHeading(t *testing.T) {
 }
 
 func TestNightReadsInstalledSource(t *testing.T) {
-	prev := nightSource
-	t.Cleanup(func() { SetNightSource(prev) })
+	prev := nightSource.Load()
+	t.Cleanup(func() { nightSource.Store(prev) })
 
 	SetNightSource(nil)
 	if Night() {
