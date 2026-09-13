@@ -63,3 +63,58 @@ func TestWireSummonAIForwardsManaFieldsToOwner(t *testing.T) {
 	}
 	assertSystemMessageStringNumberFrame(t, targetGot[0], serverpackets.SystemMessageS2MPHasBeenDrainedByS1, "Servitor", 15)
 }
+
+// TestWireSummonAIForwardsDodgeAndCounterattackToTarget pins issue #2353: a
+// summon's OnHitResult copies Dodges and Counterattacks through to
+// sendSkillHandlerResult, which resolves the target-addressed messages
+// (AVOIDED_S1_ATTACK, COUNTERED_S1_ATTACK) by AttackerID/DefenderID
+// independent of the owner argument (Blow.java:49-50,85-86 gate those on
+// the target being a Player, not the caster). The caster-addressed halves
+// (S1_DODGES_ATTACK, S1_PERFORMING_COUNTERATTACK) must still not reach the
+// owner: the summon itself, not the owner, is the attacker, and it is never
+// resolvable as a livePlayer.
+func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
+	ownerFrames := &testsupport.FrameCapture{}
+	targetFrames := &testsupport.FrameCapture{}
+	owner := newTestLivePlayer(t, 100, ownerFrames)
+	target := newTestLivePlayer(t, 200, targetFrames)
+
+	state := world.New()
+	state.AddPlayer(owner)
+	state.AddPlayer(target)
+
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
+		ObjectID:       300,
+		Owner:          owner,
+		NPCID:          1,
+		Name:           "Servitor",
+		OwnerInventory: owner.Inventory(),
+		Stats:          summon.CombatStats{MaxHP: 100, MaxMP: 100},
+	})
+	if err != nil {
+		t.Fatalf("NewServitor() error: %v", err)
+	}
+
+	l := &GameClientLink{world: state, log: zerolog.Nop()}
+	aiController := l.wireSummonAI(servitor)
+
+	aiController.OnHitResult(actorcast.EffectResult{
+		Dodges: []handlerskill.Dodge{
+			{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
+		},
+		Counterattacks: []handlerskill.Counterattack{
+			{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
+		},
+	})
+
+	if ownerGot := ownerFrames.Frames(); len(ownerGot) != 0 {
+		t.Fatalf("owner frame count = %d, want 0 (summon is not a livePlayer attacker, caster-addressed halves must not forward)", len(ownerGot))
+	}
+
+	targetGot := targetFrames.Frames()
+	if len(targetGot) != 2 {
+		t.Fatalf("target frame count = %d, want 2 (AVOIDED_S1_ATTACK, COUNTERED_S1_ATTACK)", len(targetGot))
+	}
+	assertSystemMessageStringFrame(t, targetGot[0], serverpackets.SystemMessageCounteredS1Attack, "Servitor")
+	assertSystemMessageStringFrame(t, targetGot[1], serverpackets.SystemMessageAvoidedS1Attack, "Servitor")
+}
