@@ -84,6 +84,13 @@ type MagicResist struct {
 	AttackerName string
 }
 
+// ManaDrain reports MP drained from a player target by a MANADAM cast.
+type ManaDrain struct {
+	TargetID   int32
+	CasterName string
+	MP         int32
+}
+
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	AttackFailed   int
@@ -92,7 +99,16 @@ type Result struct {
 	Dodges         []Dodge
 	Resisted       []Resisted
 	MagicResists   []MagicResist
-	CubicAdded     bool
+	// ManaDamageMissed counts MANADAM casts that missed their target
+	// (invulnerable or the magic-affected roll failed), reported to the caster.
+	ManaDamageMissed int
+	// ManaDrains reports MP drained from a player target by a MANADAM cast,
+	// delivered to the target as MP-drained.
+	ManaDrains []ManaDrain
+	// OpponentMPReduced reports, per successful MANADAM drain, the MP amount
+	// to report to the caster.
+	OpponentMPReduced []int32
+	CubicAdded        bool
 	// CubicTargets are non-caster targets whose cubic runtime was touched.
 	CubicTargets []Actor
 	// CubicAddedTargets are the non-caster targets whose visible cubic list changed.

@@ -590,6 +590,19 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 		}
 		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, resist.AttackerName))
 	}
+	for i := 0; i < result.ManaDamageMissed; i++ {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+	}
+	for _, drain := range result.ManaDrains {
+		target, online := l.livePlayerByID(drain.TargetID)
+		if !online {
+			continue
+		}
+		target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, drain.CasterName, drain.MP))
+	}
+	for _, mp := range result.OpponentMPReduced {
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, mp))
+	}
 }
 
 func sendMagicStatusUpdate(live *livePlayer, before player.Vitals) {
