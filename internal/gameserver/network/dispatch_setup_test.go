@@ -69,6 +69,38 @@ func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, t
 	}
 }
 
+// assertSystemMessageStringNumberFrame checks a two-param SystemMessage: a
+// text param followed by a number param (e.g. S2_MP_HAS_BEEN_DRAINED_BY_S1's
+// caster name and MP amount).
+func assertSystemMessageStringNumberFrame(t *testing.T, frame []byte, messageID int, text string, number int32) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
+	}
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("SystemMessage params = %d, want 2", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("SystemMessage param 1 type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != text {
+		t.Fatalf("SystemMessage text = %q, want %q", got, text)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamNumber {
+		t.Fatalf("SystemMessage param 2 type = %d, want number", typ)
+	}
+	if got := r.ReadInt32(); got != number {
+		t.Fatalf("SystemMessage number = %d, want %d", got, number)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SystemMessage: %v", err)
+	}
+}
+
 // testLinkNow, when non-nil, supplies the packet-accounting clock of every
 // GameClientLink constructed afterwards, freezing flood windows for
 // deterministic flood-gate assertions.

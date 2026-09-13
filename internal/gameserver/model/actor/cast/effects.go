@@ -13,6 +13,13 @@ import (
 type EffectHandlers struct {
 	Targets *skilltarget.Registry
 	Skills  *handlerskill.Registry
+	// OnHitResult, when set, is wired onto AIController.OnHitResult for a
+	// caster with no live connection of its own (a hostile NPC) so its
+	// target-addressed messages (MagicResist, ManaDrain, ...) still reach a
+	// real online target. It is threaded here rather than as its own
+	// constructor parameter because EffectHandlers is already the bundle
+	// carried from boot wiring down to the AIController that needs it.
+	OnHitResult func(EffectResult)
 }
 
 // EffectResult reports whether effect dispatch reached a skill handler and

@@ -187,11 +187,15 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			Definitions: castDefs,
 			Effects:     castEffects,
 			Caster:      hostile,
-			// OnHitResult is left unset: Creature.sendPacket is a no-op in
-			// the reference for a non-Player, non-Summon-owner caster, so a
-			// hostile-NPC cast's Hit-phase result has no forward target
-			// (matching AIController's own OnHitResult doc, and
-			// summon_spawn.go's Summon-only OnHitResult wiring).
+			// Creature.sendPacket is a no-op in the reference for a
+			// non-Player, non-Summon-owner caster, so caster-addressed
+			// messages (ATTACK_FAILED, MISSED_TARGET, ...) still have no
+			// forward target here. But target-addressed messages
+			// (MagicResist, ManaDrain) are delivered by ID lookup against
+			// the real target independent of caster type (Manadam.java:68),
+			// so OnHitResult is wired to the boot-provided delivery hook
+			// (issue #2350) rather than left unset.
+			OnHitResult: castEffects.OnHitResult,
 		}
 		hostile.AI().SetCastController(aiController)
 	}
