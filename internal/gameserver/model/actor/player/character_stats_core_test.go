@@ -3227,9 +3227,14 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 // (CreatureStatus.java:209-219). So an invulnerable target must still yield
 // a computed input (ok=true) letting the caller reach ReduceHP; only a
 // damage-denied attacker is rejected at this stage. ManaDamageInput is the
-// one documented exception (Manadam.java:43-44 gates isInvul() up front,
-// with no reduceHp-style backstop afterward), so it alone still rejects an
-// invulnerable target here.
+// one documented exception on the target side (Manadam.java:43-44 gates
+// isInvul() up front, with no reduceHp-style backstop afterward), so it
+// alone still rejects an invulnerable target here. On the attacker side,
+// though, MANADAM is the odd one out in the other direction (issue #2339):
+// Manadam.java has no canGiveDamage() check anywhere in its handler or in
+// Formulas.calcMagicAffected/calcManaDam, unlike the other three resolvers'
+// formulas — so ManaDamageInput alone still accepts a damage-denied
+// attacker.
 func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
@@ -3261,8 +3266,8 @@ func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermissio
 	if _, ok := target.BlowInput(caster, def); ok {
 		t.Fatal("BlowInput accepted an attacker without damage permission")
 	}
-	if _, ok := target.ManaDamageInput(caster, def); ok {
-		t.Fatal("ManaDamageInput accepted an attacker without damage permission")
+	if _, ok := target.ManaDamageInput(caster, def); !ok {
+		t.Fatal("ManaDamageInput rejected an attacker without damage permission")
 	}
 }
 

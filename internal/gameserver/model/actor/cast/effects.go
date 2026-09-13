@@ -25,6 +25,9 @@ type EffectResult struct {
 	Dodges            []handlerskill.Dodge
 	Resisted          []handlerskill.Resisted
 	MagicResists      []handlerskill.MagicResist
+	ManaDamageMissed  int
+	ManaDrains        []handlerskill.ManaDrain
+	OpponentMPReduced []int32
 	CubicAdded        bool
 	CubicTargets      []handlerskill.Actor
 	CubicAddedTargets []handlerskill.Actor
@@ -175,6 +178,9 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affec
 		Dodges:            result.Dodges,
 		Resisted:          result.Resisted,
 		MagicResists:      result.MagicResists,
+		ManaDamageMissed:  result.ManaDamageMissed,
+		ManaDrains:        result.ManaDrains,
+		OpponentMPReduced: result.OpponentMPReduced,
 		CubicAdded:        result.CubicAdded,
 		CubicTargets:      result.CubicTargets,
 		CubicAddedTargets: result.CubicAddedTargets,
