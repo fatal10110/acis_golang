@@ -451,6 +451,26 @@ func TestAggressionNotificationScalesLikeCombatHate(t *testing.T) {
 	}
 }
 
+// TestSubOneDOTTickContributesZeroHate pins the review's truncation finding
+// on PR #2346: Npc.reduceCurrentHp truncates damage to an int before
+// dispatching it to the per-script onAttacked (Npc.java:403,
+// "quest.onAttacked(this, attacker, (int) damage, skill)"), so a sub-1 DOT
+// tick contributes zero ATTACKED hate in Java — attackedHateWeight must
+// truncate the same way, not turn a 0.6 tick into positive hate.
+func TestSubOneDOTTickContributesZeroHate(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
+	dotCaster := &hostileTarget{id: 2, playable: true}
+
+	h.ReduceHPByDOT(0.6, dotCaster, true)
+
+	if _, ok := h.AI().Threats().MostHated(); ok {
+		t.Fatal("MostHated() ok = true, want no ranked attacker from a truncated-to-zero DOT tick")
+	}
+	if got := h.AI().Threats().Hate(dotCaster); got != 0 {
+		t.Fatalf("hate = %v, want 0 (truncated damage/(level+7)*100 = 0)", got)
+	}
+}
+
 func TestDamageOverTimeEffectQueuesAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})

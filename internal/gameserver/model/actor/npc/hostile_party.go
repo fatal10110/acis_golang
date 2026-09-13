@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
@@ -20,22 +22,26 @@ const flatAttackedHateWeight = 200
 
 // attackedHateWeight approximates the reference's per-hit ATTACKED-event
 // hate weight. The reference derives this via the NPC's assigned
-// individual AI script (#185, M10): Warrior.onAttacked (Warrior.java:387-397)
-// computes damage/(level+7)*100 for a Playable attacker, further scaled by
-// getHateRatio (DefaultNpc.java:111-131) — the SetHateGroup/SetHateOccupation/
-// SetHateRace AI-param ratios, which apply only to a Player attacker (not
-// every Playable) — that neither Go's Template nor the script engine
-// support yet, so dropped here. Other script families (WizardBase,
-// MonsterBehavior, LV3Monster, …) use different formulas Go hasn't ported.
-// Until #185 lands that per-script dispatch, every Hostile uses this one
-// damage-proportional formula for Playable attackers instead, and falls
-// back to the flat pre-existing weight for everything else — an
-// approximation, not the full per-script behavior.
+// individual AI script (#185, M10): Npc.reduceCurrentHp truncates damage to
+// an int before dispatching it (Npc.java:403, "quest.onAttacked(this,
+// attacker, (int) damage, skill)"), and Warrior.onAttacked (Warrior.java:387-397)
+// computes that truncated damage/(level+7)*100 for a Playable attacker,
+// further scaled by getHateRatio (DefaultNpc.java:111-131) — the
+// SetHateGroup/SetHateOccupation/SetHateRace AI-param ratios, which apply
+// only to a Player attacker (not every Playable) — that neither Go's
+// Template nor the script engine support yet, so dropped here. Other script
+// families (WizardBase, MonsterBehavior, LV3Monster, …) use different
+// formulas Go hasn't ported. Until #185 lands that per-script dispatch,
+// every Hostile uses this one damage-proportional formula for Playable
+// attackers instead (truncating damage the same way the reference does, so
+// a sub-1 DOT tick contributes zero hate here too), and falls back to the
+// flat pre-existing weight for everything else — an approximation, not the
+// full per-script behavior.
 func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float64) float64 {
 	if !creature.Playable(attacker) {
 		return flatAttackedHateWeight
 	}
-	return damage / (float64(h.Level()) + 7) * 100
+	return math.Trunc(damage) / (float64(h.Level()) + 7) * 100
 }
 
 // NotifyAggression records the incoming aggression on this NPC and fans it
