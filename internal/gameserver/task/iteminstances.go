@@ -226,8 +226,8 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	// (network.flushItemPersistence) and land an older snapshot after it.
 	byOwner := make(map[int32][]*item.Instance)
 	for _, inst := range inflight {
-		owner := inst.Snapshot().OwnerID
-		byOwner[owner] = append(byOwner[owner], inst)
+		key := i.laneKey(inst.Snapshot())
+		byOwner[key] = append(byOwner[key], inst)
 	}
 	round := &saveRound{removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
 	if round.remaining == 0 {
@@ -291,6 +291,20 @@ func (i *ItemInstances) finishOwner(round *saveRound, failed []*item.Instance, e
 		delete(i.rounds, round)
 		close(round.done)
 	}
+}
+
+// laneKey picks the persistence lane an item's write runs on: its owner's,
+// except a destroyed pet collar, whose write also deletes its pets row. That
+// one runs on the collar's own lane, where every pets-row save is queued, so
+// a save still waiting there cannot land after the delete and recreate the
+// row.
+func (i *ItemInstances) laneKey(st item.InstanceState) int32 {
+	if st.Count <= 0 {
+		if tmpl, _ := i.templates.Get(st.TemplateID); isPetCollar(tmpl) {
+			return st.ObjectID
+		}
+	}
+	return st.OwnerID
 }
 
 // saveChunks writes items in chunks of at most ItemInstanceSaveChunkSize,

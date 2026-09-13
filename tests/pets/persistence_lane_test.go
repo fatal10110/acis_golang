@@ -3,6 +3,7 @@ package pets
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -126,6 +127,43 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 	if got := h.savedPetState(t).Exp; got != wantExp {
 		t.Fatalf("pets row exp = %d, want the buyer's later save %d", got, wantExp)
 	}
+}
+
+// TestDestroyedCollarPetRowStaysDeleted returns a pet while its collar's
+// persistence lane is backed up, so the pets-row save is still queued, then
+// destroys the collar and runs the item save that deletes its pets row. The
+// delete must wait behind the queued save: once the lane drains, the pets row
+// is gone rather than recreated by the save landing after the delete.
+func TestDestroyedCollarPetRowStaysDeleted(t *testing.T) {
+	h := bootOwnerWithCollar(t)
+	h.spawnWolf(t)
+
+	release := h.srv.HoldPersistenceLane(t, h.collarID)
+	h.client.Send(encodeRequestActionUse(19, false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete")
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeRequestDestroyItem(h.collarID, 1))
+	drainUntilQuiet(t, h.client)
+	// The collar's delete is queued behind the held save; this tick gives up
+	// on its ctx and leaves the item pending.
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	_ = h.srv.ItemInstances.Save(ctx)
+	cancel()
+
+	release()
+	h.srv.FlushPersistence(t)
+	h.srv.FlushItems(t)
+	if _, ok, err := h.srv.Pets.Get(context.Background(), h.collarID); err != nil || ok {
+		t.Fatalf("pets row for destroyed collar %d: ok=%v err=%v, want deleted", h.collarID, ok, err)
+	}
+}
+
+func encodeRequestDestroyItem(objectID, count int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDestroyItem)
+	w.WriteInt32(objectID)
+	w.WriteInt32(count)
+	return w.Bytes()
 }
 
 func encodeTradeRequest(objectID int32) []byte {

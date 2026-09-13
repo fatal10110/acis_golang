@@ -437,10 +437,10 @@ func ItemTemplates() *item.Table {
 			Duration:    -1,
 			Stackable:   true,
 			Destroyable: true,
-			// The datapack's wolf collar (2375) sets no is_tradable, so it
-			// trades like any item.
+			// The datapack's wolf collar (2375) is a PET_COLLAR and sets no
+			// is_tradable, so it trades like any item.
 			Tradable: true,
-			EtcItem:  &item.EtcItemDetail{Handler: "SummonItems"},
+			EtcItem:  &item.EtcItemDetail{Type: item.EtcItemPetCollar, Handler: "SummonItems"},
 		},
 		{
 			// The wyvern control item the mount flow uses; the summon-item

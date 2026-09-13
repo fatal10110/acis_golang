@@ -1237,9 +1237,12 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 		ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory,
 		Augmentation: &item.Augmentation{Attributes: 123, SkillID: 456, SkillLevel: 7},
 	}
-	// One owner, so Save writes all three in one owner batch.
+	// One owner, so the kept item and the weapon share an owner batch. The
+	// destroyed collar gets its own batch, keyed by its object id: it deletes
+	// a pets row, whose saves run on that lane. Its id sorts after the
+	// owner's, so its batch is flushed second.
 	deletedWeapon := &item.Instance{ObjectID: 2, TemplateID: 20, OwnerID: 100, Count: 0, Location: item.LocationInventory}
-	deletedPetCollar := &item.Instance{ObjectID: 3, TemplateID: 30, OwnerID: 100, Count: 0, Location: item.LocationInventory}
+	deletedPetCollar := &item.Instance{ObjectID: 300, TemplateID: 30, OwnerID: 100, Count: 0, Location: item.LocationInventory}
 	instances.Add(kept)
 	instances.Add(deletedWeapon)
 	instances.Add(deletedPetCollar)
@@ -1251,11 +1254,15 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	batch := flusher.last()
+	batches := flusher.all()
+	if len(batches) != 2 {
+		t.Fatalf("Flush called %d times, want 2 (owner batch, then collar batch)", len(batches))
+	}
+	batch := batches[0]
 	if got, want := savedIDs(batch.Saves), []int32{1}; !slices.Equal(got, want) {
 		t.Fatalf("saved item ids = %v, want %v", got, want)
 	}
-	if got, want := batch.Deletes, []int32{2, 3}; !slices.Equal(got, want) {
+	if got, want := batch.Deletes, []int32{2}; !slices.Equal(got, want) {
 		t.Fatalf("deleted item ids = %v, want %v", got, want)
 	}
 	if got, want := augmentationSaveIDs(batch.AugmentationSaves), []int32{1}; !slices.Equal(got, want) {
@@ -1264,8 +1271,15 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 	if got, want := batch.AugmentationDeletes, []int32{2}; !slices.Equal(got, want) {
 		t.Fatalf("deleted augmentation ids = %v, want %v", got, want)
 	}
-	if got, want := batch.PetDeletes, []int32{3}; !slices.Equal(got, want) {
-		t.Fatalf("deleted pet item ids = %v, want %v", got, want)
+	if len(batch.PetDeletes) != 0 {
+		t.Fatalf("owner batch deleted pet item ids %v, want none", batch.PetDeletes)
+	}
+	collar := batches[1]
+	if got, want := collar.Deletes, []int32{300}; !slices.Equal(got, want) {
+		t.Fatalf("collar batch deleted item ids = %v, want %v", got, want)
+	}
+	if got, want := collar.PetDeletes, []int32{300}; !slices.Equal(got, want) {
+		t.Fatalf("collar batch deleted pet item ids = %v, want %v", got, want)
 	}
 	if instances.Contains(kept) {
 		t.Fatalf("Save() should clear successfully flushed pending items")
@@ -1459,8 +1473,9 @@ func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 }
 
 type itemFlusherStub struct {
-	mu    sync.Mutex
-	batch item.FlushBatch
+	mu      sync.Mutex
+	batch   item.FlushBatch
+	batches []item.FlushBatch
 }
 
 // Flush reads every save's mutable fields directly (not through
@@ -1474,8 +1489,15 @@ func (s *itemFlusherStub) Flush(_ context.Context, batch item.FlushBatch) error 
 	}
 	s.mu.Lock()
 	s.batch = batch
+	s.batches = append(s.batches, batch)
 	s.mu.Unlock()
 	return nil
+}
+
+func (s *itemFlusherStub) all() []item.FlushBatch {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.batches)
 }
 
 func (s *itemFlusherStub) last() item.FlushBatch {
