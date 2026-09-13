@@ -367,6 +367,13 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// hostile NPC caster routes through DeliverHitResult (nil live) instead:
 	// caster-addressed messages like this one are dropped there too, but
 	// target-addressed ones still reach an online target (issue #2350).
+	// AVOIDED_S1_ATTACK and COUNTERED_S1_ATTACK (Blow.java:49-50,85-86) are
+	// gated on the *target* being a Player, independent of caster type, so
+	// Dodges/Counterattacks are forwarded here too; sendSkillHandlerResult
+	// resolves attacker/defender by ID regardless of the live argument, so
+	// the caster-addressed halves (S1_DODGES_ATTACK,
+	// S1_PERFORMING_COUNTERATTACK) still correctly stay dropped since the
+	// summon itself is never resolvable as a livePlayer (issue #2353).
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {
@@ -378,6 +385,8 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			MagicResists:     result.MagicResists,
 			ManaDamageMissed: result.ManaDamageMissed,
 			ManaDrains:       result.ManaDrains,
+			Dodges:           result.Dodges,
+			Counterattacks:   result.Counterattacks,
 		})
 	}
 	brain.SetCastController(aiController)
