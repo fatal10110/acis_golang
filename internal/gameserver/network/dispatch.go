@@ -184,6 +184,8 @@ type GameClientLink struct {
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
 	persist          *persist.Worker
+	persistWait      time.Duration
+	queuedPets       queuedPets
 	restarts         *restart.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
@@ -283,7 +285,10 @@ type GameClientLinkConfig struct {
 	// ItemInstances lazily persists item rows whose live state changed.
 	ItemInstances *task.ItemInstances
 	// Persist runs detach, pet and container saves; nil writes inline.
-	Persist      *persist.Worker
+	Persist *persist.Worker
+	// PersistWait bounds how long a connection waits for queued saves before
+	// reading rows back; zero means livePlayerPersistWait.
+	PersistWait  time.Duration
 	Restarts     *restart.Table
 	Levels       *player.LevelTable
 	Admin        *admin.Data
@@ -349,6 +354,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
 		persist:          cfg.Persist,
+		persistWait:      cfg.PersistWait,
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,

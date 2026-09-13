@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"errors"
 	"regexp"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -45,9 +44,6 @@ const (
 	petRenameApplied
 )
 
-// errPersistStopped reports a write the stopped persistence worker refused.
-var errPersistStopped = errors.New("persistence worker stopped")
-
 // renamePet applies the persistence and owner-refresh portion of pet naming.
 // Packet decoding, length/pattern validation, and the "already named" gate
 // belong to RequestChangePetName, which must run them in reference order
@@ -88,24 +84,18 @@ func (l *GameClientLink) renamePet(ctx context.Context, live *livePlayer, name s
 		actor.SetNamed(oldNamed)
 		return petRenameIgnored
 	}
-	// Written on the owner's lane so a pet save queued before the rename
-	// cannot land after it and restore the old name; the result is awaited
-	// because a failed write rolls the rename back.
-	saved := make(chan error, 1)
-	pets := l.petStore
-	if !l.persist.Enqueue(live.ObjectID(), func() {
-		saveCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), livePlayerDetachSaveTimeout)
+	// Written on the owner's lane, behind any pet save already queued, so an
+	// older copy cannot land after it. The rename does not wait for the write:
+	// the reference only renames in memory and stores the name with the pet's
+	// next save, so a failed write is logged, not rolled back.
+	pets, log := l.petStore, l.log
+	l.persist.Enqueue(live.ObjectID(), func() {
+		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		saved <- pets.Save(saveCtx, itemObjectID, state)
-	}) {
-		saved <- errPersistStopped
-	}
-	if err := <-saved; err != nil {
-		actor.SetName(oldName)
-		actor.SetNamed(oldNamed)
-		l.log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet name")
-		return petRenameIgnored
-	}
+		if err := pets.Save(saveCtx, itemObjectID, state); err != nil {
+			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet name")
+		}
+	})
 	if inv := live.Inventory(); inv != nil {
 		if control := inv.ItemByObjectID(actor.ControlItemID()); control != nil {
 			control.SetCustomType2(1)

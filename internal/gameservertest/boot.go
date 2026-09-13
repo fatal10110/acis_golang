@@ -92,6 +92,7 @@ type options struct {
 	allowDelevel           bool
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
+	persistWait            time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	storeSkillCooltime     bool
@@ -180,6 +181,12 @@ func WithAttackStanceClock(now func() time.Time) Option {
 // activated on teleport completion (default: disabled).
 func WithSpawnProtection(window time.Duration) Option {
 	return func(o *options) { o.spawnProtection = window }
+}
+
+// WithPersistWait bounds how long a connection waits for queued saves before
+// reading rows back, so a suite can drive the wait's timeout quickly.
+func WithPersistWait(d time.Duration) Option {
+	return func(o *options) { o.persistWait = d }
 }
 
 // WithReuseDelays overrides the server.properties CharacterSelectTime and
@@ -1058,6 +1065,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
+		PersistWait:      o.persistWait,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},

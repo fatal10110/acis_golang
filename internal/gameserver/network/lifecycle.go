@@ -1,9 +1,12 @@
 package network
 
 import (
+	"cmp"
 	"context"
+	"sync"
 	"time"
 
+	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -150,51 +153,103 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 }
 
 // livePlayerPersistWait bounds how long a connection waits for a detached
-// player's saves: the detach budget plus room for jobs queued ahead on the
-// same lanes.
-const livePlayerPersistWait = 3 * livePlayerDetachSaveTimeout
+// player's saves: a detach with an active pet queues three jobs on the
+// player's lane, each under livePlayerDetachSaveTimeout, and one item-tick
+// chunk under task.ItemInstanceSaveTimeout can be running ahead of them.
+const livePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
 
 // awaitPersistence waits until every save already enqueued for owners has
-// run, so a read that follows sees the rows those saves write. It runs on
-// the connection goroutine, never on game-state paths.
-func (l *GameClientLink) awaitPersistence(owners ...int32) {
-	ctx, cancel := context.WithTimeout(context.Background(), livePlayerPersistWait)
+// run, so a read that follows sees the rows those saves write. It reports,
+// and logs, a wait that gave up first. It runs on the connection goroutine,
+// never on game-state paths.
+func (l *GameClientLink) awaitPersistence(owners ...int32) error {
+	ctx, cancel := context.WithTimeout(context.Background(), cmp.Or(l.persistWait, livePlayerPersistWait))
 	defer cancel()
-	if err := l.persist.Flush(ctx, owners...); err != nil {
+	err := l.persist.Flush(ctx, owners...)
+	if err != nil {
 		l.log.Error().Err(err).Ints32("owner_ids", owners).Msg("wait for queued saves")
 	}
+	return err
 }
 
 func (l *GameClientLink) savePet(ownerID int32, actor *summon.Actor, ownerInv *itemcontainer.Inventory) {
-	if write := savePet(l.petStore, actor, ownerInv, l.log); write != nil {
-		l.persist.Enqueue(ownerID, func() {
-			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-			defer cancel()
-			write(ctx)
-		})
+	itemObjectID, state, write := savePet(l.petStore, actor, ownerInv, l.log)
+	if write == nil {
+		return
 	}
+	seq := l.queuedPets.add(itemObjectID, state)
+	l.persist.Enqueue(ownerID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		write(ctx)
+		l.queuedPets.written(itemObjectID, seq)
+	})
 }
 
 // savePet copies actor's pets-row state, syncs the control item's enchant to
-// the pet's level, and returns the write for that row, or nil when there is
-// nothing to save. The control item's enchant is the pet's displayed level;
-// it is set whether or not the row write later succeeds.
-func savePet(store petStore, actor *summon.Actor, ownerInv *itemcontainer.Inventory, log zerolog.Logger) func(context.Context) {
+// the pet's level, and returns the copied state with the write for that row,
+// or a nil write when there is nothing to save. The control item's enchant is
+// the pet's displayed level; it is set whether or not the row write later
+// succeeds.
+func savePet(store petStore, actor *summon.Actor, ownerInv *itemcontainer.Inventory, log zerolog.Logger) (int32, petmodel.State, func(context.Context)) {
 	if store == nil {
-		return nil
+		return 0, petmodel.State{}, nil
 	}
 	itemObjectID, state, ok := actor.PetState()
 	if !ok {
-		return nil
+		return 0, petmodel.State{}, nil
 	}
 	if ownerInv != nil {
 		ownerInv.SetEnchantLevel(ownerInv.ItemByObjectID(itemObjectID), state.Level)
 	}
-	return func(ctx context.Context) {
+	return itemObjectID, state, func(ctx context.Context) {
 		if err := store.Save(ctx, itemObjectID, state); err != nil {
 			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("save pet")
 		}
 	}
+}
+
+// queuedPets remembers, per control item, the newest pets-row state an
+// unsummon or logout queued and whose write has not run yet. A summon restores
+// from it instead of reading a row that is still behind the owner's lane, so
+// it never waits on persistence.
+type queuedPets struct {
+	mu      sync.Mutex
+	seq     uint64
+	pending map[int32]queuedPet
+}
+
+type queuedPet struct {
+	seq   uint64
+	state petmodel.State
+}
+
+func (q *queuedPets) add(itemObjectID int32, state petmodel.State) uint64 {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.pending == nil {
+		q.pending = make(map[int32]queuedPet)
+	}
+	q.seq++
+	q.pending[itemObjectID] = queuedPet{seq: q.seq, state: state}
+	return q.seq
+}
+
+// written drops itemObjectID's entry once the write queued as seq has run,
+// unless a newer save has replaced it.
+func (q *queuedPets) written(itemObjectID int32, seq uint64) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if p, ok := q.pending[itemObjectID]; ok && p.seq == seq {
+		delete(q.pending, itemObjectID)
+	}
+}
+
+func (q *queuedPets) latest(itemObjectID int32) (petmodel.State, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	p, ok := q.pending[itemObjectID]
+	return p.state, ok
 }
 
 func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemcontainer.Inventory) {

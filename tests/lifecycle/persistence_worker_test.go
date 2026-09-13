@@ -80,6 +80,43 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	}
 }
 
+// TestSelectRefusedWhenQueuedSavesTimeOut backs up a logged-out character's
+// persistence lane past the connection's wait budget and selects the
+// character again. The selection is refused silently rather than loading
+// rows the old session has not written; once the lane drains, a new
+// selection goes through.
+func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithReuseDelays(0, 0),
+		gameservertest.WithPersistWait(200*time.Millisecond),
+	)
+	startInWorld(t, srv.Client)
+	objID := srv.SoleObjectID(t)
+
+	release := srv.HoldPersistenceLane(t, objID)
+	if err := srv.Client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "player left world", func() bool {
+		_, ok := srv.State.Player(objID)
+		return !ok
+	})
+
+	c := srv.DialClient(t, "player1", 1)
+	c.Send(encodeRequestGameStart(0))
+	if frame := c.ReadWithTimeout(time.Second); frame != nil {
+		t.Fatalf("selection answered %#x while its queued saves were still held past the wait budget", frame[0])
+	}
+
+	release()
+	srv.FlushPersistence(t)
+	c.Send(encodeRequestGameStart(0))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
+}
+
 func persistedHPAndOnline(t *testing.T, srv *gameservertest.Server, objID int32) (hp, online int) {
 	t.Helper()
 	if err := srv.DB.QueryRow("SELECT FLOOR(curHp), online FROM characters WHERE obj_Id = ?", objID).Scan(&hp, &online); err != nil {

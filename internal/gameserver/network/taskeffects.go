@@ -213,7 +213,7 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	var savePetRow func(context.Context)
 	if obj, ok := e.state.Summon(live.ObjectID()); ok {
 		if actor, ok := obj.(*summon.Actor); ok {
-			savePetRow = savePet(pets, actor, live.Inventory(), log)
+			_, _, savePetRow = savePet(pets, actor, live.Inventory(), log)
 		}
 	}
 
