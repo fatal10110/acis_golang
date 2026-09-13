@@ -10,15 +10,22 @@ const partyAttackedWeight = 1.0
 // flatAttackedHateWeight is the fallback ATTACKED-event attack Desire
 // weight for a non-Playable attacker, or while the individual AI script
 // that would derive it hasn't landed yet (#185, M10 - Content port at
-// scale) — the pre-existing approximation, unchanged.
+// scale). This is a Go-only divergence, not an approximation of Java: both
+// of Warrior.onAttacked's addAttackDesire calls, and WarriorBase.onAttacked's,
+// sit inside "if (attacker instanceof Playable)" (Warrior.java:392-397,
+// WarriorBase.java:100-102) — the reference adds zero ATTACKED hate at all
+// for a non-Playable attacker. Pre-existing (unchanged by #2346): before
+// that PR the threat table used hate=damage here, not this flat weight.
 const flatAttackedHateWeight = 200
 
 // attackedHateWeight approximates the reference's per-hit ATTACKED-event
 // hate weight. The reference derives this via the NPC's assigned
 // individual AI script (#185, M10): Warrior.onAttacked (Warrior.java:387-397)
 // computes damage/(level+7)*100 for a Playable attacker, further scaled by
-// a per-NPC "hateRatio" AI param that neither Go's Template nor the script
-// engine support yet — dropped here. Other script families (WizardBase,
+// getHateRatio (DefaultNpc.java:111-131) — the SetHateGroup/SetHateOccupation/
+// SetHateRace AI-param ratios, which apply only to a Player attacker (not
+// every Playable) — that neither Go's Template nor the script engine
+// support yet, so dropped here. Other script families (WizardBase,
 // MonsterBehavior, LV3Monster, …) use different formulas Go hasn't ported.
 // Until #185 lands that per-script dispatch, every Hostile uses this one
 // damage-proportional formula for Playable attackers instead, and falls
@@ -32,13 +39,17 @@ func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float
 }
 
 // NotifyAggression records the incoming aggression on this NPC and fans it
-// out to the master/minion party so escorts assist the same target.
+// out to the master/minion party so escorts assist the same target. power
+// goes through attackedHateWeight before reaching the threat table, matching
+// AttackableAI.onEvtAggression (AttackableAI.java:119-123), which routes the
+// AGGRESSION event into the same per-script onAttacked(actor, target, aggro,
+// null) chain a real hit uses, with aggro standing in for damage.
 func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
 	combatant, ok := source.(attackable.Combatant)
 	if !ok {
 		return
 	}
-	h.AddAttackDesire(combatant, float64(power))
+	h.AddAttackDesire(combatant, h.attackedHateWeight(combatant, float64(power)))
 	h.propagatePartyAttacked(h, combatant, power, true)
 }
 

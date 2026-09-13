@@ -428,6 +428,29 @@ func TestMeleeAttackerOutranksDOTOnlyAttacker(t *testing.T) {
 	}
 }
 
+// TestAggressionNotificationScalesLikeCombatHate pins the review's scale-
+// mismatch finding on PR #2346: NotifyAggression must route power through
+// the same attackedHateWeight scaling a real hit uses, matching
+// AttackableAI.onEvtAggression (AttackableAI.java:119-123), which feeds the
+// AGGRESSION event's aggro into the identical per-script onAttacked chain as
+// a hit's damage. Level-20 mob, a 300-damage DD hit (hate ≈ 300/27*100 ≈
+// 1111) vs a tank's power-500 AGGDEBUFF notification (hate ≈ 500/27*100 ≈
+// 1852) — the tank must outrank the DD, not merely match raw power against
+// scaled damage.
+func TestAggressionNotificationScalesLikeCombatHate(t *testing.T) {
+	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
+	dd := &hostileTarget{id: 2, playable: true}
+	tank := &hostileTarget{id: 3, playable: true}
+
+	h.ReduceHP(300, dd, modelskill.Definition{})
+	h.NotifyAggression(tank, 500)
+
+	most, ok := h.AI().Threats().MostHated()
+	if !ok || most.Attacker != tank {
+		t.Fatalf("MostHated() = (%+v, %v), want the scaled-up AGGDEBUFF tank, not the DD", most, ok)
+	}
+}
+
 func TestDamageOverTimeEffectQueuesAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
