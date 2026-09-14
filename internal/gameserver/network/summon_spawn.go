@@ -360,9 +360,10 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// (Blow.java:46-47,88-89) and the generic per-effect resisted message
 	// (L2Skill.java:1196-1197) are all gated `instanceof Player` on the
 	// caster/effector and never fire for a Summon at all in the reference —
-	// but Mdam.java:69, Blow.java:74, and Manadam.java:55 send
-	// S1_RESISTED_YOUR_S2 unconditionally for the skill's own effect-landing
-	// resist, so that subset (Resisted.Unconditional) is forwarded below
+	// but Mdam.java:69, Blow.java:74, Manadam.java:55, and
+	// L2SkillChargeDmg.java:77 send S1_RESISTED_YOUR_S2 unconditionally for
+	// the skill's own effect-landing resist, so that subset
+	// (Resisted.Unconditional) is forwarded below
 	// alongside AttackFailed/Lethals/MagicResists/ManaDamageMissed/ManaDrains
 	// (ManaDrains is itself gated `target instanceof Player`,
 	// Manadam.java:68, independent of caster type), but
@@ -384,8 +385,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			return
 		}
 		// Only the unconditional skill-level Resisted entries (Mdam.java:69,
-		// Blow.java:74, Manadam.java:55 — no `instanceof Player` gate) reach
-		// the owner via Summon.sendPacket's unconditional forwarding; the
+		// Blow.java:74, Manadam.java:55, L2SkillChargeDmg.java:77 — no
+		// `instanceof Player` gate) reach the owner via Summon.sendPacket's
+		// unconditional forwarding; the
 		// generic per-effect L2Skill.getEffects resist is gated
 		// `effector instanceof Player` and never fires for a Summon caster.
 		var resisted []handlerskill.Resisted

@@ -523,11 +523,7 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 			return
 		}
 		if !succeeded {
-			// No CHARGEDAM skillhandler exists in the reference (L2Skill
-			// dispatches it alongside PDAM/BLOW/STUN with no dedicated
-			// unconditional resist send); treat as the gated per-effect case
-			// until a real CHARGEDAM handler is ported.
-			appendResisted(result, effected, cast.Skill, false)
+			appendResisted(result, effected, cast.Skill, true)
 			return
 		}
 	}
