@@ -3,7 +3,6 @@ package summon
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -72,9 +71,6 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
-// SetLineOfSight attaches the geodata query used for attack visibility.
-func (a *Actor) SetLineOfSight(los LineOfSight) { a.los = los }
-
 // CanSee reports whether target is visible through geodata, or permits the
 // check when no query is attached (such as isolated domain tests).
 func (a *Actor) CanSee(target attackable.Combatant) bool {
@@ -131,6 +127,6 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 }
 
 func (a *Actor) BroadcastAttack(snapshot attack.Snapshot) error {
-	a.broadcast(func() wire.Frame { return a.frames.Attack(snapshot) })
+	a.emit(snapshot)
 	return nil
 }

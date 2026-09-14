@@ -3,6 +3,7 @@ package summon
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -68,53 +69,9 @@ func (a *Actor) Level() int {
 	return a.level
 }
 
-// SetStatusUpdater records the runtime hook that publishes this summon's
-// changed status to connected clients.
-func (a *Actor) SetStatusUpdater(update func()) {
-	a.statusMu.Lock()
-	defer a.statusMu.Unlock()
-	a.statusUpdater = update
-}
-
-// UpdateStatus publishes this summon's current status through its runtime hook.
+// UpdateStatus reports that this summon's current status must be republished.
 func (a *Actor) UpdateStatus() {
-	a.statusMu.RLock()
-	update := a.statusUpdater
-	a.statusMu.RUnlock()
-	if update != nil {
-		update()
-	}
-}
-
-// SetDamageNotifier records the runtime hook for owner-facing direct damage feedback.
-func (a *Actor) SetDamageNotifier(notify func(string, int32)) {
-	a.statusMu.Lock()
-	defer a.statusMu.Unlock()
-	a.damageNotifier = notify
-}
-
-// SetExpNotifier records the owner-facing pet experience feedback hook.
-func (a *Actor) SetExpNotifier(notify func(int64)) {
-	a.statusMu.Lock()
-	defer a.statusMu.Unlock()
-	a.expNotifier = notify
-}
-
-// SetOwnerInfoRefresher records the runtime hook that republishes this
-// summon's owner-only info window after a control-item enchant change.
-func (a *Actor) SetOwnerInfoRefresher(refresh func()) {
-	a.statusMu.Lock()
-	defer a.statusMu.Unlock()
-	a.ownerInfoRefresher = refresh
-}
-
-func (a *Actor) refreshOwnerInfo() {
-	a.statusMu.RLock()
-	refresh := a.ownerInfoRefresher
-	a.statusMu.RUnlock()
-	if refresh != nil {
-		refresh()
-	}
+	a.emit(event.StatusChanged{})
 }
 
 // SyncControlItemEnchant lifts the owner's control item to this pet's
@@ -133,7 +90,7 @@ func (a *Actor) SyncControlItemEnchant() bool {
 	if inst.Snapshot().EnchantLevel == level {
 		return false
 	}
-	a.refreshOwnerInfo()
+	a.emit(event.OwnerInfoChanged{})
 	return a.ownerInventory.SetEnchantLevel(inst, level)
 }
 
@@ -142,12 +99,7 @@ func (a *Actor) notifyDamage(attacker any, amount float64) {
 	if !ok {
 		return
 	}
-	a.statusMu.RLock()
-	notify := a.damageNotifier
-	a.statusMu.RUnlock()
-	if notify != nil {
-		notify(named.CharacterName(), int32(amount))
-	}
+	a.emit(event.Damaged{AttackerName: named.CharacterName(), Damage: int32(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.
@@ -297,12 +249,7 @@ func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 		a.SyncControlItemEnchant()
 	}
 	a.UpdateStatus()
-	a.statusMu.RLock()
-	notify := a.expNotifier
-	a.statusMu.RUnlock()
-	if notify != nil {
-		notify(expGain)
-	}
+	a.emit(event.ExpGained{Exp: expGain})
 }
 
 func (a *Actor) refreshGrowthLocked() bool {
@@ -559,10 +506,6 @@ func (a *Actor) OwnerCombatant() attackable.Combatant {
 func (a *Actor) SetAI(brain AI) {
 	a.brain = brain
 }
-
-// SetOnDespawn records runtime cleanup that must run exactly when this summon
-// leaves world state. It is configured before the summon is published.
-func (a *Actor) SetOnDespawn(f func()) { a.onDespawn = f }
 
 // CurrentTarget returns the summon target selected by its current command.
 func (a *Actor) CurrentTarget() world.Tracked { return a.target }

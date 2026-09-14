@@ -111,5 +111,5 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	}
 	destination := live.CurrentLocation()
 	actor.SyncPosition(destination)
-	actor.BroadcastFrame(serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
+	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
 }

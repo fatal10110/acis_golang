@@ -185,11 +185,12 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
+		Zones:     link.zones,
+		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
 		return false
 	}
-	pet.SetZones(link.zones)
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
 	// saved current values (Pet.java:552-556); NewPet already seeds
@@ -280,11 +281,12 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
+		Zones:     link.zones,
+		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
 		return false
 	}
-	servitor.SetZones(link.zones)
 	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
 	servitor.TryToFollow(live)
@@ -317,9 +319,6 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		}
 	}
 	attackController := attack.NewPlayable(actor)
-	if los, ok := l.geo.(summon.LineOfSight); ok {
-		actor.SetLineOfSight(los)
-	}
 	attackController.SetLogger(l.log)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	attackController.SetFinished(brain.Think)
@@ -408,39 +407,26 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	brain.SetCastController(aiController)
 	actor.SetAI(brain)
 	followTicker := brain.StartOffensiveFollowTicker(l.log)
+	sink := &summonSink{link: l, actor: actor, despawn: followTicker.Stop}
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
-		actor.SetOnDespawn(func() {
+		sink.despawn = func() {
 			l.ai.Remove(runner)
 			followTicker.Stop()
-		})
-	} else {
-		actor.SetOnDespawn(followTicker.Stop)
+		}
 	}
-	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
-	actor.SetOwnerInfoRefresher(func() { sendSummonInfosToOwner(actor) })
-	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	actor.SetAutoAttackStopBroadcaster(func() {
-		actor.BroadcastFrame(serverpackets.FrameAutoAttackStop(actor.ObjectID()))
-	})
-	actor.SetExpNotifier(func(exp int64) {
-		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
-			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(exp)))
-		}
-	})
-	actor.SetDamageNotifier(func(attackerName string, damage int32) {
-		owner, ok := l.livePlayerByID(actor.OwnerID())
-		if !ok {
-			return
-		}
-		messageID := serverpackets.SystemMessageSummonReceivedS2ByS1
-		if actor.IsPet() {
-			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
-		}
-		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, attackerName, damage))
-	})
+	actor.Attach(sink)
 	return aiController
+}
+
+// summonLineOfSight returns the geodata query summons use for attack
+// visibility, or nil when the geodata collaborator provides none.
+func (l *GameClientLink) summonLineOfSight() summon.LineOfSight {
+	if los, ok := l.geo.(summon.LineOfSight); ok {
+		return los
+	}
+	return nil
 }
 
 func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {

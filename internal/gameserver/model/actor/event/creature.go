@@ -60,6 +60,23 @@ type Flight struct {
 	Flight modelskill.Flight
 }
 
+// MoveToPawn is a target-relative approach or a rotation-only turn toward
+// TargetID from Origin, Distance away.
+type MoveToPawn struct {
+	TargetID int32
+	Distance int
+	Origin   location.Location
+}
+
+// StatusChanged reports that the actor's status observers see is stale.
+type StatusChanged struct{}
+
+// Despawned reports that the actor left the world for good.
+type Despawned struct{}
+
+func (MoveToPawn) event()            {}
+func (StatusChanged) event()         {}
+func (Despawned) event()             {}
 func (Attack) event()                {}
 func (Move) event()                  {}
 func (Stopped) event()               {}

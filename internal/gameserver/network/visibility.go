@@ -27,7 +27,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
 		if o.OwnerID() == p.ObjectID() {
-			o.SetAbnormalEffectUpdater(func() { refreshSummonAbnormalEffect(o) })
+			o.MarkDiscoveredByOwner()
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
@@ -81,9 +81,12 @@ func sendSummonInfosToOwner(a *summon.Actor) {
 	}
 }
 
-func refreshSummonAbnormalEffect(a *summon.Actor) {
+func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 	sendSummonInfosToOwner(a)
-	a.ForEachKnown(func(obj world.Tracked) {
+	if l.world == nil {
+		return
+	}
+	l.world.ForEachKnown(a, func(obj world.Tracked) {
 		p, ok := obj.(*livePlayer)
 		if !ok || p.ObjectID() == a.OwnerID() {
 			return
