@@ -1659,13 +1659,13 @@ type skillTarget struct {
 	// deterministic effect-landing failure regardless of shield/rnd.
 	skillSuccessChance *float64
 	lastShield         formulas.ShieldDefense
-	blowInput      formulas.BlowInput
-	blowOK         bool
-	manaInput      formulas.ManaDamageInput
-	manaOK         bool
-	lethalInput    formulas.LethalInput
-	lethalOK       bool
-	lethalPlayer   bool
+	blowInput          formulas.BlowInput
+	blowOK             bool
+	manaInput          formulas.ManaDamageInput
+	manaOK             bool
+	lethalInput        formulas.LethalInput
+	lethalOK           bool
+	lethalPlayer       bool
 
 	raidRelated  bool
 	lethalImmune bool
