@@ -30,10 +30,8 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	}
 	owners := []int32{live.ObjectID()}
 	l.abortFusionTargeting(live)
-	// Stop any in-flight attack/movement timers before anything below nulls
-	// the hooks they call into (SetFrameSender/SetAttackBroadcaster) —
-	// otherwise a timer goroutine can still fire after detach and race
-	// those writes.
+	// Stop any in-flight attack/movement timers before the session detaches
+	// below — otherwise a timer goroutine can still fire after detach.
 	live.Stop()
 	l.cancelActiveTrade(live)
 	// Excludes TaskEffects.Save's check-and-enqueue: every autosave job is

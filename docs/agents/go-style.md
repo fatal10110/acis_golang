@@ -128,6 +128,9 @@ retry, or pooling frameworks when the adopted library or standard library alread
 | `Util` grab bag | functions beside the domain concept they serve |
 | domain rules in packet handlers | a domain API returning typed outcomes |
 | hidden registration in `init` | explicit composition-root registration |
+| `func`-typed callback field + `Set<Thing>Hook` setter per notification | one `event.Sink`; a small `event.X` struct per fact; network maps in one type switch |
+| optional-capability interface asserted at runtime (`t.(fooTarget)`) | a required method on the consumer's actor interface, `Kind()` for the closed set of actor kinds, at most one `asPlayer/asNPC` helper per package |
+| universal base interface (`ObjectID()` only) stored in registries + downcast | registries typed by what they hold (`registry[T]`), `world.Tracked`/`world.Player` |
 
 ## Worked example
 

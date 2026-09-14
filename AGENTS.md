@@ -67,7 +67,8 @@ structure.
 ## Always-loaded engineering rules
 
 - Keep game rules, validation, state mutation, and persistence decisions in domain packages;
-  network handlers only decode, resolve context, call domain behavior, and map outcomes to packets.
+  network handlers only decode, resolve context, call domain behavior, and map outcomes to packets;
+  server-initiated changes reach the network as `event.Event` values, never as callbacks.
 - Give every shared mutable value an explicit owner through one goroutine or a named synchronization
   mechanism, and do not launch unowned goroutines.
 - Define focused interfaces at consumption points, return concrete types, and do not add speculative
@@ -199,7 +200,7 @@ Load only the guide needed for the current work:
 - [`docs/agents/test-strategy.md`](docs/agents/test-strategy.md): when to replace a hand-rolled test
   double with the real production type or a real DB/socket boundary, and when to keep it.
 - [`docs/agents/server-initiated-updates.md`](docs/agents/server-initiated-updates.md): delivering
-  state the server changes without a client request, runtime hooks instead of `serverpackets`
+  state the server changes without a client request, actor events instead of `serverpackets`
   imports in domain packages, and wire-through of ported tasks and adapters.
 - [`docs/agents/model-policy.md`](docs/agents/model-policy.md): evidence-based model and effort
   selection.

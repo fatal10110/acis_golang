@@ -123,17 +123,16 @@ type physicalTarget interface {
 // alongside the world-grid presence and CreatureMove position it must
 // stay consistent with.
 
-// UpdateUserInfo resends this character's UserInfo through the runtime
-// packet hook, mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
+// UpdateUserInfo reports that this character's UserInfo must be resent,
+// mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
 // every experience change — without it the client keeps displaying the
 // experience, SP and level it was last told about.
 func (c *Character) UpdateUserInfo() {
 	c.emit(event.UserInfoChanged{})
 }
 
-// UpdateAbnormalEffect refreshes this character's abnormal-effect icon
-// state through the runtime packet hook, implementing the effect list's
-// abnormalUpdater hook: it fires on every effect start and stop, matching
+// UpdateAbnormalEffect reports that this character's active-effect icon list
+// changed, implementing the effect list's abnormalUpdater hook: it fires on every effect start and stop, matching
 // Creature.addEffect()/removeEffect() unconditionally queueing an
 // EffectList icon update on each attempt.
 func (c *Character) UpdateAbnormalEffect() {
@@ -164,21 +163,18 @@ func (c *Character) AbnormalEffect() int {
 	return int(c.abnormalEffectMask.Load())
 }
 
-// BroadcastAbnormalEffect resends this character's UserInfo/CharInfo through
-// the runtime packet hook after StartAbnormalEffect/StopAbnormalEffect
-// changed its bitmask.
+// BroadcastAbnormalEffect reports that StartAbnormalEffect/StopAbnormalEffect
+// changed this character's bitmask, so its UserInfo/CharInfo must be resent.
 func (c *Character) BroadcastAbnormalEffect() {
 	c.emit(event.AbnormalEffectChanged{})
 }
 
-// BroadcastStatus sends this character's current HP through the runtime
-// packet hook.
+// BroadcastStatus reports a change to this character's current HP.
 func (c *Character) BroadcastStatus() {
 	c.emit(event.VitalsChanged{})
 }
 
-// NotifyBowDraw delivers the bow-draw client packets through the runtime
-// hook. A nil hook is a silent no-op so domain tests need no packet layer.
+// NotifyBowDraw reports that a bow shot started drawing.
 func (c *Character) NotifyBowDraw(gaugeMs int) {
 	c.emit(event.BowDrawn{GaugeMs: gaugeMs})
 }
@@ -206,8 +202,7 @@ func (c *Character) ConsumeBowMP() {
 	}
 }
 
-// BroadcastMPStatus sends this character's current HP and MP through the
-// runtime packet hook.
+// BroadcastMPStatus reports a change to this character's current HP and MP.
 func (c *Character) BroadcastMPStatus() {
 	c.emit(event.VitalsChanged{IncludeMP: true})
 }
@@ -472,17 +467,13 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 
 // MakeAttackHit resolves one physical attack result.
 
-// BroadcastAttack sends an attack snapshot through the runtime packet hook.
-// A nil hook (the player is between sessions) is normal, not a failure, so
-// this always reports nil — unlike npc.Hostile, a live player's broadcast
-// hooks come and go with its connection by design.
+// BroadcastAttack reports one resolved attack swing. It always reports nil.
 func (c *Character) BroadcastAttack(snapshot event.Attack) error {
 	c.emit(snapshot)
 	return nil
 }
 
-// BroadcastMove sends a movement event through the runtime packet hook. See
-// BroadcastAttack: a nil hook is expected, not reported as an error.
+// BroadcastMove reports a server-driven movement start.
 func (c *Character) BroadcastMove(ev event.Move) error {
 	c.emit(ev)
 	return nil
@@ -492,21 +483,18 @@ func (c *Character) BroadcastMove(ev event.Move) error {
 // target-relative movement packet.
 func (c *Character) OffensiveFollowIsPawnMove() bool { return true }
 
-// BroadcastStop sends a stop-in-place notice through the runtime packet
-// hook. See BroadcastAttack: a nil hook is expected, not reported as an
-// error.
+// BroadcastStop reports server-driven movement cancelled mid-flight.
 func (c *Character) BroadcastStop() error {
 	c.emit(event.Stopped{})
 	return nil
 }
 
-// BroadcastAutoAttackStop sends AutoAttackStop through the runtime packet
-// hook when combat stance expires from inactivity.
+// BroadcastAutoAttackStop reports that combat stance expired from inactivity.
 func (c *Character) BroadcastAutoAttackStop() {
 	c.emit(event.AutoAttackStopped{})
 }
 
-// BroadcastDie sends the death packet through the runtime packet hook.
+// BroadcastDie reports the moment this character died.
 func (c *Character) BroadcastDie() {
 	c.emit(event.Died{})
 }

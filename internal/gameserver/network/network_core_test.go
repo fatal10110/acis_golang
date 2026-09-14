@@ -12,7 +12,11 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -20,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/rs/zerolog"
 )
@@ -1091,4 +1096,122 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 			}
 		}
 	})
+}
+
+// retainingReceiver is a world-visible observer that keeps every raw frame a
+// broadcast hands it, so a test can prove each recipient owns its copy.
+type retainingReceiver struct {
+	world.Presence
+
+	id     int32
+	mu     sync.Mutex
+	frames []wire.Frame
+}
+
+func (r *retainingReceiver) ObjectID() int32 { return r.id }
+
+func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.frames = append(r.frames, frame)
+	return true
+}
+
+type sinkTestDoorShape struct{}
+
+func (sinkTestDoorShape) GeoX() int               { return 0 }
+func (sinkTestDoorShape) GeoY() int               { return 0 }
+func (sinkTestDoorShape) GeoZ() int               { return 0 }
+func (sinkTestDoorShape) Height() int             { return 100 }
+func (sinkTestDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{0}} }
+
+// TestActorSinksHandEachObserverAnOwnedCopy pins the fan-out every actor
+// sink performs: one serialized frame, an independently owned copy per
+// recipient.
+func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		emit func(t *testing.T, state *world.State)
+	}{
+		{"hostile", func(t *testing.T, state *world.State) {
+			h := newTestHostileNPC(t, 7)
+			h.Attach(HostileSinks(state)(h))
+			state.Spawn(h, 0, 0, 0, 0)
+			_ = h.BroadcastStop()
+		}},
+		{"summon", func(t *testing.T, state *world.State) {
+			actor, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 7})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actor.Attach(&summonSink{link: &GameClientLink{world: state}, actor: actor})
+			state.Spawn(actor, 0, 0, 0, 0)
+			_ = actor.BroadcastSelfSkillUse(1422, 1)
+		}},
+		{"effect point", func(t *testing.T, state *world.State) {
+			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ep.SetWorld(state)
+			ep.Attach(EffectPointSinks(state)(ep))
+			ep.Spawn(0, 0, 0, 0)
+			_ = ep.BroadcastSkillLaunched(1, 1, []int32{1})
+		}},
+		{"door", func(t *testing.T, state *world.State) {
+			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			d.Attach(DoorSinks(state)(d))
+			state.Spawn(d, 0, 0, 0, 0)
+			d.BroadcastStatus()
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			first, second := &retainingReceiver{id: 1}, &retainingReceiver{id: 2}
+			state.Spawn(first, 10, 0, 0, 0)
+			state.Spawn(second, 20, 0, 0, 0)
+
+			tc.emit(t, state)
+
+			if len(first.frames) != 1 || len(second.frames) != 1 {
+				t.Fatalf("frames = %d/%d, want 1/1", len(first.frames), len(second.frames))
+			}
+			before := append([]byte(nil), second.frames[0].Bytes()...)
+			first.frames[0].Bytes()[2] ^= 0xFF
+			if got := second.frames[0].Bytes(); string(got) != string(before) {
+				t.Fatalf("mutating one recipient's frame changed another's: %x != %x", got, before)
+			}
+		})
+	}
+}
+
+// TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines pins the sink's
+// happens-before edge: Attach runs before Spawn publishes the NPC, so a
+// goroutine that finds it through the world may emit without a data race.
+// Run with -race.
+func TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines(t *testing.T) {
+	state := world.New()
+	observer := &retainingReceiver{id: 1}
+	state.Spawn(observer, 10, 0, 0, 0)
+	h := newTestHostileNPC(t, 7)
+	h.Attach(HostileSinks(state)(h))
+	state.Spawn(h, 0, 0, 0, 0)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if obj, ok := state.Object(7); ok {
+			_ = obj.(*npc.Hostile).BroadcastStop()
+		}
+	}()
+	<-done
+
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer frames = %d, want 1", len(observer.frames))
+	}
 }
