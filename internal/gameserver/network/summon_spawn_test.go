@@ -118,3 +118,46 @@ func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
 	assertSystemMessageStringFrame(t, targetGot[0], serverpackets.SystemMessageCounteredS1Attack, "Servitor")
 	assertSystemMessageStringFrame(t, targetGot[1], serverpackets.SystemMessageAvoidedS1Attack, "Servitor")
 }
+
+// TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner pins issue #2354:
+// a summon's OnHitResult must forward only the unconditional skill-level
+// Resisted entries (Mdam.java:69, Blow.java:74, Manadam.java:55 —
+// creature.sendPacket with no `instanceof Player` gate, reaching the owner
+// via Summon.sendPacket's unconditional forwarding). The generic per-effect
+// L2Skill.getEffects resist (gated `effector instanceof Player`, never true
+// for a Summon) must not reach the owner.
+func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
+	ownerFrames := &testsupport.FrameCapture{}
+	owner := newTestLivePlayer(t, 100, ownerFrames)
+
+	state := world.New()
+	state.AddPlayer(owner)
+
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
+		ObjectID:       300,
+		Owner:          owner,
+		NPCID:          1,
+		Name:           "Servitor",
+		OwnerInventory: owner.Inventory(),
+		Stats:          summon.CombatStats{MaxHP: 100, MaxMP: 100},
+	})
+	if err != nil {
+		t.Fatalf("NewServitor() error: %v", err)
+	}
+
+	l := &GameClientLink{world: state, log: zerolog.Nop()}
+	aiController := l.wireSummonAI(servitor)
+
+	aiController.OnHitResult(actorcast.EffectResult{
+		Resisted: []handlerskill.Resisted{
+			{TargetName: "Orc", SkillID: 1, SkillLevel: 1, Unconditional: true},
+			{TargetName: "Orc", SkillID: 2, SkillLevel: 1, Unconditional: false},
+		},
+	})
+
+	ownerGot := ownerFrames.Frames()
+	if len(ownerGot) != 1 {
+		t.Fatalf("owner frame count = %d, want 1 (only the unconditional Resisted entry forwards)", len(ownerGot))
+	}
+	assertSystemMessageStringSkillNameFrame(t, ownerGot[0], serverpackets.SystemMessageS1ResistedYourS2, "Orc", 1, 1)
+}

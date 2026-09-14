@@ -286,7 +286,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 			return
 		}
 		if !succeeded {
-			appendResisted(result, effected, cast.Skill)
+			appendResisted(result, effected, cast.Skill, true)
 			return
 		}
 	}
@@ -400,7 +400,10 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	case formulas.MagicFailureHalf:
 		result.AttackFailed++
 	case formulas.MagicFailureFull:
-		appendResisted(result, target, cast.Skill)
+		// Formulas.java:614 gates this send `attacker instanceof Player` —
+		// unlike Mdam/Blow/Manadam's own unconditional skill-level resist —
+		// so it never reaches a Summon's owner in the reference.
+		appendResisted(result, target, cast.Skill, false)
 	}
 	if _, ok := target.(worldPlayerTarget); ok {
 		result.MagicResists = append(result.MagicResists, MagicResist{
@@ -451,16 +454,20 @@ func deliverMagicFailure(caster, target Actor, def modelskill.Definition, failur
 // message from the target creature's name unconditionally, and the datapack
 // ships nameless targetable monsters (npc ids 27201-27213), so an empty name
 // still owes the caster the report.
-func appendResisted(result *Result, target Actor, def modelskill.Definition) {
+func appendResisted(result *Result, target Actor, def modelskill.Definition, unconditional bool) {
 	if result == nil {
 		return
 	}
-	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: def.Level})
+	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: def.Level, Unconditional: unconditional})
 }
 
+// appendResistedCount records count per-effect-template resists produced by
+// applyEffectsWithLanding's landing roll — the L2Skill.getEffects generic
+// resist, gated to a Player caster in the reference — never the caster's own
+// unconditional skill-level resist.
 func appendResistedCount(result *Result, target Actor, def modelskill.Definition, count int) {
 	for range count {
-		appendResisted(result, target, def)
+		appendResisted(result, target, def, false)
 	}
 }
 
@@ -495,7 +502,7 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 		return
 	}
 	if !succeeded {
-		appendResisted(result, effected, cast.Skill)
+		appendResisted(result, effected, cast.Skill, true)
 		return
 	}
 	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
@@ -516,7 +523,11 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 			return
 		}
 		if !succeeded {
-			appendResisted(result, effected, cast.Skill)
+			// No CHARGEDAM skillhandler exists in the reference (L2Skill
+			// dispatches it alongside PDAM/BLOW/STUN with no dedicated
+			// unconditional resist send); treat as the gated per-effect case
+			// until a real CHARGEDAM handler is ported.
+			appendResisted(result, effected, cast.Skill, false)
 			return
 		}
 	}
@@ -573,7 +584,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			if ok && succeeded {
 				appendResistedCount(&result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false))
 			} else if ok {
-				appendResisted(&result, effected, cast.Skill)
+				appendResisted(&result, effected, cast.Skill, true)
 			}
 		}
 		rawDamage := formulas.ManaDamage(in)

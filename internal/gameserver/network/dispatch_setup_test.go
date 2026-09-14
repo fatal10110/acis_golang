@@ -101,6 +101,41 @@ func assertSystemMessageStringNumberFrame(t *testing.T, frame []byte, messageID 
 	}
 }
 
+// assertSystemMessageStringSkillNameFrame checks a two-param SystemMessage: a
+// text param followed by a skill-name param (e.g. S1_RESISTED_YOUR_S2's
+// target name and skill id/level).
+func assertSystemMessageStringSkillNameFrame(t *testing.T, frame []byte, messageID int, text string, skillID, level int32) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("SystemMessage opcode = %#x, want %#x", frame[0], serverpackets.OpcodeSystemMessage)
+	}
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
+	}
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("SystemMessage params = %d, want 2", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("SystemMessage param 1 type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != text {
+		t.Fatalf("SystemMessage text = %q, want %q", got, text)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName {
+		t.Fatalf("SystemMessage param 2 type = %d, want skill name", typ)
+	}
+	if got := r.ReadInt32(); got != skillID {
+		t.Fatalf("SystemMessage skillID = %d, want %d", got, skillID)
+	}
+	if got := r.ReadInt32(); got != level {
+		t.Fatalf("SystemMessage skill level = %d, want %d", got, level)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read SystemMessage: %v", err)
+	}
+}
+
 // testLinkNow, when non-nil, supplies the packet-accounting clock of every
 // GameClientLink constructed afterwards, freezing flood windows for
 // deterministic flood-gate assertions.
