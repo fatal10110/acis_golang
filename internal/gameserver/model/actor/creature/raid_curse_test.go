@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -11,14 +12,15 @@ import (
 func TestCursesOnAttackPetrifiesLevelGapAndStopsHate(t *testing.T) {
 	attacker := newCursePlayable(t, 80)
 	target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
-		Attacker:  attacker,
-		Target:    target,
-		NPCID:     target.npcID,
-		Skills:    raidCurseSkills(),
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Attacker: attacker,
+		Target:   target,
+		NPCID:    target.npcID,
+		Skills:   raidCurseSkills(),
+		Sink:     rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if !blocked {
 		t.Fatal("TestCursesOnAttack() = false, want true")
 	}
@@ -44,14 +46,15 @@ func TestCursesOnAttackExistingPetrifyDoesNotBlock(t *testing.T) {
 	def, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurse2SkillID, Level: 1})
 	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
 
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
-		Attacker:  attacker,
-		Target:    target,
-		NPCID:     target.npcID,
-		Skills:    skills,
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Attacker: attacker,
+		Target:   target,
+		NPCID:    target.npcID,
+		Skills:   skills,
+		Sink:     rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if blocked {
 		t.Fatal("TestCursesOnAttack() with existing petrify = true, want false")
 	}
@@ -66,15 +69,16 @@ func TestCursesOnAttackExistingPetrifyDoesNotBlock(t *testing.T) {
 func TestCursesOnAttackMountedAntiStriderDoesNotBlock(t *testing.T) {
 	attacker := newCursePlayable(t, 70)
 	target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
-		Attacker:  attacker,
-		Target:    target,
-		NPCID:     target.npcID,
-		Mounted:   true,
-		Skills:    raidCurseSkills(),
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Attacker: attacker,
+		Target:   target,
+		NPCID:    target.npcID,
+		Mounted:  true,
+		Skills:   raidCurseSkills(),
+		Sink:     rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if blocked {
 		t.Fatal("TestCursesOnAttack() mounted anti-strider = true, want false")
 	}
@@ -119,15 +123,16 @@ func TestCursesOnAttackExistingPetrifyStillAppliesAntiStrider(t *testing.T) {
 	def, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurse2SkillID, Level: 1})
 	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
 
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
-		Attacker:  attacker,
-		Target:    target,
-		NPCID:     target.npcID,
-		Mounted:   true,
-		Skills:    skills,
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Attacker: attacker,
+		Target:   target,
+		NPCID:    target.npcID,
+		Mounted:  true,
+		Skills:   skills,
+		Sink:     rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if blocked {
 		t.Fatal("existing petrify + anti-strider blocked")
 	}
@@ -142,14 +147,15 @@ func TestCursesOnAttackExistingPetrifyStillAppliesAntiStrider(t *testing.T) {
 func TestCursesOnSkillSeeOffensivePetrifiesAndAborts(t *testing.T) {
 	caster := newCursePlayable(t, 80)
 	raid := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnSkillSee(RaidCurseSkillInput{
 		Caster:    caster,
 		Offensive: true,
 		Targets:   []RaidCurseSkillSeeTarget{SkillSeeTargetOf(raid, false)},
 		Skills:    raidCurseSkills(),
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Sink:      rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if !blocked {
 		t.Fatal("TestCursesOnSkillSee() offensive = false, want true")
 	}
@@ -169,16 +175,17 @@ func TestCursesOnSkillSeeBeneficialSilencesHatedPlayable(t *testing.T) {
 	helped := newCursePlayable(t, 40)
 	helped.id = 3
 	raid := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true, hate: map[int32]float64{3: 10}}
-	var uses []MagicSkillUse
+	rec := &event.Recorder{}
 	blocked := TestCursesOnSkillSee(RaidCurseSkillInput{
 		Caster: caster,
 		Targets: []RaidCurseSkillSeeTarget{
 			SkillSeeTargetOf(helped, true),
 		},
-		Nearby:    []RaidCurseSkillRaid{raid},
-		Skills:    raidCurseSkills(),
-		Broadcast: func(use MagicSkillUse) { uses = append(uses, use) },
+		Nearby: []RaidCurseSkillRaid{raid},
+		Skills: raidCurseSkills(),
+		Sink:   rec,
 	})
+	uses := event.Of[event.MagicSkillUse](rec)
 	if !blocked {
 		t.Fatal("TestCursesOnSkillSee() beneficial = false, want true")
 	}
@@ -396,11 +403,11 @@ func TestCursesOnAttackEffectRangeBoundary(t *testing.T) {
 			attacker := newCursePlayable(t, 80)
 			target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, x: tc.x, y: tc.y, z: tc.z}
 			blocked := TestCursesOnAttack(RaidCurseInput{
-				Attacker:  attacker,
-				Target:    target,
-				NPCID:     target.npcID,
-				Skills:    raidCurseSkills(),
-				Broadcast: func(MagicSkillUse) {},
+				Attacker: attacker,
+				Target:   target,
+				NPCID:    target.npcID,
+				Skills:   raidCurseSkills(),
+				Sink:     &event.Recorder{},
 			})
 			if got := hasActiveSkill(attacker.EffectList(), modelskill.RaidCurse2SkillID); got != tc.applied {
 				t.Fatalf("petrification applied = %v, want %v", got, tc.applied)

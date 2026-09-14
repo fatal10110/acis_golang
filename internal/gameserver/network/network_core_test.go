@@ -8,13 +8,20 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -22,7 +29,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
 
@@ -991,29 +1001,17 @@ func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, leve
 }
 func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.stopAttack = gcl.stopLiveAutoAttack
-	live.attack.SetFinished(func() {
-		gcl.finishDeferredPickup(live)
-		gcl.finishDeferredMagicSkill(live)
-		gcl.finishDeferredItemAICast(live)
-		live.combat.Think()
-	})
-	live.attack.SetStarted(func() {
-		gcl.startLiveAutoAttack(live)
-	})
-	live.Character.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
-		gcl.broadcastAttack(live, snapshot)
-	})
-	live.Character.SetMoveBroadcaster(func(event move.Event) {
-		gcl.broadcastLiveMoveEvent(live, event)
-	})
-	live.Character.SetStatusBroadcaster(func() {
-		gcl.broadcastLiveStatus(live)
-	})
-	live.move.SetArrived(func() {
-		pos := live.move.Position()
-		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())
-		live.combat.Think()
-	})
+	live.link = gcl
+	live.Character.Attach(live.Live, live)
+	// Rebuild the controllers over the production player sink, so attack
+	// start/finish and arrival run the same arms attachLivePlayer wires.
+	moveCtl, err := move.NewController(live.Move(), live.Character, live)
+	if err != nil {
+		panic(err)
+	}
+	live.move = moveCtl
+	live.attack = attack.NewPlayer(live.Character, live)
+	live.combat = ai.NewPlayerAttack(live.Character, live.move, live.attack)
 }
 
 // TestAttackLiveTargetRejectsOutOfControl pins AttackRequest.java:31's
@@ -1100,4 +1098,265 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 			}
 		}
 	})
+}
+
+// retainingReceiver is a world-visible observer that keeps every raw frame a
+// broadcast hands it, so a test can prove each recipient owns its copy.
+type retainingReceiver struct {
+	world.Presence
+
+	id     int32
+	mu     sync.Mutex
+	frames []wire.Frame
+}
+
+func (r *retainingReceiver) ObjectID() int32 { return r.id }
+
+func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.frames = append(r.frames, frame)
+	return true
+}
+
+type sinkTestDoorShape struct{}
+
+func (sinkTestDoorShape) GeoX() int               { return 0 }
+func (sinkTestDoorShape) GeoY() int               { return 0 }
+func (sinkTestDoorShape) GeoZ() int               { return 0 }
+func (sinkTestDoorShape) Height() int             { return 100 }
+func (sinkTestDoorShape) GeoData() [][]block.NSWE { return [][]block.NSWE{{0}} }
+
+// TestActorSinksHandEachObserverAnOwnedCopy pins the fan-out every actor
+// sink performs: one serialized frame, an independently owned copy per
+// recipient.
+func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		emit func(t *testing.T, state *world.State)
+	}{
+		{"hostile", func(t *testing.T, state *world.State) {
+			h := newTestHostileNPC(t, 7)
+			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
+			state.Spawn(h, 0, 0, 0, 0)
+			_ = h.BroadcastStop()
+		}},
+		{"summon", func(t *testing.T, state *world.State) {
+			actor, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 7})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actor.Attach(summon.Runtime{Sink: &summonSink{link: &GameClientLink{world: state}, actor: actor}})
+			state.Spawn(actor, 0, 0, 0, 0)
+			_ = actor.BroadcastSelfSkillUse(1422, 1)
+		}},
+		{"effect point", func(t *testing.T, state *world.State) {
+			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
+			ep.Spawn(0, 0, 0, 0)
+			_ = ep.BroadcastSkillLaunched(1, 1, []int32{1})
+		}},
+		{"door", func(t *testing.T, state *world.State) {
+			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			d.Attach(DoorSinks(state)(d))
+			state.Spawn(d, 0, 0, 0, 0)
+			d.BroadcastStatus()
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := world.New()
+			first, second := &retainingReceiver{id: 1}, &retainingReceiver{id: 2}
+			state.Spawn(first, 10, 0, 0, 0)
+			state.Spawn(second, 20, 0, 0, 0)
+
+			tc.emit(t, state)
+
+			if len(first.frames) != 1 || len(second.frames) != 1 {
+				t.Fatalf("frames = %d/%d, want 1/1", len(first.frames), len(second.frames))
+			}
+			before := append([]byte(nil), second.frames[0].Bytes()...)
+			first.frames[0].Bytes()[2] ^= 0xFF
+			if got := second.frames[0].Bytes(); string(got) != string(before) {
+				t.Fatalf("mutating one recipient's frame changed another's: %x != %x", got, before)
+			}
+		})
+	}
+}
+
+// TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines pins the sink's
+// happens-before edge: Attach runs before Spawn publishes the NPC, so a
+// goroutine that finds it through the world may emit without a data race.
+// Run with -race.
+func TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines(t *testing.T) {
+	state := world.New()
+	observer := &retainingReceiver{id: 1}
+	state.Spawn(observer, 10, 0, 0, 0)
+	h := newTestHostileNPC(t, 7)
+	h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
+	state.Spawn(h, 0, 0, 0, 0)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if obj, ok := state.Object(7); ok {
+			_ = obj.(*npc.Hostile).BroadcastStop()
+		}
+	}()
+	<-done
+
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	if len(observer.frames) != 1 {
+		t.Fatalf("observer frames = %d, want 1", len(observer.frames))
+	}
+}
+
+// recordingWaterEffects counts the water task's breath-gauge updates, so a
+// test can see whether an actor was removed from the task.
+type recordingWaterEffects struct{ gauges atomic.Int32 }
+
+func (w *recordingWaterEffects) GaugeSet(task.WaterActor, time.Duration) { w.gauges.Add(1) }
+func (w *recordingWaterEffects) Drown(task.WaterActor)                   {}
+
+// detachFilterFixture is one online player known by one observer, tracked by
+// the water task, with a link wired to the PvP-flag and water trackers the
+// player's session-only event arms reach.
+type detachFilterFixture struct {
+	live, observer        *livePlayer
+	ownFrames, seenFrames *testsupport.FrameCapture
+	pvpFlags              *task.PvPFlags
+	water                 *recordingWaterEffects
+}
+
+func newDetachFilterFixture(t *testing.T) detachFilterFixture {
+	t.Helper()
+	state := world.New()
+	water := &recordingWaterEffects{}
+	waterTask, err := task.NewWater(water, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gcl := &GameClientLink{world: state, pvpFlags: task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil), water: waterTask, log: zerolog.Nop()}
+	ownFrames, seenFrames := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, ownFrames)
+	observer := newTestLivePlayer(t, 2, seenFrames)
+	live.link, observer.link = gcl, gcl
+	live.Character.Attach(live.Live, live)
+	state.Spawn(live, 100, 0, 0, 0)
+	state.Spawn(observer, 200, 0, 0, 0)
+	waterTask.Add(live, time.Minute)
+	testsupport.ResetCapture(ownFrames, seenFrames)
+	water.gauges.Store(0)
+	return detachFilterFixture{live: live, observer: observer, ownFrames: ownFrames, seenFrames: seenFrames, pvpFlags: gcl.pvpFlags, water: water}
+}
+
+// effects reports the side effects ev had on this fixture: frames the player
+// or its observer received, PvP-flag registration, and water-task removal.
+func (f detachFilterFixture) effects() string {
+	return fmt.Sprintf("own frames %d, observer frames %d, pvp-flag tracked %d, water gauge updates %d",
+		len(f.ownFrames.Frames()), len(f.seenFrames.Frames()), f.pvpFlags.Len(), f.water.gauges.Load())
+}
+
+const noDetachFilterEffects = "own frames 0, observer frames 0, pvp-flag tracked 0, water gauge updates 0"
+
+// TestLivePlayerDetachDropsSessionOnlyEvents pins the detach filter that
+// replaced clearing the player's session hooks: once DetachSession runs, an
+// event only its session delivered has no side effect — no frame to the
+// player or anyone who knows it, no PvP-flag registration, no water-task
+// removal — while the same event on an attached player does. Events whose
+// hooks detach left wired keep flowing.
+func TestLivePlayerDetachDropsSessionOnlyEvents(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ev   event.Event
+	}{
+		{"attack", event.Attack{AttackerID: 1, Hits: []event.AttackHit{{TargetID: 2}}}},
+		{"died", event.Died{}},
+		{"pvp flagged", event.PvPFlagged{}},
+		{"relation changed", event.RelationChanged{}},
+		{"weight penalty changed", event.WeightPenaltyChanged{}},
+		{"user info changed", event.UserInfoChanged{}},
+		{"bow drawn", event.BowDrawn{GaugeMs: 100}},
+		{"regen max", event.RegenMax{Count: 1, Period: 1}},
+		{"effect removed lack hp", event.EffectRemovedLackHP{}},
+		{"effect removed lack mp", event.EffectRemovedLackMP{}},
+		{"relax hp full", event.RelaxHPFull{}},
+		{"restored", event.Restored{Amount: 1}},
+		{"effect ended", event.EffectEnded{SkillID: 1, Level: 1}},
+		{"spoil result", event.SpoilResult{}},
+		{"servitor vanished", event.ServitorVanished{}},
+		{"shield blocked", event.ShieldBlocked{}},
+		{"attack failed", event.AttackFailed{}},
+		{"skill resisted", event.SkillResisted{SkillID: 1, Level: 1}},
+		{"magic resisted", event.MagicResisted{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			attached := newDetachFilterFixture(t)
+			attached.live.Emit(tc.ev)
+			if got := attached.effects(); got == noDetachFilterEffects {
+				t.Fatalf("attached player: %s, want a side effect this fixture can observe", got)
+			}
+
+			detached := newDetachFilterFixture(t)
+			detached.live.DetachSession()
+			detached.live.Emit(tc.ev)
+			if got := detached.effects(); got != noDetachFilterEffects {
+				t.Fatalf("detached player: %s, want none", got)
+			}
+		})
+	}
+
+	// An event whose hook detach never cleared still reaches observers.
+	detached := newDetachFilterFixture(t)
+	detached.live.DetachSession()
+	detached.live.Emit(event.AutoAttackStopped{})
+	if got := len(detached.seenFrames.Frames()); got != 1 {
+		t.Fatalf("detached AutoAttackStopped observer frames = %d, want 1", got)
+	}
+}
+
+// TestLivePlayerSessionOnlyEventSet pins the complete detach filter, including
+// the events whose side effects the behavior test above cannot observe in
+// its fixture (a level refresh's skill persistence, a herb's effects): adding
+// or dropping one must be a deliberate edit here.
+func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
+	sessionOnlyEvents := []event.Event{
+		event.Attack{}, event.BowDrawn{}, event.Died{}, event.HerbConsumed{},
+		event.RegenMax{}, event.EffectRemovedLackHP{}, event.EffectRemovedLackMP{},
+		event.RelaxHPFull{}, event.Restored{}, event.EffectEnded{}, event.SpoilResult{},
+		event.ServitorVanished{}, event.ShieldBlocked{}, event.AttackFailed{},
+		event.SkillResisted{}, event.MagicResisted{}, event.UserInfoChanged{},
+		event.PvPFlagged{}, event.RelationChanged{}, event.LevelChanged{},
+		event.WeightPenaltyChanged{},
+	}
+	// Hooks detach left wired: these must keep flowing.
+	stillDelivered := []event.Event{
+		event.VitalsChanged{}, event.Move{}, event.Stopped{}, event.AutoAttackStopped{},
+		event.StanceChanged{}, event.FakeDeathRevived{}, event.EffectIconsChanged{},
+		event.AbnormalEffectChanged{}, event.MagicSkillUse{}, event.Flight{},
+		event.PositionCorrected{}, event.ExpSPGained{}, event.ExpSPLost{},
+		event.KarmaChanged{}, event.LeveledUp{}, event.ShortBuff{}, event.OverHit{},
+		event.ChargeMessage{}, event.ChargesChanged{}, event.GradePenaltyChanged{},
+		event.DeathPenaltyChanged{}, event.AttackRequested{}, event.Retargeted{},
+		event.SummonConfirmRequested{}, event.TeleportRequested{}, event.Relocated{},
+		event.PetSummonRequested{}, event.ServitorSummonRequested{},
+		event.AttackStarted{}, event.AttackFinished{}, event.Arrived{},
+		event.MoveBlocked{}, event.CastAborted{}, event.CastStopAck{}, event.CastFinished{},
+	}
+	for _, ev := range sessionOnlyEvents {
+		if !sessionOnly(ev) {
+			t.Errorf("sessionOnly(%T) = false, want true", ev)
+		}
+	}
+	for _, ev := range stillDelivered {
+		if sessionOnly(ev) {
+			t.Errorf("sessionOnly(%T) = true, want false", ev)
+		}
+	}
 }

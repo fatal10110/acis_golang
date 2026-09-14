@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/rs/zerolog"
 )
@@ -26,7 +27,7 @@ var scalingDef = modelskill.Definition{ID: 10, Level: 2, Magic: true, HitTime: 1
 func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -72,7 +73,7 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -101,7 +102,7 @@ func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := &testActor{mp: 100, hp: 100, hitCost: 50}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -140,7 +141,7 @@ func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -165,7 +166,7 @@ func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -196,7 +197,7 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 	now := time.Unix(1000, 0)
 
@@ -272,7 +273,7 @@ type fakeCastTimer struct {
 
 func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	now := time.Unix(1000, 0)
-	ctrl, _, _ := newAbortController()
+	ctrl, _, rec := newAbortController()
 	plan, err := ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
 	if err != nil {
 		t.Fatal(err)
@@ -280,15 +281,17 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	clock := &fakeCastClock{}
 	ctrl.afterFunc = clock.AfterFunc
 	ended := 0
-	order := []string{}
-	ctrl.SetOnAbort(func(bool) { order = append(order, "abort") })
-	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() { ended++; order = append(order, "end") })
+	abortsBeforeEnd := -1
+	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() {
+		ended++
+		abortsBeforeEnd = event.Count[event.CastAborted](rec)
+	})
 	ctrl.Stop()
 	if ended != 1 {
 		t.Fatalf("fusion end calls after abort = %d, want 1", ended)
 	}
-	if got := strings.Join(order, " "); got != "end abort" {
-		t.Fatalf("fusion abort order = %s, want end abort", got)
+	if got := event.Count[event.CastAborted](rec); abortsBeforeEnd != 0 || got != 1 {
+		t.Fatalf("fusion abort order: aborts before end = %d, after stop = %d; want end before abort (0, 1)", abortsBeforeEnd, got)
 	}
 
 	plan, err = ctrl.Start(now, testTarget{}, modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000})
@@ -349,7 +352,7 @@ func (t *fakeCastTimer) Stop() bool {
 func TestScheduleRecoversPanickingHook(t *testing.T) {
 	buf := &syncCastBuffer{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.SetLogger(zerolog.New(buf))
 	now := time.Unix(1000, 0)
 

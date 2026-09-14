@@ -7,11 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -107,79 +105,27 @@ type Character struct {
 	onlineTimeBase int64
 	onlineBegin    time.Time
 
-	runtimeTemplate           *Template
-	levelTable                *LevelTable
-	allowDelevel              bool
-	raidCursesDisabled        bool
-	skillDefs                 skillDefinitions
-	rateKarmaExpLost          float64
-	inventory                 *itemcontainer.Inventory
-	world                     *world.State
-	los                       LineOfSight
-	zones                     PeaceZoneQuery
-	revalidateZones           func(location.Location)
-	insidePvPZone             atomic.Bool
-	insidePeaceZone           atomic.Bool
-	insideSiegeZone           atomic.Bool
-	insideNoSummonFriendZone  atomic.Bool
-	sendFrame                 func(wire.Frame) bool
-	broadcastFrame            func(wire.Frame) bool
-	broadcastAttack           func(attack.Snapshot)
-	broadcastMagicSkillUse    func(creature.MagicSkillUse)
-	broadcastMove             func(move.Event)
-	broadcastStop             func()
-	broadcastAutoAttackStop   func()
-	broadcastDie              func()
-	broadcastStatus           func()
-	broadcastMPStatus         func()
-	notifyBowDraw             func(gaugeMs int)
-	broadcastStance           func(Stance)
-	broadcastFakeDeathRevive  func()
-	updateAbnormalEffect      func()
-	abnormalEffectMask        atomic.Int32
-	broadcastAbnormalEffect   func()
-	broadcastFlight           func(location.Location, modelskill.Flight)
-	broadcastPosition         func()
-	updateWeightPenalty       func()
-	weightPenalty             int
-	weightLimitMultiplier     float64
-	maxBuffsAmount            int
-	updateUserInfo            func()
-	updateGradePenalty        func()
-	refreshItemStats          func()
-	updateDeathPenaltyRaised  func(level int)
-	updateDeathPenaltyReduced func(level int)
-	notifyExpSpGain           func(exp int64, sp int)
-	notifyExpSpLoss           func(exp int64, sp int)
-	notifyKarmaChange         func(karma int)
-	awardPKKillPVPPoint       bool
-	broadcastLevelUp          func()
-	refreshLevel              func()
-	broadcastShortBuff        func(ShortBuffUpdate)
-	sendRegenMax              func(count, period int32, hpRegen float64)
-	sendLackHPNotice          func()
-	sendLackMPNotice          func()
-	sendRelaxHPFullNotice     func()
-	sendHPRestoredNotice      func(healerName string, amount int, byOther bool)
-	sendMPRestoredNotice      func(healerName string, amount int, byOther bool)
-	sendCPRestoredNotice      func(healerName string, amount int, byOther bool)
-	sendSpoilAlreadyNotice    func()
-	sendSpoilSuccessNotice    func()
-	sendOverHitNotice         func()
-	sendServitorVanished      func()
-	sendShieldBlockSuccess    func()
-	sendShieldBlockPerfect    func()
-	sendEffectWornOff         func(skillID modelskill.ID, level int)
-	sendEffectDisappeared     func(skillID modelskill.ID, level int)
-	sendEffectAborted         func(skillID modelskill.ID, level int)
-	sendAttackFailedNotice    func()
-	sendResistedSkillNotice   func(targetName string, skillID modelskill.ID, level int)
-	sendResistedMagicNotice   func(attackerName string)
-	consumeHerb               func(itemID int32)
-	roll                      func(int) int
-	floatRoll                 func(float64) float64
-	attackTarget              func(world.Tracked)
-	retargetTarget            func(world.Tracked)
+	runtimeTemplate          *Template
+	levelTable               *LevelTable
+	allowDelevel             bool
+	raidCursesDisabled       bool
+	skillDefs                skillDefinitions
+	rateKarmaExpLost         float64
+	inventory                *itemcontainer.Inventory
+	world                    *world.State
+	los                      LineOfSight
+	zones                    PeaceZoneQuery
+	insidePvPZone            atomic.Bool
+	insidePeaceZone          atomic.Bool
+	insideSiegeZone          atomic.Bool
+	insideNoSummonFriendZone atomic.Bool
+	abnormalEffectMask       atomic.Int32
+	weightPenalty            int
+	weightLimitMultiplier    float64
+	maxBuffsAmount           int
+	awardPKKillPVPPoint      bool
+	roll                     func(int) int
+	floatRoll                func(float64) float64
 
 	dead atomic.Bool
 
@@ -189,22 +135,22 @@ type Character struct {
 	// that already imports this one.
 	cast atomic.Pointer[CastController]
 
-	// summonSpawner is the network-owned pet/servitor spawner wired back
-	// onto this character the same way cast is, so the SUMMON_CREATURE skill
-	// handler can reach it without this domain package importing the
-	// network package.
-	summonSpawner atomic.Pointer[SummonSpawner]
+	// sink receives this character's events. Attach sets it once, before
+	// the character is published into the world, and it never changes
+	// afterwards; nil drops every event (domain tests need no network).
+	sink event.Sink
+	// sessionDetached is set once the owning session has let go of this
+	// character; see DetachSession.
+	sessionDetached atomic.Bool
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
-	// teleport-confirm request state and its client-facing send hook,
+	// teleport-confirm request state,
 	// matching Player._summonTargetRequest/_summonSkillRequest
 	// (Player.java:452-453).
 	summonFriendMu    sync.Mutex
 	summonRequester   any
 	summonRequesterID int32
 	summonSkill       modelskill.Definition
-	sendSummonConfirm func(casterName string, casterID int32, x, y, z int, timeout time.Duration)
-	teleportHook      func(x, y, z, radius int)
 
 	// statMu guards statCalcs slot creation; each slot's own Calculator
 	// then guards its own Mods independently, so a warm read only ever
@@ -212,8 +158,7 @@ type Character struct {
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
 
-	// stateMu guards transient live flags, item-use disabled timestamps, and
-	// runtime send/broadcast hooks.
+	// stateMu guards transient live flags and item-use disabled timestamps.
 	stateMu              sync.RWMutex
 	stateInit            bool
 	running              bool
@@ -243,32 +188,19 @@ type Character struct {
 	target               world.Tracked
 	log                  zerolog.Logger
 
-	// pvpFlag is the client-visible PvP flag state. pvpFlagHook is the
-	// runtime hook that registers this character with the PvP flag tracker
-	// after it lands a hit on a karma-free victim; see UpdatePvPFlag and
-	// SetPvPFlagHook.
-	pvpFlag     task.PvPFlagState
-	pvpFlagHook func(useFlaggedDuration bool)
-
-	// broadcastRelations is the runtime hook fired after pvpFlag or
-	// KarmaPoints actually changes, mirroring updatePvPFlag/setKarma's
-	// shared tail: notify an owned summon and every nearby observer that
-	// this character's relation icon changed. See SetRelationBroadcaster.
-	broadcastRelations func()
+	// pvpFlag is the client-visible PvP flag state; see UpdatePvPFlag.
+	pvpFlag task.PvPFlagState
 
 	// charges is the Force/Soul charge counter (increaseCharges/
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
 	// chargeAutoClearDelay of inactivity.
-	charges           int
-	chargeTimer       *time.Timer
-	updateCharges     func()
-	sendChargeMessage func(charges int, maxed bool)
+	charges     int
+	chargeTimer *time.Timer
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.
-	deathPenaltyLevel       int
-	deathPenaltyChance      int
-	updateDeathPenaltySkill func(oldLevel, newLevel int)
+	deathPenaltyLevel  int
+	deathPenaltyChance int
 
 	// perfectShieldBlockRate is the players.properties-configured
 	// PerfectShieldBlockRate roll threshold for a shield block to upgrade

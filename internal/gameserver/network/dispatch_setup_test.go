@@ -7,8 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -16,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -31,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/rs/zerolog"
 )
 
 // staticSevenSignsStore serves the shipped default status row without a
@@ -357,8 +357,6 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
-	ch.SetFrameSender(capture.Send)
-	ch.SetBroadcastFrameSender(capture.Send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)
@@ -366,16 +364,30 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 		t.Fatal(err)
 	}
 	ch.Live = live
-	moveCtl, err := move.NewController(ch.Move(), ch)
+	control := &testControllerSink{}
+	moveCtl, err := move.NewController(ch.Move(), ch, control)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attackCtl := attack.NewPlayer(ch)
+	attackCtl := attack.NewPlayer(ch, control)
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
-	moveCtl.SetArrived(combat.Think)
-	attackCtl.SetFinished(combat.Think)
+	control.combat = combat
 
-	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+}
+
+// testControllerSink receives a fixture player's attack and movement
+// controller events: an arrival or a finished swing only re-thinks the attack
+// intention.
+type testControllerSink struct {
+	combat *ai.PlayerAttack
+}
+
+func (s *testControllerSink) Emit(ev event.Event) {
+	switch ev.(type) {
+	case event.Arrived, event.AttackFinished:
+		s.combat.Think()
+	}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
@@ -404,7 +416,6 @@ func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	return hostile
 }
 

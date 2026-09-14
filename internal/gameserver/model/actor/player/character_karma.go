@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -80,14 +81,6 @@ func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
 	pk.UpdateUserInfo()
 }
 
-// SetAwardPKKillPVPPoint configures whether killing a karma-positive player
-// awards a PvP point.
-func (c *Character) SetAwardPKKillPVPPoint(enabled bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.awardPKKillPVPPoint = enabled
-}
-
 func killerPlayer(killer creature.DeathActor) *Character {
 	if summon, ok := killer.(interface{ ActingPlayer() creature.DeathActor }); ok {
 		killer = summon.ActingPlayer()
@@ -96,21 +89,6 @@ func killerPlayer(killer creature.DeathActor) *Character {
 	return pk
 }
 
-// SetKarmaChangeNotifier records the packet-layer hook that tells this
-// character's own client its new karma total, mirroring setKarma's
-// SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) + StatusUpdate(KARMA)
-// pair (Player.java:1076-1080).
-func (c *Character) SetKarmaChangeNotifier(notify func(karma int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.notifyKarmaChange = notify
-}
-
 func (c *Character) notifyKarmaChanged() {
-	c.stateMu.RLock()
-	notify := c.notifyKarmaChange
-	c.stateMu.RUnlock()
-	if notify != nil {
-		notify(c.KarmaPoints)
-	}
+	c.emit(event.KarmaChanged{Karma: c.KarmaPoints})
 }

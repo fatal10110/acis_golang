@@ -22,16 +22,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// gameSummonSpawner is the network layer's player.SummonSpawner: it has the
-// world, npc templates, summon-item table and pet persistence the domain
-// layer intentionally doesn't depend on directly (mirrors castController's
-// split for the same reason). One is wired per connected live player.
+// gameSummonSpawner spawns a live player's pet or servitor for its summon
+// request events: it has the world, npc templates, summon-item table and
+// pet persistence the domain layer intentionally doesn't depend on directly.
+// One is created per connected live player.
 type gameSummonSpawner struct {
 	link *GameClientLink
 	live *livePlayer
 }
-
-var _ player.SummonSpawner = (*gameSummonSpawner)(nil)
 
 const petSpawnOffset = 40
 
@@ -187,11 +185,12 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
+		Zones:     link.zones,
+		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
 		return false
 	}
-	pet.SetZones(link.zones)
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
 	// saved current values (Pet.java:552-556); NewPet already seeds
@@ -214,7 +213,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// reject it" (live_accessors.go), which is exactly what a cast
 	// controller-less ai.Summon already does by design.
 	//
-	// SetAI must run before SpawnBesideOwner publishes pet into world.State:
+	// Attach must run before SpawnBesideOwner publishes pet into world.State:
 	// SpawnBesideOwner's registry writes take a mutex, giving a
 	// happens-before edge to any other goroutine's registry read (e.g. the
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
@@ -282,11 +281,12 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,
 		SkillDefs: link.skills,
+		Zones:     link.zones,
+		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
 		return false
 	}
-	servitor.SetZones(link.zones)
 	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
 	servitor.TryToFollow(live)
@@ -303,6 +303,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	if len(speed) != 0 {
 		runSpeed = speed[0]
 	}
+	sink := &summonSink{link: l, actor: actor}
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
@@ -310,28 +311,20 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
 		} else {
 			setWaterSurface(actor.Move(), l.zones)
-			if controller, err := move.NewController(actor.Move(), actor); err != nil {
+			if controller, err := move.NewController(actor.Move(), actor, sink); err != nil {
 				l.log.Warn().Err(err).Msg("summon: attach movement controller")
 			} else {
 				controller.SetPositionUpdates(l.positions)
 				moveController = controller
+				sink.move = controller
 			}
 		}
 	}
-	attackController := attack.NewPlayable(actor)
-	if los, ok := l.geo.(summon.LineOfSight); ok {
-		actor.SetLineOfSight(los)
-	}
+	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetLogger(l.log)
 	brain := ai.NewSummon(actor, moveController, attackController)
-	attackController.SetFinished(brain.Think)
+	sink.brain = brain
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
-	if controller, ok := moveController.(*move.Controller); ok {
-		controller.SetArrived(func() {
-			actor.SyncPosition(controller.Position())
-			brain.Think()
-		})
-	}
 	// SetLogger records broadcast errors from TryToAttack/TryToFollow/TryToIdle/Think
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
@@ -342,7 +335,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// it's silently discarded through the zero-value zerolog.Logger.
 	// Player-owned controllers get the same wiring (live.cast.SetLogger /
 	// c.SetLogger).
-	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor})
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
 	castController.SetLogger(l.log)
 	aiController := &actorcast.AIController{
 		Controller:  castController,
@@ -408,41 +401,27 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		})
 	}
 	brain.SetCastController(aiController)
-	actor.SetAI(brain)
+	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
 	followTicker := brain.StartOffensiveFollowTicker(l.log)
+	sink.despawn = followTicker.Stop
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
-		actor.SetOnDespawn(func() {
+		sink.despawn = func() {
 			l.ai.Remove(runner)
 			followTicker.Stop()
-		})
-	} else {
-		actor.SetOnDespawn(followTicker.Stop)
+		}
 	}
-	actor.SetStatusUpdater(func() { l.broadcastSummonStatus(actor) })
-	actor.SetOwnerInfoRefresher(func() { sendSummonInfosToOwner(actor) })
-	actor.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	actor.SetAutoAttackStopBroadcaster(func() {
-		actor.BroadcastFrame(serverpackets.FrameAutoAttackStop(actor.ObjectID()))
-	})
-	actor.SetExpNotifier(func(exp int64) {
-		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
-			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(exp)))
-		}
-	})
-	actor.SetDamageNotifier(func(attackerName string, damage int32) {
-		owner, ok := l.livePlayerByID(actor.OwnerID())
-		if !ok {
-			return
-		}
-		messageID := serverpackets.SystemMessageSummonReceivedS2ByS1
-		if actor.IsPet() {
-			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
-		}
-		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, attackerName, damage))
-	})
 	return aiController
+}
+
+// summonLineOfSight returns the geodata query summons use for attack
+// visibility, or nil when the geodata collaborator provides none.
+func (l *GameClientLink) summonLineOfSight() summon.LineOfSight {
+	if los, ok := l.geo.(summon.LineOfSight); ok {
+		return los
+	}
+	return nil
 }
 
 func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {

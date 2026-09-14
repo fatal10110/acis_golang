@@ -2,7 +2,6 @@ package player
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"os"
 	"reflect"
@@ -16,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -62,7 +62,7 @@ func TestCharacterPoleAttackConfigAndKnownCombatants(t *testing.T) {
 	}
 
 	state := world.New()
-	c.SetWorld(state)
+	c.world = state
 	state.Spawn(c, 0, 0, 0, 0)
 	near := &poleKnownCombatant{id: 2}
 	far := &poleKnownCombatant{id: 3}
@@ -898,36 +898,36 @@ func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
 
 func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing.T) {
 	c := &Character{ID: 1}
-	var updates int
-	c.SetChargesUpdater(func() { updates++ })
+	rec := recordEvents(c)
 
 	if !c.IncreaseCharges(5, 5) {
 		t.Fatal("IncreaseCharges() = false, want true")
 	}
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after clamped add = %d, want 1", updates)
 	}
 	if c.IncreaseCharges(1, 5) {
 		t.Fatal("IncreaseCharges() = true at max, want false")
 	}
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after at-max no-op = %d, want 1", updates)
 	}
 }
 
 func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) {
 	c := &Character{ID: 1}
-	var events []string
-	c.SetChargeMessageSender(func(charges int, maxed bool) {
-		events = append(events, fmt.Sprintf("message:%d:%t", charges, maxed))
-	})
-	c.SetChargesUpdater(func() { events = append(events, "status") })
+	rec := recordEvents(c)
 
 	c.IncreaseCharges(2, 5)
 	c.IncreaseCharges(3, 5)
 	c.IncreaseCharges(1, 5)
 
-	want := []string{"message:2:false", "status", "message:5:true", "status", "message:5:true"}
+	events := rec.Events()
+	want := []event.Event{
+		event.ChargeMessage{Charges: 2}, event.ChargesChanged{},
+		event.ChargeMessage{Charges: 5, Maxed: true}, event.ChargesChanged{},
+		event.ChargeMessage{Charges: 5, Maxed: true},
+	}
 	if !reflect.DeepEqual(events, want) {
 		t.Fatalf("charge notifications = %v, want %v", events, want)
 	}
@@ -948,19 +948,18 @@ func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 func TestCharacterDecreaseChargesNotifiesStatusOnlyAfterSuccessfulRemoval(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(2, 5)
-	var updates int
-	c.SetChargesUpdater(func() { updates++ })
+	rec := recordEvents(c)
 
 	if !c.DecreaseCharges(1) {
 		t.Fatal("DecreaseCharges() = false, want true")
 	}
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after successful removal = %d, want 1", updates)
 	}
 	if c.DecreaseCharges(2) {
 		t.Fatal("DecreaseCharges() = true with insufficient charges, want false")
 	}
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after failed removal = %d, want 1", updates)
 	}
 }
@@ -979,15 +978,14 @@ func TestCharacterClearChargesResetsToZero(t *testing.T) {
 func TestCharacterClearChargesNotifiesStatusOnlyWhenChargesChange(t *testing.T) {
 	c := &Character{ID: 1}
 	c.IncreaseCharges(4, 5)
-	var updates int
-	c.SetChargesUpdater(func() { updates++ })
+	rec := recordEvents(c)
 
 	c.ClearCharges()
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after clearing charges = %d, want 1", updates)
 	}
 	c.ClearCharges()
-	if updates != 1 {
+	if updates := event.Count[event.ChargesChanged](rec); updates != 1 {
 		t.Fatalf("updates after clearing empty charges = %d, want 1", updates)
 	}
 }
@@ -1073,9 +1071,9 @@ func deathExpKarmaTable(t *testing.T, karmaModifier, expLossAtDeath float64) *Le
 
 func newDeathExpKarmaCharacter(t *testing.T, karmaModifier, expLossAtDeath float64) *Character {
 	c := &Character{ID: 1, CharLevel: 10, Exp: 1500, KarmaPoints: 100}
-	c.SetLevelTable(deathExpKarmaTable(t, karmaModifier, expLossAtDeath))
-	c.SetAllowDelevel(true)
-	c.SetRateKarmaExpLost(2.0)
+	c.levelTable = deathExpKarmaTable(t, karmaModifier, expLossAtDeath)
+	c.allowDelevel = true
+	c.rateKarmaExpLost = 2.0
 	return c
 }
 
@@ -1089,12 +1087,18 @@ func TestApplyDeathExpKarmaLossKarmaPositive(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	killer := &Character{ID: 2}
 
-	var karmaNotified []int
-	c.SetKarmaChangeNotifier(func(karma int) { karmaNotified = append(karmaNotified, karma) })
-	var lossNotified [][2]int64
-	c.SetExpSpLossNotifier(func(exp int64, sp int) { lossNotified = append(lossNotified, [2]int64{exp, int64(sp)}) })
+	rec := recordEvents(c)
 
 	c.applyDeathExpKarmaLoss(killer)
+
+	var karmaNotified []int
+	for _, e := range event.Of[event.KarmaChanged](rec) {
+		karmaNotified = append(karmaNotified, e.Karma)
+	}
+	var lossNotified [][2]int64
+	for _, e := range event.Of[event.ExpSPLost](rec) {
+		lossNotified = append(lossNotified, [2]int64{e.Exp, int64(e.SP)})
+	}
 
 	// span = 3000-1000 = 2000; percentLost = 10.0*2.0 = 20.0; lostExp =
 	// round(2000*20/100) = 400.
@@ -1166,7 +1170,7 @@ func TestApplyDeathExpKarmaLossNoKillerIsNoOp(t *testing.T) {
 // off, no death ever applies the penalty regardless of killer or karma.
 func TestApplyDeathExpKarmaLossDelevelDisabledIsNoOp(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
-	c.SetAllowDelevel(false)
+	c.allowDelevel = false
 	killer := &Character{ID: 2}
 
 	c.applyDeathExpKarmaLoss(killer)
@@ -1246,10 +1250,14 @@ func TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot(t *testing.T) {
 	killer := &Character{ID: 2}
 	c.applyDeathExpKarmaLoss(killer) // Exp: 1500 -> 1100, ExpBeforeDeath = 1500.
 
-	var gained []int64
-	c.SetExpSpGainNotifier(func(exp int64, sp int) { gained = append(gained, exp) })
+	rec := recordEvents(c)
 
 	c.RestoreExp(50)
+
+	var gained []int64
+	for _, e := range event.Of[event.ExpSPGained](rec) {
+		gained = append(gained, e.Exp)
+	}
 
 	// restored = round((1500-1100)*50/100) = 200.
 	if want := int64(1300); c.Exp != want {
@@ -1348,11 +1356,17 @@ func TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater(t *testing.T) {
 	c := &Character{ID: 1}
 	c.SetDeathPenaltyLevel(1)
 
-	var got []int
-	c.SetDeathPenaltyReducedUpdater(func(level int) { got = append(got, level) })
+	rec := recordEvents(c)
 
 	c.ReduceDeathPenaltyLevel() // 1 -> 0: reapply-message branch never fires, LIFTED does.
 	c.ReduceDeathPenaltyLevel() // already 0: no-op, updater must not fire again.
+
+	var got []int
+	for _, e := range event.Of[event.DeathPenaltyChanged](rec) {
+		if !e.Raised {
+			got = append(got, e.New)
+		}
+	}
 
 	if want := []int{0}; len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("reduced-updater calls = %v, want %v", got, want)
@@ -1361,18 +1375,19 @@ func TestCharacterReduceDeathPenaltyLevelFiresReducedUpdater(t *testing.T) {
 
 func TestCharacterDeathPenaltySkillUpdaterReplacesLevelOnEachChange(t *testing.T) {
 	c := &Character{ID: 1}
-	c.SetDeathPenaltyChance(100)
+	c.deathPenaltyChance = 100
+	rec := recordEvents(c)
+
+	c.RaiseDeathPenaltyLevel(nil, 1)
+	c.RaiseDeathPenaltyLevel(nil, 1)
+	c.ReduceDeathPenaltyLevel()
+	c.ReduceDeathPenaltyLevel()
+	c.ReduceDeathPenaltyLevel()
 
 	var got [][2]int
-	c.SetDeathPenaltySkillUpdater(func(oldLevel, newLevel int) {
-		got = append(got, [2]int{oldLevel, newLevel})
-	})
-
-	c.RaiseDeathPenaltyLevel(nil, 1)
-	c.RaiseDeathPenaltyLevel(nil, 1)
-	c.ReduceDeathPenaltyLevel()
-	c.ReduceDeathPenaltyLevel()
-	c.ReduceDeathPenaltyLevel()
+	for _, e := range event.Of[event.DeathPenaltyChanged](rec) {
+		got = append(got, [2]int{e.Old, e.New})
+	}
 
 	want := [][2]int{{0, 1}, {1, 2}, {2, 1}, {1, 0}}
 	if len(got) != len(want) {
@@ -1414,7 +1429,7 @@ func TestRaiseDeathPenaltyLevelRejectsPlayerKiller(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 	c := &Character{ID: 1}
-	c.SetDeathPenaltyChance(20)
+	c.deathPenaltyChance = 20
 
 	// roll above the configured chance, no karma: blocked.
 	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 21); changed || got != 0 {
@@ -1428,7 +1443,7 @@ func TestRaiseDeathPenaltyLevelNoKarmaFailsChanceRoll(t *testing.T) {
 
 func TestRaiseDeathPenaltyLevelUsesConfiguredChance(t *testing.T) {
 	c := &Character{ID: 1}
-	c.SetDeathPenaltyChance(0)
+	c.deathPenaltyChance = 0
 
 	if got, changed := c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 1); changed || got != 0 {
 		t.Fatalf("RaiseDeathPenaltyLevel(configured chance) = (%d, %v), want (0, false)", got, changed)
@@ -1490,11 +1505,17 @@ func TestRaiseDeathPenaltyLevelFiresRaisedUpdaterOnlyOnPass(t *testing.T) {
 	c := &Character{ID: 1}
 	c.KarmaPoints = 1
 
-	var got []int
-	c.SetDeathPenaltyRaisedUpdater(func(level int) { got = append(got, level) })
+	rec := recordEvents(c)
 
 	c.RaiseDeathPenaltyLevel(&Character{ID: 2}, 100) // blocked: player killer, must not fire.
 	c.RaiseDeathPenaltyLevel(deathPenaltyKiller{}, 100)
+
+	var got []int
+	for _, e := range event.Of[event.DeathPenaltyChanged](rec) {
+		if e.Raised {
+			got = append(got, e.New)
+		}
+	}
 
 	if want := []int{1}; len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("raised-updater calls = %v, want %v", got, want)
@@ -1551,8 +1572,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
-	statusUpdates := 0
-	c.SetStatusBroadcaster(func() { statusUpdates++ })
+	rec := recordEvents(c)
 	before := c.HP()
 
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
@@ -1566,7 +1586,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	if got, want := c.HP(), before-4; got != want {
 		t.Fatalf("HP() = %v, want %v", got, want)
 	}
-	if statusUpdates != 1 {
+	if statusUpdates := countVitals(rec, false); statusUpdates != 1 {
 		t.Fatalf("status updates = %d, want 1", statusUpdates)
 	}
 }
@@ -1586,8 +1606,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
-	mpStatusUpdates := 0
-	c.SetMPStatusBroadcaster(func() { mpStatusUpdates++ })
+	rec := recordEvents(c)
 	before := c.MPValue()
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
 	if err != nil {
@@ -1600,7 +1619,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	if got, want := c.MPValue(), before-4; got != want {
 		t.Fatalf("MPValue() = %v, want %v", got, want)
 	}
-	if mpStatusUpdates != 1 {
+	if mpStatusUpdates := countVitals(rec, true); mpStatusUpdates != 1 {
 		t.Fatalf("MP status updates = %d, want 1", mpStatusUpdates)
 	}
 }
@@ -1612,30 +1631,23 @@ func TestNotifyEffectRemovedDueLackHPAndMP(t *testing.T) {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
 
-	hpNotices, mpNotices, relaxNotices := 0, 0, 0
-	c.SetLackHPNotifier(func() { hpNotices++ })
-	c.SetLackMPNotifier(func() { mpNotices++ })
-	c.SetRelaxHPFullNotifier(func() { relaxNotices++ })
+	// No sink attached must not panic.
+	c.NotifyEffectRemovedDueLackHP(nil)
+	c.NotifyEffectRemovedDueLackMP(nil)
 
+	rec := recordEvents(c)
 	c.NotifyEffectRemovedDueLackHP(nil)
 	c.NotifyEffectRemovedDueLackMP(nil)
 	c.NotifyRelaxDeactivatedHPFull(nil)
-	if hpNotices != 1 {
+	if hpNotices := event.Count[event.EffectRemovedLackHP](rec); hpNotices != 1 {
 		t.Fatalf("hp notices = %d, want 1", hpNotices)
 	}
-	if mpNotices != 1 {
+	if mpNotices := event.Count[event.EffectRemovedLackMP](rec); mpNotices != 1 {
 		t.Fatalf("mp notices = %d, want 1", mpNotices)
 	}
-	if relaxNotices != 1 {
+	if relaxNotices := event.Count[event.RelaxHPFull](rec); relaxNotices != 1 {
 		t.Fatalf("relax notices = %d, want 1", relaxNotices)
 	}
-
-	// Unwiring the hook (as lifecycle detach does) must not panic.
-	c.SetLackHPNotifier(nil)
-	c.SetLackMPNotifier(nil)
-	c.SetRelaxHPFullNotifier(nil)
-	c.NotifyEffectRemovedDueLackHP(nil)
-	c.NotifyEffectRemovedDueLackMP(nil)
 }
 
 func TestNotifyHealRestoredHooks(t *testing.T) {
@@ -1644,32 +1656,15 @@ func TestNotifyHealRestoredHooks(t *testing.T) {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
 
-	var hpName, mpName string
-	var hpAmount, mpAmount int
-	var hpOther, mpOther bool
-	hpCalls, mpCalls := 0, 0
-	c.SetHealRestoredNotifiers(func(name string, amount int, byOther bool) {
-		hpCalls++
-		hpName, hpAmount, hpOther = name, amount, byOther
-	}, func(name string, amount int, byOther bool) {
-		mpCalls++
-		mpName, mpAmount, mpOther = name, amount, byOther
-	})
-
+	rec := recordEvents(c)
 	c.NotifyHPRestored("Healer", 4, true)
 	c.NotifyMPRestored("", 8, false)
-	if hpCalls != 1 || hpName != "Healer" || hpAmount != 4 || !hpOther {
-		t.Fatalf("HP notice = calls %d name %q amount %d byOther %v", hpCalls, hpName, hpAmount, hpOther)
+	want := []event.Event{
+		event.Restored{Resource: event.ResourceHP, HealerName: "Healer", Amount: 4, ByOther: true},
+		event.Restored{Resource: event.ResourceMP, Amount: 8},
 	}
-	if mpCalls != 1 || mpName != "" || mpAmount != 8 || mpOther {
-		t.Fatalf("MP notice = calls %d name %q amount %d byOther %v", mpCalls, mpName, mpAmount, mpOther)
-	}
-
-	c.SetHealRestoredNotifiers(nil, nil)
-	c.NotifyHPRestored("Healer", 4, true)
-	c.NotifyMPRestored("", 8, false)
-	if hpCalls != 1 || mpCalls != 1 {
-		t.Fatalf("unwired notices = hp %d mp %d, want both 1", hpCalls, mpCalls)
+	if got := rec.Events(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("restored notices = %+v, want %+v", got, want)
 	}
 }
 
@@ -1679,35 +1674,21 @@ func TestNotifyMagicFailureHooks(t *testing.T) {
 		t.Fatalf("NewCharacter() error: %v", err)
 	}
 
-	failed, resisted, magic := 0, 0, 0
-	var resistedName, magicName string
-	var resistedID modelskill.ID
-	var resistedLevel int
-	c.SetMagicFailureNotifiers(func() { failed++ }, func(name string, id modelskill.ID, level int) {
-		resisted++
-		resistedName, resistedID, resistedLevel = name, id, level
-	}, func(name string) {
-		magic++
-		magicName = name
-	})
+	// No sink attached must not panic.
+	c.NotifyAttackFailed()
 
+	rec := recordEvents(c)
 	c.NotifyAttackFailed()
 	c.NotifyResistedSkill("Victim", 1419, 1)
 	c.NotifyResistedMagic("Mage")
-	if failed != 1 {
-		t.Fatalf("attack-failed notices = %d, want 1", failed)
+	want := []event.Event{
+		event.AttackFailed{},
+		event.SkillResisted{TargetName: "Victim", SkillID: 1419, Level: 1},
+		event.MagicResisted{AttackerName: "Mage"},
 	}
-	if resisted != 1 || resistedName != "Victim" || resistedID != 1419 || resistedLevel != 1 {
-		t.Fatalf("resisted-skill notice = %d %q %d/%d, want 1 Victim 1419/1", resisted, resistedName, resistedID, resistedLevel)
+	if got := rec.Events(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("magic failure notices = %+v, want %+v", got, want)
 	}
-	if magic != 1 || magicName != "Mage" {
-		t.Fatalf("resisted-magic notice = %d %q, want 1 Mage", magic, magicName)
-	}
-
-	c.SetMagicFailureNotifiers(nil, nil, nil)
-	c.NotifyAttackFailed()
-	c.NotifyResistedSkill("Victim", 1419, 1)
-	c.NotifyResistedMagic("Mage")
 }
 
 // ---- from character_forces_test.go ----
@@ -1840,9 +1821,7 @@ func TestRefreshExpertisePenalty(t *testing.T) {
 	c := &Character{ID: 1}
 	c.AttachRuntime(nil, inv)
 	c.SetSkillLevel(expertiseSkillID, 1)
-	updates, refreshes := 0, 0
-	c.SetGradePenaltyUpdater(func() { updates++ })
-	c.SetItemStatsRefresher(func() { refreshes++ })
+	rec := recordEvents(c)
 
 	c.RefreshExpertisePenalty()
 	if got, want := c.ArmorGradePenalty(), 3; !c.WeaponGradePenalty() || got != want {
@@ -1851,14 +1830,14 @@ func TestRefreshExpertisePenalty(t *testing.T) {
 	if got := c.SkillLevel(gradePenaltySkillID); got != 1 {
 		t.Fatalf("grade penalty skill level = %d, want 1", got)
 	}
-	if updates != 1 || refreshes != 1 {
-		t.Fatalf("hooks = updates %d refreshes %d, want 1 each", updates, refreshes)
+	if updates := event.Count[event.GradePenaltyChanged](rec); updates != 1 {
+		t.Fatalf("grade penalty events = %d, want 1", updates)
 	}
 
 	// Unchanged state neither re-sends packets nor reattaches item passives.
 	c.RefreshExpertisePenalty()
-	if updates != 1 || refreshes != 1 {
-		t.Fatalf("unchanged hooks = updates %d refreshes %d, want 1 each", updates, refreshes)
+	if updates := event.Count[event.GradePenaltyChanged](rec); updates != 1 {
+		t.Fatalf("unchanged grade penalty events = %d, want 1", updates)
 	}
 
 	c.SetSkillLevel(expertiseSkillID, int(item.CrystalS))
@@ -1866,8 +1845,8 @@ func TestRefreshExpertisePenalty(t *testing.T) {
 	if c.WeaponGradePenalty() || c.ArmorGradePenalty() != 0 || c.HasSkill(gradePenaltySkillID) {
 		t.Fatalf("cleared penalty = weapon %v armor %d skill %v", c.WeaponGradePenalty(), c.ArmorGradePenalty(), c.HasSkill(gradePenaltySkillID))
 	}
-	if updates != 2 || refreshes != 2 {
-		t.Fatalf("cleared hooks = updates %d refreshes %d, want 2 each", updates, refreshes)
+	if updates := event.Count[event.GradePenaltyChanged](rec); updates != 2 {
+		t.Fatalf("cleared grade penalty events = %d, want 2", updates)
 	}
 }
 
@@ -1879,24 +1858,23 @@ func TestConsumeHerbReportsWhetherAConsumerTookIt(t *testing.T) {
 	c := &Character{ID: 1}
 
 	if c.ConsumeHerb(8600) {
-		t.Fatal("ConsumeHerb() = true with no consumer wired")
+		t.Fatal("ConsumeHerb() = true with no sink attached")
 	}
 
-	var consumed []int32
-	c.SetHerbConsumer(func(itemID int32) { consumed = append(consumed, itemID) })
+	rec := recordEvents(c)
 	if !c.ConsumeHerb(8600) {
-		t.Fatal("ConsumeHerb() = false with a consumer wired")
+		t.Fatal("ConsumeHerb() = false with a sink attached")
 	}
-	if len(consumed) != 1 || consumed[0] != 8600 {
-		t.Fatalf("consumed = %v, want [8600]", consumed)
+	if got := event.Of[event.HerbConsumed](rec); len(got) != 1 || got[0].ItemID != 8600 {
+		t.Fatalf("consumed = %v, want [8600]", got)
 	}
 
-	c.SetHerbConsumer(nil)
+	c.DetachSession()
 	if c.ConsumeHerb(8600) {
 		t.Fatal("ConsumeHerb() = true after detach")
 	}
-	if len(consumed) != 1 {
-		t.Fatalf("consumed = %v, want no further consumption after detach", consumed)
+	if got := event.Count[event.HerbConsumed](rec); got != 1 {
+		t.Fatalf("consumed = %d, want no further consumption after detach", got)
 	}
 }
 
@@ -2046,45 +2024,43 @@ func TestCharacterMountWyvernTracksControlItemAndNotifies(t *testing.T) {
 // ---- from character_pvpflag_test.go ----
 func TestUpdatePvPFlagRefreshesUserInfoOnlyOnChange(t *testing.T) {
 	c := &Character{ID: 1}
-	updates := 0
-	c.SetUserInfoUpdater(func() { updates++ })
+	rec := recordEvents(c)
 
 	c.UpdatePvPFlag(task.PvPFlagOn)
 	if got := c.PvPFlagState(); got != task.PvPFlagOn {
 		t.Fatalf("PvPFlagState() = %v, want PvPFlagOn", got)
 	}
-	if updates != 1 {
+	if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
 		t.Fatalf("updates after first change = %d, want 1", updates)
 	}
 
 	c.UpdatePvPFlag(task.PvPFlagOn)
-	if updates != 1 {
+	if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
 		t.Fatalf("updates after unchanged state = %d, want 1 (no-op)", updates)
 	}
 
 	c.UpdatePvPFlag(task.PvPFlagBlinking)
-	if updates != 2 {
+	if updates := event.Count[event.UserInfoChanged](rec); updates != 2 {
 		t.Fatalf("updates after second change = %d, want 2", updates)
 	}
 }
 
 func TestUpdatePvPFlagBroadcastsRelationsOnlyOnChange(t *testing.T) {
 	c := &Character{ID: 1}
-	broadcasts := 0
-	c.SetRelationBroadcaster(func() { broadcasts++ })
+	rec := recordEvents(c)
 
 	c.UpdatePvPFlag(task.PvPFlagOn)
-	if broadcasts != 1 {
+	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 1 {
 		t.Fatalf("broadcasts after first change = %d, want 1", broadcasts)
 	}
 
 	c.UpdatePvPFlag(task.PvPFlagOn)
-	if broadcasts != 1 {
+	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 1 {
 		t.Fatalf("broadcasts after unchanged state = %d, want 1 (no-op)", broadcasts)
 	}
 
 	c.UpdatePvPFlag(task.PvPFlagBlinking)
-	if broadcasts != 2 {
+	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 2 {
 		t.Fatalf("broadcasts after second change = %d, want 2", broadcasts)
 	}
 }
@@ -2099,10 +2075,10 @@ func TestUpdatePvPFlagNoopWithoutRelationBroadcaster(t *testing.T) {
 func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker)
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
 		t.Fatalf("hook calls = %v, want [false] (normal duration)", calls)
@@ -2114,10 +2090,10 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	victim := &Character{ID: 2}
 	attacker.SetInPvPZone(true)
 	victim.SetInPvPZone(true)
-	called := false
-	attacker.SetPvPFlagHook(func(bool) { called = true })
+	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker)
+	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
 		t.Fatal("hook fired for two PvP-zone players")
@@ -2134,10 +2110,10 @@ func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
 	victim.pvpFlag = task.PvPFlagOn
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker)
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != true {
 		t.Fatalf("hook calls = %v, want [true] (PvP-vs-PvP duration)", calls)
@@ -2148,10 +2124,10 @@ func TestNotePvPHitFromAttackerUsesNormalDurationWhenAttackerHasKarma(t *testing
 	attacker := &Character{ID: 1, KarmaPoints: 500}
 	victim := &Character{ID: 2}
 	victim.pvpFlag = task.PvPFlagOn
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker)
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
 		t.Fatalf("hook calls = %v, want [false]: a karma'd attacker never gets the PvP-vs-PvP duration", calls)
@@ -2161,10 +2137,10 @@ func TestNotePvPHitFromAttackerUsesNormalDurationWhenAttackerHasKarma(t *testing
 func TestNotePvPHitFromAttackerSkipsWhenVictimHasKarma(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2, KarmaPoints: 500}
-	called := false
-	attacker.SetPvPFlagHook(func(bool) { called = true })
+	rec := recordEvents(attacker)
 
 	victim.notePvPHitFromAttacker(attacker)
+	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
 		t.Fatal("hook fired, want no-op: hitting a karma'd (PK) victim never flags the attacker")
@@ -2186,10 +2162,10 @@ func TestNotePvPHitFromAttackerSkipsNilAttacker(t *testing.T) {
 
 func TestNotePvPHitFromAttackerSkipsSelfHit(t *testing.T) {
 	c := &Character{ID: 1}
-	called := false
-	c.SetPvPFlagHook(func(bool) { called = true })
+	rec := recordEvents(c)
 
 	c.notePvPHitFromAttacker(c)
+	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
 		t.Fatal("hook fired, want no-op: self-damage never flags the actor")
@@ -2210,10 +2186,10 @@ func TestCharacterNotePvPAttackFlagsInnocentVictim(t *testing.T) {
 	items := combatItems()
 	attacker := liveCharacter(1, tmpl, items)
 	victim := liveCharacter(2, tmpl, items)
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	attacker.NotePvPAttack(victim)
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
 		t.Fatalf("hook calls after NotePvPAttack = %v, want [false]", calls)
@@ -2223,10 +2199,10 @@ func TestCharacterNotePvPAttackFlagsInnocentVictim(t *testing.T) {
 func TestCharacterNotePvPAttackFlagsOwnerOfSummonedTarget(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	attacker.NotePvPAttack(summonKiller{owner: victim})
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] {
 		t.Fatalf("hook calls after summoned target = %v, want [false]", calls)
@@ -2239,10 +2215,10 @@ func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing
 	attacker := liveCharacter(1, tmpl, items)
 	flagged := liveCharacter(2, tmpl, items)
 	flagged.UpdatePvPFlag(task.PvPFlagOn)
-	var calls []bool
-	attacker.SetPvPFlagHook(func(useFlagged bool) { calls = append(calls, useFlagged) })
+	rec := recordEvents(attacker)
 
 	attacker.NotePvPSkillTargets([]creature.DeathActor{flagged, pvpFlagNPC{}}, false, "DUMMY")
+	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 2 || calls[0] || calls[1] {
 		t.Fatalf("hook calls after NotePvPSkillTargets = %v, want [false false]", calls)
@@ -2253,10 +2229,10 @@ func TestCharacterNotePvPSkillTargetsFlagsOwnerOfFlaggedSummon(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
 	victim.UpdatePvPFlag(task.PvPFlagOn)
-	called := false
-	attacker.SetPvPFlagHook(func(bool) { called = true })
+	rec := recordEvents(attacker)
 
 	attacker.NotePvPSkillTargets([]creature.DeathActor{summonKiller{owner: victim}}, false, "DUMMY")
+	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if !called {
 		t.Fatal("non-offensive cast at a flagged summon did not flag its owner")
@@ -2273,10 +2249,10 @@ func TestCharacterReduceHPByDOTDoesNotFlagAttacker(t *testing.T) {
 	items := combatItems()
 	attacker := liveCharacter(1, tmpl, items)
 	victim := liveCharacter(2, tmpl, items)
-	called := false
-	attacker.SetPvPFlagHook(func(bool) { called = true })
+	rec := recordEvents(attacker)
 
 	victim.ReduceHPByDOT(10, attacker, true)
+	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
 		t.Fatal("hook fired on ReduceHPByDOT, want no-op: DOT ticks don't re-flag the attacker")
@@ -2417,9 +2393,7 @@ func TestCharacterSpawnProtectionMakesItInvulnerable(t *testing.T) {
 func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
 	c := &Character{ID: 1}
 	c.SetStanding(false)
-	stances, revives := 0, 0
-	c.SetStanceBroadcaster(func(Stance) { stances++ })
-	c.SetFakeDeathReviveBroadcaster(func() { revives++ })
+	rec := recordEvents(c)
 	if !c.MarkDead() {
 		t.Fatal("MarkDead() = false, want true")
 	}
@@ -2427,7 +2401,7 @@ func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
 	if c.StopFakeDeath() {
 		t.Fatal("StopFakeDeath() = true for a dead character, want false")
 	}
-	if stances != 0 || revives != 0 {
+	if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 0 || revives != 0 {
 		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want none", stances, revives)
 	}
 }
@@ -3696,7 +3670,7 @@ func TestCharacterShieldDefenseUsesConfiguredPerfectShieldBlockRate(t *testing.T
 
 	// Configuring PerfectShieldBlockRate to 15 pushes the same roll (10)
 	// under the threshold, upgrading the block to perfect.
-	target.SetPerfectShieldBlockRate(15)
+	target.perfectShieldBlockRate = 15
 	if got := target.ShieldDefense(caster, modelskill.Definition{SkillType: "STUN"}, false); got != formulas.ShieldPerfect {
 		t.Fatalf("ShieldDefense() with configured rate 15 = %v, want ShieldPerfect", got)
 	}
@@ -3814,10 +3788,15 @@ func TestCharacterShieldDefenseNotifiesDefendingPlayerBySDefOnly(t *testing.T) {
 			})
 			target.SetRollSource(func(int) int { return tt.roll })
 
-			var gotSuccess, gotPerfect bool
-			target.SetShieldBlockNotifiers(func() { gotSuccess = true }, func() { gotPerfect = true })
+			rec := recordEvents(target)
 
 			target.ShieldDefense(caster, def, false)
+
+			var gotSuccess, gotPerfect bool
+			for _, e := range event.Of[event.ShieldBlocked](rec) {
+				gotSuccess = gotSuccess || !e.Perfect
+				gotPerfect = gotPerfect || e.Perfect
+			}
 
 			if gotSuccess != tt.wantSuccess {
 				t.Fatalf("shield block success notice fired = %v, want %v", gotSuccess, tt.wantSuccess)
@@ -4075,80 +4054,52 @@ func testModOwner() effect.ModOwner {
 }
 
 // ---- from character_summon_test.go ----
-type spySummonSpawner struct {
-	calls []spySpawnCall
-	ok    bool
-}
-
-type spySpawnCall struct {
-	owner *Character
-	item  *item.Instance
-	def   modelskill.Definition
-}
-
-func (s *spySummonSpawner) SpawnPet(owner *Character, controlItem *item.Instance) bool {
-	s.calls = append(s.calls, spySpawnCall{owner: owner, item: controlItem})
-	return s.ok
-}
-
-func (s *spySummonSpawner) SpawnServitor(owner *Character, def modelskill.Definition) bool {
-	s.calls = append(s.calls, spySpawnCall{owner: owner, def: def})
-	return s.ok
-}
-
-func TestCharacterSummonCreatureDelegatesToSpawner(t *testing.T) {
+func TestCharacterSummonCreatureRequestsPetSpawn(t *testing.T) {
 	c := &Character{}
-	spy := &spySummonSpawner{ok: true}
-	c.SetSummonSpawner(spy)
+	rec := recordEvents(c)
 	inst := &item.Instance{ObjectID: 500, TemplateID: 91000}
 
 	c.SummonCreature(modelskill.Definition{ID: 2046, Level: 1}, inst)
 
-	if len(spy.calls) != 1 {
-		t.Fatalf("SpawnPet calls = %d, want 1", len(spy.calls))
+	got := event.Of[event.PetSummonRequested](rec)
+	if len(got) != 1 {
+		t.Fatalf("pet summon requests = %d, want 1", len(got))
 	}
-	if spy.calls[0].owner != c {
-		t.Fatalf("SpawnPet owner = %v, want %v", spy.calls[0].owner, c)
-	}
-	if spy.calls[0].item != inst {
-		t.Fatalf("SpawnPet item = %v, want %v", spy.calls[0].item, inst)
+	if got[0].ControlItem != inst {
+		t.Fatalf("pet summon item = %v, want %v", got[0].ControlItem, inst)
 	}
 }
 
-func TestCharacterSummonServitorDelegatesToSpawner(t *testing.T) {
+func TestCharacterSummonServitorRequestsServitorSpawn(t *testing.T) {
 	c := &Character{}
-	spy := &spySummonSpawner{ok: true}
-	c.SetSummonSpawner(spy)
+	rec := recordEvents(c)
 
 	c.SummonServitor(modelskill.Definition{NpcID: 14848})
 
-	if len(spy.calls) != 1 {
-		t.Fatalf("SpawnServitor calls = %d, want 1", len(spy.calls))
-	}
-	if spy.calls[0].owner != c || spy.calls[0].def.NpcID != 14848 {
-		t.Fatalf("SpawnServitor call = %+v, want owner and NpcID 14848", spy.calls[0])
+	got := event.Of[event.ServitorSummonRequested](rec)
+	if len(got) != 1 || got[0].Skill.NpcID != 14848 {
+		t.Fatalf("servitor summon requests = %+v, want one with NpcID 14848", got)
 	}
 }
 
-func TestCharacterSummonCreatureNoopsWithoutSpawner(t *testing.T) {
+func TestCharacterSummonCreatureNoopsWithoutSink(t *testing.T) {
 	c := &Character{}
-	// No SetSummonSpawner call: must not panic, matching Java's item==nil
-	// early return.
+	// No sink attached: must not panic, matching Java's item==nil early
+	// return.
 	c.SummonCreature(modelskill.Definition{ID: 2046, Level: 1}, &item.Instance{})
 }
 
 func TestCharacterSummonCreatureNoopsOnNonItemArg(t *testing.T) {
 	c := &Character{}
-	spy := &spySummonSpawner{ok: true}
-	c.SetSummonSpawner(spy)
+	rec := recordEvents(c)
 
 	// A cast-interrupted skill can reach the handler with no item
 	// (handler/skill/summon.go's own doc comment); SummonCreature must
 	// drop that silently, matching Java's checkedItem==nil early return.
 	c.SummonCreature(modelskill.Definition{ID: 2046, Level: 1}, nil)
 
-	if len(spy.calls) != 0 {
-		t.Fatalf("SpawnPet calls = %d, want 0 for a non-item cast.Item", len(spy.calls))
+	if got := event.Count[event.PetSummonRequested](rec); got != 0 {
+		t.Fatalf("pet summon requests = %d, want 0 for a non-item cast.Item", got)
 	}
 }
 
@@ -4185,18 +4136,22 @@ func TestCharacterRetargetableOnAggressionRetargetsWhenNotAlreadyTargetingCaster
 	target := targetCharacter(2)
 	target.StoreTarget(other)
 
-	var attacked bool
-	target.SetAttackTargetHook(func(world.Tracked) { attacked = true })
-
 	if got := target.CurrentTarget(); got != world.Tracked(other) {
 		t.Fatalf("CurrentTarget() = %v, want %v", got, other)
 	}
 	target.SetTarget(caster)
-
 	if got := target.Target(); got != world.Tracked(caster) {
-		t.Fatalf("Target() after SetTarget = %v, want caster", got)
+		t.Fatalf("Target() after SetTarget with no sink = %v, want caster", got)
 	}
-	if attacked {
+
+	target.StoreTarget(other)
+	rec := recordEvents(target)
+	target.SetTarget(caster)
+
+	if got := event.Of[event.Retargeted](rec); len(got) != 1 || got[0].Target != event.Object(caster) {
+		t.Fatalf("Retargeted events = %+v, want one onto caster", got)
+	}
+	if event.Count[event.AttackRequested](rec) != 0 {
 		t.Fatal("a playable not already targeting the caster must be retargeted, not attacked")
 	}
 }
@@ -4210,13 +4165,12 @@ func TestCharacterRetargetableOnAggressionAttacksWhenAlreadyTargetingCaster(t *t
 	target := targetCharacter(2)
 	target.StoreTarget(caster)
 
-	var attackedWith any
-	target.SetAttackTargetHook(func(t world.Tracked) { attackedWith = t })
+	rec := recordEvents(target)
 
 	target.AttackTarget(caster)
 
-	if attackedWith != world.Tracked(caster) {
-		t.Fatalf("AttackTarget hook called with %v, want caster", attackedWith)
+	if got := event.Of[event.AttackRequested](rec); len(got) != 1 || got[0].Target != event.Object(caster) {
+		t.Fatalf("AttackRequested events = %+v, want one onto caster", got)
 	}
 	if got := target.Target(); got != world.Tracked(caster) {
 		t.Fatalf("Target() = %v, want unchanged caster (attack, not retarget)", got)
@@ -4226,13 +4180,12 @@ func TestCharacterRetargetableOnAggressionAttacksWhenAlreadyTargetingCaster(t *t
 func TestCharacterTryToAttackDelegatesToAttackTarget(t *testing.T) {
 	caster := targetCharacter(1)
 	target := targetCharacter(2)
-	var attackedWith any
-	target.SetAttackTargetHook(func(t world.Tracked) { attackedWith = t })
+	rec := recordEvents(target)
 
 	target.TryToAttack(caster)
 
-	if attackedWith != world.Tracked(caster) {
-		t.Fatalf("attack target hook called with %v, want caster", attackedWith)
+	if got := event.Of[event.AttackRequested](rec); len(got) != 1 || got[0].Target != event.Object(caster) {
+		t.Fatalf("AttackRequested events = %+v, want one onto caster", got)
 	}
 }
 
@@ -4519,7 +4472,7 @@ func TestRefreshWeightPenalty(t *testing.T) {
 			inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 			c := &Character{}
 			c.AttachRuntime(&Template{CON: 20}, inv)
-			c.SetWeightLimitMultiplier(1)
+			c.weightLimitMultiplier = 1
 			inv.AddNew(1, int(math.Ceil(float64(c.WeightLimit())*tc.ratio)), 1)
 			inv.UpdateWeight()
 			c.RefreshWeightPenalty()
@@ -4534,15 +4487,14 @@ func TestRefreshWeightPenaltyChangesOnlyOnBandChange(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.SetWeightLimitMultiplier(1)
+	c.weightLimitMultiplier = 1
 	inv.AddNew(1, c.WeightLimit()/2, 1)
 	inv.UpdateWeight()
-	updates := 0
-	c.SetWeightPenaltyUpdater(func() { updates++ })
+	rec := recordEvents(c)
 
 	c.RefreshWeightPenalty()
 	c.RefreshWeightPenalty()
-	if updates != 1 {
+	if updates := event.Count[event.WeightPenaltyChanged](rec); updates != 1 {
 		t.Fatalf("updates after unchanged refresh = %d, want 1", updates)
 	}
 
@@ -4552,7 +4504,7 @@ func TestRefreshWeightPenaltyChangesOnlyOnBandChange(t *testing.T) {
 	if got, want := c.WeightPenalty(), 2; got != want {
 		t.Fatalf("WeightPenalty() = %d, want %d", got, want)
 	}
-	if updates != 2 {
+	if updates := event.Count[event.WeightPenaltyChanged](rec); updates != 2 {
 		t.Fatalf("updates after band change = %d, want 2", updates)
 	}
 }
@@ -4588,7 +4540,7 @@ func TestAddLevelRefreshesWeightPenalty(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{CharLevel: 1}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.SetWeightLimitMultiplier(1)
+	c.weightLimitMultiplier = 1
 	inv.AddNew(1, c.WeightLimit(), 1) // full overload -> band 4
 	inv.UpdateWeight()
 
@@ -4611,11 +4563,11 @@ func TestRefreshWeightPenaltyKeepsStateWhenLimitIsZero(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.SetWeightLimitMultiplier(1)
+	c.weightLimitMultiplier = 1
 	inv.AddNew(1, c.WeightLimit(), 1)
 	inv.UpdateWeight()
 	c.RefreshWeightPenalty()
-	c.SetWeightLimitMultiplier(0)
+	c.weightLimitMultiplier = 0
 	c.RefreshWeightPenalty()
 	if got, want := c.WeightPenalty(), 4; got != want {
 		t.Fatalf("WeightPenalty() after zero limit = %d, want %d", got, want)
@@ -4685,7 +4637,7 @@ func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*ite
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
-	c.SetPerfectShieldBlockRate(5)
+	c.perfectShieldBlockRate = 5
 	return c
 }
 
@@ -5125,11 +5077,12 @@ func TestAddExpAndSpNotifiesGain(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			c := newProgressionCharacter()
-			var got []gain
-			c.SetExpSpGainNotifier(func(exp int64, sp int) {
-				got = append(got, gain{exp, sp})
-			})
+			rec := recordEvents(c)
 			c.AddExpAndSp(table, tmpl, tc.exp, tc.sp)
+			var got []gain
+			for _, e := range event.Of[event.ExpSPGained](rec) {
+				got = append(got, gain{e.Exp, e.SP})
+			}
 			if len(got) != len(tc.want) {
 				t.Fatalf("gain notifications = %v, want %v", got, tc.want)
 			}
@@ -5151,10 +5104,9 @@ func TestAddExpAndSpNotifiesGainAtSPCeiling(t *testing.T) {
 
 	c := newProgressionCharacter()
 	c.SP = maxSP
-	notifications := 0
-	c.SetExpSpGainNotifier(func(int64, int) { notifications++ })
+	rec := recordEvents(c)
 	c.AddExpAndSp(table, tmpl, -1, 25)
-	if notifications != 0 {
+	if notifications := event.Count[event.ExpSPGained](rec); notifications != 0 {
 		t.Errorf("gain notifications = %d, want 0", notifications)
 	}
 }
@@ -5163,14 +5115,15 @@ func TestAddExpAndSpNotifiesGainAtSPCeiling(t *testing.T) {
 // applies SP only and must still report it.
 func TestRewardExpAndSpNotifiesGain(t *testing.T) {
 	c := newProgressionCharacter()
-	var got []int
-	c.SetExpSpGainNotifier(func(exp int64, sp int) {
-		if exp != 0 {
-			t.Errorf("gain notification exp = %d, want 0", exp)
-		}
-		got = append(got, sp)
-	})
+	rec := recordEvents(c)
 	c.RewardExpAndSp(nil, 100, 25)
+	var got []int
+	for _, e := range event.Of[event.ExpSPGained](rec) {
+		if e.Exp != 0 {
+			t.Errorf("gain notification exp = %d, want 0", e.Exp)
+		}
+		got = append(got, e.SP)
+	}
 	if len(got) != 1 || got[0] != 25 {
 		t.Errorf("gain notifications = %v, want [25]", got)
 	}
@@ -5184,12 +5137,11 @@ func TestAddLevelBroadcastsLevelUp(t *testing.T) {
 
 	t.Run("increase", func(t *testing.T) {
 		c := newProgressionCharacter()
-		broadcasts := 0
-		c.SetLevelUpBroadcaster(func() { broadcasts++ })
+		rec := recordEvents(c)
 		if !c.AddLevel(table, tmpl, 1) {
 			t.Fatal("AddLevel(1) = false, want true")
 		}
-		if broadcasts != 1 {
+		if broadcasts := event.Count[event.LeveledUp](rec); broadcasts != 1 {
 			t.Errorf("level-up broadcasts = %d, want 1", broadcasts)
 		}
 	})
@@ -5197,12 +5149,11 @@ func TestAddLevelBroadcastsLevelUp(t *testing.T) {
 	t.Run("decrease", func(t *testing.T) {
 		c := newProgressionCharacter()
 		c.AddLevel(table, tmpl, 5)
-		broadcasts := 0
-		c.SetLevelUpBroadcaster(func() { broadcasts++ })
+		rec := recordEvents(c)
 		if c.AddLevel(table, tmpl, -1) {
 			t.Fatal("AddLevel(-1) = true, want false")
 		}
-		if broadcasts != 0 {
+		if broadcasts := event.Count[event.LeveledUp](rec); broadcasts != 0 {
 			t.Errorf("level-up broadcasts = %d, want 0", broadcasts)
 		}
 	})
@@ -5227,11 +5178,18 @@ func TestAddLevelRefreshesLevelEntitlements(t *testing.T) {
 			c := newProgressionCharacter()
 			c.AddLevel(table, tmpl, 20)
 
-			var order []string
-			c.SetLevelRefresher(func() { order = append(order, "refresh") })
-			c.SetUserInfoUpdater(func() { order = append(order, "userinfo") })
+			rec := recordEvents(c)
 
 			c.AddLevel(table, tmpl, tc.delta)
+			var order []string
+			for _, e := range rec.Events() {
+				switch e.(type) {
+				case event.LevelChanged:
+					order = append(order, "refresh")
+				case event.UserInfoChanged:
+					order = append(order, "userinfo")
+				}
+			}
 			if want := []string{"refresh", "userinfo"}; !slices.Equal(order, want) {
 				t.Errorf("hook calls = %v, want %v", order, want)
 			}
@@ -5242,13 +5200,11 @@ func TestAddLevelRefreshesLevelEntitlements(t *testing.T) {
 	// leaves the character alone, so it owes neither hook.
 	t.Run("refused", func(t *testing.T) {
 		c := newProgressionCharacter()
-		refreshes, updates := 0, 0
-		c.SetLevelRefresher(func() { refreshes++ })
-		c.SetUserInfoUpdater(func() { updates++ })
+		rec := recordEvents(c)
 		if c.AddLevel(table, tmpl, table.RealMaxLevel()+1) {
 			t.Fatal("AddLevel past the real max reported an increase")
 		}
-		if refreshes != 0 || updates != 0 {
+		if refreshes, updates := event.Count[event.LevelChanged](rec), event.Count[event.UserInfoChanged](rec); refreshes != 0 || updates != 0 {
 			t.Errorf("refreshes = %d, UserInfo updates = %d, want 0 and 0", refreshes, updates)
 		}
 	})
@@ -5263,17 +5219,12 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 	t.Run("without level drop", func(t *testing.T) {
 		c := newProgressionCharacter()
 		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10)+1000, 1000)
-		var lost [][2]int64
-		broadcasts := 0
-		c.SetExpSpLossNotifier(func(exp int64, sp int) {
-			lost = append(lost, [2]int64{exp, int64(sp)})
-		})
-		c.SetStatusBroadcaster(func() { broadcasts++ })
+		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, 10, 25)
-		if len(lost) != 1 || lost[0] != [2]int64{10, 25} {
+		if lost := event.Of[event.ExpSPLost](rec); len(lost) != 1 || lost[0] != (event.ExpSPLost{Exp: 10, SP: 25}) {
 			t.Errorf("loss notifications = %v, want [[10 25]]", lost)
 		}
-		if broadcasts != 0 {
+		if broadcasts := countVitals(rec, false); broadcasts != 0 {
 			t.Errorf("status broadcasts = %d, want 0", broadcasts)
 		}
 	})
@@ -5282,10 +5233,9 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 		c := newProgressionCharacter()
 		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10), 1000)
 		before := c.CharLevel
-		notifications, broadcasts := 0, 0
-		c.SetExpSpLossNotifier(func(int64, int) { notifications++ })
-		c.SetStatusBroadcaster(func() { broadcasts++ })
+		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, c.Exp, 0)
+		notifications, broadcasts := event.Count[event.ExpSPLost](rec), countVitals(rec, false)
 		if c.CharLevel >= before {
 			t.Fatalf("CharLevel = %d, want below %d", c.CharLevel, before)
 		}
@@ -5299,10 +5249,9 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 
 	t.Run("nothing removed", func(t *testing.T) {
 		c := newProgressionCharacter()
-		notifications := 0
-		c.SetExpSpLossNotifier(func(int64, int) { notifications++ })
+		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, 0, 0)
-		if notifications != 0 {
+		if notifications := event.Count[event.ExpSPLost](rec); notifications != 0 {
 			t.Errorf("loss notifications = %d, want 0", notifications)
 		}
 	})
@@ -5317,10 +5266,9 @@ func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
 	t.Run("with level table, no level gained", func(t *testing.T) {
 		c := newProgressionCharacter()
 		c.AddExpAndSp(table, nil, table.RequiredExpForLevel(10), 0)
-		updates := 0
-		c.SetUserInfoUpdater(func() { updates++ })
+		rec := recordEvents(c)
 		c.RewardExpAndSp(table, 1, 10)
-		if updates != 1 {
+		if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
 			t.Errorf("UserInfo updates = %d, want 1", updates)
 		}
 	})
@@ -5331,22 +5279,20 @@ func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
 	// second restates the first rather than contradicting it.
 	t.Run("with level table, level gained", func(t *testing.T) {
 		c := newProgressionCharacter()
-		updates := 0
-		c.SetUserInfoUpdater(func() { updates++ })
+		rec := recordEvents(c)
 		if !c.RewardExpAndSp(table, table.RequiredExpForLevel(2), 10) {
 			t.Fatal("RewardExpAndSp did not report a level increase")
 		}
-		if updates != 2 {
+		if updates := event.Count[event.UserInfoChanged](rec); updates != 2 {
 			t.Errorf("UserInfo updates = %d, want 2", updates)
 		}
 	})
 
 	t.Run("without level table", func(t *testing.T) {
 		c := newProgressionCharacter()
-		updates := 0
-		c.SetUserInfoUpdater(func() { updates++ })
+		rec := recordEvents(c)
 		c.RewardExpAndSp(nil, 100, 10)
-		if updates != 1 {
+		if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
 			t.Errorf("UserInfo updates = %d, want 1", updates)
 		}
 	})
@@ -5981,4 +5927,31 @@ func equalSkillGrants(a, b []SkillGrant) bool {
 		}
 	}
 	return true
+}
+
+// recordEvents attaches a Recorder as c's sink and returns it.
+func recordEvents(c *Character) *event.Recorder {
+	rec := &event.Recorder{}
+	c.sink = rec
+	return rec
+}
+
+// countVitals counts VitalsChanged events carrying MP (includeMP) or not.
+func countVitals(rec *event.Recorder, includeMP bool) int {
+	n := 0
+	for _, e := range event.Of[event.VitalsChanged](rec) {
+		if e.IncludeMP == includeMP {
+			n++
+		}
+	}
+	return n
+}
+
+// pvpFlagCalls returns each PvPFlagged event's duration choice, in order.
+func pvpFlagCalls(rec *event.Recorder) []bool {
+	var calls []bool
+	for _, e := range event.Of[event.PvPFlagged](rec) {
+		calls = append(calls, e.UseFlaggedDuration)
+	}
+	return calls
 }

@@ -1,18 +1,12 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 const baseWeightLimit = 69000
-
-// SetWeightLimitMultiplier records the players.properties WeightLimit rate.
-func (c *Character) SetWeightLimitMultiplier(multiplier float64) {
-	c.stateMu.Lock()
-	c.weightLimitMultiplier = multiplier
-	c.stateMu.Unlock()
-}
 
 // WeightLimit returns the current stat-modified carrying limit.
 func (c *Character) WeightLimit() int {
@@ -55,13 +49,12 @@ func (c *Character) RefreshWeightPenalty() {
 	c.stateMu.Lock()
 	changed := c.weightPenalty != penalty
 	c.weightPenalty = penalty
-	update := c.updateWeightPenalty
 	c.stateMu.Unlock()
 	if changed && c.Live != nil {
 		c.Move().SetSpeed(c.RunSpeed())
 	}
-	if changed && update != nil {
-		update()
+	if changed {
+		c.emit(event.WeightPenaltyChanged{})
 	}
 }
 
@@ -70,13 +63,6 @@ func (c *Character) WeightPenalty() int {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.weightPenalty
-}
-
-// SetWeightPenaltyUpdater records the packet-layer notification for a band change.
-func (c *Character) SetWeightPenaltyUpdater(update func()) {
-	c.stateMu.Lock()
-	c.updateWeightPenalty = update
-	c.stateMu.Unlock()
 }
 
 // weightPenaltySpeedMultiplier mirrors WeightPenalty's per-band speed

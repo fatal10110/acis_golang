@@ -151,7 +151,6 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 type magicCastBroadcaster interface {
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
-	BroadcastSkillCanceled(objectID int32) error
 }
 
 // Cast starts the cast against target and schedules its Launch, Hit and
@@ -178,20 +177,6 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	broadcaster, _ := a.Caster.(magicCastBroadcaster)
 
 	if broadcaster != nil {
-		// Every abort path (Launch revalidation failure, insufficient
-		// MP/HP at Hit, a damage-break interrupt) routes through
-		// Controller.Stop/Interrupt, which fires the abort observer only
-		// when a cast was actually in flight — matching CreatureCast.stop()
-		// broadcasting MagicSkillCanceled behind the same isCastingNow()
-		// guard (CreatureCast.java:416-419), inherited unmodified by
-		// NpcCast. This PR is what first makes the cast start observable
-		// (MagicSkillUse below), so an abort must now close that loop too.
-		a.Controller.SetOnAbort(func(bool) {
-			if err := broadcaster.BroadcastSkillCanceled(a.Caster.ObjectID()); err != nil {
-				a.Controller.log.Warn().Err(err).Msg("cast: skill-canceled broadcast")
-			}
-		})
-
 		// MagicSkillUse broadcasts the instant the cast starts, matching
 		// CreatureCast.doCast's broadcastPacket call before the launch
 		// timer is even scheduled (CreatureCast.java:148,165).

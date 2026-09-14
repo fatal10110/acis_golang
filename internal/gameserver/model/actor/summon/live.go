@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -76,40 +77,31 @@ type Actor struct {
 	maxBuffsAmount int
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
-	// lifetime, combat stat bases, invul, statusUpdater, and
-	// ownerInfoRefresher:
+	// lifetime, combat stat bases, and invul:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
 	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
 	// the owner-connection and tick goroutines write them, per
 	// world.Observer's concurrency contract
 	// (internal/gameserver/world/visibility.go).
-	statusMu           sync.RWMutex
-	invul              bool
-	level              int
-	name               string
-	named              bool
-	lifetime           LifetimeState
-	statusUpdater      func()
-	ownerInfoRefresher func()
-	damageNotifier     func(string, int32)
-	expNotifier        func(int64)
-	dead               bool
-	disabled           bool
-	brain              AI
-	onDespawn          func()
-	// frames is the network-owned packet builder installed via
-	// SetFrameBuilder before SpawnBesideOwner publishes this summon into
-	// world.State; that publish takes a registry mutex, giving every other
-	// goroutine's read a happens-before edge over this unsynchronized write.
-	frames FrameBuilder
-	// broadcastAutoAttackStop is installed alongside SetFrameBuilder,
-	// before SpawnBesideOwner, so the same happens-before edge covers it.
-	broadcastAutoAttackStop func()
+	statusMu sync.RWMutex
+	invul    bool
+	level    int
+	name     string
+	named    bool
+	lifetime LifetimeState
+	dead     bool
+	disabled bool
+	brain    AI
+	// sink receives this summon's events. Attach installs it before
+	// SpawnBesideOwner publishes this summon into world.State; that publish
+	// takes a registry mutex, giving every other goroutine's read a
+	// happens-before edge over this unsynchronized write.
+	sink event.Sink
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
 	skills map[int]int
-	zones  peaceZoneQuery
+	zones  PeaceZoneQuery
 
 	followActive       bool
 	belowUnsummonLimit bool
@@ -156,9 +148,8 @@ type Actor struct {
 	stateMu                             sync.RWMutex
 	paralyzed, teleporting, immobilized bool
 
-	abnormalEffect   atomic.Int32
-	abnormalMu       sync.RWMutex
-	onAbnormalUpdate func()
+	abnormalEffect  atomic.Int32
+	ownerDiscovered atomic.Bool
 
 	shotsMu        sync.Mutex
 	shotsMask      int32
@@ -289,6 +280,8 @@ type PetConfig struct {
 	// resolves them into stat funcs attached before current HP/MP seed.
 	Passives  []modelskill.Ref
 	SkillDefs skillLookup
+	Zones     PeaceZoneQuery
+	LOS       LineOfSight
 }
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
@@ -318,6 +311,8 @@ type ServitorConfig struct {
 	// resolves them into stat funcs attached before current HP/MP seed.
 	Passives  []modelskill.Ref
 	SkillDefs skillLookup
+	Zones     PeaceZoneQuery
+	LOS       LineOfSight
 }
 
 // NewServitor returns a live servitor actor.
@@ -344,6 +339,8 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		skills:           cfg.Skills,
 		skillDefs:        cfg.SkillDefs,
 		maxBuffsAmount:   defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
+		zones:            cfg.Zones,
+		los:              cfg.LOS,
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
@@ -398,6 +395,8 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		skills:         cfg.Skills,
 		skillDefs:      cfg.SkillDefs,
 		maxBuffsAmount: defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
+		zones:          cfg.Zones,
+		los:            cfg.LOS,
 	}
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err

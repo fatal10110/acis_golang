@@ -9,10 +9,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -76,11 +77,13 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	hostile.SetWorld(s.State)
-	hostile.SetWeapon(s.itemTable)
-	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
+	hostile.Attach(npc.Runtime{
+		World: s.State,
+		Items: s.itemTable,
+		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+			gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable),
+		Sink: network.HostileSinks(s.State)(hostile),
+	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
 }
@@ -92,7 +95,21 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 // parked: only DoAttack drives it, never the AI loop.
 type AttackingHostile struct {
 	*npc.Hostile
-	ctl *attack.Controller
+	ctl      *attack.Controller
+	finished chan struct{}
+}
+
+// attackFinishedSignal is the attack controller sink of an AttackingHostile:
+// it signals every finished swing on its channel.
+type attackFinishedSignal chan struct{}
+
+func (c attackFinishedSignal) Emit(ev event.Event) {
+	if _, ok := ev.(event.AttackFinished); ok {
+		select {
+		case c <- struct{}{}:
+		default:
+		}
+	}
 }
 
 // DoAttack starts one swing against target and blocks until it lands (the
@@ -102,13 +119,11 @@ type AttackingHostile struct {
 // timeout.
 func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant, timeout time.Duration) {
 	t.Helper()
-	done := make(chan struct{})
-	h.ctl.SetFinished(func() { close(done) })
 	if err := h.ctl.DoAttack(target); err != nil {
 		t.Fatalf("npc attack: %v", err)
 	}
 	select {
-	case <-done:
+	case <-h.finished:
 	case <-time.After(timeout):
 		t.Fatal("npc attack did not finish within timeout")
 	}
@@ -157,7 +172,8 @@ func (s *Server) SpawnAttackingHostileNPCAt(t *testing.T, at location.Location) 
 func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Template, at location.Location) *AttackingHostile {
 	t.Helper()
 	actorRef := &hostileActorRef{}
-	attackCtl := attack.NewAttackable(actorRef)
+	finished := make(attackFinishedSignal, 1)
+	attackCtl := attack.NewAttackable(actorRef, finished)
 	hostile := s.spawnHostile(t, tmpl, at, attackCtl)
 	actorRef.CreatureActor = hostile
 	// A deterministic zero roll always lands (Missed's rate is never
@@ -168,7 +184,7 @@ func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Templa
 	// non-zero CritRate will see every landed hit crit, not the
 	// configured percentage.
 	hostile.SetRollSource(func(int) int { return 0 })
-	return &AttackingHostile{Hostile: hostile, ctl: attackCtl}
+	return &AttackingHostile{Hostile: hostile, ctl: attackCtl, finished: finished}
 }
 
 type movingHostileStatRef struct{ effect.StatOwner }
@@ -237,13 +253,14 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new npc live: %v", err)
 	}
 	locRef := &movingHostileLocatedRef{}
-	moveCtl, err := move.NewController(live.Move(), locRef)
+	control := &movingHostileControl{server: s}
+	moveCtl, err := move.NewController(live.Move(), locRef, control)
 	if err != nil {
 		t.Fatalf("new move controller: %v", err)
 	}
 	moveCtl.SetPositionUpdates(s.positions)
 	actorRef := &hostileActorRef{}
-	attackCtl := attack.NewAttackable(actorRef)
+	attackCtl := attack.NewAttackable(actorRef, control)
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
@@ -251,27 +268,40 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
-	// The production event-driven Think hooks (data/manager newLiveHostile):
-	// without them a hostile re-thinks only once per AI tick, and its final
-	// arrival position never reaches world presence.
-	moveCtl.SetArrived(func() {
-		hostile.SyncPosition(moveCtl.Position())
-		hostile.AI().Arrived()
-		s.think(hostile)
+	control.hostile, control.move = hostile, moveCtl
+	hostile.Attach(npc.Runtime{
+		World: s.State,
+		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+			gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable),
+		Sink: network.HostileSinks(s.State)(hostile),
 	})
-	moveCtl.SetBlocked(func() bool {
-		moveCtl.BroadcastBlockedCorrection()
-		hostile.AI().ArrivedBlocked()
-		s.think(hostile)
-		return true
-	})
-	attackCtl.SetFinished(func() { s.think(hostile) })
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	hostile.SetWorld(s.State)
-	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
+}
+
+// movingHostileControl reacts to a moving fixture NPC's controller events
+// the way production does (data/manager newLiveHostile): without it a
+// hostile re-thinks only once per AI tick, and its final arrival position
+// never reaches world presence.
+type movingHostileControl struct {
+	server  *Server
+	hostile *npc.Hostile
+	move    *move.Controller
+}
+
+func (c *movingHostileControl) Emit(ev event.Event) {
+	switch ev.(type) {
+	case event.Arrived:
+		c.hostile.SyncPosition(c.move.Position())
+		c.hostile.AI().Arrived()
+		c.server.think(c.hostile)
+	case event.MoveBlocked:
+		c.move.BroadcastBlockedCorrection()
+		c.hostile.AI().ArrivedBlocked()
+		c.server.think(c.hostile)
+	case event.AttackFinished:
+		c.server.think(c.hostile)
+	}
 }
 
 func (s *Server) think(hostile *npc.Hostile) {

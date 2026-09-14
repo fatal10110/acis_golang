@@ -1,7 +1,7 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -21,7 +21,7 @@ type EffectPoint struct {
 
 	effects *effect.List
 	world   *world.State
-	frames  FrameBuilder
+	sink    event.Sink
 	log     zerolog.Logger
 }
 
@@ -63,22 +63,17 @@ func (ep *EffectPoint) AddStatFuncs([]effect.Mod)          {}
 func (ep *EffectPoint) RemoveStatsByOwner(effect.ModOwner) {}
 func (ep *EffectPoint) MaxBuffCount() int                  { return 0 }
 
-// SetWorld attaches the world state this actor spawns into and broadcasts
-// through.
-func (ep *EffectPoint) SetWorld(state *world.State) { ep.world = state }
-
-// SetFrameBuilder records the network-layer hook that translates this
-// actor's broadcast-worthy state changes into wire frames, keeping
-// serverpackets and wire-encoding knowledge out of the model layer.
-func (ep *EffectPoint) SetFrameBuilder(b FrameBuilder) { ep.frames = b }
-
-// SetLogger records where a broadcast failure from this actor's own
-// periodic tick (not routed through an AI think loop) is logged. The zero
-// value discards it.
-func (ep *EffectPoint) SetLogger(log zerolog.Logger) { ep.log = log }
+// Attach installs rt's World (the world this actor spawns into), Log (where
+// a failure from its own periodic tick is logged) and Sink. Call it once,
+// before Spawn; the other Runtime fields do not apply to an effect point.
+func (ep *EffectPoint) Attach(rt Runtime) {
+	ep.world = rt.World
+	ep.log = rt.Log
+	ep.sink = rt.Sink
+}
 
 // Spawn places the actor in the world at (x, y, z), facing heading. It is a
-// no-op until SetWorld has been called.
+// no-op until Attach has installed a world.
 func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
@@ -86,8 +81,8 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	ep.world.Spawn(ep, x, y, z, heading)
 }
 
-// Despawn removes the actor from the world. It is a no-op until SetWorld
-// has been called.
+// Despawn removes the actor from the world. It is a no-op until Attach has
+// installed a world.
 func (ep *EffectPoint) Despawn() {
 	if ep.world == nil {
 		return
@@ -101,8 +96,8 @@ func (ep *EffectPoint) Despawn() {
 }
 
 // ForEachNearby calls fn for every world object within radius units of
-// this actor, excluding itself. It is a no-op until SetWorld has been
-// called.
+// this actor, excluding itself. It is a no-op until Attach installs a
+// world.
 func (ep *EffectPoint) ForEachNearby(radius int, fn func(world.Tracked)) {
 	if ep.world == nil {
 		return
@@ -118,50 +113,33 @@ type skillCastTarget interface {
 	Position() (x, y, z int)
 }
 
-// BroadcastSkillUse sends a cast-start animation packet from this actor to
-// target, to every currently known observer capable of receiving one. It
-// is a no-op until SetWorld has been called.
+// BroadcastSkillUse reports a cast-start animation from this actor to target.
+// It is a no-op until Attach has installed a world.
 func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) error {
 	if ep.world == nil {
 		return ErrNoWorld
 	}
-	if ep.frames == nil {
-		return ErrNoFrameBuilder
+	if ep.sink == nil {
+		return nil
 	}
 	ax, ay, az := ep.Position()
 	tx, ty, tz := target.Position()
-	ep.broadcastFrame(ep.frames.SkillUse(
-		ep.ObjectID(), location.Location{X: ax, Y: ay, Z: az},
-		target.ObjectID(), location.Location{X: tx, Y: ty, Z: tz},
-		skillID, level, 0, 0, false,
-	))
+	ep.sink.Emit(event.MagicSkillUse{
+		CasterID: ep.ObjectID(), CasterAt: location.Location{X: ax, Y: ay, Z: az},
+		TargetID: target.ObjectID(), TargetAt: location.Location{X: tx, Y: ty, Z: tz},
+		SkillID: skillID, Level: level,
+	})
 	return nil
 }
 
-// BroadcastSkillLaunched sends the cast-launch target packet for skillID at
-// level, listing targetIDs, to every currently known observer capable of
-// receiving one. It is a no-op until SetWorld has been called.
+// BroadcastSkillLaunched reports the cast launch of skillID at level onto
+// targetIDs. It is a no-op until Attach has installed a world.
 func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	if ep.world == nil {
 		return ErrNoWorld
 	}
-	if ep.frames == nil {
-		return ErrNoFrameBuilder
+	if ep.sink != nil {
+		ep.sink.Emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
 	}
-	ep.broadcastFrame(ep.frames.SkillLaunched(ep.ObjectID(), skillID, level, targetIDs))
 	return nil
-}
-
-func (ep *EffectPoint) broadcastFrame(fr wire.Frame) {
-	ep.world.ForEachKnown(ep, func(o world.Tracked) {
-		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		frame, ok := wire.CopyFrame(fr)
-		if ok {
-			receiver.BroadcastFrame(frame)
-		}
-	})
-	fr.Release()
 }

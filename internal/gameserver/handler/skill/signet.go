@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -74,7 +75,7 @@ type signetHandler struct {
 	templates signetTemplates
 	ids       signetIDAllocator
 	world     *world.State
-	frames    npc.FrameBuilder
+	newSink   func(*npc.EffectPoint) event.Sink
 	log       zerolog.Logger
 }
 
@@ -161,7 +162,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if !ok {
 		return nil, false
 	}
-	if h.frames == nil {
+	if h.newSink == nil {
 		return nil, false
 	}
 	id, err := h.ids.NextID()
@@ -174,9 +175,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if err != nil {
 		return nil, false
 	}
-	actor.SetWorld(h.world)
-	actor.SetFrameBuilder(h.frames)
-	actor.SetLogger(h.log)
+	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {

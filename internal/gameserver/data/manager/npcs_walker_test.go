@@ -112,7 +112,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestNpcMovementCapsAtWaterSurface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, zones)
+	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, zones)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 }
 
 // TestNpcLeashReturnDoesNotHijackWalkerRoute pins a review finding on #1940:
-// the shared moveCtl.SetArrived hook fires for every kind of movement this
+// the shared Arrived event fires for every kind of movement this
 // Hostile makes, not only route moves — offensive-follow chase and leash
 // return-home (Hostile.ReturnHome -> MoveHome) go through the very same
 // hook. aCis NpcAI.onEvtArrived only continues route-node logic when the
@@ -318,7 +318,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	}
 
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 
@@ -422,7 +422,7 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 	}
 
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 
@@ -435,11 +435,11 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
 
-	event, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
+	ev, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
 	if err != nil {
 		t.Fatalf("MoveToLocation() error: %v", err)
 	}
-	if got, want := event.Speed, 50.0; got != want {
+	if got, want := ev.Speed, 50.0; got != want {
 		t.Fatalf("MoveToLocation() Speed = %v, want WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
 	}
 }

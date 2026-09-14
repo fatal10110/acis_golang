@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -31,7 +29,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -39,6 +36,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 type itemStore interface {
@@ -372,7 +370,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,
-			Frames:    serverpackets.NpcFrameBuilder{},
+			NewSink:   EffectPointSinks(cfg.World),
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,

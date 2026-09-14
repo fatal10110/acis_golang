@@ -3,6 +3,7 @@ package player
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -49,35 +50,11 @@ func (c *Character) ObserverMode() bool { return false }
 // isn't ported yet.
 func (c *Character) FestivalParticipant() bool { return false }
 
-// SetSummonConfirmSender records the packet-layer hook that sends skill
-// 1403's confirm-summon dialog (ConfirmDlg,
-// S1_WISHES_TO_SUMMON_YOU_FROM_S2_DO_YOU_ACCEPT).
-func (c *Character) SetSummonConfirmSender(send func(casterName string, casterID int32, x, y, z int, timeout time.Duration)) {
-	c.summonFriendMu.Lock()
-	defer c.summonFriendMu.Unlock()
-	c.sendSummonConfirm = send
-}
-
-// SetTeleportHook records the packet-layer hook that relocates this
-// character discontinuously (ground-snap, attack/cast stop,
-// TeleportToLocation broadcast), used by the plain SUMMON_FRIEND/SUMMON_PARTY
-// path and by TeleportAnswer's accept path.
-func (c *Character) SetTeleportHook(hook func(x, y, z, radius int)) {
-	c.summonFriendMu.Lock()
-	defer c.summonFriendMu.Unlock()
-	c.teleportHook = hook
-}
-
 // TeleportTo is summonFriendTraveler's entry point
 // (handler/skill/summon.go), matching Player.teleportTo
 // (Player.java:196-198).
 func (c *Character) TeleportTo(x, y, z, radius int) {
-	c.summonFriendMu.Lock()
-	hook := c.teleportHook
-	c.summonFriendMu.Unlock()
-	if hook != nil {
-		hook(x, y, z, radius)
-	}
+	c.emit(event.TeleportRequested{X: x, Y: y, Z: z, Radius: radius})
 }
 
 // ItemCount is summonFriendItemConsumer's entry point, matching
@@ -145,14 +122,8 @@ func (c *Character) ConfirmSummon(caster any, skill modelskill.Definition, timeo
 	if !ok {
 		return
 	}
-	c.summonFriendMu.Lock()
-	send := c.sendSummonConfirm
-	c.summonFriendMu.Unlock()
-	if send == nil {
-		return
-	}
 	x, y, z := info.Position()
-	send(info.CharacterName(), info.ObjectID(), x, y, z, timeout)
+	c.emit(event.SummonConfirmRequested{CasterName: info.CharacterName(), CasterID: info.ObjectID(), X: x, Y: y, Z: z, Timeout: timeout})
 }
 
 // TeleportAnswer handles the client's DlgAnswer response to ConfirmSummon,

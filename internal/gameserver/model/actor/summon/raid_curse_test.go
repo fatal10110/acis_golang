@@ -5,7 +5,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -71,14 +71,17 @@ func TestSummonRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 	}
 }
 
-func TestBroadcastSkillUseSendsCasterToTarget(t *testing.T) {
-	fx := newBroadcastFixture(t)
-	fx.actor.BroadcastSkillUse(2, location.Location{X: 1, Y: 2, Z: 3}, 7, location.Location{X: 4, Y: 5, Z: 6}, 4515, 1, 300, 0)
-	if fx.frames.skillUses != 1 {
-		t.Fatalf("SkillUse translations = %d, want 1", fx.frames.skillUses)
-	}
-	if len(fx.receiver.frames) == 0 {
-		t.Fatal("no observer received MagicSkillUse")
+func TestSummonRaidCurseEmitsCasterToTargetSkillUse(t *testing.T) {
+	a := mustServitor(t, ServitorConfig{ObjectID: 7, Level: 80, SkillDefs: newRaidCurseSkillTable()})
+	rec := &event.Recorder{}
+	a.Attach(Runtime{Sink: rec})
+	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
+
+	a.TestCursesOnAttack(target)
+
+	uses := event.Of[event.MagicSkillUse](rec)
+	if len(uses) != 1 || uses[0].CasterID != 2 || uses[0].TargetID != 7 || uses[0].SkillID != int32(modelskill.RaidCurse2SkillID) {
+		t.Fatalf("MagicSkillUse events = %+v, want raid 2 cursing summon 7", uses)
 	}
 }
 

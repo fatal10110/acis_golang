@@ -1,233 +1,88 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// SetHealRestoredNotifiers records the packet-layer hooks for Heal/ManaHeal
-// start-hook HP/MP restored system messages.
-func (c *Character) SetHealRestoredNotifiers(hp, mp func(healerName string, amount int, byOther bool)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendHPRestoredNotice, c.sendMPRestoredNotice = hp, mp
-}
-
 // NotifyHPRestored sends the HP-restored system message: number-only for a
 // self restore, healer name plus amount when another actor applied it.
 func (c *Character) NotifyHPRestored(healerName string, amount int, byOther bool) {
-	c.stateMu.RLock()
-	send := c.sendHPRestoredNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(healerName, amount, byOther)
-	}
+	c.emit(event.Restored{Resource: event.ResourceHP, HealerName: healerName, Amount: amount, ByOther: byOther})
 }
 
 // NotifyMPRestored sends the MP-restored system message: number-only for a
 // self restore, healer name plus amount when another actor applied it.
 func (c *Character) NotifyMPRestored(healerName string, amount int, byOther bool) {
-	c.stateMu.RLock()
-	send := c.sendMPRestoredNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(healerName, amount, byOther)
-	}
-}
-
-func (c *Character) SetCPRestoredNotifier(send func(healerName string, amount int, byOther bool)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendCPRestoredNotice = send
+	c.emit(event.Restored{Resource: event.ResourceMP, HealerName: healerName, Amount: amount, ByOther: byOther})
 }
 
 func (c *Character) NotifyCPRestored(healerName string, amount int, byOther bool) {
-	c.stateMu.RLock()
-	send := c.sendCPRestoredNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(healerName, amount, byOther)
-	}
-}
-
-// SetLackHPNotifier records the packet-layer hook for a toggle DOT effect
-// removed because its tick would exceed the target's remaining HP.
-func (c *Character) SetLackHPNotifier(send func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendLackHPNotice = send
+	c.emit(event.Restored{Resource: event.ResourceCP, HealerName: healerName, Amount: amount, ByOther: byOther})
 }
 
 // NotifyEffectRemovedDueLackHP sends this player's SKILL_REMOVED_DUE_LACK_HP
 // system message. e is unused: the reference message carries no skill-name
 // parameter (EffectDamOverTime.java:32-36).
 func (c *Character) NotifyEffectRemovedDueLackHP(*effect.Effect) {
-	c.stateMu.RLock()
-	send := c.sendLackHPNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
-}
-
-// SetLackMPNotifier records the packet-layer hook for a toggle mana-DOT
-// effect removed because its tick would exceed the target's remaining MP.
-func (c *Character) SetLackMPNotifier(send func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendLackMPNotice = send
+	c.emit(event.EffectRemovedLackHP{})
 }
 
 // NotifyEffectRemovedDueLackMP sends this player's SKILL_REMOVED_DUE_LACK_MP
 // system message. e is unused: the reference message carries no skill-name
 // parameter (EffectManaDamOverTime.java:29-33).
 func (c *Character) NotifyEffectRemovedDueLackMP(*effect.Effect) {
-	c.stateMu.RLock()
-	send := c.sendLackMPNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
-}
-
-// SetRelaxHPFullNotifier records the packet-layer hook for Relax ending at full HP.
-func (c *Character) SetRelaxHPFullNotifier(send func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendRelaxHPFullNotice = send
+	c.emit(event.EffectRemovedLackMP{})
 }
 
 // NotifyRelaxDeactivatedHPFull sends SKILL_DEACTIVATED_HP_FULL.
 func (c *Character) NotifyRelaxDeactivatedHPFull(*effect.Effect) {
-	c.stateMu.RLock()
-	send := c.sendRelaxHPFullNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
-}
-
-// SetSpoilNotifiers records packet-layer hooks for Spoil outcomes.
-func (c *Character) SetSpoilNotifiers(already, success func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendSpoilAlreadyNotice, c.sendSpoilSuccessNotice = already, success
+	c.emit(event.RelaxHPFull{})
 }
 
 func (c *Character) NotifySpoilAlready() {
-	c.stateMu.RLock()
-	send := c.sendSpoilAlreadyNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
+	c.emit(event.SpoilResult{Already: true})
 }
 
 func (c *Character) NotifySpoilSuccess() {
-	c.stateMu.RLock()
-	send := c.sendSpoilSuccessNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
-}
-
-// SetOverHitNotifier records the packet-layer hook that tells this character's
-// client a kill reward included an overhit XP bonus.
-func (c *Character) SetOverHitNotifier(send func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendOverHitNotice = send
+	c.emit(event.SpoilResult{})
 }
 
 // NotifyOverHit sends the OVER_HIT system message for a valid overhit kill.
 func (c *Character) NotifyOverHit() {
-	c.stateMu.RLock()
-	send := c.sendOverHitNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
-}
-
-// SetEffectExpiryNotifiers records the packet-layer hooks for an active
-// effect's worn-off/disappeared/aborted system message.
-func (c *Character) SetEffectExpiryNotifiers(wornOff, disappeared, aborted func(skillID modelskill.ID, level int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendEffectWornOff, c.sendEffectDisappeared, c.sendEffectAborted = wornOff, disappeared, aborted
+	c.emit(event.OverHit{})
 }
 
 // NotifyEffectWornOff sends S1_HAS_WORN_OFF for an effect that ran its full
 // course.
 func (c *Character) NotifyEffectWornOff(skillID modelskill.ID, level int) {
-	c.stateMu.RLock()
-	send := c.sendEffectWornOff
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(skillID, level)
-	}
+	c.emit(event.EffectEnded{Reason: event.EffectWornOff, SkillID: skillID, Level: level})
 }
 
 // NotifyEffectDisappeared sends EFFECT_S1_DISAPPEARED for an effect removed
 // before it ran its full course.
 func (c *Character) NotifyEffectDisappeared(skillID modelskill.ID, level int) {
-	c.stateMu.RLock()
-	send := c.sendEffectDisappeared
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(skillID, level)
-	}
+	c.emit(event.EffectEnded{Reason: event.EffectDisappeared, SkillID: skillID, Level: level})
 }
 
 // NotifyEffectAborted sends S1_HAS_BEEN_ABORTED for a toggle skill turned
 // off.
 func (c *Character) NotifyEffectAborted(skillID modelskill.ID, level int) {
-	c.stateMu.RLock()
-	send := c.sendEffectAborted
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(skillID, level)
-	}
-}
-
-// SetMagicFailureNotifiers records the packet-layer hooks for a magic-damage
-// resist: ATTACK_FAILED or S1_RESISTED_YOUR_S2 on the caster, and
-// RESISTED_S1_MAGIC on a player target.
-func (c *Character) SetMagicFailureNotifiers(attackFailed func(), resistedSkill func(string, modelskill.ID, int), resistedMagic func(string)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendAttackFailedNotice = attackFailed
-	c.sendResistedSkillNotice = resistedSkill
-	c.sendResistedMagicNotice = resistedMagic
+	c.emit(event.EffectEnded{Reason: event.EffectAborted, SkillID: skillID, Level: level})
 }
 
 // NotifyAttackFailed sends ATTACK_FAILED for a half-damage magic resist.
 func (c *Character) NotifyAttackFailed() {
-	c.stateMu.RLock()
-	send := c.sendAttackFailedNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send()
-	}
+	c.emit(event.AttackFailed{})
 }
 
 // NotifyResistedSkill sends S1_RESISTED_YOUR_S2 naming the target and skill.
 func (c *Character) NotifyResistedSkill(targetName string, skillID modelskill.ID, level int) {
-	c.stateMu.RLock()
-	send := c.sendResistedSkillNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(targetName, skillID, level)
-	}
+	c.emit(event.SkillResisted{TargetName: targetName, SkillID: skillID, Level: level})
 }
 
 // NotifyResistedMagic sends RESISTED_S1_MAGIC naming the attacker.
 func (c *Character) NotifyResistedMagic(attackerName string) {
-	c.stateMu.RLock()
-	send := c.sendResistedMagicNotice
-	c.stateMu.RUnlock()
-	if send != nil {
-		send(attackerName)
-	}
+	c.emit(event.MagicResisted{AttackerName: attackerName})
 }

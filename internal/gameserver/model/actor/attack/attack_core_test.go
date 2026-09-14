@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -26,7 +27,7 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			actor := &curseTimingPlayer{timingPlayer: timingPlayer{timingActor: timingActor{attackSpeed: 500}}, blocks: tt.blocks}
 			target := &timingTarget{id: 2, raidRelated: true}
-			ctrl := NewPlayable(actor)
+			ctrl := NewPlayable(actor, nil)
 
 			ctrl.deliverHits(0, []Hit{{Target: target, Damage: 1}})
 
@@ -44,10 +45,11 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	clock := &timingClock{}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
-	finished := 0
-	ctrl.SetFinished(func() { finished++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
+	finished := func() int { return event.Count[event.AttackFinished](rec) }
 
 	if err := ctrl.DoAttack(target); err != nil {
 		t.Fatalf("DoAttack() error: %v", err)
@@ -75,12 +77,12 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	if target.hits != 2 {
 		t.Fatalf("hits at attackTime = %d, want 2", target.hits)
 	}
-	if !ctrl.AttackingNow() || finished != 0 {
-		t.Fatalf("completion before 3*attackTime/2: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished)
+	if !ctrl.AttackingNow() || finished() != 0 {
+		t.Fatalf("completion before 3*attackTime/2: attacking = %v, finished = %d; want true, 0", ctrl.AttackingNow(), finished())
 	}
 	clock.fire(1500 * time.Millisecond)
-	if ctrl.AttackingNow() || finished != 1 {
-		t.Fatalf("completion at 3*attackTime/2: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished)
+	if ctrl.AttackingNow() || finished() != 1 {
+		t.Fatalf("completion at 3*attackTime/2: attacking = %v, finished = %d; want false, 1", ctrl.AttackingNow(), finished())
 	}
 }
 
@@ -88,10 +90,11 @@ func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	clock := &timingClock{}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
-	finished := 0
-	ctrl.SetFinished(func() { finished++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
+	finished := func() int { return event.Count[event.AttackFinished](rec) }
 	target.onDamage = func() {
 		if target.hits == 1 {
 			clock.fire(time.Second)
@@ -102,16 +105,16 @@ func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
 		t.Fatalf("DoAttack() error: %v", err)
 	}
 	clock.fire(500 * time.Millisecond)
-	if target.hits != 1 || finished != 0 {
-		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished)
+	if target.hits != 1 || finished() != 0 {
+		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished())
 	}
 	clock.fire(1500 * time.Millisecond)
-	if target.hits != 2 || finished != 0 {
-		t.Fatalf("after delayed second hit: hits = %d, finished = %d; want 2, 0", target.hits, finished)
+	if target.hits != 2 || finished() != 0 {
+		t.Fatalf("after delayed second hit: hits = %d, finished = %d; want 2, 0", target.hits, finished())
 	}
 	clock.fire(2 * time.Second)
-	if finished != 1 {
-		t.Fatalf("finished after delayed second hit = %d, want 1", finished)
+	if finished() != 1 {
+		t.Fatalf("finished after delayed second hit = %d, want 1", finished())
 	}
 }
 
@@ -119,7 +122,7 @@ func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 	actor := &timingActor{attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	clock := &timingClock{}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	if err := ctrl.DoAttack(target); err != nil {
@@ -135,7 +138,7 @@ func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 
 func TestControllerStopIsSilent(t *testing.T) {
 	actor := &timingPlayer{}
-	NewPlayer(actor).Stop()
+	NewPlayer(actor, nil).Stop()
 
 	if actor.idles != 0 || actor.actionFailed != 0 {
 		t.Fatalf("Stop() notifications = idle %d, ActionFailed %d; want 0, 0", actor.idles, actor.actionFailed)
@@ -153,7 +156,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 		reuse:       1500 * time.Millisecond,
 	}}
 	target := &timingTarget{id: 2}
-	ctrl := NewPlayer(actor)
+	ctrl := NewPlayer(actor, nil)
 	ctrl.afterFunc = (&timingClock{}).AfterFunc
 
 	if err := ctrl.DoAttack(target); err != nil {
@@ -170,7 +173,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponBow, attackSpeed: 500}
 	target := &timingTarget{id: 2}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = (&timingClock{}).AfterFunc
 
 	if err := ctrl.DoAttack(target); err != nil {
@@ -192,7 +195,7 @@ func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
 	}}
 	target := &timingTarget{id: 2}
 	clock := &timingClock{}
-	ctrl := NewPlayer(actor)
+	ctrl := NewPlayer(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	if err := ctrl.DoAttack(target); err != nil {
@@ -231,14 +234,15 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	}
 	actor.known = []attackable.Combatant{actor, primary, outsideCone, first, second, beyondCap, behind, outOfRange, notAttackable}
 	clock := &timingClock{}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
-	finished := 0
-	ctrl.SetFinished(func() { finished++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
+	finished := func() int { return event.Count[event.AttackFinished](rec) }
 	primary.onDamage = func() {
 		clock.fire(time.Second)
-		if finished != 0 {
-			t.Fatalf("pole completed during hit group: finished = %d, want 0", finished)
+		if finished() != 0 {
+			t.Fatalf("pole completed during hit group: finished = %d, want 0", finished())
 		}
 		actor.dead = true
 		ctrl.Stop()
@@ -290,7 +294,7 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 		known:       []attackable.Combatant{secondary},
 	}
 	clock := &timingClock{}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	if err := ctrl.DoAttack(primary); err != nil {
@@ -306,7 +310,7 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 	}
 }
 
-func snapshotTargetIDs(snapshot Snapshot) []int32 {
+func snapshotTargetIDs(snapshot event.Attack) []int32 {
 	ids := make([]int32, len(snapshot.Hits))
 	for i, hit := range snapshot.Hits {
 		ids[i] = hit.TargetID
@@ -376,7 +380,7 @@ type timingActor struct {
 	poleMax          int
 	known            []attackable.Combatant
 	queryRadius      int
-	snapshot         Snapshot
+	snapshot         event.Attack
 	broadcasts       int
 	events           []string
 	dead             bool
@@ -458,7 +462,7 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	return Hit{Target: t, Damage: 1}
 }
 func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
-func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
+func (a *timingActor) BroadcastAttack(snapshot event.Attack) error {
 	a.snapshot = snapshot
 	a.broadcasts++
 	a.events = append(a.events, "broadcast")
@@ -504,7 +508,7 @@ func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
 func TestControllerRejectsOutOfRangeWhenMovementDisabled(t *testing.T) {
 	actor := &timingActor{attackSpeed: 300, movementDisabled: true, outOfRange: true}
 	target := &timingTarget{id: 2, attackable: true}
-	ctrl := NewCreature(actor)
+	ctrl := NewCreature(actor, nil)
 
 	if ctrl.CanAttack(target) {
 		t.Fatal("CanAttack() = true when movement-disabled and out of range")

@@ -1377,7 +1377,7 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	}
 	c.Live = live
 	c.SetRollSource(func(int) int { return 99 })
-	c.SetPerfectShieldBlockRate(5)
+	c.Configure(player.Runtime{Rules: player.Rules{PerfectShieldBlockRate: 5}})
 	return c
 }
 

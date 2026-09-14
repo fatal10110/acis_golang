@@ -8,9 +8,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -21,6 +21,7 @@ type WorldObjects struct {
 	geo        *engine.Engine
 	state      *world.State
 	doorTimers *task.Door
+	newSink    func(*door.Object) event.Sink
 	now        func() time.Time
 
 	doors       map[int]*door.Object
@@ -34,7 +35,7 @@ type WorldObjects struct {
 // reference server's DoorAI. A door whose triangulated footprint is
 // degenerate or samples to no geodata cells is logged and skipped rather
 // than aborting boot, matching DoorData.java:113-123.
-func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door, log zerolog.Logger) (*WorldObjects, error) {
+func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door, newSink func(*door.Object) event.Sink, log zerolog.Logger) (*WorldObjects, error) {
 	if ids == nil {
 		return nil, fmt.Errorf("world objects: nil id allocator")
 	}
@@ -52,6 +53,7 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 		geo:        geo,
 		state:      state,
 		doorTimers: doorTimers,
+		newSink:    newSink,
 		now:        time.Now,
 		doors:      make(map[int]*door.Object),
 	}
@@ -182,8 +184,9 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	if err != nil {
 		return nil, fmt.Errorf("world objects: door %d: %w", tmpl.ID, err)
 	}
-	obj.SetWorld(w.state)
-	obj.SetFrameBuilder(serverpackets.DoorFrameBuilder{})
+	if w.newSink != nil {
+		obj.Attach(w.newSink(obj))
+	}
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)

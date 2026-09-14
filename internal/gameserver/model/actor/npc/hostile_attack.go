@@ -3,18 +3,15 @@ package npc
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // physicalTarget is the surface MakeAttackHit needs from an opponent to
@@ -57,13 +54,6 @@ func (h *Hostile) InAttackRange(target attackable.Combatant) bool {
 // terrain occlusion between two actors.
 type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
-}
-
-// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
-// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
-// permissive.
-func (h *Hostile) SetLineOfSight(los LineOfSight) {
-	h.los = los
 }
 
 // CanSee reports whether target is visible to this NPC: a geodata
@@ -123,7 +113,7 @@ func (h *Hostile) CollisionHeight() float64 {
 }
 
 // AttackType returns this NPC's attack style, resolved from the weapon
-// SetWeapon recorded. Unarmed (WeaponFist) when SetWeapon found no
+// Attach resolved. Unarmed (WeaponFist) when Attach found no
 // right-hand weapon — the common case, since the overwhelming majority of
 // monster templates carry no weapon item id in the shipped data.
 func (h *Hostile) AttackType() item.WeaponType {
@@ -162,7 +152,7 @@ func (h *Hostile) ConsumeBowMP() {
 }
 
 // WeaponGrade returns this NPC's resolved right-hand weapon's crystal
-// grade, recorded by SetWeapon. Zero (CrystalNone) when unarmed. Reference:
+// grade, resolved by Attach. Zero (CrystalNone) when unarmed. Reference:
 // Npc.getActiveWeaponItem, Npc.java:371-375.
 func (h *Hostile) WeaponGrade() int {
 	return int(h.weaponCrystal)
@@ -239,27 +229,8 @@ func (h *Hostile) RollAttackedShotRecharge() {
 }
 
 func (h *Hostile) broadcastShotRecharge(skillID int32) {
-	if h.world == nil || h.frames == nil {
-		return
-	}
 	x, y, z := h.Position()
-	self := location.Location{X: x, Y: y, Z: z}
-	var frame wire.Frame
-	built := false
-	defer func() { frame.Release() }()
-	h.world.ForEachKnownInRadius(h, 600, func(o world.Tracked) {
-		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
-		if ok {
-			if !built {
-				frame = h.frames.SkillUse(h.ObjectID(), self, h.ObjectID(), self, skillID, 1, 0, 0, false)
-				built = true
-			}
-			owned, copied := wire.CopyFrame(frame)
-			if copied {
-				receiver.BroadcastFrame(owned)
-			}
-		}
-	})
+	h.emit(event.ShotRecharged{SkillID: skillID, At: location.Location{X: x, Y: y, Z: z}})
 }
 
 // SetHeadingTo orients this NPC toward target. A target with no known
@@ -327,93 +298,55 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 	return hit
 }
 
-// BroadcastAttack sends the attack packet to every currently known
-// observer capable of receiving one (i.e. a connected player session). It
-// is a no-op until SetWorld has been called.
-func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Attack(snapshot)
-	})
+// BroadcastAttack reports one resolved attack swing.
+func (h *Hostile) BroadcastAttack(snapshot event.Attack) error {
+	h.emit(snapshot)
+	return nil
 }
 
-// BroadcastSkillUse sends a cast-start animation packet from this actor to
-// the target at (targetX, targetY, targetZ), to every currently known
-// observer capable of receiving one. It is a no-op until SetWorld has been
-// called.
+// BroadcastSkillUse reports a cast-start animation from this actor to the
+// target at (targetX, targetY, targetZ).
 func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
 	sx, sy, sz := h.Position()
-	origin := location.Location{X: sx, Y: sy, Z: sz}
-	targetAt := location.Location{X: targetX, Y: targetY, Z: targetZ}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.SkillUse(h.ObjectID(), origin, targetID, targetAt, skillID, level, hitTime, reuseDelay, false)
+	h.emit(event.MagicSkillUse{
+		CasterID: h.ObjectID(), CasterAt: location.Location{X: sx, Y: sy, Z: sz},
+		TargetID: targetID, TargetAt: location.Location{X: targetX, Y: targetY, Z: targetZ},
+		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
 	})
+	return nil
 }
 
-// BroadcastSkillLaunched sends the cast-launch target packet for skillID at
-// level, listing targetIDs, to every currently known observer capable of
-// receiving one. It is a no-op until SetWorld has been called.
+// BroadcastSkillLaunched reports the cast launch of skillID at level onto
+// targetIDs.
 func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.SkillLaunched(h.ObjectID(), skillID, level, targetIDs)
-	})
+	h.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
+	return nil
 }
 
-// BroadcastSkillCanceled sends the cast-cancel animation packet for
-// objectID to every currently known observer capable of receiving one. It
-// is a no-op until SetWorld has been called.
+// BroadcastSkillCanceled reports the cast-cancel animation for objectID.
 func (h *Hostile) BroadcastSkillCanceled(objectID int32) error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.SkillCanceled(objectID)
-	})
+	h.emit(event.SkillCanceled{ObjectID: objectID})
+	return nil
 }
 
-// BroadcastDie sends the death packet to every currently known observer
-// capable of receiving one, so clients play the corpse-fall animation
-// instead of leaving this NPC standing until its corpse decays. It is a
-// no-op until SetWorld has been called.
+// BroadcastDie reports this NPC's death, so clients play the corpse-fall
+// animation instead of leaving it standing until its corpse decays.
 func (h *Hostile) BroadcastDie() error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Die(h.ObjectID(), h.SpoilPool().Sweepable())
-	})
+	h.emit(event.Died{})
+	return nil
 }
 
-// BroadcastMove sends a MoveToLocation packet for event to every currently
-// known observer capable of receiving one. It is a no-op until SetWorld has
-// been called.
-func (h *Hostile) BroadcastMove(event move.Event) error {
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Move(h.ObjectID(), event) })
+// BroadcastMove reports a server-driven movement start.
+func (h *Hostile) BroadcastMove(ev event.Move) error {
+	h.emit(ev)
+	return nil
 }
 
-// BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward target
-// to every currently known observer capable of receiving one, matching the
-// reference's fallback when an AI-initiated cast is rejected after movement
-// has already turned the actor toward target. It is a no-op until SetWorld
-// has been called or if target exposes no position.
+// BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
+// target, matching the reference's fallback when an AI-initiated cast is
+// rejected after movement has already turned the actor toward target. A
+// target that exposes no position is ignored.
 func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
-	if h.world == nil {
-		return ErrNoWorld
-	}
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
 	located, ok := target.(interface{ Position() (int, int, int) })
 	if !ok {
 		return nil
@@ -422,66 +355,20 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	tx, ty, tz := located.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
-	distance := int(origin.Distance3D(dest))
-
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.MoveToPawn(h.ObjectID(), target.ObjectID(), distance, origin)
-	})
+	h.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
+	return nil
 }
 
-// BroadcastStop sends a stop-in-place notice to every currently known
-// observer capable of receiving one. It is a no-op until SetWorld has been
-// called.
+// BroadcastStop reports a stop in place.
 func (h *Hostile) BroadcastStop() error {
-	if h.world == nil {
-		return ErrNoWorld
-	}
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	x, y, z := h.Position()
-	at := location.Location{X: x, Y: y, Z: z}
-	return h.broadcastFrame(func() wire.Frame { return h.frames.Stop(h.ObjectID(), at, h.Heading()) })
+	h.emit(event.Stopped{})
+	return nil
 }
 
-// BroadcastStatus sends this NPC's current/max HP to every currently known
-// observer capable of receiving one, so a target's health bar reflects
-// damage as it lands rather than only the moment it dies. It is a no-op
-// until SetWorld has been called.
+// BroadcastStatus reports this NPC's current/max HP, so a target's health
+// bar reflects damage as it lands rather than only the moment it dies.
 func (h *Hostile) BroadcastStatus() error {
-	if h.world == nil {
-		return ErrNoWorld
-	}
-	if h.frames == nil {
-		return ErrNoFrameBuilder
-	}
-	maxHP, curHP := h.MaxHP(), h.CurrentHP()
-	return h.broadcastFrame(func() wire.Frame {
-		return h.frames.Status(h.ObjectID(), []npcinfo.StatusAttribute{{Type: npcinfo.StatusMaxHP, Value: maxHP}, {Type: npcinfo.StatusCurrentHP, Value: curHP}})
-	})
-}
-
-func (h *Hostile) broadcastFrame(build func() wire.Frame) error {
-	if h.world == nil {
-		return ErrNoWorld
-	}
-	known := h.known.SnapshotCopy(h.world, h)
-	defer known.Release()
-	var frame wire.Frame
-	built := false
-	defer func() { frame.Release() }()
-	for _, o := range known.Tracked() {
-		if receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool }); ok {
-			if !built {
-				frame = build()
-				built = true
-			}
-			owned, copied := wire.CopyFrame(frame)
-			if copied {
-				receiver.BroadcastFrame(owned)
-			}
-		}
-	}
+	h.emit(event.Status{Attrs: []event.StatusAttr{{Kind: event.StatusMaxHP, Value: h.MaxHP()}, {Kind: event.StatusCurrentHP, Value: h.CurrentHP()}}})
 	return nil
 }
 

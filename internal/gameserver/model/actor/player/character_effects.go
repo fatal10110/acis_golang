@@ -21,18 +21,6 @@ var _ target.Creature = (*Character)(nil)
 // ShieldDefense/DecreaseFusion take their caster/effected parameter as.
 var _ creature.DeathActor = (*Character)(nil)
 
-// SetMaxBuffsAmount records the players.properties MaxBuffsAmount base
-// buff-slot count. Known Divine Inspiration levels add on top of this at
-// MaxBuffCount time.
-func (c *Character) SetMaxBuffsAmount(amount int) {
-	if c == nil {
-		return
-	}
-	c.stateMu.Lock()
-	c.maxBuffsAmount = amount
-	c.stateMu.Unlock()
-}
-
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once: the configured base plus the known Divine Inspiration
 // skill level (0 when unknown).

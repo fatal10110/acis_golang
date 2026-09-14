@@ -3,11 +3,11 @@ package summon
 import (
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
@@ -180,9 +180,7 @@ func (a *Actor) despawn(state *world.State) {
 	// Stop the periodic effect sweep from reaching this summon's list once
 	// it leaves the world for good, even if it still holds a buff.
 	a.EffectList().Untrack()
-	if a.onDespawn != nil {
-		a.onDespawn()
-	}
+	a.emit(event.Despawned{})
 }
 
 func (a *Actor) resolveRequest(ctx CommandContext) Request {

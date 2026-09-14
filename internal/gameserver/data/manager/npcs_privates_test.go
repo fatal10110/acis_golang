@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -14,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
@@ -39,7 +38,7 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: partyAI},
 		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
 	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

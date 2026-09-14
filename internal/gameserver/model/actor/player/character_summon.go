@@ -1,59 +1,25 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// SummonSpawner spawns c's pet or servitor in response to a SUMMON_CREATURE
-// (or SUMMON servitor-branch) cast, mirroring the reference's
-// Pet.restore/World.addPet/Player.setSummon sequence. The domain layer
-// depends on this narrow interface instead of the network package, which
-// owns world placement, persistence, and AI wiring — the same split
-// SetCastController uses for the cast controller.
-type SummonSpawner interface {
-	// SpawnPet summons owner's pet from controlItem, the pet-collar item
-	// instance the SUMMON_CREATURE cast was cast with. It reports whether a
-	// pet was actually spawned.
-	SpawnPet(owner *Character, controlItem *item.Instance) bool
-	// SpawnServitor summons a servitor selected by a non-cubic SUMMON skill.
-	SpawnServitor(owner *Character, def modelskill.Definition) bool
-}
-
-// SetSummonSpawner wires c's live summon spawner, called once by the
-// network layer when it creates one for c.
-func (c *Character) SetSummonSpawner(spawner SummonSpawner) {
-	c.summonSpawner.Store(&spawner)
-}
-
-func (c *Character) loadSummonSpawner() SummonSpawner {
-	if p := c.summonSpawner.Load(); p != nil {
-		return *p
-	}
-	return nil
-}
-
 // SummonCreature is the SUMMON_CREATURE skill handler's entry point
 // (handler/skill/summon.go's creatureSummonRuntime), matching Java's
 // SummonCreature.useSkill: only a pet-collar-item cast reaches here, so a
-// non-*item.Instance item (or no spawner attached) is a silent no-op, same
-// as Java's item==nil / getSummonItem==null early returns.
+// non-*item.Instance item is a silent no-op, same as Java's item==nil /
+// getSummonItem==null early returns.
 func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
-	spawner := c.loadSummonSpawner()
-	if spawner == nil {
-		return
-	}
 	inst, ok := itemArg.(*item.Instance)
 	if !ok {
 		return
 	}
-	spawner.SpawnPet(c, inst)
+	c.emit(event.PetSummonRequested{ControlItem: inst})
 }
 
 // SummonServitor is the non-cubic SUMMON skill handler's entry point.
 func (c *Character) SummonServitor(def modelskill.Definition) {
-	spawner := c.loadSummonSpawner()
-	if spawner != nil {
-		spawner.SpawnServitor(c, def)
-	}
+	c.emit(event.ServitorSummonRequested{Skill: def})
 }

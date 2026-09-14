@@ -2,8 +2,7 @@ package serverpackets
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -26,7 +25,7 @@ func (NpcFrameBuilder) ObjectInfo(snapshot npcinfo.Snapshot) wire.Frame {
 }
 
 // Attack builds the attack packet for snapshot.
-func (NpcFrameBuilder) Attack(snapshot attack.Snapshot) wire.Frame {
+func (NpcFrameBuilder) Attack(snapshot event.Attack) wire.Frame {
 	return FrameAttack(snapshot)
 }
 
@@ -80,8 +79,8 @@ func (NpcFrameBuilder) Die(objectID int32, sweep bool) wire.Frame {
 }
 
 // Move builds a MoveToLocation packet for event.
-func (NpcFrameBuilder) Move(objectID int32, event move.Event) wire.Frame {
-	return FrameMove(objectID, event)
+func (NpcFrameBuilder) Move(objectID int32, ev event.Move) wire.Frame {
+	return FrameMove(objectID, ev)
 }
 
 // MoveToPawn builds a rotation-only MoveToPawn notice toward target.

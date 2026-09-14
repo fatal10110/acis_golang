@@ -21,12 +21,14 @@ delay.
   `CreatureStatus.setHp` calls `broadcastStatusUpdate`. Read the setter, not only the reward or task
   method that calls it.
 - Domain packages must not import `serverpackets`; that is a real import cycle, not a style rule.
-  Deliver the update through a runtime hook on the actor — a `Set<Thing>Updater` setter plus an
-  `Update<Thing>` caller, as `SetUserInfoUpdater`/`UpdateUserInfo` and
-  `SetStatusBroadcaster`/`BroadcastStatus` already do — and wire it where the live actor is built.
-- A nil hook must stay a silent no-op, so domain tests need no packet layer.
-- Cover the delivery with a domain test that counts hook calls. A test asserting only the new state
-  value cannot fail when the packet is missing, which is exactly the bug.
+  Emit an `event.Event` from the code path that makes the change; the actor's `event.Sink` (set
+  once at attach, nil in domain tests) carries it; the network layer maps it to packets in that
+  actor kind's single `Emit` type switch; cover delivery with a domain test asserting on
+  `event.Recorder`.
+- Never add a func-typed hook field or a `Set<Thing>Hook` setter to an actor; add an event type
+  instead.
+- A test asserting only the new state value cannot fail when the packet is missing, which is exactly
+  the bug.
 - A ported task manager, hook interface, or composition-root adapter is not done until a production
   caller feeds it. A constructor referenced only from tests, a queue nothing drains, and an adapter
   method with an empty body are unshipped features, not complete ports; treat them as gaps needing a

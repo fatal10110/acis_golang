@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -25,7 +26,7 @@ type Actor interface {
 	ObjectID() int32
 	SyncPosition(location.Location)
 	SetHeading(int)
-	BroadcastMove(Event) error
+	BroadcastMove(event.Move) error
 	BroadcastStop() error
 }
 
@@ -83,6 +84,7 @@ type PositionUpdateRegistry interface {
 type Controller struct {
 	move            *CreatureMove
 	self            Actor
+	sink            event.Sink
 	positionUpdates PositionUpdateRegistry
 
 	mu                     sync.Mutex
@@ -92,32 +94,59 @@ type Controller struct {
 }
 
 // NewController adapts move for self, the position/footprint of the actor
-// move drives.
-func NewController(move *CreatureMove, self Actor) (*Controller, error) {
+// move drives. sink receives Arrived and MoveBlocked; nil drops Arrived and
+// answers a blocked move with the stopped-cell correction itself.
+func NewController(move *CreatureMove, self Actor, sink event.Sink) (*Controller, error) {
 	if move == nil {
 		return nil, errors.New("move: nil creature move")
 	}
 	if self == nil {
 		return nil, errors.New("move: nil self")
 	}
-	// A route split across geopath waypoints re-broadcasts on every segment
-	// advance, not just the first: without it, clients keep predicting the
-	// original straight-line walk and visibly cut through obstacles the
-	// server itself routed around.
-	move.SetSegmentAdvancedHook(func(event Event) error {
-		// Continuations describe the next route leg, so they must carry its
-		// waypoint rather than a follow target.
-		event.FollowTarget = 0
-		event.FollowOffset = 0
-		// Reference rotates toward the new leg immediately before
-		// broadcasting it (CreatureMove.java moveToNextRoutePoint,
-		// setHeadingTo(destination) directly above the MoveToLocation send).
-		self.SetHeading(event.Origin.HeadingTo(event.Destination))
-		return self.BroadcastMove(event)
-	})
-	c := &Controller{move: move, self: self}
-	move.SetBlockedHook(c.BroadcastBlockedCorrection)
+	c := &Controller{move: move, self: self, sink: sink}
+	move.setOwner(c)
 	return c, nil
+}
+
+// segmentAdvanced re-broadcasts a route split across geopath waypoints on
+// every segment advance, not just the first: without it, clients keep
+// predicting the original straight-line walk and visibly cut through
+// obstacles the server itself routed around.
+func (c *Controller) segmentAdvanced(ev event.Move) error {
+	// Continuations describe the next route leg, so they must carry its
+	// waypoint rather than a follow target.
+	ev.FollowTarget = 0
+	ev.FollowOffset = 0
+	// Reference rotates toward the new leg immediately before
+	// broadcasting it (CreatureMove.java moveToNextRoutePoint,
+	// setHeadingTo(destination) directly above the MoveToLocation send).
+	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
+	return c.self.BroadcastMove(ev)
+}
+
+// blocked reports an in-flight move stopped by a newly blocked geodata path.
+// The sink owes observers BroadcastBlockedCorrection, ordered around its own
+// reaction; with no sink the correction is sent here.
+func (c *Controller) blocked() {
+	if c.sink == nil {
+		c.BroadcastBlockedCorrection()
+		return
+	}
+	c.sink.Emit(event.MoveBlocked{})
+}
+
+// arrived unregisters position ticks for a move that is not chasing a
+// target, then reports the arrival.
+func (c *Controller) arrived() {
+	c.mu.Lock()
+	following := c.offensiveTarget != nil
+	c.mu.Unlock()
+	if !following {
+		c.removePositionUpdate()
+	}
+	if c.sink != nil {
+		c.sink.Emit(event.Arrived{})
+	}
 }
 
 // ObjectID returns the actor id this controller moves.
@@ -219,7 +248,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		return false, nil
 	}
 	if !c.move.Moving() || c.move.Destination() != dest {
-		event, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
+		ev, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
 		if err != nil {
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
@@ -230,11 +259,11 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		c.applyPathFindOutcome(outcome)
 		if mode == FollowOffensive {
 			if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
-				event.FollowTarget = target.ObjectID()
-				event.FollowOffset = offset
+				ev.FollowTarget = target.ObjectID()
+				ev.FollowOffset = offset
 			}
 		}
-		broadcastErr := c.self.BroadcastMove(event)
+		broadcastErr := c.self.BroadcastMove(ev)
 		c.addPositionUpdate()
 		return true, broadcastErr
 	}
@@ -257,12 +286,12 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return nil
 	}
 
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	if err != nil {
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
 	return broadcastErr
 }
@@ -272,12 +301,12 @@ func (c *Controller) MoveHome(home location.Location) error {
 // point and counts as a geo-path failure for actors that recover from
 // repeated stalls.
 func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
 		return false, nil
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
 	return true, broadcastErr
 }
@@ -285,15 +314,15 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // MoveToLocationEvent behaves like MoveToLocation but also returns the
 // accepted move's Event, for callers that need the move detail alongside
 // acceptance (task.Walker's WalkerActor contract).
-func (c *Controller) MoveToLocationEvent(target location.Location) (Event, error) {
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, error) {
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
-		return Event{}, err
+		return event.Move{}, err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
-	return event, broadcastErr
+	return ev, broadcastErr
 }
 
 func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
@@ -332,44 +361,12 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 	return c.move.CanMoveTo(target)
 }
 
-// SetBlocked records the callback invoked when an in-flight move is stopped
-// by a newly blocked geodata path. Returning true skips the default
-// same-cell MoveToLocation correction (the callback already produced the
-// client-visible packet). A nil callback, or false, still broadcasts that
-// correction. Callers that need correction-then-callback order (hostile
-// NPCs) must BroadcastBlockedCorrection themselves and return true.
-func (c *Controller) SetBlocked(blocked func() bool) {
-	c.move.SetBlockedHook(func() {
-		if blocked != nil && blocked() {
-			return
-		}
-		c.BroadcastBlockedCorrection()
-	})
-}
-
 // BroadcastBlockedCorrection snaps observers to the cell the actor actually
 // stopped on. A same-cell MoveToLocation is the correction packet; StopMove
 // would freeze client prediction at the stale destination.
 func (c *Controller) BroadcastBlockedCorrection() {
 	pos := c.move.Position()
-	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})
-}
-
-// SetArrived records the callback invoked once movement this controller
-// started reaches its destination. A nil callback (the default) makes
-// arrival a no-op.
-func (c *Controller) SetArrived(arrived func()) {
-	c.move.SetArrivedHook(func() {
-		c.mu.Lock()
-		following := c.offensiveTarget != nil
-		c.mu.Unlock()
-		if !following {
-			c.removePositionUpdate()
-		}
-		if arrived != nil {
-			arrived()
-		}
-	})
+	_ = c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
 }
 
 // PositionUpdate advances one movement correction tick, syncing this
@@ -377,20 +374,20 @@ func (c *Controller) SetArrived(arrived func()) {
 // ordinary interpolation tick does not itself rebroadcast a movement
 // packet — resending one every tick would restart the client-side walk
 // animation instead of just correcting server-side state — but crossing a
-// geopath segment boundary inside UpdatePosition does rebroadcast (via the
-// segment-advanced hook installed in NewController), deliberately, so the
+// geopath segment boundary inside UpdatePosition does rebroadcast (via
+// segmentAdvanced), deliberately, so the
 // client restarts its per-leg animation the same way the reference client
 // does on each routed waypoint. It returns false once the move has
 // stopped.
 //
 // Reaching the destination fires the arrived hook synchronously inside
-// UpdatePosition, before this returns — including SetArrived's own
+// UpdatePosition, before this returns — including the controller's own
 // removePositionUpdate call. If that hook (an NPC's AI, say) starts a new
 // move as a result, c.move is moving again by the time UpdatePosition
 // returns, so the fresh state here — not the stale result of this tick —
 // decides whether to unregister.
 func (c *Controller) PositionUpdate() bool {
-	event, moving := c.move.UpdatePosition(PositionUpdateInterval)
+	ev, moving := c.move.UpdatePosition(PositionUpdateInterval)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recheckOffensiveFollow()
@@ -400,7 +397,7 @@ func (c *Controller) PositionUpdate() bool {
 		}
 		return c.move.Moving() || c.offensiveTarget != nil
 	}
-	c.self.SyncPosition(event.Origin)
+	c.self.SyncPosition(ev.Origin)
 	return true
 }
 

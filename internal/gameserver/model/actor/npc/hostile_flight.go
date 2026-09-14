@@ -1,20 +1,14 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // FlyTo broadcasts a forced-flight animation without changing server position.
 func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
-	if h.frames == nil {
-		return
-	}
-	x, y, z := h.Position()
-	_ = h.broadcastFrame(func() wire.Frame {
-		return h.frames.FlyTo(h.ObjectID(), dest, location.Location{X: x, Y: y, Z: z}, flight)
-	})
+	h.emit(event.Flight{Dest: dest, Flight: flight})
 }
 
 // TeleportTo snaps the NPC to target and broadcasts the forced correction.
@@ -37,11 +31,5 @@ func (h *Hostile) SetXYZ(x, y, z int) {
 
 // BroadcastPosition sends the forced-location correction after a flight lands.
 func (h *Hostile) BroadcastPosition() {
-	if h.frames == nil {
-		return
-	}
-	x, y, z := h.Position()
-	_ = h.broadcastFrame(func() wire.Frame {
-		return h.frames.ValidateLocation(h.ObjectID(), location.Location{X: x, Y: y, Z: z}, h.Heading())
-	})
+	h.emit(event.PositionCorrected{})
 }

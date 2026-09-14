@@ -1,12 +1,8 @@
 package summon
 
-type peaceZoneQuery interface {
+// PeaceZoneQuery is the zone query launch revalidation uses.
+type PeaceZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
-}
-
-// SetZones records the zone query launch revalidation uses.
-func (a *Actor) SetZones(zones peaceZoneQuery) {
-	a.zones = zones
 }
 
 // EffectRangeInPeaceZone reports whether an effect overlaps a peace zone in

@@ -6,15 +6,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func TestCharacterRaidCursePetrifiesAndBlocks(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	var uses []creature.MagicSkillUse
-	c.SetSkillDefinitions(newRaidCurseSkillTable())
-	c.SetMagicSkillUseBroadcaster(func(use creature.MagicSkillUse) { uses = append(uses, use) })
+	c.skillDefs = newRaidCurseSkillTable()
+	rec := recordEvents(c)
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 
 	if !c.TestCursesOnAttack(target) {
@@ -26,7 +26,7 @@ func TestCharacterRaidCursePetrifiesAndBlocks(t *testing.T) {
 	if _, ok := c.EffectList().ActiveBySkillID(int(modelskill.RaidCurse2SkillID)); !ok {
 		t.Fatal("petrification effect missing")
 	}
-	if len(uses) != 1 || uses[0].SkillID != int32(modelskill.RaidCurse2SkillID) || uses[0].HitTime != creature.RaidCurseHitTime {
+	if uses := event.Of[event.MagicSkillUse](rec); len(uses) != 1 || uses[0].SkillID != int32(modelskill.RaidCurse2SkillID) || uses[0].HitTime != creature.RaidCurseHitTime {
 		t.Fatalf("MagicSkillUse = %+v, want petrify hitTime 300", uses)
 	}
 }
@@ -35,7 +35,7 @@ func TestCharacterRaidCurseMountedAntiStriderContinues(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 70
 	c.Mount(12526, 99)
-	c.SetSkillDefinitions(newRaidCurseSkillTable())
+	c.skillDefs = newRaidCurseSkillTable()
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 
 	if c.TestCursesOnAttack(target) {
@@ -52,8 +52,8 @@ func TestCharacterRaidCurseMountedAntiStriderContinues(t *testing.T) {
 func TestCharacterRaidCurseDisabledDoesNotBlock(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	c.SetRaidCursesDisabled(true)
-	c.SetSkillDefinitions(newRaidCurseSkillTable())
+	c.raidCursesDisabled = true
+	c.skillDefs = newRaidCurseSkillTable()
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 
 	if c.TestCursesOnAttack(target) {
@@ -64,9 +64,8 @@ func TestCharacterRaidCurseDisabledDoesNotBlock(t *testing.T) {
 func TestCharacterRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	var uses []creature.MagicSkillUse
-	c.SetSkillDefinitions(newRaidCurseSkillTable())
-	c.SetMagicSkillUseBroadcaster(func(use creature.MagicSkillUse) { uses = append(uses, use) })
+	c.skillDefs = newRaidCurseSkillTable()
+	rec := recordEvents(c)
 	raid := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
 	if !c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Creature{raid}) {
@@ -78,7 +77,7 @@ func TestCharacterRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 	if _, ok := c.EffectList().ActiveBySkillID(int(modelskill.RaidCurse2SkillID)); !ok {
 		t.Fatal("petrification effect missing")
 	}
-	if len(uses) != 1 || uses[0].SkillID != int32(modelskill.RaidCurse2SkillID) {
+	if uses := event.Of[event.MagicSkillUse](rec); len(uses) != 1 || uses[0].SkillID != int32(modelskill.RaidCurse2SkillID) {
 		t.Fatalf("MagicSkillUse = %+v, want petrify 4515", uses)
 	}
 }
@@ -86,8 +85,8 @@ func TestCharacterRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 func TestCharacterRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	c.SetRaidCursesDisabled(true)
-	c.SetSkillDefinitions(newRaidCurseSkillTable())
+	c.raidCursesDisabled = true
+	c.skillDefs = newRaidCurseSkillTable()
 	raid := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
 	if c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Creature{raid}) {

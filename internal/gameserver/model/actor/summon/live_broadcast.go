@@ -1,103 +1,42 @@
 package summon
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// FrameBuilder translates this summon's broadcast-worthy state changes into
-// wire frames. The network layer implements it (see
-// serverpackets.NpcFrameBuilder) so this package never constructs packets or
-// touches wire encoding itself — it only knows *when* to broadcast and *who*
-// is listening, mirroring npc.FrameBuilder.
-type FrameBuilder interface {
-	Attack(snapshot attack.Snapshot) wire.Frame
-	Move(objectID int32, event move.Event) wire.Frame
-	MoveToPawn(objectID, targetID int32, distance int, origin location.Location) wire.Frame
-	Stop(objectID int32, at location.Location, heading int) wire.Frame
-	SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame
+// Runtime is what a summon needs to act in the live world beyond its
+// construction config: the AI loop commands and effects drive, and the sink
+// its events reach. Both are built from the actor, so they cannot be
+// constructor config.
+type Runtime struct {
+	AI   AI
+	Sink event.Sink
 }
 
-// SetFrameBuilder records the network-owned hook that translates this
-// summon's broadcasts into packets. A nil builder keeps every Broadcast*
-// method a silent no-op so domain tests need no packet layer.
-func (a *Actor) SetFrameBuilder(b FrameBuilder) { a.frames = b }
-
-// SetAutoAttackStopBroadcaster records the packet-layer hook that broadcasts
-// AutoAttackStop to this summon's known observers when its owner's combat
-// stance expires. A nil hook keeps BroadcastAutoAttackStop a silent no-op.
-func (a *Actor) SetAutoAttackStopBroadcaster(fn func()) {
-	a.broadcastAutoAttackStop = fn
+// Attach installs rt. Call it once, before SpawnBesideOwner publishes the
+// summon into the world; a nil Sink drops every event so domain tests need no
+// packet layer, and a nil AI leaves commands unexecuted.
+func (a *Actor) Attach(rt Runtime) {
+	a.brain = rt.AI
+	a.sink = rt.Sink
 }
 
-// BroadcastAutoAttackStop sends AutoAttackStop through the runtime packet
-// hook when the owner's combat stance expires from inactivity.
+func (a *Actor) emit(e event.Event) {
+	if a.sink != nil {
+		a.sink.Emit(e)
+	}
+}
+
+// BroadcastAutoAttackStop reports that the owner's combat stance expired from
+// inactivity.
 func (a *Actor) BroadcastAutoAttackStop() {
-	if a.broadcastAutoAttackStop != nil {
-		a.broadcastAutoAttackStop()
-	}
+	a.emit(event.AutoAttackStopped{})
 }
 
-// broadcast builds one frame lazily — only once a known observer capable of
-// receiving frames is found — and hands every such receiver an independently
-// owned copy, releasing the source frame afterwards. It is a no-op until
-// SpawnBesideOwner has attached a world and SetFrameBuilder has installed the
-// network-owned builder.
-func (a *Actor) broadcast(build func() wire.Frame) {
-	if a.world == nil || a.frames == nil {
-		return
-	}
-	var frame wire.Frame
-	built := false
-	defer func() {
-		if built {
-			frame.Release()
-		}
-	}()
-	a.world.ForEachKnown(a, func(o world.Tracked) {
-		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		if !built {
-			frame = build()
-			built = true
-		}
-		owned, ok := wire.CopyFrame(frame)
-		if ok {
-			receiver.BroadcastFrame(owned)
-		}
-	})
-}
-
-// BroadcastFrame sends frame to every currently known observer capable of
-// receiving one (i.e. a connected player session), from this summon's own
-// known list. It takes ownership of frame and releases it. It is a no-op until
-// SpawnBesideOwner has attached a world. Unlike the typed Broadcast* methods
-// below, it carries an already-built frame and needs no FrameBuilder.
-func (a *Actor) BroadcastFrame(frame wire.Frame) {
-	defer frame.Release()
-	if a.world == nil {
-		return
-	}
-	a.world.ForEachKnown(a, func(o world.Tracked) {
-		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
-		if !ok {
-			return
-		}
-		owned, ok := wire.CopyFrame(frame)
-		if ok {
-			receiver.BroadcastFrame(owned)
-		}
-	})
-}
-
-func (a *Actor) BroadcastMove(event move.Event) error {
-	a.broadcast(func() wire.Frame { return a.frames.Move(a.ObjectID(), event) })
+func (a *Actor) BroadcastMove(ev event.Move) error {
+	a.emit(ev)
 	return nil
 }
 
@@ -108,10 +47,7 @@ func (a *Actor) SyncPosition(position location.Location) {
 }
 
 func (a *Actor) BroadcastStop() error {
-	x, y, z := a.Position()
-	a.broadcast(func() wire.Frame {
-		return a.frames.Stop(a.ObjectID(), location.Location{X: x, Y: y, Z: z}, a.Heading())
-	})
+	a.emit(event.Stopped{})
 	return nil
 }
 
@@ -134,41 +70,24 @@ func (a *Actor) BroadcastMoveToPawn(target attackable.Combatant) error {
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	tx, ty, tz := located.Position()
 	distance := int(origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}))
-	a.broadcast(func() wire.Frame {
-		return a.frames.MoveToPawn(a.ObjectID(), target.ObjectID(), distance, origin)
-	})
+	a.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: distance, Origin: origin})
 	return nil
 }
 
-// BroadcastSelfSkillUse sends the cast-start animation of skillID at level
-// with this summon as both caster and target, to every currently known
-// observer capable of receiving one, matching the reference's
+// BroadcastSelfSkillUse reports the cast-start animation of skillID at level
+// with this summon as both caster and target, matching the reference's
 // summon.broadcastPacket(new MagicSkillUse(summon, summon, ...)) self-cast
-// shape. It is a silent no-op until SpawnBesideOwner has attached a world and
-// SetFrameBuilder has installed the network-owned builder.
+// shape.
 func (a *Actor) BroadcastSelfSkillUse(skillID, level int32) error {
 	x, y, z := a.Position()
 	at := location.Location{X: x, Y: y, Z: z}
-	a.broadcast(func() wire.Frame {
-		return a.frames.SkillUse(a.ObjectID(), at, a.ObjectID(), at, skillID, level, 0, 0, false)
-	})
+	a.emit(event.MagicSkillUse{CasterID: a.ObjectID(), CasterAt: at, TargetID: a.ObjectID(), TargetAt: at, SkillID: skillID, Level: level})
 	return nil
 }
 
-// ForEachKnown visits the currently visible objects around this summon.
-func (a *Actor) ForEachKnown(fn func(world.Tracked)) {
-	if a.world != nil {
-		a.world.ForEachKnown(a, fn)
-	}
-}
-
-// SetAbnormalEffectUpdater installs the network-owned renderer for abnormal
-// effect transitions after the owner discovers the summon.
-func (a *Actor) SetAbnormalEffectUpdater(fn func()) {
-	a.abnormalMu.Lock()
-	defer a.abnormalMu.Unlock()
-	a.onAbnormalUpdate = fn
-}
+// MarkDiscoveredByOwner records that the owner's client now knows this
+// summon; abnormal-effect changes are reported only from then on.
+func (a *Actor) MarkDiscoveredByOwner() { a.ownerDiscovered.Store(true) }
 
 // StartAbnormalEffect adds mask to this summon's visible abnormal state.
 func (a *Actor) StartAbnormalEffect(mask int) { a.abnormalEffect.Or(int32(mask)) }
@@ -186,12 +105,10 @@ func (a *Actor) StopAbnormalEffect(mask int) {
 // AbnormalEffect returns this summon's visible abnormal-effect bitmask.
 func (a *Actor) AbnormalEffect() int { return int(a.abnormalEffect.Load()) }
 
-// UpdateAbnormalEffect re-announces the current state to non-owner observers.
+// UpdateAbnormalEffect reports the current state for re-announcement once the
+// owner has discovered this summon.
 func (a *Actor) UpdateAbnormalEffect() {
-	a.abnormalMu.RLock()
-	fn := a.onAbnormalUpdate
-	a.abnormalMu.RUnlock()
-	if fn != nil {
-		fn()
+	if a.ownerDiscovered.Load() {
+		a.emit(event.AbnormalEffectChanged{})
 	}
 }

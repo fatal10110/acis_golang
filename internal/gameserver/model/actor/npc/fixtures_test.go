@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -25,7 +24,6 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	return h
 }
 func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackController) *Hostile {

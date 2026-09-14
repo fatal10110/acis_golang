@@ -39,7 +39,7 @@ func relationAutoAttackable(karma int, pvpFlag task.PvPFlagState, subjectInPvPZo
 // broadcastRelationsChanges() (Player.java:6827-6839): each nearby player
 // gets one RelationChanged for `this` and, if `_summon != null`, one more
 // for `_summon`, both carrying the same relation/auto-attackable values.
-// Wired as live.Character's SetRelationBroadcaster hook.
+// It is the RelationChanged event's arm on livePlayer.Emit.
 func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 	if l.world == nil {
 		return

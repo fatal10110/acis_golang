@@ -74,7 +74,7 @@ func newTestWorldObjects(t *testing.T, tmpl *door.Template) (*WorldObjects, *eng
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, nil, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestNewWorldObjectsSpawnsDoorsAndStaticObjects(t *testing.T) {
 	}
 
 	state := world.New()
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, state, doorTimers, nil, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestNewWorldObjectsSkipsDegenerateDoor(t *testing.T) {
 	}
 
 	var logs bytes.Buffer
-	objs, err := NewWorldObjects(doors, statics, &worldObjectIDs{}, geo, world.New(), doorTimers, zerolog.New(&logs))
+	objs, err := NewWorldObjects(doors, statics, &worldObjectIDs{}, geo, world.New(), doorTimers, nil, zerolog.New(&logs))
 	if err != nil {
 		t.Fatalf("NewWorldObjects() error: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestSetDoorOpenCascadesToTriggeredDoor(t *testing.T) {
 		t.Fatalf("NewDoor: %v", err)
 	}
 
-	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, zerolog.Nop())
+	objects, err := NewWorldObjects(doorTemplates, staticTemplates, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, nil, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("NewWorldObjects: %v", err)
 	}

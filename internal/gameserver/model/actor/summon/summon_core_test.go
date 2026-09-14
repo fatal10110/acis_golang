@@ -9,6 +9,7 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -1120,12 +1121,12 @@ func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 	} {
 		t.Run(damage.name, func(t *testing.T) {
 			a := mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}})
-			updates := 0
-			a.SetStatusUpdater(func() { updates++ })
+			rec := &event.Recorder{}
+			a.Attach(Runtime{Sink: rec})
 
 			damage.apply(a)
 
-			if updates != 1 {
+			if updates := event.Count[event.StatusChanged](rec); updates != 1 {
 				t.Fatalf("status updates = %d, want 1", updates)
 			}
 		})
@@ -1145,22 +1146,21 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 		{"unknown attacker", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var gotName string
-			var gotDamage int32
-			calls := 0
 			a := tc.new()
-			a.SetDamageNotifier(func(name string, damage int32) { calls++; gotName, gotDamage = name, damage })
+			rec := &event.Recorder{}
+			a.Attach(Runtime{Sink: rec})
 			var attacker effect.Participant = namedDamageAttacker{name: "Attacker"}
 			if tc.name == "unknown attacker" {
 				attacker = anonymousAttacker{}
 			}
 			tc.apply(a, attacker)
+			got := event.Of[event.Damaged](rec)
 			if tc.called {
-				if calls != 1 || gotName != "Attacker" || gotDamage != 12 {
-					t.Fatalf("notification = (%d, %q, %d), want (1, Attacker, 12)", calls, gotName, gotDamage)
+				if len(got) != 1 || got[0] != (event.Damaged{AttackerName: "Attacker", Damage: 12}) {
+					t.Fatalf("notifications = %+v, want [{Attacker 12}]", got)
 				}
-			} else if calls != 0 {
-				t.Fatalf("notifications = %d, want 0", calls)
+			} else if len(got) != 0 {
+				t.Fatalf("notifications = %d, want 0", len(got))
 			}
 		})
 	}

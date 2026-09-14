@@ -1,26 +1,15 @@
 package player
 
-// SetHerbConsumer records the hook that applies a received herb's carried
-// skill to this character. Herbs never enter an inventory: whatever hands a
-// herb to a player consumes it on the spot, and the packet layer owns the
-// cast broadcast and effect application.
-func (c *Character) SetHerbConsumer(consume func(itemID int32)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.consumeHerb = consume
-}
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 
 // ConsumeHerb applies the herb itemID carries to this character and reports
-// whether a consumer was there to apply it. A detached character has none, so
-// the caller can still deliver the herb some other way instead of dropping it
-// on the floor of a hook that no longer exists.
+// whether anything was there to apply it. A character with no sink, or whose
+// session has detached, has nothing, so the caller can still deliver the herb
+// some other way instead of dropping it.
 func (c *Character) ConsumeHerb(itemID int32) bool {
-	c.stateMu.RLock()
-	consume := c.consumeHerb
-	c.stateMu.RUnlock()
-	if consume == nil {
+	if c.sink == nil || c.SessionDetached() {
 		return false
 	}
-	consume(itemID)
+	c.emit(event.HerbConsumed{ItemID: itemID})
 	return true
 }

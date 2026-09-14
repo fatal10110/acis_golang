@@ -4,10 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -142,35 +141,14 @@ func (f fakeSignetDefinitions) MaxLevel(id modelskill.ID) int {
 	return max
 }
 
-// fakeSignetFrames stands in for the network-owned packet builder. Signet
-// ticks broadcast SkillUse and SkillLaunched through it, so those two are
-// counted and answered with a throwaway frame; the embedded interface keeps
-// every unneeded method a non-nil panic guard rather than silent success.
-type fakeSignetFrames struct {
-	npc.FrameBuilder
-
-	skillUses int
-	launched  int
-}
-
-func (f *fakeSignetFrames) SkillUse(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int, success bool) wire.Frame {
-	f.skillUses++
-	return wire.BorrowedFrame([]byte{0x48})
-}
-
-func (f *fakeSignetFrames) SkillLaunched(objectID, skillID, level int32, targetIDs []int32) wire.Frame {
-	f.launched++
-	return wire.BorrowedFrame([]byte{0x76})
-}
-
-func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *fakeSignetFrames) {
+func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *event.Recorder) {
 	state := world.New()
 	templates := fakeSignetTemplates{byID: map[int]*npc.Template{
 		13018: {ID: 13018, Type: "EffectPoint"},
 	}}
-	frames := &fakeSignetFrames{}
-	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, frames: frames}
-	return h, state, frames
+	rec := &event.Recorder{}
+	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }}
+	return h, state, rec
 }
 
 func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {

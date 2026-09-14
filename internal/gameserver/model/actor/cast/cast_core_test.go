@@ -12,6 +12,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -44,12 +45,11 @@ func (a *abortActor) EnableAllSkills() {
 
 func (a *abortActor) ExitSignetGround() { a.signetExits++ }
 
-func newAbortController() (*Controller, *abortActor, *int) {
+func newAbortController() (*Controller, *abortActor, *event.Recorder) {
 	actor := &abortActor{testActor: scalingActor()}
-	ctrl := NewController(actor)
-	aborts := new(int)
-	ctrl.SetOnAbort(func(bool) { *aborts++ })
-	return ctrl, actor, aborts
+	rec := &event.Recorder{}
+	ctrl := NewController(actor, rec)
+	return ctrl, actor, rec
 }
 
 func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
@@ -97,8 +97,8 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 
 			tt.end(ctrl)
 
-			if *aborts != tt.wantAborts {
-				t.Fatalf("abort observer fired %d times, want %d", *aborts, tt.wantAborts)
+			if event.Count[event.CastAborted](aborts) != tt.wantAborts {
+				t.Fatalf("abort observer fired %d times, want %d", event.Count[event.CastAborted](aborts), tt.wantAborts)
 			}
 			if ctrl.CastingNow() {
 				t.Fatal("CastingNow() = true after the cast ended, want cleared")
@@ -107,30 +107,22 @@ func TestAbortObserverFiresOnlyForAnInFlightCast(t *testing.T) {
 	}
 }
 
-// TestFinishObserverReportsTheCastThatEnded pins that SetOnFinish's def and
-// target are the skill that just ended, not the zero value: the network
+// TestFinishObserverReportsTheCastThatEnded pins that CastFinished carries
+// the skill that just ended, not the zero value: the network
 // layer's PlayableAI.onEvtFinishedCasting (PlayableAI.java:43-63) port
 // gates attack resume on that skill's NextActionIsAttack, so a stale or
 // zero def would silently disable or wrongly enable the resume for every
 // cast.
 func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
-	ctrl, _, _ := newAbortController()
-	target := testTarget{}
-	var gotDef modelskill.Definition
-	var gotTarget Target
-	ctrl.SetOnFinish(func(_ bool, def modelskill.Definition, tgt Target) {
-		gotDef, gotTarget = def, tgt
-	})
-	if _, err := ctrl.Start(time.Unix(1000, 0), target, scalingDef); err != nil {
+	ctrl, _, rec := newAbortController()
+	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef); err != nil {
 		t.Fatalf("Start() error: %v", err)
 	}
 	ctrl.Finish()
 
-	if gotDef.ID != scalingDef.ID || gotDef.Level != scalingDef.Level {
-		t.Fatalf("finish observer def = %+v, want %+v", gotDef, scalingDef)
-	}
-	if gotTarget != target {
-		t.Fatalf("finish observer target = %v, want %v", gotTarget, target)
+	finished := event.Of[event.CastFinished](rec)
+	if len(finished) != 1 || finished[0].Skill.ID != scalingDef.ID || finished[0].Skill.Level != scalingDef.Level {
+		t.Fatalf("finish events = %+v, want one for %+v", finished, scalingDef)
 	}
 }
 
@@ -150,9 +142,7 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl, _, _ := newAbortController()
-			var got []bool
-			ctrl.SetOnFinish(func(interrupted bool, _ modelskill.Definition, _ Target) { got = append(got, interrupted) })
+			ctrl, _, rec := newAbortController()
 			if tt.start {
 				if _, err := ctrl.Start(now, testTarget{}, scalingDef); err != nil {
 					t.Fatalf("Start() error: %v", err)
@@ -160,6 +150,10 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 			}
 
 			tt.end(ctrl)
+			var got []bool
+			for _, e := range event.Of[event.CastFinished](rec) {
+				got = append(got, e.Interrupted)
+			}
 			if !slices.Equal(got, tt.want) {
 				t.Fatalf("finish observer = %v, want %v", got, tt.want)
 			}
@@ -192,8 +186,8 @@ func TestStopCancelsPendingPhaseTimers(t *testing.T) {
 	if len(fired) != 0 {
 		t.Fatalf("phase hooks ran after Stop: %v", fired)
 	}
-	if *aborts != 1 {
-		t.Fatalf("abort observer fired %d times, want 1", *aborts)
+	if event.Count[event.CastAborted](aborts) != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", event.Count[event.CastAborted](aborts))
 	}
 }
 
@@ -220,7 +214,7 @@ func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
 			if !errors.Is(err, ErrNotEnoughMP) {
 				t.Fatalf("Failed hook error = %v, want ErrNotEnoughMP", err)
 			}
-			if *aborts != 0 {
+			if event.Count[event.CastAborted](aborts) != 0 {
 				t.Fatal("abort observer fired before the failure was reported")
 			}
 			order = append(order, "failed")
@@ -233,8 +227,8 @@ func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
 	if len(order) != 1 || order[0] != "failed" {
 		t.Fatalf("hook order = %v, want only the failure hook", order)
 	}
-	if *aborts != 1 {
-		t.Fatalf("abort observer fired %d times, want 1", *aborts)
+	if event.Count[event.CastAborted](aborts) != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", event.Count[event.CastAborted](aborts))
 	}
 	if ctrl.CastingNow() {
 		t.Fatal("CastingNow() = true after an unaffordable hit, want cleared")
@@ -279,7 +273,7 @@ func (a *reentrantCostActor) ReduceHP(n int) {
 func newReentrantCostController() (*Controller, *reentrantCostActor, modelskill.Definition) {
 	actor := &reentrantCostActor{testActor: scalingActor()}
 	actor.items = map[int]int{57: 5}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	actor.ctrl = ctrl
 	def := scalingDef
 	def.ItemConsumeID, def.ItemConsumeCount = 57, 1
@@ -290,8 +284,8 @@ func newReentrantCostController() (*Controller, *reentrantCostActor, modelskill.
 
 func TestCastCostsMayCallBackIntoTheController(t *testing.T) {
 	ctrl, actor, def := newReentrantCostController()
-	aborts := 0
-	ctrl.SetOnAbort(func(bool) { aborts++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
 
 	done := make(chan error, 1)
 	go func() {
@@ -313,8 +307,8 @@ func TestCastCostsMayCallBackIntoTheController(t *testing.T) {
 	if ctrl.CastingNow() {
 		t.Fatal("CastingNow() = true, want the HP cost's Stop to have ended the cast")
 	}
-	if aborts != 1 {
-		t.Fatalf("abort observer fired %d times, want 1", aborts)
+	if event.Count[event.CastAborted](rec) != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", event.Count[event.CastAborted](rec))
 	}
 	if actor.items[57] != 4 || actor.mp != 100-7-5 || actor.hp != 1000-3 {
 		t.Fatalf("items=%d mp=%d hp=%d, want 4/88/997", actor.items[57], actor.mp, actor.hp)
@@ -328,8 +322,8 @@ func TestCastCostsMayCallBackIntoTheController(t *testing.T) {
 func TestStartRejectsACastItsOwnCostEnded(t *testing.T) {
 	ctrl, actor, def := newReentrantCostController()
 	actor.stopOnReduceMP = true
-	aborts := 0
-	ctrl.SetOnAbort(func(bool) { aborts++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
 
 	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotCasting) {
 		t.Fatalf("Start() error = %v, want ErrNotCasting", err)
@@ -337,8 +331,8 @@ func TestStartRejectsACastItsOwnCostEnded(t *testing.T) {
 	if ctrl.CastingNow() {
 		t.Fatal("CastingNow() = true, want the cost's Stop to have ended the cast")
 	}
-	if aborts != 1 {
-		t.Fatalf("abort observer fired %d times, want 1", aborts)
+	if event.Count[event.CastAborted](rec) != 1 {
+		t.Fatalf("abort observer fired %d times, want 1", event.Count[event.CastAborted](rec))
 	}
 	// The costs charged before the cast ended stay charged, matching a
 	// reference that pays reuse and the initial MP before it claims the cast.
@@ -354,8 +348,8 @@ func TestStartRejectsACastItsOwnCostEnded(t *testing.T) {
 func TestStartItemFailureAfterTheCastEnded(t *testing.T) {
 	ctrl, actor, def := newReentrantCostController()
 	actor.consumeFail, actor.stopOnConsume = true, true
-	aborts := 0
-	ctrl.SetOnAbort(func(bool) { aborts++ })
+	rec := &event.Recorder{}
+	ctrl.sink = rec
 
 	if _, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, def); !errors.Is(err, ErrNotEnoughItems) {
 		t.Fatalf("Start() error = %v, want ErrNotEnoughItems", err)
@@ -363,8 +357,8 @@ func TestStartItemFailureAfterTheCastEnded(t *testing.T) {
 	if ctrl.CastingNow() {
 		t.Fatal("CastingNow() = true after a rejected Start, want cleared")
 	}
-	if aborts != 1 {
-		t.Fatalf("abort observer fired %d times, want 1 (the cost's own Stop)", aborts)
+	if event.Count[event.CastAborted](rec) != 1 {
+		t.Fatalf("abort observer fired %d times, want 1 (the cost's own Stop)", event.Count[event.CastAborted](rec))
 	}
 	if actor.mp != 100 || len(actor.disabled) != 0 || len(actor.reuses) != 0 {
 		t.Fatalf("mp=%d disabled=%v reuses=%v, want nothing charged past the item failure", actor.mp, actor.disabled, actor.reuses)
@@ -447,7 +441,7 @@ func TestStopRunsOwnerCleanupEvenWhenIdle(t *testing.T) {
 // ---- from ai_test.go ----
 func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{}}
 
 	if ai.Disabled() {
@@ -465,7 +459,7 @@ func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 
 func TestAIControllerDisabledReflectsAllSkillsDisabled(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ai := &AIController{Controller: NewController(actor), Definitions: fakeDefinitions{}}
+	ai := &AIController{Controller: NewController(actor, nil), Definitions: fakeDefinitions{}}
 
 	if ai.Disabled() {
 		t.Fatal("Disabled() = true before the lock is set")
@@ -510,7 +504,7 @@ func TestAIControllerCanAttemptReflectsCooldown(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1}
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
 	target := &fakeCastCreature{id: 2}
 
@@ -528,7 +522,7 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 5, hp: 100}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
 	target := &fakeCastCreature{id: 2}
 
@@ -546,7 +540,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(def): true}}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
 	target := &fakeCastCreature{id: 2}
 
@@ -579,7 +573,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -634,7 +628,7 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -701,7 +695,7 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -768,7 +762,7 @@ func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Creature,
 func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -821,7 +815,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -850,16 +844,17 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 	}
 }
 
-// TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort verifies an
-// aborted cast broadcasts MagicSkillCanceled, closing the loop this PR
-// opened by making cast start observable — matching CreatureCast.stop()'s
-// `if (isCastingNow()) _actor.broadcastPacket(new
-// MagicSkillCanceled(...))` (CreatureCast.java:416-419), the common exit
-// every abort path (Launch revalidation failure here; also insufficient
-// MP/HP at Hit and a damage-break interrupt) routes through.
-func TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort(t *testing.T) {
+// TestAIControllerCastReportsAbortOnLaunchRevalidationFailure verifies an AI
+// cast rejected at Launch reports CastAborted, the event the NPC's owner maps
+// to MagicSkillCanceled — matching CreatureCast.stop()'s `if
+// (isCastingNow()) _actor.broadcastPacket(new MagicSkillCanceled(...))`
+// (CreatureCast.java:416-419), the common exit every abort path (Launch
+// revalidation failure here; also insufficient MP/HP at Hit and a
+// damage-break interrupt) routes through.
+func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 	clock := &fakeCastClock{}
-	ctrl := NewController(scalingActor())
+	rec := &event.Recorder{}
+	ctrl := NewController(scalingActor(), rec)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -878,8 +873,8 @@ func TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort(t *testing.T) {
 	ai.Cast(&fakeCastCreature{id: 2, x: 200, category: skilltarget.CategoryAttackable}, ref)
 	clock.fire(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
 
-	if len(caster.skillCanceledObjects) != 1 || caster.skillCanceledObjects[0] != 1 {
-		t.Fatalf("BroadcastSkillCanceled objects = %v, want [1] (the caster's own id)", caster.skillCanceledObjects)
+	if got := event.Count[event.CastAborted](rec); got != 1 {
+		t.Fatalf("CastAborted events = %d, want 1", got)
 	}
 	if len(caster.skillLaunchedCalls) != 0 {
 		t.Fatal("BroadcastSkillLaunched called on an aborted launch")
@@ -888,7 +883,7 @@ func TestAIControllerCastBroadcastsSkillCanceledOnLaunchAbort(t *testing.T) {
 
 func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	clock := &fakeCastClock{}
-	ctrl := NewController(scalingActor())
+	ctrl := NewController(scalingActor(), nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -924,7 +919,7 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 func TestAIControllerCastReportsHitResult(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -970,7 +965,7 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	clock := &fakeCastClock{}
 	actor := scalingActor()
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
@@ -1009,7 +1004,7 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 
 func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ctrl := NewController(actor)
+	ctrl := NewController(actor, nil)
 	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{}}
 	target := &fakeCastCreature{id: 2}
 
@@ -1069,9 +1064,8 @@ type skillLaunchedCall struct {
 // assert the Launch/Hit packet sequence AIController.Cast wires.
 type fakeBroadcastingCaster struct {
 	fakeCastCreature
-	skillUseCalls        []skillUseCall
-	skillLaunchedCalls   []skillLaunchedCall
-	skillCanceledObjects []int32
+	skillUseCalls      []skillUseCall
+	skillLaunchedCalls []skillLaunchedCall
 }
 
 func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
@@ -1081,11 +1075,6 @@ func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targ
 
 func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
-	return nil
-}
-
-func (f *fakeBroadcastingCaster) BroadcastSkillCanceled(objectID int32) error {
-	f.skillCanceledObjects = append(f.skillCanceledObjects, objectID)
 	return nil
 }
 
@@ -1948,11 +1937,10 @@ func TestRevalidateLaunchPeaceZone(t *testing.T) {
 
 func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
-	target, err := summon.NewPet(summon.PetConfig{ObjectID: 2})
+	target, err := summon.NewPet(summon.PetConfig{ObjectID: 2, Zones: launchZoneQuery(true)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	target.SetZones(launchZoneQuery(true))
 
 	if got := RevalidateLaunch(caster, target, modelskill.Definition{Offensive: true}); got != LaunchAbortTargetPeaceZone {
 		t.Fatalf("RevalidateLaunch(summon target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
@@ -2203,7 +2191,7 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	defs := requestDefinitions{
 		{ID: 3, Level: 1}: {
 			ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -2244,7 +2232,7 @@ func TestStartPlayerSkillAcceptsKnownActiveSkill(t *testing.T) {
 func TestStartPlayerSkillKeepsTargetRejectionFromResolver(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	defs := requestDefinitions{{ID: 3, Level: 1}: {
 		ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 	}}
@@ -2287,7 +2275,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		if !ch.RecentFakeDeath() {
 			t.Fatal("MarkRecentFakeDeath did not set the grace")
 		}
-		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: def}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -2305,7 +2293,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		ch := newRequestCharacter(10)
 		ch.SetSkillLevel(3, 1)
 		ch.MarkRecentFakeDeath()
-		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: def}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -2325,7 +2313,7 @@ func TestStartPlayerSkillClearsRecentFakeDeath(t *testing.T) {
 		ch := newRequestCharacter(10)
 		ch.SetSkillLevel(3, 1)
 		ch.MarkRecentFakeDeath()
-		ctrl := NewController(&testActor{mp: 100, hp: 100})
+		ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 		defs := requestDefinitions{{ID: 3, Level: 1}: fusionDef}
 
 		if _, err := StartPlayerSkill(PlayerSkillRequest{
@@ -2369,7 +2357,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 			if tt.dead {
 				ch.MarkDead()
 			}
-			ctrl := NewController(&testActor{mp: 100, hp: 100})
+			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 
 			if _, err := StartPlayerSkill(PlayerSkillRequest{
 				Now:         time.Unix(1000, 0),
@@ -2390,7 +2378,7 @@ func TestStartPlayerSkillRejectsUnavailableSkill(t *testing.T) {
 func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 	ch := newRequestCharacter(10)
 	ch.SetSkillLevel(3, 1)
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	defs := requestDefinitions{
 		{ID: 3, Level: 1}: {ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne},
 	}
@@ -2416,7 +2404,7 @@ func TestStartPlayerSkillRejectsInvalidTarget(t *testing.T) {
 func TestStartItemSkillAcceptsResolvedSkill(t *testing.T) {
 	ch := newRequestCharacter(10)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	def := modelskill.Definition{
 		ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		StaticHitTime: true, HitTime: 800, StaticReuse: true, ReuseDelay: 0,
@@ -2470,7 +2458,7 @@ func TestStartItemSkillRejectsUnavailableSkill(t *testing.T) {
 			if tt.dead {
 				ch.MarkDead()
 			}
-			ctrl := NewController(&testActor{mp: 100, hp: 100})
+			ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 
 			if _, err := StartItemSkill(ItemSkillRequest{
 				Now:         time.Unix(1000, 0),
@@ -2490,7 +2478,7 @@ func TestStartItemSkillRejectsUnavailableSkill(t *testing.T) {
 
 func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 	ch := newRequestCharacter(10)
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	defs := requestDefinitions{
 		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne},
 	}
@@ -2516,7 +2504,7 @@ func TestStartItemSkillRejectsInvalidTarget(t *testing.T) {
 func TestStartItemSkillKeepsResolverRejection(t *testing.T) {
 	ch := newRequestCharacter(10)
 	target := &requestTarget{id: 20}
-	ctrl := NewController(&testActor{mp: 100, hp: 100})
+	ctrl := NewController(&testActor{mp: 100, hp: 100}, nil)
 	defs := requestDefinitions{
 		{ID: 7, Level: 1}: {ID: 7, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable},
 	}
@@ -2889,12 +2877,12 @@ func toggleDef() modelskill.Definition {
 func TestCanCastToggleOnlyChecksBlanketLockAndReuseDelay(t *testing.T) {
 	def := toggleDef()
 	actor := &testActor{mp: 0, hp: 0}
-	if err := NewController(actor).CanCastToggle(def); err != nil {
+	if err := NewController(actor, nil).CanCastToggle(def); err != nil {
 		t.Fatalf("CanCastToggle() error = %v, want nil despite empty resources", err)
 	}
 
 	actor.disabledKeys = map[int32]bool{ReuseKey(def): true}
-	if err := NewController(actor).CanCastToggle(def); !errors.Is(err, ErrSkillDisabled) {
+	if err := NewController(actor, nil).CanCastToggle(def); !errors.Is(err, ErrSkillDisabled) {
 		t.Fatalf("CanCastToggle() error = %v, want ErrSkillDisabled", err)
 	}
 }
@@ -2908,7 +2896,7 @@ func TestCanCastToggleOnlyChecksBlanketLockAndReuseDelay(t *testing.T) {
 func TestCanCastToggleRejectsAllSkillsDisabled(t *testing.T) {
 	def := toggleDef()
 	actor := &testActor{mp: 100, hp: 100, allDisabled: true}
-	if err := NewController(actor).CanCastToggle(def); !errors.Is(err, ErrAllSkillsDisabled) {
+	if err := NewController(actor, nil).CanCastToggle(def); !errors.Is(err, ErrAllSkillsDisabled) {
 		t.Fatalf("CanCastToggle() error = %v, want ErrAllSkillsDisabled", err)
 	}
 }
@@ -2931,12 +2919,12 @@ func (a *groundTestActor) GroundTarget() (x, y, z int) { return a.gx, a.gy, a.gz
 func TestCanAttemptCastRejectsUnsetGroundTarget(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
 	actor := &groundTestActor{testActor: &testActor{}}
-	if err := NewController(actor).CanAttemptCast(testTarget{}, def); !errors.Is(err, ErrGroundTargetUnset) {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); !errors.Is(err, ErrGroundTargetUnset) {
 		t.Fatalf("CanAttemptCast() error = %v, want ErrGroundTargetUnset", err)
 	}
 
 	actor.gx, actor.gy, actor.gz = 1000, 2000, 300
-	if err := NewController(actor).CanAttemptCast(testTarget{}, def); err != nil {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); err != nil {
 		t.Fatalf("CanAttemptCast() error = %v, want nil once the signet point is set", err)
 	}
 }
@@ -2948,7 +2936,7 @@ func TestCanAttemptCastRejectsUnsetGroundTarget(t *testing.T) {
 func TestCanAttemptCastSkipsGroundGateForNonGroundTargeter(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, Target: modelskill.TargetGround}
 	actor := &testActor{}
-	if err := NewController(actor).CanAttemptCast(testTarget{}, def); err != nil {
+	if err := NewController(actor, nil).CanAttemptCast(testTarget{}, def); err != nil {
 		t.Fatalf("CanAttemptCast() error = %v, want nil for a caster with no GroundTarget surface", err)
 	}
 }
@@ -2958,7 +2946,7 @@ func TestCanCastToggleRejectsNonToggleSkill(t *testing.T) {
 	def.Activation = modelskill.ActivationActive
 
 	actor := &testActor{mp: 100, hp: 100}
-	if err := NewController(actor).CanCastToggle(def); err == nil {
+	if err := NewController(actor, nil).CanCastToggle(def); err == nil {
 		t.Fatal("CanCastToggle() error = nil, want an error for a non-toggle skill")
 	}
 }
@@ -2968,7 +2956,7 @@ func TestCastToggleDeactivatesAnAlreadyActiveInstanceAtNoCost(t *testing.T) {
 	def := toggleDef()
 	def.HPConsume = 3
 
-	activated, err := NewController(actor).CastToggle(true, def)
+	activated, err := NewController(actor, nil).CastToggle(true, def)
 	if err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
@@ -2985,7 +2973,7 @@ func TestCastToggleActivatesAndPaysMPAndHP(t *testing.T) {
 	def := toggleDef()
 	def.HPConsume = 3
 
-	activated, err := NewController(actor).CastToggle(false, def)
+	activated, err := NewController(actor, nil).CastToggle(false, def)
 	if err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
@@ -3003,7 +2991,7 @@ func TestCastToggleFailsWithoutConsumingWhenResourcesAreInsufficient(t *testing.
 		def := toggleDef()
 		def.HPConsume = 3
 
-		if _, err := NewController(actor).CastToggle(false, def); !errors.Is(err, ErrNotEnoughMP) {
+		if _, err := NewController(actor, nil).CastToggle(false, def); !errors.Is(err, ErrNotEnoughMP) {
 			t.Fatalf("CastToggle() error = %v, want ErrNotEnoughMP", err)
 		}
 		if actor.mp != 5 || actor.hp != 10 {
@@ -3019,7 +3007,7 @@ func TestCastToggleFailsWithoutConsumingWhenResourcesAreInsufficient(t *testing.
 		def := toggleDef()
 		def.HPConsume = 3
 
-		if _, err := NewController(actor).CastToggle(false, def); !errors.Is(err, ErrNotEnoughHP) {
+		if _, err := NewController(actor, nil).CastToggle(false, def); !errors.Is(err, ErrNotEnoughHP) {
 			t.Fatalf("CastToggle() error = %v, want ErrNotEnoughHP", err)
 		}
 		if actor.mp != 8 || actor.hp != 2 {
@@ -3033,7 +3021,7 @@ func TestCastToggleNeverInstallsAReuseDelay(t *testing.T) {
 	def := toggleDef()
 	def.ReuseDelay = 60000
 
-	if _, err := NewController(actor).CastToggle(false, def); err != nil {
+	if _, err := NewController(actor, nil).CastToggle(false, def); err != nil {
 		t.Fatalf("CastToggle() error: %v", err)
 	}
 	if len(actor.disabled) != 0 || len(actor.reuses) != 0 {

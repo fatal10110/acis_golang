@@ -5,9 +5,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -61,8 +61,7 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
-	hostile.SetWorld(state)
+	hostile.Attach(npc.Runtime{World: state})
 
 	locRef := &locatedRef{Actor: hostile}
 	locRef.AddGeoPathFailCount()
@@ -100,5 +99,31 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 	}
 	if got := hostile.GeoPathFailCount(); got != 0 {
 		t.Fatalf("GeoPathFailCount() after teleport = %d, want 0", got)
+	}
+}
+
+// TestHostileControlClosesAbortedCastWithCancelAnimation pins the NPC cast
+// abort mapping newLiveHostile's controller sink owns: an aborted AI cast
+// reports the NPC's own MagicSkillCanceled, matching CreatureCast.stop()'s
+// isCastingNow()-gated broadcast (CreatureCast.java:416-419) that NpcCast
+// inherits.
+func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
+	inst := &npc.Instance{
+		ObjectID: 7,
+		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100, AIParams: commons.NewStatSet()},
+		Kind:     "Monster",
+	}
+	state := world.New()
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil)
+	if err != nil {
+		t.Fatalf("newLiveHostile() error: %v", err)
+	}
+	rec := &event.Recorder{}
+	hostile.Attach(npc.Runtime{World: state, Sink: rec})
+
+	(&hostileControl{hostile: hostile}).Emit(event.CastAborted{Interrupted: true})
+
+	if got := event.Of[event.SkillCanceled](rec); len(got) != 1 || got[0].ObjectID != 7 {
+		t.Fatalf("SkillCanceled events = %+v, want one for the NPC itself (7)", got)
 	}
 }

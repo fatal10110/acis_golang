@@ -25,7 +25,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req clientpackets.AuthLogin) (bool, error) {
@@ -451,27 +450,31 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 		return tmpl.EtcItem.SharedReuseGroup, true
 	})
-	c.SetWeightLimitMultiplier(l.playerConfig.WeightLimitMultiplier)
-	c.SetDeathPenaltyChance(l.playerConfig.DeathPenaltyChance)
-	c.SetMaxBuffsAmount(l.playerConfig.MaxBuffsAmount)
-	c.SetPerfectShieldBlockRate(l.playerConfig.PerfectShieldBlockRate)
-	c.SetAllowDelevel(l.playerConfig.AllowDelevel)
-	c.SetRaidCursesDisabled(l.disableRaidCurse)
-	c.SetSkillDefinitions(l.skills)
-	c.SetRateKarmaExpLost(l.playerConfig.RateKarmaExpLost)
-	c.SetLevelTable(l.levels)
-	c.RefreshWeightPenalty()
-	c.RefreshExpertisePenalty()
-	c.SetWorld(l.world)
+	rt := player.Runtime{
+		World:  l.world,
+		Skills: l.skills,
+		Levels: l.levels,
+		Log:    l.log,
+		Rules: player.Rules{
+			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
+			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
+			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
+			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,
+			DeathPenaltyChance:     l.playerConfig.DeathPenaltyChance,
+			AllowDelevel:           l.playerConfig.AllowDelevel,
+			RaidCursesDisabled:     l.disableRaidCurse,
+			AwardPKKillPVPPoint:    l.playerConfig.AwardPKKillPVPPoint,
+		},
+	}
 	if los, ok := l.geo.(player.LineOfSight); ok {
-		c.SetLineOfSight(los)
+		rt.LOS = los
 	}
 	if l.zones != nil {
-		c.SetZones(l.zones)
+		rt.Zones = l.zones
 	}
-	c.SetFrameSender(client.Session.SendFrame)
-	c.SetBroadcastFrameSender(client.Session.SendFrame)
-	c.SetLogger(l.log)
+	c.Configure(rt)
+	c.RefreshWeightPenalty()
+	c.RefreshExpertisePenalty()
 
 	x, y, z := c.Position()
 	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c)
@@ -479,228 +482,26 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
-	c.AttachLive(creatureLive)
-	moveCtl, err := move.NewController(c.Move(), c)
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	c.Attach(creatureLive, live)
+	moveCtl, err := move.NewController(c.Move(), c, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	moveCtl.SetPositionUpdates(l.positions)
-	attackCtl := attack.NewPlayer(c)
+	attackCtl := attack.NewPlayer(c, live)
 	c.Move().SetLogger(l.log)
 	attackCtl.SetLogger(l.log)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
-	live := &livePlayer{Character: c, template: tmpl, npcs: l.npcs, items: items, attack: attackCtl, move: moveCtl, combat: combat, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}
-	c.SetSummonConfirmSender(func(casterName string, casterID int32, x, y, z int, timeout time.Duration) {
-		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(casterName, casterID, int32(x), int32(y), int32(z), timeout))
-	})
-	c.SetTeleportHook(func(x, y, z, radius int) {
-		l.teleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, radius)
-	})
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
-	c.SetZoneRevalidator(func(previous location.Location) {
-		l.revalidateZones(live, previous)
-	})
-	attackCtl.SetFinished(func() {
-		l.finishDeferredPickup(live)
-		l.finishDeferredMagicSkill(live)
-		l.finishDeferredItemAICast(live)
-		combat.Think()
-	})
-	attackCtl.SetStarted(func() {
-		l.startLiveAutoAttack(live)
-	})
-	moveCtl.SetArrived(func() {
-		// CreatureMove tracks position for its own timing only; push the
-		// arrived position into the world-grid presence range checks
-		// actually read before re-thinking the attack intention, or it
-		// re-evaluates against a stale position forever.
-		pos := moveCtl.Position()
-		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
-		l.finishLiveGroundPickup(live)
-		l.finishPetInteract(live)
-		l.finishDeferredMagicSkill(live)
-		combat.Think()
-	})
-	moveCtl.SetBlocked(func() bool {
-		return l.onPlayerArrivedBlocked(live)
-	})
-	c.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
-		l.broadcastAttack(live, snapshot)
-	})
-	c.SetBowDrawNotifier(func(gaugeMs int) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageGettingReadyToShootAnArrow))
-		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeRed, gaugeMs, gaugeMs))
-	})
-	c.SetMagicSkillUseBroadcaster(func(use creature.MagicSkillUse) {
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMagicSkillUse(
-				serverpackets.SkillCastObject{ObjectID: use.CasterID, Location: use.CasterAt},
-				serverpackets.SkillCastObject{ObjectID: use.TargetID, Location: use.TargetAt},
-				use.SkillID, use.Level, use.HitTime, use.ReuseDelay, false,
-			)
-		})
-	})
-	c.SetMoveBroadcaster(func(event move.Event) {
-		l.broadcastLiveMoveEvent(live, event)
-	})
-	c.SetFlightBroadcaster(func(dest location.Location, flight modelskill.Flight) {
-		at := live.CurrentLocation()
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameFlyToLocation(live.ObjectID(), dest, at, flight)
-		})
-	})
-	c.SetPositionBroadcaster(func() {
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
-		})
-	})
-	c.SetStopBroadcaster(func() {
-		x, y, z := live.Position()
-		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
-	})
-	c.SetAutoAttackStopBroadcaster(func() {
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameAutoAttackStop(live.ObjectID())
-		})
-	})
-	c.SetStanceBroadcaster(func(stance player.Stance) {
-		waitType := serverpackets.WaitSitting
-		switch stance {
-		case player.StanceStanding:
-			waitType = serverpackets.WaitStanding
-		case player.StanceFakeDeathStart:
-			waitType = serverpackets.WaitFakeDeathStart
-		case player.StanceFakeDeathStop:
-			waitType = serverpackets.WaitFakeDeathStop
-		}
-		x, y, z := live.Position()
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
-		})
-	})
-	c.SetFakeDeathReviveBroadcaster(func() { l.broadcastLiveRevive(live) })
-	c.SetDieBroadcaster(func() {
-		if l.water != nil {
-			l.water.Remove(live)
-		}
-		l.broadcastLiveDie(live)
-	})
-	c.SetStatusBroadcaster(func() {
-		l.broadcastLiveStatus(live)
-	})
-	c.SetMPStatusBroadcaster(func() {
-		l.broadcastLiveMPStatus(live)
-	})
-	c.SetAbnormalEffectUpdater(func() {
-		l.updateLiveAbnormalEffect(live)
-	})
-	c.SetAbnormalEffectBroadcaster(func() {
-		l.broadcastCharacterInfo(live)
-	})
-	c.SetExpSpGainNotifier(func(exp int64, sp int) {
-		live.SendFrame(expSpGainMessage(exp, sp))
-	})
-	c.SetExpSpLossNotifier(func(exp int64, sp int) {
-		sendExpSpLossFrames(live, exp, sp)
-	})
-	c.SetKarmaChangeNotifier(func(karma int) {
-		sendKarmaChangeFrames(live, karma)
-	})
-	c.SetAwardPKKillPVPPoint(l.playerConfig.AwardPKKillPVPPoint)
-	c.SetRelationBroadcaster(func() {
-		l.broadcastRelations(live)
-	})
-	c.SetPvPFlagHook(func(useFlaggedDuration bool) {
-		if l.pvpFlags == nil {
-			return
-		}
-		if useFlaggedDuration {
-			l.pvpFlags.AddFlagged(c)
-			return
-		}
-		l.pvpFlags.AddNormal(c)
-	})
-	c.SetLevelUpBroadcaster(func() {
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
-		})
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouIncreasedYourLevel))
-	})
-	c.SetUserInfoUpdater(func() {
-		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	})
-	c.SetChargesUpdater(func() {
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
-	})
-	c.SetChargeMessageSender(func(charges int, maxed bool) {
-		if maxed {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageForceMaxLevelReached))
-			return
-		}
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageForceIncreasedToS1, int32(charges)))
-	})
-	c.SetGradePenaltyUpdater(func() {
-		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
-	})
-	c.SetWeightPenaltyUpdater(func() {
-		items := live.inventoryItems()
-		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
-		if l.world != nil {
-			info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.template, Items: items}
-			broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
-				l.world.ForEachKnown(live, func(o world.Tracked) {
-					if receiver, ok := o.(frameReceiver); ok {
-						send(receiver)
-					}
-				})
-			})
-		}
-	})
-	c.SetDeathPenaltyRaisedUpdater(func(level int) {
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(level)))
-	})
-	c.SetDeathPenaltyReducedUpdater(func(level int) {
-		if level > 0 {
-			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(level)))
-		} else {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDeathPenaltyLifted))
-		}
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(level)}))
-	})
-	if l.skills != nil {
-		c.SetDeathPenaltySkillUpdater(func(oldLevel, level int) {
-			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, oldLevel, level); err != nil {
-				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("update death-penalty passive stats")
-			}
-		})
-	}
-	c.SetItemStatsRefresher(func() {
-		if l.skills == nil {
-			return
-		}
-		skillsChanged, timersChanged, err := l.skills.RefreshEquippedItemStats(live.Character, live.Inventory())
-		if err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh grade-penalty item stats")
-		}
-		if skillsChanged {
-			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		}
-		if timersChanged {
-			now := time.Now()
-			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
-		}
-	})
-	c.SetLevelRefresher(func() { l.refreshLiveLevelSkills(ctx, live) })
 	// Register the inventory with the batching task the moment it queues an
 	// update, matching the reference's Inventory.addUpdate registering with
 	// InventoryUpdateTaskManager on every mutation. The task is the only
@@ -739,84 +540,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			}
 		}
 	}
-	c.SetShortBuffBroadcaster(func(update player.ShortBuffUpdate) {
-		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(update.SkillID, update.Level, update.DurationSeconds))
-	})
-	c.SetRegenMaxSender(func(count, period int32, hpRegen float64) {
-		live.SendFrame(serverpackets.FrameExRegenMax(count, period, hpRegen))
-	})
-	c.SetLackHPNotifier(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackHP))
-	})
-	c.SetLackMPNotifier(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP))
-	})
-	c.SetRelaxHPFullNotifier(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillDeactivatedHPFull))
-	})
-	c.SetHealRestoredNotifiers(func(healerName string, amount int, byOther bool) {
-		if byOther {
-			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2HPRestoredByS1, healerName, int32(amount)))
-			return
-		}
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1HPRestored, int32(amount)))
-	}, func(healerName string, amount int, byOther bool) {
-		if byOther {
-			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPRestoredByS1, healerName, int32(amount)))
-			return
-		}
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1MPRestored, int32(amount)))
-	})
-	c.SetCPRestoredNotifier(func(healerName string, amount int, byOther bool) {
-		if byOther {
-			live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2CPWillBeRestoredByS1, healerName, int32(amount)))
-			return
-		}
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1CPWillBeRestored, int32(amount)))
-	})
-	c.SetEffectExpiryNotifiers(func(skillID modelskill.ID, level int) {
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasWornOff, int32(skillID), int32(level)))
-	}, func(skillID modelskill.ID, level int) {
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageEffectS1Disappeared, int32(skillID), int32(level)))
-	}, func(skillID modelskill.ID, level int) {
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasBeenAborted, int32(skillID), int32(level)))
-	})
-	c.SetSpoilNotifiers(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadySpoiled))
-	}, func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSpoilSuccess))
-	})
-	c.SetOverHitNotifier(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOverHit))
-	})
-	c.SetServitorVanishedNotifier(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
-	})
-	c.SetShieldBlockNotifiers(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
-	}, func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageExcellentShieldDefenseSuccess))
-	})
-	c.SetMagicFailureNotifiers(func() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
-	}, func(targetName string, skillID modelskill.ID, level int) {
-		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, targetName, int32(skillID), int32(level)))
-	}, func(attackerName string) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, attackerName))
-	})
-	c.SetAttackTargetHook(func(target world.Tracked) {
-		l.attackLiveTarget(live, target)
-	})
-	c.SetRetargetHook(func(target world.Tracked) {
-		if target == nil {
-			l.clearLiveTarget(live)
-			return
-		}
-		l.selectLiveTarget(live, target)
-	})
-	c.SetHerbConsumer(func(itemID int32) {
-		l.consumeHerb(live, itemID)
-	})
 	return live, nil
 }
 

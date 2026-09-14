@@ -1,6 +1,10 @@
 package player
 
-import "math"
+import (
+	"math"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+)
 
 // maxSP is the largest SP value a character can hold, matching the 32-bit
 // signed integer ceiling the persisted column was sized for.
@@ -249,76 +253,18 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int) bool 
 	return increased
 }
 
-// SetExpSpGainNotifier records the packet-layer hook that tells this
-// character's own client how much experience and SP an addition granted. It
-// fires once per addition attempt that was not fully rejected, including one
-// granting zero of both.
-func (c *Character) SetExpSpGainNotifier(notify func(exp int64, sp int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.notifyExpSpGain = notify
-}
-
-// SetExpSpLossNotifier records the packet-layer hook that tells this
-// character's own client how much experience and SP a removal took.
-func (c *Character) SetExpSpLossNotifier(notify func(exp int64, sp int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.notifyExpSpLoss = notify
-}
-
-// SetLevelRefresher records the hook that re-derives everything a
-// character's level entitles it to — the skills the new level grants or
-// revokes, and the client's view of them — after any level change, up or
-// down. It runs before the level change's UserInfo, so the packet describes
-// the already-refreshed character.
-func (c *Character) SetLevelRefresher(refresh func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.refreshLevel = refresh
-}
-
-// SetLevelUpBroadcaster records the packet-layer hook that plays this
-// character's level-up animation for every observer and tells its own client
-// the level went up.
-func (c *Character) SetLevelUpBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastLevelUp = broadcast
-}
-
 func (c *Character) sendExpSpGain(exp int64, sp int) {
-	c.stateMu.RLock()
-	notify := c.notifyExpSpGain
-	c.stateMu.RUnlock()
-	if notify != nil {
-		notify(exp, sp)
-	}
+	c.emit(event.ExpSPGained{Exp: exp, SP: sp})
 }
 
 func (c *Character) sendExpSpLoss(exp int64, sp int) {
-	c.stateMu.RLock()
-	notify := c.notifyExpSpLoss
-	c.stateMu.RUnlock()
-	if notify != nil {
-		notify(exp, sp)
-	}
+	c.emit(event.ExpSPLost{Exp: exp, SP: sp})
 }
 
 func (c *Character) refreshForLevel() {
-	c.stateMu.RLock()
-	refresh := c.refreshLevel
-	c.stateMu.RUnlock()
-	if refresh != nil {
-		refresh()
-	}
+	c.emit(event.LevelChanged{})
 }
 
 func (c *Character) announceLevelUp() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastLevelUp
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
+	c.emit(event.LeveledUp{})
 }

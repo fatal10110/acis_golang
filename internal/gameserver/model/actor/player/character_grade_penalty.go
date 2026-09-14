@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+)
 
 const (
 	expertiseSkillID    = 239
@@ -41,7 +44,6 @@ func (c *Character) RefreshExpertisePenalty() {
 		c.weaponGradePenalty = weaponPenalty
 		c.armorGradePenalty = armorPenalty
 	}
-	update, refresh := c.updateGradePenalty, c.refreshItemStats
 	c.stateMu.Unlock()
 	if !changed {
 		return
@@ -51,12 +53,7 @@ func (c *Character) RefreshExpertisePenalty() {
 	} else {
 		c.SetSkillLevel(gradePenaltySkillID, 0)
 	}
-	if update != nil {
-		update()
-	}
-	if refresh != nil {
-		refresh()
-	}
+	c.emit(event.GradePenaltyChanged{})
 }
 
 // WeaponGradePenalty reports whether an equipped weapon exceeds Expertise.
@@ -76,18 +73,4 @@ func (c *Character) ArmorGradePenalty() int {
 // WeaponSkillsAllowed reports whether Expertise permits a weapon's item skills.
 func (c *Character) WeaponSkillsAllowed(crystal item.CrystalType) bool {
 	return c.SkillLevel(expertiseSkillID) >= int(crystal)
-}
-
-// SetGradePenaltyUpdater records the packet-layer notification for a changed penalty state.
-func (c *Character) SetGradePenaltyUpdater(update func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateGradePenalty = update
-}
-
-// SetItemStatsRefresher records the item-passive refresh run after a penalty change.
-func (c *Character) SetItemStatsRefresher(refresh func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.refreshItemStats = refresh
 }

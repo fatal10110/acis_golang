@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
@@ -183,15 +184,34 @@ type Controller struct {
 	timers    []scheduledTimer
 	fusionEnd func()
 	afterFunc afterFunc
-	onAbort   func(interrupted bool)
-	onFinish  func(interrupted bool, def modelskill.Definition, target Target)
-	onStopAck func()
+	sink      event.Sink
 	log       zerolog.Logger
 }
 
-// NewController returns a cast controller for actor.
-func NewController(actor Actor) *Controller {
-	return &Controller{actor: actor}
+// NewController returns a cast controller for actor. sink receives, each
+// after the controller's lock is released so it may call back in:
+//   - CastAborted, once whenever a cast that was actually in flight is
+//     aborted (never for a natural finish, nor for a stop on an idle
+//     controller); Interrupted reports the window-gated Interrupt path,
+//     which additionally owes CASTING_INTERRUPTED, rather than an
+//     unconditional Stop;
+//   - CastStopAck, once on every Stop/Interrupt call whether or not a cast
+//     was in flight, matching PlayerCast.stop()'s unconditional
+//     _actor.getAI().clientActionFailed() (PlayerCast.java:381-387) that
+//     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
+//   - CastFinished, once whenever an in-flight cast ends, aborted or
+//     completed, letting the owner apply the nextActionAttack resume gate
+//     (PlayableAI.onEvtFinishedCasting, PlayableAI.java:43-63).
+//
+// A nil sink drops all three.
+func NewController(actor Actor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, sink: sink}
+}
+
+func (c *Controller) emit(e event.Event) {
+	if c.sink != nil {
+		c.sink.Emit(e)
+	}
 }
 
 // SetLogger records where a panic recovered from a scheduled cast callback
@@ -200,44 +220,6 @@ func (c *Controller) SetLogger(log zerolog.Logger) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.log = log
-}
-
-// SetOnAbort registers the observer fired once whenever a cast that was
-// actually in flight is aborted, so the owner can tell the client the cast
-// was cancelled and react to the interruption. It never fires for a natural
-// Finish, nor for a Stop on an idle controller. The observer runs after the
-// controller's lock is released, so it may call back into the controller.
-// interrupted reports whether the abort went through the window-gated
-// Interrupt path (which additionally sends CASTING_INTERRUPTED) rather than
-// an unconditional Stop.
-func (c *Controller) SetOnAbort(f func(interrupted bool)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.onAbort = f
-}
-
-// SetOnFinish registers the observer fired once whenever an in-flight cast
-// ends. interrupted distinguishes an abort from natural completion; def and
-// target are the cast that just ended, letting the owner apply the
-// reference's nextActionAttack resume gate (PlayableAI.onEvtFinishedCasting,
-// PlayableAI.java:43-63). The observer runs after the controller lock is
-// released.
-func (c *Controller) SetOnFinish(f func(interrupted bool, def modelskill.Definition, target Target)) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.onFinish = f
-}
-
-// SetOnStopAck registers the observer fired once on every Stop/Interrupt
-// call, regardless of whether a cast was actually in flight — matching
-// PlayerCast.stop()'s unconditional _actor.getAI().clientActionFailed()
-// (PlayerCast.java:381-387), which runs after super.stop()'s own
-// isCastingNow()-gated cancel broadcast rather than being gated by it. The
-// observer runs after the controller lock is released.
-func (c *Controller) SetOnStopAck(f func()) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.onStopAck = f
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -485,7 +467,7 @@ func (c *Controller) Finish() {
 //
 // The two owner-state steps and the stop-ack observer run unconditionally,
 // as the reference does them ahead of (owner state) or regardless of
-// (clientActionFailed) its own casting check; only the abort observer is
+// (clientActionFailed) its own casting check; only CastAborted is
 // reserved for a cast that was really in flight.
 func (c *Controller) Stop() {
 	c.stopInternal(false)
@@ -497,14 +479,11 @@ func (c *Controller) stopInternal(interrupted bool) {
 
 	c.mu.Lock()
 	abort, finish := c.abortLocked()
-	stopAck := c.onStopAck
 	c.mu.Unlock()
 	if abort != nil {
 		abort(interrupted)
 	}
-	if stopAck != nil {
-		stopAck()
-	}
+	c.emit(event.CastStopAck{})
 	if finish != nil {
 		finish(true)
 	}
@@ -514,8 +493,8 @@ func (c *Controller) stopInternal(interrupted bool) {
 // once it has released mu, or nil when no cast was in flight.
 func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	aborted := c.casting
-	current, target := c.current, c.target
-	fusionEnd, onAbort, onFinish := c.fusionEnd, c.onAbort, c.onFinish
+	current := c.current
+	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	if !aborted {
 		return nil, nil
@@ -524,13 +503,9 @@ func (c *Controller) abortLocked() (func(bool), func(bool)) {
 			if fusionEnd != nil {
 				fusionEnd()
 			}
-			if onAbort != nil {
-				onAbort(interrupted)
-			}
+			c.emit(event.CastAborted{Interrupted: interrupted})
 		}, func(interrupted bool) {
-			if onFinish != nil {
-				onFinish(interrupted, current, target)
-			}
+			c.emit(event.CastFinished{Interrupted: interrupted, Skill: current})
 		}
 }
 
@@ -538,16 +513,14 @@ func (c *Controller) finishLocked() func(bool) {
 	if !c.casting {
 		return nil
 	}
-	current, target := c.current, c.target
-	fusionEnd, onFinish := c.fusionEnd, c.onFinish
+	current := c.current
+	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	return func(aborted bool) {
 		if fusionEnd != nil {
 			fusionEnd()
 		}
-		if onFinish != nil {
-			onFinish(aborted, current, target)
-		}
+		c.emit(event.CastFinished{Interrupted: aborted, Skill: current})
 	}
 }
 

@@ -6,8 +6,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -20,7 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot attack.Snapshot) {
+func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.Attack) {
 	if attacker == nil {
 		return
 	}
@@ -246,7 +246,7 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 }
 
 // finishPetInteract fires once an approach walk started by showOwnedPetStatus
-// arrives (wired through move.Controller.SetArrived), mirroring
+// arrives (the Arrived event from its move.Controller), mirroring
 // thinkInteract's post-move canDoInteract recheck: the owner or pet may have
 // moved again meanwhile, so the range and ownership gates run again before
 // the status window opens.
