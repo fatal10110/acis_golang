@@ -58,7 +58,7 @@ func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
-			controller, err := NewController(mover, tt.self)
+			controller, err := NewController(mover, tt.self, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -128,7 +128,7 @@ func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t
 		t.Fatal(err)
 	}
 	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestControllerDefersToActorOwnedOffensiveFollowTicker(t *testing.T) {
 		t.Fatal(err)
 	}
 	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestControllerMoveHomeTeleportsAfterTenBlockedPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestControllerMoveHomeReturnsMoveErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +289,7 @@ func TestControllerMoveHomeResetsFailCountOnRoutedPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestControllerMoveToLocationIncrementsFailCountOnBlockedPath(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,7 +339,7 @@ func TestControllerMoveToLocationResetsFailCountOnRoutedPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func TestControllerMoveToLocationLeavesFailCountOnDirectPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +386,7 @@ func TestControllerMoveToLocationEventIncrementsFailCountOnBlockedPath(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,7 +406,7 @@ func TestControllerOffensiveFollowIncrementsFailCountOnBlockedPath(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	controller, err := NewController(mover, self)
+	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1093,8 +1093,7 @@ func TestCreatureMove_UpdatePositionStopsWhenObstacleCloses(t *testing.T) {
 	}
 	arrived := 0
 	blocked := 0
-	mover.SetArrivedHook(func() { arrived++ })
-	mover.SetBlockedHook(func() { blocked++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
 	if _, err := mover.MoveToLocation(location.Location{X: 100}); err != nil {
 		t.Fatal(err)
 	}
@@ -1130,8 +1129,7 @@ func TestCreatureMove_UpdatePositionChecksFinalStepForNewObstacle(t *testing.T) 
 	}
 	arrived := 0
 	blocked := 0
-	mover.SetArrivedHook(func() { arrived++ })
-	mover.SetBlockedHook(func() { blocked++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
 	if _, err := mover.MoveToLocation(location.Location{X: 10}); err != nil {
 		t.Fatal(err)
 	}
@@ -1165,8 +1163,7 @@ func TestCreatureMove_UpdatePositionStopsWhenDynamicNSWECloses(t *testing.T) {
 	}
 	arrived := 0
 	blocked := 0
-	mover.SetArrivedHook(func() { arrived++ })
-	mover.SetBlockedHook(func() { blocked++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
 	}
@@ -1206,13 +1203,11 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	blocked := 0
 	advanced := 0
 	var advancedEvent event.Move
-	mover.SetArrivedHook(func() { arrived++ })
-	mover.SetBlockedHook(func() { blocked++ })
-	mover.SetSegmentAdvancedHook(func(ev event.Move) error {
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }, onAdvanced: func(ev event.Move) error {
 		advanced++
 		advancedEvent = ev
 		return nil
-	})
+	}})
 	if _, err := mover.MoveToLocation(location.Location{X: 100, Y: 100, Z: 30}); err != nil {
 		t.Fatal(err)
 	}
@@ -1294,8 +1289,7 @@ func startBlockedMidRouteMove(t *testing.T) (mover *CreatureMove, allow *bool, a
 	}
 	arrivedN, blockedN := 0, 0
 	arrived, blocked = &arrivedN, &blockedN
-	mover.SetArrivedHook(func() { arrivedN++ })
-	mover.SetBlockedHook(func() { blockedN++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrivedN++ }, onBlocked: func() { blockedN++ }})
 	if _, err := mover.MoveToLocation(location.Location{X: 100, Y: 100, Z: 30}); err != nil {
 		t.Fatal(err)
 	}
@@ -1510,7 +1504,7 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 	clock := &fakeMoveClock{}
 	mover.afterFunc = clock.AfterFunc
 	arrivedCalls := 0
-	mover.SetArrivedHook(func() { arrivedCalls++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
 	ev, err := mover.MoveToLocation(location.Location{X: 100, Y: 50, Z: 30})
 	if err != nil {
@@ -1582,7 +1576,7 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 	clock := &fakeMoveClock{}
 	mover.afterFunc = clock.AfterFunc
 	arrivedCalls := 0
-	mover.SetArrivedHook(func() { arrivedCalls++ })
+	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
 	ev, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
 	if err != nil {
@@ -1694,4 +1688,29 @@ func TestRandomNearbyLocationNilGeoReturnsTargetUnchanged(t *testing.T) {
 	if got != target {
 		t.Fatalf("RandomNearbyLocation(nil, ...) = %+v, want unchanged %+v", got, target)
 	}
+}
+
+// hookOwner adapts test callbacks to the moveOwner milestones.
+type hookOwner struct {
+	onArrived, onBlocked func()
+	onAdvanced           func(event.Move) error
+}
+
+func (o *hookOwner) arrived() {
+	if o.onArrived != nil {
+		o.onArrived()
+	}
+}
+
+func (o *hookOwner) blocked() {
+	if o.onBlocked != nil {
+		o.onBlocked()
+	}
+}
+
+func (o *hookOwner) segmentAdvanced(ev event.Move) error {
+	if o.onAdvanced != nil {
+		return o.onAdvanced(ev)
+	}
+	return nil
 }

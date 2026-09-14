@@ -56,13 +56,6 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
-// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
-// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
-// permissive.
-func (h *Hostile) SetLineOfSight(los LineOfSight) {
-	h.los = los
-}
-
 // CanSee reports whether target is visible to this NPC: a geodata
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
@@ -120,7 +113,7 @@ func (h *Hostile) CollisionHeight() float64 {
 }
 
 // AttackType returns this NPC's attack style, resolved from the weapon
-// SetWeapon recorded. Unarmed (WeaponFist) when SetWeapon found no
+// Attach resolved. Unarmed (WeaponFist) when Attach found no
 // right-hand weapon — the common case, since the overwhelming majority of
 // monster templates carry no weapon item id in the shipped data.
 func (h *Hostile) AttackType() item.WeaponType {
@@ -159,7 +152,7 @@ func (h *Hostile) ConsumeBowMP() {
 }
 
 // WeaponGrade returns this NPC's resolved right-hand weapon's crystal
-// grade, recorded by SetWeapon. Zero (CrystalNone) when unarmed. Reference:
+// grade, resolved by Attach. Zero (CrystalNone) when unarmed. Reference:
 // Npc.getActiveWeaponItem, Npc.java:371-375.
 func (h *Hostile) WeaponGrade() int {
 	return int(h.weaponCrystal)

@@ -213,7 +213,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// reject it" (live_accessors.go), which is exactly what a cast
 	// controller-less ai.Summon already does by design.
 	//
-	// SetAI must run before SpawnBesideOwner publishes pet into world.State:
+	// Attach must run before SpawnBesideOwner publishes pet into world.State:
 	// SpawnBesideOwner's registry writes take a mutex, giving a
 	// happens-before edge to any other goroutine's registry read (e.g. the
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
@@ -303,6 +303,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	if len(speed) != 0 {
 		runSpeed = speed[0]
 	}
+	sink := &summonSink{link: l, actor: actor}
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
@@ -310,25 +311,20 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
 		} else {
 			setWaterSurface(actor.Move(), l.zones)
-			if controller, err := move.NewController(actor.Move(), actor); err != nil {
+			if controller, err := move.NewController(actor.Move(), actor, sink); err != nil {
 				l.log.Warn().Err(err).Msg("summon: attach movement controller")
 			} else {
 				controller.SetPositionUpdates(l.positions)
 				moveController = controller
+				sink.move = controller
 			}
 		}
 	}
-	attackController := attack.NewPlayable(actor)
+	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetLogger(l.log)
 	brain := ai.NewSummon(actor, moveController, attackController)
-	attackController.SetFinished(brain.Think)
+	sink.brain = brain
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
-	if controller, ok := moveController.(*move.Controller); ok {
-		controller.SetArrived(func() {
-			actor.SyncPosition(controller.Position())
-			brain.Think()
-		})
-	}
 	// SetLogger records broadcast errors from TryToAttack/TryToFollow/TryToIdle/Think
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
@@ -339,7 +335,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// it's silently discarded through the zero-value zerolog.Logger.
 	// Player-owned controllers get the same wiring (live.cast.SetLogger /
 	// c.SetLogger).
-	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor})
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
 	castController.SetLogger(l.log)
 	aiController := &actorcast.AIController{
 		Controller:  castController,
@@ -405,9 +401,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		})
 	}
 	brain.SetCastController(aiController)
-	actor.SetAI(brain)
+	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
 	followTicker := brain.StartOffensiveFollowTicker(l.log)
-	sink := &summonSink{link: l, actor: actor, despawn: followTicker.Stop}
+	sink.despawn = followTicker.Stop
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
@@ -416,7 +412,6 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			followTicker.Stop()
 		}
 	}
-	actor.Attach(sink)
 	return aiController
 }
 

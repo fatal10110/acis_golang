@@ -246,7 +246,7 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 }
 
 // finishPetInteract fires once an approach walk started by showOwnedPetStatus
-// arrives (wired through move.Controller.SetArrived), mirroring
+// arrives (the Arrived event from its move.Controller), mirroring
 // thinkInteract's post-move canDoInteract recheck: the owner or pet may have
 // moved again meanwhile, so the range and ownership gates run again before
 // the status window opens.

@@ -26,7 +26,7 @@ func newBroadcastFixture(t *testing.T) (*Actor, *event.Recorder) {
 	state := world.New()
 	actor := mustServitor(t, ServitorConfig{ObjectID: 7})
 	rec := &event.Recorder{}
-	actor.Attach(rec)
+	actor.Attach(Runtime{Sink: rec})
 	SpawnBesideOwner(state, actor, &fakeSummonOwner{id: 1}, location.Location{})
 	return actor, rec
 }

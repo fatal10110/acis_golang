@@ -2,7 +2,9 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -13,6 +15,10 @@ import (
 type summonSink struct {
 	link  *GameClientLink
 	actor *summon.Actor
+	// brain and move are the summon's AI loop and movement controller its
+	// attack and arrival events re-evaluate; move is nil without geodata.
+	brain *ai.Summon
+	move  *move.Controller
 	// despawn is the runtime cleanup that runs exactly when the summon
 	// leaves the world.
 	despawn func()
@@ -63,6 +69,13 @@ func (s *summonSink) Emit(ev event.Event) {
 			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, e.AttackerName, e.Damage))
+	case event.AttackFinished:
+		s.brain.Think()
+	case event.Arrived:
+		actor.SyncPosition(s.move.Position())
+		s.brain.Think()
+	case event.MoveBlocked:
+		s.move.BroadcastBlockedCorrection()
 	case event.Despawned:
 		if s.despawn != nil {
 			s.despawn()

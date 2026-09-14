@@ -484,12 +484,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	setWaterSurface(creatureLive.Move(), l.zones)
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	c.Attach(creatureLive, live)
-	moveCtl, err := move.NewController(c.Move(), c)
+	moveCtl, err := move.NewController(c.Move(), c, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	moveCtl.SetPositionUpdates(l.positions)
-	attackCtl := attack.NewPlayer(c)
+	attackCtl := attack.NewPlayer(c, live)
 	c.Move().SetLogger(l.log)
 	attackCtl.SetLogger(l.log)
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
@@ -502,30 +502,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
-	attackCtl.SetFinished(func() {
-		l.finishDeferredPickup(live)
-		l.finishDeferredMagicSkill(live)
-		l.finishDeferredItemAICast(live)
-		combat.Think()
-	})
-	attackCtl.SetStarted(func() {
-		l.startLiveAutoAttack(live)
-	})
-	moveCtl.SetArrived(func() {
-		// CreatureMove tracks position for its own timing only; push the
-		// arrived position into the world-grid presence range checks
-		// actually read before re-thinking the attack intention, or it
-		// re-evaluates against a stale position forever.
-		pos := moveCtl.Position()
-		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
-		l.finishLiveGroundPickup(live)
-		l.finishPetInteract(live)
-		l.finishDeferredMagicSkill(live)
-		combat.Think()
-	})
-	moveCtl.SetBlocked(func() bool {
-		return l.onPlayerArrivedBlocked(live)
-	})
 	// Register the inventory with the batching task the moment it queues an
 	// update, matching the reference's Inventory.addUpdate registering with
 	// InventoryUpdateTaskManager on every mutation. The task is the only

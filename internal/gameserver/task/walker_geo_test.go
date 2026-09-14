@@ -105,7 +105,7 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctl, err := move.NewController(mover, self)
+	ctl, err := move.NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

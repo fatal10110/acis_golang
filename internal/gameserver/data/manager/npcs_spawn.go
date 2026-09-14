@@ -186,12 +186,14 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		mp = hostile.CurrentMP()
 	}
 	hostile.SetCurrentMP(mp)
-	hostile.SetWorld(n.state)
-	if n.newSink != nil {
-		hostile.Attach(n.newSink(hostile))
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: n.rewarderFor(hostile, tmpl)}
+	if los, ok := n.geo.(npc.LineOfSight); ok {
+		rt.LOS = los
 	}
-	hostile.SetWeapon(n.items)
-	hostile.SetRewarder(n.rewarderFor(hostile, tmpl))
+	if n.newSink != nil {
+		rt.Sink = n.newSink(hostile)
+	}
+	hostile.Attach(rt)
 	if master != nil {
 		hostile.SetMaster(master)
 		master.AddMinion(hostile)

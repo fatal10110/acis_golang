@@ -184,7 +184,6 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	if err != nil {
 		return nil, fmt.Errorf("world objects: door %d: %w", tmpl.ID, err)
 	}
-	obj.SetWorld(w.state)
 	if w.newSink != nil {
 		obj.Attach(w.newSink(obj))
 	}

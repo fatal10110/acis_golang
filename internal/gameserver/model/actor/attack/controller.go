@@ -123,8 +123,7 @@ type Controller struct {
 	timers         []scheduledTimer
 	attackSeq      uint64
 	afterFunc      afterFunc
-	finished       func()
-	started        func()
+	sink           event.Sink
 	log            zerolog.Logger
 }
 
@@ -136,43 +135,36 @@ func (c *Controller) SetLogger(log zerolog.Logger) {
 	c.log = log
 }
 
-// SetFinished records the callback invoked once an attack animation
-// finishes (the swing lands and, for non-bow weapons, the actor is free to
-// attack again). A nil callback (the default) makes it a no-op.
-func (c *Controller) SetFinished(finished func()) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.finished = finished
-}
-
-// SetStarted records the callback invoked as each attack animation starts,
-// before its hits are scheduled or broadcast. A nil callback (the default)
-// makes it a no-op.
-func (c *Controller) SetStarted(started func()) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.started = started
-}
+// Every constructor takes the sink that receives AttackStarted, as each
+// attack animation starts (before its hits are scheduled or broadcast), and
+// AttackFinished, once it finishes (the swing lands and, for non-bow weapons,
+// the actor is free to attack again). A nil sink drops both.
 
 // NewCreature returns a base creature attack controller.
-func NewCreature(actor CreatureActor) *Controller {
-	return &Controller{actor: actor}
+func NewCreature(actor CreatureActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, sink: sink}
 }
 
 // NewPlayable returns an attack controller with playable-specific rules.
-func NewPlayable(actor PlayableActor) *Controller {
-	return &Controller{actor: actor, playable: actor}
+func NewPlayable(actor PlayableActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, playable: actor, sink: sink}
 }
 
 // NewPlayer returns an attack controller with player-specific rules.
-func NewPlayer(actor PlayerActor) *Controller {
-	return &Controller{actor: actor, playable: actor, player: actor}
+func NewPlayer(actor PlayerActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, playable: actor, player: actor, sink: sink}
 }
 
 // NewAttackable returns an attack controller with hostile NPC-specific
 // rules.
-func NewAttackable(actor CreatureActor) *Controller {
-	return &Controller{actor: actor, attackable: true}
+func NewAttackable(actor CreatureActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, attackable: true, sink: sink}
+}
+
+func (c *Controller) emit(e event.Event) {
+	if c.sink != nil {
+		c.sink.Emit(e)
+	}
 }
 
 // AttackingNow reports whether an attack animation is still active.
@@ -270,12 +262,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 		return nil
 	}
 
-	c.mu.RLock()
-	started := c.started
-	c.mu.RUnlock()
-	if started != nil {
-		started()
-	}
+	c.emit(event.AttackStarted{})
 
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
 	c.actor.SetHeadingTo(target)
@@ -542,12 +529,9 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	}
 
 	c.bowCooling = false
-	finished := c.finished
 	c.mu.Unlock()
 
-	if finished != nil {
-		finished()
-	}
+	c.emit(event.AttackFinished{})
 }
 
 func (c *Controller) finishAttack(seq uint64) {
@@ -557,12 +541,9 @@ func (c *Controller) finishAttack(seq uint64) {
 		return
 	}
 	c.attacking = false
-	finished := c.finished
 	c.mu.Unlock()
 
-	if finished != nil {
-		finished()
-	}
+	c.emit(event.AttackFinished{})
 }
 
 func (c *Controller) clearHitAnimation(seq uint64) {
@@ -580,12 +561,9 @@ func (c *Controller) clearBowCooldown(seq uint64) {
 		return
 	}
 	c.bowCooling = false
-	finished := c.finished
 	c.mu.Unlock()
 
-	if finished != nil {
-		finished()
-	}
+	c.emit(event.AttackFinished{})
 }
 
 func (c *Controller) scaledBowReuse() time.Duration {

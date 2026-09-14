@@ -63,21 +63,17 @@ func (ep *EffectPoint) AddStatFuncs([]effect.Mod)          {}
 func (ep *EffectPoint) RemoveStatsByOwner(effect.ModOwner) {}
 func (ep *EffectPoint) MaxBuffCount() int                  { return 0 }
 
-// SetWorld attaches the world state this actor spawns into and broadcasts
-// through.
-func (ep *EffectPoint) SetWorld(state *world.State) { ep.world = state }
-
-// Attach installs sink as the receiver of this actor's events. Call it once,
-// before Spawn.
-func (ep *EffectPoint) Attach(sink event.Sink) { ep.sink = sink }
-
-// SetLogger records where a broadcast failure from this actor's own
-// periodic tick (not routed through an AI think loop) is logged. The zero
-// value discards it.
-func (ep *EffectPoint) SetLogger(log zerolog.Logger) { ep.log = log }
+// Attach installs rt's World (the world this actor spawns into), Log (where
+// a failure from its own periodic tick is logged) and Sink. Call it once,
+// before Spawn; the other Runtime fields do not apply to an effect point.
+func (ep *EffectPoint) Attach(rt Runtime) {
+	ep.world = rt.World
+	ep.log = rt.Log
+	ep.sink = rt.Sink
+}
 
 // Spawn places the actor in the world at (x, y, z), facing heading. It is a
-// no-op until SetWorld has been called.
+// no-op until Attach has installed a world.
 func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
@@ -85,8 +81,8 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	ep.world.Spawn(ep, x, y, z, heading)
 }
 
-// Despawn removes the actor from the world. It is a no-op until SetWorld
-// has been called.
+// Despawn removes the actor from the world. It is a no-op until Attach has
+// installed a world.
 func (ep *EffectPoint) Despawn() {
 	if ep.world == nil {
 		return
@@ -100,8 +96,8 @@ func (ep *EffectPoint) Despawn() {
 }
 
 // ForEachNearby calls fn for every world object within radius units of
-// this actor, excluding itself. It is a no-op until SetWorld has been
-// called.
+// this actor, excluding itself. It is a no-op until Attach installs a
+// world.
 func (ep *EffectPoint) ForEachNearby(radius int, fn func(world.Tracked)) {
 	if ep.world == nil {
 		return
@@ -118,7 +114,7 @@ type skillCastTarget interface {
 }
 
 // BroadcastSkillUse reports a cast-start animation from this actor to target.
-// It is a no-op until SetWorld has been called.
+// It is a no-op until Attach has installed a world.
 func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) error {
 	if ep.world == nil {
 		return ErrNoWorld
@@ -137,7 +133,7 @@ func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level 
 }
 
 // BroadcastSkillLaunched reports the cast launch of skillID at level onto
-// targetIDs. It is a no-op until SetWorld has been called.
+// targetIDs. It is a no-op until Attach has installed a world.
 func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
 	if ep.world == nil {
 		return ErrNoWorld

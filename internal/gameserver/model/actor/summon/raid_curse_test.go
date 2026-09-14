@@ -74,7 +74,7 @@ func TestSummonRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 func TestSummonRaidCurseEmitsCasterToTargetSkillUse(t *testing.T) {
 	a := mustServitor(t, ServitorConfig{ObjectID: 7, Level: 80, SkillDefs: newRaidCurseSkillTable()})
 	rec := &event.Recorder{}
-	a.Attach(rec)
+	a.Attach(Runtime{Sink: rec})
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 
 	a.TestCursesOnAttack(target)

@@ -335,39 +335,17 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 
 func (p *livePlayer) attackController() *attack.Controller {
 	if p.attack == nil {
-		p.attack = attack.NewPlayer(p.Character)
+		p.attack = attack.NewPlayer(p.Character, nil)
 	}
 	return p.attack
 }
 
 // castController returns live's cast controller, building it on first use
-// with the abort observer that turns an aborted in-flight cast into its
-// client-visible cancel packets.
+// with live as the sink its abort, stop and finish events reach.
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
-		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character})
+		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
 		live.cast.SetLogger(live.log)
-		live.cast.SetOnAbort(func(interrupted bool) { l.broadcastCastAborted(live, interrupted) })
-		live.cast.SetOnStopAck(func() { sendMagicActionFailed(live) })
-		live.cast.SetOnFinish(func(_ bool, def modelskill.Definition, _ actorcast.Target) {
-			if l.finishDeferredItemAICast(live) {
-				return
-			}
-			if live.combat == nil {
-				return
-			}
-			if live.combat.ResumeAfterCast() {
-				return
-			}
-			// A queued CAST already ran above. With no next intention, a
-			// finished CAST only re-engages the attack when the skill
-			// carries nextActionAttack; anything else goes idle.
-			if def.NextActionIsAttack {
-				live.combat.Think()
-				return
-			}
-			live.combat.Stop()
-		})
 		live.Character.SetCastController(live.cast)
 	}
 	return live.cast

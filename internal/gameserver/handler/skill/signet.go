@@ -175,9 +175,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if err != nil {
 		return nil, false
 	}
-	actor.SetWorld(h.world)
-	actor.Attach(h.newSink(actor))
-	actor.SetLogger(h.log)
+	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {

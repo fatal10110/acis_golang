@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -363,16 +364,30 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 		t.Fatal(err)
 	}
 	ch.Live = live
-	moveCtl, err := move.NewController(ch.Move(), ch)
+	control := &testControllerSink{}
+	moveCtl, err := move.NewController(ch.Move(), ch, control)
 	if err != nil {
 		t.Fatal(err)
 	}
-	attackCtl := attack.NewPlayer(ch)
+	attackCtl := attack.NewPlayer(ch, control)
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
-	moveCtl.SetArrived(combat.Think)
-	attackCtl.SetFinished(combat.Think)
+	control.combat = combat
 
 	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+}
+
+// testControllerSink receives a fixture player's attack and movement
+// controller events: an arrival or a finished swing only re-thinks the attack
+// intention.
+type testControllerSink struct {
+	combat *ai.PlayerAttack
+}
+
+func (s *testControllerSink) Emit(ev event.Event) {
+	switch ev.(type) {
+	case event.Arrived, event.AttackFinished:
+		s.combat.Think()
+	}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {

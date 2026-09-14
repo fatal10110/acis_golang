@@ -84,6 +84,7 @@ type PositionUpdateRegistry interface {
 type Controller struct {
 	move            *CreatureMove
 	self            Actor
+	sink            event.Sink
 	positionUpdates PositionUpdateRegistry
 
 	mu                     sync.Mutex
@@ -93,32 +94,59 @@ type Controller struct {
 }
 
 // NewController adapts move for self, the position/footprint of the actor
-// move drives.
-func NewController(move *CreatureMove, self Actor) (*Controller, error) {
+// move drives. sink receives Arrived and MoveBlocked; nil drops Arrived and
+// answers a blocked move with the stopped-cell correction itself.
+func NewController(move *CreatureMove, self Actor, sink event.Sink) (*Controller, error) {
 	if move == nil {
 		return nil, errors.New("move: nil creature move")
 	}
 	if self == nil {
 		return nil, errors.New("move: nil self")
 	}
-	// A route split across geopath waypoints re-broadcasts on every segment
-	// advance, not just the first: without it, clients keep predicting the
-	// original straight-line walk and visibly cut through obstacles the
-	// server itself routed around.
-	move.SetSegmentAdvancedHook(func(ev event.Move) error {
-		// Continuations describe the next route leg, so they must carry its
-		// waypoint rather than a follow target.
-		ev.FollowTarget = 0
-		ev.FollowOffset = 0
-		// Reference rotates toward the new leg immediately before
-		// broadcasting it (CreatureMove.java moveToNextRoutePoint,
-		// setHeadingTo(destination) directly above the MoveToLocation send).
-		self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
-		return self.BroadcastMove(ev)
-	})
-	c := &Controller{move: move, self: self}
-	move.SetBlockedHook(c.BroadcastBlockedCorrection)
+	c := &Controller{move: move, self: self, sink: sink}
+	move.setOwner(c)
 	return c, nil
+}
+
+// segmentAdvanced re-broadcasts a route split across geopath waypoints on
+// every segment advance, not just the first: without it, clients keep
+// predicting the original straight-line walk and visibly cut through
+// obstacles the server itself routed around.
+func (c *Controller) segmentAdvanced(ev event.Move) error {
+	// Continuations describe the next route leg, so they must carry its
+	// waypoint rather than a follow target.
+	ev.FollowTarget = 0
+	ev.FollowOffset = 0
+	// Reference rotates toward the new leg immediately before
+	// broadcasting it (CreatureMove.java moveToNextRoutePoint,
+	// setHeadingTo(destination) directly above the MoveToLocation send).
+	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
+	return c.self.BroadcastMove(ev)
+}
+
+// blocked reports an in-flight move stopped by a newly blocked geodata path.
+// The sink owes observers BroadcastBlockedCorrection, ordered around its own
+// reaction; with no sink the correction is sent here.
+func (c *Controller) blocked() {
+	if c.sink == nil {
+		c.BroadcastBlockedCorrection()
+		return
+	}
+	c.sink.Emit(event.MoveBlocked{})
+}
+
+// arrived unregisters position ticks for a move that is not chasing a
+// target, then reports the arrival.
+func (c *Controller) arrived() {
+	c.mu.Lock()
+	following := c.offensiveTarget != nil
+	c.mu.Unlock()
+	if !following {
+		c.removePositionUpdate()
+	}
+	if c.sink != nil {
+		c.sink.Emit(event.Arrived{})
+	}
 }
 
 // ObjectID returns the actor id this controller moves.
@@ -333,21 +361,6 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 	return c.move.CanMoveTo(target)
 }
 
-// SetBlocked records the callback invoked when an in-flight move is stopped
-// by a newly blocked geodata path. Returning true skips the default
-// same-cell MoveToLocation correction (the callback already produced the
-// client-visible packet). A nil callback, or false, still broadcasts that
-// correction. Callers that need correction-then-callback order (hostile
-// NPCs) must BroadcastBlockedCorrection themselves and return true.
-func (c *Controller) SetBlocked(blocked func() bool) {
-	c.move.SetBlockedHook(func() {
-		if blocked != nil && blocked() {
-			return
-		}
-		c.BroadcastBlockedCorrection()
-	})
-}
-
 // BroadcastBlockedCorrection snaps observers to the cell the actor actually
 // stopped on. A same-cell MoveToLocation is the correction packet; StopMove
 // would freeze client prediction at the stale destination.
@@ -356,36 +369,19 @@ func (c *Controller) BroadcastBlockedCorrection() {
 	_ = c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
 }
 
-// SetArrived records the callback invoked once movement this controller
-// started reaches its destination. A nil callback (the default) makes
-// arrival a no-op.
-func (c *Controller) SetArrived(arrived func()) {
-	c.move.SetArrivedHook(func() {
-		c.mu.Lock()
-		following := c.offensiveTarget != nil
-		c.mu.Unlock()
-		if !following {
-			c.removePositionUpdate()
-		}
-		if arrived != nil {
-			arrived()
-		}
-	})
-}
-
 // PositionUpdate advances one movement correction tick, syncing this
 // controller's world presence to the newly interpolated position. An
 // ordinary interpolation tick does not itself rebroadcast a movement
 // packet — resending one every tick would restart the client-side walk
 // animation instead of just correcting server-side state — but crossing a
-// geopath segment boundary inside UpdatePosition does rebroadcast (via the
-// segment-advanced hook installed in NewController), deliberately, so the
+// geopath segment boundary inside UpdatePosition does rebroadcast (via
+// segmentAdvanced), deliberately, so the
 // client restarts its per-leg animation the same way the reference client
 // does on each routed waypoint. It returns false once the move has
 // stopped.
 //
 // Reaching the destination fires the arrived hook synchronously inside
-// UpdatePosition, before this returns — including SetArrived's own
+// UpdatePosition, before this returns — including the controller's own
 // removePositionUpdate call. If that hook (an NPC's AI, say) starts a new
 // move as a result, c.move is moving again by the time UpdatePosition
 // returns, so the fresh state here — not the stale result of this tick —

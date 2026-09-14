@@ -65,7 +65,7 @@ type Hostile struct {
 	log  zerolog.Logger
 
 	// rewards computes this NPC's drop/experience payout when TakeDamage
-	// kills it. It is nil until SetRewarder is called, in which case death
+	// kills it. It is nil until Attach installs one, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
 	rewards creature.Rewarder
@@ -112,12 +112,12 @@ type Hostile struct {
 	mp   float64
 
 	// weapon is this NPC's resolved right-hand weapon kind, recorded by
-	// SetWeapon. Nil means unarmed — the common case, since the
+	// Attach. Nil means unarmed — the common case, since the
 	// overwhelming majority of monster templates carry no weapon item id.
 	weapon *item.WeaponDetail
 
 	// weaponCrystal is the resolved right-hand weapon's crystal grade,
-	// recorded by SetWeapon alongside weapon. CrystalNone when unarmed.
+	// resolved by Attach alongside weapon. CrystalNone when unarmed.
 	weaponCrystal item.CrystalType
 
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
@@ -270,15 +270,6 @@ func shotRates(tpl *Template) (soulshotRate, spiritshotRate int, err error) {
 	return soulshotRate, spiritshotRate, nil
 }
 
-// SetWorld records the world registry BroadcastAttack reaches nearby
-// observers through. Call it once, before exposing this NPC to other
-// goroutines — BroadcastAttack is a no-op until then. This mirrors Decay's
-// worldState parameter, which BroadcastAttack has no room for since
-// attack.CreatureActor fixes its signature to the snapshot alone.
-func (h *Hostile) SetWorld(state *world.State) {
-	h.world = state
-}
-
 // ForEachKnownCombatantInRadius visits nearby combatants through the world grid.
 func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
 	if h.world == nil {
@@ -291,10 +282,40 @@ func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.C
 	})
 }
 
-// Attach installs sink as the receiver of this NPC's events. Call it once,
-// before exposing this NPC to other goroutines — same constraint as SetWorld.
-func (h *Hostile) Attach(sink event.Sink) {
-	h.sink = sink
+// Runtime is everything a Hostile needs to act in the live world beyond its
+// template and controllers. A nil dependency leaves the matching behavior
+// off: no world means no spatial queries, no LOS means CanSee is permissive,
+// no Items leaves the NPC unarmed, no Rewards makes a kill reward-free, and
+// no Sink drops every event.
+type Runtime struct {
+	World   *world.State
+	LOS     LineOfSight
+	Log     zerolog.Logger
+	Items   *item.Table
+	Rewards creature.Rewarder
+	Sink    event.Sink
+}
+
+// Attach installs rt. Call it once, before exposing this NPC to other
+// goroutines. Items resolves the template's right-hand item id into the
+// weapon kind AttackType and WeaponReuseDelay read; a template with no
+// right-hand item id, an unknown id, or a non-weapon item leaves the NPC
+// unarmed.
+func (h *Hostile) Attach(rt Runtime) {
+	h.world = rt.World
+	h.los = rt.LOS
+	h.log = rt.Log
+	h.rewards = rt.Rewards
+	h.sink = rt.Sink
+	if rt.Items == nil || h.Instance.Template.RightHand == 0 {
+		return
+	}
+	tmpl, ok := rt.Items.Get(int32(h.Instance.Template.RightHand))
+	if !ok || tmpl.Weapon == nil {
+		return
+	}
+	h.weapon = tmpl.Weapon
+	h.weaponCrystal = tmpl.Crystal
 }
 
 func (h *Hostile) emit(e event.Event) {
@@ -360,15 +381,8 @@ func (h *Hostile) UpdateAbnormalEffect() {
 	h.emit(event.AbnormalEffectChanged{})
 }
 
-// SetLogger records where a broadcast failure from an internally-triggered
-// status/death update (not routed through the AI think loop) is logged.
-// The zero value discards it.
-func (h *Hostile) SetLogger(log zerolog.Logger) {
-	h.log = log
-}
-
 // SyncPosition moves this NPC's world-grid presence to position. A no-op
-// until SetWorld has been called.
+// until Attach installs a world.
 func (h *Hostile) SyncPosition(position location.Location) {
 	if h.world == nil {
 		return
@@ -376,36 +390,10 @@ func (h *Hostile) SyncPosition(position location.Location) {
 	_ = h.world.Move(h, position.X, position.Y, position.Z)
 }
 
-// SetWeapon resolves this NPC's template right-hand item id against items
-// and records its weapon kind for AttackType and WeaponReuseDelay. Call it
-// once, before exposing this NPC to other goroutines — same constraint as
-// SetWorld. A template with no right-hand item id, an unknown item id, or a
-// right-hand item that isn't a weapon leaves this NPC unarmed.
-func (h *Hostile) SetWeapon(items *item.Table) {
-	if items == nil || h.Instance.Template.RightHand == 0 {
-		return
-	}
-	tmpl, ok := items.Get(int32(h.Instance.Template.RightHand))
-	if !ok || tmpl.Weapon == nil {
-		return
-	}
-	h.weapon = tmpl.Weapon
-	h.weaponCrystal = tmpl.Crystal
-}
-
 // SetRollSource overrides the random source MakeAttackHit uses for its
 // hit/crit/damage-spread rolls, for deterministic tests.
 func (h *Hostile) SetRollSource(f func(n int) int) {
 	h.roll = f
-}
-
-// SetRewarder records the reward hook TakeDamage passes to Die when its
-// damage newly kills this NPC. Call it once, before exposing this NPC to
-// other goroutines — same constraint as SetWorld. Leaving it unset keeps
-// TakeDamage's kill path reward-free, matching Die's own "rewards may be
-// nil" contract.
-func (h *Hostile) SetRewarder(rewards creature.Rewarder) {
-	h.rewards = rewards
 }
 
 // ObjectID returns the world object id assigned to this NPC.

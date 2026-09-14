@@ -6,10 +6,22 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-// Attach installs sink as the receiver of this summon's events. Call it once,
-// before SpawnBesideOwner publishes the summon into the world; nil keeps
-// every event a silent drop so domain tests need no packet layer.
-func (a *Actor) Attach(sink event.Sink) { a.sink = sink }
+// Runtime is what a summon needs to act in the live world beyond its
+// construction config: the AI loop commands and effects drive, and the sink
+// its events reach. Both are built from the actor, so they cannot be
+// constructor config.
+type Runtime struct {
+	AI   AI
+	Sink event.Sink
+}
+
+// Attach installs rt. Call it once, before SpawnBesideOwner publishes the
+// summon into the world; a nil Sink drops every event so domain tests need no
+// packet layer, and a nil AI leaves commands unexecuted.
+func (a *Actor) Attach(rt Runtime) {
+	a.brain = rt.AI
+	a.sink = rt.Sink
+}
 
 func (a *Actor) emit(e event.Event) {
 	if a.sink != nil {

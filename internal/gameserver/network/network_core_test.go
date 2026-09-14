@@ -13,6 +13,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -994,22 +997,17 @@ func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, leve
 }
 func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.stopAttack = gcl.stopLiveAutoAttack
-	live.attack.SetFinished(func() {
-		gcl.finishDeferredPickup(live)
-		gcl.finishDeferredMagicSkill(live)
-		gcl.finishDeferredItemAICast(live)
-		live.combat.Think()
-	})
-	live.attack.SetStarted(func() {
-		gcl.startLiveAutoAttack(live)
-	})
 	live.link = gcl
 	live.Character.Attach(live.Live, live)
-	live.move.SetArrived(func() {
-		pos := live.move.Position()
-		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())
-		live.combat.Think()
-	})
+	// Rebuild the controllers over the production player sink, so attack
+	// start/finish and arrival run the same arms attachLivePlayer wires.
+	moveCtl, err := move.NewController(live.Move(), live.Character, live)
+	if err != nil {
+		panic(err)
+	}
+	live.move = moveCtl
+	live.attack = attack.NewPlayer(live.Character, live)
+	live.combat = ai.NewPlayerAttack(live.Character, live.move, live.attack)
 }
 
 // TestAttackLiveTargetRejectsOutOfControl pins AttackRequest.java:31's
@@ -1135,7 +1133,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 	}{
 		{"hostile", func(t *testing.T, state *world.State) {
 			h := newTestHostileNPC(t, 7)
-			h.Attach(HostileSinks(state)(h))
+			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
 			state.Spawn(h, 0, 0, 0, 0)
 			_ = h.BroadcastStop()
 		}},
@@ -1144,7 +1142,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			actor.Attach(&summonSink{link: &GameClientLink{world: state}, actor: actor})
+			actor.Attach(summon.Runtime{Sink: &summonSink{link: &GameClientLink{world: state}, actor: actor}})
 			state.Spawn(actor, 0, 0, 0, 0)
 			_ = actor.BroadcastSelfSkillUse(1422, 1)
 		}},
@@ -1153,8 +1151,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			ep.SetWorld(state)
-			ep.Attach(EffectPointSinks(state)(ep))
+			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
 			_ = ep.BroadcastSkillLaunched(1, 1, []int32{1})
 		}},
@@ -1197,7 +1194,7 @@ func TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines(t *testing.T) {
 	observer := &retainingReceiver{id: 1}
 	state.Spawn(observer, 10, 0, 0, 0)
 	h := newTestHostileNPC(t, 7)
-	h.Attach(HostileSinks(state)(h))
+	h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
 	state.Spawn(h, 0, 0, 0, 0)
 
 	done := make(chan struct{})

@@ -246,7 +246,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 }
 
 // TestNpcLeashReturnDoesNotHijackWalkerRoute pins a review finding on #1940:
-// the shared moveCtl.SetArrived hook fires for every kind of movement this
+// the shared Arrived event fires for every kind of movement this
 // Hostile makes, not only route moves — offensive-follow chase and leash
 // return-home (Hostile.ReturnHome -> MoveHome) go through the very same
 // hook. aCis NpcAI.onEvtArrived only continues route-node logic when the

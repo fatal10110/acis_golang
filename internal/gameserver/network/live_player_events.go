@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -217,6 +218,34 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
 	case event.Relocated:
 		l.revalidateZones(live, e.Previous)
+	case event.AttackStarted:
+		l.startLiveAutoAttack(live)
+	case event.AttackFinished:
+		l.finishDeferredPickup(live)
+		l.finishDeferredMagicSkill(live)
+		l.finishDeferredItemAICast(live)
+		live.combat.Think()
+	case event.Arrived:
+		// CreatureMove tracks position for its own timing only; push the
+		// arrived position into the world-grid presence range checks
+		// actually read before re-thinking the attack intention, or it
+		// re-evaluates against a stale position forever.
+		pos := live.move.Position()
+		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
+		l.finishLiveGroundPickup(live)
+		l.finishPetInteract(live)
+		l.finishDeferredMagicSkill(live)
+		live.combat.Think()
+	case event.MoveBlocked:
+		if !l.onPlayerArrivedBlocked(live) {
+			live.move.BroadcastBlockedCorrection()
+		}
+	case event.CastAborted:
+		l.broadcastCastAborted(live, e.Interrupted)
+	case event.CastStopAck:
+		sendMagicActionFailed(live)
+	case event.CastFinished:
+		l.finishLiveCast(live, e.Skill)
 	case event.PetSummonRequested:
 		spawner := p.summonSpawner.Load()
 		if spawner == nil {
@@ -304,4 +333,25 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDeathPenaltyLifted))
 	}
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
+}
+
+// finishLiveCast resumes live's intentions once an in-flight cast ends.
+func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition) {
+	if l.finishDeferredItemAICast(live) {
+		return
+	}
+	if live.combat == nil {
+		return
+	}
+	if live.combat.ResumeAfterCast() {
+		return
+	}
+	// A queued CAST already ran above. With no next intention, a finished
+	// CAST only re-engages the attack when the skill carries
+	// nextActionAttack; anything else goes idle.
+	if def.NextActionIsAttack {
+		live.combat.Think()
+		return
+	}
+	live.combat.Stop()
 }

@@ -502,11 +502,6 @@ func (a *Actor) OwnerCombatant() attackable.Combatant {
 	return owner
 }
 
-// SetAI attaches the summon intention loop used by accepted commands.
-func (a *Actor) SetAI(brain AI) {
-	a.brain = brain
-}
-
 // CurrentTarget returns the summon target selected by its current command.
 func (a *Actor) CurrentTarget() world.Tracked { return a.target }
 

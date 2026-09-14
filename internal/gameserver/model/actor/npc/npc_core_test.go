@@ -1283,7 +1283,7 @@ func TestHostileTeleportToClearsGeoPathFailCount(t *testing.T) {
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
 	w := world.New()
 	w.Spawn(hostile, 0, 0, 0, 0)
-	hostile.SetWorld(w)
+	hostile.Attach(Runtime{World: w})
 	for range 7 {
 		hostile.AddGeoPathFailCount()
 	}
@@ -1301,10 +1301,9 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
 	rec := &event.Recorder{}
-	hostile.Attach(rec)
 	w := world.New()
 	w.Spawn(hostile, 100, 0, 0, 0)
-	hostile.SetWorld(w)
+	hostile.Attach(Runtime{World: w, Sink: rec})
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.Template.RunSpeed = 120
@@ -1326,7 +1325,7 @@ func TestRestoreSpawnHeadingIfAtHome(t *testing.T) {
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
 	w := world.New()
 	w.Spawn(hostile, 100, 0, 0, 0)
-	hostile.SetWorld(w)
+	hostile.Attach(Runtime{World: w})
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.SpawnHeading = 40000
@@ -1448,11 +1447,10 @@ func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
 	rec := &event.Recorder{}
-	hostile.Attach(rec)
 	hostile.Instance.Kind = "SiegeGuard"
 	w := world.New()
 	w.Spawn(hostile, 100, 0, 0, 0)
-	hostile.SetWorld(w)
+	hostile.Attach(Runtime{World: w, Sink: rec})
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.Template.RunSpeed = 120
@@ -1707,7 +1705,7 @@ func spawnPartyWorld(t *testing.T, actors ...*Hostile) *world.State {
 	t.Helper()
 	state := world.New()
 	for i, actor := range actors {
-		actor.SetWorld(state)
+		actor.Attach(Runtime{World: state})
 		state.Spawn(actor, i*100, 0, 0, 0)
 	}
 	return state
@@ -1721,8 +1719,8 @@ func TestStationaryMinionHoldsAttackWhenPlayableInRange(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 	state := world.New()
-	master.SetWorld(state)
-	minion.SetWorld(state)
+	master.Attach(Runtime{World: state})
+	minion.Attach(Runtime{World: state})
 	state.Spawn(master, 0, 0, 0, 0)
 	state.Spawn(minion, 10, 0, 0, 0)
 	attacker := &hostileTarget{id: 99}
@@ -1750,8 +1748,8 @@ func TestStationaryMinionDropsAttackWhenPlayableOutOfRangeAndIsTopDesire(t *test
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 	state := world.New()
-	master.SetWorld(state)
-	minion.SetWorld(state)
+	master.Attach(Runtime{World: state})
+	minion.Attach(Runtime{World: state})
 	state.Spawn(master, 0, 0, 0, 0)
 	state.Spawn(minion, 0, 0, 0, 0)
 	attacker := &hostileTarget{id: 99}
@@ -1836,8 +1834,8 @@ func TestMinionThinkFollowMovesToEscortSlot(t *testing.T) {
 	master := partyHostile(t, 1, 2, masterMove)
 	minion := partyHostile(t, 2, 1, minionMove)
 	state := world.New()
-	master.SetWorld(state)
-	minion.SetWorld(state)
+	master.Attach(Runtime{World: state})
+	minion.Attach(Runtime{World: state})
 	state.Spawn(master, 1000, 1000, 0, 0)
 	state.Spawn(minion, 0, 0, 0, 0)
 	master.AddMinion(minion)
@@ -1861,8 +1859,8 @@ func TestMinionThinkFollowLooseMovesTowardNonMaster(t *testing.T) {
 	follower := partyHostile(t, 1, 1, move)
 	target := partyHostile(t, 2, 0, &hostileMove{})
 	state := world.New()
-	follower.SetWorld(state)
-	target.SetWorld(state)
+	follower.Attach(Runtime{World: state})
+	target.Attach(Runtime{World: state})
 	state.Spawn(follower, 0, 0, 0, 0)
 	state.Spawn(target, 400, 0, 0, 0)
 	n := 0
@@ -1898,8 +1896,8 @@ func TestMinionThinkFollowTeleportsAfterGeoPathFails(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
 	state := world.New()
-	master.SetWorld(state)
-	minion.SetWorld(state)
+	master.Attach(Runtime{World: state})
+	minion.Attach(Runtime{World: state})
 	state.Spawn(master, 500, 0, 0, 0)
 	state.Spawn(minion, 0, 0, 0, 0)
 	master.AddMinion(minion)

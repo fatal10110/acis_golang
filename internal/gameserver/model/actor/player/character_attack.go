@@ -75,18 +75,11 @@ type physicalTarget interface {
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
 
-// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
-// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
-// permissive.
-
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
 // (regionX, regionY). Callers pass their own position as the region anchor,
 // matching the reference's caster-region-only zone lookup.
-
-// SetZones records the zone index EffectRangeInPeaceZone queries. A nil
-// zones (e.g. in tests that don't exercise zone data) leaves it permissive.
 
 // SetGroundTarget records the last ground-click point a ground-targeted
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
@@ -113,8 +106,6 @@ type physicalTarget interface {
 
 // Inventory returns the carried item collection attached by AttachRuntime,
 // or nil if the character has none yet.
-
-// SetWorld records the world registry BroadcastAttack reaches through.
 
 // SyncPosition moves this player's live world-grid presence to position.
 

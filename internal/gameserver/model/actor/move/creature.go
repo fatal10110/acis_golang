@@ -73,13 +73,26 @@ type CreatureMove struct {
 	followTarget         int32
 	followOffset         int
 	followMode           FollowMode
-	arrived              func()
-	blocked              func()
-	segmentAdvanced      func(event.Move) error
+	owner                moveOwner
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
 	log                  zerolog.Logger
+}
+
+// moveOwner is the controller a CreatureMove reports its movement milestones
+// to, each after the move's lock is released.
+type moveOwner interface {
+	// arrived runs once an accepted move reaches its destination.
+	arrived()
+	// blocked runs when an in-flight move stops because a geodata path
+	// closed and no remaining geopath waypoint can continue the route.
+	blocked()
+	// segmentAdvanced runs each time a multi-segment move advances to the
+	// next queued waypoint, with the newly active segment. It does not run
+	// for the first segment (MoveToLocation already returns it) or for the
+	// final segment's completion (arrived does).
+	segmentAdvanced(event.Move) error
 }
 
 type scheduledTimer interface {
@@ -125,21 +138,12 @@ func (m *CreatureMove) SetSpeed(speed float64) {
 	m.mu.Unlock()
 }
 
-// SetArrivedHook records the callback fired once an accepted move reaches
-// its destination. A nil hook (the default) makes arrival a no-op.
-func (m *CreatureMove) SetArrivedHook(arrived func()) {
+// setOwner records the controller this move reports milestones to. With no
+// owner (the default) every milestone is a no-op.
+func (m *CreatureMove) setOwner(owner moveOwner) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.arrived = arrived
-}
-
-// SetBlockedHook records the callback fired when an in-flight move stops
-// because a geodata path closed and no remaining geopath waypoints can
-// continue the route. A nil hook (the default) makes it a no-op.
-func (m *CreatureMove) SetBlockedHook(blocked func()) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.blocked = blocked
+	m.owner = owner
 }
 
 // SetLogger records where a panic recovered from an arrival callback is
@@ -156,18 +160,6 @@ func (m *CreatureMove) SetWaterSurface(query func(location.Location, int) (int, 
 	m.mu.Lock()
 	m.waterSurface = query
 	m.mu.Unlock()
-}
-
-// SetSegmentAdvancedHook records the callback fired each time a multi-segment
-// move advances from one queued waypoint to the next, with the event
-// describing the newly active segment. It does not fire for the first
-// segment (already reported by MoveToLocation's own return value) or for the
-// final segment's completion (that's the arrived hook's job). A nil hook
-// (the default) makes segment advancement a no-op.
-func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(event.Move) error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.segmentAdvanced = segmentAdvanced
 }
 
 // CanMoveTo reports whether a straight-line geodata walk from the current
@@ -428,13 +420,13 @@ func (m *CreatureMove) finishLocked() func() {
 		m.moving = true
 		m.rescheduleLocked(duration)
 		ev := m.currentEventLocked()
-		segmentAdvanced := m.segmentAdvanced
-		if segmentAdvanced == nil {
+		owner := m.owner
+		if owner == nil {
 			return nil
 		}
 		log := m.log
 		return func() {
-			if err := segmentAdvanced(ev); err != nil {
+			if err := owner.segmentAdvanced(ev); err != nil {
 				log.Warn().Err(err).Msg("move: segment-advance broadcast")
 			}
 		}
@@ -534,17 +526,23 @@ func (m *CreatureMove) maxZLocked() int {
 }
 
 func (m *CreatureMove) arrivalHookLocked() func() {
-	if m.routeBlocked {
-		return m.blocked
+	if m.owner == nil {
+		return nil
 	}
-	return m.arrived
+	if m.routeBlocked {
+		return m.owner.blocked
+	}
+	return m.owner.arrived
 }
 
 func (m *CreatureMove) stopBlockedLocked() func() {
 	m.rescheduleLocked(0)
 	m.waypoints = nil
 	m.moving = false
-	return m.blocked
+	if m.owner == nil {
+		return nil
+	}
+	return m.owner.blocked
 }
 
 // startNextWaypointLocked starts the next queued geopath leg from the
@@ -576,13 +574,13 @@ func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
 	m.moving = true
 	m.rescheduleLocked(duration)
 	ev := m.currentEventLocked()
-	segmentAdvanced := m.segmentAdvanced
-	if segmentAdvanced == nil {
+	owner := m.owner
+	if owner == nil {
 		return true, nil
 	}
 	log := m.log
 	return true, func() {
-		if err := segmentAdvanced(ev); err != nil {
+		if err := owner.segmentAdvanced(ev); err != nil {
 			log.Warn().Err(err).Msg("move: segment-advance broadcast")
 		}
 	}

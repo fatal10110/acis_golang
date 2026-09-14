@@ -132,6 +132,7 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
+	control := &hostileControl{walker: walker, log: log}
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
 	if err != nil {
@@ -148,14 +149,14 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	}
 
 	locRef := &locatedRef{}
-	moveCtl, err := move.NewController(live.Move(), locRef)
+	moveCtl, err := move.NewController(live.Move(), locRef, control)
 	if err != nil {
 		return nil, nil, err
 	}
 	moveCtl.SetPositionUpdates(positions)
 
 	actorRef := &creatureActorRef{}
-	attackCtl := attack.NewAttackable(actorRef)
+	attackCtl := attack.NewAttackable(actorRef, control)
 	live.Move().SetLogger(log)
 	attackCtl.SetLogger(log)
 
@@ -165,10 +166,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		return nil, nil, err
 	}
 	hostile.SetMaxBuffsAmount(maxBuffsAmount)
-	hostile.SetLogger(log)
-	if los, ok := geo.(npc.LineOfSight); ok {
-		hostile.SetLineOfSight(los)
-	}
 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
@@ -180,7 +177,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	// cast" no-op contract for IntentionCast — the same nil-safe pattern
 	// SummonActor's caller relies on before l.skills is ready.
 	if castDefs != nil {
-		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile})
+		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
 		castController.SetLogger(log)
 		aiController := &actorcast.AIController{
 			Controller:  castController,
@@ -202,44 +199,67 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl, routeMove: routeMove}
 
-	// Re-evaluate the AI loop as soon as a chase leg completes or a swing
-	// finishes, rather than waiting for the next fixed AI tick — otherwise
-	// a hostile NPC only closes distance on, or re-attacks, its target once
-	// per task.AITick. CreatureMove tracks position for its own timing only;
-	// the arrived hook must push that position into the world-grid presence
-	// range checks actually read before re-thinking, or the AI loop re-runs
-	// against a stale position forever.
-	moveCtl.SetArrived(func() {
-		pos := moveCtl.Position()
-		hostile.SyncPosition(pos)
+	control.hostile, control.move, control.walkerRef, control.routeMove = hostile, moveCtl, walkerRef, routeMove
+	return hostile, walkerRef, nil
+}
+
+// hostileControl reacts to a live hostile NPC's controller events: it
+// re-evaluates the AI loop as soon as a chase leg completes or a swing
+// finishes, rather than waiting for the next fixed AI tick — otherwise a
+// hostile NPC only closes distance on, or re-attacks, its target once per
+// task.AITick — and closes an aborted AI cast with its cancel animation.
+// newLiveHostile fills it before the NPC is published.
+type hostileControl struct {
+	hostile   *npc.Hostile
+	move      *move.Controller
+	walker    *task.Walker
+	walkerRef *walkerActorRef
+	routeMove *atomic.Bool
+	log       zerolog.Logger
+}
+
+// Emit maps one controller event to the NPC's AI and broadcasts.
+func (c *hostileControl) Emit(ev event.Event) {
+	switch ev.(type) {
+	case event.Arrived:
+		// CreatureMove tracks position for its own timing only; push the
+		// arrived position into the world-grid presence range checks
+		// actually read before re-thinking, or the AI loop re-runs against a
+		// stale position forever.
+		c.hostile.SyncPosition(c.move.Position())
 		// Only an arrival the walker task itself just moved toward counts as
-		// a route arrival — offensive-follow chase and MoveHome fire this
-		// same hook and must not advance/reissue the patrol route.
-		if walker != nil && routeMove.Load() {
-			if err := walker.Arrived(walkerRef); err != nil {
-				log.Warn().Err(err).Msg("task: walker arrived")
+		// a route arrival — offensive-follow chase and MoveHome arrive the
+		// same way and must not advance/reissue the patrol route.
+		if c.walker != nil && c.routeMove.Load() {
+			if err := c.walker.Arrived(c.walkerRef); err != nil {
+				c.log.Warn().Err(err).Msg("task: walker arrived")
 			}
 		}
-		hostile.AI().Arrived()
-		if err := hostile.Think(); err != nil {
-			log.Warn().Err(err).Msg("ai: hostile think")
+		c.hostile.AI().Arrived()
+		c.think()
+	case event.MoveBlocked:
+		c.move.BroadcastBlockedCorrection()
+		c.hostile.AI().ArrivedBlocked()
+		c.think()
+	case event.AttackFinished:
+		c.think()
+	case event.CastAborted:
+		// Every AI cast abort path (Launch revalidation failure,
+		// insufficient MP/HP at Hit, a damage-break interrupt) routes
+		// through Controller.Stop/Interrupt, which reports an abort only when
+		// a cast was actually in flight — matching CreatureCast.stop()
+		// broadcasting MagicSkillCanceled behind the same isCastingNow()
+		// guard (CreatureCast.java:416-419), inherited unmodified by NpcCast.
+		if err := c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID()); err != nil {
+			c.log.Warn().Err(err).Msg("cast: skill-canceled broadcast")
 		}
-	})
-	moveCtl.SetBlocked(func() bool {
-		moveCtl.BroadcastBlockedCorrection()
-		hostile.AI().ArrivedBlocked()
-		if err := hostile.Think(); err != nil {
-			log.Warn().Err(err).Msg("ai: hostile think")
-		}
-		return true
-	})
-	attackCtl.SetFinished(func() {
-		if err := hostile.Think(); err != nil {
-			log.Warn().Err(err).Msg("ai: hostile think")
-		}
-	})
+	}
+}
 
-	return hostile, walkerRef, nil
+func (c *hostileControl) think() {
+	if err := c.hostile.Think(); err != nil {
+		c.log.Warn().Err(err).Msg("ai: hostile think")
+	}
 }
 
 // walkerWalkModeIDs are the template ids aCis Walkers.java's onCreated forces

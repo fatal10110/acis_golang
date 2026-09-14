@@ -110,8 +110,7 @@ type Object struct {
 
 	opened atomic.Bool
 
-	world *world.State
-	sink  event.Sink
+	sink event.Sink
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -191,9 +190,6 @@ func (o *Object) Opened() bool {
 func (o *Object) SetOpened(open bool) bool {
 	return o.opened.CompareAndSwap(!open, open)
 }
-
-// SetWorld records the world state this door is spawned into.
-func (o *Object) SetWorld(state *world.State) { o.world = state }
 
 // Attach installs sink as the receiver of this door's events. Call it once,
 // before the door is spawned.

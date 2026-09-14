@@ -24,7 +24,7 @@ func newCastAICharacter(id int32) *player.Character {
 
 func startedCastAIController(t *testing.T, caster *player.Character, def modelskill.Definition) *actorcast.Controller {
 	t.Helper()
-	ctrl := actorcast.NewController(actorcast.PlayerActor{Character: caster})
+	ctrl := actorcast.NewController(actorcast.PlayerActor{Character: caster}, nil)
 	if _, err := ctrl.Start(time.Unix(1000, 0), caster, def); err != nil {
 		t.Fatalf("setup Start() error: %v", err)
 	}

@@ -1122,7 +1122,7 @@ func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 		t.Run(damage.name, func(t *testing.T) {
 			a := mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}})
 			rec := &event.Recorder{}
-			a.Attach(rec)
+			a.Attach(Runtime{Sink: rec})
 
 			damage.apply(a)
 
@@ -1148,7 +1148,7 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			a := tc.new()
 			rec := &event.Recorder{}
-			a.Attach(rec)
+			a.Attach(Runtime{Sink: rec})
 			var attacker effect.Participant = namedDamageAttacker{name: "Attacker"}
 			if tc.name == "unknown attacker" {
 				attacker = anonymousAttacker{}
