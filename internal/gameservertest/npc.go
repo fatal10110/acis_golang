@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
@@ -12,7 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -76,7 +77,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	hostile.Attach(network.HostileSinks(s.State)(hostile))
 	hostile.SetWorld(s.State)
 	hostile.SetWeapon(s.itemTable)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
@@ -266,7 +267,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		return true
 	})
 	attackCtl.SetFinished(func() { s.think(hostile) })
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	hostile.Attach(network.HostileSinks(s.State)(hostile))
 	hostile.SetWorld(s.State)
 	hostile.SetRewarder(gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable))

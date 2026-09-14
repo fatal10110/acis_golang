@@ -31,7 +31,7 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 // *task.Door to schedule timers with, so that task's own effects can only
 // point back at WorldObjects after it exists.
 func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, log zerolog.Logger) (*manager.WorldObjects, error) {
-	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, log)
+	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, network.DoorSinks(state), log)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 		Log:       log,
 	})
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers, OnHitResult: link.DeliverHitResult}, walker, int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), data.Zones)
+		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers, OnHitResult: link.DeliverHitResult}, walker, network.HostileSinks(state), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), data.Zones)
 	if err != nil {
 		return nil, err
 	}

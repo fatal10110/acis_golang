@@ -7,7 +7,6 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -61,7 +60,6 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
 	hostile.SetWorld(state)
 
 	locRef := &locatedRef{Actor: hostile}

@@ -9,7 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -56,13 +57,13 @@ type Hostile struct {
 
 	Instance *Instance
 
-	brain  *ai.Attackable
-	move   ai.MoveController
-	world  *world.State
-	frames FrameBuilder
-	log    zerolog.Logger
-
-	known world.KnownBuffer
+	brain *ai.Attackable
+	move  ai.MoveController
+	world *world.State
+	// sink receives this NPC's events. Attach installs it before the NPC is
+	// published into world.State; nil drops every event.
+	sink event.Sink
+	log  zerolog.Logger
 
 	// rewards computes this NPC's drop/experience payout when TakeDamage
 	// kills it. It is nil until SetRewarder is called, in which case death
@@ -291,12 +292,16 @@ func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.C
 	})
 }
 
-// SetFrameBuilder records the network-layer hook that translates this NPC's
-// broadcast-worthy state changes into wire frames, keeping serverpackets and
-// wire-encoding knowledge out of the model layer. Broadcast* is a no-op
-// until both SetWorld and SetFrameBuilder have been called.
-func (h *Hostile) SetFrameBuilder(b FrameBuilder) {
-	h.frames = b
+// Attach installs sink as the receiver of this NPC's events. Call it once,
+// before exposing this NPC to other goroutines — same constraint as SetWorld.
+func (h *Hostile) Attach(sink event.Sink) {
+	h.sink = sink
+}
+
+func (h *Hostile) emit(e event.Event) {
+	if h.sink != nil {
+		h.sink.Emit(e)
+	}
 }
 
 // StartAbnormalEffect adds mask to this NPC's client-visible abnormal state.
@@ -343,7 +348,9 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	}
 }
 
-func (h *Hostile) serverObjectInfoSnapshot() npcinfo.Snapshot {
+// ServerObjectInfoSnapshot is NPCInfoSnapshot with the template's server-side
+// name always shown, the view an immobile NPC is announced with.
+func (h *Hostile) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	snapshot := h.NPCInfoSnapshot()
 	snapshot.Name = h.Instance.Template.Name
 	return snapshot
@@ -351,9 +358,7 @@ func (h *Hostile) serverObjectInfoSnapshot() npcinfo.Snapshot {
 
 // UpdateAbnormalEffect re-announces this NPC's current visible state.
 func (h *Hostile) UpdateAbnormalEffect() {
-	if err := h.broadcastFrame(func() wire.Frame { return h.frames.Info(h.NPCInfoSnapshot()) }); err != nil {
-		h.log.Debug().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc abnormal effect")
-	}
+	h.emit(event.AbnormalEffectChanged{})
 }
 
 // SetLogger records where a broadcast failure from an internally-triggered

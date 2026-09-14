@@ -1,7 +1,7 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
 // Running reports whether this NPC is in run rather than walk stance.
@@ -47,12 +47,7 @@ func (h *Hostile) setWalkOrRun(running bool) {
 	if h.moveSpeed() == 0 {
 		return
 	}
-	if h.frames == nil {
-		return
-	}
-	_ = h.broadcastFrame(func() wire.Frame {
-		return h.frames.ChangeMoveType(h.ObjectID(), h.Running())
-	})
+	h.emit(event.MoveTypeChanged{Running: h.Running()})
 }
 
 func (h *Hostile) moveSpeed() int {

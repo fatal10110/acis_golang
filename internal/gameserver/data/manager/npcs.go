@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/rs/zerolog"
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -78,12 +80,15 @@ type Npcs struct {
 	positions      *task.PositionUpdates
 	items          *item.Table
 	ground         groundPlacer
-	rewards        KillRewardConfig
-	spawns         *Spawns
-	now            func() time.Time
-	log            zerolog.Logger
-	walker         *task.Walker
-	zones          *zone.Index
+	// newSink builds the event sink each spawned NPC reports through; nil
+	// leaves spawned NPCs silent.
+	newSink func(*npc.Hostile) event.Sink
+	rewards KillRewardConfig
+	spawns  *Spawns
+	now     func() time.Time
+	log     zerolog.Logger
+	walker  *task.Walker
+	zones   *zone.Index
 
 	// castDefs and castEffects wire a live Hostile's cast.AIController at
 	// spawn (see newLiveHostile). castDefs is nil-checked so a caller with
@@ -112,17 +117,17 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, 20, 30, zoneIndexes...)
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, 20, 30, zoneIndexes...)
 }
 
 // NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot base
 // and RandomWalkRate.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, randomWalkRate int, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, maxBuffsAmount, randomWalkRate, zoneIndexes...)
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, maxBuffsAmount, randomWalkRate int, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, maxBuffsAmount, randomWalkRate, zoneIndexes...)
 }
 
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, randomWalkRate int, zoneIndexes ...*zone.Index) (*Npcs, error) {
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, maxBuffsAmount, randomWalkRate int, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -185,6 +190,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		now:            now,
 		log:            log,
 		walker:         walker,
+		newSink:        newSink,
 		zones:          zones,
 		castDefs:       castDefs,
 		castEffects:    castEffects,

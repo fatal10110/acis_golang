@@ -3,7 +3,8 @@ package npc
 import (
 	"sync/atomic"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 )
 
@@ -85,10 +86,7 @@ func (h *Hostile) AddGeoPathFailCount() {
 // SocialAction broadcasts a social-animation packet, driven by a
 // walkerRoutes.xml node's socialId (aCis NpcAI.onEvtArrived).
 func (h *Hostile) SocialAction(id int) {
-	if h.frames == nil {
-		return
-	}
-	_ = h.broadcastFrame(func() wire.Frame { return h.frames.SocialAction(h.ObjectID(), int32(id)) })
+	h.emit(event.SocialAction{ID: int32(id)})
 }
 
 // SayNPCString broadcasts a walkerRoutes.xml node's fstring chat line
@@ -97,9 +95,8 @@ func (h *Hostile) SocialAction(id int) {
 // silent beats fabricating text the client would show as this NPC's line.
 func (h *Hostile) SayNPCString(id int) {
 	text, ok := npcstring.Text(int32(id))
-	if !ok || h.frames == nil {
+	if !ok {
 		return
 	}
-	npcID := h.Instance.Template.TemplateID
-	_ = h.broadcastFrame(func() wire.Frame { return h.frames.NpcSay(h.ObjectID(), npcID, text) })
+	h.emit(event.NpcSay{NpcID: h.Instance.Template.TemplateID, Text: text})
 }

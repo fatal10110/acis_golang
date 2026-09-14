@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"reflect"
 	"strings"
 
@@ -198,8 +199,10 @@ type SignetDeps struct {
 	Templates signetTemplates
 	IDs       signetIDAllocator
 	World     *world.State
-	Frames    npc.FrameBuilder
-	Log       zerolog.Logger
+	// NewSink builds the event sink a spawned signet effect point reports
+	// through; nil disables signet spawning.
+	NewSink func(*npc.EffectPoint) event.Sink
+	Log     zerolog.Logger
 }
 
 // NewDefaultRegistryWithSignet returns the same handlers as
@@ -207,7 +210,7 @@ type SignetDeps struct {
 // signet's own world-spawning collaborators.
 func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
 	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, frames: signet.Frames, log: signet.Log})
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, log: signet.Log})
 	return r
 }
 

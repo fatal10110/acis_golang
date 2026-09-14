@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -188,7 +187,9 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	hostile.SetCurrentMP(mp)
 	hostile.SetWorld(n.state)
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	if n.newSink != nil {
+		hostile.Attach(n.newSink(hostile))
+	}
 	hostile.SetWeapon(n.items)
 	hostile.SetRewarder(n.rewarderFor(hostile, tmpl))
 	if master != nil {

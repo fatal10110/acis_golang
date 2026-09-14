@@ -1,8 +1,7 @@
 package npc
 
 import (
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -53,39 +52,31 @@ func (h *Hostile) broadcastModifiedStats(fns []effect.Mod) {
 }
 
 func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
-	if h.frames == nil {
+	if h.sink == nil {
 		return
 	}
 	full := false
-	attrs := make([]npcinfo.StatusAttribute, 0, len(stats))
+	attrs := make([]event.StatusAttr, 0, len(stats))
 	for _, s := range stats {
 		switch s {
 		case stat.PowerAttackSpeed:
-			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusPhysicalSpeed, Value: h.AttackSpeed()})
+			attrs = append(attrs, event.StatusAttr{Kind: event.StatusPhysicalSpeed, Value: h.AttackSpeed()})
 		case stat.MagicAttackSpeed:
-			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusMagicSpeed, Value: h.MagicAttackSpeed()})
+			attrs = append(attrs, event.StatusAttr{Kind: event.StatusMagicSpeed, Value: h.MagicAttackSpeed()})
 		case stat.MaxHP:
-			attrs = append(attrs, npcinfo.StatusAttribute{Type: npcinfo.StatusMaxHP, Value: int(h.MaxHPValue())})
+			attrs = append(attrs, event.StatusAttr{Kind: event.StatusMaxHP, Value: int(h.MaxHPValue())})
 		case stat.RunSpeed:
 			full = true
 		}
 	}
 	if full {
-		build := func() wire.Frame { return h.frames.Info(h.NPCInfoSnapshot()) }
-		if h.RunSpeed() == 0 {
-			build = func() wire.Frame { return h.frames.ObjectInfo(h.serverObjectInfoSnapshot()) }
-		}
-		if err := h.broadcastFrame(build); err != nil {
-			h.log.Warn().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc stat change")
-		}
+		h.emit(event.NPCInfoChanged{ServerObject: h.RunSpeed() == 0})
 		return
 	}
 	if len(attrs) == 0 {
 		return
 	}
-	if err := h.broadcastFrame(func() wire.Frame { return h.frames.Status(h.ObjectID(), attrs) }); err != nil {
-		h.log.Warn().Err(err).Int32("object_id", h.ObjectID()).Msg("broadcast npc stat change")
-	}
+	h.emit(event.Status{Attrs: attrs})
 }
 
 // SetMaxBuffsAmount records the players.properties base buff-slot count.

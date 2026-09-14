@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -1300,11 +1300,10 @@ func TestHostileTeleportToClearsGeoPathFailCount(t *testing.T) {
 func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	rec := &event.Recorder{}
+	hostile.Attach(rec)
 	w := world.New()
-	observer := &frameReceiver{trackedID: 999}
 	w.Spawn(hostile, 100, 0, 0, 0)
-	w.Spawn(observer, 50, 0, 0, 0)
 	hostile.SetWorld(w)
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
@@ -1318,10 +1317,9 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	if hostile.Running() {
 		t.Fatal("Running() = true after ordinary ReturnHome, want walk stance")
 	}
-	if len(observer.frames) != 1 {
-		t.Fatalf("observer frame count = %d, want 1 ChangeMoveType", len(observer.frames))
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: false}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("events = %+v, want %+v", got, want)
 	}
-	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), false)
 }
 
 func TestRestoreSpawnHeadingIfAtHome(t *testing.T) {
@@ -1449,12 +1447,11 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	movement := &hostileMove{}
 	hostile := newTestHostile(t, movement, &hostileAttack{})
-	hostile.SetFrameBuilder(serverpackets.NpcFrameBuilder{})
+	rec := &event.Recorder{}
+	hostile.Attach(rec)
 	hostile.Instance.Kind = "SiegeGuard"
 	w := world.New()
-	observer := &frameReceiver{trackedID: 999}
 	w.Spawn(hostile, 100, 0, 0, 0)
-	w.Spawn(observer, 50, 0, 0, 0)
 	hostile.SetWorld(w)
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
@@ -1469,30 +1466,8 @@ func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	if !hostile.Running() {
 		t.Fatal("Running() = false after SiegeGuard ReturnHome, want run stance")
 	}
-	if len(observer.frames) != 1 {
-		t.Fatalf("observer frame count = %d, want 1 ChangeMoveType", len(observer.frames))
-	}
-	assertChangeMoveTypeFrame(t, observer.frames[0], hostile.ObjectID(), true)
-}
-
-func assertChangeMoveTypeFrame(t *testing.T, frame []byte, objectID int32, running bool) {
-	t.Helper()
-	if frame[0] != serverpackets.OpcodeChangeMoveType {
-		t.Fatalf("opcode = %#x, want ChangeMoveType (%#x)", frame[0], serverpackets.OpcodeChangeMoveType)
-	}
-	r := wire.NewReader(frame[1:])
-	if got := r.ReadInt32(); got != objectID {
-		t.Fatalf("ChangeMoveType object id = %d, want %d", got, objectID)
-	}
-	wantRun := int32(0)
-	if running {
-		wantRun = 1
-	}
-	if got := r.ReadInt32(); got != wantRun {
-		t.Fatalf("ChangeMoveType running = %d, want %d", got, wantRun)
-	}
-	if got := r.ReadInt32(); got != 0 {
-		t.Fatalf("ChangeMoveType swimming = %d, want 0", got)
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: true}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("events = %+v, want %+v", got, want)
 	}
 }
 
