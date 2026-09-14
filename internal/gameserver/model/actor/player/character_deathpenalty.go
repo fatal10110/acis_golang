@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+)
 
 // maxDeathPenaltyLevel is the reference's hard cap on the death-penalty
 // debuff level (skill 5076).
@@ -11,14 +14,6 @@ const maxDeathPenaltyLevel = 15
 // without an identified killer.
 type raidRelatedKiller interface {
 	RaidRelated() bool
-}
-
-// SetDeathPenaltyChance records the players.properties chance used by the
-// non-karma death-penalty gate.
-func (c *Character) SetDeathPenaltyChance(chance int) {
-	c.stateMu.Lock()
-	c.deathPenaltyChance = chance
-	c.stateMu.Unlock()
 }
 
 // DeathPenaltyLevel returns the current death-penalty debuff level.
@@ -43,7 +38,7 @@ func (c *Character) SetDeathPenaltyLevel(level int) {
 // lower than zero, and reports the resulting level. It is a no-op reporting
 // the unchanged level (0) when already at zero, matching the reference's
 // reduceDeathPenaltyBuffLevel() guard (Player.java:6537-6538). On an actual
-// decrement it fires the reduced-updater with the new level, matching the
+// decrement it emits DeathPenaltyChanged with the new level, matching the
 // reference's DEATH_PENALTY_LEVEL_S1_ADDED/DEATH_PENALTY_LIFTED + EtcStatusUpdate
 // send (Player.java:6544-6553).
 func (c *Character) ReduceDeathPenaltyLevel() int {
@@ -55,45 +50,10 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 	c.deathPenaltyLevel--
 	oldLevel := c.deathPenaltyLevel + 1
 	level := c.deathPenaltyLevel
-	skillUpdate := c.updateDeathPenaltySkill
-	update := c.updateDeathPenaltyReduced
 	c.stateMu.Unlock()
 
-	if skillUpdate != nil {
-		skillUpdate(oldLevel, level)
-	}
-	if update != nil {
-		update(level)
-	}
+	c.emit(event.DeathPenaltyChanged{Old: oldLevel, New: level})
 	return level
-}
-
-// SetDeathPenaltyRaisedUpdater records the packet-layer notification fired
-// when a death raises the death-penalty debuff level, matching the
-// reference's EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send inside
-// calculateDeathPenaltyBuffLevel (Player.java:6527-6528).
-func (c *Character) SetDeathPenaltyRaisedUpdater(update func(level int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateDeathPenaltyRaised = update
-}
-
-// SetDeathPenaltyReducedUpdater records the packet-layer notification fired
-// when a Recovery effect reduces the death-penalty debuff level, matching
-// the reference's DEATH_PENALTY_LEVEL_S1_ADDED/DEATH_PENALTY_LIFTED +
-// EtcStatusUpdate send in reduceDeathPenaltyBuffLevel (Player.java:6544-6553).
-func (c *Character) SetDeathPenaltyReducedUpdater(update func(level int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateDeathPenaltyReduced = update
-}
-
-// SetDeathPenaltySkillUpdater records the runtime hook that replaces the
-// death-penalty skill's transient passive stats after each level change.
-func (c *Character) SetDeathPenaltySkillUpdater(update func(oldLevel, newLevel int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateDeathPenaltySkill = update
 }
 
 // RaiseDeathPenaltyLevel evaluates the death-penalty increment gate for a
@@ -108,7 +68,7 @@ func (c *Character) SetDeathPenaltySkillUpdater(update func(oldLevel, newLevel i
 // a Player killer, blocked by Charm of Luck unless the killer is unknown or
 // raid-related, blocked by Phoenix Blessing, and — absent karma — only
 // passes on the chance roll. It is also blocked in PvP and siege zones. On a
-// passing gate it fires the raised-updater with the new level, matching the
+// passing gate it emits DeathPenaltyChanged with the new level, matching the
 // reference's
 // EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send (Player.java:6527-6528).
 func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
@@ -145,16 +105,9 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 	oldLevel := c.deathPenaltyLevel
 	c.deathPenaltyLevel++
 	level := c.deathPenaltyLevel
-	skillUpdate := c.updateDeathPenaltySkill
-	update := c.updateDeathPenaltyRaised
 	c.stateMu.Unlock()
 
-	if skillUpdate != nil {
-		skillUpdate(oldLevel, level)
-	}
-	if update != nil {
-		update(level)
-	}
+	c.emit(event.DeathPenaltyChanged{Old: oldLevel, New: level, Raised: true})
 	return level, true
 }
 

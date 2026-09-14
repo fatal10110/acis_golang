@@ -3,6 +3,10 @@ package player
 import (
 	"math/rand/v2"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/rs/zerolog"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -19,13 +23,6 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
-// SetLineOfSight records the geodata line-of-sight query used by CanSee. A
-// nil los (e.g. in tests that don't exercise geodata) leaves CanSee
-// permissive.
-func (c *Character) SetLineOfSight(los LineOfSight) {
-	c.los = los
-}
-
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
@@ -33,12 +30,6 @@ func (c *Character) SetLineOfSight(los LineOfSight) {
 // matching the reference's caster-region-only zone lookup.
 type PeaceZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
-}
-
-// SetZones records the zone index EffectRangeInPeaceZone queries. A nil
-// zones (e.g. in tests that don't exercise zone data) leaves it permissive.
-func (c *Character) SetZones(zones PeaceZoneQuery) {
-	c.zones = zones
 }
 
 // SetInPvPZone records the live zone engine's current PvP membership.
@@ -83,14 +74,6 @@ func (c *Character) SetInNoSummonFriendZone(inside bool) {
 // isInsideZone(ZoneId.NO_SUMMON_FRIEND) (SummonFriend.java:113,138).
 func (c *Character) NoSummonFriendZone() bool {
 	return c.insideNoSummonFriendZone.Load()
-}
-
-// SetZoneRevalidator records the runtime hook that updates zone occupancy
-// whenever the player's server-authoritative position changes.
-func (c *Character) SetZoneRevalidator(revalidate func(location.Location)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.revalidateZones = revalidate
 }
 
 // SetGroundTarget records the last ground-click point a ground-targeted
@@ -162,6 +145,76 @@ func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) 
 	}
 }
 
+// Rules is the server-configuration slice a character's own rules read.
+type Rules struct {
+	RateKarmaExpLost       float64
+	WeightLimitMultiplier  float64
+	PerfectShieldBlockRate int
+	MaxBuffsAmount         int
+	DeathPenaltyChance     int
+	AllowDelevel           bool
+	RaidCursesDisabled     bool
+	AwardPKKillPVPPoint    bool
+}
+
+// Runtime is everything a persisted Character needs to act in the live
+// world besides its event sink. A nil dependency leaves the matching query
+// permissive (e.g. in tests that don't exercise geodata or zones).
+type Runtime struct {
+	World  *world.State
+	LOS    LineOfSight
+	Zones  PeaceZoneQuery
+	Skills skillDefinitions
+	Levels *LevelTable
+	Log    zerolog.Logger
+	Rules  Rules
+}
+
+// Configure installs rt. Call it before exposing c to the world.
+func (c *Character) Configure(rt Runtime) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.world = rt.World
+	c.los = rt.LOS
+	c.zones = rt.Zones
+	c.skillDefs = rt.Skills
+	c.levelTable = rt.Levels
+	c.log = rt.Log
+	c.rateKarmaExpLost = rt.Rules.RateKarmaExpLost
+	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
+	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
+	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount
+	c.deathPenaltyChance = rt.Rules.DeathPenaltyChance
+	c.allowDelevel = rt.Rules.AllowDelevel
+	c.raidCursesDisabled = rt.Rules.RaidCursesDisabled
+	c.awardPKKillPVPPoint = rt.Rules.AwardPKKillPVPPoint
+}
+
+// Attach installs live as this character's crowd-control/movement runtime
+// state and sink as the receiver of its events. Call it once, before the
+// character is published into the world. Live is written under stateMu so a
+// concurrent caller (e.g. a persisted-state assertion racing live setup)
+// never observes a torn pointer.
+func (c *Character) Attach(live *creature.Live, sink event.Sink) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.Live = live
+	c.sink = sink
+}
+
+// DetachSession marks the owning session gone. Events the session alone
+// delivered are dropped from then on, and a herb can no longer be applied.
+func (c *Character) DetachSession() { c.sessionDetached.Store(true) }
+
+// SessionDetached reports whether DetachSession has run.
+func (c *Character) SessionDetached() bool { return c.sessionDetached.Load() }
+
+func (c *Character) emit(e event.Event) {
+	if c.sink != nil {
+		c.sink.Emit(e)
+	}
+}
+
 // AddRewardItem creates and adds one kill-reward item stack to this live
 // character's inventory. objectID must be allocated by the reward caller.
 func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
@@ -178,11 +231,6 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 // or nil if the character has none yet.
 func (c *Character) Inventory() *itemcontainer.Inventory {
 	return c.inventory
-}
-
-// SetWorld records the world registry BroadcastAttack reaches through.
-func (c *Character) SetWorld(state *world.State) {
-	c.world = state
 }
 
 // ForEachKnownCombatantInRadius visits nearby combatants through the world grid.
@@ -207,12 +255,7 @@ func (c *Character) SyncPosition(position location.Location) {
 		return
 	}
 	_ = c.world.Move(c, position.X, position.Y, position.Z)
-	c.stateMu.RLock()
-	revalidate := c.revalidateZones
-	c.stateMu.RUnlock()
-	if revalidate != nil {
-		revalidate(previous)
-	}
+	c.emit(event.Relocated{Previous: previous})
 }
 
 // SetLastKnownPosition records position and heading as this player's last

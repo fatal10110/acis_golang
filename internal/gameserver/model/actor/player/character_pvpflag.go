@@ -3,6 +3,7 @@ package player
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -33,23 +34,8 @@ func (c *Character) PvPFlagState() task.PvPFlagState {
 	return c.pvpFlag
 }
 
-// SetPvPFlagHook records the runtime hook that registers this character
-// with the shared PvP flag tracker (task.PvPFlags.AddNormal/AddFlagged).
-// notePvPHitFromAttacker calls it on this character once it has decided
-// whether the normal or PvP-vs-PvP duration applies.
-func (c *Character) SetPvPFlagHook(hook func(useFlaggedDuration bool)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.pvpFlagHook = hook
-}
-
 func (c *Character) flagPvP(useFlaggedDuration bool) {
-	c.stateMu.RLock()
-	hook := c.pvpFlagHook
-	c.stateMu.RUnlock()
-	if hook != nil {
-		hook(useFlaggedDuration)
-	}
+	c.emit(event.PvPFlagged{UseFlaggedDuration: useFlaggedDuration})
 }
 
 // NotePvPAttack records one resolved physical attack against target.

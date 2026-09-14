@@ -357,8 +357,6 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
-	ch.SetFrameSender(capture.Send)
-	ch.SetBroadcastFrameSender(capture.Send)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)
@@ -375,7 +373,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	moveCtl.SetArrived(combat.Think)
 	attackCtl.SetFinished(combat.Think)
 
-	return &livePlayer{Character: ch, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
 }
 
 func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {

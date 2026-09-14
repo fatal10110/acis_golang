@@ -27,8 +27,6 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
 	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, templates, items))
-	ch.SetFrameSender(capture.Send)
-	ch.SetBroadcastFrameSender(capture.Send)
 
 	live, err := creature.NewLive(ch.Location, tmpl.RunSpeed, testGeo{}, ch)
 	if err != nil {
@@ -36,7 +34,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 	}
 	ch.Live = live
 
-	return &livePlayer{Character: ch, template: tmpl, items: items, visibilitySend: capture.Send}
+	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, items: items, visibilitySend: capture.Send}
 }
 
 func assertStaticSystemMessageFrame(t *testing.T, frame []byte, messageID int) {

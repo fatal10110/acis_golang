@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -1000,15 +998,8 @@ func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.attack.SetStarted(func() {
 		gcl.startLiveAutoAttack(live)
 	})
-	live.Character.SetAttackBroadcaster(func(snapshot attack.Snapshot) {
-		gcl.broadcastAttack(live, snapshot)
-	})
-	live.Character.SetMoveBroadcaster(func(event move.Event) {
-		gcl.broadcastLiveMoveEvent(live, event)
-	})
-	live.Character.SetStatusBroadcaster(func() {
-		gcl.broadcastLiveStatus(live)
-	})
+	live.link = gcl
+	live.Character.Attach(live.Live, live)
 	live.move.SetArrived(func() {
 		pos := live.move.Position()
 		gcl.updateLivePlayerPosition(live, pos, live.CurrentHeading())

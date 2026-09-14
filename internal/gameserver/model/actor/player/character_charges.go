@@ -1,6 +1,10 @@
 package player
 
-import "time"
+import (
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+)
 
 // chargeAutoClearDelay is how long Force/Soul charges survive without being
 // spent or topped up before they auto-clear, matching the reference's
@@ -21,12 +25,9 @@ func (c *Character) Charges() int {
 func (c *Character) IncreaseCharges(count, max int) bool {
 	c.stateMu.Lock()
 	if c.charges >= max {
-		send := c.sendChargeMessage
 		charges := c.charges
 		c.stateMu.Unlock()
-		if send != nil {
-			send(charges, true)
-		}
+		c.emit(event.ChargeMessage{Charges: charges, Maxed: true})
 		return false
 	}
 	c.charges += count
@@ -35,32 +36,11 @@ func (c *Character) IncreaseCharges(count, max int) bool {
 		c.charges = max
 	}
 	c.restartChargeTimerLocked()
-	update := c.updateCharges
-	send := c.sendChargeMessage
 	charges := c.charges
 	c.stateMu.Unlock()
-	if send != nil {
-		send(charges, maxed)
-	}
-	if update != nil {
-		update()
-	}
+	c.emit(event.ChargeMessage{Charges: charges, Maxed: maxed})
+	c.emit(event.ChargesChanged{})
 	return true
-}
-
-// SetChargesUpdater records the packet-layer hook that refreshes the Force/Soul charge display.
-func (c *Character) SetChargesUpdater(update func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateCharges = update
-}
-
-// SetChargeMessageSender records the packet-layer hook that reports Force/Soul
-// charge changes and the maximum-capacity outcome to the owning client.
-func (c *Character) SetChargeMessageSender(send func(charges int, maxed bool)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendChargeMessage = send
 }
 
 // DecreaseCharges removes count charges, reporting whether there were
@@ -79,11 +59,8 @@ func (c *Character) DecreaseCharges(count int) bool {
 	} else {
 		c.restartChargeTimerLocked()
 	}
-	update := c.updateCharges
 	c.stateMu.Unlock()
-	if update != nil {
-		update()
-	}
+	c.emit(event.ChargesChanged{})
 	return true
 }
 
@@ -95,10 +72,9 @@ func (c *Character) ClearCharges() {
 	changed := c.charges > 0
 	c.charges = 0
 	c.stopChargeTimerLocked()
-	update := c.updateCharges
 	c.stateMu.Unlock()
-	if changed && update != nil {
-		update()
+	if changed {
+		c.emit(event.ChargesChanged{})
 	}
 }
 

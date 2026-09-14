@@ -124,32 +124,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// list registered with task.Effects (see effect.List.Untrack) until
 	// something tells it the owner is gone.
 	live.Character.EffectList().Untrack()
-	live.Character.SetFrameSender(nil)
-	live.Character.SetBroadcastFrameSender(nil)
-	live.Character.SetAttackBroadcaster(nil)
-	live.Character.SetBowDrawNotifier(nil)
-	live.Character.SetDieBroadcaster(nil)
-	// The herb consumer reaches skill reuse and effect application without
-	// going through SendFrame, so a kill reward resolving against an already
-	// detached character would still mutate it. Unwire it here, and the
-	// UserInfo updater with it, so detaching really does unwire every hook.
-	live.Character.SetHerbConsumer(nil)
-	live.Character.SetRegenMaxSender(nil)
-	live.Character.SetLackHPNotifier(nil)
-	live.Character.SetLackMPNotifier(nil)
-	live.Character.SetRelaxHPFullNotifier(nil)
-	live.Character.SetHealRestoredNotifiers(nil, nil)
-	live.Character.SetCPRestoredNotifier(nil)
-	live.Character.SetEffectExpiryNotifiers(nil, nil, nil)
-	live.Character.SetSpoilNotifiers(nil, nil)
-	live.Character.SetServitorVanishedNotifier(nil)
-	live.Character.SetShieldBlockNotifiers(nil, nil)
-	live.Character.SetMagicFailureNotifiers(nil, nil, nil)
-	live.Character.SetUserInfoUpdater(nil)
-	live.Character.SetPvPFlagHook(nil)
-	live.Character.SetRelationBroadcaster(nil)
-	live.Character.SetLevelRefresher(nil)
-	live.Character.SetWeightPenaltyUpdater(nil)
+	// From here on the session no longer delivers this character's
+	// session-only events, and a kill reward can no longer apply a herb to it.
+	live.Character.DetachSession()
 	return owners
 }
 

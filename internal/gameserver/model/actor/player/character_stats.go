@@ -3,6 +3,8 @@ package player
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -226,14 +228,6 @@ func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
 
-// SetPerfectShieldBlockRate records the players.properties-configured
-// PerfectShieldBlockRate roll threshold used by ShieldDefense.
-func (c *Character) SetPerfectShieldBlockRate(rate int) {
-	c.stateMu.Lock()
-	c.perfectShieldBlockRate = rate
-	c.stateMu.Unlock()
-}
-
 // ShieldDefense resolves c's shield-block outcome against an incoming skill.
 func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	if def.IgnoreShield || !c.secondaryShieldEquipped() {
@@ -262,19 +256,11 @@ func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Def
 // notifyShieldBlock sends this defending player's client feedback for a
 // shield-block roll: no message on a failed block (Formulas.java:866-879).
 func (c *Character) notifyShieldBlock(result formulas.ShieldDefense) {
-	c.stateMu.RLock()
-	success, perfect := c.sendShieldBlockSuccess, c.sendShieldBlockPerfect
-	c.stateMu.RUnlock()
-
 	switch result {
 	case formulas.ShieldSuccess:
-		if success != nil {
-			success()
-		}
+		c.emit(event.ShieldBlocked{})
 	case formulas.ShieldPerfect:
-		if perfect != nil {
-			perfect()
-		}
+		c.emit(event.ShieldBlocked{Perfect: true})
 	}
 }
 

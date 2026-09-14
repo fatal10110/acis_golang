@@ -2,6 +2,7 @@ package creature
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -21,12 +22,7 @@ const (
 // MagicSkillUse is the domain snapshot a playable broadcasts when a raid
 // curse animation fires. Caster is the raid-related Attackable; Target is
 // the playable.
-type MagicSkillUse struct {
-	CasterID, TargetID  int32
-	CasterAt, TargetAt  location.Location
-	SkillID, Level      int32
-	HitTime, ReuseDelay int
-}
+type MagicSkillUse = event.MagicSkillUse
 
 // RaidCurseSkills looks up loaded curse skill definitions.
 type RaidCurseSkills interface {
@@ -59,13 +55,13 @@ type RaidCurseAttacker interface {
 
 // RaidCurseInput is the playable attack-curse decision.
 type RaidCurseInput struct {
-	Attacker  RaidCurseAttacker
-	Target    attackable.Combatant
-	NPCID     int
-	Mounted   bool
-	Disabled  bool
-	Skills    RaidCurseSkills
-	Broadcast func(MagicSkillUse)
+	Attacker RaidCurseAttacker
+	Target   attackable.Combatant
+	NPCID    int
+	Mounted  bool
+	Disabled bool
+	Skills   RaidCurseSkills
+	Sink     event.Sink
 }
 
 // RaidCurseSkillRaid is a known raid-related Attackable the beneficial
@@ -92,7 +88,7 @@ type RaidCurseSkillInput struct {
 	Nearby    []RaidCurseSkillRaid
 	Disabled  bool
 	Skills    RaidCurseSkills
-	Broadcast func(MagicSkillUse)
+	Sink      event.Sink
 }
 
 // SkillSeeTargetOf classifies t for the skill-see curse decision.
@@ -182,10 +178,10 @@ func TestCursesOnSkillSee(in RaidCurseSkillInput) bool {
 
 func skillSeeAsAttack(in RaidCurseSkillInput) RaidCurseInput {
 	return RaidCurseInput{
-		Attacker:  in.Caster,
-		Disabled:  in.Disabled,
-		Skills:    in.Skills,
-		Broadcast: in.Broadcast,
+		Attacker: in.Caster,
+		Disabled: in.Disabled,
+		Skills:   in.Skills,
+		Sink:     in.Sink,
 	}
 }
 
@@ -222,12 +218,12 @@ func hasActiveSkill(list *effect.List, id modelskill.ID) bool {
 }
 
 func broadcastRaidCurse(in RaidCurseInput, target RaidCurseTarget, def modelskill.Definition) {
-	if in.Broadcast == nil {
+	if in.Sink == nil {
 		return
 	}
 	cx, cy, cz := target.Position()
 	tx, ty, tz := in.Attacker.Position()
-	in.Broadcast(MagicSkillUse{
+	in.Sink.Emit(event.MagicSkillUse{
 		CasterID:   target.ObjectID(),
 		TargetID:   in.Attacker.ObjectID(),
 		CasterAt:   location.Location{X: cx, Y: cy, Z: cz},

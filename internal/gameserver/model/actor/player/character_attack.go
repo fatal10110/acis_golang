@@ -4,7 +4,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -123,101 +124,12 @@ type physicalTarget interface {
 // alongside the world-grid presence and CreatureMove position it must
 // stay consistent with.
 
-// SetFrameSender records the session send hook used by network-owned live
-// player wrappers. Passing nil disconnects the character from that session.
-func (c *Character) SetFrameSender(send func(wire.Frame) bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.sendFrame = send
-}
-
-// SetBroadcastFrameSender records the non-blocking session hook for frames
-// delivered by a broadcast fan-out. Passing nil disconnects broadcasts.
-func (c *Character) SetBroadcastFrameSender(send func(wire.Frame) bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastFrame = send
-}
-
-// SetAttackBroadcaster records the packet-layer hook that broadcasts attack
-// snapshots to nearby connected clients.
-func (c *Character) SetAttackBroadcaster(broadcast func(attack.Snapshot)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastAttack = broadcast
-}
-
-// SetMoveBroadcaster records the packet-layer hook that broadcasts movement
-// events to this character's own session and nearby connected clients.
-func (c *Character) SetMoveBroadcaster(broadcast func(move.Event)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastMove = broadcast
-}
-
-// SetStopBroadcaster records the packet-layer hook that broadcasts a
-// stop-in-place notice to this character's own session and nearby connected
-// clients when server-driven movement is cancelled mid-flight.
-func (c *Character) SetStopBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastStop = broadcast
-}
-
-// SetAutoAttackStopBroadcaster records the packet-layer hook that broadcasts
-// AutoAttackStop to this character's own session and nearby connected clients
-// when its combat-stance inactivity period expires.
-func (c *Character) SetAutoAttackStopBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastAutoAttackStop = broadcast
-}
-
-// SetDieBroadcaster records the packet-layer hook that broadcasts the death
-// packet to this character's own session and nearby connected clients at
-// the moment this character dies.
-func (c *Character) SetDieBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastDie = broadcast
-}
-
-// SetStatusBroadcaster records the packet-layer hook that broadcasts this
-// character's current HP to nearby connected clients whenever it changes.
-func (c *Character) SetStatusBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastStatus = broadcast
-}
-
-// SetAbnormalEffectUpdater records the packet-layer hook that sends this
-// character's own session its current active-effect icon list.
-func (c *Character) SetAbnormalEffectUpdater(update func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateAbnormalEffect = update
-}
-
-// SetUserInfoUpdater records the packet-layer hook that resends this
-// character's own UserInfo, the packet carrying its experience, SP and
-// level.
-func (c *Character) SetUserInfoUpdater(update func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.updateUserInfo = update
-}
-
 // UpdateUserInfo resends this character's UserInfo through the runtime
 // packet hook, mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
 // every experience change — without it the client keeps displaying the
 // experience, SP and level it was last told about.
 func (c *Character) UpdateUserInfo() {
-	c.stateMu.RLock()
-	update := c.updateUserInfo
-	c.stateMu.RUnlock()
-	if update != nil {
-		update()
-	}
+	c.emit(event.UserInfoChanged{})
 }
 
 // UpdateAbnormalEffect refreshes this character's abnormal-effect icon
@@ -226,12 +138,7 @@ func (c *Character) UpdateUserInfo() {
 // Creature.addEffect()/removeEffect() unconditionally queueing an
 // EffectList icon update on each attempt.
 func (c *Character) UpdateAbnormalEffect() {
-	c.stateMu.RLock()
-	update := c.updateAbnormalEffect
-	c.stateMu.RUnlock()
-	if update != nil {
-		update()
-	}
+	c.emit(event.EffectIconsChanged{})
 }
 
 // StartAbnormalEffect adds mask to this character's client-visible
@@ -258,73 +165,23 @@ func (c *Character) AbnormalEffect() int {
 	return int(c.abnormalEffectMask.Load())
 }
 
-// SetAbnormalEffectBroadcaster records the packet-layer hook that resends
-// this character's own UserInfo and broadcasts CharInfo to nearby observers
-// after its abnormal-effect bitmask changes, mirroring
-// Player.updateAbnormalEffect() -> broadcastUserInfo(). This is distinct
-// from UpdateAbnormalEffect, which refreshes the buff icon list
-// (EffectList.updateEffectIcons()) on every effect start/exit regardless of
-// whether the bitmask changed.
-func (c *Character) SetAbnormalEffectBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastAbnormalEffect = broadcast
-}
-
 // BroadcastAbnormalEffect resends this character's UserInfo/CharInfo through
 // the runtime packet hook after StartAbnormalEffect/StopAbnormalEffect
 // changed its bitmask.
 func (c *Character) BroadcastAbnormalEffect() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastAbnormalEffect
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
+	c.emit(event.AbnormalEffectChanged{})
 }
 
 // BroadcastStatus sends this character's current HP through the runtime
 // packet hook.
 func (c *Character) BroadcastStatus() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastStatus
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
-}
-
-// SetMPStatusBroadcaster records the packet-layer hook that broadcasts this
-// character's current HP and MP to its own session whenever an MP-only
-// change (e.g. a mana-drain tick) needs to reach the client. Separate from
-// SetStatusBroadcaster because PlayerStatus.broadcastStatusUpdate()
-// (CreatureStatus.java's Player override) unconditionally includes CUR_MP
-// in every status packet it sends, unlike the generic HP-only,
-// threshold-gated broadcast the base Creature path uses.
-func (c *Character) SetMPStatusBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastMPStatus = broadcast
-}
-
-// SetBowDrawNotifier records the packet-layer hook that tells this player's
-// own client a bow shot is drawing: the ready-to-shoot system message and
-// the red setup gauge covering attack time plus reuse.
-func (c *Character) SetBowDrawNotifier(notify func(gaugeMs int)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.notifyBowDraw = notify
+	c.emit(event.VitalsChanged{})
 }
 
 // NotifyBowDraw delivers the bow-draw client packets through the runtime
 // hook. A nil hook is a silent no-op so domain tests need no packet layer.
 func (c *Character) NotifyBowDraw(gaugeMs int) {
-	c.stateMu.RLock()
-	notify := c.notifyBowDraw
-	c.stateMu.RUnlock()
-	if notify != nil {
-		notify(gaugeMs)
-	}
+	c.emit(event.BowDrawn{GaugeMs: gaugeMs})
 }
 
 // ConsumeBowShot spends one equipped arrow at fire time. A missing
@@ -353,36 +210,7 @@ func (c *Character) ConsumeBowMP() {
 // BroadcastMPStatus sends this character's current HP and MP through the
 // runtime packet hook.
 func (c *Character) BroadcastMPStatus() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastMPStatus
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
-}
-
-// SendFrame sends frame to the connected client, if any.
-func (c *Character) SendFrame(frame wire.Frame) bool {
-	c.stateMu.RLock()
-	send := c.sendFrame
-	c.stateMu.RUnlock()
-	if send == nil {
-		frame.Release()
-		return false
-	}
-	return send(frame)
-}
-
-// BroadcastFrame sends frame through the broadcast-only session hook, if any.
-func (c *Character) BroadcastFrame(frame wire.Frame) bool {
-	c.stateMu.RLock()
-	send := c.broadcastFrame
-	c.stateMu.RUnlock()
-	if send == nil {
-		frame.Release()
-		return false
-	}
-	return send(frame)
+	c.emit(event.VitalsChanged{IncludeMP: true})
 }
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic
@@ -650,24 +478,14 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 // this always reports nil — unlike npc.Hostile, a live player's broadcast
 // hooks come and go with its connection by design.
 func (c *Character) BroadcastAttack(snapshot attack.Snapshot) error {
-	c.stateMu.RLock()
-	broadcast := c.broadcastAttack
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast(snapshot)
-	}
+	c.emit(snapshot)
 	return nil
 }
 
 // BroadcastMove sends a movement event through the runtime packet hook. See
 // BroadcastAttack: a nil hook is expected, not reported as an error.
 func (c *Character) BroadcastMove(event move.Event) error {
-	c.stateMu.RLock()
-	broadcast := c.broadcastMove
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast(event)
-	}
+	c.emit(event)
 	return nil
 }
 
@@ -679,34 +497,19 @@ func (c *Character) OffensiveFollowIsPawnMove() bool { return true }
 // hook. See BroadcastAttack: a nil hook is expected, not reported as an
 // error.
 func (c *Character) BroadcastStop() error {
-	c.stateMu.RLock()
-	broadcast := c.broadcastStop
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
+	c.emit(event.Stopped{})
 	return nil
 }
 
 // BroadcastAutoAttackStop sends AutoAttackStop through the runtime packet
 // hook when combat stance expires from inactivity.
 func (c *Character) BroadcastAutoAttackStop() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastAutoAttackStop
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
+	c.emit(event.AutoAttackStopped{})
 }
 
 // BroadcastDie sends the death packet through the runtime packet hook.
 func (c *Character) BroadcastDie() {
-	c.stateMu.RLock()
-	broadcast := c.broadcastDie
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast()
-	}
+	c.emit(event.Died{})
 }
 
 // TryToIdle is the player attack stop hook. AI idle state is not modeled yet.

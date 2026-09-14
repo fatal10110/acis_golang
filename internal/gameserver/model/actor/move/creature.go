@@ -3,6 +3,7 @@ package move
 
 import (
 	"errors"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"math"
 	"sync"
 	"time"
@@ -13,13 +14,7 @@ import (
 )
 
 // Event describes one accepted movement request.
-type Event struct {
-	Origin, Destination location.Location
-	Speed               float64
-	Duration            time.Duration
-	FollowTarget        int32
-	FollowOffset        int
-}
+type Event = event.Move
 
 // FollowMode identifies the active follow task flavor.
 type FollowMode uint8

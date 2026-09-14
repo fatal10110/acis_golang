@@ -3,6 +3,7 @@
 package attack
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"sync"
 	"time"
 
@@ -27,18 +28,10 @@ const (
 )
 
 // SnapshotHit is one target entry in an attack animation broadcast.
-type SnapshotHit struct {
-	TargetID int32
-	Damage   int
-	Flags    uint8
-}
+type SnapshotHit = event.AttackHit
 
 // Snapshot is the immutable data needed to broadcast one attack.
-type Snapshot struct {
-	AttackerID int32
-	X, Y, Z    int
-	Hits       []SnapshotHit
-}
+type Snapshot = event.Attack
 
 // CreatureActor is the owner state a physical attack controller reads and
 // updates while starting attacks.

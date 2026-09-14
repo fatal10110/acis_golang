@@ -13,28 +13,6 @@ type skillDefinitions interface {
 	Definition(modelskill.Ref) (modelskill.Definition, bool)
 }
 
-// SetRaidCursesDisabled records the npcs.properties DisableRaidCurse gate.
-func (c *Character) SetRaidCursesDisabled(disabled bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.raidCursesDisabled = disabled
-}
-
-// SetSkillDefinitions records the loaded skill table raid-curse lookups use.
-func (c *Character) SetSkillDefinitions(defs skillDefinitions) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.skillDefs = defs
-}
-
-// SetMagicSkillUseBroadcaster records the packet-layer hook that broadcasts
-// a raid-curse MagicSkillUse animation. A nil hook is a silent no-op.
-func (c *Character) SetMagicSkillUseBroadcaster(broadcast func(creature.MagicSkillUse)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastMagicSkillUse = broadcast
-}
-
 // TestCursesOnAttack applies this player's raid petrification and mounted
 // anti-strider curses against target. True means the leftover physical hit
 // must be cancelled.
@@ -45,16 +23,15 @@ func (c *Character) TestCursesOnAttack(target attackable.Combatant) bool {
 	c.stateMu.RLock()
 	disabled := c.raidCursesDisabled
 	skills := c.skillDefs
-	broadcast := c.broadcastMagicSkillUse
 	c.stateMu.RUnlock()
 	return creature.TestCursesOnAttack(creature.RaidCurseInput{
-		Attacker:  c,
-		Target:    target,
-		NPCID:     creature.NPCIDOf(target),
-		Mounted:   c.Mounted(),
-		Disabled:  disabled,
-		Skills:    skills,
-		Broadcast: broadcast,
+		Attacker: c,
+		Target:   target,
+		NPCID:    creature.NPCIDOf(target),
+		Mounted:  c.Mounted(),
+		Disabled: disabled,
+		Skills:   skills,
+		Sink:     c.sink,
 	})
 }
 
@@ -68,7 +45,6 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 	c.stateMu.RLock()
 	disabled := c.raidCursesDisabled
 	skills := c.skillDefs
-	broadcast := c.broadcastMagicSkillUse
 	c.stateMu.RUnlock()
 
 	converted := make([]creature.RaidCurseSkillSeeTarget, 0, len(targets))
@@ -94,6 +70,6 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 		Nearby:    nearby,
 		Disabled:  disabled,
 		Skills:    skills,
-		Broadcast: broadcast,
+		Sink:      c.sink,
 	})
 }

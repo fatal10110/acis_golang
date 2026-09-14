@@ -7,33 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// SetLevelTable records the level table consulted for the exp-loss- and
-// karma-loss-at-death calculations.
-func (c *Character) SetLevelTable(table *LevelTable) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.levelTable = table
-}
-
-// SetAllowDelevel records the players.properties AllowDelevel gate: whether
-// a death may cost experience/karma at all, matching applyDeathPenalty's
-// caller-side guard (Player.java:2650: `Config.ALLOW_DELEVEL &&
-// (!hasSkill(SKILL_LUCKY) || getStatus().getLevel() > 9)`).
-func (c *Character) SetAllowDelevel(allow bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.allowDelevel = allow
-}
-
-// SetRateKarmaExpLost records the server.properties RateKarmaExpLost
-// multiplier applied to the death exp-loss percentage while karma is
-// positive (Player.java:2904, Config.java:968).
-func (c *Character) SetRateKarmaExpLost(rate float64) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.rateKarmaExpLost = rate
-}
-
 // applyDeathExpKarmaLoss computes and applies the experience and karma cost
 // of this character's death, mirroring Player.applyDeathPenalty and
 // updateKarmaLoss (Player.java:2649-2651, 2874-2926, 2749-2757). It is a

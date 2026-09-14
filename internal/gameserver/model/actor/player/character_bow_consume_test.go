@@ -20,10 +20,10 @@ func TestConsumeBowShotSpendsOffhandArrowAndWeaponMP(t *testing.T) {
 	arrows := &item.Instance{ObjectID: 102, TemplateID: 17, Count: 5, Location: item.LocationPaperdoll, LocationData: itemcontainer.LHand, ManaLeft: -1}
 	c := liveCharacter(1, combatTemplate(), bowConsumeItems(), bow, arrows)
 
-	mpCalls := 0
-	c.SetMPStatusBroadcaster(func() { mpCalls++ })
+	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
+	mpCalls := countVitals(rec, true)
 
 	if arrows.Count != 4 {
 		t.Fatalf("arrow count = %d, want 4", arrows.Count)
@@ -40,10 +40,10 @@ func TestConsumeBowShotEmptyOffhandStillSpendsMP(t *testing.T) {
 	bow := &item.Instance{ObjectID: 101, TemplateID: 14, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand, ManaLeft: -1}
 	c := liveCharacter(1, combatTemplate(), bowConsumeItems(), bow)
 
-	mpCalls := 0
-	c.SetMPStatusBroadcaster(func() { mpCalls++ })
+	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
+	mpCalls := countVitals(rec, true)
 
 	if c.Inventory().ItemAt(itemcontainer.LHand) != nil {
 		t.Fatal("empty off-hand grew an arrow stack")
@@ -61,10 +61,10 @@ func TestConsumeBowShotZeroMPCostSkipsStatusBroadcast(t *testing.T) {
 	arrows := &item.Instance{ObjectID: 102, TemplateID: 17, Count: 2, Location: item.LocationPaperdoll, LocationData: itemcontainer.LHand, ManaLeft: -1}
 	c := liveCharacter(1, combatTemplate(), bowConsumeItems(), bow, arrows)
 
-	mpCalls := 0
-	c.SetMPStatusBroadcaster(func() { mpCalls++ })
+	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
+	mpCalls := countVitals(rec, true)
 
 	if arrows.Count != 1 {
 		t.Fatalf("arrow count = %d, want 1", arrows.Count)

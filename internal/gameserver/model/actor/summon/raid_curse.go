@@ -5,6 +5,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -32,13 +33,13 @@ func (a *Actor) TestCursesOnAttack(target attackable.Combatant) bool {
 	disabled := a.raidCursesDisabled
 	a.statusMu.RUnlock()
 	return creature.TestCursesOnAttack(creature.RaidCurseInput{
-		Attacker:  a,
-		Target:    target,
-		NPCID:     creature.NPCIDOf(target),
-		Mounted:   false,
-		Disabled:  disabled,
-		Skills:    a.skillDefs,
-		Broadcast: a.broadcastMagicSkillUse,
+		Attacker: a,
+		Target:   target,
+		NPCID:    creature.NPCIDOf(target),
+		Mounted:  false,
+		Disabled: disabled,
+		Skills:   a.skillDefs,
+		Sink:     summonCurseSink{a},
 	})
 }
 
@@ -76,7 +77,7 @@ func (a *Actor) TestCursesOnSkillSee(def modelskill.Definition, targets []skillt
 		Nearby:    nearby,
 		Disabled:  disabled,
 		Skills:    a.skillDefs,
-		Broadcast: a.broadcastMagicSkillUse,
+		Sink:      summonCurseSink{a},
 	})
 }
 
@@ -90,4 +91,13 @@ func (a *Actor) BroadcastSkillUse(casterID int32, casterAt location.Location, ta
 	a.broadcast(func() wire.Frame {
 		return a.frames.SkillUse(casterID, casterAt, targetID, targetAt, skillID, level, hitTime, reuseDelay, false)
 	})
+}
+
+// summonCurseSink is a temporary adapter until the summon emits events.
+type summonCurseSink struct{ a *Actor }
+
+func (s summonCurseSink) Emit(e event.Event) {
+	if use, ok := e.(event.MagicSkillUse); ok {
+		s.a.broadcastMagicSkillUse(use)
+	}
 }

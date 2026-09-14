@@ -3,17 +3,19 @@ package player
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
 // Stance is the client-visible animation caused by a sit/stand transition.
-type Stance int
+type Stance = event.Stance
 
 const (
-	StanceSitting Stance = iota
-	StanceStanding
-	StanceFakeDeathStart
-	StanceFakeDeathStop
+	StanceSitting        = event.StanceSitting
+	StanceStanding       = event.StanceStanding
+	StanceFakeDeathStart = event.StanceFakeDeathStart
+	StanceFakeDeathStop  = event.StanceFakeDeathStop
 )
 
 func (c *Character) initStateLocked() {
@@ -63,22 +65,6 @@ func (c *Character) SetStanding(standing bool) bool {
 	return true
 }
 
-// SetStanceBroadcaster records the packet-layer hook for sit and fake-death
-// animation changes.
-func (c *Character) SetStanceBroadcaster(broadcast func(Stance)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastStance = broadcast
-}
-
-// SetFakeDeathReviveBroadcaster records the packet-layer hook sent after a
-// fake-death stand-up animation.
-func (c *Character) SetFakeDeathReviveBroadcaster(broadcast func()) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastFakeDeathRevive = broadcast
-}
-
 // Sit changes to the ordinary seated stance and broadcasts it.
 func (c *Character) Sit() bool {
 	changed := c.SetStanding(false)
@@ -107,22 +93,12 @@ func (c *Character) StopFakeDeath() bool {
 	}
 	changed := c.SetStanding(true)
 	c.broadcastStanceChange(StanceFakeDeathStop)
-	c.stateMu.RLock()
-	revive := c.broadcastFakeDeathRevive
-	c.stateMu.RUnlock()
-	if revive != nil {
-		revive()
-	}
+	c.emit(event.FakeDeathRevived{})
 	return changed
 }
 
 func (c *Character) broadcastStanceChange(stance Stance) {
-	c.stateMu.RLock()
-	broadcast := c.broadcastStance
-	c.stateMu.RUnlock()
-	if broadcast != nil {
-		broadcast(stance)
-	}
+	c.emit(event.StanceChanged{Stance: stance})
 }
 
 // InCombat reports whether this character has started an attack stance.
@@ -301,16 +277,6 @@ func (c *Character) AllSkillsDisabled() bool {
 		return false
 	}
 	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Afraid()
-}
-
-// AttachLive installs live as this character's crowd-control/movement
-// runtime state. EnterWorld's live-attach and AllSkillsDisabled's read both
-// go through stateMu, so a concurrent caller (e.g. a persisted-state
-// assertion racing live setup) never observes a torn pointer.
-func (c *Character) AttachLive(live *creature.Live) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.Live = live
 }
 
 // liveLocked reads the Live pointer under stateMu, for call sites that

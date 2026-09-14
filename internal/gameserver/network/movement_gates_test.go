@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -67,7 +68,7 @@ func TestMoveLivePlayerRejectsZeroMoveSpeed(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
-	live.Character.SetWeightLimitMultiplier(1)
+	live.Character.Configure(player.Runtime{Rules: player.Rules{WeightLimitMultiplier: 1}})
 	live.Character.Inventory().AddNew(9500, 100000, 999) // Heavy Ingot, weight 10 each
 	live.Character.Inventory().UpdateWeight()
 	live.Character.RefreshWeightPenalty()
@@ -94,7 +95,7 @@ func TestMoveLivePlayerZeroSpeedKeepsActiveEnchant(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 
-	live.Character.SetWeightLimitMultiplier(1)
+	live.Character.Configure(player.Runtime{Rules: player.Rules{WeightLimitMultiplier: 1}})
 	live.Character.Inventory().AddNew(9500, 100000, 999) // Heavy Ingot, weight 10 each
 	live.Character.Inventory().UpdateWeight()
 	live.Character.RefreshWeightPenalty()

@@ -27,6 +27,12 @@ import (
 
 type livePlayer struct {
 	*player.Character
+	link *GameClientLink
+	// ctx is the owning connection's context, used by event arms that reach
+	// persistence.
+	ctx context.Context
+	// session sends one frame to this player's client; see SendFrame.
+	session  func(wire.Frame) bool
 	template *player.Template
 	npcs     *npc.Table
 	items    []*item.Instance
@@ -38,11 +44,10 @@ type livePlayer struct {
 	move   *move.Controller
 	combat *ai.PlayerAttack
 	cast   *actorcast.Controller
-	// summonSpawner caches the pet/servitor spawner wired onto p.Character,
-	// so useSummonItem only allocates and wires one on the first pet-collar
-	// use rather than on every use — link/live are stable for p's whole
-	// connection lifetime, so it never needs to change.
-	summonSpawner *gameSummonSpawner
+	// summonSpawner is the pet/servitor spawner summon-request events reach.
+	// useSummonItem creates it on the first pet-collar use, from the
+	// connection goroutine; the cast timer goroutine reads it.
+	summonSpawner atomic.Pointer[gameSummonSpawner]
 	shortcuts     *shortcut.List
 	isGM          bool
 	log           zerolog.Logger
@@ -114,10 +119,6 @@ type itemAICastIntention struct {
 	item      *item.Instance
 	skill     modelskill.Definition
 	selected  world.Tracked
-}
-
-func (p *livePlayer) SendFrame(frame wire.Frame) bool {
-	return p.Character.SendFrame(frame)
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {

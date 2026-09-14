@@ -22,16 +22,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// gameSummonSpawner is the network layer's player.SummonSpawner: it has the
-// world, npc templates, summon-item table and pet persistence the domain
-// layer intentionally doesn't depend on directly (mirrors castController's
-// split for the same reason). One is wired per connected live player.
+// gameSummonSpawner spawns a live player's pet or servitor for its summon
+// request events: it has the world, npc templates, summon-item table and
+// pet persistence the domain layer intentionally doesn't depend on directly.
+// One is created per connected live player.
 type gameSummonSpawner struct {
 	link *GameClientLink
 	live *livePlayer
 }
-
-var _ player.SummonSpawner = (*gameSummonSpawner)(nil)
 
 const petSpawnOffset = 40
 

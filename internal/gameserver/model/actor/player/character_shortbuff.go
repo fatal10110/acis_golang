@@ -3,33 +3,13 @@ package player
 import (
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
 // ShortBuffUpdate is one short-buff HUD state change for the item-window
 // healing-potion-family HUD slot: SkillID/Level/DurationSeconds for a new
 // short buff, or the zero value to clear the HUD.
-type ShortBuffUpdate struct {
-	SkillID         int32
-	Level           int32
-	DurationSeconds int32
-}
-
-// SetShortBuffBroadcaster records the packet-layer hook UpdateShortBuff
-// drives, both when a short buff starts and when its timer clears it.
-func (c *Character) SetShortBuffBroadcaster(broadcast func(ShortBuffUpdate)) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.broadcastShortBuff = broadcast
-}
-
-// SetLogger records where a panic recovered from a scheduled callback (e.g.
-// the short-buff clear timer) is logged. The zero value discards it.
-func (c *Character) SetLogger(log zerolog.Logger) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.log = log
-}
+type ShortBuffUpdate = event.ShortBuff
 
 // ShortBuffTaskSkillID returns the skill id of the short buff currently
 // showing on the item-window HUD slot, or 0 if none. Callers deciding
@@ -55,7 +35,6 @@ func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 		c.shortBuffTimer.Stop()
 	}
 	c.shortBuffTaskSkillID = skillID
-	broadcast := c.broadcastShortBuff
 	log := c.log
 	c.shortBuffTimer = time.AfterFunc(time.Duration(durationSeconds)*time.Second, func() {
 		defer func() {
@@ -67,9 +46,7 @@ func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 	})
 	c.stateMu.Unlock()
 
-	if broadcast != nil {
-		broadcast(ShortBuffUpdate{SkillID: skillID, Level: level, DurationSeconds: durationSeconds})
-	}
+	c.emit(event.ShortBuff{SkillID: skillID, Level: level, DurationSeconds: durationSeconds})
 }
 
 // clearShortBuff resets the HUD slot and broadcasts its clear state; it
@@ -78,10 +55,7 @@ func (c *Character) clearShortBuff() {
 	c.stateMu.Lock()
 	c.shortBuffTaskSkillID = 0
 	c.shortBuffTimer = nil
-	broadcast := c.broadcastShortBuff
 	c.stateMu.Unlock()
 
-	if broadcast != nil {
-		broadcast(ShortBuffUpdate{})
-	}
+	c.emit(event.ShortBuff{})
 }
