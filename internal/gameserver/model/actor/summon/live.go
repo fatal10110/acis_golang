@@ -37,8 +37,8 @@ type AI interface {
 // command preconditions.
 type Owner interface {
 	world.Tracked
+	attackable.Combatant
 	LevelValue() int
-	Position() (int, int, int)
 	// InCombat reports the owner's own attack-stance state. Summon.isInCombat
 	// (Summon.java:302-305) delegates straight to _owner.isInCombat() — a
 	// pet/servitor's "in combat" status is entirely owner-derived, never

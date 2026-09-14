@@ -63,18 +63,9 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 	if h.los == nil {
 		return true
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var theight float64
-	if th, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		theight = th.CollisionHeight()
-	}
-
 	ox, oy, oz := h.Position()
-	tx, ty, tz := other.Position()
-	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
+	tx, ty, tz := target.Position()
+	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
 }
 
 // CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
@@ -233,15 +224,10 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	h.emit(event.ShotRecharged{SkillID: skillID, At: location.Location{X: x, Y: y, Z: z}})
 }
 
-// SetHeadingTo orients this NPC toward target. A target with no known
-// position is ignored.
+// SetHeadingTo orients this NPC toward target.
 func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return
-	}
 	sx, sy, _ := h.Position()
-	tx, ty, _ := other.Position()
+	tx, ty, _ := target.Position()
 	h.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
@@ -344,16 +330,11 @@ func (h *Hostile) BroadcastMove(ev event.Move) error {
 
 // BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
 // target, matching the reference's fallback when an AI-initiated cast is
-// rejected after movement has already turned the actor toward target. A
-// target that exposes no position is ignored.
+// rejected after movement has already turned the actor toward target.
 func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
-	located, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return nil
-	}
 	sx, sy, sz := h.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
-	tx, ty, tz := located.Position()
+	tx, ty, tz := target.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	h.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
 	return nil

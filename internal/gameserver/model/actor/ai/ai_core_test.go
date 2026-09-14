@@ -12,6 +12,7 @@ import (
 	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -515,6 +516,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 // so ai's own test package cannot import npc back without an import cycle.
 // Kept as-is per docs/agents/test-strategy.md.
 type fakeActor struct {
+	attackabletest.Combatant
 	world.Presence
 	id              int32
 	siegeGuard      bool
@@ -2839,3 +2841,5 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 		t.Fatalf("attack target = %v, want the queued attacker", strike.target)
 	}
 }
+
+func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }

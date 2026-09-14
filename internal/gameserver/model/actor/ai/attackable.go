@@ -54,6 +54,9 @@ type AttackableActor interface {
 type MoveController interface {
 	MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
 	MoveHome(location.Location) error
+	MoveToLocation(location.Location) (bool, error)
+	// CanMoveTo reports whether a path to the destination exists.
+	CanMoveTo(location.Location) bool
 	Stop() error
 }
 
@@ -363,10 +366,7 @@ type followThinker interface {
 // one whose move controller reports the destination unreachable, drops the
 // request.
 func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
-	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
-		return false
-	}
-	if g, ok := a.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(loc) {
+	if a.actor.MovementDisabled() || !a.move.CanMoveTo(loc) {
 		return false
 	}
 	a.desires.AddOrUpdate(&Desire{
@@ -824,19 +824,13 @@ func (a *Attackable) pruneDesires() {
 	if a.actor.DenyAIAction() {
 		return
 	}
-	ox, oy, oz, ok := combatantPosition(a.actor)
-	if !ok {
-		return
-	}
+	ox, oy, oz := a.actor.Position()
 	origin := location.Location{X: ox, Y: oy, Z: oz}
 	a.desires.RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionAttack || d.FinalTarget == nil {
 			return false
 		}
-		tx, ty, tz, ok := combatantPosition(d.FinalTarget)
-		if !ok {
-			return false
-		}
+		tx, ty, tz := d.FinalTarget.Position()
 		return origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}) > attackDesireRange
 	})
 }
@@ -860,15 +854,6 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 			a.current = intention{kind: IntentionIdle}
 		}
 	}
-}
-
-func combatantPosition(c attackable.Combatant) (x, y, z int, ok bool) {
-	p, ok := c.(interface{ Position() (int, int, int) })
-	if !ok {
-		return 0, 0, 0, false
-	}
-	x, y, z = p.Position()
-	return x, y, z, true
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports
@@ -959,15 +944,13 @@ func (a *Attackable) thinkMoveTo() {
 	if a.actor.DenyAIAction() {
 		return
 	}
-	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
+	if a.actor.MovementDisabled() {
 		return
 	}
-	if ox, oy, oz, ok := combatantPosition(a.actor); ok {
-		if (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
-			a.clearCurrentDesire()
-			a.current = intention{kind: IntentionIdle}
-			return
-		}
+	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
+		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
+		return
 	}
 	_ = a.move.MoveHome(a.current.loc)
 }

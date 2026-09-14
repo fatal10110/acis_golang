@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -375,6 +376,7 @@ func (t *timingTimer) Stop() bool {
 }
 
 type timingActor struct {
+	attackabletest.Combatant
 	attackType       item.WeaponType
 	attackSpeed      int
 	reuse            time.Duration
@@ -471,6 +473,7 @@ func (a *timingActor) BroadcastAttack(snapshot event.Attack) error {
 }
 
 type timingTarget struct {
+	attackabletest.Combatant
 	id          int32
 	x, y, z     int
 	attackable  bool
@@ -608,6 +611,7 @@ func TestInPhysicalRange2DGraceAndBoundary(t *testing.T) {
 }
 
 type rangeTarget struct {
+	attackabletest.Combatant
 	x, y, z int
 	radius  float64
 	moving  bool
@@ -627,3 +631,5 @@ func (timingTarget) Kind() actor.Kind { return actor.KindNPC }
 func (timingActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (rangeTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (rangeTarget) Heading() int { return 0 }

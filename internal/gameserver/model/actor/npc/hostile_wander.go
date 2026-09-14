@@ -52,13 +52,7 @@ func (h *Hostile) MoveFromSpawnUsingRandomOffset(offset int) {
 	if !ok || dest == from {
 		return
 	}
-	mover, ok := h.move.(interface {
-		MoveToLocation(location.Location) (bool, error)
-	})
-	if !ok {
-		return
-	}
-	_, _ = mover.MoveToLocation(dest)
+	_, _ = h.move.MoveToLocation(dest)
 }
 
 func (h *Hostile) randomWalkLocation(from location.Location, offset int) (location.Location, bool) {

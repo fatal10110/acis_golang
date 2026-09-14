@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -12,6 +13,7 @@ import (
 
 // fakeSummonOwner is a minimal owner for SpawnBesideOwner fixtures.
 type fakeSummonOwner struct {
+	attackabletest.Combatant
 	world.Presence
 
 	id int32

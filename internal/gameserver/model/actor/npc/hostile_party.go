@@ -151,10 +151,8 @@ func (h *Hostile) queueMovingPartyAttack(target, top attackable.Combatant, weigh
 		return
 	}
 	if h.GeoPathFailCount() > 10 && samePartyTarget(target, top) && h.hpRatio() < 1 {
-		if pos, ok := combatantLocation(target); ok {
-			h.TeleportTo(pos)
-			h.ResetGeoPathFailCount()
-		}
+		h.TeleportTo(combatantLocation(target))
+		h.ResetGeoPathFailCount()
 	}
 	if h.Rooted() && partyDistance2D(h, top) > 40 {
 		if !h.canAutoAttack(top) {
@@ -196,11 +194,7 @@ func samePartyTarget(a, b attackable.Combatant) bool {
 }
 
 func partyDistance2D(h *Hostile, other attackable.Combatant) float64 {
-	pos, ok := combatantLocation(other)
-	if !ok {
-		return 0
-	}
-	return h.location().Distance2D(pos)
+	return h.location().Distance2D(combatantLocation(other))
 }
 
 func (h *Hostile) aiInt(key string, def int) int {

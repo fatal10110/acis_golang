@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -789,6 +790,7 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 // a guaranteed-success SkillSuccessInput by default (IgnoreResists with a
 // 100 base chance always beats a [0,100) roll).
 type disablerFake struct {
+	attackabletest.Combatant
 	id                     int32
 	dead, invul, paralyzed bool
 	list                   *effect.List
@@ -3365,3 +3367,11 @@ func (positionedFakeActor) Kind() actor.Kind { return actor.KindNPC }
 func (fakeActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (disablerFake) Kind() actor.Kind { return actor.KindNPC }
+
+func (disablerFake) Heading() int { return 0 }
+
+func (disablerFake) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (disablerHostileMove) CanMoveTo(location.Location) bool { return true }
+
+func (disablerHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }

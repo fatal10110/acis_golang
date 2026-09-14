@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -40,6 +41,7 @@ func (s *playerFollowSelf) BroadcastStop() error            { return nil }
 func (s *playerFollowSelf) OffensiveFollowIsPawnMove() bool { return true }
 
 type followTarget struct {
+	attackabletest.Combatant
 	x, y, z int
 	moving  bool
 }
@@ -1717,3 +1719,5 @@ func (o *hookOwner) segmentAdvanced(ev event.Move) error {
 }
 
 func (followTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (followTarget) Heading() int { return 0 }

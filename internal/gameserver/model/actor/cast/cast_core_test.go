@@ -12,6 +12,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -1028,6 +1029,7 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 // surface ApplyEffects needs), so the same fake can stand in for an
 // AIController's target on both sides of the bridge it builds.
 type fakeCastCreature struct {
+	attackabletest.Combatant
 	id       int32
 	x, y, z  int
 	dead     bool
@@ -1219,6 +1221,7 @@ func (f *fakeCubicFireOwner) Roll(n int) int {
 }
 
 type fakeCubicTarget struct {
+	attackabletest.Combatant
 	world.Presence
 	objectID   int32
 	x, y, z    int
@@ -1777,6 +1780,7 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 // RevalidateLaunch's gates consult, each independently controllable so
 // tests can isolate one gate at a time.
 type launchActor struct {
+	attackabletest.Combatant
 	id          int32
 	x, y, z     int
 	category    skilltarget.Category
@@ -3043,3 +3047,7 @@ func (effectsActor) Kind() actor.Kind { return actor.KindNPC }
 func (fakeCubicEffectTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (launchActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (castHostileMove) CanMoveTo(location.Location) bool { return true }
+
+func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }

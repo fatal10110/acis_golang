@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -2698,7 +2699,10 @@ func (f *confusionFake) AddAttackDesire(attacker attackable.Combatant, hate floa
 	f.addAttackDesireHate = hate
 }
 
-type confusionCandidate struct{ id int32 }
+type confusionCandidate struct {
+	attackabletest.Combatant
+	id int32
+}
 
 func (c confusionCandidate) ObjectID() int32  { return c.id }
 func (c confusionCandidate) SiegeGuard() bool { return false }
@@ -2736,3 +2740,7 @@ func (chanceTriggerFakeActor) Kind() actor.Kind { return actor.KindNPC }
 func (confusionFake) Kind() actor.Kind { return actor.KindNPC }
 
 func (growEffectTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (confusionCandidate) Heading() int { return 0 }
+
+func (confusionCandidate) Position() (x, y, z int) { return 0, 0, 0 }

@@ -960,10 +960,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 }
 
 func (h *Hostile) scheduleWanderRecheck() {
-	mover, ok := h.move.(interface {
-		MoveToLocation(location.Location) (bool, error)
-	})
-	if !ok || h.moveSpeed() <= 0 {
+	if h.moveSpeed() <= 0 {
 		return
 	}
 	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
@@ -974,7 +971,7 @@ func (h *Hostile) scheduleWanderRecheck() {
 		position := h.location()
 		distance := min(int(h.CollisionRadius())*2, 50)
 		radians := (location.HeadingDegrees(h.Heading()) + 180) * math.Pi / 180
-		_, _ = mover.MoveToLocation(location.Location{
+		_, _ = h.move.MoveToLocation(location.Location{
 			X: position.X + int(float64(distance)*math.Cos(radians)),
 			Y: position.Y + int(float64(distance)*math.Sin(radians)),
 			Z: position.Z,
