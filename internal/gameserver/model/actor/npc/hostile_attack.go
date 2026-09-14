@@ -3,13 +3,11 @@ package npc
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -308,7 +306,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 }
 
 // BroadcastAttack reports one resolved attack swing.
-func (h *Hostile) BroadcastAttack(snapshot attack.Snapshot) error {
+func (h *Hostile) BroadcastAttack(snapshot event.Attack) error {
 	h.emit(snapshot)
 	return nil
 }
@@ -346,7 +344,7 @@ func (h *Hostile) BroadcastDie() error {
 }
 
 // BroadcastMove reports a server-driven movement start.
-func (h *Hostile) BroadcastMove(ev move.Event) error {
+func (h *Hostile) BroadcastMove(ev event.Move) error {
 	h.emit(ev)
 	return nil
 }

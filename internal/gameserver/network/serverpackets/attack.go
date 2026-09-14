@@ -3,6 +3,7 @@ package serverpackets
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
 const (
@@ -20,10 +21,10 @@ const (
 )
 
 // AttackHit is one target entry in an Attack packet.
-type AttackHit = attack.SnapshotHit
+type AttackHit = event.AttackHit
 
 // AttackSnapshot is the immutable data needed to broadcast one attack.
-type AttackSnapshot = attack.Snapshot
+type AttackSnapshot = event.Attack
 
 // FrameAttack builds an Attack packet as an owned frame.
 func FrameAttack(s AttackSnapshot) wire.Frame {

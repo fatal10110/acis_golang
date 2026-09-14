@@ -6,11 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
-// ShortBuffUpdate is one short-buff HUD state change for the item-window
-// healing-potion-family HUD slot: SkillID/Level/DurationSeconds for a new
-// short buff, or the zero value to clear the HUD.
-type ShortBuffUpdate = event.ShortBuff
-
 // ShortBuffTaskSkillID returns the skill id of the short buff currently
 // showing on the item-window HUD slot, or 0 if none. Callers deciding
 // whether a newly used skill should override the current HUD slot compare

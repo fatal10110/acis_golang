@@ -3,7 +3,6 @@ package summon
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -24,7 +23,7 @@ func (a *Actor) BroadcastAutoAttackStop() {
 	a.emit(event.AutoAttackStopped{})
 }
 
-func (a *Actor) BroadcastMove(ev move.Event) error {
+func (a *Actor) BroadcastMove(ev event.Move) error {
 	a.emit(ev)
 	return nil
 }

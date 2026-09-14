@@ -8,13 +8,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // ---- from controller_3d_follow_test.go ----
 type playerFollowSelf struct {
 	x, y, z int
-	moves   []Event
+	moves   []event.Move
 }
 
 type tickerOwnedFollowSelf struct{ playerFollowSelf }
@@ -30,8 +31,8 @@ func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y
 func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }
 func (s *playerFollowSelf) SetHeading(int)                     {}
 func (s *playerFollowSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
-func (s *playerFollowSelf) BroadcastMove(event Event) error {
-	s.moves = append(s.moves, event)
+func (s *playerFollowSelf) BroadcastMove(ev event.Move) error {
+	s.moves = append(s.moves, ev)
 	return nil
 }
 func (s *playerFollowSelf) BroadcastStop() error            { return nil }
@@ -674,12 +675,12 @@ func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
 	mover.SetPosition(current)
 	mover.StartFriendlyFollow(target.ObjectID, 20)
 
-	event, moved, err := mover.FollowTick(target, 5)
+	ev, moved, err := mover.FollowTick(target, 5)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if moved {
-		t.Fatalf("FollowTick() moved = true with event %+v", event)
+		t.Fatalf("FollowTick() moved = true with event %+v", ev)
 	}
 	if len(geo.moveCalls) != 0 {
 		t.Fatalf("CanMove() calls = %+v, want none", geo.moveCalls)
@@ -701,7 +702,7 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 	}
 
 	mover.StartFriendlyFollow(target.ObjectID, 70)
-	event, moved, err := mover.FollowTick(target, 9.9)
+	ev, moved, err := mover.FollowTick(target, 9.9)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -709,14 +710,14 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 		t.Fatal("FollowTick() moved = false, want true")
 	}
 
-	want := Event{
+	want := event.Move{
 		Origin:      origin,
 		Destination: location.Location{X: 111, Y: 20, Z: 30},
 		Speed:       50,
 		Duration:    2100 * time.Millisecond,
 	}
-	if event != want {
-		t.Fatalf("FollowTick() event = %+v, want %+v", event, want)
+	if ev != want {
+		t.Fatalf("FollowTick() event = %+v, want %+v", ev, want)
 	}
 	if got := mover.Destination(); got != want.Destination {
 		t.Fatalf("Destination() = %+v, want %+v", got, want.Destination)
@@ -743,15 +744,15 @@ func TestCreatureMove_FriendlyFollowTickMovesAtExactRange(t *testing.T) {
 	}
 	mover.StartFriendlyFollow(target.ObjectID, 70)
 
-	event, moved, err := mover.FollowTick(target, 9.9)
+	ev, moved, err := mover.FollowTick(target, 9.9)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !moved {
 		t.Fatal("FollowTick() moved = false at the exact follow range, want true")
 	}
-	if event.Destination != target.Position {
-		t.Fatalf("FollowTick() destination = %+v, want %+v", event.Destination, target.Position)
+	if ev.Destination != target.Position {
+		t.Fatalf("FollowTick() destination = %+v, want %+v", ev.Destination, target.Position)
 	}
 }
 
@@ -825,15 +826,15 @@ func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 				test.start(mover)
 			}
 
-			event, moved, err := mover.FollowTick(test.target, 9.9)
+			ev, moved, err := mover.FollowTick(test.target, 9.9)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if moved {
-				t.Fatalf("FollowTick() moved = true with event %+v", event)
+				t.Fatalf("FollowTick() moved = true with event %+v", ev)
 			}
-			if event != (Event{}) {
-				t.Fatalf("FollowTick() event = %+v, want zero", event)
+			if ev != (event.Move{}) {
+				t.Fatalf("FollowTick() event = %+v, want zero", ev)
 			}
 			if got := mover.Destination(); got != origin {
 				t.Fatalf("Destination() = %+v, want %+v", got, origin)
@@ -862,19 +863,19 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 	}
 
 	inRange := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 58, Y: 0}, CollisionRadius: 10}
-	if event, moved, err := mover.FollowTick(inRange, 9.9); err != nil || moved || event != (Event{}) {
-		t.Fatalf("FollowTick(in range) = event %+v moved %v err %v, want no move", event, moved, err)
+	if ev, moved, err := mover.FollowTick(inRange, 9.9); err != nil || moved || ev != (event.Move{}) {
+		t.Fatalf("FollowTick(in range) = event %+v moved %v err %v, want no move", ev, moved, err)
 	}
 
 	outside := TargetSnapshot{ObjectID: 9, Known: true, Position: location.Location{X: 59, Y: 0}, CollisionRadius: 10}
-	event, moved, err := mover.FollowTick(outside, 9.9)
+	ev, moved, err := mover.FollowTick(outside, 9.9)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !moved {
 		t.Fatal("FollowTick(outside) moved = false, want true")
 	}
-	want := Event{
+	want := event.Move{
 		Origin:       origin,
 		Destination:  location.Location{X: 59, Y: 0, Z: 0},
 		Speed:        100,
@@ -882,8 +883,8 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 		FollowTarget: 9,
 		FollowOffset: 40,
 	}
-	if event != want {
-		t.Fatalf("FollowTick(outside) event = %+v, want %+v", event, want)
+	if ev != want {
+		t.Fatalf("FollowTick(outside) event = %+v, want %+v", ev, want)
 	}
 }
 
@@ -947,7 +948,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 		target            location.Location
 		initialTarget     *location.Location
 		blockAfterInitial bool
-		wantEvent         Event
+		wantEvent         event.Move
 		wantErr           bool
 		wantDestination   location.Location
 		wantMoving        bool
@@ -956,7 +957,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			name:            "normalizes height and uses Java tick duration",
 			canMove:         true,
 			target:          location.Location{X: 60, Y: 20, Z: 999},
-			wantEvent:       Event{Origin: origin, Destination: previous, Speed: 50, Duration: time.Second},
+			wantEvent:       event.Move{Origin: origin, Destination: previous, Speed: 50, Duration: time.Second},
 			wantDestination: previous,
 			wantMoving:      true,
 		},
@@ -964,7 +965,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			name:            "rounds one unit up to one tick",
 			canMove:         true,
 			target:          location.Location{X: 11, Y: 20, Z: 999},
-			wantEvent:       Event{Origin: origin, Destination: location.Location{X: 11, Y: 20, Z: 30}, Speed: 50, Duration: 100 * time.Millisecond},
+			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 11, Y: 20, Z: 30}, Speed: 50, Duration: 100 * time.Millisecond},
 			wantDestination: location.Location{X: 11, Y: 20, Z: 30},
 			wantMoving:      true,
 		},
@@ -972,14 +973,14 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			name:            "rounds fifty-one units up to eleven ticks",
 			canMove:         true,
 			target:          location.Location{X: 61, Y: 20, Z: 999},
-			wantEvent:       Event{Origin: origin, Destination: location.Location{X: 61, Y: 20, Z: 30}, Speed: 50, Duration: 1100 * time.Millisecond},
+			wantEvent:       event.Move{Origin: origin, Destination: location.Location{X: 61, Y: 20, Z: 30}, Speed: 50, Duration: 1100 * time.Millisecond},
 			wantDestination: location.Location{X: 61, Y: 20, Z: 30},
 			wantMoving:      true,
 		},
 		{
 			name:            "accepts blocked route as zero-distance arrival",
 			target:          location.Location{X: 60, Y: 20},
-			wantEvent:       Event{Origin: origin, Destination: origin, Speed: 50},
+			wantEvent:       event.Move{Origin: origin, Destination: origin, Speed: 50},
 			wantDestination: origin,
 			wantMoving:      true,
 		},
@@ -987,7 +988,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			name:            "same position has zero duration",
 			canMove:         true,
 			target:          origin,
-			wantEvent:       Event{Origin: origin, Destination: origin, Speed: 50},
+			wantEvent:       event.Move{Origin: origin, Destination: origin, Speed: 50},
 			wantDestination: origin,
 			wantMoving:      true,
 		},
@@ -996,7 +997,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			speed:           math.SmallestNonzeroFloat64,
 			canMove:         true,
 			target:          location.Location{X: origin.X, Y: origin.Y, Z: 999},
-			wantEvent:       Event{Origin: origin, Destination: origin, Speed: math.SmallestNonzeroFloat64},
+			wantEvent:       event.Move{Origin: origin, Destination: origin, Speed: math.SmallestNonzeroFloat64},
 			wantDestination: origin,
 			wantMoving:      true,
 		},
@@ -1015,7 +1016,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			initialTarget:     &location.Location{X: 60, Y: 20},
 			blockAfterInitial: true,
 			target:            location.Location{X: 70, Y: 20},
-			wantEvent:         Event{Origin: origin, Destination: origin, Speed: 50},
+			wantEvent:         event.Move{Origin: origin, Destination: origin, Speed: 50},
 			wantDestination:   origin,
 			wantMoving:        true,
 		},
@@ -1045,12 +1046,12 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 				geo.canMove = false
 			}
 
-			event, err := mover.MoveToLocation(test.target)
+			ev, err := mover.MoveToLocation(test.target)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("MoveToLocation() error = %v, want error = %v", err, test.wantErr)
 			}
-			if !test.wantErr && event != test.wantEvent {
-				t.Fatalf("event = %+v, want %+v", event, test.wantEvent)
+			if !test.wantErr && ev != test.wantEvent {
+				t.Fatalf("event = %+v, want %+v", ev, test.wantEvent)
 			}
 			if got := mover.Destination(); got != test.wantDestination {
 				t.Fatalf("Destination() = %+v, want %+v", got, test.wantDestination)
@@ -1204,12 +1205,12 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	arrived := 0
 	blocked := 0
 	advanced := 0
-	var advancedEvent Event
+	var advancedEvent event.Move
 	mover.SetArrivedHook(func() { arrived++ })
 	mover.SetBlockedHook(func() { blocked++ })
-	mover.SetSegmentAdvancedHook(func(event Event) error {
+	mover.SetSegmentAdvancedHook(func(ev event.Move) error {
 		advanced++
-		advancedEvent = event
+		advancedEvent = ev
 		return nil
 	})
 	if _, err := mover.MoveToLocation(location.Location{X: 100, Y: 100, Z: 30}); err != nil {
@@ -1232,7 +1233,7 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	}
 
 	allow = false
-	event, moving := mover.UpdatePosition(PositionUpdateInterval)
+	ev, moving := mover.UpdatePosition(PositionUpdateInterval)
 	if !moving {
 		t.Fatal("UpdatePosition() moving = false after mid-route obstacle, want next-leg walk")
 	}
@@ -1242,8 +1243,8 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	if got := mover.Destination(); got != waypoints[1] {
 		t.Fatalf("Destination() = %+v, want remaining waypoint %+v", got, waypoints[1])
 	}
-	if event.Destination != waypoints[1] {
-		t.Fatalf("event.Destination = %+v, want remaining waypoint %+v", event.Destination, waypoints[1])
+	if ev.Destination != waypoints[1] {
+		t.Fatalf("event.Destination = %+v, want remaining waypoint %+v", ev.Destination, waypoints[1])
 	}
 	if arrived != 0 || blocked != 0 {
 		t.Fatalf("arrival callbacks = (%d, %d), want (0, 0) while remaining waypoints exist", arrived, blocked)
@@ -1439,19 +1440,19 @@ func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 	}
 	mover.SetPosition(current)
 
-	event, err := mover.MoveToLocation(location.Location{X: 70, Y: 20, Z: 999})
+	ev, err := mover.MoveToLocation(location.Location{X: 70, Y: 20, Z: 999})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := Event{
+	want := event.Move{
 		Origin:      current,
 		Destination: location.Location{X: 70, Y: 20, Z: 30},
 		Speed:       50,
 		Duration:    200 * time.Millisecond,
 	}
-	if event != want {
-		t.Fatalf("MoveToLocation() event = %+v, want %+v", event, want)
+	if ev != want {
+		t.Fatalf("MoveToLocation() event = %+v, want %+v", ev, want)
 	}
 	wantMove := geoCall{origin: current, target: want.Destination}
 	if got := geo.moveCalls[len(geo.moveCalls)-1]; got != wantMove {
@@ -1511,15 +1512,15 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 	arrivedCalls := 0
 	mover.SetArrivedHook(func() { arrivedCalls++ })
 
-	event, err := mover.MoveToLocation(location.Location{X: 100, Y: 50, Z: 30})
+	ev, err := mover.MoveToLocation(location.Location{X: 100, Y: 50, Z: 30})
 	if err != nil {
 		t.Fatalf("MoveToLocation() error = %v, want nil", err)
 	}
 	// The active destination is the first geopath entry; the remaining two
 	// are queued inside CreatureMove.
 	wantFirst := location.Location{X: 50, Y: 0, Z: 30}
-	if event.Destination != wantFirst {
-		t.Fatalf("event.Destination = %+v, want %+v (first waypoint)", event.Destination, wantFirst)
+	if ev.Destination != wantFirst {
+		t.Fatalf("event.Destination = %+v, want %+v (first waypoint)", ev.Destination, wantFirst)
 	}
 	if got := mover.Destination(); got != wantFirst {
 		t.Fatalf("Destination() = %+v, want %+v", got, wantFirst)
@@ -1544,7 +1545,7 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 		if !mover.Moving() {
 			t.Fatalf("Moving() = false before firing segment %d", i)
 		}
-		clock.fire(event.Duration)
+		clock.fire(ev.Duration)
 	}
 
 	// After the last segment finishes, the arrived hook fires exactly once,
@@ -1583,12 +1584,12 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 	arrivedCalls := 0
 	mover.SetArrivedHook(func() { arrivedCalls++ })
 
-	event, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
+	ev, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
 	if err != nil {
 		t.Fatalf("MoveToLocation() error = %v, want nil (tier 3 fall-back)", err)
 	}
-	if event.Destination != fallback {
-		t.Fatalf("event.Destination = %+v, want fall-back %+v", event.Destination, fallback)
+	if ev.Destination != fallback {
+		t.Fatalf("event.Destination = %+v, want fall-back %+v", ev.Destination, fallback)
 	}
 	if got := mover.Destination(); got != fallback {
 		t.Fatalf("Destination() = %+v, want %+v", got, fallback)
@@ -1597,7 +1598,7 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 		t.Fatalf("ValidLocation() calls = %d, want 1", got)
 	}
 
-	clock.fire(event.Duration)
+	clock.fire(ev.Duration)
 	if arrivedCalls != 1 {
 		t.Fatalf("arrived hook calls = %d, want 1", arrivedCalls)
 	}
@@ -1627,12 +1628,12 @@ func TestCreatureMove_MoveToLocationNoProgressFallbackStartsZeroDistanceArrival(
 	mover.destination = prior
 	mover.moving = true
 
-	event, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
+	ev, err := mover.MoveToLocation(location.Location{X: 100, Y: 0, Z: 30})
 	if err != nil {
 		t.Fatalf("MoveToLocation() error = %v, want nil", err)
 	}
-	if want := (Event{Origin: origin, Destination: origin, Speed: 50}); event != want {
-		t.Fatalf("MoveToLocation() event = %+v, want %+v", event, want)
+	if want := (event.Move{Origin: origin, Destination: origin, Speed: 50}); ev != want {
+		t.Fatalf("MoveToLocation() event = %+v, want %+v", ev, want)
 	}
 	if got := mover.Destination(); got != origin {
 		t.Fatalf("Destination() = %+v, want origin %+v", got, origin)

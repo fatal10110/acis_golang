@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -57,7 +58,7 @@ func (s *walkerCtlSelf) Position() (int, int, int)          { return s.x, s.y, s
 func (s *walkerCtlSelf) CollisionRadius() float64           { return 0 }
 func (s *walkerCtlSelf) SetHeading(int)                     {}
 func (s *walkerCtlSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
-func (s *walkerCtlSelf) BroadcastMove(move.Event) error     { return nil }
+func (s *walkerCtlSelf) BroadcastMove(event.Move) error     { return nil }
 func (s *walkerCtlSelf) BroadcastStop() error               { return nil }
 func (s *walkerCtlSelf) GeoPathFailCount() int {
 	return s.failCount
@@ -86,7 +87,7 @@ func (w *controllerWalker) Position() location.Location {
 
 func (w *controllerWalker) Moving() bool { return false }
 
-func (w *controllerWalker) MoveToLocation(target location.Location) (move.Event, error) {
+func (w *controllerWalker) MoveToLocation(target location.Location) (event.Move, error) {
 	return w.ctl.MoveToLocationEvent(target)
 }
 

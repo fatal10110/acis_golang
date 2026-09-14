@@ -4,11 +4,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -477,15 +476,15 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 // A nil hook (the player is between sessions) is normal, not a failure, so
 // this always reports nil — unlike npc.Hostile, a live player's broadcast
 // hooks come and go with its connection by design.
-func (c *Character) BroadcastAttack(snapshot attack.Snapshot) error {
+func (c *Character) BroadcastAttack(snapshot event.Attack) error {
 	c.emit(snapshot)
 	return nil
 }
 
 // BroadcastMove sends a movement event through the runtime packet hook. See
 // BroadcastAttack: a nil hook is expected, not reported as an error.
-func (c *Character) BroadcastMove(event move.Event) error {
-	c.emit(event)
+func (c *Character) BroadcastMove(ev event.Move) error {
+	c.emit(ev)
 	return nil
 }
 

@@ -10,7 +10,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -1479,11 +1479,11 @@ func TestFrameMagicSkillCanceled(t *testing.T) {
 
 // ---- from move_test.go ----
 func TestFrameMoveLocationEvent(t *testing.T) {
-	event := move.Event{
+	ev := event.Move{
 		Origin:      location.Location{X: 10, Y: 20, Z: 30},
 		Destination: location.Location{X: 100, Y: 200, Z: 300},
 	}
-	got := framePayload(t, FrameMove(101, event))
+	got := framePayload(t, FrameMove(101, ev))
 	want := []byte{
 		0x01,
 		0x65, 0x00, 0x00, 0x00,
@@ -1500,12 +1500,12 @@ func TestFrameMoveLocationEvent(t *testing.T) {
 }
 
 func TestFrameMoveFollowEvent(t *testing.T) {
-	event := move.Event{
+	ev := event.Move{
 		Origin:       location.Location{X: 10, Y: 20, Z: 30},
 		FollowTarget: 202,
 		FollowOffset: 40,
 	}
-	got := framePayload(t, FrameMove(101, event))
+	got := framePayload(t, FrameMove(101, ev))
 	want := []byte{
 		0x60,
 		0x65, 0x00, 0x00, 0x00,

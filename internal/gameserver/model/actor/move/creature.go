@@ -3,18 +3,15 @@ package move
 
 import (
 	"errors"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/rs/zerolog"
 )
-
-// Event describes one accepted movement request.
-type Event = event.Move
 
 // FollowMode identifies the active follow task flavor.
 type FollowMode uint8
@@ -78,7 +75,7 @@ type CreatureMove struct {
 	followMode           FollowMode
 	arrived              func()
 	blocked              func()
-	segmentAdvanced      func(Event) error
+	segmentAdvanced      func(event.Move) error
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
@@ -167,7 +164,7 @@ func (m *CreatureMove) SetWaterSurface(query func(location.Location, int) (int, 
 // segment (already reported by MoveToLocation's own return value) or for the
 // final segment's completion (that's the arrived hook's job). A nil hook
 // (the default) makes segment advancement a no-op.
-func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(Event) error) {
+func (m *CreatureMove) SetSegmentAdvancedHook(segmentAdvanced func(event.Move) error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.segmentAdvanced = segmentAdvanced
@@ -234,17 +231,17 @@ func (m *CreatureMove) Walkable(x, y, z int) bool {
 // MoveToLocation is the outcome-free convenience form of
 // MoveToLocationWithPathOutcome, retained for tests and embedded movement
 // state. Production chase/wander/walker accounting goes through Controller.
-func (m *CreatureMove) MoveToLocation(target location.Location) (Event, error) {
+func (m *CreatureMove) MoveToLocation(target location.Location) (event.Move, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	event, _, err := m.moveToLocationLocked(target)
-	return event, err
+	ev, _, err := m.moveToLocationLocked(target)
+	return ev, err
 }
 
 // MoveToLocationWithPathOutcome behaves like MoveToLocation and also reports
 // how geodata resolved the route, so callers can count blocked pathfinding
 // attempts the same way a successful routed search clears that streak.
-func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (Event, pathFindResult, error) {
+func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (event.Move, pathFindResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.moveToLocationLocked(target)
@@ -258,7 +255,7 @@ const (
 	pathFailed
 )
 
-func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pathFindResult, error) {
+func (m *CreatureMove) moveToLocationLocked(target location.Location) (event.Move, pathFindResult, error) {
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination. Only a fresh request (not currently moving)
@@ -275,11 +272,11 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pa
 		m.accurateY = float64(m.origin.Y)
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
-		return Event{Origin: m.origin, Destination: target, Speed: m.speed}, pathDirect, nil
+		return event.Move{Origin: m.origin, Destination: target, Speed: m.speed}, pathDirect, nil
 	}
 
 	if m.speed == 0 {
-		return Event{}, pathDirect, errors.New("move: actor cannot move at zero speed")
+		return event.Move{}, pathDirect, errors.New("move: actor cannot move at zero speed")
 	}
 
 	destination, waypoints, outcome := m.resolvePathLocked(target)
@@ -288,7 +285,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pa
 	ticks := math.Ceil(distance / (m.speed / 10))
 	const tickDuration = 100 * time.Millisecond
 	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
-		return Event{}, outcome, errors.New("move: duration exceeds limit")
+		return event.Move{}, outcome, errors.New("move: duration exceeds limit")
 	}
 	duration := time.Duration(ticks) * tickDuration
 	origin := m.origin
@@ -303,7 +300,7 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location) (Event, pa
 		m.rescheduleLocked(duration)
 	}
 
-	return Event{
+	return event.Move{
 		Origin:      origin,
 		Destination: destination,
 		Speed:       m.speed,
@@ -430,14 +427,14 @@ func (m *CreatureMove) finishLocked() func() {
 		m.destination = next
 		m.moving = true
 		m.rescheduleLocked(duration)
-		event := m.currentEventLocked()
+		ev := m.currentEventLocked()
 		segmentAdvanced := m.segmentAdvanced
 		if segmentAdvanced == nil {
 			return nil
 		}
 		log := m.log
 		return func() {
-			if err := segmentAdvanced(event); err != nil {
+			if err := segmentAdvanced(ev); err != nil {
 				log.Warn().Err(err).Msg("move: segment-advance broadcast")
 			}
 		}
@@ -452,16 +449,16 @@ func (m *CreatureMove) finishLocked() func() {
 // already stopped or reaches its final destination. Reaching an intermediate
 // waypoint — including when the current leg is blocked and a later waypoint
 // remains — returns the next segment's event with true.
-func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
+func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
 	m.mu.Lock()
 	if !m.moving {
 		m.mu.Unlock()
-		return Event{}, false
+		return event.Move{}, false
 	}
 	if step <= 0 {
-		event := m.currentEventLocked()
+		ev := m.currentEventLocked()
 		m.mu.Unlock()
-		return event, true
+		return ev, true
 	}
 
 	maxZ := m.maxZLocked()
@@ -489,14 +486,14 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 			if action != nil {
 				action()
 			}
-			return Event{}, false
+			return event.Move{}, false
 		}
-		event := m.currentEventLocked()
+		ev := m.currentEventLocked()
 		m.mu.Unlock()
 		if action != nil {
 			action()
 		}
-		return event, true
+		return ev, true
 	}
 	if left == 0 || passed >= left {
 		action := m.finishLocked()
@@ -505,25 +502,25 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (Event, bool) {
 			if action != nil {
 				action()
 			}
-			return Event{}, false
+			return event.Move{}, false
 		}
 		// Advanced to the next waypoint segment; report it and fire the
 		// segment-advanced hook (if any) so the client is told about the new
 		// leg the same tick the server itself commits to it.
-		event := m.currentEventLocked()
+		ev := m.currentEventLocked()
 		m.mu.Unlock()
 		if action != nil {
 			action()
 		}
-		return event, true
+		return ev, true
 	}
 
 	m.accurateX = nextAccurateX
 	m.accurateY = nextAccurateY
 	m.origin = next
-	event := m.currentEventLocked()
+	ev := m.currentEventLocked()
 	m.mu.Unlock()
-	return event, true
+	return ev, true
 }
 
 func (m *CreatureMove) maxZLocked() int {
@@ -578,30 +575,30 @@ func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
 	}
 	m.moving = true
 	m.rescheduleLocked(duration)
-	event := m.currentEventLocked()
+	ev := m.currentEventLocked()
 	segmentAdvanced := m.segmentAdvanced
 	if segmentAdvanced == nil {
 		return true, nil
 	}
 	log := m.log
 	return true, func() {
-		if err := segmentAdvanced(event); err != nil {
+		if err := segmentAdvanced(ev); err != nil {
 			log.Warn().Err(err).Msg("move: segment-advance broadcast")
 		}
 	}
 }
 
-func (m *CreatureMove) currentEventLocked() Event {
-	event := Event{
+func (m *CreatureMove) currentEventLocked() event.Move {
+	ev := event.Move{
 		Origin:      m.origin,
 		Destination: m.destination,
 		Speed:       m.speed,
 	}
 	if m.followMode == FollowOffensive {
-		event.FollowTarget = m.followTarget
-		event.FollowOffset = m.followOffset
+		ev.FollowTarget = m.followTarget
+		ev.FollowOffset = m.followOffset
 	}
-	return event
+	return ev
 }
 
 // CancelMove stops any pending arrival timer and leaves the actor at its
@@ -692,32 +689,32 @@ func (m *CreatureMove) followIntervalLocked() time.Duration {
 // the target is still known and outside the collision-adjusted follow range.
 // Tests are the only callers. Path-outcome accounting is not applied here;
 // production chase goes through Controller.maybeStartFollow.
-func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (Event, bool, error) {
+func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (event.Move, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.followMode == FollowNone || target.ObjectID != m.followTarget || !target.Known {
-		return Event{}, false, nil
+		return event.Move{}, false, nil
 	}
 	if m.followMode == FollowFriendly && target.InBoat {
-		return Event{}, false, nil
+		return event.Move{}, false, nil
 	}
 
 	if m.origin.In2DRadius(target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
-		return Event{}, false, nil
+		return event.Move{}, false, nil
 	}
 
 	followMode := m.followMode
 	followOffset := m.followOffset
-	event, _, err := m.moveToLocationLocked(target.Position)
+	ev, _, err := m.moveToLocationLocked(target.Position)
 	if err != nil {
-		return Event{}, false, err
+		return event.Move{}, false, err
 	}
 	if followMode == FollowOffensive {
-		event.FollowTarget = target.ObjectID
-		event.FollowOffset = followOffset
+		ev.FollowTarget = target.ObjectID
+		ev.FollowOffset = followOffset
 	}
-	return event, true, nil
+	return ev, true, nil
 }
 
 func followRange(offset int, actorRadius, targetRadius float64) int {

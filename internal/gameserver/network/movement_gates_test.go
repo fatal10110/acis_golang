@@ -3,12 +3,11 @@ package network
 import (
 	"testing"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/rs/zerolog"
 )
 
 // TestMoveLivePlayerRejectsBeyond9900Units pins MoveBackwardToLocation.java:

@@ -4,7 +4,6 @@ import (
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 )
 

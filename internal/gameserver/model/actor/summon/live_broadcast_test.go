@@ -5,9 +5,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -37,7 +34,7 @@ func newBroadcastFixture(t *testing.T) (*Actor, *event.Recorder) {
 func TestSummonBroadcastEmitsTypedEvents(t *testing.T) {
 	actor, rec := newBroadcastFixture(t)
 
-	move := move.Event{Origin: location.Location{X: 1}, Destination: location.Location{X: 2}}
+	move := event.Move{Origin: location.Location{X: 1}, Destination: location.Location{X: 2}}
 	if err := actor.BroadcastMove(move); err != nil {
 		t.Fatalf("BroadcastMove() error = %v", err)
 	}
@@ -47,7 +44,7 @@ func TestSummonBroadcastEmitsTypedEvents(t *testing.T) {
 	if err := actor.BroadcastSelfSkillUse(1422, 1); err != nil {
 		t.Fatalf("BroadcastSelfSkillUse() error = %v", err)
 	}
-	if err := actor.BroadcastAttack(attack.Snapshot{AttackerID: 7}); err != nil {
+	if err := actor.BroadcastAttack(event.Attack{AttackerID: 7}); err != nil {
 		t.Fatalf("BroadcastAttack() error = %v", err)
 	}
 

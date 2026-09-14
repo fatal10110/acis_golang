@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -306,7 +307,7 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 	}
 }
 
-func snapshotTargetIDs(snapshot Snapshot) []int32 {
+func snapshotTargetIDs(snapshot event.Attack) []int32 {
 	ids := make([]int32, len(snapshot.Hits))
 	for i, hit := range snapshot.Hits {
 		ids[i] = hit.TargetID
@@ -376,7 +377,7 @@ type timingActor struct {
 	poleMax          int
 	known            []attackable.Combatant
 	queryRadius      int
-	snapshot         Snapshot
+	snapshot         event.Attack
 	broadcasts       int
 	events           []string
 	dead             bool
@@ -458,7 +459,7 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	return Hit{Target: t, Damage: 1}
 }
 func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
-func (a *timingActor) BroadcastAttack(snapshot Snapshot) error {
+func (a *timingActor) BroadcastAttack(snapshot event.Attack) error {
 	a.snapshot = snapshot
 	a.broadcasts++
 	a.events = append(a.events, "broadcast")

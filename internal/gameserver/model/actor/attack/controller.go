@@ -3,13 +3,13 @@
 package attack
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"sync"
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -26,12 +26,6 @@ const (
 	// HitMiss marks an evaded hit.
 	HitMiss = 0x80
 )
-
-// SnapshotHit is one target entry in an attack animation broadcast.
-type SnapshotHit = event.AttackHit
-
-// Snapshot is the immutable data needed to broadcast one attack.
-type Snapshot = event.Attack
 
 // CreatureActor is the owner state a physical attack controller reads and
 // updates while starting attacks.
@@ -61,7 +55,7 @@ type CreatureActor interface {
 	Category() skilltarget.Category
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
-	BroadcastAttack(Snapshot) error
+	BroadcastAttack(event.Attack) error
 	ConsumeBowMP()
 }
 
@@ -440,17 +434,17 @@ func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index 
 	})
 }
 
-func (c *Controller) snapshot(hits []Hit) Snapshot {
+func (c *Controller) snapshot(hits []Hit) event.Attack {
 	x, y, z := c.actor.Position()
-	s := Snapshot{
+	s := event.Attack{
 		AttackerID: c.actor.ObjectID(),
 		X:          x,
 		Y:          y,
 		Z:          z,
-		Hits:       make([]SnapshotHit, 0, len(hits)),
+		Hits:       make([]event.AttackHit, 0, len(hits)),
 	}
 	for _, hit := range hits {
-		s.Hits = append(s.Hits, SnapshotHit{
+		s.Hits = append(s.Hits, event.AttackHit{
 			TargetID: hit.TargetID,
 			Damage:   hit.Damage,
 			Flags:    c.hitFlags(hit),

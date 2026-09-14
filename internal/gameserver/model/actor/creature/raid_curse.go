@@ -19,11 +19,6 @@ const (
 	raidCurseSkillLevel     = 1
 )
 
-// MagicSkillUse is the domain snapshot a playable broadcasts when a raid
-// curse animation fires. Caster is the raid-related Attackable; Target is
-// the playable.
-type MagicSkillUse = event.MagicSkillUse
-
 // RaidCurseSkills looks up loaded curse skill definitions.
 type RaidCurseSkills interface {
 	Definition(modelskill.Ref) (modelskill.Definition, bool)

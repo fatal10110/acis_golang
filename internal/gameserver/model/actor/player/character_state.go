@@ -3,19 +3,8 @@ package player
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
-)
-
-// Stance is the client-visible animation caused by a sit/stand transition.
-type Stance = event.Stance
-
-const (
-	StanceSitting        = event.StanceSitting
-	StanceStanding       = event.StanceStanding
-	StanceFakeDeathStart = event.StanceFakeDeathStart
-	StanceFakeDeathStop  = event.StanceFakeDeathStop
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
 func (c *Character) initStateLocked() {
@@ -68,21 +57,21 @@ func (c *Character) SetStanding(standing bool) bool {
 // Sit changes to the ordinary seated stance and broadcasts it.
 func (c *Character) Sit() bool {
 	changed := c.SetStanding(false)
-	c.broadcastStanceChange(StanceSitting)
+	c.broadcastStanceChange(event.StanceSitting)
 	return changed
 }
 
 // StandUp changes to the standing stance and broadcasts it.
 func (c *Character) StandUp() bool {
 	changed := c.SetStanding(true)
-	c.broadcastStanceChange(StanceStanding)
+	c.broadcastStanceChange(event.StanceStanding)
 	return changed
 }
 
 // StartFakeDeath changes to the fake-death stance and broadcasts it.
 func (c *Character) StartFakeDeath() bool {
 	changed := c.SetStanding(false)
-	c.broadcastStanceChange(StanceFakeDeathStart)
+	c.broadcastStanceChange(event.StanceFakeDeathStart)
 	return changed
 }
 
@@ -92,12 +81,12 @@ func (c *Character) StopFakeDeath() bool {
 		return false
 	}
 	changed := c.SetStanding(true)
-	c.broadcastStanceChange(StanceFakeDeathStop)
+	c.broadcastStanceChange(event.StanceFakeDeathStop)
 	c.emit(event.FakeDeathRevived{})
 	return changed
 }
 
-func (c *Character) broadcastStanceChange(stance Stance) {
+func (c *Character) broadcastStanceChange(stance event.Stance) {
 	c.emit(event.StanceChanged{Stance: stance})
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -126,7 +127,7 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 	return hit
 }
 
-func (a *Actor) BroadcastAttack(snapshot attack.Snapshot) error {
+func (a *Actor) BroadcastAttack(snapshot event.Attack) error {
 	a.emit(snapshot)
 	return nil
 }

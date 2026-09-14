@@ -435,11 +435,11 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
 
-	event, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
+	ev, err := hostile.Move().MoveToLocation(location.Location{X: 900, Y: 200, Z: 0})
 	if err != nil {
 		t.Fatalf("MoveToLocation() error: %v", err)
 	}
-	if got, want := event.Speed, 50.0; got != want {
+	if got, want := ev.Speed, 50.0; got != want {
 		t.Fatalf("MoveToLocation() Speed = %v, want WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
 	}
 }

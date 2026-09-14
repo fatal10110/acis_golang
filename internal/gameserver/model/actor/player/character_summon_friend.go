@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 

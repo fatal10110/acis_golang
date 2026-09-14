@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 const (
@@ -28,7 +27,7 @@ type WalkerActor interface {
 	world.Tracked
 	Position() location.Location
 	Moving() bool
-	MoveToLocation(location.Location) (move.Event, error)
+	MoveToLocation(location.Location) (event.Move, error)
 	TeleportTo(location.Location)
 	GeoPathFailCount() int
 	ResetGeoPathFailCount()

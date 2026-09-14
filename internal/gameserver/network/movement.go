@@ -2,7 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -157,9 +157,9 @@ func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID in
 	})
 }
 
-func (l *GameClientLink) broadcastLiveMoveEvent(live *livePlayer, event move.Event) {
+func (l *GameClientLink) broadcastLiveMoveEvent(live *livePlayer, ev event.Move) {
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMove(live.ObjectID(), event)
+		return serverpackets.FrameMove(live.ObjectID(), ev)
 	})
 }
 

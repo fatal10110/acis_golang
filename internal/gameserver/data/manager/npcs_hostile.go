@@ -3,12 +3,12 @@ package manager
 import (
 	"sync/atomic"
 
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -92,7 +92,7 @@ func (r *walkerActorRef) Moving() bool {
 	return r.Hostile.Move().Moving()
 }
 
-func (r *walkerActorRef) MoveToLocation(target location.Location) (move.Event, error) {
+func (r *walkerActorRef) MoveToLocation(target location.Location) (event.Move, error) {
 	r.routeMove.Store(true)
 	return r.moveCtl.MoveToLocationEvent(target)
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -25,7 +26,7 @@ type Actor interface {
 	ObjectID() int32
 	SyncPosition(location.Location)
 	SetHeading(int)
-	BroadcastMove(Event) error
+	BroadcastMove(event.Move) error
 	BroadcastStop() error
 }
 
@@ -104,16 +105,16 @@ func NewController(move *CreatureMove, self Actor) (*Controller, error) {
 	// advance, not just the first: without it, clients keep predicting the
 	// original straight-line walk and visibly cut through obstacles the
 	// server itself routed around.
-	move.SetSegmentAdvancedHook(func(event Event) error {
+	move.SetSegmentAdvancedHook(func(ev event.Move) error {
 		// Continuations describe the next route leg, so they must carry its
 		// waypoint rather than a follow target.
-		event.FollowTarget = 0
-		event.FollowOffset = 0
+		ev.FollowTarget = 0
+		ev.FollowOffset = 0
 		// Reference rotates toward the new leg immediately before
 		// broadcasting it (CreatureMove.java moveToNextRoutePoint,
 		// setHeadingTo(destination) directly above the MoveToLocation send).
-		self.SetHeading(event.Origin.HeadingTo(event.Destination))
-		return self.BroadcastMove(event)
+		self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
+		return self.BroadcastMove(ev)
 	})
 	c := &Controller{move: move, self: self}
 	move.SetBlockedHook(c.BroadcastBlockedCorrection)
@@ -219,7 +220,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		return false, nil
 	}
 	if !c.move.Moving() || c.move.Destination() != dest {
-		event, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
+		ev, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
 		if err != nil {
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
@@ -230,11 +231,11 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		c.applyPathFindOutcome(outcome)
 		if mode == FollowOffensive {
 			if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
-				event.FollowTarget = target.ObjectID()
-				event.FollowOffset = offset
+				ev.FollowTarget = target.ObjectID()
+				ev.FollowOffset = offset
 			}
 		}
-		broadcastErr := c.self.BroadcastMove(event)
+		broadcastErr := c.self.BroadcastMove(ev)
 		c.addPositionUpdate()
 		return true, broadcastErr
 	}
@@ -257,12 +258,12 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return nil
 	}
 
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	if err != nil {
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
 	return broadcastErr
 }
@@ -272,12 +273,12 @@ func (c *Controller) MoveHome(home location.Location) error {
 // point and counts as a geo-path failure for actors that recover from
 // repeated stalls.
 func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
 		return false, nil
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
 	return true, broadcastErr
 }
@@ -285,15 +286,15 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // MoveToLocationEvent behaves like MoveToLocation but also returns the
 // accepted move's Event, for callers that need the move detail alongside
 // acceptance (task.Walker's WalkerActor contract).
-func (c *Controller) MoveToLocationEvent(target location.Location) (Event, error) {
-	event, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, error) {
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	if err != nil {
-		return Event{}, err
+		return event.Move{}, err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(event)
+	broadcastErr := c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
-	return event, broadcastErr
+	return ev, broadcastErr
 }
 
 func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
@@ -352,7 +353,7 @@ func (c *Controller) SetBlocked(blocked func() bool) {
 // would freeze client prediction at the stale destination.
 func (c *Controller) BroadcastBlockedCorrection() {
 	pos := c.move.Position()
-	_ = c.self.BroadcastMove(Event{Origin: pos, Destination: pos})
+	_ = c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
 }
 
 // SetArrived records the callback invoked once movement this controller
@@ -390,7 +391,7 @@ func (c *Controller) SetArrived(arrived func()) {
 // returns, so the fresh state here — not the stale result of this tick —
 // decides whether to unregister.
 func (c *Controller) PositionUpdate() bool {
-	event, moving := c.move.UpdatePosition(PositionUpdateInterval)
+	ev, moving := c.move.UpdatePosition(PositionUpdateInterval)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recheckOffensiveFollow()
@@ -400,7 +401,7 @@ func (c *Controller) PositionUpdate() bool {
 		}
 		return c.move.Moving() || c.offensiveTarget != nil
 	}
-	c.self.SyncPosition(event.Origin)
+	c.self.SyncPosition(ev.Origin)
 	return true
 }
 
