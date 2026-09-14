@@ -8,6 +8,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -234,7 +235,7 @@ func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Crea
 	if !ok {
 		return nil
 	}
-	if pet, ok := obj.(interface{ IsPet() bool }); ok && pet.IsPet() {
+	if pet, ok := obj.(*summon.Actor); ok && pet.IsPet() {
 		return nil
 	}
 	target, ok := obj.(skilltarget.Creature)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func spoilStart(e *Effect) bool {
@@ -180,7 +181,9 @@ func betrayStart(e *Effect) bool {
 	if owner == nil {
 		return false
 	}
-	summon.TryToAttack(owner)
+	if tracked, ok := owner.(world.Tracked); ok {
+		summon.TryToAttack(tracked)
+	}
 	return true
 }
 
@@ -193,8 +196,8 @@ func betrayExit(e *Effect) {
 	if !ok {
 		return
 	}
-	if owner := ownerSource.OwnerCombatant(); owner != nil {
-		summon.TryToFollow(owner)
+	if tracked, ok := ownerSource.OwnerCombatant().(world.Tracked); ok {
+		summon.TryToFollow(tracked)
 	}
 }
 

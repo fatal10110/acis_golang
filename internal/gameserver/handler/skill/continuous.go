@@ -4,8 +4,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // fearImmunePlayableSkillIDs are the skills whose FEAR effect must not land on
@@ -185,9 +185,9 @@ type aggressionNotifiable interface {
 // of a landed aggression-debuff effect; a target without one isn't
 // retargeted yet.
 type retargetableOnAggression interface {
-	CurrentTarget() worldobject.Object
-	SetTarget(worldobject.Object)
-	AttackTarget(worldobject.Object)
+	CurrentTarget() world.Tracked
+	SetTarget(world.Tracked)
+	AttackTarget(world.Tracked)
 }
 
 // fireAggressionEvent runs the post-landing aggression notification an
@@ -208,11 +208,15 @@ func fireAggressionEvent(caster, effected Actor, def modelskill.Definition) {
 		if !ok {
 			return
 		}
+		tracked, isTracked := caster.(world.Tracked)
+		if !isTracked && caster != nil {
+			return
+		}
 		current, _ := r.CurrentTarget().(Actor)
 		if sameObject(current, caster) {
-			r.AttackTarget(caster)
+			r.AttackTarget(tracked)
 		} else {
-			r.SetTarget(caster)
+			r.SetTarget(tracked)
 		}
 	}
 }

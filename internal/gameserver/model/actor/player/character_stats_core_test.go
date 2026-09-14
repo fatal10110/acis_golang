@@ -4164,12 +4164,12 @@ func TestCharacterTargetRoundTrips(t *testing.T) {
 	}
 
 	other := targetCharacter(2)
-	c.SetTargetTracked(other)
+	c.StoreTarget(other)
 	if got := c.Target(); got != world.Tracked(other) {
 		t.Fatalf("Target() = %v, want %v", got, other)
 	}
 
-	c.SetTargetTracked(nil)
+	c.StoreTarget(nil)
 	if got := c.Target(); got != nil {
 		t.Fatalf("Target() = %v, want nil after clearing", got)
 	}
@@ -4183,7 +4183,7 @@ func TestCharacterRetargetableOnAggressionRetargetsWhenNotAlreadyTargetingCaster
 	caster := targetCharacter(1)
 	other := targetCharacter(3)
 	target := targetCharacter(2)
-	target.SetTargetTracked(other)
+	target.StoreTarget(other)
 
 	var attacked bool
 	target.SetAttackTargetHook(func(world.Tracked) { attacked = true })
@@ -4208,7 +4208,7 @@ func TestCharacterRetargetableOnAggressionRetargetsWhenNotAlreadyTargetingCaster
 func TestCharacterRetargetableOnAggressionAttacksWhenAlreadyTargetingCaster(t *testing.T) {
 	caster := targetCharacter(1)
 	target := targetCharacter(2)
-	target.SetTargetTracked(caster)
+	target.StoreTarget(caster)
 
 	var attackedWith any
 	target.SetAttackTargetHook(func(t world.Tracked) { attackedWith = t })

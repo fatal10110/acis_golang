@@ -22,7 +22,7 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.followActive = !a.followActive
 		if a.followActive {
 			a.intent = IntentFollowOwner
-			a.TryToFollow(a.OwnerCombatant())
+			a.TryToFollow(a.owner)
 		} else {
 			a.TryToIdle()
 		}

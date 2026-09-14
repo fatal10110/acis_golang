@@ -11,6 +11,7 @@ import (
 )
 
 type countingRegenActor struct {
+	world.Presence
 	id    int32
 	ticks int
 	on    func()

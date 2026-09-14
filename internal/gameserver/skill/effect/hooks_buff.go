@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func increaseChargesStart(e *Effect) bool {
@@ -25,10 +26,14 @@ func targetMeStart(e *Effect) bool {
 	if pt, ok := e.Effected.(playerTarget); !ok || !pt.IsPlayer() {
 		return false
 	}
-	if target.CurrentTarget() == e.Effector {
-		target.TryToAttack(e.Effector)
+	effector, ok := e.Effector.(world.Tracked)
+	if !ok && e.Effector != nil {
+		return true
+	}
+	if target.CurrentTarget() == effector {
+		target.TryToAttack(effector)
 	} else {
-		target.SetTarget(e.Effector)
+		target.SetTarget(effector)
 	}
 	return true
 }

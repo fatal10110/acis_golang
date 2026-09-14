@@ -7,12 +7,14 @@ import (
 )
 
 type namedPlayerObject struct {
+	Presence
 	id   int32
 	name string
 }
 
-func (o namedPlayerObject) ObjectID() int32       { return o.id }
-func (o namedPlayerObject) CharacterName() string { return o.name }
+func (o *namedPlayerObject) ObjectID() int32       { return o.id }
+func (o *namedPlayerObject) CharacterName() string { return o.name }
+func (o *namedPlayerObject) WorldPlayer()          {}
 
 // blockingNamedPlayer's CharacterName blocks on its first call (the one
 // AddPlayer makes) until ready is closed, and returns immediately on every
@@ -21,6 +23,7 @@ func (o namedPlayerObject) CharacterName() string { return o.name }
 // its full critical section first, deterministically reproducing the
 // interleave a non-atomic add/remove would allow.
 type blockingNamedPlayer struct {
+	Presence
 	id      int32
 	name    string
 	ready   chan struct{}
@@ -29,6 +32,7 @@ type blockingNamedPlayer struct {
 }
 
 func (o *blockingNamedPlayer) ObjectID() int32 { return o.id }
+func (o *blockingNamedPlayer) WorldPlayer()    {}
 
 func (o *blockingNamedPlayer) CharacterName() string {
 	if atomic.AddInt32(&o.calls, 1) == 1 {
@@ -40,7 +44,7 @@ func (o *blockingNamedPlayer) CharacterName() string {
 
 func TestState_PlayerByName(t *testing.T) {
 	s := New()
-	p := namedPlayerObject{id: 42, name: "Newbie"}
+	p := &namedPlayerObject{id: 42, name: "Newbie"}
 	s.AddPlayer(p)
 
 	t.Run("found, case-insensitive", func(t *testing.T) {
@@ -110,7 +114,7 @@ func TestState_AddRemovePlayer_ConcurrentSameID_NoStaleName(t *testing.T) {
 	<-addDone
 	<-removeDone
 
-	other := namedPlayerObject{id: 2, name: "Newbie"}
+	other := &namedPlayerObject{id: 2, name: "Newbie"}
 	s.AddPlayer(other)
 
 	got, ok := s.PlayerByName("Newbie")
