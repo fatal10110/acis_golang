@@ -12,7 +12,6 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -115,7 +114,7 @@ type Actor struct {
 	followActive       bool
 	belowUnsummonLimit bool
 	intent             Intent
-	target             worldobject.Object
+	target             world.Tracked
 
 	ownerInventory   *itemcontainer.Inventory
 	timeLostIdle     int
@@ -213,7 +212,7 @@ const (
 type CommandContext struct {
 	Command Command
 	World   *world.State
-	Target  worldobject.Object
+	Target  world.Tracked
 
 	TargetIsCreature     bool
 	TargetIsDeadCreature bool

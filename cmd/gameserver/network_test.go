@@ -9,17 +9,20 @@ import (
 )
 
 type rosterPlayerStub struct {
+	world.Presence
 	id      int32
 	account string
 }
 
-func (s rosterPlayerStub) ObjectID() int32     { return s.id }
-func (s rosterPlayerStub) AccountName() string { return s.account }
+func (s *rosterPlayerStub) ObjectID() int32       { return s.id }
+func (s *rosterPlayerStub) AccountName() string   { return s.account }
+func (s *rosterPlayerStub) CharacterName() string { return "" }
+func (s *rosterPlayerStub) WorldPlayer()          {}
 
 func TestOnlineAccountsCollectsWorldRoster(t *testing.T) {
 	state := world.New()
-	state.AddPlayer(rosterPlayerStub{account: "acc1"})
-	state.AddPlayer(rosterPlayerStub{account: ""})
+	state.AddPlayer(&rosterPlayerStub{account: "acc1"})
+	state.AddPlayer(&rosterPlayerStub{account: ""})
 
 	got := onlineAccounts(state)
 	if len(got) != 1 || got[0] != "acc1" {

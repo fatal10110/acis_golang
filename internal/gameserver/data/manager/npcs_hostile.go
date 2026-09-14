@@ -53,7 +53,7 @@ func (r *locatedRef) TeleportTo(target location.Location) {
 }
 
 func (r *locatedRef) OffensiveFollowLead() bool {
-	actor, ok := r.Actor.(interface{ OffensiveFollowLead() bool })
+	actor, ok := r.Actor.(*npc.Hostile)
 	return ok && actor.OffensiveFollowLead()
 }
 
@@ -123,7 +123,7 @@ func (r routeAwareMoveController) MoveHome(home location.Location) error {
 }
 
 func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
-	g, ok := r.MoveController.(interface{ CanMoveTo(location.Location) bool })
+	g, ok := r.MoveController.(*move.Controller)
 	return !ok || g.CanMoveTo(target)
 }
 

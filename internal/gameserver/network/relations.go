@@ -1,7 +1,6 @@
 package network
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -91,7 +90,7 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 // nearby observers — the owner's relation hasn't changed, so it is not
 // resent here. Call after the pet is registered in world state (world.AddSummon),
 // since it must already be resolvable as live's summon.
-func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worldobject.Object) {
+func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet world.Tracked) {
 	if l.world == nil || pet == nil {
 		return
 	}

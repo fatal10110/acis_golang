@@ -54,7 +54,10 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 // benchRegenActor is a minimal npcRegenActor: TickRegen never finds itself
 // below max, matching the review's "all objects already at full HP/MP"
 // steady-state case that a full scan still has to visit.
-type benchRegenActor struct{ id int32 }
+type benchRegenActor struct {
+	world.Presence
+	id int32
+}
 
 func (a *benchRegenActor) ObjectID() int32 { return a.id }
 func (a *benchRegenActor) TickRegen()      {}

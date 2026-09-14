@@ -5,7 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Participant is the surface every cast participant shares: what
@@ -212,9 +212,9 @@ type rechargeRateTarget interface {
 // targetRedirectTarget is implemented by an actor whose current target can
 // be read or replaced, or turned into an attack.
 type targetRedirectTarget interface {
-	CurrentTarget() worldobject.Object
-	SetTarget(worldobject.Object)
-	TryToAttack(worldobject.Object)
+	CurrentTarget() world.Tracked
+	SetTarget(world.Tracked)
+	TryToAttack(world.Tracked)
 }
 
 // headingTarget is implemented by an actor whose facing can be read or set.
@@ -422,8 +422,8 @@ type summonOwnerCombatant interface {
 // summonOwnerAttacker is implemented by a summon that can redirect its AI
 // toward and away from its owner.
 type summonOwnerAttacker interface {
-	TryToAttack(worldobject.Object)
-	TryToFollow(worldobject.Object)
+	TryToAttack(world.Tracked)
+	TryToFollow(world.Tracked)
 }
 
 type chargesTarget interface {

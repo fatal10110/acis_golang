@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
 
@@ -512,6 +513,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 // so ai's own test package cannot import npc back without an import cycle.
 // Kept as-is per docs/agents/test-strategy.md.
 type fakeActor struct {
+	world.Presence
 	id              int32
 	siegeGuard      bool
 	alikeDead       bool

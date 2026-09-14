@@ -83,6 +83,16 @@ type livePlayer struct {
 	cubics   map[cubic.ID]*cubic.Runtime
 }
 
+// OnlineCharacter returns the character behind an online player registered
+// in the world, or false when p is not one this package registered.
+func OnlineCharacter(p world.Player) (*player.Character, bool) {
+	live, ok := p.(*livePlayer)
+	if !ok {
+		return nil, false
+	}
+	return live.Character, true
+}
+
 // AccountName returns the owning account of this in-world player, used to
 // report the online roster and per-account entries to the login server.
 func (p *livePlayer) AccountName() string { return p.Character.AccountName }

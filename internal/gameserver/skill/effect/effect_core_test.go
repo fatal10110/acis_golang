@@ -14,9 +14,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from condition_test.go ----
@@ -675,6 +675,7 @@ func (namedActor) Dead() bool       { return false }
 func (n namedActor) String() string { return string(n) }
 
 type liveEffectTarget struct {
+	world.Presence
 	events            []string
 	hp                float64
 	mp                float64
@@ -689,7 +690,7 @@ type liveEffectTarget struct {
 	healProficiency   float64
 	healEffectiveness float64
 	rechargeRate      func(float64) float64
-	target            worldobject.Object
+	target            world.Tracked
 	heading           int
 	bluffExempt       bool
 	isPlayer          bool
@@ -844,14 +845,14 @@ func (t *liveEffectTarget) RechargeMP(base float64) float64 {
 	return t.rechargeRate(base)
 }
 
-func (t *liveEffectTarget) CurrentTarget() worldobject.Object { return t.target }
+func (t *liveEffectTarget) CurrentTarget() world.Tracked { return t.target }
 
-func (t *liveEffectTarget) SetTarget(target worldobject.Object) {
+func (t *liveEffectTarget) SetTarget(target world.Tracked) {
 	t.target = target
 	t.events = append(t.events, fmt.Sprintf("set-target:%v", target))
 }
 
-func (t *liveEffectTarget) TryToAttack(target worldobject.Object) {
+func (t *liveEffectTarget) TryToAttack(target world.Tracked) {
 	t.events = append(t.events, fmt.Sprintf("try-attack:%v", target))
 }
 

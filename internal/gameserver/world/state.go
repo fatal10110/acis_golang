@@ -3,8 +3,6 @@ package world
 import (
 	"strings"
 	"sync"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 )
 
 // State tracks every live object, player, and pet currently in the game
@@ -13,9 +11,9 @@ import (
 type State struct {
 	*Grid
 
-	objects *registry
-	players *registry
-	pets    *registry // keyed by the pet owner's id, not the pet's own id
+	objects *registry[Tracked]
+	players *registry[Player]
+	summons *registry[Tracked] // keyed by the owner's id, not the summon's own id
 
 	// playersMu serializes AddPlayer/RemovePlayer so the players registry
 	// mutation and the playerNames index mutation happen as one atomic
@@ -43,32 +41,25 @@ type State struct {
 func New() *State {
 	s := &State{
 		Grid:        NewGrid(),
-		objects:     newRegistry(),
-		players:     newRegistry(),
-		pets:        newRegistry(),
+		objects:     newRegistry[Tracked](),
+		players:     newRegistry[Player](),
+		summons:     newRegistry[Tracked](),
 		playerNames: make(map[string]int32),
 	}
 	s.idle.L = &s.mu
 	return s
 }
 
-// namedPlayer is implemented by every player registered through AddPlayer;
-// it backs the name-to-online-player-ID index without widening
-// worldobject.Object for every kind of tracked object.
-type namedPlayer interface {
-	CharacterName() string
-}
-
 // AddObject starts tracking obj, unless an object with the same id is
 // already tracked.
-func (s *State) AddObject(obj worldobject.Object) { s.objects.add(obj.ObjectID(), obj) }
+func (s *State) AddObject(obj Tracked) { s.objects.add(obj.ObjectID(), obj) }
 
 // RemoveObject stops tracking the object with the given id.
 func (s *State) RemoveObject(id int32) { s.objects.remove(id) }
 
 // removeObjectIfSame stops tracking obj only if it is still the object
 // registered under its own id. See registry.removeIfSame.
-func (s *State) removeObjectIfSame(obj worldobject.Object) bool {
+func (s *State) removeObjectIfSame(obj Tracked) bool {
 	return s.objects.removeIfSame(obj.ObjectID(), obj)
 }
 
@@ -76,10 +67,10 @@ func (s *State) removeObjectIfSame(obj worldobject.Object) bool {
 func (s *State) RemoveObjects(ids []int32) { s.objects.removeAll(ids) }
 
 // Object returns the tracked object with the given id, if any.
-func (s *State) Object(id int32) (worldobject.Object, bool) { return s.objects.get(id) }
+func (s *State) Object(id int32) (Tracked, bool) { return s.objects.get(id) }
 
 // Objects returns a snapshot of every tracked object.
-func (s *State) Objects() []worldobject.Object { return s.AppendObjects(nil) }
+func (s *State) Objects() []Tracked { return s.AppendObjects(nil) }
 
 // AppendObjects appends every tracked object to dst and returns the
 // extended slice, matching Region.appendObjects' append (not replace)
@@ -87,7 +78,7 @@ func (s *State) Objects() []worldobject.Object { return s.AppendObjects(nil) }
 // repeat calls (e.g. a per-tick scratch buffer owned by a single
 // goroutine) pays the allocation only until the buffer's capacity
 // stabilizes at the tracked population size.
-func (s *State) AppendObjects(dst []worldobject.Object) []worldobject.Object {
+func (s *State) AppendObjects(dst []Tracked) []Tracked {
 	return s.objects.appendAll(dst)
 }
 
@@ -95,17 +86,15 @@ func (s *State) AppendObjects(dst []worldobject.Object) []worldobject.Object {
 // tracked, and indexes its name for PlayerByName lookups. The registry and
 // name-index updates happen under one lock so a concurrent RemovePlayer for
 // the same id can't interleave between them.
-func (s *State) AddPlayer(obj worldobject.Object) {
+func (s *State) AddPlayer(obj Player) {
 	s.playersMu.Lock()
 	defer s.playersMu.Unlock()
 
 	s.players.add(obj.ObjectID(), obj)
 
-	if np, ok := obj.(namedPlayer); ok {
-		name := strings.ToLower(np.CharacterName())
-		if _, exists := s.playerNames[name]; !exists {
-			s.playerNames[name] = obj.ObjectID()
-		}
+	name := strings.ToLower(obj.CharacterName())
+	if _, exists := s.playerNames[name]; !exists {
+		s.playerNames[name] = obj.ObjectID()
 	}
 }
 
@@ -116,11 +105,9 @@ func (s *State) RemovePlayer(id int32) {
 	defer s.playersMu.Unlock()
 
 	if obj, ok := s.players.get(id); ok {
-		if np, ok := obj.(namedPlayer); ok {
-			name := strings.ToLower(np.CharacterName())
-			if s.playerNames[name] == id {
-				delete(s.playerNames, name)
-			}
+		name := strings.ToLower(obj.CharacterName())
+		if s.playerNames[name] == id {
+			delete(s.playerNames, name)
 		}
 	}
 
@@ -128,11 +115,11 @@ func (s *State) RemovePlayer(id int32) {
 }
 
 // Player returns the online player with the given id, if any.
-func (s *State) Player(id int32) (worldobject.Object, bool) { return s.players.get(id) }
+func (s *State) Player(id int32) (Player, bool) { return s.players.get(id) }
 
 // PlayerByName returns the online player with the given name, matched
 // case-insensitively, mirroring Java's World.getPlayer(String).
-func (s *State) PlayerByName(name string) (worldobject.Object, bool) {
+func (s *State) PlayerByName(name string) (Player, bool) {
 	s.playersMu.RLock()
 	id, ok := s.playerNames[strings.ToLower(name)]
 	s.playersMu.RUnlock()
@@ -143,23 +130,14 @@ func (s *State) PlayerByName(name string) (worldobject.Object, bool) {
 }
 
 // Players returns a snapshot of every online player.
-func (s *State) Players() []worldobject.Object { return s.players.appendAll(nil) }
+func (s *State) Players() []Player { return s.players.appendAll(nil) }
 
-// AddPet marks pet as ownerID's active pet, unless that owner already has
-// one tracked.
-func (s *State) AddPet(ownerID int32, pet worldobject.Object) { s.pets.add(ownerID, pet) }
-
-// AddSummon marks summon as ownerID's active pet or servitor.
-func (s *State) AddSummon(ownerID int32, summon worldobject.Object) { s.AddPet(ownerID, summon) }
-
-// RemovePet clears ownerID's active pet, if any.
-func (s *State) RemovePet(ownerID int32) { s.pets.remove(ownerID) }
+// AddSummon marks summon as ownerID's active pet or servitor, unless that
+// owner already has one tracked.
+func (s *State) AddSummon(ownerID int32, summon Tracked) { s.summons.add(ownerID, summon) }
 
 // RemoveSummon clears ownerID's active pet or servitor, if any.
-func (s *State) RemoveSummon(ownerID int32) { s.RemovePet(ownerID) }
-
-// Pet returns ownerID's active pet, if any.
-func (s *State) Pet(ownerID int32) (worldobject.Object, bool) { return s.pets.get(ownerID) }
+func (s *State) RemoveSummon(ownerID int32) { s.summons.remove(ownerID) }
 
 // Summon returns ownerID's active pet or servitor, if any.
-func (s *State) Summon(ownerID int32) (worldobject.Object, bool) { return s.Pet(ownerID) }
+func (s *State) Summon(ownerID int32) (Tracked, bool) { return s.summons.get(ownerID) }

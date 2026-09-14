@@ -4,11 +4,10 @@ import (
 	"math/rand/v2"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/worldobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func sameObject(a, b worldobject.Object) bool {
+func sameObject(a, b world.Tracked) bool {
 	if a == nil || b == nil {
 		return false
 	}
