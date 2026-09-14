@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -73,6 +74,7 @@ type hostileTarget struct {
 }
 
 func (t *hostileTarget) ObjectID() int32  { return t.id }
+func (*hostileTarget) Kind() actor.Kind   { return actor.KindNPC }
 func (t *hostileTarget) SiegeGuard() bool { return false }
 func (t *hostileTarget) AlikeDead() bool  { return false }
 func (t *hostileTarget) Playable() bool   { return t.playable }
@@ -161,6 +163,7 @@ type frameReceiver struct {
 }
 
 func (f *frameReceiver) ObjectID() int32 { return f.trackedID }
+func (*frameReceiver) Kind() actor.Kind  { return actor.KindNPC }
 
 func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 	defer frame.Release()
@@ -172,3 +175,5 @@ func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 }
 
 func (f *frameReceiver) BroadcastFrame(frame wire.Frame) bool { return f.SendFrame(frame) }
+
+func (hostileEffectTarget) Kind() actor.Kind { return actor.KindNPC }

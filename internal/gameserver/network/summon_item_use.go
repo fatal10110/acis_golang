@@ -181,7 +181,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	var duplicate *npc.Decoration
 	l.world.ForEachKnownInRadius(live, decorativeSummonRadius, func(obj world.Tracked) {
-		if decoration, ok := obj.(*npc.Decoration); ok && decoration.Kind == npc.InstanceKind("ChristmasTree") && duplicate == nil {
+		if decoration, ok := obj.(*npc.Decoration); ok && decoration.Instance.Kind == npc.InstanceKind("ChristmasTree") && duplicate == nil {
 			duplicate = decoration
 		}
 	})

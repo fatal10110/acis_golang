@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -542,9 +544,10 @@ func actor(id int32) *fakeActor {
 	return &fakeActor{id: id, attackRange: 40, known: make(map[int32]bool), inTerritory: true}
 }
 
-func (a *fakeActor) ObjectID() int32  { return a.id }
-func (a *fakeActor) SiegeGuard() bool { return a.siegeGuard }
-func (a *fakeActor) AlikeDead() bool  { return a.alikeDead }
+func (a *fakeActor) ObjectID() int32     { return a.id }
+func (*fakeActor) Kind() modelactor.Kind { return modelactor.KindNPC }
+func (a *fakeActor) SiegeGuard() bool    { return a.siegeGuard }
+func (a *fakeActor) AlikeDead() bool     { return a.alikeDead }
 func (a *fakeActor) DenyAIAction() bool {
 	return a.denyAction
 }

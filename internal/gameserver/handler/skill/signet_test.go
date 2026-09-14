@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -87,6 +88,7 @@ func newSignetFakeTarget(id int32) *signetFakeTarget {
 }
 
 func (t *signetFakeTarget) ObjectID() int32          { return t.id }
+func (*signetFakeTarget) Kind() actor.Kind           { return actor.KindNPC }
 func (t *signetFakeTarget) Dead() bool               { return t.dead }
 func (t *signetFakeTarget) InPeaceZone() bool        { return t.peace }
 func (t *signetFakeTarget) EffectList() *effect.List { return t.list }
@@ -396,3 +398,5 @@ func findEffectPointObjects(state *world.State) []*npc.EffectPoint {
 	}
 	return out
 }
+
+func (signetFakeCaster) Kind() actor.Kind { return actor.KindNPC }

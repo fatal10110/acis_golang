@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
@@ -68,7 +69,6 @@ var (
 	_ magicDamageTarget     = (*player.Character)(nil)
 	_ magicDamageTarget     = (*npc.Hostile)(nil)
 	_ magicDamageTarget     = (*summon.Actor)(nil)
-	_ worldPlayerTarget     = (*player.Character)(nil)
 	_ attackFailedNotifier  = (*player.Character)(nil)
 	_ resistedSkillNotifier = (*player.Character)(nil)
 	_ resistedMagicNotifier = (*player.Character)(nil)
@@ -535,6 +535,7 @@ func newContinuousFake(id int32) *continuousFake {
 }
 
 func (f *continuousFake) ObjectID() int32                { return f.id }
+func (*continuousFake) Kind() actor.Kind                 { return actor.KindNPC }
 func (*continuousFake) CharacterName() string            { return "Target" }
 func (f *continuousFake) Dead() bool                     { return f.dead }
 func (f *continuousFake) Invul() bool                    { return f.invul }
@@ -2126,7 +2127,7 @@ func TestPhysicalMagicBlowAndManaDamageHandlersUseFormulaInputs(t *testing.T) {
 // player-gated system messages.
 type playerActor struct{ skillTarget }
 
-func (*playerActor) WorldPlayer() {}
+func (*playerActor) Kind() actor.Kind { return actor.KindPlayer }
 
 func TestManaDamageHandlerReportsSystemMessages(t *testing.T) {
 	registry := NewDefaultRegistry()
@@ -3356,3 +3357,11 @@ func TestUnlockChestAboveBracketTooLowSkillGuaranteedFail(t *testing.T) {
 		t.Fatal("a failed chest unlock should delete the chest")
 	}
 }
+
+func (effectLandingFake) Kind() actor.Kind { return actor.KindNPC }
+
+func (positionedFakeActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (fakeActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (disablerFake) Kind() actor.Kind { return actor.KindNPC }

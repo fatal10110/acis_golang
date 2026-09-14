@@ -3,12 +3,15 @@ package world
 import (
 	"fmt"
 	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 // Tracked is anything that can be placed on the world grid: an
-// identifiable object carrying a Presence.
+// identifiable object of a known Kind carrying a Presence.
 type Tracked interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	presence() *Presence
 }
 
@@ -31,22 +34,16 @@ type Observer interface {
 	Forget(obj Tracked)
 }
 
-// Player is implemented by tracked objects that are player characters —
-// the only objects whose presence keeps a Region active. Entering or
-// leaving a region's 3x3 neighborhood as a Player toggles Region.Active
-// for the regions that lose or gain a nearby player.
-//
-// WorldPlayer takes no arguments and returns nothing: it is a pure type
-// marker. Implementing it at all is what makes a type count as a Player —
-// there is no way to implement it and opt out, unlike a boolean-returning
-// method a caller might reasonably expect to report false sometimes.
-// CharacterName backs State.PlayerByName; it cannot double as the marker
-// because NPCs and summons implement it too.
+// Player is a tracked player character. Only objects of KindPlayer keep a
+// Region active: entering or leaving a region's 3x3 neighborhood as a
+// player toggles Region.Active for the regions that lose or gain a nearby
+// player. CharacterName backs State.PlayerByName.
 type Player interface {
 	Tracked
-	WorldPlayer()
 	CharacterName() string
 }
+
+func isPlayer(t Tracked) bool { return t.Kind() == actor.KindPlayer }
 
 // Spawn places t in the world at (x, y, z) facing heading, clamping x and
 // y to the world bounds, registers it, and notifies observers around the
@@ -181,10 +178,7 @@ func (s *State) DespawnAll(ts []Tracked) {
 			continue
 		}
 		areas := s.AppendNeighbors(areaBuf[:0], region, 1)
-		if slices.ContainsFunc(left, func(t Tracked) bool {
-			_, ok := t.(Player)
-			return ok
-		}) {
+		if slices.ContainsFunc(left, isPlayer) {
 			for _, r := range areas {
 				if s.regionNeighborhoodEmpty(r) && r.setActive(false) {
 					toggles = append(toggles, regionToggle{r, false})
@@ -258,7 +252,7 @@ func (s *State) awaitIdleLocked(p *Presence) {
 // delivered before its visibility notifications.
 func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 	p := t.presence()
-	_, tIsPlayer := t.(Player)
+	tIsPlayer := isPlayer(t)
 	prev := p.region.Load()
 
 	var oldAreaBuf, newAreaBuf [9]*Region

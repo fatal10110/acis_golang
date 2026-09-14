@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -1226,6 +1227,7 @@ type fakeCubicTarget struct {
 }
 
 func (f *fakeCubicTarget) ObjectID() int32           { return f.objectID }
+func (*fakeCubicTarget) Kind() actor.Kind            { return actor.KindNPC }
 func (f *fakeCubicTarget) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeCubicTarget) AlikeDead() bool           { return f.alikeDead }
 func (f *fakeCubicTarget) SiegeGuard() bool          { return f.siegeGuard }
@@ -1636,6 +1638,7 @@ type nonCreatureSelection struct {
 }
 
 func (s *nonCreatureSelection) ObjectID() int32 { return s.id }
+func (*nonCreatureSelection) Kind() actor.Kind  { return actor.KindStatic }
 
 var _ world.Tracked = (*nonCreatureSelection)(nil)
 var _ Target = (*nonCreatureSelection)(nil)
@@ -2700,6 +2703,7 @@ type requestTarget struct {
 }
 
 func (t *requestTarget) ObjectID() int32 { return t.id }
+func (*requestTarget) Kind() actor.Kind  { return actor.KindNPC }
 
 // ---- from target_test.go ----
 func TestSelectTarget(t *testing.T) {
@@ -2737,6 +2741,7 @@ type castTarget struct {
 }
 
 func (t *castTarget) ObjectID() int32 { return t.id }
+func (*castTarget) Kind() actor.Kind  { return actor.KindNPC }
 
 // ---- from testfakes_test.go ----
 type testTarget struct{}
@@ -3028,3 +3033,13 @@ func TestCastToggleNeverInstallsAReuseDelay(t *testing.T) {
 		t.Fatalf("cooldown state after activate = disabled %+v reuses %+v, want none", actor.disabled, actor.reuses)
 	}
 }
+
+func (fakeCastCreature) Kind() actor.Kind { return actor.KindNPC }
+
+func (fakeCubicEffectCaster) Kind() actor.Kind { return actor.KindNPC }
+
+func (effectsActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (fakeCubicEffectTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (launchActor) Kind() actor.Kind { return actor.KindNPC }

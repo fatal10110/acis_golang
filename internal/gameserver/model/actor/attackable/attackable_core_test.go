@@ -3,6 +3,8 @@ package attackable
 import (
 	"sync"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 // ---- from combatant_test.go ----
@@ -260,3 +262,5 @@ func TestThreatTable_ConcurrentAccess(t *testing.T) {
 		t.Errorf("table has %d entries after concurrent add/remove, want 0", len(table.Snapshot()))
 	}
 }
+
+func (fakeCombatant) Kind() actor.Kind { return actor.KindNPC }

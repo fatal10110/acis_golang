@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -1390,3 +1391,9 @@ func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
 		t.Fatalf("Cursed Man crit=8: miss=%v crit=%v, want hit crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
 	}
 }
+
+func (anonymousAttacker) Kind() actor.Kind { return actor.KindNPC }
+
+func (fakePlayerEffector) Kind() actor.Kind { return actor.KindNPC }
+
+func (namedDamageAttacker) Kind() actor.Kind { return actor.KindNPC }

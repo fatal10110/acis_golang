@@ -3,6 +3,7 @@ package target
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -27,6 +28,7 @@ func (c Category) Has(want Category) bool { return c&want == want }
 // skill targets.
 type Creature interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	Position() (x, y, z int)
 	Heading() int
 	Dead() bool

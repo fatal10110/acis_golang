@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -1714,3 +1715,5 @@ func (o *hookOwner) segmentAdvanced(ev event.Move) error {
 	}
 	return nil
 }
+
+func (followTarget) Kind() actor.Kind { return actor.KindNPC }

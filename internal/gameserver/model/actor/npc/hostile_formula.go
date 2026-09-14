@@ -404,3 +404,7 @@ func raceStats(r Race) (atk, res stat.Stat, ok bool) {
 		return 0, 0, false
 	}
 }
+
+// WeaponGradePenalty reports false: NPCs carry no weapon grade to be
+// under-skilled for.
+func (h *Hostile) WeaponGradePenalty() bool { return false }

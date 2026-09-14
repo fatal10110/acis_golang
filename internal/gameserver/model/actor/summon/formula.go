@@ -691,3 +691,7 @@ func positiveBase(value float64) float64 {
 	}
 	return 1
 }
+
+// WeaponGradePenalty reports false: summons carry no weapon grade to be
+// under-skilled for.
+func (a *Actor) WeaponGradePenalty() bool { return false }

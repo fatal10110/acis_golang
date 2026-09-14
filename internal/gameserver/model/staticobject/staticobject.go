@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -57,6 +58,9 @@ func (o *Object) Type() int { return o.Template.Type }
 func (o *Object) Busy() bool {
 	return o.busy.Load()
 }
+
+// Kind reports KindStatic.
+func (o *Object) Kind() actor.Kind { return actor.KindStatic }
 
 // SetBusy updates whether this static object is occupied and reports whether it changed.
 func (o *Object) SetBusy(busy bool) bool {

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -900,6 +901,7 @@ func (t *liveEffectTarget) MarkRecentFakeDeath() {
 }
 
 func (t *liveEffectTarget) ObjectID() int32 { return t.objectID }
+func (*liveEffectTarget) Kind() actor.Kind  { return actor.KindNPC }
 
 func (t *liveEffectTarget) OwnerID() int32 { return t.ownerID }
 
@@ -2726,3 +2728,11 @@ func TestConfusionStartDoesNotDoubleCountHate(t *testing.T) {
 		t.Fatalf("AddAttackDesire hate = %v, want %v", target.addAttackDesireHate, math.MaxInt32)
 	}
 }
+
+func (confusionCandidate) Kind() actor.Kind { return actor.KindNPC }
+
+func (chanceTriggerFakeActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (confusionFake) Kind() actor.Kind { return actor.KindNPC }
+
+func (growEffectTarget) Kind() actor.Kind { return actor.KindNPC }

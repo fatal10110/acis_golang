@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -400,6 +401,9 @@ func (h *Hostile) SetRollSource(f func(n int) int) {
 func (h *Hostile) ObjectID() int32 {
 	return h.Instance.ObjectID
 }
+
+// Kind reports KindNPC.
+func (h *Hostile) Kind() actor.Kind { return actor.KindNPC }
 
 // Unlockable reports whether this hostile NPC is a chest.
 func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }

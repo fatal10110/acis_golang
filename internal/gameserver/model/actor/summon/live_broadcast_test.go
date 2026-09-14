@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -17,6 +18,7 @@ type fakeSummonOwner struct {
 }
 
 func (o *fakeSummonOwner) ObjectID() int32           { return o.id }
+func (*fakeSummonOwner) Kind() actor.Kind            { return actor.KindPlayer }
 func (o *fakeSummonOwner) LevelValue() int           { return 1 }
 func (o *fakeSummonOwner) Position() (int, int, int) { return 1000, 1000, 0 }
 func (o *fakeSummonOwner) InCombat() bool            { return false }

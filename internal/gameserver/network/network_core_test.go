@@ -14,6 +14,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -1111,6 +1112,7 @@ type retainingReceiver struct {
 }
 
 func (r *retainingReceiver) ObjectID() int32 { return r.id }
+func (*retainingReceiver) Kind() actor.Kind  { return actor.KindNPC }
 
 func (r *retainingReceiver) BroadcastFrame(frame wire.Frame) bool {
 	r.mu.Lock()

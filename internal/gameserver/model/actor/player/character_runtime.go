@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -273,12 +274,11 @@ func (c *Character) ObjectID() int32 {
 	return c.ID
 }
 
+// Kind reports KindPlayer.
+func (c *Character) Kind() actor.Kind { return actor.KindPlayer }
+
 // CharacterName returns this player's display name for character-name packets.
 func (c *Character) CharacterName() string { return c.Name }
-
-// WorldPlayer satisfies world.Player: a Character's presence keeps its
-// world Region active.
-func (c *Character) WorldPlayer() {}
 
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {

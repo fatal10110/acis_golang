@@ -4,6 +4,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -726,3 +727,13 @@ func TestResolvePhysicalAttackInputWiresPosPvpWeaponRaceCritShieldAndSoulshot(t 
 		t.Fatalf("perfect-block damage = %d, want 1", got)
 	}
 }
+
+func (randomDamageTestActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (randomDamageTestActor) WeaponGradePenalty() bool { return false }
+
+func (physicalAttackActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (physicalAttackActor) WeaponGradePenalty() bool { return false }
+
+func (ccTestTarget) Kind() actor.Kind { return actor.KindNPC }

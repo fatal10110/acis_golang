@@ -203,9 +203,6 @@ func (c *Character) BroadcastMPStatus() {
 
 // ObjectID returns the persistent world object id assigned to this player.
 
-// WorldPlayer satisfies world.Player: a Character's presence keeps its
-// world Region active.
-
 // LevelValue returns the player's current level for live-owned actors.
 
 // Level satisfies the cast/target handler interfaces (cancelTarget,

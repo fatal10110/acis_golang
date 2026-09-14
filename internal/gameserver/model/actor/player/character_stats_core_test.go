@@ -12,6 +12,7 @@ import (
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
@@ -35,6 +36,7 @@ type poleKnownCombatant struct {
 }
 
 func (c *poleKnownCombatant) ObjectID() int32  { return c.id }
+func (*poleKnownCombatant) Kind() actor.Kind   { return actor.KindNPC }
 func (c *poleKnownCombatant) SiegeGuard() bool { return false }
 func (c *poleKnownCombatant) AlikeDead() bool  { return false }
 
@@ -5955,3 +5957,9 @@ func pvpFlagCalls(rec *event.Recorder) []bool {
 	}
 	return calls
 }
+
+func (ccFleeTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (reduceHPNpcAttacker) Kind() actor.Kind { return actor.KindNPC }
+
+func (reduceHPPlayableAttacker) Kind() actor.Kind { return actor.KindNPC }

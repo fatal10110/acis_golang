@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -19,6 +20,7 @@ import (
 // as an inert `any` that every one of those assertions then misses.
 type Actor interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	Dead() bool
 }
 

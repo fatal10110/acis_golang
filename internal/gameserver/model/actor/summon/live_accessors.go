@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -30,6 +31,9 @@ func (a *Actor) Move() *move.CreatureMove { return &a.movement }
 func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.Geo) error {
 	return a.movement.Init(origin, speed, geo)
 }
+
+// Kind reports KindSummon.
+func (a *Actor) Kind() actor.Kind { return actor.KindSummon }
 
 // ActingPlayer returns the owner for player-attributed outcomes.
 func (a *Actor) ActingPlayer() creature.DeathActor {

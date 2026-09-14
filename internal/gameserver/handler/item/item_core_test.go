@@ -8,6 +8,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -1275,3 +1276,7 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 		})
 	}
 }
+
+func (fakeSummon) Kind() actor.Kind { return actor.KindNPC }
+
+func (fakeCaster) Kind() actor.Kind { return actor.KindNPC }

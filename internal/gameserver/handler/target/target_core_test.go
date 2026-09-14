@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -1053,3 +1054,7 @@ func (k knownList) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn 
 		fn(actor)
 	}
 }
+
+func (targetActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (targetCreature) Kind() actor.Kind { return actor.KindNPC }

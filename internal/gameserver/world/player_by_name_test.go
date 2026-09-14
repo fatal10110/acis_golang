@@ -4,6 +4,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 type namedPlayerObject struct {
@@ -14,7 +16,7 @@ type namedPlayerObject struct {
 
 func (o *namedPlayerObject) ObjectID() int32       { return o.id }
 func (o *namedPlayerObject) CharacterName() string { return o.name }
-func (o *namedPlayerObject) WorldPlayer()          {}
+func (o *namedPlayerObject) Kind() actor.Kind      { return actor.KindPlayer }
 
 // blockingNamedPlayer's CharacterName blocks on its first call (the one
 // AddPlayer makes) until ready is closed, and returns immediately on every
@@ -31,8 +33,8 @@ type blockingNamedPlayer struct {
 	calls   int32
 }
 
-func (o *blockingNamedPlayer) ObjectID() int32 { return o.id }
-func (o *blockingNamedPlayer) WorldPlayer()    {}
+func (o *blockingNamedPlayer) ObjectID() int32  { return o.id }
+func (o *blockingNamedPlayer) Kind() actor.Kind { return actor.KindPlayer }
 
 func (o *blockingNamedPlayer) CharacterName() string {
 	if atomic.AddInt32(&o.calls, 1) == 1 {

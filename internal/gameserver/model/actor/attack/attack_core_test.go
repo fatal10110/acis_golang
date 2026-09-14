@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -618,3 +619,11 @@ func (t rangeTarget) AlikeDead() bool           { return false }
 func (t rangeTarget) Position() (int, int, int) { return t.x, t.y, t.z }
 func (t rangeTarget) CollisionRadius() float64  { return t.radius }
 func (t rangeTarget) IsMoving() bool            { return t.moving }
+
+func (curseTimingPlayer) Kind() actor.Kind { return actor.KindNPC }
+
+func (timingTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (timingActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (rangeTarget) Kind() actor.Kind { return actor.KindNPC }

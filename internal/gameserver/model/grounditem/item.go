@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -46,6 +47,9 @@ func (i *Item) Count() int { return i.Instance.CountValue() }
 func (i *Item) Stackable() bool {
 	return i != nil && i.Template != nil && i.Template.Stackable
 }
+
+// Kind reports KindItem.
+func (i *Item) Kind() actor.Kind { return actor.KindItem }
 
 // Equipable reports whether the item can occupy an equipment slot.
 func (i *Item) Equipable() bool {

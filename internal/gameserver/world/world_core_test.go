@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 // ---- from grid_test.go ----
@@ -102,12 +104,13 @@ type regionTestObject struct {
 }
 
 func (o *regionTestObject) ObjectID() int32 { return o.id }
+func (*regionTestObject) Kind() actor.Kind  { return actor.KindNPC }
 
 type regionTestPlayer struct {
 	regionTestObject
 }
 
-func (p *regionTestPlayer) WorldPlayer()          {}
+func (p *regionTestPlayer) Kind() actor.Kind      { return actor.KindPlayer }
 func (p *regionTestPlayer) CharacterName() string { return "" }
 
 func TestRegion_AddReplaceSameID(t *testing.T) {
@@ -317,6 +320,7 @@ type lockProbe struct {
 }
 
 func (o *lockProbe) ObjectID() int32   { return o.id }
+func (*lockProbe) Kind() actor.Kind    { return actor.KindNPC }
 func (o *lockProbe) Discover(Tracked)  { o.check("Discover") }
 func (o *lockProbe) Forget(Tracked)    { o.check("Forget") }
 func (o *lockProbe) OnActiveRegion()   { o.check("OnActiveRegion") }
@@ -333,7 +337,7 @@ func (o *lockProbe) check(name string) {
 
 type lockProbePlayer struct{ lockProbe }
 
-func (*lockProbePlayer) WorldPlayer()          {}
+func (*lockProbePlayer) Kind() actor.Kind      { return actor.KindPlayer }
 func (*lockProbePlayer) CharacterName() string { return "" }
 
 // Every placement path — player and non-player Spawn, Move, Despawn and
@@ -382,6 +386,7 @@ type gatedObserver struct {
 }
 
 func (o *gatedObserver) ObjectID() int32 { return 1 }
+func (*gatedObserver) Kind() actor.Kind  { return actor.KindNPC }
 
 func (o *gatedObserver) Discover(obj Tracked) {
 	if obj.ObjectID() != o.gatedID {
@@ -632,6 +637,7 @@ type blockingForgetObserver struct {
 }
 
 func (o *blockingForgetObserver) ObjectID() int32  { return 1 }
+func (*blockingForgetObserver) Kind() actor.Kind   { return actor.KindNPC }
 func (o *blockingForgetObserver) Discover(Tracked) {}
 func (o *blockingForgetObserver) Forget(Tracked) {
 	o.once.Do(func() {

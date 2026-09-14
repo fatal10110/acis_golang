@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -162,6 +163,9 @@ func (*Object) AttackableBy(skilltarget.Creature) bool { return false }
 func (o *Object) AttackableWithoutForceBy(caster skilltarget.Creature) bool {
 	return o.AttackableBy(caster)
 }
+
+// Kind reports KindDoor.
+func (o *Object) Kind() actor.Kind { return actor.KindDoor }
 
 var _ skilltarget.Creature = (*Object)(nil)
 var _ skilltarget.UnlockableTarget = (*Object)(nil)

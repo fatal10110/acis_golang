@@ -3,6 +3,7 @@ package task
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -60,6 +61,7 @@ type benchRegenActor struct {
 }
 
 func (a *benchRegenActor) ObjectID() int32 { return a.id }
+func (*benchRegenActor) Kind() actor.Kind  { return actor.KindNPC }
 func (a *benchRegenActor) TickRegen()      {}
 
 // BenchmarkNPCRegenTickManyIdleActors reproduces the review's 30k tracked

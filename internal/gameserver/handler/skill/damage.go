@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -388,10 +389,6 @@ func actorName(obj Actor) string {
 	return ""
 }
 
-type worldPlayerTarget interface {
-	WorldPlayer()
-}
-
 func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, result *Result) {
 	if result == nil || failure == formulas.MagicFailureNone {
 		return
@@ -405,7 +402,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 		// so it never reaches a Summon's owner in the reference.
 		appendResisted(result, target, cast.Skill, false)
 	}
-	if _, ok := target.(worldPlayerTarget); ok {
+	if target.Kind() == actor.KindPlayer {
 		result.MagicResists = append(result.MagicResists, MagicResist{
 			TargetID:     target.ObjectID(),
 			AttackerName: actorName(cast.Caster),
@@ -591,14 +588,14 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if mp > 0 {
 			target.ReduceMP(mp)
 		}
-		if _, ok := obj.(worldPlayerTarget); ok {
+		if obj.Kind() == actor.KindPlayer {
 			result.ManaDrains = append(result.ManaDrains, ManaDrain{
 				TargetID:   obj.ObjectID(),
 				CasterName: actorName(cast.Caster),
 				MP:         int32(mp),
 			})
 		}
-		if _, ok := cast.Caster.(worldPlayerTarget); ok {
+		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
 			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw

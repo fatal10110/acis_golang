@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -16,6 +17,7 @@ import (
 // FormulaActor is the live actor surface needed to resolve skill formula
 // inputs before they are passed to the pure formula package.
 type FormulaActor interface {
+	Kind() actor.Kind
 	Position() (x, y, z int)
 	Heading() int
 	Level() int
@@ -41,6 +43,11 @@ type FormulaActor interface {
 	CalcStat(stat.Stat, float64) float64
 	RandomDamageSpread() int
 	Roll(int) int
+
+	// WeaponGradePenalty reports a flat magic-failure penalty for an
+	// under-graded weapon; only players carry weapon grades, so NPCs and
+	// summons report false.
+	WeaponGradePenalty() bool
 }
 
 type shieldDefenseActor interface {
@@ -238,25 +245,13 @@ func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelsk
 	return in, true
 }
 
-type magicFailureWeapon interface {
-	WeaponGradePenalty() bool
-}
-
-type worldPlayerMarker interface {
-	WorldPlayer()
-}
-
 func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaActor, def modelskill.Definition) {
 	if !formulas.MagicFailuresEnabled() {
 		return
 	}
-	penalty := false
-	if p, ok := any(attacker).(magicFailureWeapon); ok {
-		penalty = p.WeaponGradePenalty()
-	}
-	rate := formulas.MagicSuccessRate(target.Level(), attacker.Level(), def.MagicLevel, def.LevelDepend, penalty)
+	rate := formulas.MagicSuccessRate(target.Level(), attacker.Level(), def.MagicLevel, def.LevelDepend, attacker.WeaponGradePenalty())
 	first := formulas.MagicSucceeds(rate, attacker.Roll(10000))
-	_, isPlayer := any(attacker).(worldPlayerMarker)
+	isPlayer := attacker.Kind() == actor.KindPlayer
 	second := false
 	if !first && isPlayer {
 		second = formulas.MagicSucceeds(rate, attacker.Roll(10000))
