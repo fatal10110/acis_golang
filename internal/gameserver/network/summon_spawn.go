@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -359,8 +360,12 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// (Blow.java:46-47,88-89) and the generic per-effect resisted message
 	// (L2Skill.java:1196-1197) are all gated `instanceof Player` on the
 	// caster/effector and never fire for a Summon at all in the reference —
-	// so AttackFailed/Lethals/MagicResists/ManaDamageMissed/ManaDrains are
-	// forwarded here (ManaDrains is itself gated `target instanceof Player`,
+	// but Mdam.java:69, Blow.java:74, Manadam.java:55, and
+	// L2SkillChargeDmg.java:77 send S1_RESISTED_YOUR_S2 unconditionally for
+	// the skill's own effect-landing resist, so that subset
+	// (Resisted.Unconditional) is forwarded below
+	// alongside AttackFailed/Lethals/MagicResists/ManaDamageMissed/ManaDrains
+	// (ManaDrains is itself gated `target instanceof Player`,
 	// Manadam.java:68, independent of caster type), but
 	// YOUR_OPPONENTS_MP_WAS_REDUCED_BY_S1 (Manadam.java:72) is gated
 	// `creature instanceof Player` on the caster and stays unforwarded; a
@@ -379,6 +384,18 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		if !ok {
 			return
 		}
+		// Only the unconditional skill-level Resisted entries (Mdam.java:69,
+		// Blow.java:74, Manadam.java:55, L2SkillChargeDmg.java:77 — no
+		// `instanceof Player` gate) reach the owner via Summon.sendPacket's
+		// unconditional forwarding; the
+		// generic per-effect L2Skill.getEffects resist is gated
+		// `effector instanceof Player` and never fires for a Summon caster.
+		var resisted []handlerskill.Resisted
+		for _, r := range result.Resisted {
+			if r.Unconditional {
+				resisted = append(resisted, r)
+			}
+		}
 		l.sendSkillHandlerResult(owner, actorcast.EffectResult{
 			AttackFailed:     result.AttackFailed,
 			Lethals:          result.Lethals,
@@ -387,6 +404,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			ManaDrains:       result.ManaDrains,
 			Dodges:           result.Dodges,
 			Counterattacks:   result.Counterattacks,
+			Resisted:         resisted,
 		})
 	}
 	brain.SetCastController(aiController)

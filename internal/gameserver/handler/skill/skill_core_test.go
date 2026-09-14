@@ -1654,14 +1654,18 @@ type skillTarget struct {
 	magicInput     formulas.MagicDamageInput
 	magicOK        bool
 	skillSuccessOK bool
-	lastShield     formulas.ShieldDefense
-	blowInput      formulas.BlowInput
-	blowOK         bool
-	manaInput      formulas.ManaDamageInput
-	manaOK         bool
-	lethalInput    formulas.LethalInput
-	lethalOK       bool
-	lethalPlayer   bool
+	// skillSuccessChance overrides SkillSuccessInput's BaseChance; nil keeps
+	// the default guaranteed-success 100, a pointer to 0 forces a
+	// deterministic effect-landing failure regardless of shield/rnd.
+	skillSuccessChance *float64
+	lastShield         formulas.ShieldDefense
+	blowInput          formulas.BlowInput
+	blowOK             bool
+	manaInput          formulas.ManaDamageInput
+	manaOK             bool
+	lethalInput        formulas.LethalInput
+	lethalOK           bool
+	lethalPlayer       bool
 
 	raidRelated  bool
 	lethalImmune bool
@@ -1808,7 +1812,11 @@ func (t *skillTarget) MagicDamageInput(caster creature.DeathActor, skill modelsk
 
 func (t *skillTarget) SkillSuccessInput(_ creature.DeathActor, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	t.lastShield = shield
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, t.skillSuccessOK
+	chance := 100.0
+	if t.skillSuccessChance != nil {
+		chance = *t.skillSuccessChance
+	}
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: chance, Shield: shield}, t.skillSuccessOK
 }
 
 func (t *skillTarget) BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool) {
@@ -2337,6 +2345,194 @@ func TestMdamReusesResolvedShieldForEffectLanding(t *testing.T) {
 	if result.AttackFailed != 0 {
 		t.Fatalf("AttackFailed = %d, want 0", result.AttackFailed)
 	}
+}
+
+// resistedIconTemplate is an effect template whose landing roll always
+// resists: skillTarget implements skillSuccessSource (the skill's own
+// effect-success roll, controlled by skillSuccessChance) but not
+// effectSuccessSource (the per-template roll inside applyEffectsWithLanding),
+// so any EffectPowerSet template with an icon is force-counted as resisted
+// there regardless of rnd.
+var resistedIconTemplate = []modelskill.EffectTemplate{{Name: "Buff", Time: 10, EffectPowerSet: true, EffectPower: 100, Icon: true}}
+
+func chanceOf(v float64) *float64 { return &v }
+
+// TestMdamTagsResistedByOrigin pins the fix to a PR-2356 review comment:
+// Mdam's own effect-success roll (Mdam.java:69, unconditional
+// creature.sendPacket) must tag Resisted.Unconditional true, while a
+// resisted per-effect-template landing (L2Skill.java:1196-1197, gated
+// `effector instanceof Player`) must tag it false.
+func TestMdamTagsResistedByOrigin(t *testing.T) {
+	registry := NewDefaultRegistry()
+	magicInput := formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1}
+
+	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			magicInput: magicInput, magicOK: true,
+			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for MDAM")
+		}
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		}
+	})
+
+	t.Run("per-effect-template landing resists", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			magicInput: magicInput, magicOK: true,
+			skillSuccessOK: true,
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "MDAM", Effects: resistedIconTemplate},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for MDAM")
+		}
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		}
+	})
+}
+
+// TestBlowTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin for
+// Blow.java:74's unconditional resist vs. the gated per-effect one.
+func TestBlowTagsResistedByOrigin(t *testing.T) {
+	registry := NewDefaultRegistry()
+	blowInput := formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}
+
+	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			blowInput: blowInput, blowOK: true,
+			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "BLOW", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for BLOW")
+		}
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		}
+	})
+
+	t.Run("per-effect-template landing resists", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			blowInput: blowInput, blowOK: true,
+			skillSuccessOK: true,
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "BLOW", Effects: resistedIconTemplate},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for BLOW")
+		}
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		}
+	})
+}
+
+// TestChargeDamTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin for
+// L2SkillChargeDmg.java:77's unconditional resist vs. the gated per-effect
+// one; CHARGEDAM has no damage-gate on applyChargeDamEffects, unlike
+// Mdam/Blow, so no damage-input fields are needed to reach it.
+func TestChargeDamTagsResistedByOrigin(t *testing.T) {
+	registry := NewDefaultRegistry()
+	physicalInput := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+
+	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			physicalInput: physicalInput, physicalOK: true,
+			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for CHARGEDAM")
+		}
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		}
+	})
+
+	t.Run("per-effect-template landing resists", func(t *testing.T) {
+		target := &skillTarget{
+			hp: 2000, effects: effect.NewList(nil),
+			physicalInput: physicalInput, physicalOK: true,
+			skillSuccessOK: true,
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: resistedIconTemplate},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for CHARGEDAM")
+		}
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		}
+	})
+}
+
+// TestManaDamageTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin
+// for MANADAM's checkSkillSuccess-gated resist (Manadam.java:55) vs. the
+// per-effect-template one it produces on a successful roll.
+func TestManaDamageTagsResistedByOrigin(t *testing.T) {
+	registry := NewDefaultRegistry()
+	manaInput := formulas.ManaDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970, VulnMul: 1, Affected: true}
+
+	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
+		target := &skillTarget{
+			mp: 100, maxMP: 100, effects: effect.NewList(nil),
+			manaInput: manaInput, manaOK: true,
+			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "MANADAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for MANADAM")
+		}
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		}
+	})
+
+	t.Run("per-effect-template landing resists", func(t *testing.T) {
+		target := &skillTarget{
+			mp: 100, maxMP: 100, effects: effect.NewList(nil),
+			manaInput: manaInput, manaOK: true,
+			skillSuccessOK: true,
+		}
+		result, ok := registry.UseResult(Cast{
+			Skill:   modelskill.Definition{SkillType: "MANADAM", Effects: resistedIconTemplate},
+			Targets: []Actor{target},
+		})
+		if !ok {
+			t.Fatal("UseResult() handled = false, want true for MANADAM")
+		}
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		}
+	})
 }
 
 func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {

@@ -76,6 +76,14 @@ type Resisted struct {
 	TargetName string
 	SkillID    modelskill.ID
 	SkillLevel int
+	// Unconditional marks a skill's own effect-landing resist — Mdam/Blow/Manadam/
+	// L2SkillChargeDmg's creature.sendPacket, sent with no caster-type gate in the
+	// reference — as
+	// opposed to the generic per-effect-template resist inside L2Skill.getEffects,
+	// which the reference gates to a Player caster. Only Summon.sendPacket
+	// forwards the former to a summon's owner unconditionally; the latter never
+	// fires for a non-Player caster at all.
+	Unconditional bool
 }
 
 // MagicResist reports a player target that resisted a magic-damage cast.
