@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -377,6 +379,13 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, 
 	return true
 }
 
+// positionedTarget is a target whose facing the client needs revalidated on
+// selection.
+type positionedTarget interface {
+	Position() (int, int, int)
+	Heading() int
+}
+
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
 		return false
@@ -390,13 +399,14 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
 	// ported feature, so every target here is treated as never in one.
 	if target.ObjectID() != live.ObjectID() {
-		// Only creatures and doors (skill actors) get a ValidateLocation;
-		// static objects send none in the reference (Player.java:2465-2470),
-		// matching Player.setTarget's ValidateLocation leg sitting strictly
-		// inside the `instanceof Creature` branch (Player.java:2474-2475).
-		if creature, ok := target.(skilltarget.Actor); ok {
-			x, y, z := creature.Position()
-			live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creature.Heading()))
+		// Every creature target (players, NPCs including decorations,
+		// summons, doors) gets a ValidateLocation; static objects and items
+		// send none.
+		if kind := target.Kind(); kind != actor.KindStatic && kind != actor.KindItem {
+			if creature, ok := target.(positionedTarget); ok {
+				x, y, z := creature.Position()
+				live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creature.Heading()))
+			}
 		}
 	}
 	live.SendFrame(serverpackets.FrameMyTargetSelected(target.ObjectID(), targetColor(live.Character, target)))
