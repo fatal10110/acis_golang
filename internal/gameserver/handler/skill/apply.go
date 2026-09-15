@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -17,7 +18,7 @@ type effectListTarget interface {
 }
 
 type effectSuccessSource interface {
-	EffectSuccessInput(creature.DeathActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
+	EffectSuccessInput(attackable.Combatant, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
 }
 
 type positionedActor interface {
@@ -74,7 +75,7 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 				}
 				continue
 			}
-			in, ok := source.EffectSuccessInput(effector, def, tmpl, bss, shield)
+			in, ok := source.EffectSuccessInput(combatantOf(effector), def, tmpl, bss, shield)
 			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
 				if tmpl.Icon {
 					resisted++
@@ -134,7 +135,7 @@ func offensiveEffectApplyBlocked(effector, effected Actor, def modelskill.Defini
 	if inv, ok := effected.(invulnerableEffected); ok && inv.Invul() {
 		return true
 	}
-	return !creature.CanDealDamage(effector)
+	return !creature.CanDealDamage(combatantOf(effector))
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the

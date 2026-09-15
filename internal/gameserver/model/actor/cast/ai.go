@@ -20,7 +20,7 @@ type AIController struct {
 	Effects     EffectHandlers
 	// Caster is the actor casting the skill, used both to start the cast
 	// and as ApplyEffects' caster.
-	Caster skilltarget.Creature
+	Caster LaunchCaster
 	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
@@ -44,10 +44,7 @@ func (a *AIController) Disabled() bool {
 	if a.Controller.CastingNow() {
 		return true
 	}
-	if d, ok := a.Controller.actor.(interface{ AllSkillsDisabled() bool }); ok {
-		return d.AllSkillsDisabled()
-	}
-	return false
+	return a.Controller.actor.AllSkillsDisabled()
 }
 
 func (a *AIController) CastingNow() bool {

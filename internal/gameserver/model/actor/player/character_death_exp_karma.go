@@ -3,7 +3,7 @@ package player
 import (
 	"math"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -32,7 +32,7 @@ import (
 // halving are wired: InSiegeZone and FestivalParticipant are live
 // accessors (FestivalParticipant is a permanent false stub pending #223, so
 // its branch stays dormant, not approximated).
-func (c *Character) applyDeathExpKarmaLoss(killer creature.DeathActor) {
+func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if killer == nil {
 		return
 	}

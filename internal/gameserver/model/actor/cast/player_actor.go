@@ -146,9 +146,16 @@ func (a PlayerActor) ConsumeItem(itemID, count int) bool {
 }
 
 // GroundTarget forwards the character's last recorded ground-click point,
-// satisfying groundTargeter for CanAttemptCast's unset-signet gate —
+// backing GroundTargetUnset for CanAttemptCast's unset-signet gate —
 // PlayerCast.canAttemptCast rejecting a GROUND cast while _signetLocation
 // is still Location.DUMMY_LOC (PlayerCast.java:224, :42).
+// GroundTargetUnset reports whether the player's signet point is still the
+// origin.
+func (a PlayerActor) GroundTargetUnset() bool {
+	x, y, z := a.GroundTarget()
+	return x == 0 && y == 0 && z == 0
+}
+
 func (a PlayerActor) GroundTarget() (x, y, z int) {
 	if a.Character == nil {
 		return 0, 0, 0
@@ -174,13 +181,13 @@ func (a PlayerActor) ExitSignetGround() {
 }
 
 // CubicListFull reports whether a's character already holds as many active
-// cubics as Cubic Mastery allows, satisfying the cubicLister interface
+// cubics as Cubic Mastery allows, backing Actor.CubicListFull
 // CanCast's cubic-specific gate checks.
 func (a PlayerActor) CubicListFull() bool {
 	return a.Character != nil && a.Character.CubicListFull()
 }
 
-// AllSkillsDisabled satisfies the allSkillsDisabler interface Controller.Stop
+// AllSkillsDisabled backs Actor.AllSkillsDisabled, which Controller.Stop
 // and AIController.Disabled probe for, matching Java's
 // Creature.isAllSkillsDisabled().
 func (a PlayerActor) AllSkillsDisabled() bool {
@@ -192,7 +199,7 @@ func (a PlayerActor) AllSkillsDisabled() bool {
 // lock since Duel isn't ported, so there is nothing to clear yet.
 func (PlayerActor) EnableAllSkills() {}
 
-// IncreaseCharges and DecreaseCharges satisfy the chargeHolder interface
+// IncreaseCharges and DecreaseCharges back Actor charges
 // Controller.Hit probes for, matching CreatureCast.onMagicHitTimer's
 // `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
 // PlayerActor implements this, so an NPC/summon timed cast never applies

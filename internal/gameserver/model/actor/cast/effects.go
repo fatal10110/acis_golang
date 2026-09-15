@@ -3,8 +3,9 @@ package cast
 import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -43,7 +44,7 @@ type EffectResult struct {
 }
 
 type pvpSkillNotifier interface {
-	NotePvPSkillTargets([]creature.DeathActor, bool, string)
+	NotePvPSkillTargets([]attackable.Combatant, bool, string)
 }
 
 type skillSeeCurseTester interface {
@@ -145,25 +146,32 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affec
 			return EffectResult{}
 		}
 	}
-	// caster already satisfies skilltarget.Creature, a strict superset of
-	// handlerskill.Actor, so no runtime guard is needed here.
-	castCaster := handlerskill.Actor(caster)
+	// Only creatures cast skills; a door never reaches the handlers as a caster.
+	castCaster, ok := caster.(attackable.Combatant)
+	if !ok {
+		return EffectResult{}
+	}
 	castTargets := make([]handlerskill.Actor, len(affected))
 	for i, t := range affected {
 		castTargets[i] = t
 	}
 	if notifier, ok := caster.(pvpSkillNotifier); ok {
-		notifyTargets := make([]creature.DeathActor, len(castTargets))
-		for i, t := range castTargets {
-			notifyTargets[i] = t
+		// Doors never take part in PvP flagging, so only creature targets are
+		// reported.
+		notifyTargets := make([]attackable.Combatant, 0, len(affected))
+		for _, t := range affected {
+			if c, ok := t.(attackable.Combatant); ok {
+				notifyTargets = append(notifyTargets, c)
+			}
 		}
 		notifier.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	}
 
-	if def.Overhit && caster.Category().Has(skilltarget.CategoryPlayable) {
+	if def.Overhit && caster.Kind().Playable() {
 		for _, t := range affected {
-			if target, ok := t.(interface{ EnableOverhit() }); ok {
-				target.EnableOverhit()
+			// Only hostile NPCs track overhit damage.
+			if hostile, ok := t.(*npc.Hostile); ok {
+				hostile.EnableOverhit()
 			}
 		}
 	}

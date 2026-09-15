@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -17,10 +18,7 @@ import (
 // FormulaActor is the live actor surface needed to resolve skill formula
 // inputs before they are passed to the pure formula package.
 type FormulaActor interface {
-	Kind() actor.Kind
-	Position() (x, y, z int)
-	Heading() int
-	Level() int
+	attackable.Combatant
 
 	STR() int
 	CON() int
@@ -48,13 +46,14 @@ type FormulaActor interface {
 	// under-graded weapon; only players carry weapon grades, so NPCs and
 	// summons report false.
 	WeaponGradePenalty() bool
+	// LethalRate multiplies the lethal-strike chances of this actor's skills.
+	LethalRate() float64
 }
 
 type shieldDefenseActor interface {
-	ShieldDefense(caster DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
-type damagePermissionActor interface{ CanGiveDamage() bool }
 type invulnerableActor interface{ Invul() bool }
 
 // damageBlocked reports whether attacker lacks permission to deal damage.
@@ -72,7 +71,7 @@ type invulnerableActor interface{ Invul() bool }
 // damageBlocked. MANADAM does gate on target.Invul() up front instead
 // (Manadam.java:43-44), with no reduceHp-style backstop afterward, so
 // ResolveManaDamageInput applies that check itself.
-func damageBlocked(attacker any) bool {
+func damageBlocked(attacker attackable.Combatant) bool {
 	return !CanDealDamage(attacker)
 }
 
@@ -95,19 +94,16 @@ func casterSkillPower(attacker FormulaActor, def modelskill.Definition) float64 
 	return formulas.SkillPowerFor(def.SkillType, power, src.HP()/src.MaxHPValue())
 }
 
-// CanDealDamage reports whether attacker is permitted to inflict damage.
-// Actors without an access-level permission surface are ordinary combatants.
-func CanDealDamage(attacker any) bool {
-	if attacker, ok := attacker.(damagePermissionActor); ok {
-		return attacker.CanGiveDamage()
-	}
-	return true
+// CanDealDamage reports whether attacker is permitted to inflict damage. A
+// nil attacker (damage with no creature source) is never blocked.
+func CanDealDamage(attacker attackable.Combatant) bool {
+	return attacker == nil || attacker.CanGiveDamage()
 }
 
 // ResolvePhysicalSkillInput builds a physical-skill damage input from the
 // caster/target pair. raceMul is supplied by NPC targets whose template race
 // has a matching attack/resistance stat pair.
-func ResolvePhysicalSkillInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
+func ResolvePhysicalSkillInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.PhysicalSkillInput{}, false
@@ -160,9 +156,7 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 	}
 	shield := formulas.ShieldFailed
 	if resolver, ok := any(target).(shieldDefenseActor); ok {
-		if caster, ok := any(attacker).(DeathActor); ok {
-			shield = resolver.ShieldDefense(caster, modelskill.Definition{}, crit)
-		}
+		shield = resolver.ShieldDefense(attacker, modelskill.Definition{}, crit)
 	}
 	defence := Positive(target.PDef())
 	if shield == formulas.ShieldSuccess {
@@ -209,7 +203,7 @@ func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.
 
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
 // pair.
-func ResolveMagicDamageInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
+func ResolveMagicDamageInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
@@ -263,7 +257,7 @@ func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaAc
 }
 
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.
-func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
+func ResolveBlowInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.BlowInput{}, false
@@ -284,7 +278,7 @@ func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Def
 	ax, ay, az := attacker.Position()
 	facing := location.OrientedLocation{
 		Location: location.Location{X: tx, Y: ty, Z: tz},
-		Heading:  formulaHeading(target),
+		Heading:  target.Heading(),
 	}
 	attackerLocation := location.Location{X: ax, Y: ay, Z: az}
 	behind := facing.IsBehind(attackerLocation)
@@ -341,7 +335,7 @@ func ResolveBlowInput(caster DeathActor, target FormulaActor, def modelskill.Def
 // Manadam.java's handler and Formulas.calcMagicAffected/calcManaDam have no
 // canGiveDamage() gate, unlike the other three resolvers' formulas
 // (Formulas.java:390,492,575). A damage-denied attacker still drains MP.
-func ResolveManaDamageInput(caster DeathActor, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func ResolveManaDamageInput(caster attackable.Combatant, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	attacker, ok := caster.(FormulaActor)
 	if !ok || attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false
@@ -451,9 +445,8 @@ func MagicPvPMul(attacker FormulaActor, def modelskill.Definition, pvp bool) flo
 
 // Playable reports whether v is a player-controlled actor for PvP formula
 // gating.
-func Playable(v any) bool {
-	p, ok := v.(interface{ Playable() bool })
-	return ok && p.Playable()
+func Playable(c attackable.Combatant) bool {
+	return c != nil && c.Kind().Playable()
 }
 
 // PositionMultiplierFrom returns the target-facing position multiplier for a
@@ -483,9 +476,8 @@ func RaceMultiplierFrom(target, attacker FormulaActor) float64 {
 }
 
 // AttackFacing reports whether attacker stands behind or in front of target,
-// using target's own heading. Side is !behind && !inFront. Missing heading
-// treats the target as facing heading 0.
-func AttackFacing(target, attacker interface{ Position() (int, int, int) }) (behind, inFront bool) {
+// using target's own heading. Side is !behind && !inFront.
+func AttackFacing(target, attacker attackable.Combatant) (behind, inFront bool) {
 	if target == nil || attacker == nil {
 		return false, true
 	}
@@ -493,27 +485,10 @@ func AttackFacing(target, attacker interface{ Position() (int, int, int) }) (beh
 	ax, ay, _ := attacker.Position()
 	facing := location.OrientedLocation{
 		Location: location.Location{X: tx, Y: ty, Z: tz},
-		Heading:  facingHeading(target),
+		Heading:  target.Heading(),
 	}
 	pos := location.Location{X: ax, Y: ay}
 	return facing.IsBehind(pos), facing.IsInFrontOf(pos)
-}
-
-func formulaHeading(actor FormulaActor) int {
-	return facingHeading(actor)
-}
-
-func facingHeading(actor any) int {
-	if actor == nil {
-		return 0
-	}
-	if h, ok := actor.(interface{ CurrentHeading() int }); ok {
-		return h.CurrentHeading()
-	}
-	if h, ok := actor.(interface{ Heading() int }); ok {
-		return h.Heading()
-	}
-	return 0
 }
 
 // SkillStatModifier returns the target attribute modifier used by effect

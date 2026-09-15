@@ -8,6 +8,7 @@ import (
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -128,7 +129,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if def.SkillType == "FUSION" {
 		live.setFusionTarget(target.ObjectID())
 		finishFusion := func() {
-			skillhandler.DecreaseFusion(l.skills, live.Character, target, def)
+			// Only a creature carries the triggered fusion effect to decrease.
+			if effected, ok := target.(attackable.Combatant); ok {
+				skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
+			}
 			live.clearFusionTarget(target.ObjectID())
 		}
 		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)

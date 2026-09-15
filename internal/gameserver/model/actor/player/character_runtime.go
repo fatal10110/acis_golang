@@ -320,16 +320,8 @@ func (c *Character) Knows(target attackable.Combatant) bool {
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
 func (c *Character) CanSee(target attackable.Combatant) bool {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var theight float64
-	if h, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		theight = h.CollisionHeight()
-	}
-	tx, ty, tz := other.Position()
-	return c.canSeePosition(tx, ty, tz, theight)
+	tx, ty, tz := target.Position()
+	return c.canSeePosition(tx, ty, tz, target.CollisionHeight())
 }
 
 // CanSeeTarget reports whether t is visible to this player, satisfying

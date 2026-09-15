@@ -4,7 +4,7 @@ import (
 	"math/rand/v2"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -100,7 +100,7 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 // places them on the ground or, when configured and supported, adds them
 // directly to the killer's inventory. An auto-looted herb is consumed
 // instantly instead: herbs never occupy an inventory slot.
-func (k *KillReward) CalculateRewards(killer creature.DeathActor) {
+func (k *KillReward) CalculateRewards(killer attackable.Combatant) {
 	receiver, isPlayer := killer.(rewardItemReceiver)
 	if isPlayer {
 		// Only a Playable kill gets its drop reserved, matching Npc.dropItem's
@@ -142,7 +142,7 @@ func (k *KillReward) isHerb(itemID int32) bool {
 
 // consumeHerb hands itemID to killer for instant consumption and reports
 // whether a consumer was there to take it.
-func (k *KillReward) consumeHerb(killer creature.DeathActor, itemID int32) bool {
+func (k *KillReward) consumeHerb(killer attackable.Combatant, itemID int32) bool {
 	consumer, ok := killer.(herbReceiver)
 	if !ok {
 		return false

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -19,7 +20,7 @@ var _ target.Creature = (*Character)(nil)
 
 // Character satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
 // ShieldDefense/DecreaseFusion take their caster/effected parameter as.
-var _ creature.DeathActor = (*Character)(nil)
+var _ attackable.Combatant = (*Character)(nil)
 
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once: the configured base plus the known Divine Inspiration
@@ -115,11 +116,11 @@ func (c *Character) SetCanGiveDamage(v bool) {
 // SkillSuccessInput returns the effect-landing roll input for def cast
 // against c, given the caster's blessed-spiritshot charge state (bss) and
 // this cast's already-resolved shield-block outcome (shield).
-func (c *Character) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (c *Character) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, c, def, bss, shield)
 }
 
-func (c *Character) EffectSuccessInput(caster creature.DeathActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (c *Character) EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if tmpl.EffectType == "" {
 		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 	}

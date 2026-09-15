@@ -444,12 +444,8 @@ func (c *Character) WeaponGrade() int {
 
 // SetHeadingTo orients this player toward target.
 func (c *Character) SetHeadingTo(target attackable.Combatant) {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return
-	}
 	sx, sy, _ := c.Position()
-	tx, ty, _ := other.Position()
+	tx, ty, _ := target.Position()
 	c.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 

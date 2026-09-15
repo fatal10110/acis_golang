@@ -30,3 +30,7 @@ func (h *Hostile) Guard() bool { return false }
 
 // Owner reports no owner: NPCs are not summons.
 func (h *Hostile) Owner() (attackable.Combatant, bool) { return nil, false }
+
+// EffectRangeInPeaceZone reports false: NPC effects are never suppressed by
+// peace zones.
+func (h *Hostile) EffectRangeInPeaceZone(x, y, z, effectRange int) bool { return false }

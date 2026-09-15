@@ -3,7 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -11,23 +11,23 @@ import (
 )
 
 type hpDamageTarget interface {
-	Actor
-	ReduceHP(amount float64, attacker creature.DeathActor, skill modelskill.Definition)
+	attackable.Combatant
+	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
 }
 
 type physicalSkillTarget interface {
 	hpDamageTarget
-	PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	PhysicalSkillInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
 }
 
 type magicDamageTarget interface {
 	hpDamageTarget
-	MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
+	MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
 }
 
 type blowDamageTarget interface {
 	hpDamageTarget
-	BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool)
+	BlowInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.BlowInput, bool)
 }
 
 type counterSkillPhysicalTarget interface {
@@ -46,7 +46,7 @@ type manaDamageTarget interface {
 	Actor
 	MPValue() float64
 	ReduceMP(float64) float64
-	ManaDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
+	ManaDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
 }
 
 type shotCharger interface {
@@ -59,8 +59,8 @@ type chargedShotUser interface {
 }
 
 type lethalTarget interface {
-	LethalInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.LethalInput, bool)
-	ApplyLethalOutcome(formulas.LethalOutcome, creature.DeathActor, modelskill.Definition)
+	LethalInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.LethalInput, bool)
+	ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition)
 }
 
 type lethalInvulnerableTarget interface {
@@ -425,7 +425,7 @@ type resistedMagicNotifier interface {
 // deliverMagicFailure sends the caster/target resist system messages a
 // magic-damage failure produces, for paths that do not return a skill
 // handler Result (signet ticks).
-func deliverMagicFailure(caster, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
+func deliverMagicFailure(caster attackable.Combatant, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
 	var result Result
 	reportMagicFailure(Cast{Caster: caster, Skill: def}, target, failure, &result)
 	if n, ok := caster.(attackFailedNotifier); ok {

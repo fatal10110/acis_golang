@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -23,7 +22,7 @@ type disablerTarget interface {
 // state and the target's shield-block outcome against this cast; ok is
 // false when the target can't be rolled against at all.
 type skillSuccessSource interface {
-	SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+	SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
 }
 
 // blessedSpiritshotCaster optionally reports whether a caster currently has
@@ -37,7 +36,7 @@ type blessedSpiritshotCaster interface {
 // critical hit. A target without one never blocks with a shield, matching a
 // target whose shield equip/facing resolution isn't wired yet.
 type shieldDefenseSource interface {
-	ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func blessedSpiritshotCharged(caster Actor) bool {
@@ -48,7 +47,7 @@ func blessedSpiritshotCharged(caster Actor) bool {
 // resolveShieldDefense returns def's shield-block outcome against target,
 // or ShieldFailed when the skill ignores shields entirely or target exposes
 // no resolved shield-block source yet.
-func resolveShieldDefense(caster, target Actor, def modelskill.Definition) formulas.ShieldDefense {
+func resolveShieldDefense(caster attackable.Combatant, target Actor, def modelskill.Definition) formulas.ShieldDefense {
 	if def.IgnoreShield {
 		return formulas.ShieldFailed
 	}
@@ -157,7 +156,7 @@ func (disablersHandler) Use(cast Cast) {
 // shield-block outcome against this cast. ok is false when target exposes
 // no resolved-landing-rate source, letting a caller decide whether to treat
 // that as "doesn't apply" or fall back.
-func checkSkillSuccess(caster, target Actor, def modelskill.Definition) (succeeded, ok bool) {
+func checkSkillSuccess(caster attackable.Combatant, target Actor, def modelskill.Definition) (succeeded, ok bool) {
 	return checkSkillSuccessBSS(caster, target, def, blessedSpiritshotCharged(caster))
 }
 
@@ -165,11 +164,11 @@ func checkSkillSuccess(caster, target Actor, def modelskill.Definition) (succeed
 // input forced to bss rather than read from caster's real charge state —
 // Blow.java hardcodes this input to true regardless of the caster's actual
 // charge, unlike every other landing-rate roll in the reference.
-func checkSkillSuccessBSS(caster, target Actor, def modelskill.Definition, bss bool) (succeeded, ok bool) {
+func checkSkillSuccessBSS(caster attackable.Combatant, target Actor, def modelskill.Definition, bss bool) (succeeded, ok bool) {
 	return checkSkillSuccessBSSWithShield(caster, target, def, bss, resolveShieldDefense(caster, target, def))
 }
 
-func checkSkillSuccessBSSWithShield(caster, target Actor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
+func checkSkillSuccessBSSWithShield(caster attackable.Combatant, target Actor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (succeeded, ok bool) {
 	src, ok := target.(skillSuccessSource)
 	if !ok {
 		return false, false

@@ -2104,7 +2104,10 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	}
 }
 
-type pvpFlagNPC struct{ guard bool }
+type pvpFlagNPC struct {
+	attackabletest.Combatant
+	guard bool
+}
 
 func (pvpFlagNPC) ObjectID() int32                { return 4 }
 func (pvpFlagNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
@@ -2221,7 +2224,7 @@ func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing
 	flagged.UpdatePvPFlag(task.PvPFlagOn)
 	rec := recordEvents(attacker)
 
-	attacker.NotePvPSkillTargets([]creature.DeathActor{flagged, pvpFlagNPC{}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]attackable.Combatant{flagged, pvpFlagNPC{}}, false, "DUMMY")
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 2 || calls[0] || calls[1] {
@@ -2235,7 +2238,7 @@ func TestCharacterNotePvPSkillTargetsFlagsOwnerOfFlaggedSummon(t *testing.T) {
 	victim.UpdatePvPFlag(task.PvPFlagOn)
 	rec := recordEvents(attacker)
 
-	attacker.NotePvPSkillTargets([]creature.DeathActor{summonKiller{owner: victim}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]attackable.Combatant{summonKiller{owner: victim}}, false, "DUMMY")
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if !called {
@@ -2266,14 +2269,18 @@ func TestCharacterReduceHPByDOTDoesNotFlagAttacker(t *testing.T) {
 // ---- from character_reducehp_cc_test.go ----
 // reduceHPPlayableAttacker is a minimal Playable-attacker stub for CP
 // absorption tests (a distinct actor from the target, unlike self-damage).
-type reduceHPPlayableAttacker struct{}
+type reduceHPPlayableAttacker struct {
+	attackabletest.Combatant
+}
 
 func (reduceHPPlayableAttacker) ObjectID() int32 { return 99 }
 func (reduceHPPlayableAttacker) Dead() bool      { return false }
 func (reduceHPPlayableAttacker) Playable() bool  { return true }
 
 // reduceHPNpcAttacker is a non-Playable attacker stub.
-type reduceHPNpcAttacker struct{}
+type reduceHPNpcAttacker struct {
+	attackabletest.Combatant
+}
 
 func (reduceHPNpcAttacker) ObjectID() int32 { return 98 }
 func (reduceHPNpcAttacker) Dead() bool      { return false }
@@ -3599,7 +3606,7 @@ func TestCharacterHealAmountUsesMagicAttackAndHealProficiency(t *testing.T) {
 
 // ---- from character_stats_shield_test.go ----
 type shieldDefenseResolver interface {
-	ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {
@@ -4684,10 +4691,14 @@ type npcKiller struct{ id int32 }
 
 func (k npcKiller) ObjectID() int32 { return k.id }
 
-type summonKiller struct{ owner creature.DeathActor }
+type summonKiller struct {
+	attackabletest.Combatant
+	owner attackable.Combatant
+}
 
-func (k summonKiller) ObjectID() int32                   { return 3 }
-func (k summonKiller) ActingPlayer() creature.DeathActor { return k.owner }
+func (k summonKiller) ObjectID() int32                     { return 3 }
+func (k summonKiller) Kind() actor.Kind                    { return actor.KindSummon }
+func (k summonKiller) Owner() (attackable.Combatant, bool) { return k.owner, k.owner != nil }
 
 // ---- from level_test.go ----
 func TestLevelTable_Levels(t *testing.T) {
@@ -5964,4 +5975,20 @@ func (ccFleeTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (reduceHPNpcAttacker) Kind() actor.Kind { return actor.KindNPC }
 
-func (reduceHPPlayableAttacker) Kind() actor.Kind { return actor.KindNPC }
+func (reduceHPPlayableAttacker) Kind() actor.Kind { return actor.KindPlayer }
+
+func (pvpFlagNPC) Heading() int { return 0 }
+
+func (pvpFlagNPC) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (summonKiller) Heading() int { return 0 }
+
+func (summonKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (reduceHPPlayableAttacker) Heading() int { return 0 }
+
+func (reduceHPPlayableAttacker) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (reduceHPNpcAttacker) Heading() int { return 0 }
+
+func (reduceHPNpcAttacker) Position() (x, y, z int) { return 0, 0, 0 }

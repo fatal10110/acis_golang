@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -171,7 +172,7 @@ func (h *Hostile) ReduceMP(amount float64) float64 {
 // invul/damage-permission guard (CreatureStatus.java:209-226): an
 // invulnerable NPC, or one hit by an attacker without damage permission,
 // still aggroes and calls its party, but takes no damage.
-func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ modelskill.Definition) {
+func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	if h.AlikeDead() {
 		return
 	}
@@ -190,8 +191,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker creature.DeathActor, _ model
 	if !newlyDead {
 		return
 	}
-	killer, _ := attacker.(creature.DeathActor)
-	h.Die(killer, h.rewards)
+	h.Die(attacker, h.rewards)
 }
 
 // ReduceHPByDOT applies periodic damage and records it in the threat table
@@ -203,15 +203,12 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isD
 	if h.AlikeDead() {
 		return
 	}
-	var killer creature.DeathActor
-	if a, ok := attacker.(creature.DeathActor); ok {
-		killer = a
-	}
+	killer, _ := attacker.(attackable.Combatant)
 	h.testOverhit(killer, amount)
 	if amount > 0 {
-		h.registerHit(attacker, amount, true)
+		h.registerHit(killer, amount, true)
 	}
-	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
+	if amount <= 0 || h.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
@@ -283,22 +280,22 @@ func (h *Hostile) HealAmount(def modelskill.Definition) (float64, bool) {
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against h.
-func (h *Hostile) PhysicalSkillInput(caster creature.DeathActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (h *Hostile) PhysicalSkillInput(caster attackable.Combatant, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	attacker, _ := caster.(creature.FormulaActor)
 	raceMul := h.RaceMultiplier(attacker)
-	return creature.ResolvePhysicalSkillInput(caster, h, def, creature.Playable(caster) && h.Playable(), raceMul)
+	return creature.ResolvePhysicalSkillInput(caster, h, def, creature.Playable(caster) && h.Kind().Playable(), raceMul)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast by
 // caster against h.
-func (h *Hostile) MagicDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
-	return creature.ResolveMagicDamageInput(caster, h, def, creature.Playable(caster) && h.Playable())
+func (h *Hostile) MagicDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+	return creature.ResolveMagicDamageInput(caster, h, def, creature.Playable(caster) && h.Kind().Playable())
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by caster
 // against h.
-func (h *Hostile) BlowInput(caster creature.DeathActor, def modelskill.Definition) (formulas.BlowInput, bool) {
-	return creature.ResolveBlowInput(caster, h, def, creature.Playable(caster) && h.Playable())
+func (h *Hostile) BlowInput(caster attackable.Combatant, def modelskill.Definition) (formulas.BlowInput, bool) {
+	return creature.ResolveBlowInput(caster, h, def, creature.Playable(caster) && h.Kind().Playable())
 }
 
 func (h *Hostile) CounterSkillPhysical() float64 {
@@ -330,7 +327,7 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill cast
 // by caster against h.
-func (h *Hostile) ManaDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (h *Hostile) ManaDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, h, h.MaxMPValue(), def)
 }
 
@@ -340,14 +337,11 @@ func (h *Hostile) LethalRate() float64 {
 }
 
 // LethalInput resolves a lethal-strike roll against h.
-func (h *Hostile) LethalInput(caster creature.DeathActor, def modelskill.Definition) (formulas.LethalInput, bool) {
+func (h *Hostile) LethalInput(caster attackable.Combatant, def modelskill.Definition) (formulas.LethalInput, bool) {
 	if h.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
-	attacker, ok := caster.(interface {
-		Level() int
-		LethalRate() float64
-	})
+	attacker, ok := caster.(creature.FormulaActor)
 	if !ok {
 		return formulas.LethalInput{}, false
 	}
@@ -362,7 +356,7 @@ func (h *Hostile) LethalInput(caster creature.DeathActor, def modelskill.Definit
 }
 
 // ApplyLethalOutcome applies a lethal-strike tier to h.
-func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster creature.DeathActor, def modelskill.Definition) {
+func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
 		h.ReduceHP(h.HP()-1, caster, def)

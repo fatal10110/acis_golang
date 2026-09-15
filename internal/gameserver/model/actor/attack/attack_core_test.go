@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -498,7 +497,7 @@ func (t *timingTarget) Position() (int, int, int) {
 }
 func (t *timingTarget) AttackableBy(target.Creature) bool             { return t.attackable }
 func (t *timingTarget) AttackableWithoutForceBy(target.Creature) bool { return t.attackable }
-func (t *timingTarget) TakeDamage(_ int, _ creature.DeathActor) bool {
+func (t *timingTarget) TakeDamage(_ int, _ attackable.Combatant) bool {
 	t.hits++
 	if t.landed != nil {
 		*t.landed = append(*t.landed, t.id)
@@ -633,3 +632,7 @@ func (timingActor) Kind() actor.Kind { return actor.KindNPC }
 func (rangeTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (rangeTarget) Heading() int { return 0 }
+
+func (timingPlayer) NotePvPAttack(attackable.Combatant) {}
+
+func (timingPlayer) TestCursesOnAttack(attackable.Combatant) bool { return false }

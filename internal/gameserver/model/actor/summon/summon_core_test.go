@@ -9,6 +9,8 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -1098,19 +1100,14 @@ func TestSummonChargedShotStateAndCounts(t *testing.T) {
 }
 
 // ---- from status_update_test.go ----
-type namedDamageAttacker struct{ name string }
+type namedDamageAttacker struct {
+	attackabletest.Combatant
+	name string
+}
 
 func (a namedDamageAttacker) ObjectID() int32       { return 1 }
 func (a namedDamageAttacker) Dead() bool            { return false }
 func (a namedDamageAttacker) CharacterName() string { return a.name }
-
-// anonymousAttacker satisfies effect.Participant but not the
-// CharacterName-having surface notifyDamage looks for, so it stands in for
-// an attacker whose identity the notifier doesn't recognize.
-type anonymousAttacker struct{}
-
-func (anonymousAttacker) ObjectID() int32 { return 0 }
-func (anonymousAttacker) Dead() bool      { return false }
 
 func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 	for _, damage := range []struct {
@@ -1138,22 +1135,18 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		new    func() *Actor
-		apply  func(*Actor, effect.Participant)
+		apply  func(*Actor, attackable.Combatant)
 		called bool
 	}{
-		{"pet direct", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"servitor direct", func() *Actor { return mustServitor(t, ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"dot", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
-		{"unknown attacker", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, false},
+		{"pet direct", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker attackable.Combatant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"servitor direct", func() *Actor { return mustServitor(t, ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker attackable.Combatant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"dot", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker attackable.Combatant) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := tc.new()
 			rec := &event.Recorder{}
 			a.Attach(Runtime{Sink: rec})
-			var attacker effect.Participant = namedDamageAttacker{name: "Attacker"}
-			if tc.name == "unknown attacker" {
-				attacker = anonymousAttacker{}
-			}
+			var attacker attackable.Combatant = namedDamageAttacker{name: "Attacker"}
 			tc.apply(a, attacker)
 			got := event.Of[event.Damaged](rec)
 			if tc.called {
@@ -1392,8 +1385,10 @@ func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
 	}
 }
 
-func (anonymousAttacker) Kind() actor.Kind { return actor.KindNPC }
-
 func (fakePlayerEffector) Kind() actor.Kind { return actor.KindNPC }
 
 func (namedDamageAttacker) Kind() actor.Kind { return actor.KindNPC }
+
+func (namedDamageAttacker) Heading() int { return 0 }
+
+func (namedDamageAttacker) Position() (x, y, z int) { return 0, 0, 0 }

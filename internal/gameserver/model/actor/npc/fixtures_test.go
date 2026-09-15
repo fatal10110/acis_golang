@@ -75,8 +75,13 @@ type hostileTarget struct {
 	playable bool
 }
 
-func (t *hostileTarget) ObjectID() int32  { return t.id }
-func (*hostileTarget) Kind() actor.Kind   { return actor.KindNPC }
+func (t *hostileTarget) ObjectID() int32 { return t.id }
+func (t *hostileTarget) Kind() actor.Kind {
+	if t.playable {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
 func (t *hostileTarget) SiegeGuard() bool { return false }
 func (t *hostileTarget) AlikeDead() bool  { return false }
 func (t *hostileTarget) Playable() bool   { return t.playable }

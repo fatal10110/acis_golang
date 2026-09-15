@@ -116,6 +116,7 @@ var (
 // that models death or identity itself declares its own Dead or ObjectID,
 // which shadows the one embedded here.
 type fakeActor struct {
+	attackabletest.Combatant
 	objectID int32
 }
 
@@ -142,7 +143,9 @@ type damagePermissionFake struct {
 	allow bool
 }
 
-func (f damagePermissionFake) CanGiveDamage() bool { return f.allow }
+func (f damagePermissionFake) CanGiveDamage() bool   { return f.allow }
+func (damagePermissionFake) Position() (x, y, z int) { return 0, 0, 0 }
+func (damagePermissionFake) Heading() int            { return 0 }
 
 type positionedFakeActor struct {
 	fakeActor
@@ -158,7 +161,7 @@ type effectListOnlyFake struct {
 
 func (f *effectListOnlyFake) EffectList() *effect.List { return f.list }
 
-func (*effectLandingFake) EffectSuccessInput(_ creature.DeathActor, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (*effectLandingFake) EffectSuccessInput(_ attackable.Combatant, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 }
 
@@ -497,6 +500,7 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 // ---- from continuous_fixtures_test.go ----
 // reflect sources wired to a guaranteed-success roll by default.
 type continuousFake struct {
+	attackabletest.Combatant
 	world.Presence
 	id                int32
 	dead, invul       bool
@@ -547,7 +551,7 @@ func (f *continuousFake) CursedWeaponEquipped() bool     { return f.cursed }
 func (f *continuousFake) EffectList() *effect.List       { return f.list }
 func (f *continuousFake) BlessedSpiritshotCharged() bool { return f.bss }
 
-func (f *continuousFake) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (f *continuousFake) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if f.recordSuccessInput != nil {
 		f.recordSuccessInput(caster, def, bss, shield)
 	}
@@ -558,7 +562,7 @@ func (f *continuousFake) SkillReflectInput(modelskill.Definition) formulas.Skill
 	return f.skillReflectInput
 }
 
-func (f *continuousFake) NotifyAggression(source creature.DeathActor, power int) {
+func (f *continuousFake) NotifyAggression(source attackable.Combatant, power int) {
 	f.aggressionSource = source
 	f.aggressionPower = power
 }
@@ -832,7 +836,7 @@ func (d *disablerFake) Invul() bool              { return d.invul }
 func (d *disablerFake) Paralyzed() bool          { return d.paralyzed }
 func (d *disablerFake) EffectList() *effect.List { return d.list }
 
-func (d *disablerFake) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (d *disablerFake) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
@@ -840,7 +844,7 @@ func (d *disablerFake) SkillSuccessInput(caster creature.DeathActor, def modelsk
 
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
 // exercise checkSkillSuccess's shield-block threading.
-func (d *disablerFake) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (d *disablerFake) ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	return d.shield
 }
 
@@ -867,7 +871,7 @@ func (d *disablerFake) ClearAggroTables() {
 }
 func (d *disablerFake) Level() int { return d.level }
 
-func (d *disablerFake) NotifyAggression(source creature.DeathActor, power int) {
+func (d *disablerFake) NotifyAggression(source attackable.Combatant, power int) {
 	d.aggressionSource = source
 	d.aggressionPower = power
 }
@@ -1790,12 +1794,12 @@ func (t *skillTarget) SetCP(v float64) {
 
 func (t *skillTarget) AddExpAndSP(exp, sp int) { t.sp += sp }
 
-func (t *skillTarget) Die(killer creature.DeathActor) {
+func (t *skillTarget) Die(killer attackable.Combatant) {
 	t.dead = true
 	t.diedBy = killer
 }
 
-func (t *skillTarget) ReduceHP(v float64, attacker creature.DeathActor, skill modelskill.Definition) {
+func (t *skillTarget) ReduceHP(v float64, attacker attackable.Combatant, skill modelskill.Definition) {
 	t.hp -= v
 }
 
@@ -1805,15 +1809,15 @@ func (t *skillTarget) SetChargedShot(kind modelitem.ShotKind, _ bool) {
 
 func (t *skillTarget) ChargedShot(kind modelitem.ShotKind) bool { return t.charged[kind] }
 
-func (t *skillTarget) PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (t *skillTarget) PhysicalSkillInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
 }
 
-func (t *skillTarget) MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *skillTarget) MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 
-func (t *skillTarget) SkillSuccessInput(_ creature.DeathActor, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (t *skillTarget) SkillSuccessInput(_ attackable.Combatant, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	t.lastShield = shield
 	chance := 100.0
 	if t.skillSuccessChance != nil {
@@ -1822,15 +1826,15 @@ func (t *skillTarget) SkillSuccessInput(_ creature.DeathActor, _ modelskill.Defi
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: chance, Shield: shield}, t.skillSuccessOK
 }
 
-func (t *skillTarget) BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool) {
+func (t *skillTarget) BlowInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.BlowInput, bool) {
 	return t.blowInput, t.blowOK
 }
 
-func (t *skillTarget) ManaDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (t *skillTarget) ManaDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return t.manaInput, t.manaOK
 }
 
-func (t *skillTarget) LethalInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.LethalInput, bool) {
+func (t *skillTarget) LethalInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.LethalInput, bool) {
 	in := t.lethalInput
 	in.Chance1 = skill.LethalChance1
 	in.Chance2 = skill.LethalChance2
@@ -1838,7 +1842,7 @@ func (t *skillTarget) LethalInput(caster creature.DeathActor, skill modelskill.D
 	return in, t.lethalOK
 }
 
-func (t *skillTarget) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster creature.DeathActor, skill modelskill.Definition) {
+func (t *skillTarget) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, skill modelskill.Definition) {
 	t.lethalOutcomes = append(t.lethalOutcomes, outcome)
 	switch outcome {
 	case formulas.LethalFull:
@@ -3300,18 +3304,18 @@ type chestFake struct {
 	desireAdded, hateAdded bool
 }
 
-func (c *chestFake) Dead() bool                     { return c.dead }
-func (c *chestFake) Interacted() bool               { return c.interacted }
-func (c *chestFake) SetInteracted()                 { c.interacted = true }
-func (c *chestFake) Box() bool                      { return c.box }
-func (c *chestFake) Level() int                     { return c.level }
-func (c *chestFake) Die(killer creature.DeathActor) { c.died = true }
-func (c *chestFake) DeleteMe()                      { c.deleted = true }
+func (c *chestFake) Dead() bool                      { return c.dead }
+func (c *chestFake) Interacted() bool                { return c.interacted }
+func (c *chestFake) SetInteracted()                  { c.interacted = true }
+func (c *chestFake) Box() bool                       { return c.box }
+func (c *chestFake) Level() int                      { return c.level }
+func (c *chestFake) Die(killer attackable.Combatant) { c.died = true }
+func (c *chestFake) DeleteMe()                       { c.deleted = true }
 
-func (c *chestFake) AddAttackDesire(attacker creature.DeathActor, weight float64) {
+func (c *chestFake) AddAttackDesire(attacker attackable.Combatant, weight float64) {
 	c.desireAdded = true
 }
-func (c *chestFake) AddDamageHate(attacker creature.DeathActor, damage, hate float64) {
+func (c *chestFake) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
 	c.hateAdded = true
 }
 
@@ -3375,3 +3379,41 @@ func (disablerFake) Position() (x, y, z int) { return 0, 0, 0 }
 func (disablerHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (disablerHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+func (cancelFakeActor) Heading() int { return 0 }
+
+func (cancelFakeActor) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (fakeCubicSummoner) Heading() int { return 0 }
+
+func (fakeCubicSummoner) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (bssCasterFake) Heading() int { return 0 }
+
+func (bssCasterFake) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (extractableFakeCaster) Heading() int { return 0 }
+
+func (extractableFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (skillTarget) Heading() int { return 0 }
+
+func (skillTarget) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (manorFakeCaster) Heading() int { return 0 }
+
+func (manorFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (reviveFakeCaster) Heading() int { return 0 }
+
+func (reviveFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (spoilFakeCaster) Heading() int { return 0 }
+
+func (spoilFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (jumpFakeCaster) Heading() int { return 0 }
+
+func (jumpFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (getPlayerFakeCaster) Heading() int { return 0 }

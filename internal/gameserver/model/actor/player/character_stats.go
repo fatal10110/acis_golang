@@ -3,6 +3,7 @@ package player
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -228,7 +229,7 @@ func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
 
 // ShieldDefense resolves c's shield-block outcome against an incoming skill.
-func (c *Character) ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (c *Character) ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	if def.IgnoreShield || !c.secondaryShieldEquipped() {
 		return formulas.ShieldFailed
 	}
@@ -278,18 +279,17 @@ func (c *Character) secondaryShieldEquipped() bool {
 		tmpl.Armor.Type == item.ArmorShield
 }
 
-func (c *Character) facing(caster any, degrees int) bool {
-	other, ok := caster.(interface{ Position() (int, int, int) })
-	if !ok {
+func (c *Character) facing(caster attackable.Combatant, degrees int) bool {
+	if caster == nil {
 		return false
 	}
-	x, y, z := other.Position()
+	x, y, z := caster.Position()
 	targetFacing := location.OrientedLocation{Location: c.CurrentLocation(), Heading: c.CurrentHeading()}
 	return targetFacing.IsFacing(location.Location{X: x, Y: y, Z: z}, degrees)
 }
 
-func attackerUsesBow(caster any) bool {
-	attacker, ok := caster.(interface{ AttackType() item.WeaponType })
+func attackerUsesBow(caster attackable.Combatant) bool {
+	attacker, ok := caster.(creature.FormulaActor)
 	return ok && attacker.AttackType() == item.WeaponBow
 }
 
@@ -450,12 +450,6 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// playableAttacker is satisfied by any attacker that counts as a Playable
-// for CP-absorption purposes (Player and Summon actors).
-type playableAttacker interface {
-	Playable() bool
-}
-
 // absorbCPThenReduceHP applies PlayerStatus.reduceHp's CP-first absorption
 // (PlayerStatus.java:166-184): a Playable attacker other than the actor
 // itself (PvP, pet/summon damage) drains CP before HP, unless ignoreCP is
@@ -469,15 +463,15 @@ type playableAttacker interface {
 // stun-break side effects (PlayerStatus.java:118-134), which run first in
 // the reference. Already-dead is a no-op, matching the prior curHP<=0
 // guards.
-func (c *Character) absorbCPThenReduceHP(amount float64, attacker any, ignoreCP bool) (dead bool) {
+func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) (dead bool) {
 	if amount < 0 {
 		amount = 0
 	}
 	if c.curHP <= 0 {
 		return false
 	}
-	if !ignoreCP && attacker != nil && attacker != any(c) {
-		if p, ok := attacker.(playableAttacker); ok && p.Playable() {
+	if !ignoreCP && attacker != nil && attacker != attackable.Combatant(c) {
+		if attacker.Kind().Playable() {
 			if c.curCP > 0 {
 				drained := math.Min(c.curCP, amount)
 				c.curCP -= drained
@@ -494,7 +488,7 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker any, ignoreCP 
 }
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
-func (c *Character) ReduceHP(amount float64, attacker creature.DeathActor, skill modelskill.Definition) {
+func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition) {
 	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -523,8 +517,7 @@ func (c *Character) ReduceHP(amount float64, attacker creature.DeathActor, skill
 	// too.
 	c.breakCastOnDamage(rawDamage)
 	if dead {
-		killer, _ := attacker.(creature.DeathActor)
-		c.Die(killer)
+		c.Die(attacker)
 	}
 }
 
@@ -539,7 +532,8 @@ func (c *Character) ReduceHP(amount float64, attacker creature.DeathActor, skill
 // only skill that does, Backstab, is a BLOW burst hit, never delivered
 // through EffectDamOverTime), so ignoreCP is always false here.
 func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Participant, isDOT bool) {
-	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
+	killer, _ := attacker.(attackable.Combatant)
+	if amount <= 0 || c.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
 	c.vitalsMu.Lock()
@@ -554,11 +548,10 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Participant, i
 		c.vitalsMu.Unlock()
 		return
 	}
-	dead := c.absorbCPThenReduceHP(amount, attacker, false)
+	dead := c.absorbCPThenReduceHP(amount, killer, false)
 	c.vitalsMu.Unlock()
 	c.BroadcastStatus()
 	if dead {
-		killer, _ := attacker.(creature.DeathActor)
 		c.Die(killer)
 	}
 }
@@ -646,19 +639,19 @@ func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against c.
-func (c *Character) PhysicalSkillInput(caster creature.DeathActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (c *Character) PhysicalSkillInput(caster attackable.Combatant, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return creature.ResolvePhysicalSkillInput(caster, c, def, creature.Playable(caster), 1)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast
 // by caster against c.
-func (c *Character) MagicDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (c *Character) MagicDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return creature.ResolveMagicDamageInput(caster, c, def, creature.Playable(caster))
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by
 // caster against c.
-func (c *Character) BlowInput(caster creature.DeathActor, def modelskill.Definition) (formulas.BlowInput, bool) {
+func (c *Character) BlowInput(caster attackable.Combatant, def modelskill.Definition) (formulas.BlowInput, bool) {
 	return creature.ResolveBlowInput(caster, c, def, creature.Playable(caster))
 }
 
@@ -691,7 +684,7 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill
 // cast by caster against c.
-func (c *Character) ManaDamageInput(caster creature.DeathActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (c *Character) ManaDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, c, c.MaxMPValue(), def)
 }
 
@@ -701,14 +694,11 @@ func (c *Character) LethalRate() float64 {
 }
 
 // LethalInput resolves a lethal-strike roll against c.
-func (c *Character) LethalInput(caster creature.DeathActor, def modelskill.Definition) (formulas.LethalInput, bool) {
+func (c *Character) LethalInput(caster attackable.Combatant, def modelskill.Definition) (formulas.LethalInput, bool) {
 	if c.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
-	attacker, ok := caster.(interface {
-		Level() int
-		LethalRate() float64
-	})
+	attacker, ok := caster.(creature.FormulaActor)
 	if !ok {
 		return formulas.LethalInput{}, false
 	}
@@ -723,7 +713,7 @@ func (c *Character) LethalInput(caster creature.DeathActor, def modelskill.Defin
 }
 
 // ApplyLethalOutcome applies a lethal-strike tier to c.
-func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ creature.DeathActor, _ modelskill.Definition) {
+func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ attackable.Combatant, _ modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
 		c.SetHP(1)

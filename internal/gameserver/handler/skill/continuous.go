@@ -2,7 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -177,7 +177,7 @@ func (continuousHandler) reflectTarget(caster Actor, def modelskill.Definition, 
 // to an incoming AI aggression notification carrying the landed skill's
 // power; a target without one doesn't react to it yet.
 type aggressionNotifiable interface {
-	NotifyAggression(source creature.DeathActor, power int)
+	NotifyAggression(source attackable.Combatant, power int)
 }
 
 // retargetableOnAggression is implemented by a playable target that tracks
@@ -196,7 +196,7 @@ type retargetableOnAggression interface {
 // provoked into attacking the caster if it was already targeting it, or
 // retargeted onto the caster otherwise. A target implementing neither
 // optional surface is left as-is.
-func fireAggressionEvent(caster, effected Actor, def modelskill.Definition) {
+func fireAggressionEvent(caster attackable.Combatant, effected Actor, def modelskill.Definition) {
 	if am, ok := effected.(attackableMarker); ok && am.Attackable() {
 		if n, ok := effected.(aggressionNotifiable); ok {
 			n.NotifyAggression(caster, int(def.Power))

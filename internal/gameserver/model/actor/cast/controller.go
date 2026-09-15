@@ -48,51 +48,6 @@ var (
 	ErrGroundTargetUnset = errors.New("cast: ground target unset")
 )
 
-// cubicLister is the narrow surface a self-targeted cubic-granting skill
-// checks before casting is allowed to start at all — matching the
-// reference's CubicList.isFull() gate in L2SkillSummon.checkCondition. A
-// mass-cubic skill (target type other than SELF) skips this gate entirely;
-// each recipient's own list silently evicts its oldest cubic instead, once
-// the skill actually applies its effect.
-type cubicLister interface {
-	CubicListFull() bool
-}
-
-// signetGroundExiter is the optional owner surface an abort uses to drop a
-// live ground-signet effect, matching the reference exiting the actor's
-// first SIGNET_GROUND effect on every stop. An owner that cannot hold one
-// simply doesn't implement it.
-type signetGroundExiter interface {
-	ExitSignetGround()
-}
-
-// allSkillsDisabler is the optional owner surface for the blanket
-// skill-lock CanCast gates on and an abort lifts, matching Java's
-// Creature.isAllSkillsDisabled()/enableAllSkills(). An owner that cannot
-// carry the lock simply doesn't implement it.
-type allSkillsDisabler interface {
-	AllSkillsDisabled() bool
-	EnableAllSkills()
-}
-
-// groundTargeter is the optional owner surface for the GROUND signet point,
-// matching Java's Player-only _signetLocation (PlayerCast.java:42). An
-// owner that cannot hold one (a non-player caster) skips the unset-signet
-// gate entirely.
-type groundTargeter interface {
-	GroundTarget() (x, y, z int)
-}
-
-// chargeHolder is the optional owner surface for a skill's Force/Soul
-// charge apply at hit time, matching CreatureCast.onMagicHitTimer's
-// `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
-// player-backed actor implements this, so an NPC/summon timed cast is a
-// silent no-op instead of applying charges.
-type chargeHolder interface {
-	IncreaseCharges(count, max int) bool
-	DecreaseCharges(count int) bool
-}
-
 // Actor is the owner state a cast controller reads and updates while
 // validating and advancing casts. Status implementations own stat
 // calculation; the controller only consumes already-resolved costs, speeds,
@@ -120,6 +75,23 @@ type Actor interface {
 
 	ItemCount(itemID int) int
 	ConsumeItem(itemID, count int) bool
+
+	// CubicListFull reports whether a self-targeted cubic-granting skill must
+	// be refused because the caster already holds its maximum cubics.
+	CubicListFull() bool
+	// ExitSignetGround drops the caster's live ground-signet effect on abort.
+	ExitSignetGround()
+	// AllSkillsDisabled reports the blanket skill lock CanCast gates on;
+	// EnableAllSkills lifts it on abort.
+	AllSkillsDisabled() bool
+	EnableAllSkills()
+	// GroundTargetUnset reports whether a ground-targeted cast has no signet
+	// point set. Only players hold one; other casters never block.
+	GroundTargetUnset() bool
+	// IncreaseCharges and DecreaseCharges apply a skill's Force/Soul charges
+	// at hit time; only players carry charges.
+	IncreaseCharges(count, max int) bool
+	DecreaseCharges(count int) bool
 }
 
 // Plan is the timing and reuse state for one accepted cast. Durations are
@@ -250,17 +222,15 @@ func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) er
 	if c.CastingNow() {
 		return ErrAlreadyCasting
 	}
-	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+	if c.actor.AllSkillsDisabled() {
 		return ErrAllSkillsDisabled
 	}
 	if c.actor.SkillDisabled(ReuseKey(def)) {
 		return ErrSkillDisabled
 	}
 	if def.Target == modelskill.TargetGround {
-		if gt, ok := c.actor.(groundTargeter); ok {
-			if x, y, z := gt.GroundTarget(); x == 0 && y == 0 && z == 0 {
-				return ErrGroundTargetUnset
-			}
+		if c.actor.GroundTargetUnset() {
+			return ErrGroundTargetUnset
 		}
 	}
 	return nil
@@ -272,7 +242,7 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
-	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+	if c.actor.AllSkillsDisabled() {
 		return ErrAllSkillsDisabled
 	}
 	key := ReuseKey(def)
@@ -295,7 +265,7 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		return ErrPhysicalMuted
 	}
 	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
-		if lister, ok := c.actor.(cubicLister); ok && lister.CubicListFull() {
+		if c.actor.CubicListFull() {
 			return ErrCubicListFull
 		}
 	}
@@ -440,12 +410,10 @@ func (c *Controller) Hit() error {
 	// (CreatureCast.java:276-282): runs after the MP/HP consume above and
 	// before the caller's Hooks.Hit applies the skill's effects.
 	if def.NumCharges > 0 {
-		if ch, ok := c.actor.(chargeHolder); ok {
-			if def.MaxCharges > 0 {
-				ch.IncreaseCharges(def.NumCharges, def.MaxCharges)
-			} else {
-				ch.DecreaseCharges(def.NumCharges)
-			}
+		if def.MaxCharges > 0 {
+			c.actor.IncreaseCharges(def.NumCharges, def.MaxCharges)
+		} else {
+			c.actor.DecreaseCharges(def.NumCharges)
 		}
 	}
 	return nil
@@ -525,14 +493,12 @@ func (c *Controller) finishLocked() func(bool) {
 }
 
 func (c *Controller) exitSignetGround() {
-	if s, ok := c.actor.(signetGroundExiter); ok {
-		s.ExitSignetGround()
-	}
+	c.actor.ExitSignetGround()
 }
 
 func (c *Controller) enableAllSkills() {
-	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
-		d.EnableAllSkills()
+	if c.actor.AllSkillsDisabled() {
+		c.actor.EnableAllSkills()
 	}
 }
 

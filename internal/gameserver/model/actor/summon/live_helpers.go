@@ -63,14 +63,6 @@ func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset loca
 	actor.owner = owner
 	actor.world = state
 	x, y, z := owner.Position()
-	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, ownerHeading(owner))
+	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, owner.Heading())
 	state.AddSummon(owner.ObjectID(), actor)
-}
-
-func ownerHeading(owner Owner) int {
-	h, ok := owner.(interface{ Heading() int })
-	if !ok {
-		return 0
-	}
-	return h.Heading()
 }

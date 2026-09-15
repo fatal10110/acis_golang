@@ -130,15 +130,8 @@ func cubicWithinRange(a, b Target) bool {
 	dz := float64(az - bz)
 	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
 
-	total := float64(cubicMaxMagicRange) + cubicCollisionRadius(a) + cubicCollisionRadius(b)
+	total := float64(cubicMaxMagicRange) + collisionRadius(a) + collisionRadius(b)
 	return dist <= total
-}
-
-func cubicCollisionRadius(t Target) float64 {
-	if cr, ok := t.(interface{ CollisionRadius() float64 }); ok {
-		return cr.CollisionRadius()
-	}
-	return 0
 }
 
 // cubicHealTarget and cubicHealEffectiveness are the narrow surfaces
@@ -184,7 +177,7 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // outcome) back to the caller, matching useContinuousSkill (Cubic.java:439-444):
 // a failed offensive continuous roll must still reach the owner as
 // ATTACK_FAILED, not be dropped silently.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Actor, def modelskill.Definition, target Target) EffectResult {
+func ApplyCubicEffect(skills *handlerskill.Registry, caster attackable.Combatant, def modelskill.Definition, target Target) EffectResult {
 	if skills == nil {
 		return EffectResult{}
 	}

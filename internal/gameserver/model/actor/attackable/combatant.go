@@ -14,6 +14,8 @@ type Combatant interface {
 	Heading() int
 	CollisionRadius() float64
 	CollisionHeight() float64
+	// CharacterName is the display name system messages use for the combatant.
+	CharacterName() string
 	Level() int
 
 	// Karma is the combatant's PK karma; 0 for kinds that carry none.
@@ -33,9 +35,14 @@ type Combatant interface {
 	IsMoving() bool
 	MovementDisabled() bool
 	InPeaceZone() bool
+	// EffectRangeInPeaceZone reports whether an effect of effectRange centered
+	// on (x, y, z) overlaps a peace zone in the combatant's region.
+	EffectRangeInPeaceZone(x, y, z, effectRange int) bool
 	// SilentMoving reports whether the combatant moves unseen by aggressive
 	// NPCs outside their close range.
 	SilentMoving() bool
+	// Knows reports whether other is in this combatant's known list.
+	Knows(other Combatant) bool
 	SpawnProtected() bool
 	// CanGiveDamage reports whether the combatant may damage others; only
 	// access-level restrictions revoke it.

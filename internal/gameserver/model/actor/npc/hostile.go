@@ -767,7 +767,7 @@ func (h *Hostile) MarkDead() bool {
 // task afterwards (using Instance.Template.CorpseTime as the display
 // interval) — Hostile does not hold a reference to that task, so the
 // scheduling stays at the orchestration layer that owns it.
-func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) bool {
+func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bool {
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}

@@ -3,7 +3,6 @@ package summon
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -34,12 +33,6 @@ func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.G
 
 // Kind reports KindSummon.
 func (a *Actor) Kind() actor.Kind { return actor.KindSummon }
-
-// ActingPlayer returns the owner for player-attributed outcomes.
-func (a *Actor) ActingPlayer() creature.DeathActor {
-	owner, _ := a.owner.(creature.DeathActor)
-	return owner
-}
 
 // OwnerID returns the owning player's world object id.
 func (a *Actor) OwnerID() int32 {
@@ -98,12 +91,8 @@ func (a *Actor) SyncControlItemEnchant() bool {
 	return a.ownerInventory.SetEnchantLevel(inst, level)
 }
 
-func (a *Actor) notifyDamage(attacker any, amount float64) {
-	named, ok := attacker.(interface{ CharacterName() string })
-	if !ok {
-		return
-	}
-	a.emit(event.Damaged{AttackerName: named.CharacterName(), Damage: int32(amount)})
+func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
+	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: int32(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.

@@ -1,7 +1,7 @@
 package skill
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -49,7 +49,7 @@ func (h fusionHandler) Use(cast Cast) {
 	}
 }
 
-func (h fusionHandler) applyTriggered(caster, effected Actor, triggeredID modelskill.ID, level int) {
+func (h fusionHandler) applyTriggered(caster attackable.Combatant, effected Actor, triggeredID modelskill.ID, level int) {
 	def, ok := h.defs.Definition(modelskill.Ref{ID: triggeredID, Level: level})
 	if !ok {
 		return
@@ -58,11 +58,8 @@ func (h fusionHandler) applyTriggered(caster, effected Actor, triggeredID models
 }
 
 // DecreaseFusion removes one level from the target's triggered fusion effect.
-// It is called when the owning FUSION cast channel ends or aborts. effected
-// takes creature.DeathActor because the channel's caller holds its target as
-// a world-object selection rather than a resolved cast participant; a
-// selection that owns no effect list is dropped below either way.
-func DecreaseFusion(defs Definitions, caster Actor, effected creature.DeathActor, castSkill modelskill.Definition) {
+// It is called when the owning FUSION cast channel ends or aborts.
+func DecreaseFusion(defs Definitions, caster, effected attackable.Combatant, castSkill modelskill.Definition) {
 	target, ok := effected.(effectListTarget)
 	if !ok || defs == nil {
 		return
@@ -75,6 +72,6 @@ func DecreaseFusion(defs Definitions, caster Actor, effected creature.DeathActor
 	}
 	h := fusionHandler{defs: defs}
 	e.DecreaseForce(list, func(level int) {
-		h.applyTriggered(caster, target, triggeredID, level)
+		h.applyTriggered(caster, effected, triggeredID, level)
 	})
 }

@@ -9,6 +9,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -762,6 +763,7 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 // destination, proving the mirror path reuses the same ApplyEffects surface
 // any caster drives rather than a servitor-specific one.
 type fakeSummon struct {
+	attackabletest.Combatant
 	id int32
 }
 
@@ -888,6 +890,7 @@ func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Creature, int, 
 
 // ---- from use_skill_test.go ----
 type fakeCaster struct {
+	attackabletest.Combatant
 	disabled             map[int32]bool
 	disableCalls         int
 	reuseCalls           int

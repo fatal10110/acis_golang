@@ -78,17 +78,9 @@ func (a *Actor) CanSee(target attackable.Combatant) bool {
 	if a.los == nil {
 		return true
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var height float64
-	if target, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		height = target.CollisionHeight()
-	}
 	ox, oy, oz := a.Position()
-	tx, ty, tz := other.Position()
-	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, height)
+	tx, ty, tz := target.Position()
+	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
 }
 func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSpeed()) }
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }

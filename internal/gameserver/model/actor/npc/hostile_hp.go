@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
@@ -63,7 +64,7 @@ func (h *Hostile) SetCurrentMP(mp int) {
 // HP change itself (CreatureStatus.java:209-226): an invulnerable NPC, or
 // one hit by an attacker without damage permission, still aggroes and calls
 // its party, but takes no damage.
-func (h *Hostile) TakeDamage(dmg int, attacker creature.DeathActor) bool {
+func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if h.AlikeDead() {
 		return false
 	}

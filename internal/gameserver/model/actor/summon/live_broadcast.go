@@ -52,23 +52,15 @@ func (a *Actor) BroadcastStop() error {
 }
 
 func (a *Actor) SetHeadingTo(target attackable.Combatant) {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return
-	}
 	sx, sy, _ := a.Position()
-	tx, ty, _ := other.Position()
+	tx, ty, _ := target.Position()
 	a.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
 func (a *Actor) BroadcastMoveToPawn(target attackable.Combatant) error {
-	located, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return nil
-	}
 	sx, sy, sz := a.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
-	tx, ty, tz := located.Position()
+	tx, ty, tz := target.Position()
 	distance := int(origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}))
 	a.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: distance, Origin: origin})
 	return nil

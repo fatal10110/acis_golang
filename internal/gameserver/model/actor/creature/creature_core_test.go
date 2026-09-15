@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -15,6 +17,7 @@ import (
 
 // ---- from death_test.go ----
 type deathTestActor struct {
+	attackabletest.Combatant
 	id   int32
 	mu   sync.Mutex
 	dead bool
@@ -33,10 +36,10 @@ func (a *deathTestActor) MarkDead() bool {
 }
 
 type recordingRewarder struct {
-	calls []DeathActor
+	calls []attackable.Combatant
 }
 
-func (r *recordingRewarder) CalculateRewards(killer DeathActor) {
+func (r *recordingRewarder) CalculateRewards(killer attackable.Combatant) {
 	r.calls = append(r.calls, killer)
 }
 
@@ -99,6 +102,7 @@ func TestDieConcurrentOnlyOneWinner(t *testing.T) {
 // randomDamageTestActor is a minimal FormulaActor stub for exercising
 // RandomDamageMultiplier in isolation.
 type randomDamageTestActor struct {
+	attackabletest.Combatant
 	level         int
 	spread        int
 	roll          int
@@ -481,18 +485,12 @@ func TestLiveInvulReportsChange(t *testing.T) {
 }
 
 type facingStub struct {
+	attackabletest.Combatant
 	x, y, z, heading int
 }
 
 func (s facingStub) Position() (int, int, int) { return s.x, s.y, s.z }
 func (s facingStub) Heading() int              { return s.heading }
-
-type currentHeadingStub struct {
-	facingStub
-	current int
-}
-
-func (s currentHeadingStub) CurrentHeading() int { return s.current }
 
 type nightStub bool
 
@@ -514,16 +512,6 @@ func TestAttackFacingBehindFrontAndSide(t *testing.T) {
 	behind, inFront = AttackFacing(target, facingStub{y: 100})
 	if behind || inFront {
 		t.Fatalf("side attacker: behind=%v inFront=%v, want false, false", behind, inFront)
-	}
-}
-
-func TestAttackFacingPrefersCurrentHeading(t *testing.T) {
-	// Heading() faces north (16384); CurrentHeading faces east (0).
-	target := currentHeadingStub{facingStub: facingStub{heading: 16384}, current: 0}
-
-	behind, inFront := AttackFacing(target, facingStub{x: -100})
-	if !behind || inFront {
-		t.Fatalf("CurrentHeading 0, attacker x=-100: behind=%v inFront=%v, want true, false", behind, inFront)
 	}
 }
 
@@ -562,6 +550,7 @@ func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 }
 
 type physicalAttackActor struct {
+	attackabletest.Combatant
 	id         int32
 	x, y, z    int
 	heading    int
@@ -618,7 +607,7 @@ type shieldedPhysicalAttackActor struct {
 	shield formulas.ShieldDefense
 }
 
-func (a *shieldedPhysicalAttackActor) ShieldDefense(DeathActor, modelskill.Definition, bool) formulas.ShieldDefense {
+func (a *shieldedPhysicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
 	return a.shield
 }
 
@@ -732,8 +721,21 @@ func (randomDamageTestActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (randomDamageTestActor) WeaponGradePenalty() bool { return false }
 
-func (physicalAttackActor) Kind() actor.Kind { return actor.KindNPC }
+func (a physicalAttackActor) Kind() actor.Kind {
+	if a.playable {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
 
 func (physicalAttackActor) WeaponGradePenalty() bool { return false }
 
 func (ccTestTarget) Kind() actor.Kind { return actor.KindNPC }
+
+func (*deathTestActor) Heading() int { return 0 }
+
+func (*deathTestActor) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (randomDamageTestActor) LethalRate() float64 { return 0 }
+
+func (physicalAttackActor) LethalRate() float64 { return 0 }

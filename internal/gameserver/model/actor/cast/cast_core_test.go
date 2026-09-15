@@ -1148,7 +1148,10 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 // skill (DEBUFF/DOT/etc.) always fails its landing roll — matching
 // Cubic.useContinuousSkill's calcCubicSkillSuccess()==false branch
 // (Cubic.java:439-444), the case this test exercises.
-type fakeCubicEffectCaster struct{ id int32 }
+type fakeCubicEffectCaster struct {
+	attackabletest.Combatant
+	id int32
+}
 
 func (f *fakeCubicEffectCaster) ObjectID() int32           { return f.id }
 func (f *fakeCubicEffectCaster) Position() (int, int, int) { return 0, 0, 0 }
@@ -1300,6 +1303,7 @@ func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 // caster, proving the resolution path ApplyEffects drives doesn't require
 // the live-player packet-handling type the player cast flow uses.
 type effectsActor struct {
+	attackabletest.Combatant
 	id       int32
 	x, y, z  int
 	category skilltarget.Category
@@ -1315,13 +1319,13 @@ type pvpEffectsActor struct {
 }
 
 type pvpSkillCall struct {
-	targets   []creature.DeathActor
+	targets   []attackable.Combatant
 	offensive bool
 	skillType string
 }
 
-func (a *pvpEffectsActor) NotePvPSkillTargets(targets []creature.DeathActor, offensive bool, skillType string) {
-	a.calls = append(a.calls, pvpSkillCall{targets: append([]creature.DeathActor(nil), targets...), offensive: offensive, skillType: skillType})
+func (a *pvpEffectsActor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+	a.calls = append(a.calls, pvpSkillCall{targets: append([]attackable.Combatant(nil), targets...), offensive: offensive, skillType: skillType})
 }
 
 type cursePvpEffectsActor struct {
@@ -1452,7 +1456,7 @@ func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 		t.Fatalf("PvP status calls = %d, want 1", len(caster.calls))
 	}
 	call := caster.calls[0]
-	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != target {
+	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != attackable.Combatant(target) {
 		t.Fatalf("PvP status call = %+v, want offensive selected target", call)
 	}
 }
@@ -2097,7 +2101,7 @@ func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
 
 // TestPlayerActorAllSkillsDisabledReflectsCrowdControl covers Java's
 // Creature.isAllSkillsDisabled(): a live crowd-control state (here, Stun)
-// blocks casting through the same allSkillsDisabler seam Controller.CanCast
+// blocks casting through the same Actor.AllSkillsDisabled seam Controller.CanCast
 // and Controller.Stop both probe, and EnableAllSkills stays a no-op since
 // this port doesn't model the raw Duel-defeat lock.
 func TestPlayerActorAllSkillsDisabledReflectsCrowdControl(t *testing.T) {
@@ -2919,7 +2923,7 @@ type groundTestActor struct {
 	gx, gy, gz int
 }
 
-func (a *groundTestActor) GroundTarget() (x, y, z int) { return a.gx, a.gy, a.gz }
+func (a *groundTestActor) GroundTargetUnset() bool { return a.gx == 0 && a.gy == 0 && a.gz == 0 }
 
 // TestCanAttemptCastRejectsUnsetGroundTarget covers PlayerCast.canAttemptCast
 // (PlayerCast.java:224): a GROUND skill requested before any
@@ -3046,8 +3050,39 @@ func (effectsActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (fakeCubicEffectTarget) Kind() actor.Kind { return actor.KindNPC }
 
-func (launchActor) Kind() actor.Kind { return actor.KindNPC }
+func (a *launchActor) Kind() actor.Kind {
+	if a.category.Has(skilltarget.CategoryPlayable) {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
 
 func (castHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+func (fakeCubicEffectCaster) Heading() int { return 0 }
+
+func (fakeCastCreature) CanSeeTarget(skilltarget.Creature) bool { return true }
+
+func (abortActor) DecreaseCharges(int) bool { return false }
+
+func (abortActor) GroundTargetUnset() bool { return false }
+
+func (abortActor) IncreaseCharges(int, int) bool { return false }
+
+func (reentrantCostActor) DecreaseCharges(int) bool { return false }
+
+func (reentrantCostActor) ExitSignetGround() {}
+
+func (reentrantCostActor) GroundTargetUnset() bool { return false }
+
+func (reentrantCostActor) IncreaseCharges(int, int) bool { return false }
+
+func (testActor) DecreaseCharges(int) bool { return false }
+
+func (testActor) ExitSignetGround() {}
+
+func (testActor) GroundTargetUnset() bool { return false }
+
+func (testActor) IncreaseCharges(int, int) bool { return false }

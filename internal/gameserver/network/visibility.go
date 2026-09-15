@@ -65,6 +65,13 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	}
 }
 
+// liveSummonOwner returns the connected player controlling a.
+func liveSummonOwner(a *summon.Actor) (*livePlayer, bool) {
+	owner, _ := a.Owner()
+	live, ok := owner.(*livePlayer)
+	return live, ok
+}
+
 // sendSummonInfosToOwner republishes the owner-only pet window. PetInfo
 // wipes PartySpelled icons; re-push is deferred with #1268 — that issue's
 // notifyAbnormalUpdate wiring does not cover this trigger.
@@ -72,7 +79,7 @@ func sendSummonInfosToOwner(a *summon.Actor) {
 	if a == nil {
 		return
 	}
-	owner, ok := a.ActingPlayer().(*livePlayer)
+	owner, ok := liveSummonOwner(a)
 	if !ok {
 		return
 	}
@@ -160,7 +167,7 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 	}
 	x, y, z := a.Position()
 	title, pvpFlag, karma := "", 0, 0
-	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
+	if owner, ok := liveSummonOwner(a); ok {
 		title = owner.Name
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()

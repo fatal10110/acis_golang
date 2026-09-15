@@ -282,6 +282,10 @@ func (c *Character) CurrentLocation() location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
+// Heading is CurrentHeading: the live heading while spawned, the last-known
+// heading otherwise, matching Position.
+func (c *Character) Heading() int { return c.CurrentHeading() }
+
 // CurrentHeading returns the synchronized live heading when c is spawned,
 // otherwise the persisted last-known heading.
 func (c *Character) CurrentHeading() int {

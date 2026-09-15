@@ -428,7 +428,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if actor == nil {
 		return
 	}
-	owner, ok := actor.ActingPlayer().(*livePlayer)
+	owner, ok := liveSummonOwner(actor)
 	if !ok {
 		return
 	}

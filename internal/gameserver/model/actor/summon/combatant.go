@@ -1,6 +1,9 @@
 package summon
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+import (
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+)
 
 // Karma reports 0: a summon carries no karma of its own.
 func (a *Actor) Karma() int { return 0 }
@@ -30,3 +33,7 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 	}
 	return a.owner, true
 }
+
+// CanSeeTarget reports true: the launch-phase line-of-sight gate is not wired
+// for summon casts yet, so it never aborts one.
+func (a *Actor) CanSeeTarget(skilltarget.Creature) bool { return true }

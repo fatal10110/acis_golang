@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -26,7 +27,7 @@ type Actor interface {
 
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster  Actor
+	Caster  attackable.Combatant
 	Skill   modelskill.Definition
 	Targets []Actor
 	// Item is a genuinely heterogeneous payload with unrelated consumers
@@ -316,4 +317,12 @@ type cursedWeaponHolder interface {
 func cursed(a Actor) bool {
 	c, ok := a.(cursedWeaponHolder)
 	return ok && c.CursedWeaponEquipped()
+}
+
+// combatantOf returns a as a combatant, or nil for a cast participant that is
+// not a creature (a door or a signet effect point). Formula inputs treat a nil
+// caster as one that cannot roll.
+func combatantOf(a Actor) attackable.Combatant {
+	c, _ := a.(attackable.Combatant)
+	return c
 }

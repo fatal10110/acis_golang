@@ -30,22 +30,16 @@ type RaidCurseTarget interface {
 	attackable.Combatant
 
 	Attackable() bool
-	Level() int
 	NpcID() int
-	Dead() bool
 	StopAggroHate(attackable.Combatant)
-	Position() (int, int, int)
 }
 
 // RaidCurseAttacker is the playable receiving the curse decision.
 type RaidCurseAttacker interface {
 	attackable.Combatant
 
-	Level() int
 	EffectList() *effect.List
-	Position() (int, int, int)
 	Invul() bool
-	Dead() bool
 }
 
 // RaidCurseInput is the playable attack-curse decision.
@@ -63,7 +57,6 @@ type RaidCurseInput struct {
 // skill-see branch consults for hate.
 type RaidCurseSkillRaid interface {
 	RaidCurseTarget
-	RaidRelated() bool
 	AggroHate(attackable.Combatant) float64
 }
 
@@ -89,10 +82,8 @@ type RaidCurseSkillInput struct {
 // SkillSeeTargetOf classifies t for the skill-see curse decision.
 func SkillSeeTargetOf(t any, playable bool) RaidCurseSkillSeeTarget {
 	var item RaidCurseSkillSeeTarget
-	if raid, ok := t.(RaidCurseTarget); ok && raid.Attackable() {
-		if related, ok := t.(interface{ RaidRelated() bool }); ok && related.RaidRelated() {
-			item.Raid = raid
-		}
+	if raid, ok := t.(RaidCurseTarget); ok && raid.Attackable() && raid.RaidRelated() {
+		item.Raid = raid
 	}
 	if playable {
 		if helped, ok := t.(attackable.Combatant); ok {
@@ -262,10 +253,10 @@ func applyRaidCurseEffects(attacker RaidCurseAttacker, target RaidCurseTarget, d
 	effect.Apply(attacker.EffectList(), effector, effected, effect.SkillFromDefinition(def), def.Effects)
 }
 
-// NPCIDOf returns target's NPC id when it exposes one, otherwise 0.
+// NPCIDOf returns target's NPC id when it is a raid curse target, otherwise 0.
 func NPCIDOf(target attackable.Combatant) int {
-	if n, ok := target.(interface{ NpcID() int }); ok {
-		return n.NpcID()
+	if raid, ok := target.(RaidCurseTarget); ok {
+		return raid.NpcID()
 	}
 	return 0
 }

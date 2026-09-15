@@ -12,7 +12,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -1938,23 +1941,28 @@ func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	}
 }
 
-type overhitActor int32
-
-func (a overhitActor) ObjectID() int32 { return int32(a) }
-
-type overhitSummon struct {
-	id    int32
-	owner creature.DeathActor
+type overhitActor struct {
+	attackabletest.Combatant
+	id int32
 }
 
-func (s overhitSummon) ObjectID() int32 { return s.id }
-func (s overhitSummon) ActingPlayer() creature.DeathActor {
-	return s.owner
+func (a overhitActor) ObjectID() int32 { return a.id }
+
+type overhitSummon struct {
+	attackabletest.Combatant
+	id    int32
+	owner attackable.Combatant
+}
+
+func (s overhitSummon) ObjectID() int32  { return s.id }
+func (s overhitSummon) Kind() actor.Kind { return actor.KindSummon }
+func (s overhitSummon) Owner() (attackable.Combatant, bool) {
+	return s.owner, s.owner != nil
 }
 
 func TestOverhitBonusExpOracle(t *testing.T) {
-	attacker := overhitActor(1)
-	other := overhitActor(2)
+	attacker := overhitActor{id: 1}
+	other := overhitActor{id: 2}
 
 	t.Run("no overhit", func(t *testing.T) {
 		var s overhitState
@@ -2129,3 +2137,11 @@ func TestMakeAttackHitAppliesRacePosAndIgnoresPvP(t *testing.T) {
 		t.Fatalf("RaceMultiplier = %v, want 1.49", target.RaceMultiplier(attacker))
 	}
 }
+
+func (overhitActor) Heading() int { return 0 }
+
+func (overhitActor) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (overhitSummon) Heading() int { return 0 }
+
+func (overhitSummon) Position() (x, y, z int) { return 0, 0, 0 }

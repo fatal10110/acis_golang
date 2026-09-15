@@ -50,13 +50,12 @@ func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float
 // AttackableAI.onEvtAggression (AttackableAI.java:119-123), which routes the
 // AGGRESSION event into the same per-script onAttacked(actor, target, aggro,
 // null) chain a real hit uses, with aggro standing in for damage.
-func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
-	combatant, ok := source.(attackable.Combatant)
-	if !ok {
+func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
+	if source == nil {
 		return
 	}
-	h.AddAttackDesire(combatant, h.attackedHateWeight(combatant, float64(power)))
-	h.propagatePartyAttacked(h, combatant, power, true)
+	h.AddAttackDesire(source, h.attackedHateWeight(source, float64(power)))
+	h.propagatePartyAttacked(h, source, power, true)
 }
 
 // registerHit records hate, the shot-recharge roll, and the party/minion
@@ -70,9 +69,8 @@ func (h *Hostile) NotifyAggression(source creature.DeathActor, power int) {
 // attacker isn't a Combatant (e.g. an environmental DOT source). Pulled out
 // after this exact block drifted out of order between copies twice (#2326,
 // #2328) — one place to keep the ordering right.
-func (h *Hostile) registerHit(attacker any, amount float64, isDOT bool) {
-	combatant, ok := attacker.(attackable.Combatant)
-	if !ok {
+func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, isDOT bool) {
+	if combatant == nil {
 		return
 	}
 	if isDOT {
