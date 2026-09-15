@@ -3,29 +3,26 @@ package effect
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func stunStart(e *Effect) bool {
-	abortAll(e.Effected)
-	if target, ok := e.Effected.(idleTarget); ok {
-		target.TryToIdle()
-	}
+	e.Effected.AbortAll(false)
+	e.Effected.TryToIdle()
 	refresh(e.Effected)
 	return true
 }
 
 func rootStart(e *Effect) bool {
-	if target, ok := e.Effected.(moveStopper); ok {
-		target.StopMove()
-	}
+	e.Effected.StopMove()
 	refresh(e.Effected)
 	return true
 }
 
 func sleepStart(e *Effect) bool {
-	abortAll(e.Effected)
+	e.Effected.AbortAll(false)
 	refresh(e.Effected)
 	return true
 }
@@ -34,39 +31,37 @@ func fearStart(e *Effect) bool {
 	if isPlayable(e.Effected) && fearHalvedDurationPlayableSkillIDs[e.Skill.ID] {
 		e.Template.Count /= 2
 	}
-	if fearImmune(e.Effected) || isAfraid(e.Effected) {
+	if e.Effected.FearImmune() || e.Effected.Afraid() {
 		return false
 	}
 	if isPlayable(e.Effected) && fearSkippedPlayableSkillIDs[e.Skill.ID] {
 		return false
 	}
 
-	abortAll(e.Effected)
+	e.Effected.AbortAll(false)
 	refresh(e.Effected)
 	return fearAction(e)
 }
 
 func fearAction(e *Effect) bool {
-	target, ok := e.Effected.(fleeTarget)
-	if !ok {
-		return false
-	}
-	target.FleeFrom(e.Effector, 500)
-	return true
+	return e.Effected.FleeFrom(e.Effector, 500)
 }
 
 func fearExit(e *Effect) {
-	if target, ok := e.Effected.(effectStopper); ok {
-		target.StopEffects(TypeFear)
-	}
+	e.Effected.StopEffects(TypeFear)
 	refresh(e.Effected)
 }
 
 func thinkAndRefreshExit(e *Effect) {
-	if target, ok := e.Effected.(thinkTarget); ok {
-		_ = target.Think()
-	}
+	think(e.Effected)
 	refresh(e.Effected)
+}
+
+// think wakes an NPC target's AI; other kinds have no AI loop to wake.
+func think(target Actor) {
+	if npc, ok := asNPC(target); ok {
+		_ = npc.Think()
+	}
 }
 
 func refreshExit(e *Effect) {
@@ -77,28 +72,24 @@ func abortCastStart(e *Effect) bool {
 	if e.Effected == nil || e.Effected == e.Effector {
 		return false
 	}
-	if rt, ok := e.Effected.(raidTarget); ok && rt.RaidRelated() {
+	if e.Effected.RaidRelated() {
 		return false
 	}
-	if target, ok := e.Effected.(castInterrupter); ok && target.CastingNow() {
+	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() {
 		target.InterruptCast()
 	}
 	return true
 }
 
 func immobileUntilAttackedStart(e *Effect) bool {
-	abortAll(e.Effected)
+	e.Effected.AbortAll(false)
 	refresh(e.Effected)
 	return true
 }
 
 func immobileUntilAttackedExit(e *Effect) {
-	if target, ok := e.Effected.(skillIDEffectStopper); ok {
-		target.StopSkillEffectsByID(e.Skill.ID)
-	}
-	if target, ok := e.Effected.(thinkTarget); ok {
-		_ = target.Think()
-	}
+	e.Effected.StopSkillEffectsByID(e.Skill.ID)
+	think(e.Effected)
 	refresh(e.Effected)
 }
 
@@ -111,33 +102,29 @@ func immobileUntilAttackedAction(e *Effect) bool {
 }
 
 func immobilizeEffectorStart(e *Effect) bool {
-	if target, ok := e.Effector.(immobilizeTarget); ok {
-		target.SetImmobilized(true)
+	if e.Effector != nil {
+		e.Effector.SetImmobilized(true)
 	}
 	return true
 }
 
 func immobilizeEffectorExit(e *Effect) {
-	if target, ok := e.Effector.(immobilizeTarget); ok {
-		target.SetImmobilized(false)
+	if e.Effector != nil {
+		e.Effector.SetImmobilized(false)
 	}
 }
 
 func invincibleStart(e *Effect) bool {
-	if target, ok := e.Effected.(invulnerabilityTarget); ok {
-		target.SetInvul(true)
-	}
+	e.Effected.SetInvul(true)
 	return true
 }
 
 func invincibleExit(e *Effect) {
-	if target, ok := e.Effected.(invulnerabilityTarget); ok {
-		target.SetInvul(false)
-	}
+	e.Effected.SetInvul(false)
 }
 
 func muteStart(e *Effect) bool {
-	if target, ok := e.Effected.(magicCastTarget); ok && target.CastingNow() && target.CurrentSkillIsMagic() {
+	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() && target.CurrentSkillIsMagic() {
 		target.StopCast()
 	}
 	refresh(e.Effected)
@@ -145,7 +132,7 @@ func muteStart(e *Effect) bool {
 }
 
 func physicalMuteStart(e *Effect) bool {
-	if target, ok := e.Effected.(magicCastTarget); ok && target.CastingNow() && !target.CurrentSkillIsMagic() {
+	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() && !target.CurrentSkillIsMagic() {
 		target.StopCast()
 	}
 	refresh(e.Effected)
@@ -154,7 +141,7 @@ func physicalMuteStart(e *Effect) bool {
 
 func paralyzeStart(e *Effect) bool {
 	startAbnormalEffect(e.Effected, 0x000400)
-	abortAll(e.Effected)
+	e.Effected.AbortAll(false)
 	return true
 }
 
@@ -165,43 +152,35 @@ func paralyzeExit(e *Effect) {
 
 func petrificationStart(e *Effect) bool {
 	startAbnormalEffect(e.Effected, 0x000800)
-	abortAll(e.Effected)
-	if target, ok := e.Effected.(invulnerabilityTarget); ok {
-		target.SetInvul(true)
-	}
+	e.Effected.AbortAll(false)
+	e.Effected.SetInvul(true)
 	return true
 }
 
 func petrificationExit(e *Effect) {
 	stopAbnormalEffect(e.Effected, 0x000800)
 	thinkIfNotPlayer(e.Effected)
-	if target, ok := e.Effected.(invulnerabilityTarget); ok {
-		target.SetInvul(false)
-	}
+	e.Effected.SetInvul(false)
 }
 
-func thinkIfNotPlayer(target Participant) {
-	if player, ok := target.(playerTarget); ok && player.IsPlayer() {
+func thinkIfNotPlayer(target Actor) {
+	if isPlayer(target) {
 		return
 	}
-	if target, ok := target.(thinkTarget); ok {
-		_ = target.Think()
-	}
+	think(target)
 }
 
 func removeTargetStart(e *Effect) bool {
-	if target, ok := e.Effected.(targetClearer); ok {
-		target.ClearTarget()
-		target.StopAttack()
-	}
-	if target, ok := e.Effected.(castStopper); ok {
+	e.Effected.ClearTarget()
+	e.Effected.StopAttack()
+	if target, ok := asPlayer(e.Effected); ok {
 		target.StopCast()
 	}
 	return true
 }
 
 func silenceAllStart(e *Effect) bool {
-	if target, ok := e.Effected.(castStopper); ok {
+	if target, ok := asPlayer(e.Effected); ok {
 		target.StopCast()
 	}
 	refresh(e.Effected)
@@ -212,34 +191,12 @@ func silentMoveAction(e *Effect) bool {
 	if e.Skill.SkillType != "CONT" {
 		return false
 	}
-	target, ok := e.Effected.(mpDotTarget)
-	if !ok {
-		return false
-	}
-	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
-		Dead:   target.Dead(),
-		MP:     target.MPValue(),
-		Damage: e.Template.Value,
-		Toggle: true,
-	})
-	if result.RemovedForLackMP {
-		if notifier, ok := e.Effected.(lackMPNotifier); ok {
-			notifier.NotifyEffectRemovedDueLackMP(e)
-		}
-	}
-	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
-	// amount, not the requested tick damage.
-	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
-		broadcastMPStatus(e.Effected)
-	}
-	return result.Continue
+	return manaDrainTick(e)
 }
 
 func stunSelfStart(e *Effect) bool {
-	if p, ok := e.Effected.(playableTarget); ok && p.Playable() {
-		if target, ok := e.Effected.(idleTarget); ok {
-			target.TryToIdle()
-		}
+	if isPlayable(e.Effected) {
+		e.Effected.TryToIdle()
 	}
 	refresh(e.Effector)
 	return true
@@ -253,74 +210,62 @@ func immobilizePetBuffStart(e *Effect) bool {
 	if !isPlayer(e.Effector) {
 		return false
 	}
-	player, ok := e.Effector.(objectIDTarget)
-	if !ok {
+	summon, ok := asSummon(e.Effected)
+	if !ok || summon.OwnerID() != e.Effector.ObjectID() {
 		return false
 	}
-	summon, ok := e.Effected.(summonOwnerTarget)
-	if !ok || summon.OwnerID() != player.ObjectID() {
-		return false
-	}
-	target, ok := e.Effected.(immobilizeTarget)
-	if !ok {
-		return false
-	}
-	target.SetImmobilized(true)
+	summon.SetImmobilized(true)
 	return true
 }
 
 func immobilizePetBuffExit(e *Effect) {
-	if target, ok := e.Effected.(immobilizeTarget); ok {
-		target.SetImmobilized(false)
-	}
+	e.Effected.SetImmobilized(false)
 }
 
-// fakeDeathStart puts the target in the seated transition Fake Death
-// reuses for its lie-down animation; it always reports success.
-
+// throwUpStart computes a knockback's landing point and starts the
+// client-visible flight. The target is always aborted first, even when the
+// distance gate below rejects the effect outright — that ordering matches
+// the reference behavior, where the abort is unconditional and the range
+// check only guards whether the flight itself happens.
+//
+// The destination pivots on the effector's position, not the effected's:
+// the target is pushed further along the effector-to-effected line. Z is
+// left at the effected's current height even after the X/Y geo correction
+// below — the reference implementation never corrects Z for this effect,
+// a known approximation preserved here rather than fixed. Summons cannot be
+// knocked back yet: they have no flight movement.
 func throwUpStart(e *Effect) bool {
-	abortAll(e.Effected)
+	e.Effected.AbortAll(false)
 
-	source, ok := e.Effector.(flightPosition)
-	if !ok {
+	if e.Effector == nil || e.Effected.Kind() == actor.KindSummon {
 		return false
 	}
-	target, ok := e.Effected.(flightPosition)
-	if !ok {
-		return false
-	}
-	mover, ok := e.Effected.(flightMover)
-	if !ok {
-		return false
-	}
-
-	ox, oy, oz := target.X(), target.Y(), target.Z()
-	dx := float64(source.X() - ox)
-	dy := float64(source.Y() - oy)
+	sx, sy, sz := e.Effector.Position()
+	ox, oy, oz := e.Effected.Position()
+	dx := float64(sx - ox)
+	dy := float64(sy - oy)
 	distance := math.Sqrt(dx*dx + dy*dy)
 	if distance < 1 || distance > 2000 {
 		return false
 	}
 
 	offset := float64(min(int(distance)+e.Skill.FlyRadius, 1400))
-	offset += math.Abs(float64(source.Z() - oz))
+	offset += math.Abs(float64(sz - oz))
 	if offset < 5 {
 		offset = 5
 	}
 
-	x := source.X() - int(offset*(dx/distance))
-	y := source.Y() - int(offset*(dy/distance))
+	x := sx - int(offset*(dx/distance))
+	y := sy - int(offset*(dy/distance))
 	z := oz
 
-	if resolver, ok := e.Effected.(flightResolver); ok {
-		valid := resolver.ValidLocation(ox, oy, oz, x, y, z)
-		x, y = valid.X, valid.Y
-	}
+	valid := e.Effected.ValidLocation(ox, oy, oz, x, y, z)
+	x, y = valid.X, valid.Y
 
 	e.landing = location.Location{X: x, Y: y, Z: z}
 	refresh(e.Effected)
 
-	mover.FlyTo(e.landing, modelskill.FlightThrowUp)
+	e.Effected.FlyTo(e.landing, modelskill.FlightThrowUp)
 	return true
 }
 
@@ -328,8 +273,9 @@ func throwUpStart(e *Effect) bool {
 // syncs it to observers.
 func throwUpExit(e *Effect) {
 	refresh(e.Effected)
-	if mover, ok := e.Effected.(flightMover); ok {
-		mover.SetXYZ(e.landing.X, e.landing.Y, e.landing.Z)
-		mover.BroadcastPosition()
+	if e.Effected.Kind() == actor.KindSummon {
+		return
 	}
+	e.Effected.SetXYZ(e.landing.X, e.landing.Y, e.landing.Z)
+	e.Effected.BroadcastPosition()
 }

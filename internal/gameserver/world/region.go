@@ -92,7 +92,7 @@ func (r *Region) add(obj Tracked) regionActivityArrival {
 		r.objects = append(r.objects, obj)
 	}
 	r.mu.Unlock()
-	if _, ok := obj.(Player); ok {
+	if isPlayer(obj) {
 		r.playersCount++
 	}
 	return regionActivityArrival{r.activityVersion, r.activityPending != 0}
@@ -109,7 +109,7 @@ func (r *Region) remove(id int32) {
 	r.mu.Lock()
 	r.removeAt(i)
 	r.mu.Unlock()
-	if _, isPlayer := obj.(Player); isPlayer {
+	if isPlayer(obj) {
 		r.playersCount--
 	}
 }
@@ -127,7 +127,7 @@ func (r *Region) removeIfSame(id int32, obj Tracked) bool {
 	r.mu.Lock()
 	r.removeAt(i)
 	r.mu.Unlock()
-	if _, isPlayer := obj.(Player); isPlayer {
+	if isPlayer(obj) {
 		r.playersCount--
 	}
 	return true

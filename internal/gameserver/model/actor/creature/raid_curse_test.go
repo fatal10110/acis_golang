@@ -3,10 +3,13 @@ package creature
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestCursesOnAttackPetrifiesLevelGapAndStopsHate(t *testing.T) {
@@ -289,6 +292,8 @@ func TestCursesOnSkillSeeZeroHateAndGapEightDoNotAbort(t *testing.T) {
 }
 
 type cursePlayable struct {
+	world.Presence
+	effecttest.Actor
 	id    int32
 	level int
 	list  *effect.List
@@ -314,6 +319,8 @@ func (p *cursePlayable) RemoveStatsByOwner(effect.ModOwner) {}
 func (p *cursePlayable) MaxBuffCount() int                  { return 20 }
 
 type curseNPC struct {
+	world.Presence
+	effecttest.Actor
 	id          int32
 	npcID       int
 	level       int
@@ -420,3 +427,15 @@ func TestCursesOnAttackEffectRangeBoundary(t *testing.T) {
 		})
 	}
 }
+
+func (*cursePlayable) Kind() actor.Kind { return actor.KindNPC }
+
+func (*curseNPC) Kind() actor.Kind { return actor.KindNPC }
+
+func (*cursePlayable) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (*cursePlayable) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (*cursePlayable) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (*cursePlayable) UpdateEffectIcons() {}

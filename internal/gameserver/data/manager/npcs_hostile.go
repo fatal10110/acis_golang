@@ -103,7 +103,7 @@ func (r *walkerActorRef) TeleportTo(target location.Location) {
 
 // routeAwareMoveController wraps a Hostile's ai.MoveController so that any
 // AI-initiated movement other than route walking (offensive-follow chase,
-// leash return-home) clears routeMove before it starts — otherwise the
+// leash return-home, random walk and escort moves) clears routeMove before it starts — otherwise the
 // arrived hook would treat that move's completion as a route arrival too,
 // since it fires through the same move.Controller and task.Walker.Arrived
 // has no intention of its own to check.
@@ -120,6 +120,11 @@ func (r routeAwareMoveController) MaybeStartOffensiveFollow(target attackable.Co
 func (r routeAwareMoveController) MoveHome(home location.Location) error {
 	r.routeMove.Store(false)
 	return r.MoveController.MoveHome(home)
+}
+
+func (r routeAwareMoveController) MoveToLocation(dest location.Location) (bool, error) {
+	r.routeMove.Store(false)
+	return r.MoveController.MoveToLocation(dest)
 }
 
 func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {

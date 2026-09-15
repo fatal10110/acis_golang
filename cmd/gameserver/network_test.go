@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -17,7 +18,7 @@ type rosterPlayerStub struct {
 func (s *rosterPlayerStub) ObjectID() int32       { return s.id }
 func (s *rosterPlayerStub) AccountName() string   { return s.account }
 func (s *rosterPlayerStub) CharacterName() string { return "" }
-func (s *rosterPlayerStub) WorldPlayer()          {}
+func (s *rosterPlayerStub) Kind() actor.Kind      { return actor.KindPlayer }
 
 func TestOnlineAccountsCollectsWorldRoster(t *testing.T) {
 	state := world.New()

@@ -4,12 +4,14 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -67,12 +69,19 @@ func (hostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 }
 
 type hostileTarget struct {
+	effecttest.Actor
 	world.Presence
 	id       int32
 	playable bool
 }
 
-func (t *hostileTarget) ObjectID() int32  { return t.id }
+func (t *hostileTarget) ObjectID() int32 { return t.id }
+func (t *hostileTarget) Kind() actor.Kind {
+	if t.playable {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
 func (t *hostileTarget) SiegeGuard() bool { return false }
 func (t *hostileTarget) AlikeDead() bool  { return false }
 func (t *hostileTarget) Playable() bool   { return t.playable }
@@ -137,11 +146,12 @@ func (a *hostileAttack) Stop() {}
 
 // hostileEffectTarget satisfies the flee hook a Fear effect's runtime needs,
 // so it activates regardless of what its actual effected actor is.
-type hostileEffectTarget struct{}
+type hostileEffectTarget struct {
+	world.Presence
+	effecttest.Actor
+}
 
-func (hostileEffectTarget) ObjectID() int32                                    { return 0 }
-func (hostileEffectTarget) Dead() bool                                         { return false }
-func (hostileEffectTarget) FleeFrom(effector effect.Participant, distance int) {}
+func (*hostileEffectTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
 
 func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effect {
 	t.Helper()
@@ -149,7 +159,7 @@ func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effec
 	if err != nil {
 		t.Fatalf("effect.New(%q) error: %v", name, err)
 	}
-	e.Effected = hostileEffectTarget{}
+	e.Effected = &hostileEffectTarget{}
 	hostile.EffectList().Add(e)
 	return e
 }
@@ -161,6 +171,7 @@ type frameReceiver struct {
 }
 
 func (f *frameReceiver) ObjectID() int32 { return f.trackedID }
+func (*frameReceiver) Kind() actor.Kind  { return actor.KindNPC }
 
 func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 	defer frame.Release()

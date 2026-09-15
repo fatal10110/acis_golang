@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -401,6 +402,9 @@ func (h *Hostile) ObjectID() int32 {
 	return h.Instance.ObjectID
 }
 
+// Kind reports KindNPC.
+func (h *Hostile) Kind() actor.Kind { return actor.KindNPC }
+
 // Unlockable reports whether this hostile NPC is a chest.
 func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }
 
@@ -763,7 +767,7 @@ func (h *Hostile) MarkDead() bool {
 // task afterwards (using Instance.Template.CorpseTime as the display
 // interval) — Hostile does not hold a reference to that task, so the
 // scheduling stays at the orchestration layer that owns it.
-func (h *Hostile) Die(killer creature.DeathActor, rewards creature.Rewarder) bool {
+func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bool {
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}
@@ -822,6 +826,8 @@ func (h *Hostile) DenyAIAction() bool {
 }
 
 // Knows reports whether target is currently visible to this NPC.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (h *Hostile) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(h, tracked)
@@ -956,10 +962,7 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 }
 
 func (h *Hostile) scheduleWanderRecheck() {
-	mover, ok := h.move.(interface {
-		MoveToLocation(location.Location) (bool, error)
-	})
-	if !ok || h.moveSpeed() <= 0 {
+	if h.moveSpeed() <= 0 {
 		return
 	}
 	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
@@ -970,7 +973,7 @@ func (h *Hostile) scheduleWanderRecheck() {
 		position := h.location()
 		distance := min(int(h.CollisionRadius())*2, 50)
 		radians := (location.HeadingDegrees(h.Heading()) + 180) * math.Pi / 180
-		_, _ = mover.MoveToLocation(location.Location{
+		_, _ = h.move.MoveToLocation(location.Location{
 			X: position.X + int(float64(distance)*math.Cos(radians)),
 			Y: position.Y + int(float64(distance)*math.Sin(radians)),
 			Z: position.Z,

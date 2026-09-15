@@ -27,6 +27,9 @@ type Actor interface {
 	IsRunning() bool
 	IsRiding() bool
 	IsFlying() bool
+	// CurrentHeading is the actor's facing, which IsBehind and IsInFrontOf
+	// read from the other side.
+	CurrentHeading() int
 	IsBehind(other Actor) bool
 	IsInFrontOf(other Actor) bool
 

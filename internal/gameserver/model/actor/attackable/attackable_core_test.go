@@ -3,6 +3,8 @@ package attackable
 import (
 	"sync"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 // ---- from combatant_test.go ----
@@ -17,6 +19,29 @@ type fakeCombatant struct {
 func (f *fakeCombatant) ObjectID() int32  { return f.id }
 func (f *fakeCombatant) SiegeGuard() bool { return f.siegeGuard }
 func (f *fakeCombatant) AlikeDead() bool  { return f.alikeDead }
+
+func (f *fakeCombatant) Position() (x, y, z int)                    { return 0, 0, 0 }
+func (f *fakeCombatant) Heading() int                               { return 0 }
+func (f *fakeCombatant) CollisionRadius() float64                   { return 0 }
+func (f *fakeCombatant) CollisionHeight() float64                   { return 0 }
+func (f *fakeCombatant) CharacterName() string                      { return "" }
+func (f *fakeCombatant) Level() int                                 { return 0 }
+func (f *fakeCombatant) Karma() int                                 { return 0 }
+func (f *fakeCombatant) Dead() bool                                 { return false }
+func (f *fakeCombatant) FakeDeath() bool                            { return false }
+func (f *fakeCombatant) RecentFakeDeath() bool                      { return false }
+func (f *fakeCombatant) IsMoving() bool                             { return false }
+func (f *fakeCombatant) MovementDisabled() bool                     { return false }
+func (f *fakeCombatant) InPeaceZone() bool                          { return false }
+func (f *fakeCombatant) EffectRangeInPeaceZone(x, y, z, r int) bool { return false }
+func (f *fakeCombatant) Knows(Combatant) bool                       { return true }
+func (f *fakeCombatant) SilentMoving() bool                         { return false }
+func (f *fakeCombatant) SpawnProtected() bool                       { return false }
+func (f *fakeCombatant) CanGiveDamage() bool                        { return true }
+func (f *fakeCombatant) TakeDamage(int, Combatant) bool             { return false }
+func (f *fakeCombatant) RaidRelated() bool                          { return false }
+func (f *fakeCombatant) Guard() bool                                { return false }
+func (f *fakeCombatant) Owner() (Combatant, bool)                   { return nil, false }
 
 func combatant(id int32) *fakeCombatant { return &fakeCombatant{id: id} }
 
@@ -260,3 +285,5 @@ func TestThreatTable_ConcurrentAccess(t *testing.T) {
 		t.Errorf("table has %d entries after concurrent add/remove, want 0", len(table.Snapshot()))
 	}
 }
+
+func (fakeCombatant) Kind() actor.Kind { return actor.KindNPC }

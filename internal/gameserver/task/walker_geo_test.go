@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -79,6 +80,7 @@ type controllerWalker struct {
 }
 
 func (w *controllerWalker) ObjectID() int32 { return w.self.ObjectID() }
+func (*controllerWalker) Kind() actor.Kind  { return actor.KindNPC }
 
 func (w *controllerWalker) Position() location.Location {
 	x, y, z := w.self.Position()

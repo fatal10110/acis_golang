@@ -91,3 +91,12 @@ func (a HostileActor) BlessedSpiritshotCharged() bool {
 func (HostileActor) SkillMastery(modelskill.Definition) bool { return false }
 func (HostileActor) ItemCount(int) int                       { return 0 }
 func (HostileActor) ConsumeItem(int, int) bool               { return false }
+
+// HostileActor casters hold no cubics, ground signet, skill lock or charges.
+func (HostileActor) CubicListFull() bool           { return false }
+func (HostileActor) ExitSignetGround()             {}
+func (HostileActor) AllSkillsDisabled() bool       { return false }
+func (HostileActor) EnableAllSkills()              {}
+func (HostileActor) GroundTargetUnset() bool       { return false }
+func (HostileActor) IncreaseCharges(int, int) bool { return false }
+func (HostileActor) DecreaseCharges(int) bool      { return false }

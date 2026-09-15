@@ -36,10 +36,8 @@ const ootSweepPeriod = 10 * time.Second
 type AttackableActor interface {
 	attackable.Combatant
 	DenyAIAction() bool
-	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	ReturnHome() bool
-	IsMoving() bool
 	InTerritory() bool
 	// SetHeadingTo faces the actor toward target, used before committing to
 	// a skill cast whose animation is long enough to plant first.
@@ -48,12 +46,28 @@ type AttackableActor interface {
 	// target, used when a final cast attempt is rejected after movement so
 	// observers still see the actor face its target.
 	BroadcastMoveToPawn(target attackable.Combatant) error
+
+	// IdleFollowTarget is the master an escorting NPC follows when idle; nil
+	// when it escorts no one.
+	IdleFollowTarget() attackable.Combatant
+	// ThinkFollow runs one escort-follow step and reports whether the follow
+	// desire should be cleared.
+	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
+	ShouldIdleWander() bool
+	ForceWalkStance()
+	ForceRunStance()
+	RestoreSpawnHeadingIfAtHome()
+	RealMoveSpeed() float64
+	MoveFromSpawnUsingRandomOffset(offset int)
 }
 
 // MoveController controls movement requests emitted by the AI loop.
 type MoveController interface {
 	MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
 	MoveHome(location.Location) error
+	MoveToLocation(location.Location) (bool, error)
+	// CanMoveTo reports whether a path to the destination exists.
+	CanMoveTo(location.Location) bool
 	Stop() error
 }
 
@@ -345,28 +359,13 @@ const defaultWanderWeight = 5
 // defaultRandomWalkRate is npcs.properties RandomWalkRate's shipped default.
 const defaultRandomWalkRate = 30
 
-// idleFollower is implemented by an NPC that should escort a master when it
-// has nothing else to do.
-type idleFollower interface {
-	IdleFollowTarget() attackable.Combatant
-}
-
-// followThinker is implemented by an NPC that runs escort (or loose)
-// follow movement while IntentionFollow is current.
-type followThinker interface {
-	ThinkFollow(target attackable.Combatant, lastWasFollow bool) (clearDesire bool)
-}
-
 // AddMoveToDesire queues a weighted MOVE_TO request and reports whether it
 // was accepted. It does not take the AI mutex so ReturnHome can enqueue
 // from thinkWander, which already holds it. A movement-disabled actor, or
 // one whose move controller reports the destination unreachable, drops the
 // request.
 func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool {
-	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
-		return false
-	}
-	if g, ok := a.move.(interface{ CanMoveTo(location.Location) bool }); ok && !g.CanMoveTo(loc) {
+	if a.actor.MovementDisabled() || !a.move.CanMoveTo(loc) {
 		return false
 	}
 	a.desires.AddOrUpdate(&Desire{
@@ -396,42 +395,16 @@ func (a *Attackable) thinkIdle() {
 	if a.cast != nil {
 		a.cast.Stop()
 	}
-	if actor, ok := a.actor.(stanceActor); ok {
-		actor.ForceWalkStance()
-	}
+	a.actor.ForceWalkStance()
 	a.current = intention{kind: IntentionIdle}
 }
 
 func (a *Attackable) queueIdleFollow() {
-	follower, ok := a.actor.(idleFollower)
-	if !ok {
-		return
-	}
-	a.addFollowDesire(follower.IdleFollowTarget(), escortFollowWeight)
-}
-
-type idleWanderer interface {
-	ShouldIdleWander() bool
-}
-
-type stanceActor interface {
-	ForceWalkStance()
-	ForceRunStance()
-}
-
-type headingRestorer interface {
-	RestoreSpawnHeadingIfAtHome()
-}
-
-type wanderMover interface {
-	stanceActor
-	RealMoveSpeed() float64
-	MoveFromSpawnUsingRandomOffset(offset int)
+	a.addFollowDesire(a.actor.IdleFollowTarget(), escortFollowWeight)
 }
 
 func (a *Attackable) queueIdleWander() {
-	wanderer, ok := a.actor.(idleWanderer)
-	if !ok || !wanderer.ShouldIdleWander() {
+	if !a.actor.ShouldIdleWander() {
 		return
 	}
 	a.desires.AddOrUpdate(&Desire{
@@ -448,11 +421,7 @@ func (a *Attackable) thinkFollow() error {
 		return nil
 	}
 	a.followPulse++
-	follower, ok := a.actor.(followThinker)
-	if !ok {
-		return nil
-	}
-	if follower.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
+	if a.actor.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
 		a.desires.Remove(IntentionFollow, a.current.target)
 		a.current = intention{kind: IntentionIdle}
 	}
@@ -824,19 +793,13 @@ func (a *Attackable) pruneDesires() {
 	if a.actor.DenyAIAction() {
 		return
 	}
-	ox, oy, oz, ok := combatantPosition(a.actor)
-	if !ok {
-		return
-	}
+	ox, oy, oz := a.actor.Position()
 	origin := location.Location{X: ox, Y: oy, Z: oz}
 	a.desires.RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionAttack || d.FinalTarget == nil {
 			return false
 		}
-		tx, ty, tz, ok := combatantPosition(d.FinalTarget)
-		if !ok {
-			return false
-		}
+		tx, ty, tz := d.FinalTarget.Position()
 		return origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}) > attackDesireRange
 	})
 }
@@ -860,15 +823,6 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 			a.current = intention{kind: IntentionIdle}
 		}
 	}
-}
-
-func combatantPosition(c attackable.Combatant) (x, y, z int, ok bool) {
-	p, ok := c.(interface{ Position() (int, int, int) })
-	if !ok {
-		return 0, 0, 0, false
-	}
-	x, y, z = p.Position()
-	return x, y, z, true
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports
@@ -929,9 +883,7 @@ func (a *Attackable) thinkCast() (bool, error) {
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref))
 	if following {
-		if actor, ok := a.actor.(stanceActor); ok {
-			actor.ForceRunStance()
-		}
+		a.actor.ForceRunStance()
 		return false, err
 	}
 
@@ -959,15 +911,13 @@ func (a *Attackable) thinkMoveTo() {
 	if a.actor.DenyAIAction() {
 		return
 	}
-	if g, ok := a.actor.(interface{ MovementDisabled() bool }); ok && g.MovementDisabled() {
+	if a.actor.MovementDisabled() {
 		return
 	}
-	if ox, oy, oz, ok := combatantPosition(a.actor); ok {
-		if (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
-			a.clearCurrentDesire()
-			a.current = intention{kind: IntentionIdle}
-			return
-		}
+	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
+		a.clearCurrentDesire()
+		a.current = intention{kind: IntentionIdle}
+		return
 	}
 	_ = a.move.MoveHome(a.current.loc)
 }
@@ -986,9 +936,7 @@ func (a *Attackable) Arrived() {
 		return
 	}
 	a.clearArrivalDesire()
-	if restorer, ok := a.actor.(headingRestorer); ok {
-		restorer.RestoreSpawnHeadingIfAtHome()
-	}
+	a.actor.RestoreSpawnHeadingIfAtHome()
 	a.syncOOTSweepLocked()
 }
 
@@ -1015,9 +963,7 @@ func (a *Attackable) clearCurrentDesire() {
 }
 
 func (a *Attackable) thinkWander() {
-	if mover, ok := a.actor.(wanderMover); ok {
-		mover.ForceWalkStance()
-	}
+	a.actor.ForceWalkStance()
 	if a.actor.IsMoving() {
 		return
 	}
@@ -1057,11 +1003,7 @@ func (a *Attackable) doWanderMove() {
 		a.current = intention{kind: IntentionIdle}
 		return
 	}
-	mover, ok := a.actor.(wanderMover)
-	if !ok {
-		return
-	}
-	mover.MoveFromSpawnUsingRandomOffset(int(mover.RealMoveSpeed()) * 3)
+	a.actor.MoveFromSpawnUsingRandomOffset(int(a.actor.RealMoveSpeed()) * 3)
 }
 
 func (a *Attackable) refreshCombatMemory() {

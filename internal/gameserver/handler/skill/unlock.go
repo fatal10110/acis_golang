@@ -2,7 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -22,20 +22,20 @@ type chestTarget interface {
 	SetInteracted()
 	Box() bool
 	Level() int
-	Die(killer creature.DeathActor)
+	Die(killer attackable.Combatant)
 	DeleteMe()
 }
 
 // attackDesirable optionally lets a chest that resists opening notify its
 // AI to attack instead; a target without an AI wired up simply skips it.
 type attackDesirable interface {
-	AddAttackDesire(attacker creature.DeathActor, weight float64)
+	AddAttackDesire(attacker attackable.Combatant, weight float64)
 }
 
 // hateAdder optionally lets a broken-open chest seed its reward
 // distribution with the opener's hate; skipped when unimplemented.
 type hateAdder interface {
-	AddDamageHate(attacker creature.DeathActor, damage, hate float64)
+	AddDamageHate(attacker attackable.Combatant, damage, hate float64)
 }
 
 type unlockHandler struct{}

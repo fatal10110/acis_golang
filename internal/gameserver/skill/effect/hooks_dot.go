@@ -1,11 +1,7 @@
 package effect
 
 func damageOverTimeAction(e *Effect) bool {
-	target, ok := e.Effected.(dotTarget)
-	if !ok {
-		return false
-	}
-
+	target := e.Effected
 	result := DamageOverTimeTick(DamageOverTimeInput{
 		Dead:      target.Dead(),
 		HP:        target.HP(),
@@ -14,8 +10,8 @@ func damageOverTimeAction(e *Effect) bool {
 		Toggle:    e.Skill.Toggle,
 	})
 	if result.RemovedForLackHP {
-		if notifier, ok := e.Effected.(lackHPNotifier); ok {
-			notifier.NotifyEffectRemovedDueLackHP(e)
+		if player, ok := asPlayer(target); ok {
+			player.NotifyEffectRemovedDueLackHP(e)
 		}
 	}
 	if result.Damage > 0 {
@@ -29,11 +25,7 @@ func damageOverTimeAction(e *Effect) bool {
 }
 
 func manaDamageOverTimeAction(e *Effect) bool {
-	target, ok := e.Effected.(mpDotTarget)
-	if !ok {
-		return false
-	}
-
+	target := e.Effected
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
 		MP:     target.MPValue(),
@@ -41,8 +33,8 @@ func manaDamageOverTimeAction(e *Effect) bool {
 		Toggle: e.Skill.Toggle,
 	})
 	if result.RemovedForLackMP {
-		if notifier, ok := e.Effected.(lackMPNotifier); ok {
-			notifier.NotifyEffectRemovedDueLackMP(e)
+		if player, ok := asPlayer(target); ok {
+			player.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
 	// reduceMp itself no-ops and skips the broadcast when the applied
@@ -57,10 +49,7 @@ func manaDamageOverTimeAction(e *Effect) bool {
 }
 
 func manaHealOverTimeAction(e *Effect) bool {
-	target, ok := e.Effected.(manaHealTarget)
-	if !ok {
-		return false
-	}
+	target := e.Effected
 	if !target.CanBeHealed() {
 		return false
 	}
@@ -72,7 +61,20 @@ func manaHealOverTimeAction(e *Effect) bool {
 	return true
 }
 
-func manaDrainTick(e *Effect, target mpDotTarget) bool {
+// manaDrainTick runs one ManaDamageOverTimeTick against e's target and
+// applies its result, shared by relax, chameleon rest, fake death and silent
+// move.
+//
+// Toggle is forced true regardless of e.Skill.Toggle: the reference Relax
+// and ChameleonRest effects check "cost exceeds current MP" unconditionally,
+// not only for toggle skills (unlike EffectManaDamOverTime, whose lack-MP
+// check really is toggle-gated). Every skill carrying either effect in the
+// current datapack happens to be TOGGLE-typed, so reading e.Skill.Toggle
+// would produce the same result today — but that's a data coincidence, not
+// a contract; force true here so a future non-toggle skill using these
+// effects still gets the unconditional check Java requires.
+func manaDrainTick(e *Effect) bool {
+	target := e.Effected
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{
 		Dead:   target.Dead(),
 		MP:     target.MPValue(),
@@ -80,8 +82,8 @@ func manaDrainTick(e *Effect, target mpDotTarget) bool {
 		Toggle: true,
 	})
 	if result.RemovedForLackMP {
-		if notifier, ok := e.Effected.(lackMPNotifier); ok {
-			notifier.NotifyEffectRemovedDueLackMP(e)
+		if player, ok := asPlayer(target); ok {
+			player.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
 	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
@@ -92,9 +94,7 @@ func manaDrainTick(e *Effect, target mpDotTarget) bool {
 	return result.Continue
 }
 
-// immobilizePetBuffStart locks the effected summon in place, gated on the
-// caster being specifically a player and that summon's own owner.
-
+// DamageOverTimeInput is the state a periodic HP damage tick needs.
 type DamageOverTimeInput struct {
 	Dead      bool
 	HP        float64
@@ -163,6 +163,3 @@ func ManaDamageOverTimeTick(in ManaDamageOverTimeInput) ManaDamageOverTimeResult
 	}
 	return ManaDamageOverTimeResult{Damage: in.Damage, Continue: true}
 }
-
-// flightPosition is the world coordinates a knockback reads from both sides
-// of the throw: the effector as pivot, the effected as origin.

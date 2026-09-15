@@ -14,13 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 func (a *Actor) AttackDisabled() bool { return a.DenyAIAction() }
 
 // MovementDisabled reports whether this summon cannot move. Fear is not
@@ -78,17 +71,9 @@ func (a *Actor) CanSee(target attackable.Combatant) bool {
 	if a.los == nil {
 		return true
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var height float64
-	if target, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		height = target.CollisionHeight()
-	}
 	ox, oy, oz := a.Position()
-	tx, ty, tz := other.Position()
-	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, height)
+	tx, ty, tz := target.Position()
+	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
 }
 func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSpeed()) }
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }
@@ -102,12 +87,7 @@ func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
-	other, ok := target.(physicalTarget)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-	formulaTarget, ok := target.(creature.FormulaActor)
+	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true
 		return hit
@@ -120,7 +100,7 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 		return hit
 	}
 	crit := formulas.CritSucceeds(a.CriticalRate(a.combatStats().CritRate), a.Roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(a, formulaTarget, crit)
+	in, shield := creature.ResolvePhysicalAttackInput(a, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
 	hit.Shield = shield

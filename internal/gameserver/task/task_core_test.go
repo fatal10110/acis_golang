@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -2302,3 +2303,5 @@ func TestGroundItemOptionsFromPropertiesSpecialItemsOverridesDefault(t *testing.
 		}
 	}
 }
+
+func (waterFakeActor) Kind() actor.Kind { return actor.KindNPC }

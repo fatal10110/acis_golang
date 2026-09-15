@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -18,6 +19,7 @@ type countingRegenActor struct {
 }
 
 func (a *countingRegenActor) ObjectID() int32 { return a.id }
+func (*countingRegenActor) Kind() actor.Kind  { return actor.KindNPC }
 func (a *countingRegenActor) TickRegen() {
 	a.ticks++
 	if a.on != nil {

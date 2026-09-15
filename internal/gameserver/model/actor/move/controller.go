@@ -156,6 +156,7 @@ func (c *Controller) ObjectID() int32 {
 
 // RegionActor returns the world-tracked actor this controller advances, when
 // the actor participates in region activity.
+// Hostile movement drives a non-world forwarding ref, which reports nil.
 func (c *Controller) RegionActor() world.Tracked {
 	tracked, _ := c.self.(world.Tracked)
 	return tracked
@@ -217,7 +218,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
-	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && targetMoving(target) {
+	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && target.IsMoving() {
 		totalRadius += 50
 	}
 	inRange := origin.In2DRadius(dest, totalRadius)
@@ -425,16 +426,6 @@ func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
 func (c *Controller) selfHasOffensiveFollowLead() bool {
 	actor, ok := c.self.(offensiveFollowLeadActor)
 	return ok && actor.OffensiveFollowLead()
-}
-
-func targetMoving(target attackable.Combatant) bool {
-	if target, ok := target.(interface{ IsMoving() bool }); ok {
-		return target.IsMoving()
-	}
-	if target, ok := target.(interface{ Move() *CreatureMove }); ok {
-		return target.Move().Moving()
-	}
-	return false
 }
 
 func (c *Controller) clearOffensiveFollow() {

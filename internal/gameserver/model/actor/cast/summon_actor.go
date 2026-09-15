@@ -64,3 +64,12 @@ func (a SummonActor) BlessedSpiritshotCharged() bool {
 func (SummonActor) SkillMastery(modelskill.Definition) bool { return false }
 func (SummonActor) ItemCount(int) int                       { return 0 }
 func (SummonActor) ConsumeItem(int, int) bool               { return false }
+
+// SummonActor casters hold no cubics, ground signet, skill lock or charges.
+func (SummonActor) CubicListFull() bool           { return false }
+func (SummonActor) ExitSignetGround()             {}
+func (SummonActor) AllSkillsDisabled() bool       { return false }
+func (SummonActor) EnableAllSkills()              {}
+func (SummonActor) GroundTargetUnset() bool       { return false }
+func (SummonActor) IncreaseCharges(int, int) bool { return false }
+func (SummonActor) DecreaseCharges(int) bool      { return false }

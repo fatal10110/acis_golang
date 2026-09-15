@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -29,7 +31,7 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 	encoded := append([]byte(nil), frame.Bytes()...)
 	frame.Release()
 
-	send := func(receiver interface{ BroadcastFrame(wire.Frame) bool }) {
+	send := func(receiver frameReceiver) {
 		receiver.BroadcastFrame(wire.BorrowedFrame(append([]byte(nil), encoded...)))
 	}
 	send(attacker)
@@ -38,7 +40,7 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 		return
 	}
 	l.world.ForEachKnown(attacker, func(o world.Tracked) {
-		receiver, ok := o.(interface{ BroadcastFrame(wire.Frame) bool })
+		receiver, ok := o.(frameReceiver)
 		if !ok {
 			return
 		}
@@ -359,10 +361,7 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, 
 	if live == nil {
 		return false
 	}
-	chair, ok := target.(interface {
-		staticobject.Chair
-		StaticObjectID() int
-	})
+	chair, ok := target.(staticobject.Chair)
 	if !ok || !staticobject.ClaimChair(live, chair, staticobject.ChairInteractionDistance) {
 		return false
 	}
@@ -380,6 +379,13 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, 
 	return true
 }
 
+// positionedTarget is a target whose facing the client needs revalidated on
+// selection.
+type positionedTarget interface {
+	Position() (int, int, int)
+	Heading() int
+}
+
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
 		return false
@@ -393,22 +399,13 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
 	// ported feature, so every target here is treated as never in one.
 	if target.ObjectID() != live.ObjectID() {
-		// staticobject.Chair excludes the StaticObject branch, which sends no
-		// ValidateLocation in the reference (Player.java:2465-2470); every
-		// other target reaching this point is Creature-ish (Hostile,
-		// player.Character, summon.Actor) and gets Position()/Heading() via
-		// its embedded world.Presence, matching Player.setTarget's
-		// ValidateLocation leg sitting strictly inside the `instanceof
-		// Creature` branch (Player.java:2474-2475). AttackableBy alone would
-		// under-match here: only Hostile and player.Character implement it,
-		// silently excluding summon.Actor.
-		if _, isStatic := target.(staticobject.Chair); !isStatic {
-			if creatureLike, ok := target.(interface {
-				Position() (int, int, int)
-				Heading() int
-			}); ok {
-				x, y, z := creatureLike.Position()
-				live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creatureLike.Heading()))
+		// Every creature target (players, NPCs including decorations,
+		// summons, doors) gets a ValidateLocation; static objects and items
+		// send none.
+		if kind := target.Kind(); kind != actor.KindStatic && kind != actor.KindItem {
+			if creature, ok := target.(positionedTarget); ok {
+				x, y, z := creature.Position()
+				live.SendFrame(serverpackets.FrameValidateLocation(target.ObjectID(), location.Location{X: x, Y: y, Z: z}, creature.Heading()))
 			}
 		}
 	}
@@ -634,9 +631,8 @@ func targetColor(attacker *player.Character, target world.Tracked) int {
 	if attacker == nil {
 		return 0
 	}
-	attackableTarget, ok := target.(interface {
-		AttackableBy(skilltarget.Creature) bool
-	})
+	// Only skill actors have attackability; other objects color neutral.
+	attackableTarget, ok := target.(skilltarget.Actor)
 	if !ok || !attackableTarget.AttackableBy(attacker) {
 		return 0
 	}

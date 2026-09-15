@@ -3,8 +3,14 @@ package effect
 import (
 	"sync"
 	"sync/atomic"
+
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
+// StatOwner is what a List is attached to: the holder its stat modifiers
+// land on, the client icons its changes refresh and the recipient of its
+// expiry messages. Kinds without client icons or messages implement those as
+// no-ops.
 type StatOwner interface {
 	AddStatFuncs([]Mod)
 	RemoveStatsByOwner(owner ModOwner)
@@ -12,6 +18,16 @@ type StatOwner interface {
 	// owner can hold at once (base slot count plus any bonus the owner
 	// grants, e.g. from a known passive).
 	MaxBuffCount() int
+
+	// UpdateEffectIcons refreshes the owner's effect icons after an add or
+	// remove attempt.
+	UpdateEffectIcons()
+	// NotifyEffectWornOff, NotifyEffectDisappeared and NotifyEffectAborted
+	// send the system message that accompanies an icon effect leaving the
+	// list.
+	NotifyEffectWornOff(skillID modelskill.ID, level int)
+	NotifyEffectDisappeared(skillID modelskill.ID, level int)
+	NotifyEffectAborted(skillID modelskill.ID, level int)
 }
 
 // Option changes List behavior.

@@ -428,7 +428,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if actor == nil {
 		return
 	}
-	owner, ok := actor.ActingPlayer().(*livePlayer)
+	owner, ok := liveSummonOwner(actor)
 	if !ok {
 		return
 	}
@@ -466,8 +466,10 @@ type inertSummonMoveController struct{}
 func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
-func (inertSummonMoveController) MoveHome(location.Location) error { return nil }
-func (inertSummonMoveController) Stop() error                      { return nil }
+func (inertSummonMoveController) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (inertSummonMoveController) CanMoveTo(location.Location) bool               { return true }
+func (inertSummonMoveController) MoveHome(location.Location) error               { return nil }
+func (inertSummonMoveController) Stop() error                                    { return nil }
 func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }

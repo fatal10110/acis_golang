@@ -5,20 +5,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from group_test.go ----
 func TestPartyHandlerSweepsActingPlayerAndPartyMembers(t *testing.T) {
 	caster := &targetActor{
-		id: 1, category: CategoryPlayable, x: 0,
+		id: 1, kind: actor.KindPlayer, x: 0,
 		sameParty: map[int32]bool{3: true},
 	}
-	summon := &targetActor{id: 2, category: CategoryPlayable, x: 20, owner: caster}
-	partyMember := &targetActor{id: 3, category: CategoryPlayable, x: 50}
-	stranger := &targetActor{id: 4, category: CategoryPlayable, x: 50}
-	deadPartyMember := &targetActor{id: 5, category: CategoryPlayable, x: 40, dead: true}
+	summon := &targetActor{id: 2, kind: actor.KindPlayer, x: 20, owner: caster}
+	partyMember := &targetActor{id: 3, kind: actor.KindPlayer, x: 50}
+	stranger := &targetActor{id: 4, kind: actor.KindPlayer, x: 50}
+	deadPartyMember := &targetActor{id: 5, kind: actor.KindPlayer, x: 40, dead: true}
 	caster.summon = summon
 
 	registry := NewRegistry(knownList{caster, summon, partyMember, stranger, deadPartyMember})
@@ -38,16 +41,16 @@ func TestPartyHandlerSweepsActingPlayerAndPartyMembers(t *testing.T) {
 
 func TestAllyHandlerSweepsClanAndAllyBypassingDuelOpponents(t *testing.T) {
 	caster := &targetActor{
-		id: 1, category: CategoryPlayable, x: 0, hasClan: true,
+		id: 1, kind: actor.KindPlayer, x: 0, hasClan: true,
 		sameClan: map[int32]bool{2: true},
 		sameAlly: map[int32]bool{3: true},
 	}
-	casterSummon := &targetActor{id: 10, category: CategoryPlayable, x: 30, owner: caster}
+	casterSummon := &targetActor{id: 10, kind: actor.KindPlayer, x: 30, owner: caster}
 	caster.summon = casterSummon
-	clanMate := &targetActor{id: 2, category: CategoryPlayable, x: 60}
-	allyMate := &targetActor{id: 3, category: CategoryPlayable, x: 70}
-	stranger := &targetActor{id: 4, category: CategoryPlayable, x: 60}
-	deadClanMate := &targetActor{id: 5, category: CategoryPlayable, x: 60, dead: true}
+	clanMate := &targetActor{id: 2, kind: actor.KindPlayer, x: 60}
+	allyMate := &targetActor{id: 3, kind: actor.KindPlayer, x: 70}
+	stranger := &targetActor{id: 4, kind: actor.KindPlayer, x: 60}
+	deadClanMate := &targetActor{id: 5, kind: actor.KindPlayer, x: 60, dead: true}
 
 	registry := NewRegistry(knownList{caster, casterSummon, clanMate, allyMate, stranger, deadClanMate})
 	ally := mustHandler(t, registry, modelskill.TargetAlly)
@@ -69,11 +72,11 @@ func TestAllyHandlerSweepsClanAndAllyBypassingDuelOpponents(t *testing.T) {
 
 	// Dueling caster excludes allies from the opposing team.
 	duelingClan := &targetActor{
-		id: 11, category: CategoryPlayable, x: 60,
+		id: 11, kind: actor.KindPlayer, x: 60,
 		duelID: 7, duelTeam: 1,
 	}
 	duelingClanEnemy := &targetActor{
-		id: 12, category: CategoryPlayable, x: 60,
+		id: 12, kind: actor.KindPlayer, x: 60,
 		duelID: 7, duelTeam: 2,
 	}
 	caster.duelID = 7
@@ -92,12 +95,12 @@ func TestAllyHandlerSweepsClanAndAllyBypassingDuelOpponents(t *testing.T) {
 }
 
 func TestClanHandlerMatchesMonsterClanGroups(t *testing.T) {
-	attacker := &targetActor{id: 1, category: CategoryAttackable, x: 0, clanGroups: []string{"orc"}}
-	fellow := &targetActor{id: 2, category: CategoryAttackable, x: 60, clanGroups: []string{"orc"}}
-	rival := &targetActor{id: 3, category: CategoryAttackable, x: 60, clanGroups: []string{"undead"}}
-	deadFellow := &targetActor{id: 4, category: CategoryAttackable, x: 60, dead: true, clanGroups: []string{"orc"}}
-	clanless := &targetActor{id: 5, category: CategoryAttackable, x: 60}
-	playableNearby := &targetActor{id: 6, category: CategoryPlayable, x: 60, clanGroups: []string{"orc"}}
+	attacker := &targetActor{id: 1, kind: actor.KindNPC, x: 0, clanGroups: []string{"orc"}}
+	fellow := &targetActor{id: 2, kind: actor.KindNPC, x: 60, clanGroups: []string{"orc"}}
+	rival := &targetActor{id: 3, kind: actor.KindNPC, x: 60, clanGroups: []string{"undead"}}
+	deadFellow := &targetActor{id: 4, kind: actor.KindNPC, x: 60, dead: true, clanGroups: []string{"orc"}}
+	clanless := &targetActor{id: 5, kind: actor.KindNPC, x: 60}
+	playableNearby := &targetActor{id: 6, kind: actor.KindPlayer, x: 60, clanGroups: []string{"orc"}}
 
 	registry := NewRegistry(knownList{attacker, fellow, rival, deadFellow, clanless, playableNearby})
 	clan := mustHandler(t, registry, modelskill.TargetClan)
@@ -111,7 +114,7 @@ func TestClanHandlerMatchesMonsterClanGroups(t *testing.T) {
 	}
 
 	// Non-attackable caster contributes no list.
-	playable := &targetActor{id: 7, category: CategoryPlayable}
+	playable := &targetActor{id: 7, kind: actor.KindPlayer}
 	if got := clan.Targets(playable, nil, &modelskill.Definition{Radius: 100}); got != nil {
 		t.Fatalf("clan targets for playable caster = %v, want nil", got)
 	}
@@ -119,14 +122,14 @@ func TestClanHandlerMatchesMonsterClanGroups(t *testing.T) {
 
 func TestPartyMemberHandlerSpecialCasesSelfSummonAndSummonFriend(t *testing.T) {
 	caster := &targetActor{
-		id: 1, category: CategoryPlayable,
+		id: 1, kind: actor.KindPlayer,
 		inParty: true, partyMembers: map[int32]bool{3: true},
 	}
-	casterSummon := &targetActor{id: 2, category: CategoryPlayable, owner: caster}
+	casterSummon := &targetActor{id: 2, kind: actor.KindPlayer, owner: caster}
 	caster.summon = casterSummon
-	partyPlayer := &targetActor{id: 3, category: CategoryPlayable}
-	deadPlayer := &targetActor{id: 4, category: CategoryPlayable, dead: true}
-	otherPlayer := &targetActor{id: 5, category: CategoryPlayable}
+	partyPlayer := &targetActor{id: 3, kind: actor.KindPlayer}
+	deadPlayer := &targetActor{id: 4, kind: actor.KindPlayer, dead: true}
+	otherPlayer := &targetActor{id: 5, kind: actor.KindPlayer}
 
 	registry := NewRegistry(knownList{})
 	pm := mustHandler(t, registry, modelskill.TargetPartyMember)
@@ -167,14 +170,14 @@ func TestPartyMemberHandlerSpecialCasesSelfSummonAndSummonFriend(t *testing.T) {
 
 func TestPartyOtherHandlerGatesSelfMageClassAndPartyMembership(t *testing.T) {
 	caster := &targetActor{
-		id: 1, category: CategoryPlayable,
+		id: 1, kind: actor.KindPlayer,
 		inParty: true, partyMembers: map[int32]bool{2: true, 3: true},
 	}
-	mage := &targetActor{id: 2, category: CategoryPlayable, mageClass: true}
-	fighter := &targetActor{id: 3, category: CategoryPlayable}
-	deadPlayer := &targetActor{id: 4, category: CategoryPlayable, dead: true}
-	casterSummon := &targetActor{id: 5, category: CategoryPlayable, owner: caster}
-	otherPlayer := &targetActor{id: 6, category: CategoryPlayable}
+	mage := &targetActor{id: 2, kind: actor.KindPlayer, mageClass: true}
+	fighter := &targetActor{id: 3, kind: actor.KindPlayer}
+	deadPlayer := &targetActor{id: 4, kind: actor.KindPlayer, dead: true}
+	casterSummon := &targetActor{id: 5, kind: actor.KindPlayer, owner: caster}
+	otherPlayer := &targetActor{id: 6, kind: actor.KindPlayer}
 
 	registry := NewRegistry(knownList{})
 	other := mustHandler(t, registry, modelskill.TargetPartyOther)
@@ -214,15 +217,15 @@ func TestPartyOtherHandlerGatesSelfMageClassAndPartyMembership(t *testing.T) {
 
 func TestCorpseAllyHandlerSweepsDeadAllies(t *testing.T) {
 	caster := &targetActor{
-		id: 1, category: CategoryPlayable, x: 0, hasClan: true,
+		id: 1, kind: actor.KindPlayer, x: 0, hasClan: true,
 		sameClan: map[int32]bool{2: true},
 		sameAlly: map[int32]bool{3: true},
 	}
-	deadClanMate := &targetActor{id: 2, category: CategoryPlayable, x: 50, dead: true}
-	deadAllyMate := &targetActor{id: 3, category: CategoryPlayable, x: 50, dead: true}
-	livingClanMate := &targetActor{id: 4, category: CategoryPlayable, x: 50}
-	deadStranger := &targetActor{id: 5, category: CategoryPlayable, x: 50, dead: true}
-	deadOwnedSummon := &targetActor{id: 6, category: CategoryPlayable, x: 50, dead: true, owner: caster}
+	deadClanMate := &targetActor{id: 2, kind: actor.KindPlayer, x: 50, dead: true}
+	deadAllyMate := &targetActor{id: 3, kind: actor.KindPlayer, x: 50, dead: true}
+	livingClanMate := &targetActor{id: 4, kind: actor.KindPlayer, x: 50}
+	deadStranger := &targetActor{id: 5, kind: actor.KindPlayer, x: 50, dead: true}
+	deadOwnedSummon := &targetActor{id: 6, kind: actor.KindPlayer, x: 50, dead: true, owner: caster}
 
 	registry := NewRegistry(knownList{caster, deadClanMate, deadAllyMate, livingClanMate, deadStranger, deadOwnedSummon})
 	corpseAlly := mustHandler(t, registry, modelskill.TargetCorpseAlly)
@@ -266,12 +269,12 @@ func TestCorpseAllyHandlerSweepsDeadAllies(t *testing.T) {
 
 // ---- from target_area_test.go ----
 func TestAreaTargetsAnchorOnAimedTarget(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, x: 0, y: 0, attackableWithoutForce: true}
-	aimed := &targetActor{id: 2, category: CategoryAttackable, x: 100, y: 0, attackableWithoutForce: true}
-	near := &targetActor{id: 3, category: CategoryAttackable, x: 150, y: 0, attackableWithoutForce: true}
-	dead := &targetActor{id: 4, category: CategoryAttackable, x: 120, y: 0, dead: true, attackableWithoutForce: true}
-	blocked := &targetActor{id: 5, category: CategoryAttackable, x: 130, y: 0, attackableWithoutForce: true}
-	far := &targetActor{id: 6, category: CategoryAttackable, x: 260, y: 0, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, x: 0, y: 0, attackableWithoutForce: true}
+	aimed := &targetActor{id: 2, kind: actor.KindNPC, x: 100, y: 0, attackableWithoutForce: true}
+	near := &targetActor{id: 3, kind: actor.KindNPC, x: 150, y: 0, attackableWithoutForce: true}
+	dead := &targetActor{id: 4, kind: actor.KindNPC, x: 120, y: 0, dead: true, attackableWithoutForce: true}
+	blocked := &targetActor{id: 5, kind: actor.KindNPC, x: 130, y: 0, attackableWithoutForce: true}
+	far := &targetActor{id: 6, kind: actor.KindNPC, x: 260, y: 0, attackableWithoutForce: true}
 	aimed.see = map[int32]bool{5: false}
 
 	registry := NewRegistry(knownList{caster, aimed, near, dead, blocked, far})
@@ -288,12 +291,12 @@ func TestAreaTargetsAnchorOnAimedTarget(t *testing.T) {
 }
 
 func TestAuraTargetsFilterBySightAndAttackability(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	attackable := &targetActor{id: 2, category: CategoryAttackable, x: 80, attackableWithoutForce: true}
-	playable := &targetActor{id: 3, category: CategoryPlayable, x: 90, attackableWithoutForce: true}
-	passive := &targetActor{id: 4, category: CategoryAttackable, x: 70}
-	dead := &targetActor{id: 5, category: CategoryAttackable, x: 60, dead: true, attackableWithoutForce: true}
-	blocked := &targetActor{id: 6, category: CategoryAttackable, x: 50, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	attackable := &targetActor{id: 2, kind: actor.KindNPC, x: 80, attackableWithoutForce: true}
+	playable := &targetActor{id: 3, kind: actor.KindPlayer, x: 90, attackableWithoutForce: true}
+	passive := &targetActor{id: 4, kind: actor.KindNPC, x: 70}
+	dead := &targetActor{id: 5, kind: actor.KindNPC, x: 60, dead: true, attackableWithoutForce: true}
+	blocked := &targetActor{id: 6, kind: actor.KindNPC, x: 50, attackableWithoutForce: true}
 	caster.see = map[int32]bool{6: false}
 
 	registry := NewRegistry(knownList{caster, attackable, playable, passive, dead, blocked})
@@ -306,13 +309,13 @@ func TestAuraTargetsFilterBySightAndAttackability(t *testing.T) {
 }
 
 func TestAuraUndeadTargetsFilterByUndeadSightAndAttackability(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	undeadMonster := &targetActor{id: 2, category: CategoryAttackable, x: 80, undead: true, attackableWithoutForce: true}
-	undeadPlayable := &targetActor{id: 3, category: CategoryPlayable, x: 90, undead: true, attackableWithoutForce: true}
-	living := &targetActor{id: 4, category: CategoryAttackable, x: 70, attackableWithoutForce: true}
-	dead := &targetActor{id: 5, category: CategoryAttackable, x: 60, dead: true, undead: true, attackableWithoutForce: true}
-	blocked := &targetActor{id: 6, category: CategoryAttackable, x: 50, undead: true, attackableWithoutForce: true}
-	passive := &targetActor{id: 7, category: CategoryAttackable, x: 40, undead: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	undeadMonster := &targetActor{id: 2, kind: actor.KindNPC, x: 80, undead: true, attackableWithoutForce: true}
+	undeadPlayable := &targetActor{id: 3, kind: actor.KindPlayer, x: 90, undead: true, attackableWithoutForce: true}
+	living := &targetActor{id: 4, kind: actor.KindNPC, x: 70, attackableWithoutForce: true}
+	dead := &targetActor{id: 5, kind: actor.KindNPC, x: 60, dead: true, undead: true, attackableWithoutForce: true}
+	blocked := &targetActor{id: 6, kind: actor.KindNPC, x: 50, undead: true, attackableWithoutForce: true}
+	passive := &targetActor{id: 7, kind: actor.KindNPC, x: 40, undead: true}
 	caster.see = map[int32]bool{6: false}
 
 	registry := NewRegistry(knownList{caster, undeadMonster, undeadPlayable, living, dead, blocked, passive})
@@ -339,7 +342,7 @@ func TestAuraUndeadTargetsFilterByUndeadSightAndAttackability(t *testing.T) {
 }
 
 func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, peace: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, peace: true}
 	registry := NewRegistry(knownList{caster})
 
 	for _, target := range []modelskill.Target{modelskill.TargetAura, modelskill.TargetFrontAura} {
@@ -359,14 +362,14 @@ func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
 }
 
 func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, peace: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, peace: true}
 	offensive := &modelskill.Definition{Offensive: true}
 
 	tests := []struct {
 		name       string
 		targetType modelskill.Target
-		caster     Creature
-		aimed      Creature
+		caster     Actor
+		aimed      Actor
 		skill      *modelskill.Definition
 		want       CastRejection
 	}{
@@ -374,11 +377,13 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"front aura in peace", modelskill.TargetFrontAura, caster, nil, offensive, CastRejectCantAttackPeaceZone},
 		{"behind aura in peace", modelskill.TargetBehindAura, caster, nil, nil, CastRejectCantAttackPeaceZone},
 		{"one offensive self", modelskill.TargetOne, caster, caster, offensive, CastRejectInvalidTarget},
-		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, category: CategoryPlayable}, &targetActor{id: 2, category: CategoryPlayable, peace: true, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectTargetInPeaceZone},
+		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 2, kind: actor.KindPlayer, peace: true, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectTargetInPeaceZone},
+		{"one offensive player without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 2, kind: actor.KindPlayer, attackableBy: true}, offensive, CastRejectInvalidTarget},
+		{"one offensive summon without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 7, kind: actor.KindSummon}, offensive, CastRejectNone},
 		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
-		{"corpse pet living", modelskill.TargetCorpsePet, caster, &targetActor{id: 4, category: CategoryPlayable, pet: true}, nil, CastRejectInvalidTarget},
-		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, category: CategoryPlayable, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
-		{"corpse pet dead pet", modelskill.TargetCorpsePet, caster, &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: caster, pet: true}, nil, CastRejectNone},
+		{"corpse pet living", modelskill.TargetCorpsePet, caster, &targetActor{id: 4, kind: actor.KindPlayer, pet: true}, nil, CastRejectInvalidTarget},
+		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, kind: actor.KindPlayer, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
+		{"corpse pet dead pet", modelskill.TargetCorpsePet, caster, &targetActor{id: 6, kind: actor.KindPlayer, dead: true, owner: caster, pet: true}, nil, CastRejectNone},
 		{"corpse pet nil", modelskill.TargetCorpsePet, caster, nil, nil, CastRejectNone},
 	}
 	for _, tt := range tests {
@@ -391,9 +396,9 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 }
 
 func TestFrontAndBehindAuraDoNotAffectPlayableTargetsForFolkCaster(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryFolk, heading: 0}
-	front := &targetActor{id: 2, category: CategoryPlayable, x: 80}
-	behind := &targetActor{id: 3, category: CategoryPlayable, x: -80}
+	caster := &targetActor{id: 1, folk: true, heading: 0}
+	front := &targetActor{id: 2, kind: actor.KindPlayer, x: 80}
+	behind := &targetActor{id: 3, kind: actor.KindPlayer, x: -80}
 	registry := NewRegistry(knownList{caster, front, behind})
 
 	if got := ids(mustHandler(t, registry, modelskill.TargetFrontAura).Targets(caster, nil, &modelskill.Definition{Radius: 100})); len(got) != 0 {
@@ -405,10 +410,10 @@ func TestFrontAndBehindAuraDoNotAffectPlayableTargetsForFolkCaster(t *testing.T)
 }
 
 func TestFrontAndBehindAurasUseCasterHeading(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, heading: 0}
-	front := &targetActor{id: 2, category: CategoryAttackable, x: 80, attackableWithoutForce: true}
-	behind := &targetActor{id: 3, category: CategoryAttackable, x: -80, attackableWithoutForce: true}
-	side := &targetActor{id: 4, category: CategoryAttackable, y: 80, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, heading: 0}
+	front := &targetActor{id: 2, kind: actor.KindNPC, x: 80, attackableWithoutForce: true}
+	behind := &targetActor{id: 3, kind: actor.KindNPC, x: -80, attackableWithoutForce: true}
+	side := &targetActor{id: 4, kind: actor.KindNPC, y: 80, attackableWithoutForce: true}
 
 	registry := NewRegistry(knownList{caster, front, behind, side})
 
@@ -424,10 +429,10 @@ func TestFrontAndBehindAurasUseCasterHeading(t *testing.T) {
 }
 
 func TestFrontAreaKeepsAimedTargetAndFiltersSplashByCasterHeading(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, heading: 0}
-	aimed := &targetActor{id: 2, category: CategoryAttackable, x: 100, attackableWithoutForce: true}
-	front := &targetActor{id: 3, category: CategoryAttackable, x: 130, attackableWithoutForce: true}
-	behind := &targetActor{id: 4, category: CategoryAttackable, x: -10, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, heading: 0}
+	aimed := &targetActor{id: 2, kind: actor.KindNPC, x: 100, attackableWithoutForce: true}
+	front := &targetActor{id: 3, kind: actor.KindNPC, x: 130, attackableWithoutForce: true}
+	behind := &targetActor{id: 4, kind: actor.KindNPC, x: -10, attackableWithoutForce: true}
 
 	registry := NewRegistry(knownList{caster, aimed, front, behind})
 	frontArea := mustHandler(t, registry, modelskill.TargetFrontArea)
@@ -440,7 +445,7 @@ func TestFrontAreaKeepsAimedTargetAndFiltersSplashByCasterHeading(t *testing.T) 
 
 // ---- from target_corpse_test.go ----
 func TestCorpseMobHandlerCastConditions(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
 	handler := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetCorpseMob)
 	now := time.Now()
 
@@ -451,17 +456,17 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		want    bool
 		failure CorpseCastFailure
 	}{
-		{"no corpse", &targetActor{id: 2, category: CategoryAttackable}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
-		{"playable corpse", &targetActor{id: 3, category: CategoryPlayable, corpse: true}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
-		{"mob corpse, default skill", &targetActor{id: 4, category: CategoryAttackable, corpse: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"harvest on monster corpse", &targetActor{id: 5, category: CategoryAttackable, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CorpseCastAllowed},
-		{"harvest on attackable guard corpse", &targetActor{id: 6, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CorpseCastHarvestNotMonster},
-		{"sweep on monster corpse", &targetActor{id: 7, category: CategoryAttackable, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CorpseCastAllowed},
-		{"sweep on attackable guard corpse", &targetActor{id: 8, category: CategoryAttackable, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CorpseCastSweepNotMonster},
-		{"fresh mob corpse", &targetActor{id: 10, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"too old mob corpse", &targetActor{id: 11, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CorpseCastTooOld},
-		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, category: CategoryAttackable, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"no corpse", &targetActor{id: 2, kind: actor.KindNPC}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
+		{"playable corpse", &targetActor{id: 3, kind: actor.KindPlayer, corpse: true}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
+		{"mob corpse, default skill", &targetActor{id: 4, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"harvest on monster corpse", &targetActor{id: 5, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CorpseCastAllowed},
+		{"harvest on attackable guard corpse", &targetActor{id: 6, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CorpseCastHarvestNotMonster},
+		{"sweep on monster corpse", &targetActor{id: 7, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CorpseCastAllowed},
+		{"sweep on attackable guard corpse", &targetActor{id: 8, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CorpseCastSweepNotMonster},
+		{"fresh mob corpse", &targetActor{id: 10, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"too old mob corpse", &targetActor{id: 11, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CorpseCastTooOld},
+		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
 	}
 
 	for _, tt := range tests {
@@ -475,7 +480,7 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		})
 	}
 
-	mobCorpse := &targetActor{id: 9, category: CategoryAttackable, corpse: true}
+	mobCorpse := &targetActor{id: 9, kind: actor.KindNPC, corpse: true}
 	if got := handler.FinalTarget(caster, mobCorpse, &modelskill.Definition{}); got != mobCorpse {
 		t.Fatalf("corpse mob final target = %v, want target", got)
 	}
@@ -485,11 +490,11 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 }
 
 func TestAreaCorpseMobTargetsSplashAndSpecialSkill(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, x: 0, attackableWithoutForce: true}
-	corpse := &targetActor{id: 2, category: CategoryAttackable, corpse: true, x: 100}
-	live := &targetActor{id: 3, category: CategoryAttackable, x: 130, attackableWithoutForce: true}
-	blocked := &targetActor{id: 4, category: CategoryAttackable, x: 110, attackableWithoutForce: true}
-	deadNearby := &targetActor{id: 5, category: CategoryAttackable, x: 120, dead: true, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, x: 0, attackableWithoutForce: true}
+	corpse := &targetActor{id: 2, kind: actor.KindNPC, corpse: true, x: 100}
+	live := &targetActor{id: 3, kind: actor.KindNPC, x: 130, attackableWithoutForce: true}
+	blocked := &targetActor{id: 4, kind: actor.KindNPC, x: 110, attackableWithoutForce: true}
+	deadNearby := &targetActor{id: 5, kind: actor.KindNPC, x: 120, dead: true, attackableWithoutForce: true}
 	corpse.see = map[int32]bool{4: false}
 
 	registry := NewRegistry(knownList{caster, corpse, live, blocked, deadNearby})
@@ -514,15 +519,15 @@ func TestAreaCorpseMobTargetsSplashAndSpecialSkill(t *testing.T) {
 }
 
 func TestCorpsePlayerAndCorpsePetHandlers(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	owner := &targetActor{id: 2, category: CategoryPlayable}
-	alivePlayer := &targetActor{id: 3, category: CategoryPlayable}
-	deadPlayer := &targetActor{id: 4, category: CategoryPlayable, dead: true}
-	deadMob := &targetActor{id: 5, category: CategoryAttackable, dead: true}
-	deadPet := &targetActor{id: 6, category: CategoryPlayable, dead: true, owner: owner, pet: true}
-	deadUnownedPlayable := &targetActor{id: 7, category: CategoryPlayable, dead: true}
-	deadServitor := &targetActor{id: 8, category: CategoryPlayable, dead: true, owner: owner}
-	deadNoPetSignal := targetCreature{id: 9, category: CategoryPlayable, dead: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	owner := &targetActor{id: 2, kind: actor.KindPlayer}
+	alivePlayer := &targetActor{id: 3, kind: actor.KindPlayer}
+	deadPlayer := &targetActor{id: 4, kind: actor.KindPlayer, dead: true}
+	deadMob := &targetActor{id: 5, kind: actor.KindNPC, dead: true}
+	deadPet := &targetActor{id: 6, kind: actor.KindPlayer, dead: true, owner: owner, pet: true}
+	deadUnownedPlayable := &targetActor{id: 7, kind: actor.KindPlayer, dead: true}
+	deadServitor := &targetActor{id: 8, kind: actor.KindPlayer, dead: true, owner: owner}
+	deadNoPetSignal := &targetCreature{id: 9, kind: actor.KindPlayer, dead: true}
 
 	registry := NewRegistry(knownList{})
 
@@ -566,7 +571,7 @@ func TestCorpsePlayerAndCorpsePetHandlers(t *testing.T) {
 
 // ---- from target_ground_test.go ----
 func TestGroundHandlerTargetsCaster(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
 	handler := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetGround)
 
 	if got := handler.FinalTarget(caster, nil, &modelskill.Definition{}); got != caster {
@@ -580,7 +585,7 @@ func TestGroundHandlerTargetsCaster(t *testing.T) {
 	}
 }
 
-// groundTargetActor is a Creature that also implements GroundTargeter, so
+// groundTargetActor is a Actor that also implements GroundTargeter, so
 // groundHandler.CanCast exercises its LOS/peace-zone gate instead of the
 // permissive fallback.
 type groundTargetActor struct {
@@ -591,6 +596,7 @@ type groundTargetActor struct {
 }
 
 func (g *groundTargetActor) GroundTarget() (x, y, z int)  { return g.gx, g.gy, g.gz }
+func (g *groundTargetActor) Kind() actor.Kind             { return actor.KindPlayer }
 func (g *groundTargetActor) CanSeePoint(x, y, z int) bool { return g.canSee }
 func (g *groundTargetActor) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 	return g.inPeace
@@ -654,8 +660,8 @@ func TestRegistryRegistersRepresentativeHandlers(t *testing.T) {
 }
 
 func TestSelfAndOneHandlers(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	target := &targetActor{id: 2, category: CategoryAttackable}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	target := &targetActor{id: 2, kind: actor.KindNPC}
 	registry := NewRegistry(knownList{})
 	skill := &modelskill.Definition{Radius: 100}
 
@@ -681,8 +687,8 @@ func TestSelfAndOneHandlers(t *testing.T) {
 
 func TestOneHandlerCastConditions(t *testing.T) {
 	one := mustHandler(t, NewRegistry(knownList{}), modelskill.TargetOne)
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	playable := &targetActor{id: 2, category: CategoryPlayable, attackableBy: true, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	playable := &targetActor{id: 2, kind: actor.KindPlayer, attackableBy: true, attackableWithoutForce: true}
 
 	tests := []struct {
 		name   string
@@ -691,9 +697,9 @@ func TestOneHandlerCastConditions(t *testing.T) {
 		ctrl   bool
 		want   bool
 	}{
-		{"offensive playable needs attack rule", &targetActor{id: 2, category: CategoryPlayable}, modelskill.Definition{Offensive: true}, false, false},
-		{"offensive playable accepts ctrl force", &targetActor{id: 2, category: CategoryPlayable, attackableBy: true}, modelskill.Definition{Offensive: true}, true, true},
-		{"olympiad before start", &targetActor{id: 2, category: CategoryPlayable, attackableBy: true, attackableWithoutForce: true}, modelskill.Definition{Offensive: true}, false, false},
+		{"offensive playable needs attack rule", &targetActor{id: 2, kind: actor.KindPlayer}, modelskill.Definition{Offensive: true}, false, false},
+		{"offensive playable accepts ctrl force", &targetActor{id: 2, kind: actor.KindPlayer, attackableBy: true}, modelskill.Definition{Offensive: true}, true, true},
+		{"olympiad before start", &targetActor{id: 2, kind: actor.KindPlayer, attackableBy: true, attackableWithoutForce: true}, modelskill.Definition{Offensive: true}, false, false},
 		{"folk requires ctrl damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true, SkillType: "PDAM"}, false, false},
 		{"folk accepts ctrl damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true, SkillType: "PDAM"}, true, true},
 		{"folk rejects ctrl non-damage", &targetActor{id: 3, folkOrGuard: true}, modelskill.Definition{Offensive: true}, true, false},
@@ -713,16 +719,16 @@ func TestOneHandlerCastConditions(t *testing.T) {
 }
 
 func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	holyThing := &targetActor{id: 2, category: CategoryFolk, holy: true}
-	lockedDoor := &targetActor{id: 3, category: CategoryFolk}
-	unlockableDoor := &targetActor{id: 4, category: CategoryFolk, unlockable: true}
-	undeadMonster := &targetActor{id: 5, category: CategoryAttackable, undead: true, monster: true}
-	undeadGuard := &targetActor{id: 10, category: CategoryAttackable, undead: true}
-	livingMonster := &targetActor{id: 6, category: CategoryAttackable}
-	deadUndead := &targetActor{id: 7, category: CategoryAttackable, dead: true, undead: true}
-	undeadServitor := &targetActor{id: 8, category: CategoryPlayable, owner: caster, undead: true}
-	undeadPet := &targetActor{id: 9, category: CategoryPlayable, owner: caster, undead: true, pet: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	holyThing := &targetActor{id: 2, folk: true, holy: true}
+	lockedDoor := &targetActor{id: 3, folk: true}
+	unlockableDoor := &targetActor{id: 4, folk: true, unlockable: true}
+	undeadMonster := &targetActor{id: 5, kind: actor.KindNPC, undead: true, monster: true}
+	undeadGuard := &targetActor{id: 10, kind: actor.KindNPC, undead: true}
+	livingMonster := &targetActor{id: 6, kind: actor.KindNPC}
+	deadUndead := &targetActor{id: 7, kind: actor.KindNPC, dead: true, undead: true}
+	undeadServitor := &targetActor{id: 8, kind: actor.KindPlayer, owner: caster, undead: true}
+	undeadPet := &targetActor{id: 9, kind: actor.KindPlayer, owner: caster, undead: true, pet: true}
 	registry := NewRegistry(knownList{caster, holyThing, lockedDoor, unlockableDoor, undeadMonster, undeadGuard, livingMonster, deadUndead, undeadServitor, undeadPet})
 	skill := &modelskill.Definition{}
 
@@ -789,8 +795,8 @@ func TestSingleTargetKindHandlersValidateCastTargets(t *testing.T) {
 
 // ---- from target_summon_test.go ----
 func TestSummonTargetsCasterSummon(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable}
-	summon := &targetActor{id: 2, category: CategoryPlayable}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer}
+	summon := &targetActor{id: 2, kind: actor.KindPlayer}
 	caster.summon = summon
 
 	handler := mustHandler(t, NewRegistry(knownList{caster, summon}), modelskill.TargetSummon)
@@ -816,9 +822,9 @@ func TestSummonTargetsCasterSummon(t *testing.T) {
 }
 
 func TestOwnerPetTargetsSummonOwner(t *testing.T) {
-	owner := &targetActor{id: 1, category: CategoryPlayable}
-	summon := &targetActor{id: 2, category: CategoryPlayable, owner: owner}
-	other := &targetActor{id: 3, category: CategoryPlayable}
+	owner := &targetActor{id: 1, kind: actor.KindPlayer}
+	summon := &targetActor{id: 2, kind: actor.KindPlayer, owner: owner}
+	other := &targetActor{id: 3, kind: actor.KindPlayer}
 
 	handler := mustHandler(t, NewRegistry(knownList{owner, summon, other}), modelskill.TargetOwnerPet)
 
@@ -842,13 +848,13 @@ func TestOwnerPetTargetsSummonOwner(t *testing.T) {
 }
 
 func TestAreaSummonUsesSummonAsAnchor(t *testing.T) {
-	caster := &targetActor{id: 1, category: CategoryPlayable, x: 0, attackableWithoutForce: true}
-	summon := &targetActor{id: 2, category: CategoryPlayable, x: 100}
-	near := &targetActor{id: 3, category: CategoryAttackable, x: 130, attackableWithoutForce: true}
-	dead := &targetActor{id: 4, category: CategoryAttackable, x: 120, dead: true, attackableWithoutForce: true}
-	blocked := &targetActor{id: 5, category: CategoryAttackable, x: 110, attackableWithoutForce: true}
-	passive := &targetActor{id: 6, category: CategoryAttackable, x: 115}
-	far := &targetActor{id: 7, category: CategoryAttackable, x: 300, attackableWithoutForce: true}
+	caster := &targetActor{id: 1, kind: actor.KindPlayer, x: 0, attackableWithoutForce: true}
+	summon := &targetActor{id: 2, kind: actor.KindPlayer, x: 100}
+	near := &targetActor{id: 3, kind: actor.KindNPC, x: 130, attackableWithoutForce: true}
+	dead := &targetActor{id: 4, kind: actor.KindNPC, x: 120, dead: true, attackableWithoutForce: true}
+	blocked := &targetActor{id: 5, kind: actor.KindNPC, x: 110, attackableWithoutForce: true}
+	passive := &targetActor{id: 6, kind: actor.KindNPC, x: 115}
+	far := &targetActor{id: 7, kind: actor.KindNPC, x: 300, attackableWithoutForce: true}
 	caster.summon = summon
 	summon.see = map[int32]bool{5: false}
 
@@ -873,7 +879,7 @@ func mustHandler(t *testing.T, r *Registry, target modelskill.Target) Handler {
 	return h
 }
 
-func ids(creatures []Creature) []int32 {
+func ids(creatures []Actor) []int32 {
 	out := make([]int32, 0, len(creatures))
 	for _, creature := range creatures {
 		out = append(out, creature.ObjectID())
@@ -882,17 +888,20 @@ func ids(creatures []Creature) []int32 {
 }
 
 type targetActor struct {
-	id       int32
-	x, y, z  int
-	heading  int
-	dead     bool
-	category Category
+	world.Presence
+	neutralActor
+	id      int32
+	x, y, z int
+	heading int
+	dead    bool
+	kind    actor.Kind
+	folk    bool
 
 	see                    map[int32]bool
 	attackableBy           bool
 	attackableWithoutForce bool
-	summon                 Creature
-	owner                  Creature
+	summon                 Actor
+	owner                  Actor
 	holy                   bool
 	unlockable             bool
 	undead                 bool
@@ -923,22 +932,26 @@ type targetActor struct {
 }
 
 type targetCreature struct {
-	id       int32
-	x, y, z  int
-	heading  int
-	dead     bool
-	category Category
+	world.Presence
+	neutralActor
+	id      int32
+	x, y, z int
+	heading int
+	dead    bool
+	kind    actor.Kind
+	folk    bool
 }
 
-func (c targetCreature) ObjectID() int32 { return c.id }
+func (c *targetCreature) ObjectID() int32 { return c.id }
 
-func (c targetCreature) Position() (int, int, int) { return c.x, c.y, c.z }
+func (c *targetCreature) Position() (int, int, int) { return c.x, c.y, c.z }
 
-func (c targetCreature) Heading() int { return c.heading }
+func (c *targetCreature) Heading() int { return c.heading }
 
-func (c targetCreature) Dead() bool { return c.dead }
+func (c *targetCreature) Dead() bool { return c.dead }
 
-func (c targetCreature) Category() Category { return c.category }
+func (c *targetCreature) Kind() actor.Kind { return c.kind }
+func (c *targetCreature) Folk() bool       { return c.folk }
 
 func (a *targetActor) ObjectID() int32 { return a.id }
 
@@ -948,9 +961,15 @@ func (a *targetActor) Heading() int { return a.heading }
 
 func (a *targetActor) Dead() bool { return a.dead }
 
-func (a *targetActor) Category() Category { return a.category }
+func (a *targetActor) Kind() actor.Kind {
+	if a.door {
+		return actor.KindDoor
+	}
+	return a.kind
+}
+func (a *targetActor) Folk() bool { return a.folk }
 
-func (a *targetActor) CanSeeTarget(target Creature) bool {
+func (a *targetActor) CanSeeTarget(target Actor) bool {
 	if a.see == nil {
 		return true
 	}
@@ -958,13 +977,16 @@ func (a *targetActor) CanSeeTarget(target Creature) bool {
 	return !ok || visible
 }
 
-func (a *targetActor) AttackableBy(Creature) bool { return a.attackableBy }
+func (a *targetActor) AttackableBy(Actor) bool { return a.attackableBy }
 
-func (a *targetActor) AttackableWithoutForceBy(Creature) bool { return a.attackableWithoutForce }
+func (a *targetActor) AttackableWithoutForceBy(Actor) bool { return a.attackableWithoutForce }
 
-func (a *targetActor) Summon() (Creature, bool) { return a.summon, a.summon != nil }
+func (a *targetActor) Summon() (Actor, bool) { return a.summon, a.summon != nil }
 
-func (a *targetActor) Owner() (Creature, bool) { return a.owner, a.owner != nil }
+func (a *targetActor) Owner() (attackable.Combatant, bool) {
+	c, ok := a.owner.(attackable.Combatant)
+	return c, ok
+}
 
 func (a *targetActor) IsPet() bool { return a.pet }
 
@@ -982,9 +1004,7 @@ func (a *targetActor) MonsterKind() bool { return a.monster }
 
 func (a *targetActor) FolkOrGuard() bool { return a.folkOrGuard }
 
-func (a *targetActor) Door() bool { return a.door }
-
-func (a *targetActor) CanCastOnPlayable(Creature, *modelskill.Definition, bool, bool) bool {
+func (a *targetActor) CanCastOnPlayable(Actor, *modelskill.Definition, bool, bool) bool {
 	return !a.playableCastDenied
 }
 
@@ -1000,21 +1020,21 @@ func (a *targetActor) Spoiled() bool { return a.spoiled }
 
 func (a *targetActor) Seeded() bool { return a.seeded }
 
-func (a *targetActor) IsInSameParty(other Creature) bool {
+func (a *targetActor) IsInSameParty(other Actor) bool {
 	return actorInSet(a.sameParty, other)
 }
 
-func (a *targetActor) IsInSameClan(other Creature) bool {
+func (a *targetActor) IsInSameClan(other Actor) bool {
 	return actorInSet(a.sameClan, other)
 }
 
-func (a *targetActor) IsInSameAlly(other Creature) bool {
+func (a *targetActor) IsInSameAlly(other Actor) bool {
 	return actorInSet(a.sameAlly, other)
 }
 
 func (a *targetActor) IsInParty() bool { return a.inParty }
 
-func (a *targetActor) PartyContains(other Creature) bool {
+func (a *targetActor) PartyContains(other Actor) bool {
 	return actorInSet(a.partyMembers, other)
 }
 
@@ -1030,7 +1050,7 @@ func (a *targetActor) MageClass() bool { return a.mageClass }
 
 func (a *targetActor) ClanGroups() []string { return a.clanGroups }
 
-func actorInSet(set map[int32]bool, c Creature) bool {
+func actorInSet(set map[int32]bool, c Actor) bool {
 	if set == nil || c == nil {
 		return false
 	}
@@ -1039,7 +1059,7 @@ func actorInSet(set map[int32]bool, c Creature) bool {
 
 type knownList []*targetActor
 
-func (k knownList) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature)) {
+func (k knownList) ForEachKnownCreatureInRadius(anchor Actor, radius int, fn func(Actor)) {
 	ax, ay, az := anchor.Position()
 	for _, actor := range k {
 		if actor.ObjectID() == anchor.ObjectID() {

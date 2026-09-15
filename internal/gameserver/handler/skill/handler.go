@@ -4,10 +4,16 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -19,12 +25,70 @@ import (
 // as an inert `any` that every one of those assertions then misses.
 type Actor interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	Dead() bool
+}
+
+// Creature is a creature cast participant, caster or target: every player,
+// NPC and summon. It takes part in combat and in effects; a method that does
+// not apply to a kind returns the neutral value documented at its
+// implementation.
+type Creature interface {
+	attackable.Combatant
+	effect.Actor
+
+	Invul() bool
+	Paralyzed() bool
+	Undead() bool
+	BlessedSpiritshotCharged() bool
+	// SkillSuccessInput and EffectSuccessInput resolve an effect-landing roll
+	// of caster's skill against this creature; ok is false when it can't be
+	// rolled at all.
+	SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+	EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
+	// SkillReflectInput is the state deciding whether this creature reflects
+	// def back onto its caster.
+	SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput
+	// ShieldDefense resolves this creature's shield block against caster.
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+
+	// Attackable reports an NPC combat target; the aggro controls below only
+	// act on one.
+	Attackable() bool
+	NotifyAggression(source attackable.Combatant, power int)
+	ReduceAllAggroHate(amount float64)
+	StopAggroHate(attacker attackable.Combatant)
+	StopHateList(attacker attackable.Combatant)
+	ClearAggroTables()
+	// EnableOverhit arms overhit damage tracking for the current hit; only
+	// attackable NPCs track it.
+	EnableOverhit()
+
+	// CurrentTarget, SetTarget and AttackTarget retarget a playable creature
+	// provoked by aggression.
+	CurrentTarget() world.Tracked
+	SetTarget(world.Tracked)
+	AttackTarget(world.Tracked)
+}
+
+// Summon is the summon-only cast participant surface.
+type Summon interface {
+	Creature
+	SiegeSummon() bool
+	SummonOwner() summon.Owner
+	UnSummon(owner summon.Owner)
+}
+
+// asCreature returns a as a creature, or false for a cast participant that
+// is not one (a door or a signet effect point).
+func asCreature(a Actor) (Creature, bool) {
+	c, ok := a.(Creature)
+	return c, ok
 }
 
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster  Actor
+	Caster  Creature
 	Skill   modelskill.Definition
 	Targets []Actor
 	// Item is a genuinely heterogeneous payload with unrelated consumers
@@ -315,3 +379,17 @@ func cursed(a Actor) bool {
 	c, ok := a.(cursedWeaponHolder)
 	return ok && c.CursedWeaponEquipped()
 }
+
+// combatantOf returns a as a combatant, or nil for a cast participant that is
+// not a creature (a door or a signet effect point). Formula inputs treat a nil
+// caster as one that cannot roll.
+func combatantOf(a Actor) attackable.Combatant {
+	c, _ := a.(attackable.Combatant)
+	return c
+}
+
+var (
+	_ Creature = (*player.Character)(nil)
+	_ Creature = (*npc.Hostile)(nil)
+	_ Summon   = (*summon.Actor)(nil)
+)

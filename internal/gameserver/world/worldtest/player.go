@@ -1,6 +1,9 @@
 package worldtest
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/world"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
 
 // Player is a test-only world player marker.
 type Player struct {
@@ -12,9 +15,6 @@ type Player struct {
 // ObjectID returns the test player's object id.
 func (p *Player) ObjectID() int32 { return p.ID }
 
-// WorldPlayer marks Player as a world player.
-func (p *Player) WorldPlayer() {}
-
 // CharacterName returns an empty name; test players are not looked up by name.
 func (p *Player) CharacterName() string { return "" }
 
@@ -24,3 +24,6 @@ func SpawnPlayer(state *world.State, id int32, x, y, z int) *Player {
 	state.Spawn(player, x, y, z, 0)
 	return player
 }
+
+// Kind reports KindPlayer.
+func (p *Player) Kind() actor.Kind { return actor.KindPlayer }

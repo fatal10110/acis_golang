@@ -2,7 +2,6 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -14,26 +13,6 @@ import (
 // is reproduced here so the caster-side gating the continuous handler performs
 // matches it.
 var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 1381: true}
-
-// continuousTarget is the surface a continuous (buff/debuff/over-time) skill
-// acts on: an alive actor carrying a live effect list.
-type continuousTarget interface {
-	Actor
-	effectListTarget
-}
-
-// invulnerableCaster is implemented by casters that can report invulnerability,
-// which blocks the heal-over-time family from ticking while the caster is
-// immune.
-type invulnerableCaster interface {
-	Invul() bool
-}
-
-// playableTarget reports whether the target is player-controlled, the gate the
-// FEAR skill-id exception list keys on.
-type playableTarget interface {
-	Playable() bool
-}
 
 type continuousHandler struct {
 	defs Definitions
@@ -70,7 +49,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 	skillType := skillTypeKey(def.SkillType)
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(continuousTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -94,11 +73,11 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 				continue
 			}
 		case "HOT", "MPHOT":
-			if c, ok := cast.Caster.(invulnerableCaster); ok && c.Invul() {
+			if cast.Caster != nil && cast.Caster.Invul() {
 				continue
 			}
 		case "FEAR":
-			if pt, ok := effected.(playableTarget); ok && pt.Playable() && fearImmunePlayableSkillIDs[def.ID] {
+			if effected.Kind().Playable() && fearImmunePlayableSkillIDs[def.ID] {
 				continue
 			}
 		}
@@ -153,64 +132,31 @@ func (h continuousHandler) effectSkill(def modelskill.Definition) modelskill.Def
 }
 
 // reflectTarget returns the actual effect destination: the original target, or
-// the caster when the target reflects the skill back. It returns nil when the
-// skill reflects but the caster isn't itself a valid continuous target, which
-// is safer dropped than guessed through.
-func (continuousHandler) reflectTarget(caster Actor, def modelskill.Definition, target continuousTarget) continuousTarget {
-	src, ok := target.(skillReflectSource)
-	if !ok {
-		return target
-	}
-	in := src.SkillReflectInput(def)
+// the caster when the target reflects the skill back.
+func (continuousHandler) reflectTarget(caster Creature, def modelskill.Definition, target Creature) Creature {
+	in := target.SkillReflectInput(def)
 	in.SkillType = skillTypeKey(def.SkillType)
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target
 	}
-	self, ok := caster.(continuousTarget)
-	if !ok {
-		return nil
-	}
-	return self
-}
-
-// aggressionNotifiable is implemented by an attackable target that can react
-// to an incoming AI aggression notification carrying the landed skill's
-// power; a target without one doesn't react to it yet.
-type aggressionNotifiable interface {
-	NotifyAggression(source creature.DeathActor, power int)
-}
-
-// retargetableOnAggression is implemented by a playable target that tracks
-// a currently selected target and can be provoked into attacking the source
-// of a landed aggression-debuff effect; a target without one isn't
-// retargeted yet.
-type retargetableOnAggression interface {
-	CurrentTarget() world.Tracked
-	SetTarget(world.Tracked)
-	AttackTarget(world.Tracked)
+	return caster
 }
 
 // fireAggressionEvent runs the post-landing aggression notification an
 // AGGDEBUFF-type effect triggers: an attackable target is notified of the
 // caster's aggression at the skill's power, while a playable target is
 // provoked into attacking the caster if it was already targeting it, or
-// retargeted onto the caster otherwise. A target implementing neither
-// optional surface is left as-is.
-func fireAggressionEvent(caster, effected Actor, def modelskill.Definition) {
-	if am, ok := effected.(attackableMarker); ok && am.Attackable() {
-		if n, ok := effected.(aggressionNotifiable); ok {
-			n.NotifyAggression(caster, int(def.Power))
-		}
+// retargeted onto the caster otherwise.
+func fireAggressionEvent(caster Creature, effected Creature, def modelskill.Definition) {
+	if effected.Attackable() {
+		effected.NotifyAggression(caster, int(def.Power))
 		return
 	}
-	if pt, ok := effected.(playableTarget); ok && pt.Playable() {
-		r, ok := effected.(retargetableOnAggression)
-		if !ok {
-			return
-		}
-		tracked, isTracked := caster.(world.Tracked)
-		if !isTracked && caster != nil {
-			return
+	if effected.Kind().Playable() {
+		r := effected
+		var tracked world.Tracked
+		if caster != nil {
+			tracked = caster
 		}
 		current, _ := r.CurrentTarget().(Actor)
 		if sameObject(current, caster) {

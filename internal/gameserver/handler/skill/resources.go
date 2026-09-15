@@ -1,7 +1,7 @@
 package skill
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -99,7 +99,7 @@ type realDamageTarget interface {
 	Actor
 	HP() float64
 	SetHP(float64)
-	Die(killer creature.DeathActor)
+	Die(killer attackable.Combatant)
 }
 
 type healHandler struct{}

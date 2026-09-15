@@ -8,6 +8,7 @@ import (
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -128,7 +129,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	if def.SkillType == "FUSION" {
 		live.setFusionTarget(target.ObjectID())
 		finishFusion := func() {
-			skillhandler.DecreaseFusion(l.skills, live.Character, target, def)
+			// Only a creature carries the triggered fusion effect to decrease.
+			if effected, ok := target.(attackable.Combatant); ok {
+				skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
+			}
 			live.clearFusionTarget(target.ObjectID())
 		}
 		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
@@ -153,7 +157,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			if !ok {
 				return false
 			}
-			resolvedTarget, ok := target.(skilltarget.Creature)
+			resolvedTarget, ok := target.(skilltarget.Actor)
 			if !ok {
 				return false
 			}
@@ -223,7 +227,7 @@ func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
 	if live == nil || (def.Target != modelskill.TargetCorpseMob && def.Target != modelskill.TargetAreaCorpseMob) {
 		return
 	}
-	target, _ := live.Target().(skilltarget.Creature)
+	target, _ := live.Target().(skilltarget.Actor)
 	switch skilltarget.CorpseCastFailureFor(target, &def) {
 	case skilltarget.CorpseCastHarvestNotMonster:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
@@ -286,11 +290,11 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 }
 
 func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
-	casterCreature, ok := caster.(skilltarget.Creature)
+	casterCreature, ok := caster.(skilltarget.Actor)
 	if !ok {
 		return nil, skilltarget.CastRejectNone
 	}
-	selectedCreature, _ := selected.(skilltarget.Creature)
+	selectedCreature, _ := selected.(skilltarget.Actor)
 	handler, ok := l.targets.Handler(def.Target)
 	if !ok {
 		return nil, skilltarget.CastRejectNone

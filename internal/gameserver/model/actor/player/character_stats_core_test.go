@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -22,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -30,11 +32,13 @@ import (
 )
 
 type poleKnownCombatant struct {
+	attackabletest.Combatant
 	world.Presence
 	id int32
 }
 
 func (c *poleKnownCombatant) ObjectID() int32  { return c.id }
+func (*poleKnownCombatant) Kind() actor.Kind   { return actor.KindNPC }
 func (c *poleKnownCombatant) SiegeGuard() bool { return false }
 func (c *poleKnownCombatant) AlikeDead() bool  { return false }
 
@@ -601,11 +605,12 @@ func (ccGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 
 // ccFleeTarget satisfies the flee hook a Fear effect's runtime needs, so it
 // activates regardless of what its actual effected actor is.
-type ccFleeTarget struct{}
+type ccFleeTarget struct {
+	world.Presence
+	effecttest.Actor
+}
 
-func (ccFleeTarget) ObjectID() int32                                    { return 0 }
-func (ccFleeTarget) Dead() bool                                         { return false }
-func (ccFleeTarget) FleeFrom(effector effect.Participant, distance int) {}
+func (*ccFleeTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
 
 func attachTestLive(t *testing.T, c *Character) {
 	t.Helper()
@@ -622,7 +627,7 @@ func addCharacterEffect(t *testing.T, c *Character, name string) *effect.Effect 
 	if err != nil {
 		t.Fatalf("effect.New(%q) error: %v", name, err)
 	}
-	e.Effected = ccFleeTarget{}
+	e.Effected = &ccFleeTarget{}
 	c.EffectList().Add(e)
 	return e
 }
@@ -1403,6 +1408,7 @@ func TestCharacterDeathPenaltySkillUpdaterReplacesLevelOnEachChange(t *testing.T
 // deathPenaltyKiller is a minimal killer double: a non-Player actor whose
 // raid-relation is fixed at construction.
 type deathPenaltyKiller struct {
+	attackabletest.Combatant
 	raidRelated bool
 }
 
@@ -1558,7 +1564,7 @@ var (
 	_ interface {
 		Dead() bool
 		HP() float64
-		ReduceHPByDOT(float64, effect.Participant, bool)
+		ReduceHPByDOT(float64, effect.Actor, bool)
 	} = (*Character)(nil)
 	_ interface {
 		Dead() bool
@@ -1994,7 +2000,7 @@ func TestReduceHPByDOTSkipsCPAbsorptionForNonPlayableAttacker(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
 
-	c.ReduceHPByDOT(50, reduceHPNpcAttacker{}, true)
+	c.ReduceHPByDOT(50, &reduceHPNpcAttacker{}, true)
 
 	if c.CP() != 200 {
 		t.Fatalf("CP() = %v, want 200 unchanged for non-Playable attacker", c.CP())
@@ -2100,11 +2106,13 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	}
 }
 
-type pvpFlagNPC struct{ guard bool }
+type pvpFlagNPC struct {
+	attackabletest.Combatant
+	guard bool
+}
 
-func (pvpFlagNPC) ObjectID() int32                { return 4 }
-func (pvpFlagNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
-func (n pvpFlagNPC) Guard() bool                  { return n.guard }
+func (pvpFlagNPC) ObjectID() int32 { return 4 }
+func (n pvpFlagNPC) Guard() bool   { return n.guard }
 
 func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.T) {
 	attacker := &Character{ID: 1}
@@ -2217,7 +2225,7 @@ func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing
 	flagged.UpdatePvPFlag(task.PvPFlagOn)
 	rec := recordEvents(attacker)
 
-	attacker.NotePvPSkillTargets([]creature.DeathActor{flagged, pvpFlagNPC{}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]attackable.Combatant{flagged, pvpFlagNPC{}}, false, "DUMMY")
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 2 || calls[0] || calls[1] {
@@ -2231,7 +2239,7 @@ func TestCharacterNotePvPSkillTargetsFlagsOwnerOfFlaggedSummon(t *testing.T) {
 	victim.UpdatePvPFlag(task.PvPFlagOn)
 	rec := recordEvents(attacker)
 
-	attacker.NotePvPSkillTargets([]creature.DeathActor{summonKiller{owner: victim}}, false, "DUMMY")
+	attacker.NotePvPSkillTargets([]attackable.Combatant{summonKiller{owner: victim}}, false, "DUMMY")
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if !called {
@@ -2262,24 +2270,29 @@ func TestCharacterReduceHPByDOTDoesNotFlagAttacker(t *testing.T) {
 // ---- from character_reducehp_cc_test.go ----
 // reduceHPPlayableAttacker is a minimal Playable-attacker stub for CP
 // absorption tests (a distinct actor from the target, unlike self-damage).
-type reduceHPPlayableAttacker struct{}
+type reduceHPPlayableAttacker struct {
+	attackabletest.Combatant
+}
 
 func (reduceHPPlayableAttacker) ObjectID() int32 { return 99 }
 func (reduceHPPlayableAttacker) Dead() bool      { return false }
 func (reduceHPPlayableAttacker) Playable() bool  { return true }
 
 // reduceHPNpcAttacker is a non-Playable attacker stub.
-type reduceHPNpcAttacker struct{}
+type reduceHPNpcAttacker struct {
+	world.Presence
+	effecttest.Actor
+}
 
-func (reduceHPNpcAttacker) ObjectID() int32 { return 98 }
-func (reduceHPNpcAttacker) Dead() bool      { return false }
-func (reduceHPNpcAttacker) Playable() bool  { return false }
+func (*reduceHPNpcAttacker) ObjectID() int32 { return 98 }
+func (*reduceHPNpcAttacker) Dead() bool      { return false }
+func (*reduceHPNpcAttacker) Playable() bool  { return false }
 
 func TestReduceHPDrainsCPBeforeHPForPlayableAttacker(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
 
-	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+	c.ReduceHP(50, &reduceHPPlayableAttacker{}, modelskill.Definition{})
 
 	if c.HP() != 500 {
 		t.Fatalf("HP() = %v, want 500 (fully absorbed by CP)", c.HP())
@@ -2293,7 +2306,7 @@ func TestReduceHPSpillsOverToHPOnceCPExhausted(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 30})
 
-	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+	c.ReduceHP(50, &reduceHPPlayableAttacker{}, modelskill.Definition{})
 
 	if c.CP() != 0 {
 		t.Fatalf("CP() = %v, want 0", c.CP())
@@ -2307,7 +2320,7 @@ func TestReduceHPSkipsCPAbsorptionForNonPlayableAttacker(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
 
-	c.ReduceHP(50, reduceHPNpcAttacker{}, modelskill.Definition{})
+	c.ReduceHP(50, &reduceHPNpcAttacker{}, modelskill.Definition{})
 
 	if c.CP() != 200 {
 		t.Fatalf("CP() = %v, want 200 unchanged", c.CP())
@@ -2335,7 +2348,7 @@ func TestReduceHPSkipsCPAbsorptionForDirectHPDamageSkill(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 200})
 
-	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{DirectHPDamage: true})
+	c.ReduceHP(50, &reduceHPPlayableAttacker{}, modelskill.Definition{DirectHPDamage: true})
 
 	if c.CP() != 200 {
 		t.Fatalf("CP() = %v, want 200 unchanged for a dmgDirectlyToHp skill (matches PlayerStatus.reduceHp's ignoreCP=skill.getDmgDirectlyToHP())", c.CP())
@@ -2357,7 +2370,7 @@ func TestReduceHPBreaksCastOnRawDamageNotCPAbsorbedRemainder(t *testing.T) {
 	spy := &spyCastController{casting: true, magic: true}
 	c.SetCastController(spy)
 
-	c.ReduceHP(50, reduceHPPlayableAttacker{}, modelskill.Definition{})
+	c.ReduceHP(50, &reduceHPPlayableAttacker{}, modelskill.Definition{})
 
 	if len(spy.damageCalls) != 1 {
 		t.Fatalf("InterruptCastOnDamage calls = %d, want 1", len(spy.damageCalls))
@@ -3595,7 +3608,7 @@ func TestCharacterHealAmountUsesMagicAttackAndHealProficiency(t *testing.T) {
 
 // ---- from character_stats_shield_test.go ----
 type shieldDefenseResolver interface {
-	ShieldDefense(caster creature.DeathActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {
@@ -4680,10 +4693,14 @@ type npcKiller struct{ id int32 }
 
 func (k npcKiller) ObjectID() int32 { return k.id }
 
-type summonKiller struct{ owner creature.DeathActor }
+type summonKiller struct {
+	attackabletest.Combatant
+	owner attackable.Combatant
+}
 
-func (k summonKiller) ObjectID() int32                   { return 3 }
-func (k summonKiller) ActingPlayer() creature.DeathActor { return k.owner }
+func (k summonKiller) ObjectID() int32                     { return 3 }
+func (k summonKiller) Kind() actor.Kind                    { return actor.KindSummon }
+func (k summonKiller) Owner() (attackable.Combatant, bool) { return k.owner, k.owner != nil }
 
 // ---- from level_test.go ----
 func TestLevelTable_Levels(t *testing.T) {
@@ -5954,4 +5971,59 @@ func pvpFlagCalls(rec *event.Recorder) []bool {
 		calls = append(calls, e.UseFlaggedDuration)
 	}
 	return calls
+}
+
+func (*reduceHPNpcAttacker) Kind() actor.Kind { return actor.KindNPC }
+
+func (reduceHPPlayableAttacker) Kind() actor.Kind { return actor.KindPlayer }
+
+func (pvpFlagNPC) Heading() int { return 0 }
+
+func (pvpFlagNPC) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (summonKiller) Heading() int { return 0 }
+
+func (summonKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (reduceHPPlayableAttacker) Heading() int { return 0 }
+
+func (reduceHPPlayableAttacker) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (deathPenaltyKiller) Heading() int { return 0 }
+
+func (deathPenaltyKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+func TestCharacterCombatantReadsSilentMoveAndFakeDeathEffects(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+	var combatant attackable.Combatant = c
+	if combatant.SilentMoving() || combatant.FakeDeath() {
+		t.Fatal("SilentMoving/FakeDeath = true before any effect, want false")
+	}
+
+	for _, name := range []string{"SilentMove", "FakeDeath"} {
+		e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+		if err != nil {
+			t.Fatalf("effect.New(%q) error: %v", name, err)
+		}
+		e.Effector, e.Effected = c, c
+		c.EffectList().Add(e)
+	}
+	if !combatant.SilentMoving() {
+		t.Fatal("Combatant.SilentMoving() = false with an active SilentMove effect, want true")
+	}
+	if !combatant.FakeDeath() {
+		t.Fatal("Combatant.FakeDeath() = false with an active FakeDeath effect, want true")
+	}
+}
+
+// Facing checks read a target's Heading through Combatant, so an unspawned
+// player must still report its last-known heading there.
+func TestCharacterCombatantHeadingIsCurrentHeading(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetLastKnownPosition(location.Location{X: 1, Y: 2, Z: 3}, 16384)
+	var combatant attackable.Combatant = c
+	if got, want := combatant.Heading(), c.CurrentHeading(); got != want || got != 16384 {
+		t.Fatalf("Combatant.Heading() = %d, CurrentHeading() = %d, want both 16384", got, want)
+	}
 }

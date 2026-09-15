@@ -1,7 +1,8 @@
 package player
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -44,7 +45,7 @@ func calculatePKKillKarmaGain(pkKills int) int {
 // None of those states are tracked on Character yet, so this only ever
 // reproduces the innocent-victim and already-flagged-victim gates; the
 // others stay dormant until their owning subsystems land.
-func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
+func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 	pk := killerPlayer(killer)
 	if pk == nil || pk == c || c.KarmaPoints != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
@@ -66,7 +67,7 @@ func (c *Character) awardKillerPKKarma(killer creature.DeathActor) {
 // PvP/siege-zone early returns, and this branch's own condition also
 // allows an at-war clan kill. That state is not tracked on Character yet;
 // it remains owned by the clan subsystem.
-func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
+func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
 	pk := killerPlayer(killer)
 	if pk == nil || pk == c {
 		return
@@ -81,9 +82,12 @@ func (c *Character) awardKillerPvPKill(killer creature.DeathActor) {
 	pk.UpdateUserInfo()
 }
 
-func killerPlayer(killer creature.DeathActor) *Character {
-	if summon, ok := killer.(interface{ ActingPlayer() creature.DeathActor }); ok {
-		killer = summon.ActingPlayer()
+func killerPlayer(killer attackable.Combatant) *Character {
+	if killer == nil {
+		return nil
+	}
+	if killer.Kind() == actor.KindSummon {
+		killer, _ = killer.Owner()
 	}
 	pk, _ := killer.(*Character)
 	return pk

@@ -1,8 +1,8 @@
 package player
 
 import (
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -39,14 +39,14 @@ func (c *Character) flagPvP(useFlaggedDuration bool) {
 }
 
 // NotePvPAttack records one resolved physical attack against target.
-func (c *Character) NotePvPAttack(target any) {
+func (c *Character) NotePvPAttack(target attackable.Combatant) {
 	if victim := pvpTargetPlayer(target); victim != nil {
 		victim.notePvPHitFromAttacker(c)
 	}
 }
 
 // NotePvPSkillTargets records a resolved skill cast against targets.
-func (c *Character) NotePvPSkillTargets(targets []creature.DeathActor, offensive bool, skillType string) {
+func (c *Character) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
 	for _, target := range targets {
 		if offensive {
 			c.NotePvPAttack(target)
@@ -58,7 +58,7 @@ func (c *Character) NotePvPSkillTargets(targets []creature.DeathActor, offensive
 	}
 }
 
-func (c *Character) skillTargetFlagsPvP(target any, skillType string) bool {
+func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType string) bool {
 	if c.InPvPZone() {
 		return false
 	}
@@ -68,23 +68,15 @@ func (c *Character) skillTargetFlagsPvP(target any, skillType string) bool {
 	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
 		return false
 	}
-	actor, ok := target.(interface{ Category() skilltarget.Category })
-	if !ok || actor.Category() != skilltarget.CategoryAttackable {
-		return false
-	}
-	guard, _ := target.(interface{ Guard() bool })
-	return guard == nil || !guard.Guard()
+	return target.Kind() == actor.KindNPC && !target.Guard()
 }
 
-func pvpTargetPlayer(target any) *Character {
-	if player, ok := target.(*Character); ok {
-		return player
+func pvpTargetPlayer(target attackable.Combatant) *Character {
+	if target != nil && target.Kind() == actor.KindSummon {
+		target, _ = target.Owner()
 	}
-	if summon, ok := target.(interface{ ActingPlayer() creature.DeathActor }); ok {
-		player, _ := summon.ActingPlayer().(*Character)
-		return player
-	}
-	return nil
+	player, _ := target.(*Character)
+	return player
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a

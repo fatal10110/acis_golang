@@ -3,6 +3,7 @@ package npc
 import (
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -11,14 +12,14 @@ import (
 
 // SkillSuccessInput returns the effect-landing roll input for def cast
 // against h.
-func (h *Hostile) SkillSuccessInput(caster creature.DeathActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (h *Hostile) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if h == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
 	return creature.ResolveSkillSuccessInput(caster, h, def, bss, shield)
 }
 
-func (h *Hostile) EffectSuccessInput(caster creature.DeathActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (h *Hostile) EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if tmpl.EffectType == "" {
 		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 	}

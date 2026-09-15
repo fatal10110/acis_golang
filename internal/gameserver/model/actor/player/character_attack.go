@@ -65,13 +65,6 @@ func (w activeWeapon) grade() int {
 	return int(w.tmpl.Crystal)
 }
 
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
 
@@ -123,7 +116,7 @@ func (c *Character) UpdateUserInfo() {
 }
 
 // UpdateAbnormalEffect reports that this character's active-effect icon list
-// changed, implementing the effect list's abnormalUpdater hook: it fires on every effect start and stop, matching
+// changed, called from effect hooks and the effect list's icon refresh: it fires on every effect start and stop, matching
 // Creature.addEffect()/removeEffect() unconditionally queueing an
 // EffectList icon update on each attempt.
 func (c *Character) UpdateAbnormalEffect() {
@@ -202,9 +195,6 @@ func (c *Character) BroadcastMPStatus() {
 // tests.
 
 // ObjectID returns the persistent world object id assigned to this player.
-
-// WorldPlayer satisfies world.Player: a Character's presence keeps its
-// world Region active.
 
 // LevelValue returns the player's current level for live-owned actors.
 
@@ -447,12 +437,8 @@ func (c *Character) WeaponGrade() int {
 
 // SetHeadingTo orients this player toward target.
 func (c *Character) SetHeadingTo(target attackable.Combatant) {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return
-	}
 	sx, sy, _ := c.Position()
-	tx, ty, _ := other.Position()
+	tx, ty, _ := target.Position()
 	c.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
@@ -637,12 +623,12 @@ func (c *Character) SiegeGuard() bool { return false }
 func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player.
-func (c *Character) AttackableBy(target.Creature) bool {
+func (c *Character) AttackableBy(target.Actor) bool {
 	return !c.AlikeDead()
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force.
-func (c *Character) AttackableWithoutForceBy(caster target.Creature) bool {
+func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	return caster.ObjectID() != c.ID && (c.Karma() > 0 || c.PvPFlagState() != task.PvPFlagNone)
 }
 
@@ -662,4 +648,3 @@ func (c *Character) RandomDamageSpread() int {
 
 var _ attack.PlayerActor = (*Character)(nil)
 var _ move.Actor = (*Character)(nil)
-var _ physicalTarget = (*Character)(nil)

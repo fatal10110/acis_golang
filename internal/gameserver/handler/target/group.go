@@ -10,67 +10,13 @@ import (
 // the caster's party, clan, alliance, a single member of one of those, or the
 // corpses of allied players. The membership and duel/olympiad gating lives in
 // the social layer; this package only consumes it through the narrow seams
-// declared below. The live party/clan/alliance/duel surfaces (milestone M8)
-// will satisfy these interfaces when that layer lands — the same shape the
-// summon/owner/corpse seams in target.go follow.
-
-// PartyMate reports whether this creature is in the same player party as
-// other. Used by the party-area sweep.
-type PartyMate interface {
-	IsInSameParty(other Creature) bool
-}
-
-// ClanAllyMate reports whether this creature shares a clan or alliance with
-// other. Used by the ally-area and corpse-ally sweeps.
-type ClanAllyMate interface {
-	IsInSameClan(other Creature) bool
-	IsInSameAlly(other Creature) bool
-}
-
-// PartyState answers the party-membership checks the single-target party
-// handlers gate on: whether the caster is in a party at all, and whether a
-// specific other creature is a member of it.
-type PartyState interface {
-	IsInParty() bool
-	PartyContains(other Creature) bool
-}
-
-// OlympiadParticipant is implemented by actors barred from alliance/corpse
-// target sweeps while in the Olympiad.
-type OlympiadParticipant interface {
-	OlympiadMode() bool
-}
-
-// Dueler optionally exposes the duel id and team a creature belongs to, used
-// by the ally-area sweeps to keep duel opponents out of allied buffs. A duel
-// id of 0 means "not dueling"; only dueling casters restrict the sweep.
-type Dueler interface {
-	DuelID() int32
-	DuelTeam() int
-}
-
-// ClanHolder reports whether the actor's clan is set, gating the corpse-ally
-// sweep so a clanless caster can't resurrect allied strangers through it.
-type ClanHolder interface {
-	HasClan() bool
-}
-
-// MageClasser reports whether the actor's profession class is a mage, the
-// skill-426/427 gate on TargetPartyOther.
-type MageClasser interface {
-	MageClass() bool
-}
-
-// ClanGroupMember exposes the social-group tags a monster template carries,
-// used by TargetClan to match a casting mob against its fellow clan members.
-type ClanGroupMember interface {
-	ClanGroups() []string
-}
+// on Actor. The live party/clan/alliance/duel surfaces (milestone M8)
+// implement those methods when that layer lands.
 
 // actingPlayerOf returns the player driving caster: the owner when caster is
 // a player-owned summon, or caster itself otherwise. ok is false only when
 // caster is nil.
-func actingPlayerOf(caster Creature) (Creature, bool) {
+func actingPlayerOf(caster Actor) (Actor, bool) {
 	if caster == nil {
 		return nil, false
 	}
@@ -84,87 +30,28 @@ func actingPlayerOf(caster Creature) (Creature, bool) {
 // single-target gating. The closest available signal in this layer is a
 // playable actor with no owner; the social layer (M8) owns the real player
 // distinction.
-func isPlayerLike(creature Creature) bool {
-	if creature == nil || !creature.Category().Has(CategoryPlayable) {
+func isPlayerLike(creature Actor) bool {
+	if creature == nil || !isPlayable(creature) {
 		return false
 	}
 	_, owned := ownerOf(creature)
 	return !owned
 }
 
-func inParty(creature Creature) bool {
-	state, ok := creature.(PartyState)
-	return ok && state.IsInParty()
-}
+func sameParty(a, b Actor) bool { return a.IsInSameParty(b) }
 
-func partyContains(partyMember, other Creature) bool {
-	state, ok := partyMember.(PartyState)
-	if !ok {
-		return false
-	}
-	return state.PartyContains(other)
-}
+func sameClan(a, b Actor) bool { return a.IsInSameClan(b) }
 
-func sameParty(a, b Creature) bool {
-	mate, ok := a.(PartyMate)
-	if !ok {
-		return false
-	}
-	return mate.IsInSameParty(b)
-}
-
-func sameClan(a, b Creature) bool {
-	mate, ok := a.(ClanAllyMate)
-	if !ok {
-		return false
-	}
-	return mate.IsInSameClan(b)
-}
-
-func sameAlly(a, b Creature) bool {
-	mate, ok := a.(ClanAllyMate)
-	if !ok {
-		return false
-	}
-	return mate.IsInSameAlly(b)
-}
-
-func olympiadMode(creature Creature) bool {
-	o, ok := creature.(OlympiadParticipant)
-	return ok && o.OlympiadMode()
-}
-
-func hasClan(creature Creature) bool {
-	holder, ok := creature.(ClanHolder)
-	return ok && holder.HasClan()
-}
-
-func mageClass(creature Creature) bool {
-	m, ok := creature.(MageClasser)
-	return ok && m.MageClass()
-}
+func sameAlly(a, b Actor) bool { return a.IsInSameAlly(b) }
 
 // sameDuelTeam reports whether a and b may be grouped together by an
 // ally-targeting sweep. A non-dueling caster (DuelID == 0) sweeps everyone;
 // otherwise both must be in the same duel id and on the same team.
-func sameDuelTeam(a, b Creature) bool {
-	caster, ok := a.(Dueler)
-	if !ok || caster.DuelID() == 0 {
+func sameDuelTeam(a, b Actor) bool {
+	if a.DuelID() == 0 {
 		return true
 	}
-	other, ok := b.(Dueler)
-	if !ok {
-		return false
-	}
-	return other.DuelID() == caster.DuelID() && other.DuelTeam() == caster.DuelTeam()
-}
-
-func clanGroupsOf(creature Creature) []string {
-	member, ok := creature.(ClanGroupMember)
-	if !ok {
-		return nil
-	}
-	return member.ClanGroups()
+	return b.DuelID() == a.DuelID() && b.DuelTeam() == a.DuelTeam()
 }
 
 // clanGroupsOverlap reports whether a and b share any clan-group tag. The
@@ -183,7 +70,7 @@ func clanGroupsOverlap(a, b []string) bool {
 // ally-area sweep: it bypasses the clan/ally/duel gate for the caster's own
 // summon (which is always covered), otherwise requiring the membership and
 // duel-team gates to pass.
-func allyPlayableAppends(caster, summon, creature Creature) bool {
+func allyPlayableAppends(caster, summon, creature Actor) bool {
 	if summon != nil && sameCreature(summon, creature) {
 		return true
 	}
@@ -202,18 +89,18 @@ func (partyHandler) Target() modelskill.Target { return modelskill.TargetParty }
 // of party membership. The sweep centers on the acting player, so a skill
 // cast by a summon resolves its owning player as the sweep's anchor and list
 // head, matching the reference's getActingPlayer indirection.
-func (h partyHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+func (h partyHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	player, ok := actingPlayerOf(caster)
 	if !ok {
-		return []Creature{caster}
+		return []Actor{caster}
 	}
-	out := []Creature{player}
+	out := []Actor{player}
 	if h.known == nil {
 		return out
 	}
 	playerSummon, _ := summonOf(player)
-	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Creature) {
-		if creature.Dead() || !creature.Category().Has(CategoryPlayable) {
+	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Actor) {
+		if creature.Dead() || !isPlayable(creature) {
 			return
 		}
 		if playerSummon != nil && sameCreature(playerSummon, creature) {
@@ -228,11 +115,11 @@ func (h partyHandler) Targets(caster, _ Creature, skill *modelskill.Definition) 
 	return out
 }
 
-func (partyHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+func (partyHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor {
 	return caster
 }
 
-func (partyHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+func (partyHandler) CanCast(Actor, Actor, *modelskill.Definition, bool) bool { return true }
 
 type allyHandler struct{ known Known }
 
@@ -242,21 +129,21 @@ func (allyHandler) Target() modelskill.Target { return modelskill.TargetAlly }
 // playable sharing clan or alliance (and the same duel team when the acting
 // player is dueling), plus the acting player's own summon. An Olympiad
 // participant draws only the caster, since allies are unavailable there.
-func (h allyHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+func (h allyHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	player, ok := actingPlayerOf(caster)
 	if !ok {
-		return []Creature{caster}
+		return []Actor{caster}
 	}
-	if olympiadMode(player) {
-		return []Creature{caster}
+	if player.OlympiadMode() {
+		return []Actor{caster}
 	}
-	out := []Creature{player}
+	out := []Actor{player}
 	if h.known == nil {
 		return out
 	}
 	playerSummon, _ := summonOf(player)
-	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Creature) {
-		if creature.Dead() || !creature.Category().Has(CategoryPlayable) {
+	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Actor) {
+		if creature.Dead() || !isPlayable(creature) {
 			return
 		}
 		if allyPlayableAppends(player, playerSummon, creature) {
@@ -266,11 +153,11 @@ func (h allyHandler) Targets(caster, _ Creature, skill *modelskill.Definition) [
 	return out
 }
 
-func (allyHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+func (allyHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor {
 	return caster
 }
 
-func (allyHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+func (allyHandler) CanCast(Actor, Actor, *modelskill.Definition, bool) bool { return true }
 
 type clanHandler struct{ known Known }
 
@@ -280,17 +167,17 @@ func (clanHandler) Target() modelskill.Target { return modelskill.TargetClan }
 // clan-group tag. The reference handler only assembles a list for Attackable
 // casters and otherwise returns an empty target array, so this returns nil
 // for non-attackable casters.
-func (h clanHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
-	if !caster.Category().Has(CategoryAttackable) || h.known == nil {
+func (h clanHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
+	if !isAttackable(caster) || h.known == nil {
 		return nil
 	}
-	baseGroups := clanGroupsOf(caster)
-	out := []Creature{caster}
-	h.known.ForEachKnownCreatureInRadius(caster, skillRadius(skill), func(creature Creature) {
-		if sameCreature(caster, creature) || creature.Dead() || !creature.Category().Has(CategoryAttackable) {
+	baseGroups := caster.ClanGroups()
+	out := []Actor{caster}
+	h.known.ForEachKnownCreatureInRadius(caster, skillRadius(skill), func(creature Actor) {
+		if sameCreature(caster, creature) || creature.Dead() || !isAttackable(creature) {
 			return
 		}
-		if !clanGroupsOverlap(baseGroups, clanGroupsOf(creature)) {
+		if !clanGroupsOverlap(baseGroups, creature.ClanGroups()) {
 			return
 		}
 		out = append(out, creature)
@@ -298,21 +185,21 @@ func (h clanHandler) Targets(caster, _ Creature, skill *modelskill.Definition) [
 	return out
 }
 
-func (clanHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+func (clanHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor {
 	return caster
 }
 
-func (clanHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+func (clanHandler) CanCast(Actor, Actor, *modelskill.Definition, bool) bool { return true }
 
 type partyMemberHandler struct{}
 
 func (partyMemberHandler) Target() modelskill.Target { return modelskill.TargetPartyMember }
 
-func (partyMemberHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (partyMemberHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (partyMemberHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (partyMemberHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
@@ -323,7 +210,7 @@ func (partyMemberHandler) FinalTarget(_, target Creature, _ *modelskill.Definiti
 //
 // The reference sends an "S1 cannot be used" system message on each failed
 // branch; that network send belongs to the cast pipeline, not this layer.
-func (partyMemberHandler) CanCast(caster, target Creature, skill *modelskill.Definition, _ bool) bool {
+func (partyMemberHandler) CanCast(caster, target Actor, skill *modelskill.Definition, _ bool) bool {
 	if target == nil {
 		return false
 	}
@@ -338,22 +225,22 @@ func (partyMemberHandler) CanCast(caster, target Creature, skill *modelskill.Def
 		if summon, ok := summonOf(caster); ok && sameCreature(summon, target) {
 			return true
 		}
-		if !target.Category().Has(CategoryPlayable) || target.Dead() {
+		if !isPlayable(target) || target.Dead() {
 			return false
 		}
 	}
-	return inParty(caster) && partyContains(caster, target)
+	return caster.IsInParty() && caster.PartyContains(target)
 }
 
 type partyOtherHandler struct{}
 
 func (partyOtherHandler) Target() modelskill.Target { return modelskill.TargetPartyOther }
 
-func (partyOtherHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (partyOtherHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (partyOtherHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (partyOtherHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
@@ -363,7 +250,7 @@ func (partyOtherHandler) FinalTarget(_, target Creature, _ *modelskill.Definitio
 //
 // As with the party-member handler, the reference's system-message sends on
 // each failed branch belong to the cast pipeline and are not reproduced here.
-func (partyOtherHandler) CanCast(caster, target Creature, skill *modelskill.Definition, _ bool) bool {
+func (partyOtherHandler) CanCast(caster, target Actor, skill *modelskill.Definition, _ bool) bool {
 	if target == nil || sameCreature(caster, target) {
 		return false
 	}
@@ -371,14 +258,14 @@ func (partyOtherHandler) CanCast(caster, target Creature, skill *modelskill.Defi
 		return false
 	}
 	if skill != nil {
-		if skill.ID == dualcastManaSkillID && mageClass(target) {
+		if skill.ID == dualcastManaSkillID && target.MageClass() {
 			return false
 		}
-		if skill.ID == dualcastHealSkillID && !mageClass(target) {
+		if skill.ID == dualcastHealSkillID && !target.MageClass() {
 			return false
 		}
 	}
-	return inParty(caster) && partyContains(caster, target)
+	return caster.IsInParty() && caster.PartyContains(target)
 }
 
 type corpseAllyHandler struct{ known Known }
@@ -389,13 +276,13 @@ func (corpseAllyHandler) Target() modelskill.Target { return modelskill.TargetCo
 // (and the same duel team when the caster is dueling). With no clan or no
 // matching corpses it returns the caster alone, matching the reference's
 // empty-list fallback to the caster.
-func (h corpseAllyHandler) Targets(caster, _ Creature, skill *modelskill.Definition) []Creature {
+func (h corpseAllyHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	player, ok := actingPlayerOf(caster)
-	if !ok || !hasClan(player) || h.known == nil {
-		return []Creature{caster}
+	if !ok || !player.HasClan() || h.known == nil {
+		return []Actor{caster}
 	}
-	var out []Creature
-	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Creature) {
+	var out []Actor
+	h.known.ForEachKnownCreatureInRadius(player, skillRadius(skill), func(creature Actor) {
 		if !creature.Dead() || !isPlayerLike(creature) {
 			return
 		}
@@ -408,24 +295,24 @@ func (h corpseAllyHandler) Targets(caster, _ Creature, skill *modelskill.Definit
 		out = append(out, creature)
 	})
 	if len(out) == 0 {
-		return []Creature{caster}
+		return []Actor{caster}
 	}
 	return out
 }
 
-func (corpseAllyHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+func (corpseAllyHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor {
 	return caster
 }
 
 // CanCast blocks corpse-ally skills while the caster participates in the
 // Olympiad; the "skill unavailable during the Olympiad" send is the cast
 // pipeline's responsibility.
-func (corpseAllyHandler) CanCast(caster, _ Creature, _ *modelskill.Definition, _ bool) bool {
+func (corpseAllyHandler) CanCast(caster, _ Actor, _ *modelskill.Definition, _ bool) bool {
 	player, ok := actingPlayerOf(caster)
 	if !ok {
 		return true
 	}
-	return !olympiadMode(player)
+	return !player.OlympiadMode()
 }
 
 // summonFriendSkillID matches the Summon Friend skill that TargetPartyMember

@@ -26,7 +26,7 @@ func (c *Controller) CanCastToggle(def modelskill.Definition) error {
 	if def.Activation != modelskill.ActivationToggle {
 		return fmt.Errorf("cast: skill %d level %d is not a toggle skill", def.ID, def.Level)
 	}
-	if d, ok := c.actor.(allSkillsDisabler); ok && d.AllSkillsDisabled() {
+	if c.actor.AllSkillsDisabled() {
 		return ErrAllSkillsDisabled
 	}
 	if c.actor.SkillDisabled(ReuseKey(def)) {

@@ -47,11 +47,7 @@ func (c *Character) SetTarget(t world.Tracked) {
 		c.StoreTarget(t)
 		return
 	}
-	var target event.Object
-	if t != nil {
-		target = t
-	}
-	c.emit(event.Retargeted{Target: target})
+	c.emit(event.Retargeted{Target: t})
 }
 
 // AttackTarget implements retargetableOnAggression's attack trigger.

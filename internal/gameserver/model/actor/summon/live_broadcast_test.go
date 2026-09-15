@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -11,12 +13,14 @@ import (
 
 // fakeSummonOwner is a minimal owner for SpawnBesideOwner fixtures.
 type fakeSummonOwner struct {
+	attackabletest.Combatant
 	world.Presence
 
 	id int32
 }
 
 func (o *fakeSummonOwner) ObjectID() int32           { return o.id }
+func (*fakeSummonOwner) Kind() actor.Kind            { return actor.KindPlayer }
 func (o *fakeSummonOwner) LevelValue() int           { return 1 }
 func (o *fakeSummonOwner) Position() (int, int, int) { return 1000, 1000, 0 }
 func (o *fakeSummonOwner) InCombat() bool            { return false }
@@ -120,3 +124,5 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 		t.Fatal("OwnerStillLinked() = true after owner cleared summon, want false")
 	}
 }
+
+func (*fakeSummonOwner) ServitorVanished() {}

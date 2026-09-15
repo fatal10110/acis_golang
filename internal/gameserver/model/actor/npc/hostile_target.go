@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -70,10 +71,10 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 	_, targetIsNPC := target.(*Hostile)
 	if !targetIsNPC {
 		graceTarget := target
-		if owned, ok := target.(interface{ OwnerCombatant() attackable.Combatant }); ok {
-			graceTarget = owned.OwnerCombatant()
+		if owner, ok := target.Owner(); ok {
+			graceTarget = owner
 		}
-		if recent, ok := graceTarget.(interface{ RecentFakeDeath() bool }); ok && recent.RecentFakeDeath() {
+		if graceTarget.RecentFakeDeath() {
 			return false
 		}
 	}
@@ -91,7 +92,7 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 	}
 
 	if !allowPeaceful {
-		if pz, ok := target.(interface{ InPeaceZone() bool }); ok && pz.InPeaceZone() {
+		if target.InPeaceZone() {
 			return false
 		}
 		if !h.Aggressive() {
@@ -108,11 +109,7 @@ func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal in
 	if rangeVal < 0 {
 		return false
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	tx, ty, tz := other.Position()
+	tx, ty, tz := target.Position()
 	sx, sy, sz := h.Position()
 	dx := int64(sx) - int64(tx)
 	dy := int64(sy) - int64(ty)
@@ -124,16 +121,14 @@ func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal in
 	if h.RaidRelated() || h.Instance.Template.CanSeeThrough {
 		return true
 	}
-	sm, ok := target.(interface{ SilentMoving() bool })
-	return !ok || !sm.SilentMoving()
+	return !target.SilentMoving()
 }
 
 // karmaTargetVisible reports whether target is a karma-positive actor
 // within line of sight — the sole target rule Guard and FriendlyMonster
 // kinds use in place of the general rule below.
 func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
-	pk, ok := target.(interface{ Karma() int })
-	return ok && pk.Karma() > 0 && h.CanSee(target)
+	return target.Karma() > 0 && h.CanSee(target)
 }
 
 // siegeGuardAutoAttackTargetValid ports SiegeGuard.canAutoAttack(Creature)
@@ -150,7 +145,7 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 // line of sight. The reference resolves target.getActingPlayer() once and
 // checks the alike-dead/silent-moving/distance gates against that acting
 // player, not against target directly — for a Summon/Pet target this is the
-// owning player, matching AutoAttackTargetValid's own OwnerCombatant()
+// owning player, matching AutoAttackTargetValid's own Owner()
 // resolution above; only the closing isAttackableBy/canSeeTarget calls use
 // the raw target. Not modeled: the acting player's invisibility check
 // (targetPlayer.getAppearance().isVisible()) — no player appearance state
@@ -168,20 +163,18 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 	}
 
 	actingPlayer := target
-	if owned, ok := target.(interface{ OwnerCombatant() attackable.Combatant }); ok {
-		actingPlayer = owned.OwnerCombatant()
+	if target.Kind() == actor.KindSummon {
+		actingPlayer, _ = target.Owner()
 	}
 	if actingPlayer == nil || actingPlayer.AlikeDead() {
 		return false
 	}
 
-	if sm, ok := actingPlayer.(interface{ SilentMoving() bool }); ok && sm.SilentMoving() && !h.withinDistance(actingPlayer, 250) {
+	if actingPlayer.SilentMoving() && !h.withinDistance(actingPlayer, 250) {
 		return false
 	}
 
-	rules, ok := target.(interface {
-		AttackableBy(skilltarget.Creature) bool
-	})
+	rules, ok := target.(skilltarget.Actor)
 	if !ok || !rules.AttackableBy(h) {
 		return false
 	}
@@ -259,11 +252,7 @@ func (h *Hostile) withinDistance(target attackable.Combatant, rangeVal int) bool
 	if rangeVal < 0 {
 		return false
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	tx, ty, tz := other.Position()
+	tx, ty, tz := target.Position()
 	sx, sy, sz := h.Position()
 	dx := int64(sx) - int64(tx)
 	dy := int64(sy) - int64(ty)

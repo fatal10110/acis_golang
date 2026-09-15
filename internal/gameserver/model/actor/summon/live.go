@@ -37,13 +37,15 @@ type AI interface {
 // command preconditions.
 type Owner interface {
 	world.Tracked
+	attackable.Combatant
 	LevelValue() int
-	Position() (int, int, int)
 	// InCombat reports the owner's own attack-stance state. Summon.isInCombat
 	// (Summon.java:302-305) delegates straight to _owner.isInCombat() — a
 	// pet/servitor's "in combat" status is entirely owner-derived, never
 	// tracked on the summon itself.
 	InCombat() bool
+	// ServitorVanished tells the owner its servitor was erased.
+	ServitorVanished()
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.
