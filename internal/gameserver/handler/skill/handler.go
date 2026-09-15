@@ -60,6 +60,9 @@ type Creature interface {
 	StopAggroHate(attacker attackable.Combatant)
 	StopHateList(attacker attackable.Combatant)
 	ClearAggroTables()
+	// EnableOverhit arms overhit damage tracking for the current hit; only
+	// attackable NPCs track it.
+	EnableOverhit()
 
 	// CurrentTarget, SetTarget and AttackTarget retarget a playable creature
 	// provoked by aggression.

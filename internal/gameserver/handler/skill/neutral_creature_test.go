@@ -37,6 +37,7 @@ func (neutralCreature) ReduceAllAggroHate(float64)                 {}
 func (neutralCreature) StopAggroHate(attackable.Combatant)         {}
 func (neutralCreature) StopHateList(attackable.Combatant)          {}
 func (neutralCreature) ClearAggroTables()                          {}
+func (neutralCreature) EnableOverhit()                             {}
 func (neutralCreature) CurrentTarget() world.Tracked               { return nil }
 func (neutralCreature) SetTarget(world.Tracked)                    {}
 func (neutralCreature) AttackTarget(world.Tracked)                 {}

@@ -5,7 +5,6 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -167,9 +166,8 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 
 	if def.Overhit && caster.Kind().Playable() {
 		for _, t := range affected {
-			// Only hostile NPCs track overhit damage.
-			if hostile, ok := t.(*npc.Hostile); ok {
-				hostile.EnableOverhit()
+			if creature, ok := t.(handlerskill.Creature); ok {
+				creature.EnableOverhit()
 			}
 		}
 	}

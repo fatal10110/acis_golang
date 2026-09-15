@@ -11,3 +11,4 @@ func (a *Actor) ReduceAllAggroHate(float64)                 {}
 func (a *Actor) StopAggroHate(attackable.Combatant)         {}
 func (a *Actor) StopHateList(attackable.Combatant)          {}
 func (a *Actor) ClearAggroTables()                          {}
+func (a *Actor) EnableOverhit()                             {}
