@@ -78,15 +78,15 @@ type lethalableTarget interface {
 // reflectEffectTarget returns the effect-list-owning destination for def's
 // effects cast at obj: obj itself, or cast.Caster when obj reflects the
 // skill back — the rule disablers.go's reflectTarget applies, generalized
-// to whatever satisfies effectListTarget rather than the fuller
+// to whatever satisfies effect.Actor rather than the fuller
 // disablerTarget surface (Dead/Invul/Paralyzed) a damage handler's own
 // Dead()/evasion checks already cover before this runs. Returns nil when
 // reflect fires but the caster doesn't expose an effect list to redirect
 // onto — a duck-typing gap safer to drop than to guess through, matching
 // reflectTarget's own behavior. The second return reports whether reflect
 // fired.
-func reflectEffectTarget(cast Cast, obj Actor) (effectListTarget, bool) {
-	target, ok := obj.(effectListTarget)
+func reflectEffectTarget(cast Cast, obj Actor) (effect.Actor, bool) {
+	target, ok := obj.(effect.Actor)
 	if !ok {
 		return nil, false
 	}
@@ -99,7 +99,7 @@ func reflectEffectTarget(cast Cast, obj Actor) (effectListTarget, bool) {
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target, false
 	}
-	caster, ok := cast.Caster.(effectListTarget)
+	caster, ok := cast.Caster.(effect.Actor)
 	if !ok {
 		return nil, true
 	}
@@ -205,7 +205,7 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	elt, ok := obj.(effectListTarget)
+	elt, ok := obj.(effect.Actor)
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
@@ -268,7 +268,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	elt, ok := obj.(effectListTarget)
+	elt, ok := obj.(effect.Actor)
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
@@ -425,7 +425,7 @@ type resistedMagicNotifier interface {
 // deliverMagicFailure sends the caster/target resist system messages a
 // magic-damage failure produces, for paths that do not return a skill
 // handler Result (signet ticks).
-func deliverMagicFailure(caster attackable.Combatant, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
+func deliverMagicFailure(caster Caster, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
 	var result Result
 	reportMagicFailure(Cast{Caster: caster, Skill: def}, target, failure, &result)
 	if n, ok := caster.(attackFailedNotifier); ok {
@@ -488,7 +488,7 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 	}
 	effected, reflected := reflectEffectTarget(cast, obj)
 	if countered && reflected {
-		effected, _ = obj.(effectListTarget)
+		effected, _ = obj.(effect.Actor)
 	}
 	if effected == nil {
 		return
@@ -545,9 +545,9 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() {
 			continue
 		}
-		var effected effectListTarget
+		var effected effect.Actor
 		var effective Actor = target
-		if _, ok := obj.(effectListTarget); ok {
+		if _, ok := obj.(effect.Actor); ok {
 			effected, _ = reflectEffectTarget(cast, obj)
 			if effected == nil {
 				continue
@@ -604,7 +604,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		// through the same effect-list removal path stopEffectsBySkillID
 		// uses rather than a type assertion that only test fakes satisfy.
 		if rawDamage > 0 {
-			if elt, ok := effective.(effectListTarget); ok {
+			if elt, ok := effective.(effect.Actor); ok {
 				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
 					return e.Type == effect.TypeSleep || e.Type == effect.TypeImmobileUntilAttacked
 				})

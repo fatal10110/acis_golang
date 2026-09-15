@@ -6,11 +6,11 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -24,6 +24,7 @@ const tickInterval = 1100 * time.Millisecond
 // tests: it can be positioned and identified, owns its own live effect
 // list (for the self-targeted SIGNET_CASTTIME family), and can pay MP.
 type signetFakeCaster struct {
+	world.Presence
 	fakeActor
 	id         int32
 	x, y, z    int
@@ -67,7 +68,7 @@ func (noopStatOwner) MaxBuffCount() int                  { return 0 }
 // dance-cancel and unsummon families).
 type signetFakeTarget struct {
 	world.Presence
-	attackabletest.Combatant
+	effecttest.Actor
 
 	id    int32
 	dead  bool
@@ -401,6 +402,12 @@ func findEffectPointObjects(state *world.State) []*npc.EffectPoint {
 	return out
 }
 
-func (signetFakeCaster) Kind() actor.Kind { return actor.KindNPC }
+func (*signetFakeCaster) Kind() actor.Kind { return actor.KindNPC }
 
-func (signetFakeCaster) Heading() int { return 0 }
+func (noopStatOwner) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (noopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (noopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (noopStatOwner) UpdateEffectIcons() {}

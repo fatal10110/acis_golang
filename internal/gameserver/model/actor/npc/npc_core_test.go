@@ -321,7 +321,7 @@ var (
 	_ interface {
 		Dead() bool
 		HP() float64
-		ReduceHPByDOT(float64, effect.Participant, bool)
+		ReduceHPByDOT(float64, effect.Actor, bool)
 	} = (*Hostile)(nil)
 	_ interface {
 		Dead() bool

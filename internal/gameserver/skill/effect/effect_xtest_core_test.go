@@ -62,3 +62,11 @@ func TestApplyRestoredSkipsUnsupportedTemplatesWithoutFailingTheRest(t *testing.
 		t.Fatalf("ApplyRestored added %d effects, want 1 (unsupported template skipped)", len(list.All()))
 	}
 }
+
+func (noopStatOwner) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (noopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (noopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (noopStatOwner) UpdateEffectIcons() {}

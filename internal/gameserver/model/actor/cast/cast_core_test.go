@@ -12,7 +12,6 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -24,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -1029,7 +1029,8 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 // surface ApplyEffects needs), so the same fake can stand in for an
 // AIController's target on both sides of the bridge it builds.
 type fakeCastCreature struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id       int32
 	x, y, z  int
 	dead     bool
@@ -1149,7 +1150,8 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 // Cubic.useContinuousSkill's calcCubicSkillSuccess()==false branch
 // (Cubic.java:439-444), the case this test exercises.
 type fakeCubicEffectCaster struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id int32
 }
 
@@ -1158,6 +1160,8 @@ func (f *fakeCubicEffectCaster) Position() (int, int, int) { return 0, 0, 0 }
 func (f *fakeCubicEffectCaster) Dead() bool                { return false }
 
 type fakeCubicEffectTarget struct {
+	world.Presence
+	effecttest.Actor
 	id   int32
 	list *effect.List
 }
@@ -1224,7 +1228,7 @@ func (f *fakeCubicFireOwner) Roll(n int) int {
 }
 
 type fakeCubicTarget struct {
-	attackabletest.Combatant
+	effecttest.Actor
 	world.Presence
 	objectID   int32
 	x, y, z    int
@@ -1303,7 +1307,8 @@ func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 // caster, proving the resolution path ApplyEffects drives doesn't require
 // the live-player packet-handling type the player cast flow uses.
 type effectsActor struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id       int32
 	x, y, z  int
 	category skilltarget.Category
@@ -1784,7 +1789,8 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 // RevalidateLaunch's gates consult, each independently controllable so
 // tests can isolate one gate at a time.
 type launchActor struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id          int32
 	x, y, z     int
 	category    skilltarget.Category
@@ -3042,13 +3048,11 @@ func TestCastToggleNeverInstallsAReuseDelay(t *testing.T) {
 	}
 }
 
-func (fakeCastCreature) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeCastCreature) Kind() actor.Kind { return actor.KindNPC }
 
-func (fakeCubicEffectCaster) Kind() actor.Kind { return actor.KindNPC }
+func (*effectsActor) Kind() actor.Kind { return actor.KindNPC }
 
-func (effectsActor) Kind() actor.Kind { return actor.KindNPC }
-
-func (fakeCubicEffectTarget) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeCubicEffectTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (a *launchActor) Kind() actor.Kind {
 	if a.category.Has(skilltarget.CategoryPlayable) {
@@ -3061,9 +3065,7 @@ func (castHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
 
-func (fakeCubicEffectCaster) Heading() int { return 0 }
-
-func (fakeCastCreature) CanSeeTarget(skilltarget.Creature) bool { return true }
+func (*fakeCastCreature) CanSeeTarget(skilltarget.Creature) bool { return true }
 
 func (abortActor) DecreaseCharges(int) bool { return false }
 

@@ -1,5 +1,7 @@
 package skill
 
+import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+
 type seedHandler struct{}
 
 func (seedHandler) Types() []string { return []string{"SEED"} }
@@ -17,7 +19,7 @@ func (seedHandler) Types() []string { return []string{"SEED"} }
 // normally.
 func (seedHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
-		target, ok := obj.(effectListTarget)
+		target, ok := obj.(effect.Actor)
 		if !ok {
 			continue
 		}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -20,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -44,10 +44,10 @@ var (
 
 	// Effect-carrying targets: the destination of any effect-applying,
 	// effect-cancelling, or continuous (buff/debuff/over-time) skill.
-	_ effectListTarget     = (*player.Character)(nil)
-	_ effectListTarget     = (*npc.Hostile)(nil)
-	_ effectListTarget     = (*summon.Actor)(nil)
-	_ effectListTarget     = (*npc.EffectPoint)(nil)
+	_ effect.Actor         = (*player.Character)(nil)
+	_ effect.Actor         = (*npc.Hostile)(nil)
+	_ effect.Actor         = (*summon.Actor)(nil)
+	_ effect.Actor         = (*npc.EffectPoint)(nil)
 	_ continuousTarget     = (*player.Character)(nil)
 	_ continuousTarget     = (*npc.Hostile)(nil)
 	_ continuousTarget     = (*summon.Actor)(nil)
@@ -116,7 +116,7 @@ var (
 // that models death or identity itself declares its own Dead or ObjectID,
 // which shadows the one embedded here.
 type fakeActor struct {
-	attackabletest.Combatant
+	effecttest.Actor
 	objectID int32
 }
 
@@ -126,6 +126,7 @@ func (fakeActor) Dead() bool { return false }
 
 // ---- from apply_test.go ----
 type effectLandingFake struct {
+	world.Presence
 	fakeActor
 	list    *effect.List
 	x, y, z int
@@ -139,15 +140,16 @@ func (f *effectLandingFake) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *effectLandingFake) Invul() bool { return f.invul }
 
 type damagePermissionFake struct {
+	world.Presence
 	fakeActor
 	allow bool
 }
 
-func (f damagePermissionFake) CanGiveDamage() bool   { return f.allow }
-func (damagePermissionFake) Position() (x, y, z int) { return 0, 0, 0 }
-func (damagePermissionFake) Heading() int            { return 0 }
+func (f *damagePermissionFake) CanGiveDamage() bool { return f.allow }
+func (*damagePermissionFake) Heading() int          { return 0 }
 
 type positionedFakeActor struct {
+	world.Presence
 	fakeActor
 	x, y, z int
 }
@@ -155,6 +157,7 @@ type positionedFakeActor struct {
 func (f *positionedFakeActor) Position() (int, int, int) { return f.x, f.y, f.z }
 
 type effectListOnlyFake struct {
+	world.Presence
 	fakeActor
 	list *effect.List
 }
@@ -182,8 +185,8 @@ func TestApplyEffectsEffectRangeAtLanding(t *testing.T) {
 	configured := []modelskill.EffectTemplate{{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true}}
 	tests := []struct {
 		name      string
-		caster    Actor
-		target    effectListTarget
+		caster    effect.Actor
+		target    effect.Actor
 		templates []modelskill.EffectTemplate
 		want      int
 	}{
@@ -213,20 +216,6 @@ func TestApplyEffectsEffectRangeAtLanding(t *testing.T) {
 			templates: configured,
 			want:      1,
 		},
-		{
-			name:      "unpositioned effector",
-			caster:    fakeActor{objectID: 1},
-			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 101},
-			templates: configured,
-			want:      1,
-		},
-		{
-			name:      "unpositioned effected",
-			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target:    &effectListOnlyFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
-			templates: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
-			want:      1,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -251,32 +240,32 @@ func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T
 	landing := []modelskill.EffectTemplate{{Name: "Buff", Time: 60}}
 	tests := []struct {
 		name   string
-		caster Actor
+		caster effect.Actor
 		target *effectLandingFake
 		def    modelskill.Definition
 		want   int
 	}{
 		{
 			name:   "offensive vs invul",
-			caster: fakeActor{objectID: 1},
+			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "debuff vs invul",
-			caster: fakeActor{objectID: 1},
+			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
 			def:    modelskill.Definition{Debuff: true},
 		},
 		{
 			name:   "buff vs invul still lands",
-			caster: fakeActor{objectID: 1},
+			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
 			want:   1,
 		},
 		{
 			name:   "self offensive on invul still lands",
-			caster: fakeActor{objectID: 1},
+			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: effect.NewList(nil), invul: true},
 			def:    modelskill.Definition{Offensive: true},
 			want:   1,
@@ -288,19 +277,19 @@ func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T
 		},
 		{
 			name:   "offensive when caster cannot give damage",
-			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
+			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "buff when caster cannot give damage still lands",
-			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
+			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
 			want:   1,
 		},
 		{
 			name:   "offensive when caster may give damage",
-			caster: damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: true},
+			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: true},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 			want:   1,
@@ -367,6 +356,7 @@ func TestStopEffectOnATargetWithNoEffectListIsANoop(t *testing.T) {
 
 // ---- from cancel_test.go ----
 type cancelFakeActor struct {
+	world.Presence
 	fakeActor
 	dead  bool
 	level int
@@ -500,7 +490,7 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 // ---- from continuous_fixtures_test.go ----
 // reflect sources wired to a guaranteed-success roll by default.
 type continuousFake struct {
-	attackabletest.Combatant
+	effecttest.Actor
 	world.Presence
 	id                int32
 	dead, invul       bool
@@ -681,6 +671,7 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 
 // ---- from cubic_test.go ----
 type fakeCubicSummoner struct {
+	world.Presence
 	fakeActor
 	added        map[cubic.ID]bool
 	givenByOther map[cubic.ID]bool
@@ -794,7 +785,8 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 // a guaranteed-success SkillSuccessInput by default (IgnoreResists with a
 // 100 base chance always beats a [0,100) roll).
 type disablerFake struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id                     int32
 	dead, invul, paralyzed bool
 	list                   *effect.List
@@ -1204,6 +1196,7 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 // bssCasterFake exposes a fixed blessed-spiritshot charge state for tests
 // asserting checkSkillSuccess resolves it from the caster.
 type bssCasterFake struct {
+	world.Presence
 	fakeActor
 	bss bool
 }
@@ -1406,6 +1399,7 @@ func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
 
 // ---- from extractable_test.go ----
 type extractableFakeCaster struct {
+	world.Presence
 	fakeActor
 	granted  map[int32]int
 	capacity bool
@@ -1638,6 +1632,7 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 }
 
 type skillTarget struct {
+	world.Presence
 	fakeActor
 	hp, maxHP float64
 	mp, maxMP float64
@@ -2727,6 +2722,7 @@ func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 		if err != nil {
 			t.Fatalf("build %s effect: %v", name, err)
 		}
+		e.Effected = target
 		target.effects.Add(e)
 	}
 
@@ -2777,14 +2773,15 @@ type manorFakeItem struct {
 func (i manorFakeItem) Seed() (manor.Seed, bool) { return i.seed, i.ok }
 
 type manorFakeCaster struct {
+	world.Presence
 	fakeActor
 	id    int32
 	level int
 	items map[int32]int
 }
 
-func (c manorFakeCaster) ObjectID() int32 { return c.id }
-func (c manorFakeCaster) Level() int      { return c.level }
+func (c *manorFakeCaster) ObjectID() int32 { return c.id }
+func (c *manorFakeCaster) Level() int      { return c.level }
 func (c *manorFakeCaster) AddEarnedItem(itemID int32, count int) {
 	if c.items == nil {
 		c.items = make(map[int32]int)
@@ -2798,7 +2795,7 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 	// drives the false-negative chance for this assertion to effectively
 	// zero (0.1^300) without depending on a specific random outcome.
 	registry := NewDefaultRegistry()
-	caster := manorFakeCaster{id: 7, level: 40}
+	caster := &manorFakeCaster{id: 7, level: 40}
 	item := manorFakeItem{seed: manor.Seed{Level: 40, Alternative: false}, ok: true}
 
 	for i := 0; i < 300; i++ {
@@ -2823,7 +2820,7 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 
 func TestSowAlreadySeededIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := manorFakeCaster{id: 7, level: 40}
+	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, sownBy: 3}}
 	item := manorFakeItem{seed: manor.Seed{Level: 40}, ok: true}
 
@@ -2876,11 +2873,12 @@ func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
 
 // ---- from resurrect_test.go ----
 type reviveFakeCaster struct {
+	world.Presence
 	fakeActor
 	wit float64
 }
 
-func (c reviveFakeCaster) WITBonus() float64 { return c.wit }
+func (c *reviveFakeCaster) WITBonus() float64 { return c.wit }
 
 type reviveFakeTarget struct {
 	fakeActor
@@ -2900,7 +2898,7 @@ func (t *reviveFakeExpTarget) RestoreExp(restorePercent float64) { t.restoredPer
 
 func TestResurrectRevivesEveryTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := reviveFakeCaster{wit: 1.5}
+	caster := &reviveFakeCaster{wit: 1.5}
 	a := &reviveFakeTarget{}
 	b := &reviveFakeTarget{}
 
@@ -2923,7 +2921,7 @@ func TestResurrectRevivesEveryTarget(t *testing.T) {
 // same revive-power percent as the HP revive.
 func TestResurrectRestoresExpOnExpRestorerTargets(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := reviveFakeCaster{wit: 1.5}
+	caster := &reviveFakeCaster{wit: 1.5}
 	a := &reviveFakeExpTarget{}
 
 	if !registry.Use(Cast{
@@ -3041,6 +3039,7 @@ func (s *spoilFakeTarget) Level() int                 { return s.level }
 func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
 type spoilFakeCaster struct {
+	world.Presence
 	fakeActor
 	id             int32
 	level          int
@@ -3051,8 +3050,8 @@ type spoilFakeCaster struct {
 	alreadyNotices int
 }
 
-func (c spoilFakeCaster) ObjectID() int32 { return c.id }
-func (c spoilFakeCaster) Level() int      { return c.level }
+func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
+func (c *spoilFakeCaster) Level() int      { return c.level }
 func (c *spoilFakeCaster) AddEarnedItem(itemID int32, count int) {
 	if c.items == nil {
 		c.items = make(map[int32]int)
@@ -3161,6 +3160,7 @@ func (t jumpFakeTarget) Y() int       { return t.y }
 func (t jumpFakeTarget) Z() int       { return t.z }
 
 type jumpFakeCaster struct {
+	world.Presence
 	fakeActor
 	aborted     bool
 	broadcasted bool
@@ -3206,12 +3206,13 @@ func TestInstantJumpNoTargetsIsNoop(t *testing.T) {
 }
 
 type getPlayerFakeCaster struct {
+	world.Presence
 	fakeActor
 	x, y, z int
 }
 
-func (c getPlayerFakeCaster) AlikeDead() bool           { return false }
-func (c getPlayerFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
+func (c *getPlayerFakeCaster) AlikeDead() bool           { return false }
+func (c *getPlayerFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
 
 type getPlayerFakeTarget struct {
 	fakeActor
@@ -3228,7 +3229,7 @@ func (t *getPlayerFakeTarget) TeleportTo(x, y, z int) {
 
 func TestGetPlayerPullsLivingTargetsToCaster(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := getPlayerFakeCaster{x: 1, y: 2, z: 3}
+	caster := &getPlayerFakeCaster{x: 1, y: 2, z: 3}
 	target := &getPlayerFakeTarget{}
 	deadTarget := &getPlayerFakeTarget{dead: true}
 
@@ -3364,56 +3365,14 @@ func TestUnlockChestAboveBracketTooLowSkillGuaranteedFail(t *testing.T) {
 	}
 }
 
-func (effectLandingFake) Kind() actor.Kind { return actor.KindNPC }
+func (*effectLandingFake) Kind() actor.Kind { return actor.KindNPC }
 
-func (positionedFakeActor) Kind() actor.Kind { return actor.KindNPC }
+func (*positionedFakeActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (fakeActor) Kind() actor.Kind { return actor.KindNPC }
 
-func (disablerFake) Kind() actor.Kind { return actor.KindNPC }
-
-func (disablerFake) Heading() int { return 0 }
-
-func (disablerFake) Position() (x, y, z int) { return 0, 0, 0 }
+func (*disablerFake) Kind() actor.Kind { return actor.KindNPC }
 
 func (disablerHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (disablerHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
-
-func (cancelFakeActor) Heading() int { return 0 }
-
-func (cancelFakeActor) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (fakeCubicSummoner) Heading() int { return 0 }
-
-func (fakeCubicSummoner) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (bssCasterFake) Heading() int { return 0 }
-
-func (bssCasterFake) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (extractableFakeCaster) Heading() int { return 0 }
-
-func (extractableFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (skillTarget) Heading() int { return 0 }
-
-func (skillTarget) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (manorFakeCaster) Heading() int { return 0 }
-
-func (manorFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (reviveFakeCaster) Heading() int { return 0 }
-
-func (reviveFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (spoilFakeCaster) Heading() int { return 0 }
-
-func (spoilFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (jumpFakeCaster) Heading() int { return 0 }
-
-func (jumpFakeCaster) Position() (x, y, z int) { return 0, 0, 0 }
-
-func (getPlayerFakeCaster) Heading() int { return 0 }

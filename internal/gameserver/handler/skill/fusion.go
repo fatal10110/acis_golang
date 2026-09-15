@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // fusionHandler ports FusionSkill's constructor (java FusionSkill.java:27-43):
@@ -28,7 +29,7 @@ func (h fusionHandler) Use(cast Cast) {
 	triggeredID := modelskill.ID(cast.Skill.TriggeredID)
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(effectListTarget)
+		target, ok := obj.(effect.Actor)
 		if !ok {
 			continue
 		}
@@ -49,7 +50,7 @@ func (h fusionHandler) Use(cast Cast) {
 	}
 }
 
-func (h fusionHandler) applyTriggered(caster attackable.Combatant, effected Actor, triggeredID modelskill.ID, level int) {
+func (h fusionHandler) applyTriggered(caster Caster, effected Actor, triggeredID modelskill.ID, level int) {
 	def, ok := h.defs.Definition(modelskill.Ref{ID: triggeredID, Level: level})
 	if !ok {
 		return
@@ -59,8 +60,8 @@ func (h fusionHandler) applyTriggered(caster attackable.Combatant, effected Acto
 
 // DecreaseFusion removes one level from the target's triggered fusion effect.
 // It is called when the owning FUSION cast channel ends or aborts.
-func DecreaseFusion(defs Definitions, caster, effected attackable.Combatant, castSkill modelskill.Definition) {
-	target, ok := effected.(effectListTarget)
+func DecreaseFusion(defs Definitions, caster Caster, effected attackable.Combatant, castSkill modelskill.Definition) {
+	target, ok := effected.(effect.Actor)
 	if !ok || defs == nil {
 		return
 	}

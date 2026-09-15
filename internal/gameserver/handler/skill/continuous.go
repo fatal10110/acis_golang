@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -19,7 +20,7 @@ var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 13
 // acts on: an alive actor carrying a live effect list.
 type continuousTarget interface {
 	Actor
-	effectListTarget
+	effect.Actor
 }
 
 // invulnerableCaster is implemented by casters that can report invulnerability,
@@ -196,7 +197,7 @@ type retargetableOnAggression interface {
 // provoked into attacking the caster if it was already targeting it, or
 // retargeted onto the caster otherwise. A target implementing neither
 // optional surface is left as-is.
-func fireAggressionEvent(caster attackable.Combatant, effected Actor, def modelskill.Definition) {
+func fireAggressionEvent(caster Caster, effected Actor, def modelskill.Definition) {
 	if am, ok := effected.(attackableMarker); ok && am.Attackable() {
 		if n, ok := effected.(aggressionNotifiable); ok {
 			n.NotifyAggression(caster, int(def.Power))

@@ -343,7 +343,7 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 // Apply instantiates each of templates and adds it to list as a fresh live
 // effect, attributed to effector. A template naming an effect core this
 // port hasn't wired yet is skipped rather than failing the whole batch.
-func Apply(list *List, effector, effected Participant, meta Skill, templates []modelskill.EffectTemplate) {
+func Apply(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
 	if list == nil {
 		return
 	}
@@ -366,7 +366,7 @@ func Apply(list *List, effector, effected Participant, meta Skill, templates []m
 // scheduleEffect() chain. effector and effected are both the relogging
 // character: the original caster identity is not persisted, so every
 // reinstated effect is treated as self-applied, matching the reference.
-func ApplyRestored(list *List, effector, effected Participant, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
+func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
 	if list == nil {
 		return
 	}

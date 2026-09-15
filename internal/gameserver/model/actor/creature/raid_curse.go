@@ -28,6 +28,7 @@ type RaidCurseSkills interface {
 // drop the playable from its aggro list.
 type RaidCurseTarget interface {
 	attackable.Combatant
+	effect.Actor
 
 	Attackable() bool
 	NpcID() int
@@ -37,8 +38,8 @@ type RaidCurseTarget interface {
 // RaidCurseAttacker is the playable receiving the curse decision.
 type RaidCurseAttacker interface {
 	attackable.Combatant
+	effect.Actor
 
-	EffectList() *effect.List
 	Invul() bool
 }
 
@@ -242,15 +243,7 @@ func applyRaidCurseEffects(attacker RaidCurseAttacker, target RaidCurseTarget, d
 	if (def.Offensive || def.Debuff) && attacker.Invul() {
 		return
 	}
-	effector, ok := any(target).(effect.Participant)
-	if !ok {
-		return
-	}
-	effected, ok := any(attacker).(effect.Participant)
-	if !ok {
-		return
-	}
-	effect.Apply(attacker.EffectList(), effector, effected, effect.SkillFromDefinition(def), def.Effects)
+	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
 }
 
 // NPCIDOf returns target's NPC id when it is a raid curse target, otherwise 0.

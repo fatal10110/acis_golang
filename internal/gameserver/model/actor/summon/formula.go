@@ -239,14 +239,17 @@ func (a *Actor) Invul() bool {
 	return a.owner != nil && a.owner.SpawnProtected()
 }
 
-// SetInvul sets or clears this summon's invulnerability flag.
-func (a *Actor) SetInvul(v bool) {
+// SetInvul sets or clears this summon's invulnerability flag and reports
+// whether it changed.
+func (a *Actor) SetInvul(v bool) bool {
 	if a == nil {
-		return
+		return false
 	}
 	a.statusMu.Lock()
+	defer a.statusMu.Unlock()
+	changed := a.invul != v
 	a.invul = v
-	a.statusMu.Unlock()
+	return changed
 }
 
 // CanGiveDamage reports whether the owner may inflict damage through this summon.
@@ -519,7 +522,7 @@ func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ models
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
-func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Participant, _ bool) {
+func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	killer, _ := attacker.(attackable.Combatant)
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(killer) {
 		return

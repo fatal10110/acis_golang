@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -25,9 +26,16 @@ type Actor interface {
 	Dead() bool
 }
 
+// Caster is a creature casting a skill: it takes part in combat and in
+// effects.
+type Caster interface {
+	attackable.Combatant
+	effect.Actor
+}
+
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster  attackable.Combatant
+	Caster  Caster
 	Skill   modelskill.Definition
 	Targets []Actor
 	// Item is a genuinely heterogeneous payload with unrelated consumers

@@ -531,7 +531,7 @@ func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skil
 // 1-in-10 STUN-break roll. No datapack DOT effect sets dmgDirectlyToHp (the
 // only skill that does, Backstab, is a BLOW burst hit, never delivered
 // through EffectDamOverTime), so ignoreCP is always false here.
-func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Participant, isDOT bool) {
+func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	killer, _ := attacker.(attackable.Combatant)
 	if amount <= 0 || c.Invul() || !creature.CanDealDamage(killer) {
 		return

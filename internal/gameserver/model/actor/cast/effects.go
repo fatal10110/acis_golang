@@ -147,7 +147,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affec
 		}
 	}
 	// Only creatures cast skills; a door never reaches the handlers as a caster.
-	castCaster, ok := caster.(attackable.Combatant)
+	castCaster, ok := caster.(handlerskill.Caster)
 	if !ok {
 		return EffectResult{}
 	}

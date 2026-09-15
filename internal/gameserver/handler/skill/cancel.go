@@ -18,7 +18,7 @@ var effectNotCancellable = map[string]bool{
 }
 
 type cancelTarget interface {
-	effectListTarget
+	effect.Actor
 	Level() int
 }
 

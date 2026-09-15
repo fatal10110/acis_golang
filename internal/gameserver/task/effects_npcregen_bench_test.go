@@ -84,3 +84,11 @@ func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 		regen.Tick()
 	}
 }
+
+func (benchNoopStatOwner) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (benchNoopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (benchNoopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (benchNoopStatOwner) UpdateEffectIcons() {}

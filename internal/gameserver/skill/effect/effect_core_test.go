@@ -307,6 +307,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 			if e.RejectsIfAffected != tt.wantRejects {
 				t.Fatalf("RejectsIfAffected = %v, want %v", e.RejectsIfAffected, tt.wantRejects)
 			}
+			e.Effected = &deadTarget{}
 			if e.ActionTime() {
 				t.Fatal("non-periodic action hook continued")
 			}
@@ -420,7 +421,7 @@ func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 // Creature.startAbnormalEffect() -> updateAbnormalEffect()) — the gap this
 // issue closes for player targets.
 func TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh(t *testing.T) {
-	target := &growEffectTarget{}
+	target := &abnormalPlayerTarget{}
 	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "BigHead"})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -457,7 +458,7 @@ func TestSignetGroundKindsAcceptButDeclineToStartOutsideALiveCast(t *testing.T) 
 }
 
 func TestClanGateEffectStartsAndStopsMagicCircle(t *testing.T) {
-	target := &growEffectTarget{}
+	target := &abnormalPlayerTarget{}
 	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "ClanGate"})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -677,6 +678,7 @@ func (namedActor) Dead() bool       { return false }
 func (n namedActor) String() string { return string(n) }
 
 type liveEffectTarget struct {
+	neutralActor
 	world.Presence
 	events            []string
 	hp                float64
@@ -723,7 +725,7 @@ func (t *liveEffectTarget) HP() float64 { return t.hp }
 
 func (t *liveEffectTarget) MPValue() float64 { return t.mp }
 
-func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector Participant, isDOT bool) {
+func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector Actor, isDOT bool) {
 	t.hp -= damage
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
@@ -783,8 +785,9 @@ func (t *liveEffectTarget) FearImmune() bool { return t.fearImmune }
 
 func (t *liveEffectTarget) Playable() bool { return t.playable }
 
-func (t *liveEffectTarget) FleeFrom(effector Participant, distance int) {
+func (t *liveEffectTarget) FleeFrom(effector Actor, distance int) bool {
 	t.events = append(t.events, fmt.Sprintf("flee:%v:%d", effector, distance))
+	return true
 }
 
 func (t *liveEffectTarget) StopEffects(typ Type) {
@@ -813,8 +816,9 @@ func (t *liveEffectTarget) StopAttack() {
 	t.events = append(t.events, "stop-attack")
 }
 
-func (t *liveEffectTarget) SetInvul(v bool) {
+func (t *liveEffectTarget) SetInvul(v bool) bool {
 	t.events = append(t.events, fmt.Sprintf("invul:%v", v))
+	return true
 }
 
 func (t *liveEffectTarget) SetImmobilized(v bool) bool {
@@ -902,7 +906,6 @@ func (t *liveEffectTarget) MarkRecentFakeDeath() {
 }
 
 func (t *liveEffectTarget) ObjectID() int32 { return t.objectID }
-func (*liveEffectTarget) Kind() actor.Kind  { return actor.KindNPC }
 
 func (t *liveEffectTarget) OwnerID() int32 { return t.ownerID }
 
@@ -944,6 +947,8 @@ func hasEffectInList(list *List, e *Effect) bool {
 }
 
 type growEffectTarget struct {
+	world.Presence
+	neutralActor
 	events []string
 	radius float64
 }
@@ -999,6 +1004,8 @@ func TestNewChanceSkillTriggerRejectsMissingTriggeredID(t *testing.T) {
 }
 
 type chanceTriggerFakeActor struct {
+	world.Presence
+	neutralActor
 	tracked []*Effect
 }
 
@@ -1048,6 +1055,10 @@ func TestChanceSkillTriggerOnATargetWithNoTrackingIsANoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
+	e.Effected = &struct {
+		neutralActor
+		world.Presence
+	}{}
 	if !e.OnStart(e) {
 		t.Fatal("OnStart() = false, want true even without a tracking target")
 	}
@@ -1754,14 +1765,14 @@ func TestListRejectsSameSkillRecastOfFlagGatedEffectBeforeIdenticalDebuffLogic(t
 	requireNames(t, list.All(), []string{"stun"})
 }
 
-// abnormalUpdateOwner is a StatOwner that also implements abnormalUpdater,
+// abnormalUpdateOwner is a StatOwner that counts UpdateEffectIcons calls,
 // recording one call per notification.
 type abnormalUpdateOwner struct {
 	eventOwner
 	calls *int
 }
 
-func (o abnormalUpdateOwner) UpdateAbnormalEffect() {
+func (o abnormalUpdateOwner) UpdateEffectIcons() {
 	*o.calls++
 }
 
@@ -2673,12 +2684,14 @@ func TestBuildRestorePlan_SkillWithoutEffectsSkipsEffectRestore(t *testing.T) {
 	}
 }
 
-// confusionFake is a minimal Participant + moveStopper + nearbyCombatTarget +
+// confusionFake is a minimal Actor + moveStopper + nearbyCombatTarget +
 // hateRaiser + attackDesireRaiser double for exercising confusionStart in
 // isolation, counting calls instead of reading back threat-table hate (which
 // saturates at ThreatTable's maxThreatValue and so cannot distinguish one
 // write from a doubled one at math.MaxInt32).
 type confusionFake struct {
+	world.Presence
+	neutralActor
 	candidate           attackable.Combatant
 	addDamageHateCalls  int
 	addAttackDesireHate float64
@@ -2735,12 +2748,128 @@ func TestConfusionStartDoesNotDoubleCountHate(t *testing.T) {
 
 func (confusionCandidate) Kind() actor.Kind { return actor.KindNPC }
 
-func (chanceTriggerFakeActor) Kind() actor.Kind { return actor.KindNPC }
+func (*chanceTriggerFakeActor) Kind() actor.Kind { return actor.KindNPC }
 
-func (confusionFake) Kind() actor.Kind { return actor.KindNPC }
+func (*confusionFake) Kind() actor.Kind { return actor.KindNPC }
 
-func (growEffectTarget) Kind() actor.Kind { return actor.KindNPC }
+func (*growEffectTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (confusionCandidate) Heading() int { return 0 }
 
 func (confusionCandidate) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (funcOwner) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (funcOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (funcOwner) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (funcOwner) UpdateEffectIcons() {}
+
+func (eventOwner) UpdateEffectIcons() {}
+
+var (
+	_ PlayerActor = (*liveEffectTarget)(nil)
+	_ NPCActor    = (*liveEffectTarget)(nil)
+	_ SummonActor = (*liveEffectTarget)(nil)
+)
+
+func (t *liveEffectTarget) IncreaseCharges(int, int) bool                          { return false }
+func (t *liveEffectTarget) WeaponGradePenalty() bool                               { return false }
+func (t *liveEffectTarget) ReduceDeathPenaltyLevel() int                           { return 0 }
+func (t *liveEffectTarget) Sit() bool                                              { return false }
+func (t *liveEffectTarget) StartFakeDeath() bool                                   { return false }
+func (t *liveEffectTarget) StopFakeDeath() bool                                    { return false }
+func (t *liveEffectTarget) BroadcastStatus()                                       {}
+func (t *liveEffectTarget) SendRegenMax(int32, int32, float64)                     {}
+func (t *liveEffectTarget) NotifyHPRestored(string, int, bool)                     {}
+func (t *liveEffectTarget) NotifyMPRestored(string, int, bool)                     {}
+func (t *liveEffectTarget) NotifySpoilAlready()                                    {}
+func (t *liveEffectTarget) NotifySpoilSuccess()                                    {}
+func (t *liveEffectTarget) AddDamageHate(attackable.Combatant, float64, float64)   {}
+func (t *liveEffectTarget) AddAttackDesire(attackable.Combatant, float64)          {}
+func (t *liveEffectTarget) MonsterKind() bool                                      { return false }
+func (t *liveEffectTarget) RandomNearbyMonster(int) (attackable.Combatant, bool)   { return nil, false }
+func (t *liveEffectTarget) RandomNearbyCombatant(int) (attackable.Combatant, bool) { return nil, false }
+func (t *liveEffectTarget) RandomizeHate() bool                                    { return false }
+func (t *liveEffectTarget) StopMostHatedTarget()                                   {}
+func (t *liveEffectTarget) SpoilPool() *item.SpoilPool                             { return nil }
+func (t *liveEffectTarget) CollisionRadius() float64                               { return 0 }
+func (t *liveEffectTarget) SetCollisionRadius(float64)                             {}
+func (t *liveEffectTarget) ResetCollisionRadius()                                  {}
+func (t *liveEffectTarget) OwnerObject() (world.Tracked, bool)                     { return nil, false }
+func (t *liveEffectTarget) TryToFollow(world.Tracked)                              {}
+
+// playerStubs supplies the player-only effect surface (except
+// BroadcastAbnormalEffect) as no-ops, so a fake that records abnormal-effect
+// broadcasts can stand in for a player target.
+type playerStubs struct{}
+
+func (playerStubs) IncreaseCharges(int, int) bool        { return false }
+func (playerStubs) CurrentTarget() world.Tracked         { return nil }
+func (playerStubs) SetTarget(world.Tracked)              {}
+func (playerStubs) TryToAttack(world.Tracked)            {}
+func (playerStubs) StopCharmOfLuck(*Effect)              {}
+func (playerStubs) StopPhoenixBlessing(*Effect)          {}
+func (playerStubs) WeaponGradePenalty() bool             { return false }
+func (playerStubs) ReduceDeathPenaltyLevel() int         { return 0 }
+func (playerStubs) CastingNow() bool                     { return false }
+func (playerStubs) CurrentSkillIsMagic() bool            { return false }
+func (playerStubs) InterruptCast()                       {}
+func (playerStubs) StopCast()                            {}
+func (playerStubs) Standing() bool                       { return false }
+func (playerStubs) SetStanding(bool) bool                { return false }
+func (playerStubs) Sit() bool                            { return false }
+func (playerStubs) StartFakeDeath() bool                 { return false }
+func (playerStubs) StopFakeDeath() bool                  { return false }
+func (playerStubs) MarkRecentFakeDeath()                 {}
+func (playerStubs) HPFull() bool                         { return false }
+func (playerStubs) BroadcastStatus()                     {}
+func (playerStubs) BroadcastMPStatus()                   {}
+func (playerStubs) SendRegenMax(int32, int32, float64)   {}
+func (playerStubs) NotifyEffectRemovedDueLackHP(*Effect) {}
+func (playerStubs) NotifyEffectRemovedDueLackMP(*Effect) {}
+func (playerStubs) NotifyRelaxDeactivatedHPFull(*Effect) {}
+func (playerStubs) NotifyHPRestored(string, int, bool)   {}
+func (playerStubs) NotifyMPRestored(string, int, bool)   {}
+func (playerStubs) NotifySpoilAlready()                  {}
+func (playerStubs) NotifySpoilSuccess()                  {}
+
+// abnormalPlayerTarget is a player-shaped growEffectTarget.
+type abnormalPlayerTarget struct {
+	growEffectTarget
+	playerStubs
+}
+
+var _ PlayerActor = (*abnormalPlayerTarget)(nil)
+
+func (f *confusionFake) MonsterKind() bool                                    { return false }
+func (f *confusionFake) RandomNearbyMonster(int) (attackable.Combatant, bool) { return nil, false }
+func (f *confusionFake) RandomizeHate() bool                                  { return false }
+func (f *confusionFake) StopMostHatedTarget()                                 {}
+func (f *confusionFake) Think() error                                         { return nil }
+func (f *confusionFake) SpoilPool() *item.SpoilPool                           { return nil }
+func (f *confusionFake) CollisionRadius() float64                             { return 0 }
+func (f *confusionFake) SetCollisionRadius(float64)                           {}
+func (f *confusionFake) ResetCollisionRadius()                                {}
+
+var _ NPCActor = (*confusionFake)(nil)
+
+func (t *liveEffectTarget) Kind() actor.Kind {
+	switch {
+	case t.isPlayer:
+		return actor.KindPlayer
+	case t.playable:
+		return actor.KindSummon
+	}
+	return actor.KindNPC
+}
+
+// deadTarget is a neutral, dead effect target: every periodic hook acting on
+// it stops.
+type deadTarget struct {
+	neutralActor
+	world.Presence
+}
+
+func (*deadTarget) Dead() bool { return true }

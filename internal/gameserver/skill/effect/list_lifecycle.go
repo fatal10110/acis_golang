@@ -143,12 +143,10 @@ func (l *List) StopAllExceptThoseThatLastThroughDeath() {
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
 // state, mirroring Creature.addEffect()/removeEffect() unconditionally
 // queueing an EffectList icon update on every add or remove attempt,
-// regardless of whether the attempt actually changed anything. An owner
-// that doesn't track abnormal-effect icons (not a Player) leaves this a
-// no-op.
+// regardless of whether the attempt actually changed anything.
 func (l *List) notifyAbnormalUpdate() {
-	if u, ok := l.owner.(abnormalUpdater); ok {
-		u.UpdateAbnormalEffect()
+	if l.owner != nil {
+		l.owner.UpdateEffectIcons()
 	}
 }
 
@@ -163,8 +161,8 @@ func (l *List) notifyExpiry(e *Effect, wornOff bool, pending *[]func()) {
 	if !e.Template.Icon {
 		return
 	}
-	notifier, ok := l.owner.(effectExpiryNotifier)
-	if !ok {
+	notifier := l.owner
+	if notifier == nil {
 		return
 	}
 	skillID, level := e.Skill.ID, e.Skill.Level

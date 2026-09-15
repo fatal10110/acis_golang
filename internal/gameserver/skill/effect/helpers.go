@@ -1,55 +1,37 @@
 package effect
 
-func abortAll(target Participant) {
-	if target, ok := target.(aborter); ok {
-		target.AbortAll(false)
-	}
-}
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
-func refresh(target Participant) {
-	if target, ok := target.(abnormalUpdater); ok {
+// refresh pushes target's abnormal-effect state to observers; a nil target
+// (an effect with no source) is left alone.
+func refresh(target Actor) {
+	if target != nil {
 		target.UpdateAbnormalEffect()
 	}
 }
 
-func startAbnormalEffect(target Participant, mask int) {
-	if target, ok := target.(interface{ StartAbnormalEffect(int) }); ok {
-		target.StartAbnormalEffect(mask)
-	}
-	refresh(target)
-	if b, ok := target.(abnormalEffectBroadcaster); ok {
-		b.BroadcastAbnormalEffect()
+func startAbnormalEffect(target Actor, mask int) {
+	target.StartAbnormalEffect(mask)
+	target.UpdateAbnormalEffect()
+	if p, ok := asPlayer(target); ok {
+		p.BroadcastAbnormalEffect()
 	}
 }
 
-func stopAbnormalEffect(target Participant, mask int) {
-	if target, ok := target.(interface{ StopAbnormalEffect(int) }); ok {
-		target.StopAbnormalEffect(mask)
-	}
-	refresh(target)
-	if b, ok := target.(abnormalEffectBroadcaster); ok {
-		b.BroadcastAbnormalEffect()
+func stopAbnormalEffect(target Actor, mask int) {
+	target.StopAbnormalEffect(mask)
+	target.UpdateAbnormalEffect()
+	if p, ok := asPlayer(target); ok {
+		p.BroadcastAbnormalEffect()
 	}
 }
 
-func fearImmune(target Participant) bool {
-	t, ok := target.(fearImmuneTarget)
-	return ok && t.FearImmune()
+func isPlayable(target Actor) bool {
+	return target != nil && target.Kind().Playable()
 }
 
-func isAfraid(target Participant) bool {
-	t, ok := target.(afraidTarget)
-	return ok && t.Afraid()
-}
-
-func isPlayable(target Participant) bool {
-	t, ok := target.(playableTarget)
-	return ok && t.Playable()
-}
-
-func isPlayer(target Participant) bool {
-	t, ok := target.(playerTarget)
-	return ok && t.IsPlayer()
+func isPlayer(target Actor) bool {
+	return target != nil && target.Kind() == actor.KindPlayer
 }
 
 // statFuncs builds the stat functions templates describes, attributed to

@@ -123,7 +123,7 @@ func (c *Character) UpdateUserInfo() {
 }
 
 // UpdateAbnormalEffect reports that this character's active-effect icon list
-// changed, implementing the effect list's abnormalUpdater hook: it fires on every effect start and stop, matching
+// changed, called from effect hooks and the effect list's icon refresh: it fires on every effect start and stop, matching
 // Creature.addEffect()/removeEffect() unconditionally queueing an
 // EffectList icon update on each attempt.
 func (c *Character) UpdateAbnormalEffect() {

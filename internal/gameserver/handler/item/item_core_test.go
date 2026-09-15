@@ -9,12 +9,13 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from cast_ai_test.go ----
@@ -763,7 +764,8 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 // destination, proving the mirror path reuses the same ApplyEffects surface
 // any caster drives rather than a servitor-specific one.
 type fakeSummon struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	id int32
 }
 
@@ -890,7 +892,8 @@ func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Creature, int, 
 
 // ---- from use_skill_test.go ----
 type fakeCaster struct {
-	attackabletest.Combatant
+	world.Presence
+	effecttest.Actor
 	disabled             map[int32]bool
 	disableCalls         int
 	reuseCalls           int
@@ -1280,6 +1283,6 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 	}
 }
 
-func (fakeSummon) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeSummon) Kind() actor.Kind { return actor.KindNPC }
 
-func (fakeCaster) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeCaster) Kind() actor.Kind { return actor.KindNPC }

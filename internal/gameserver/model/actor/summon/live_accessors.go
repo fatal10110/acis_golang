@@ -489,12 +489,6 @@ func (a *Actor) IsAttackingNow() bool {
 	return a.brain != nil && a.brain.AttackingNow()
 }
 
-// OwnerCombatant returns the owning player when it can be targeted by AI.
-func (a *Actor) OwnerCombatant() attackable.Combatant {
-	owner, _ := a.owner.(attackable.Combatant)
-	return owner
-}
-
 // CurrentTarget returns the summon target selected by its current command.
 func (a *Actor) CurrentTarget() world.Tracked { return a.target }
 

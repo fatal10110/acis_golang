@@ -199,7 +199,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ mode
 // addDamageHate(attacker, damage, 0) — every HP reduction feeds the
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
 // Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
-func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Participant, isDOT bool) {
+func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	if h.AlikeDead() {
 		return
 	}

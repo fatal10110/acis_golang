@@ -11,8 +11,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from death_test.go ----
@@ -330,11 +332,12 @@ func newTestLive(t *testing.T) *Live {
 // ccTestTarget satisfies every optional target interface a core effect's
 // hooks type-assert against, so the effect always activates regardless of
 // which one is under test.
-type ccTestTarget struct{}
+type ccTestTarget struct {
+	world.Presence
+	effecttest.Actor
+}
 
-func (ccTestTarget) ObjectID() int32                                    { return 0 }
-func (ccTestTarget) Dead() bool                                         { return false }
-func (ccTestTarget) FleeFrom(effector effect.Participant, distance int) {}
+func (*ccTestTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
 
 func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	t.Helper()
@@ -342,7 +345,7 @@ func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	if err != nil {
 		t.Fatalf("effect.New(%q) error: %v", name, err)
 	}
-	e.Effected = ccTestTarget{}
+	e.Effected = &ccTestTarget{}
 	live.EffectList().Add(e)
 	return e
 }
@@ -729,8 +732,6 @@ func (a physicalAttackActor) Kind() actor.Kind {
 }
 
 func (physicalAttackActor) WeaponGradePenalty() bool { return false }
-
-func (ccTestTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (*deathTestActor) Heading() int { return 0 }
 

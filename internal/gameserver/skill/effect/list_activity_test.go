@@ -154,3 +154,11 @@ func TestListUntrackDeregistersRegardlessOfContents(t *testing.T) {
 		t.Fatal("list still registered active after Untrack")
 	}
 }
+
+func (activityTestOwner) NotifyEffectAborted(modelskill.ID, int) {}
+
+func (activityTestOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
+
+func (activityTestOwner) NotifyEffectWornOff(modelskill.ID, int) {}
+
+func (activityTestOwner) UpdateEffectIcons() {}
