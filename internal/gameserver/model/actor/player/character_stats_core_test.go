@@ -6016,3 +6016,14 @@ func TestCharacterCombatantReadsSilentMoveAndFakeDeathEffects(t *testing.T) {
 		t.Fatal("Combatant.FakeDeath() = false with an active FakeDeath effect, want true")
 	}
 }
+
+// Facing checks read a target's Heading through Combatant, so an unspawned
+// player must still report its last-known heading there.
+func TestCharacterCombatantHeadingIsCurrentHeading(t *testing.T) {
+	c := &Character{ID: 1}
+	c.SetLastKnownPosition(location.Location{X: 1, Y: 2, Z: 3}, 16384)
+	var combatant attackable.Combatant = c
+	if got, want := combatant.Heading(), c.CurrentHeading(); got != want || got != 16384 {
+		t.Fatalf("Combatant.Heading() = %d, CurrentHeading() = %d, want both 16384", got, want)
+	}
+}
