@@ -20,9 +20,6 @@ func (h *Hostile) RecentFakeDeath() bool { return false }
 // NPC is never shielded by one.
 func (h *Hostile) InPeaceZone() bool { return false }
 
-// SilentMoving reports false: NPCs never move silently.
-func (h *Hostile) SilentMoving() bool { return false }
-
 // SpawnProtected reports false: spawn protection is a player state.
 func (h *Hostile) SpawnProtected() bool { return false }
 

@@ -5,12 +5,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
-// FakeDeath reports false: the fake-death stance is not tracked as a state
-// yet.
-func (c *Character) FakeDeath() bool { return false }
-
-// SilentMoving reports false: the silent-move stat is not modeled yet.
-func (c *Character) SilentMoving() bool { return false }
+// FakeDeath reports whether an active effect makes this player play dead.
+func (c *Character) FakeDeath() bool { return c.FakeDead() }
 
 // RaidRelated reports false: players are never raid bosses or minions.
 func (c *Character) RaidRelated() bool { return false }

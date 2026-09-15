@@ -5992,3 +5992,27 @@ func (reduceHPPlayableAttacker) Position() (x, y, z int) { return 0, 0, 0 }
 func (deathPenaltyKiller) Heading() int { return 0 }
 
 func (deathPenaltyKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+func TestCharacterCombatantReadsSilentMoveAndFakeDeathEffects(t *testing.T) {
+	c := &Character{ID: 1}
+	attachTestLive(t, c)
+	var combatant attackable.Combatant = c
+	if combatant.SilentMoving() || combatant.FakeDeath() {
+		t.Fatal("SilentMoving/FakeDeath = true before any effect, want false")
+	}
+
+	for _, name := range []string{"SilentMove", "FakeDeath"} {
+		e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
+		if err != nil {
+			t.Fatalf("effect.New(%q) error: %v", name, err)
+		}
+		e.Effector, e.Effected = c, c
+		c.EffectList().Add(e)
+	}
+	if !combatant.SilentMoving() {
+		t.Fatal("Combatant.SilentMoving() = false with an active SilentMove effect, want true")
+	}
+	if !combatant.FakeDeath() {
+		t.Fatal("Combatant.FakeDeath() = false with an active FakeDeath effect, want true")
+	}
+}
