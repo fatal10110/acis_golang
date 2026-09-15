@@ -33,8 +33,7 @@ const (
 // LaunchCaster is the creature whose skill launch is revalidated.
 type LaunchCaster interface {
 	attackable.Combatant
-	skilltarget.Creature
-	skilltarget.SightChecker
+	skilltarget.Actor
 }
 
 // RevalidateLaunch runs the oracle's launch-phase mid-cast recheck
@@ -120,7 +119,7 @@ func collisionRadius(t Target) float64 {
 }
 
 func launchCanSee(caster LaunchCaster, target Target) bool {
-	creature, ok := target.(skilltarget.Creature)
+	creature, ok := target.(skilltarget.Actor)
 	return !ok || caster.CanSeeTarget(creature)
 }
 

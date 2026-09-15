@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -202,11 +201,6 @@ func (a *Actor) MEN() int { return summonStatActor{a: a}.MEN() }
 
 // LevelMod returns this summon's level-scaling factor.
 func (a *Actor) LevelMod() float64 { return summonStatActor{a: a}.LevelMod() }
-
-// Category reports a pet or servitor as a playable actor.
-func (a *Actor) Category() skilltarget.Category {
-	return skilltarget.CategoryPlayable
-}
 
 // EffectList returns this summon's active buffs and debuffs.
 func (a *Actor) EffectList() *effect.List {

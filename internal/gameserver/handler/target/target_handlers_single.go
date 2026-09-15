@@ -8,29 +8,29 @@ type selfHandler struct{}
 
 func (selfHandler) Target() modelskill.Target { return modelskill.TargetSelf }
 
-func (selfHandler) Targets(caster, _ Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{caster}
+func (selfHandler) Targets(caster, _ Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{caster}
 }
 
-func (selfHandler) FinalTarget(caster, _ Creature, _ *modelskill.Definition) Creature {
+func (selfHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor {
 	return caster
 }
 
-func (selfHandler) CanCast(Creature, Creature, *modelskill.Definition, bool) bool { return true }
+func (selfHandler) CanCast(Actor, Actor, *modelskill.Definition, bool) bool { return true }
 
 type oneHandler struct{}
 
 func (oneHandler) Target() modelskill.Target { return modelskill.TargetOne }
 
-func (oneHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (oneHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (oneHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (oneHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (oneHandler) CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool {
+func (oneHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
 	if target == nil {
 		return false
 	}
@@ -44,15 +44,15 @@ type holyHandler struct{}
 
 func (holyHandler) Target() modelskill.Target { return modelskill.TargetHoly }
 
-func (holyHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (holyHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (holyHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (holyHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (holyHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+func (holyHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
 	return target != nil && holyCastRejection(target) == CastRejectNone
 }
 
@@ -60,15 +60,15 @@ type unlockableHandler struct{}
 
 func (unlockableHandler) Target() modelskill.Target { return modelskill.TargetUnlockable }
 
-func (unlockableHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (unlockableHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (unlockableHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (unlockableHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (unlockableHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+func (unlockableHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
 	return target != nil && unlockableCastRejection(target) == CastRejectNone
 }
 
@@ -76,14 +76,14 @@ type undeadHandler struct{}
 
 func (undeadHandler) Target() modelskill.Target { return modelskill.TargetUndead }
 
-func (undeadHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (undeadHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (undeadHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (undeadHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (undeadHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+func (undeadHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
 	return validUndeadSingleTarget(target)
 }

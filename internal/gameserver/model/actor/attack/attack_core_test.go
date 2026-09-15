@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from controller_test.go ----
@@ -375,7 +377,8 @@ func (t *timingTimer) Stop() bool {
 }
 
 type timingActor struct {
-	attackabletest.Combatant
+	world.Presence
+	targettest.Actor
 	attackType       item.WeaponType
 	attackSpeed      int
 	reuse            time.Duration
@@ -398,6 +401,7 @@ type timingPlayer struct {
 }
 
 type curseTimingPlayer struct {
+	world.Presence
 	timingPlayer
 	blocks     bool
 	curseCalls int
@@ -440,7 +444,6 @@ func (a *timingActor) SetChargedShot(item.ShotKind, bool)      {}
 func (a *timingActor) Position() (int, int, int)               { return 0, 0, 0 }
 func (a *timingActor) Heading() int                            { return 0 }
 func (a *timingActor) Dead() bool                              { return a.dead }
-func (a *timingActor) Category() target.Category               { return target.CategoryAttackable }
 func (a *timingActor) SetHeadingTo(attackable.Combatant)       {}
 
 func (a *timingActor) PhysicalAttackRange() int { return 100 }
@@ -472,7 +475,8 @@ func (a *timingActor) BroadcastAttack(snapshot event.Attack) error {
 }
 
 type timingTarget struct {
-	attackabletest.Combatant
+	world.Presence
+	targettest.Actor
 	id          int32
 	x, y, z     int
 	attackable  bool
@@ -489,14 +493,11 @@ func (t *timingTarget) AlikeDead() bool   { return t.dead }
 func (t *timingTarget) Heading() int      { return 0 }
 func (t *timingTarget) Dead() bool        { return t.dead }
 func (t *timingTarget) RaidRelated() bool { return t.raidRelated }
-func (t *timingTarget) Category() target.Category {
-	return target.CategoryAttackable
-}
 func (t *timingTarget) Position() (int, int, int) {
 	return t.x, t.y, t.z
 }
-func (t *timingTarget) AttackableBy(target.Creature) bool             { return t.attackable }
-func (t *timingTarget) AttackableWithoutForceBy(target.Creature) bool { return t.attackable }
+func (t *timingTarget) AttackableBy(target.Actor) bool             { return t.attackable }
+func (t *timingTarget) AttackableWithoutForceBy(target.Actor) bool { return t.attackable }
 func (t *timingTarget) TakeDamage(_ int, _ attackable.Combatant) bool {
 	t.hits++
 	if t.landed != nil {
@@ -623,16 +624,16 @@ func (t rangeTarget) Position() (int, int, int) { return t.x, t.y, t.z }
 func (t rangeTarget) CollisionRadius() float64  { return t.radius }
 func (t rangeTarget) IsMoving() bool            { return t.moving }
 
-func (curseTimingPlayer) Kind() actor.Kind { return actor.KindNPC }
+func (*curseTimingPlayer) Kind() actor.Kind { return actor.KindNPC }
 
-func (timingTarget) Kind() actor.Kind { return actor.KindNPC }
+func (*timingTarget) Kind() actor.Kind { return actor.KindNPC }
 
-func (timingActor) Kind() actor.Kind { return actor.KindNPC }
+func (*timingActor) Kind() actor.Kind { return actor.KindNPC }
 
 func (rangeTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (rangeTarget) Heading() int { return 0 }
 
-func (timingPlayer) NotePvPAttack(attackable.Combatant) {}
+func (*timingPlayer) NotePvPAttack(attackable.Combatant) {}
 
-func (timingPlayer) TestCursesOnAttack(attackable.Combatant) bool { return false }
+func (*timingPlayer) TestCursesOnAttack(attackable.Combatant) bool { return false }

@@ -7,6 +7,7 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -14,7 +15,6 @@ import (
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -760,20 +760,19 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 }
 
 // ---- from use_skill_summon_test.go ----
-// fakeSummon is a minimal skilltarget.Creature usable as the herb-mirror
+// fakeSummon is a minimal skilltarget.Actor usable as the herb-mirror
 // destination, proving the mirror path reuses the same ApplyEffects surface
 // any caster drives rather than a servitor-specific one.
 type fakeSummon struct {
 	world.Presence
-	effecttest.Actor
+	targettest.Actor
 	id int32
 }
 
-func (s *fakeSummon) ObjectID() int32                { return s.id }
-func (s *fakeSummon) Position() (int, int, int)      { return 0, 0, 0 }
-func (s *fakeSummon) Heading() int                   { return 0 }
-func (s *fakeSummon) Dead() bool                     { return false }
-func (s *fakeSummon) Category() skilltarget.Category { return skilltarget.CategoryPlayable }
+func (s *fakeSummon) ObjectID() int32           { return s.id }
+func (s *fakeSummon) Position() (int, int, int) { return 0, 0, 0 }
+func (s *fakeSummon) Heading() int              { return 0 }
+func (s *fakeSummon) Dead() bool                { return false }
 
 var _ actorcast.Target = (*fakeSummon)(nil)
 
@@ -808,7 +807,7 @@ func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
 		res.Apply()
-		// caster and summon both satisfy skilltarget.Creature, so both
+		// caster and summon both satisfy skilltarget.Actor, so both
 		// their own effect application (caster) and the mirror (summon)
 		// record a call.
 		if len(rec.calls) != 2 {
@@ -887,13 +886,13 @@ func mirroredTo(calls []handlerskill.Cast, summon *fakeSummon) bool {
 
 type noKnownCreatures struct{}
 
-func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Creature, int, func(skilltarget.Creature)) {
+func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Actor, int, func(skilltarget.Actor)) {
 }
 
 // ---- from use_skill_test.go ----
 type fakeCaster struct {
 	world.Presence
-	effecttest.Actor
+	targettest.Actor
 	disabled             map[int32]bool
 	disableCalls         int
 	reuseCalls           int
@@ -901,12 +900,11 @@ type fakeCaster struct {
 	flying               bool
 }
 
-func (f *fakeCaster) ObjectID() int32                { return 1 }
-func (f *fakeCaster) Position() (int, int, int)      { return 0, 0, 0 }
-func (f *fakeCaster) Heading() int                   { return 0 }
-func (f *fakeCaster) Dead() bool                     { return false }
-func (f *fakeCaster) Category() skilltarget.Category { return skilltarget.CategoryPlayable }
-func (f *fakeCaster) SkillDisabled(key int32) bool   { return f.disabled != nil && f.disabled[key] }
+func (f *fakeCaster) ObjectID() int32              { return 1 }
+func (f *fakeCaster) Position() (int, int, int)    { return 0, 0, 0 }
+func (f *fakeCaster) Heading() int                 { return 0 }
+func (f *fakeCaster) Dead() bool                   { return false }
+func (f *fakeCaster) SkillDisabled(key int32) bool { return f.disabled != nil && f.disabled[key] }
 func (f *fakeCaster) DisableSkill(key int32, d time.Duration) {
 	f.disableCalls++
 }
@@ -1283,6 +1281,6 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 	}
 }
 
-func (*fakeSummon) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeSummon) Kind() actor.Kind { return actor.KindSummon }
 
-func (*fakeCaster) Kind() actor.Kind { return actor.KindNPC }
+func (*fakeCaster) Kind() actor.Kind { return actor.KindPlayer }

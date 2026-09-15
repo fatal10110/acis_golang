@@ -1,6 +1,9 @@
 package target
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // CastRejection identifies a target-handler failure that the cast boundary
 // must show to the player. It deliberately does not name packets.
@@ -18,14 +21,14 @@ const (
 
 // CastRejectionFor classifies the target-handler failures for which the
 // reference sends a system message. Other failed target checks remain silent.
-func CastRejectionFor(targetType modelskill.Target, caster, target Creature, skill *modelskill.Definition, ctrl bool) CastRejection {
+func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	switch targetType {
 	case modelskill.TargetAura, modelskill.TargetFrontAura:
-		if skill != nil && skill.Offensive && inPeaceZone(caster) {
+		if skill != nil && skill.Offensive && caster.InPeaceZone() {
 			return CastRejectCantAttackPeaceZone
 		}
 	case modelskill.TargetBehindAura:
-		if inPeaceZone(caster) {
+		if caster.InPeaceZone() {
 			return CastRejectCantAttackPeaceZone
 		}
 	case modelskill.TargetOne:
@@ -48,40 +51,35 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Creature, ski
 	return CastRejectNone
 }
 
-func holyCastRejection(target Creature) CastRejection {
-	holy, ok := target.(HolyTarget)
-	if !ok || !holy.Holy() {
+func holyCastRejection(target Actor) CastRejection {
+	if !target.Holy() {
 		return CastRejectInvalidTarget
 	}
 	return CastRejectNone
 }
 
-func unlockableCastRejection(target Creature) CastRejection {
-	unlockable, ok := target.(UnlockableTarget)
-	if !ok {
-		return CastRejectInvalidTarget
-	}
-	if unlockable.Unlockable() {
+func unlockableCastRejection(target Actor) CastRejection {
+	if target.Unlockable() {
 		return CastRejectNone
 	}
-	if door, ok := target.(DoorTarget); ok && door.Door() {
+	if target.Kind() == actor.KindDoor {
 		return CastRejectSilent
 	}
 	return CastRejectInvalidTarget
 }
 
-func oneCastRejection(caster, target Creature, skill *modelskill.Definition, ctrl bool) CastRejection {
+func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	if target == nil || skill == nil {
 		return CastRejectNone
 	}
 	if !skill.Offensive {
-		if target.Category().Has(CategoryPlayable) {
-			if rules, ok := caster.(PlayableCastRules); ok && !rules.CanCastOnPlayable(target, skill, ctrl, false) {
+		if isPlayable(target) {
+			if !caster.CanCastOnPlayable(target, skill, ctrl, false) {
 				return CastRejectInvalidTarget
 			}
 			return CastRejectNone
 		}
-		if monster, ok := target.(MonsterTarget); ok && monster.MonsterKind() && !ctrl && !skillIsDamage(skill) && !skill.Debuff {
+		if target.MonsterKind() && !ctrl && !skillIsDamage(skill) && !skill.Debuff {
 			return CastRejectInvalidTarget
 		}
 		return CastRejectNone
@@ -89,32 +87,32 @@ func oneCastRejection(caster, target Creature, skill *modelskill.Definition, ctr
 	if sameCreature(caster, target) || target.Dead() {
 		return CastRejectInvalidTarget
 	}
-	if target.Category().Has(CategoryPlayable) {
-		if rules, ok := caster.(PlayableCastRules); ok && !rules.CanCastOnPlayable(target, skill, ctrl, true) {
+	if isPlayable(target) {
+		if !caster.CanCastOnPlayable(target, skill, ctrl, true) {
 			return CastRejectInvalidTarget
 		}
-		if rules, ok := target.(AttackRules); ok && (!rules.AttackableBy(caster) || (!ctrl && !rules.AttackableWithoutForceBy(caster))) {
+		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(caster)) {
 			return CastRejectInvalidTarget
 		}
-		if olympiad, ok := caster.(OlympiadCastState); ok && olympiad.OlympiadMode() && !olympiad.OlympiadStarted() {
+		if caster.OlympiadMode() && !caster.OlympiadStarted() {
 			return CastRejectInvalidTarget
 		}
-		if inPeaceZone(caster) {
+		if caster.InPeaceZone() {
 			return CastRejectCantAttackPeaceZone
 		}
-		if inPeaceZone(target) {
+		if target.InPeaceZone() {
 			return CastRejectTargetInPeaceZone
 		}
 		return CastRejectNone
 	}
-	if folk, ok := target.(FolkOrGuardTarget); ok && folk.FolkOrGuard() {
+	if target.FolkOrGuard() {
 		if !ctrl || !skillIsDamage(skill) {
 			return CastRejectInvalidTarget
 		}
 		return CastRejectNone
 	}
-	if door, ok := target.(DoorTarget); ok && door.Door() {
-		if rules, ok := target.(AttackRules); !ok || !rules.AttackableBy(caster) {
+	if target.Kind() == actor.KindDoor {
+		if !target.AttackableBy(caster) {
 			return CastRejectInvalidTarget
 		}
 	}

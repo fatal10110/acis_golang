@@ -630,12 +630,12 @@ func (c *Character) SiegeGuard() bool { return false }
 func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player.
-func (c *Character) AttackableBy(target.Creature) bool {
+func (c *Character) AttackableBy(target.Actor) bool {
 	return !c.AlikeDead()
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force.
-func (c *Character) AttackableWithoutForceBy(caster target.Creature) bool {
+func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	return caster.ObjectID() != c.ID && (c.Karma() > 0 || c.PvPFlagState() != task.PvPFlagNone)
 }
 

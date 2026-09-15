@@ -14,9 +14,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Character satisfies the cast pipeline's line-of-sight surface.
-var _ target.SightChecker = (*Character)(nil)
-
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
 type LineOfSight interface {
@@ -328,7 +325,7 @@ func (c *Character) CanSee(target attackable.Combatant) bool {
 // handler/target.SightChecker for the cast pipeline's launch-phase
 // line-of-sight gate. Same geodata query as CanSee, keyed to t's own eye
 // height when it exposes one.
-func (c *Character) CanSeeTarget(t target.Creature) bool {
+func (c *Character) CanSeeTarget(t target.Actor) bool {
 	var theight float64
 	if h, ok := t.(interface{ CollisionHeight() float64 }); ok {
 		theight = h.CollisionHeight()

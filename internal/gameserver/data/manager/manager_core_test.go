@@ -419,7 +419,7 @@ var _ creature.Rewarder = (*KillReward)(nil)
 
 // ---- from npcs_hostile_test.go ----
 func TestCreatureActorRefSatisfiesTargetCreature(t *testing.T) {
-	var _ skilltarget.Creature = (*creatureActorRef)(nil)
+	var _ skilltarget.Actor = (*creatureActorRef)(nil)
 }
 
 // ---- from npcs_territory_test.go ----

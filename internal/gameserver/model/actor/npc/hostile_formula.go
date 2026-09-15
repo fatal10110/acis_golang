@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -13,11 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
-
-// Category reports h as an attackable actor for skill target resolution.
-func (h *Hostile) Category() skilltarget.Category {
-	return skilltarget.CategoryAttackable
-}
 
 // Attackable reports that h is an NPC-like combat target.
 func (h *Hostile) Attackable() bool { return true }

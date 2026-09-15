@@ -92,7 +92,7 @@ var hpPotionSkillIDs = map[int32]bool{2031: true, 2032: true, 2037: true}
 // itself (for the cast animation and effect resolution) and owns its own
 // skill reuse/cooldown state.
 type SkillCaster interface {
-	skilltarget.Creature
+	skilltarget.Actor
 	SkillDisabled(key int32) bool
 	DisableSkill(key int32, delay time.Duration)
 	AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration)
@@ -130,7 +130,7 @@ type UseRequest struct {
 	// `player.getSummon().getCast().doInstantCast(...)`. Nil when the caster
 	// has no active servitor, or is itself one (IsPet), leaves the mirror
 	// unapplied.
-	Summon skilltarget.Creature
+	Summon skilltarget.Actor
 
 	// Target is the caster's selected target, used by attached-skill conditions.
 	Target any

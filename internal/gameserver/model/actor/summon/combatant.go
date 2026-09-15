@@ -36,4 +36,4 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 
 // CanSeeTarget reports true: the launch-phase line-of-sight gate is not wired
 // for summon casts yet, so it never aborts one.
-func (a *Actor) CanSeeTarget(skilltarget.Creature) bool { return true }
+func (a *Actor) CanSeeTarget(skilltarget.Actor) bool { return true }

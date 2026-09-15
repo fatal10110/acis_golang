@@ -157,7 +157,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			if !ok {
 				return false
 			}
-			resolvedTarget, ok := target.(skilltarget.Creature)
+			resolvedTarget, ok := target.(skilltarget.Actor)
 			if !ok {
 				return false
 			}
@@ -227,7 +227,7 @@ func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
 	if live == nil || (def.Target != modelskill.TargetCorpseMob && def.Target != modelskill.TargetAreaCorpseMob) {
 		return
 	}
-	target, _ := live.Target().(skilltarget.Creature)
+	target, _ := live.Target().(skilltarget.Actor)
 	switch skilltarget.CorpseCastFailureFor(target, &def) {
 	case skilltarget.CorpseCastHarvestNotMonster:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
@@ -290,11 +290,11 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 }
 
 func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
-	casterCreature, ok := caster.(skilltarget.Creature)
+	casterCreature, ok := caster.(skilltarget.Actor)
 	if !ok {
 		return nil, skilltarget.CastRejectNone
 	}
-	selectedCreature, _ := selected.(skilltarget.Creature)
+	selectedCreature, _ := selected.(skilltarget.Actor)
 	handler, ok := l.targets.Handler(def.Target)
 	if !ok {
 		return nil, skilltarget.CastRejectNone

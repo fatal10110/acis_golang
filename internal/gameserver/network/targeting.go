@@ -635,7 +635,7 @@ func targetColor(attacker *player.Character, target world.Tracked) int {
 		return 0
 	}
 	attackableTarget, ok := target.(interface {
-		AttackableBy(skilltarget.Creature) bool
+		AttackableBy(skilltarget.Actor) bool
 	})
 	if !ok || !attackableTarget.AttackableBy(attacker) {
 		return 0

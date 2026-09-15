@@ -30,6 +30,7 @@ const (
 // updates while starting attacks.
 type CreatureActor interface {
 	attackable.Combatant
+	skilltarget.Actor
 
 	AttackDisabled() bool
 	MovementDisabled() bool
@@ -51,7 +52,6 @@ type CreatureActor interface {
 	Position() (int, int, int)
 	Heading() int
 	Dead() bool
-	Category() skilltarget.Category
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(event.Attack) error
@@ -205,7 +205,7 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if !c.actor.Knows(target) {
 		return false
 	}
-	if t, ok := target.(skilltarget.AttackRules); !ok || !t.AttackableBy(c.actor) {
+	if t, ok := target.(skilltarget.Actor); !ok || !t.AttackableBy(c.actor) {
 		return false
 	}
 	if !c.actor.CanSee(target) {
@@ -296,7 +296,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 				if !origin.IsFacing(location.Location{X: tx, Y: ty, Z: tz}, angle) {
 					return
 				}
-				rules, ok := candidate.(skilltarget.AttackRules)
+				rules, ok := candidate.(skilltarget.Actor)
 				if !ok || !rules.AttackableBy(c.actor) {
 					return
 				}

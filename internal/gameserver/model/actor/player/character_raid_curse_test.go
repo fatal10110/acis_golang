@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -71,7 +71,7 @@ func TestCharacterRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 	rec := recordEvents(c)
 	raid := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
-	if !c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Creature{raid}) {
+	if !c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Actor{raid}) {
 		t.Fatal("TestCursesOnSkillSee() = false, want true")
 	}
 	if raid.hateStops != 1 {
@@ -92,14 +92,14 @@ func TestCharacterRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 	c.skillDefs = newRaidCurseSkillTable()
 	raid := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
-	if c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Creature{raid}) {
+	if c.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []target.Actor{raid}) {
 		t.Fatal("disabled TestCursesOnSkillSee() = true, want false")
 	}
 }
 
 type raidCurseNPC struct {
 	world.Presence
-	effecttest.Actor
+	targettest.Actor
 	id          int32
 	npcID       int
 	level       int
@@ -117,7 +117,6 @@ func (n *raidCurseNPC) Level() int                { return n.level }
 func (n *raidCurseNPC) NpcID() int                { return n.npcID }
 func (n *raidCurseNPC) Position() (int, int, int) { return 0, 0, 0 }
 func (n *raidCurseNPC) Heading() int              { return 0 }
-func (n *raidCurseNPC) Category() target.Category { return target.CategoryAttackable }
 func (n *raidCurseNPC) RaidRelated() bool         { return n.raidRelated }
 func (n *raidCurseNPC) StopAggroHate(attackable.Combatant) {
 	n.hateStops++

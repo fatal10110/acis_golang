@@ -7,7 +7,6 @@ import (
 	"sort"
 	"testing"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -682,8 +681,8 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		{Stat: stat.HealEffectiveness, Op: effect.OpMul, Value: 1.2, Owner: owner},
 	})
 
-	if got := target.Category(); got != skilltarget.CategoryPlayable {
-		t.Fatalf("Category() = %v, want playable", got)
+	if got := target.Kind(); got != actor.KindSummon {
+		t.Fatalf("Kind() = %v, want summon", got)
 	}
 	if !target.Playable() {
 		t.Fatal("Playable() = false for a pet")

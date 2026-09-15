@@ -16,7 +16,7 @@ import (
 const defaultMaxBuffsAmount = 20
 
 // Character satisfies the actor surface skill target resolution needs.
-var _ target.Creature = (*Character)(nil)
+var _ target.Actor = (*Character)(nil)
 
 // Character satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
 // ShieldDefense/DecreaseFusion take their caster/effected parameter as.
@@ -60,11 +60,6 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 			calc.RemoveOwner(owner)
 		}
 	}
-}
-
-// Category reports c as a playable actor for skill target resolution.
-func (c *Character) Category() target.Category {
-	return target.CategoryPlayable
 }
 
 // Invul reports whether c is currently invulnerable.

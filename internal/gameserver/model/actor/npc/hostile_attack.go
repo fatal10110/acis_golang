@@ -70,7 +70,7 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 
 // CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
 // surface.
-func (h *Hostile) CanSeeTarget(target skilltarget.Creature) bool {
+func (h *Hostile) CanSeeTarget(target skilltarget.Actor) bool {
 	combatant, ok := target.(attackable.Combatant)
 	return ok && h.CanSee(combatant)
 }
@@ -354,11 +354,11 @@ func (h *Hostile) BroadcastStatus() error {
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.
-func (h *Hostile) AttackableBy(attacker skilltarget.Creature) bool {
+func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
 }
 
 // AttackableWithoutForceBy uses the ordinary NPC attackability rule.
-func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Creature) bool {
+func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	return h.AttackableBy(caster)
 }

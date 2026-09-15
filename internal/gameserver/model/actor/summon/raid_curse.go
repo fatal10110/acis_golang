@@ -43,7 +43,7 @@ func (a *Actor) TestCursesOnAttack(target attackable.Combatant) bool {
 // TestCursesOnSkillSee applies this summon's raid petrification or silence
 // curses against the resolved skill targets. True means leftover skill
 // effects must be skipped.
-func (a *Actor) TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Creature) bool {
+func (a *Actor) TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Actor) bool {
 	if a == nil {
 		return false
 	}
@@ -53,7 +53,7 @@ func (a *Actor) TestCursesOnSkillSee(def modelskill.Definition, targets []skillt
 
 	converted := make([]creature.RaidCurseSkillSeeTarget, 0, len(targets))
 	for _, t := range targets {
-		playable := t != nil && t.Category().Has(skilltarget.CategoryPlayable)
+		playable := t != nil && t.Kind().Playable()
 		converted = append(converted, creature.SkillSeeTargetOf(t, playable))
 	}
 	var nearby []creature.RaidCurseSkillRaid

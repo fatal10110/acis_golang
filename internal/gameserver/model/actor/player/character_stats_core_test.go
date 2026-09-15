@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
@@ -2111,9 +2110,8 @@ type pvpFlagNPC struct {
 	guard bool
 }
 
-func (pvpFlagNPC) ObjectID() int32                { return 4 }
-func (pvpFlagNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
-func (n pvpFlagNPC) Guard() bool                  { return n.guard }
+func (pvpFlagNPC) ObjectID() int32 { return 4 }
+func (n pvpFlagNPC) Guard() bool   { return n.guard }
 
 func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.T) {
 	attacker := &Character{ID: 1}

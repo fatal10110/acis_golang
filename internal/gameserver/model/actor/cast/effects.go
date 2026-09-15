@@ -48,7 +48,7 @@ type pvpSkillNotifier interface {
 }
 
 type skillSeeCurseTester interface {
-	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Creature) bool
+	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Actor) bool
 }
 
 // ApplyEffects resolves def's affected target set from caster and the
@@ -56,7 +56,7 @@ type skillSeeCurseTester interface {
 // to the resolved set. It reports whether a skill handler actually ran.
 //
 // caster only needs to satisfy the target-resolution surface
-// (skilltarget.Creature), not any player-specific type, so this is the same
+// (skilltarget.Actor), not any player-specific type, so this is the same
 // resolution and dispatch path any caster drives — a live player today, and
 // eventually an NPC- or summon-initiated cast once that scheduling exists —
 // rather than a player-only shortcut. A caster or resolved selection that
@@ -65,13 +65,13 @@ type skillSeeCurseTester interface {
 // with no registered effect handler all result in no effect applied; that
 // mirrors the graceful degradation the effect handlers already use for
 // actor state this port hasn't modeled yet, rather than failing the caller.
-func ApplyEffects(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition) bool {
+func ApplyEffects(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) bool {
 	return ApplyEffectsResult(handlers, caster, resolved, def).Handled
 }
 
 // ApplyEffectsResult resolves def's affected targets and returns any
 // caster-visible result the selected skill handler produced.
-func ApplyEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition) EffectResult {
+func ApplyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) EffectResult {
 	return applyEffectsResult(handlers, caster, resolved, def, nil)
 }
 
@@ -80,15 +80,15 @@ func ApplyEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, re
 // threading item through to the skill handler as handlerskill.Cast.Item —
 // ApplyEffectsResult itself never sets Item, matching every other skill
 // type, which has no use for it.
-func ApplyItemEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition, item any) EffectResult {
+func ApplyItemEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition, item any) EffectResult {
 	return applyEffectsResult(handlers, caster, resolved, def, item)
 }
 
-func resolveAffected(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition) ([]skilltarget.Creature, bool) {
+func resolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) ([]skilltarget.Actor, bool) {
 	if caster == nil || handlers.Targets == nil {
 		return nil, false
 	}
-	selected, _ := resolved.(skilltarget.Creature)
+	selected, _ := resolved.(skilltarget.Actor)
 
 	handler, ok := handlers.Targets.Handler(def.Target)
 	if !ok || !handler.CanCast(caster, selected, &def, false) {
@@ -102,7 +102,7 @@ func resolveAffected(handlers EffectHandlers, caster skilltarget.Creature, resol
 	return affected, true
 }
 
-func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition, item any) EffectResult {
+func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition, item any) EffectResult {
 	if handlers.Skills == nil {
 		return EffectResult{}
 	}
@@ -124,7 +124,7 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, re
 // for any reason (unresolvable caster/target, no registered handler,
 // CanCast rejection, or an empty affected set); affected is nil in that
 // case.
-func ResolveAffected(handlers EffectHandlers, caster skilltarget.Creature, resolved Target, def modelskill.Definition) (affected []skilltarget.Creature, ok bool) {
+func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	return resolveAffected(handlers, caster, resolved, def)
 }
 
@@ -133,14 +133,14 @@ func ResolveAffected(handlers EffectHandlers, caster skilltarget.Creature, resol
 // at launch and frozen for reuse at Hit — instead of re-resolving from a
 // single selection. See ResolveAffected's doc for why a caller needs this
 // split.
-func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Creature, affected []skilltarget.Creature, def modelskill.Definition) EffectResult {
+func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition) EffectResult {
 	if handlers.Skills == nil || len(affected) == 0 {
 		return EffectResult{}
 	}
 	return dispatchEffects(handlers, caster, affected, def, nil)
 }
 
-func dispatchEffects(handlers EffectHandlers, caster skilltarget.Creature, affected []skilltarget.Creature, def modelskill.Definition, item any) EffectResult {
+func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
 	if def.Activation != modelskill.ActivationToggle {
 		if tester, ok := caster.(skillSeeCurseTester); ok && tester.TestCursesOnSkillSee(def, affected) {
 			return EffectResult{}

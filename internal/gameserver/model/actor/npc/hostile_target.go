@@ -174,7 +174,7 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 		return false
 	}
 
-	rules, ok := target.(skilltarget.AttackRules)
+	rules, ok := target.(skilltarget.Actor)
 	if !ok || !rules.AttackableBy(h) {
 		return false
 	}

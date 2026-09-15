@@ -191,7 +191,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// re-derived. That keeps the MagicSkillLaunched broadcast and the
 	// effect-affected set as one snapshot instead of two independent
 	// resolutions 400ms apart.
-	var launchTargets []skilltarget.Creature
+	var launchTargets []skilltarget.Actor
 	var launchResolved bool
 
 	a.Controller.Schedule(plan, Hooks{
