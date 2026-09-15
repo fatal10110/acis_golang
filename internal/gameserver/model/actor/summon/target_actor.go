@@ -41,10 +41,11 @@ func (a *Actor) CorpseTime() time.Duration            { return 0 }
 func (a *Actor) Spoiled() bool                        { return false }
 func (a *Actor) Seeded() bool                         { return false }
 
-// AttackableBy reports whether caster may affect this summon offensively: any
-// living summon may be attacked.
-func (a *Actor) AttackableBy(skilltarget.Actor) bool { return !a.AlikeDead() }
+// AttackableBy reports false: summon attack rules and the summon death
+// sequence are not modeled yet, so auto-attacks and area skills never pick a
+// summon as a target.
+func (a *Actor) AttackableBy(skilltarget.Actor) bool { return false }
 
-// AttackableWithoutForceBy reports false: the owner's karma and PvP flag are
-// not consulted yet, so affecting a summon always needs a forced attack.
+// AttackableWithoutForceBy reports false: summon attack rules are not modeled
+// yet.
 func (a *Actor) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }

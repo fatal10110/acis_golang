@@ -49,15 +49,9 @@ func (a *Actor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool)
 // RaceMultiplier reports 1: only NPC races scale damage.
 func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
 
-// TakeDamage applies an auto-attack hit through the same HP reduction skill
-// damage uses and reports whether this hit killed the summon.
-func (a *Actor) TakeDamage(dmg int, attacker attackable.Combatant) bool {
-	if a.AlikeDead() {
-		return false
-	}
-	a.ReduceHP(float64(dmg), attacker, modelskill.Definition{})
-	return a.Dead()
-}
+// TakeDamage reports false and applies nothing: auto-attack damage against
+// summons is not wired yet.
+func (a *Actor) TakeDamage(int, attackable.Combatant) bool { return false }
 
 // BroadcastSkillUse reports nil without broadcasting: summon AI casts do not
 // announce themselves to observers yet.

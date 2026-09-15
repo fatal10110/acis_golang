@@ -378,6 +378,8 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"behind aura in peace", modelskill.TargetBehindAura, caster, nil, nil, CastRejectCantAttackPeaceZone},
 		{"one offensive self", modelskill.TargetOne, caster, caster, offensive, CastRejectInvalidTarget},
 		{"one offensive target in peace", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 2, kind: actor.KindPlayer, peace: true, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectTargetInPeaceZone},
+		{"one offensive player without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 2, kind: actor.KindPlayer, attackableBy: true}, offensive, CastRejectInvalidTarget},
+		{"one offensive summon without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 7, kind: actor.KindSummon}, offensive, CastRejectNone},
 		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
 		{"corpse pet living", modelskill.TargetCorpsePet, caster, &targetActor{id: 4, kind: actor.KindPlayer, pet: true}, nil, CastRejectInvalidTarget},
 		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, kind: actor.KindPlayer, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
