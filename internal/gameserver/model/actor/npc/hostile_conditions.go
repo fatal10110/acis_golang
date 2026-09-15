@@ -65,8 +65,6 @@ func (a hostileStatActor) IsFlying() bool { return false }
 // conditionGate always tests an owner against itself
 // (conditionGate.Test(actor, actor, nil)), so other is always this same
 // hostileStatActor, which implements it via CurrentHeading below.
-type headingActor interface{ CurrentHeading() int }
-
 // CurrentHeading lets a hostileStatActor serve as the "other" side of its
 // own IsBehind/IsInFrontOf check.
 func (a hostileStatActor) CurrentHeading() int { return a.h.Heading() }
@@ -75,13 +73,9 @@ func (a hostileStatActor) CurrentHeading() int { return a.h.Heading() }
 // behind other, using other's own facing (matching
 // creature.ResolveBlowInput's identical behind/front check).
 func (a hostileStatActor) IsBehind(other conditions.Actor) bool {
-	h, ok := other.(headingActor)
-	if !ok {
-		return false
-	}
 	facing := location.OrientedLocation{
 		Location: location.Location{X: other.X(), Y: other.Y(), Z: other.Z()},
-		Heading:  h.CurrentHeading(),
+		Heading:  other.CurrentHeading(),
 	}
 	return facing.IsBehind(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }
@@ -89,13 +83,9 @@ func (a hostileStatActor) IsBehind(other conditions.Actor) bool {
 // IsInFrontOf satisfies conditions.Actor: reports whether a is positioned in
 // front of other, using other's own facing.
 func (a hostileStatActor) IsInFrontOf(other conditions.Actor) bool {
-	h, ok := other.(headingActor)
-	if !ok {
-		return false
-	}
 	facing := location.OrientedLocation{
 		Location: location.Location{X: other.X(), Y: other.Y(), Z: other.Z()},
-		Heading:  h.CurrentHeading(),
+		Heading:  other.CurrentHeading(),
 	}
 	return facing.IsInFrontOf(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }

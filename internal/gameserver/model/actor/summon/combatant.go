@@ -3,6 +3,9 @@ package summon
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 // Karma reports 0: a summon carries no karma of its own.
@@ -37,3 +40,26 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 // CanSeeTarget reports true: the launch-phase line-of-sight gate is not wired
 // for summon casts yet, so it never aborts one.
 func (a *Actor) CanSeeTarget(skilltarget.Actor) bool { return true }
+
+// ShieldDefense reports ShieldFailed: summons carry no shield.
+func (a *Actor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
+}
+
+// RaceMultiplier reports 1: only NPC races scale damage.
+func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
+
+// TakeDamage reports false and applies nothing: auto-attack damage against
+// summons is not wired yet.
+func (a *Actor) TakeDamage(int, attackable.Combatant) bool { return false }
+
+// BroadcastSkillUse reports nil without broadcasting: summon AI casts do not
+// announce themselves to observers yet.
+func (a *Actor) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) error { return nil }
+
+// BroadcastSkillLaunched reports nil without broadcasting: summon AI casts do
+// not announce themselves to observers yet.
+func (a *Actor) BroadcastSkillLaunched(int32, int32, []int32) error { return nil }
+
+// NotePvPSkillTargets does nothing: PvP flagging tracks the owning player.
+func (a *Actor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}

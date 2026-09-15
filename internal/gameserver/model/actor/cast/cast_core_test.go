@@ -1083,8 +1083,6 @@ func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, ta
 	return nil
 }
 
-var _ magicCastBroadcaster = (*fakeBroadcastingCaster)(nil)
-
 // ---- from cubic_fire_test.go ----
 func TestCubicGrantedLevel(t *testing.T) {
 	tests := []struct {
@@ -1107,6 +1105,8 @@ func TestCubicGrantedLevel(t *testing.T) {
 }
 
 type fakeCubicHealTarget struct {
+	world.Presence
+	effecttest.Actor
 	healable      bool
 	effectiveness float64
 	added         float64
@@ -3078,3 +3078,32 @@ func (testActor) ExitSignetGround() {}
 func (testActor) GroundTargetUnset() bool { return false }
 
 func (testActor) IncreaseCharges(int, int) bool { return false }
+
+func (*fakeCastCreature) BroadcastSkillLaunched(int32, int32, []int32) error { return nil }
+
+func (*fakeCastCreature) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) error {
+	return nil
+}
+
+var (
+	_ SkillCaster  = (*fakeCastCreature)(nil)
+	_ SkillCaster  = (*fakeBroadcastingCaster)(nil)
+	_ SkillCaster  = (*effectsActor)(nil)
+	_ SkillCaster  = (*pvpEffectsActor)(nil)
+	_ SkillCaster  = (*cursePvpEffectsActor)(nil)
+	_ AICaster     = (*fakeCastCreature)(nil)
+	_ AICaster     = (*fakeBroadcastingCaster)(nil)
+	_ effect.Actor = (*fakeCubicHealTarget)(nil)
+)
+
+func (*fakeCastCreature) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*fakeCastCreature) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}
+
+func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}

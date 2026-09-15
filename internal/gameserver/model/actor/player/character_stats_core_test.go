@@ -1408,6 +1408,7 @@ func TestCharacterDeathPenaltySkillUpdaterReplacesLevelOnEachChange(t *testing.T
 // deathPenaltyKiller is a minimal killer double: a non-Player actor whose
 // raid-relation is fixed at construction.
 type deathPenaltyKiller struct {
+	attackabletest.Combatant
 	raidRelated bool
 }
 
@@ -5987,3 +5988,7 @@ func (summonKiller) Position() (x, y, z int) { return 0, 0, 0 }
 func (reduceHPPlayableAttacker) Heading() int { return 0 }
 
 func (reduceHPPlayableAttacker) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (deathPenaltyKiller) Heading() int { return 0 }
+
+func (deathPenaltyKiller) Position() (x, y, z int) { return 0, 0, 0 }

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -1284,3 +1285,20 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 func (*fakeSummon) Kind() actor.Kind { return actor.KindSummon }
 
 func (*fakeCaster) Kind() actor.Kind { return actor.KindPlayer }
+
+var (
+	_ actorcast.SkillCaster = (*fakeCaster)(nil)
+	_ actorcast.SkillCaster = (*fakeSummon)(nil)
+)
+
+func (*fakeCaster) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*fakeCaster) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}
+
+func (*fakeSummon) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*fakeSummon) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}

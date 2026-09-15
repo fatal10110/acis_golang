@@ -46,15 +46,21 @@ type FormulaActor interface {
 	// under-graded weapon; only players carry weapon grades, so NPCs and
 	// summons report false.
 	WeaponGradePenalty() bool
+	HP() float64
+	MaxHPValue() float64
+	Invul() bool
+	// ShieldDefense resolves this actor's shield block against caster;
+	// ShieldFailed for kinds that carry no shield.
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	// RaceMultiplier is the NPC-race attack/resist multiplier against
+	// attacker; 1 for kinds without a race.
+	RaceMultiplier(attacker FormulaActor) float64
+	// Evasion is the physical evasion stat.
+	Evasion() int
+
 	// LethalRate multiplies the lethal-strike chances of this actor's skills.
 	LethalRate() float64
 }
-
-type shieldDefenseActor interface {
-	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
-}
-
-type invulnerableActor interface{ Invul() bool }
 
 // damageBlocked reports whether attacker lacks permission to deal damage.
 // Target invulnerability is deliberately not checked here: Java only gates
@@ -75,11 +81,6 @@ func damageBlocked(attacker attackable.Combatant) bool {
 	return !CanDealDamage(attacker)
 }
 
-type currentHPActor interface {
-	HP() float64
-	MaxHPValue() float64
-}
-
 // casterSkillPower is the physical/magic/mana skill-power term: DEATHLINK
 // and FATAL scale with the caster's current/max HP ratio; every other type
 // returns the definition's raw power. Blow keeps raw power at its own
@@ -87,11 +88,7 @@ type currentHPActor interface {
 // and returns the unscaled value.
 func casterSkillPower(attacker FormulaActor, def modelskill.Definition) float64 {
 	power := float64(def.Power)
-	src, ok := attacker.(currentHPActor)
-	if !ok {
-		return power
-	}
-	return formulas.SkillPowerFor(def.SkillType, power, src.HP()/src.MaxHPValue())
+	return formulas.SkillPowerFor(def.SkillType, power, attacker.HP()/attacker.MaxHPValue())
 }
 
 // CanDealDamage reports whether attacker is permitted to inflict damage. A
@@ -124,10 +121,7 @@ func ResolvePhysicalSkillInput(caster attackable.Combatant, target FormulaActor,
 		pvpMul = attacker.CalcStat(stat.PvPPhysSkillDmg, 1)
 	}
 	crit := PhysicalSkillCrit(attacker, def)
-	shield := formulas.ShieldFailed
-	if resolver, ok := any(target).(shieldDefenseActor); ok {
-		shield = resolver.ShieldDefense(caster, def, crit)
-	}
+	shield := target.ShieldDefense(caster, def, crit)
 	defence := target.PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
@@ -154,10 +148,7 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 	if attacker == nil || target == nil {
 		return formulas.PhysicalAttackInput{}, formulas.ShieldFailed
 	}
-	shield := formulas.ShieldFailed
-	if resolver, ok := any(target).(shieldDefenseActor); ok {
-		shield = resolver.ShieldDefense(attacker, modelskill.Definition{}, crit)
-	}
+	shield := target.ShieldDefense(attacker, modelskill.Definition{}, crit)
 	defence := Positive(target.PDef())
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
@@ -212,12 +203,9 @@ func ResolveMagicDamageInput(caster attackable.Combatant, target FormulaActor, d
 		return formulas.MagicDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
-	shield := formulas.ShieldFailed
-	if resolver, ok := any(target).(shieldDefenseActor); ok {
-		// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit
-		// must not triple the shield rate.
-		shield = resolver.ShieldDefense(caster, def, false)
-	}
+	// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit must not
+	// triple the shield rate.
+	shield := target.ShieldDefense(caster, def, false)
 	mDef := target.MDef()
 	if shield == formulas.ShieldSuccess {
 		mDef += target.CalcStat(stat.ShieldDefence, 0)
@@ -297,9 +285,7 @@ func ResolveBlowInput(caster attackable.Combatant, target FormulaActor, def mode
 	crit := landed && PhysicalSkillCrit(attacker, def)
 	shield := formulas.ShieldFailed
 	if landed && !def.IgnoreShield {
-		if resolver, ok := any(target).(shieldDefenseActor); ok {
-			shield = resolver.ShieldDefense(caster, def, crit)
-		}
+		shield = target.ShieldDefense(caster, def, crit)
 	}
 	defence := target.PDef()
 	if shield == formulas.ShieldSuccess {
@@ -340,7 +326,7 @@ func ResolveManaDamageInput(caster attackable.Combatant, target FormulaActor, ma
 	if !ok || attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false
 	}
-	if t, ok := target.(invulnerableActor); ok && t.Invul() {
+	if target.Invul() {
 		return formulas.ManaDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
@@ -459,20 +445,13 @@ func PositionMultiplierFrom(target, attacker FormulaActor, crit bool) float64 {
 	return formulas.PosMul(behind, inFront, crit)
 }
 
-type raceMultiplierActor interface {
-	RaceMultiplier(FormulaActor) float64
-}
-
 // RaceMultiplierFrom returns the NPC-race attack/resist multiplier when
 // target exposes one, or 1 for every other target shape.
 func RaceMultiplierFrom(target, attacker FormulaActor) float64 {
 	if target == nil || attacker == nil {
 		return 1
 	}
-	if r, ok := target.(raceMultiplierActor); ok {
-		return r.RaceMultiplier(attacker)
-	}
-	return 1
+	return target.RaceMultiplier(attacker)
 }
 
 // AttackFacing reports whether attacker stands behind or in front of target,

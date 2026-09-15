@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+)
 
 // FakeDeath reports false: the fake-death stance is not tracked as a state
 // yet.
@@ -17,3 +20,6 @@ func (c *Character) Guard() bool { return false }
 
 // Owner reports no owner: players are not summons.
 func (c *Character) Owner() (attackable.Combatant, bool) { return nil, false }
+
+// RaceMultiplier reports 1: only NPC races scale damage.
+func (c *Character) RaceMultiplier(creature.FormulaActor) float64 { return 1 }

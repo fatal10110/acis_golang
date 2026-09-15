@@ -47,6 +47,9 @@ type Combatant interface {
 	// CanGiveDamage reports whether the combatant may damage others; only
 	// access-level restrictions revoke it.
 	CanGiveDamage() bool
+	// TakeDamage applies a landed auto-attack hit and reports whether it
+	// killed the combatant.
+	TakeDamage(damage int, attacker Combatant) bool
 	RaidRelated() bool
 
 	// SiegeGuard reports whether this combatant is a defensive siege guard.

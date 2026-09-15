@@ -38,6 +38,7 @@ func (f *fakeCombatant) Knows(Combatant) bool                       { return tru
 func (f *fakeCombatant) SilentMoving() bool                         { return false }
 func (f *fakeCombatant) SpawnProtected() bool                       { return false }
 func (f *fakeCombatant) CanGiveDamage() bool                        { return true }
+func (f *fakeCombatant) TakeDamage(int, Combatant) bool             { return false }
 func (f *fakeCombatant) RaidRelated() bool                          { return false }
 func (f *fakeCombatant) Guard() bool                                { return false }
 func (f *fakeCombatant) Owner() (Combatant, bool)                   { return nil, false }

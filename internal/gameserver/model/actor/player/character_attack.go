@@ -65,13 +65,6 @@ func (w activeWeapon) grade() int {
 	return int(w.tmpl.Crystal)
 }
 
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
 
@@ -655,4 +648,3 @@ func (c *Character) RandomDamageSpread() int {
 
 var _ attack.PlayerActor = (*Character)(nil)
 var _ move.Actor = (*Character)(nil)
-var _ physicalTarget = (*Character)(nil)

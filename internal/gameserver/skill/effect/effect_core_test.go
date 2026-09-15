@@ -2873,3 +2873,5 @@ type deadTarget struct {
 }
 
 func (*deadTarget) Dead() bool { return true }
+
+func (a fakeConditionActor) CurrentHeading() int { return 0 }

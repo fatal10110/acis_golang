@@ -6,6 +6,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -134,17 +135,6 @@ func cubicWithinRange(a, b Target) bool {
 	return dist <= total
 }
 
-// cubicHealTarget and cubicHealEffectiveness are the narrow surfaces
-// ApplyCubicHeal needs from a Life Cubic's heal target.
-type cubicHealTarget interface {
-	CanBeHealed() bool
-	AddHP(float64) float64
-}
-
-type cubicHealEffectiveness interface {
-	HealEffectiveness() float64
-}
-
 // ApplyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
 // power * target's HEAL_EFFECTIVNESS / 100, with no caster stat or
 // proficiency contribution — distinct from the generic HEAL skill handler a
@@ -152,15 +142,12 @@ type cubicHealEffectiveness interface {
 // MATK and healing proficiency. healed reports whether the target actually
 // received HP, so the caller knows whether to send the heal feedback packet.
 func ApplyCubicHeal(power float32, target Target) (healed bool) {
-	healable, ok := target.(cubicHealTarget)
+	// Only an effect participant has HP to restore.
+	healable, ok := target.(effect.Actor)
 	if !ok || !healable.CanBeHealed() {
 		return false
 	}
-	effectiveness := 100.0
-	if eff, ok := target.(cubicHealEffectiveness); ok {
-		effectiveness = eff.HealEffectiveness()
-	}
-	healable.AddHP(float64(power) * effectiveness / 100)
+	healable.AddHP(float64(power) * healable.HealEffectiveness() / 100)
 	return true
 }
 

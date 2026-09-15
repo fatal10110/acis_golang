@@ -841,3 +841,5 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		}
 	})
 }
+
+func (fakeWearingActor) CurrentHeading() int { return 0 }

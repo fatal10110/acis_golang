@@ -148,7 +148,7 @@ type Character struct {
 	// matching Player._summonTargetRequest/_summonSkillRequest
 	// (Player.java:452-453).
 	summonFriendMu    sync.Mutex
-	summonRequester   any
+	summonRequester   SummonFriendRequester
 	summonRequesterID int32
 	summonSkill       modelskill.Definition
 

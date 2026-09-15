@@ -443,10 +443,6 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 	return flags
 }
 
-type damageReceiver interface {
-	TakeDamage(int, attackable.Combatant) bool
-}
-
 func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
@@ -487,11 +483,7 @@ func (c *Controller) deliverHit(hit Hit) {
 	if hit.Miss || hit.Damage <= 0 {
 		return
 	}
-	target, ok := hit.Target.(damageReceiver)
-	if !ok {
-		return
-	}
-	target.TakeDamage(hit.Damage, c.actor)
+	hit.Target.TakeDamage(hit.Damage, c.actor)
 }
 
 func (c *Controller) finishBow(seq uint64, reuse time.Duration) {

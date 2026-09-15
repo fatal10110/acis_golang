@@ -2843,3 +2843,7 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 }
 
 func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
+
+func (*fakeActor) ThinkFollow(attackable.Combatant, bool) bool { return false }

@@ -43,12 +43,14 @@ type EffectResult struct {
 	CubicID           cubic.ID
 }
 
-type pvpSkillNotifier interface {
-	NotePvPSkillTargets([]attackable.Combatant, bool, string)
-}
-
-type skillSeeCurseTester interface {
+// SkillCaster is a creature whose skill effects the cast pipeline dispatches.
+type SkillCaster interface {
+	handlerskill.Caster
+	// TestCursesOnSkillSee applies the raid skill-see curse and reports
+	// whether it blocked the skill.
 	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Actor) bool
+	// NotePvPSkillTargets records a resolved cast's targets for PvP flagging.
+	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
 }
 
 // ApplyEffects resolves def's affected target set from caster and the
@@ -141,31 +143,27 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Acto
 }
 
 func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
-	if def.Activation != modelskill.ActivationToggle {
-		if tester, ok := caster.(skillSeeCurseTester); ok && tester.TestCursesOnSkillSee(def, affected) {
-			return EffectResult{}
-		}
-	}
 	// Only creatures cast skills; a door never reaches the handlers as a caster.
-	castCaster, ok := caster.(handlerskill.Caster)
+	castCaster, ok := caster.(SkillCaster)
 	if !ok {
+		return EffectResult{}
+	}
+	if def.Activation != modelskill.ActivationToggle && castCaster.TestCursesOnSkillSee(def, affected) {
 		return EffectResult{}
 	}
 	castTargets := make([]handlerskill.Actor, len(affected))
 	for i, t := range affected {
 		castTargets[i] = t
 	}
-	if notifier, ok := caster.(pvpSkillNotifier); ok {
-		// Doors never take part in PvP flagging, so only creature targets are
-		// reported.
-		notifyTargets := make([]attackable.Combatant, 0, len(affected))
-		for _, t := range affected {
-			if c, ok := t.(attackable.Combatant); ok {
-				notifyTargets = append(notifyTargets, c)
-			}
+	// Doors never take part in PvP flagging, so only creature targets are
+	// reported.
+	notifyTargets := make([]attackable.Combatant, 0, len(affected))
+	for _, t := range affected {
+		if c, ok := t.(attackable.Combatant); ok {
+			notifyTargets = append(notifyTargets, c)
 		}
-		notifier.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	}
+	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 
 	if def.Overhit && caster.Kind().Playable() {
 		for _, t := range affected {

@@ -3,6 +3,7 @@ package skill
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -35,8 +36,7 @@ type summonFriendActorState interface {
 }
 
 type summonFriendCaster interface {
-	summonFriendActorState
-	Position() (x, y, z int)
+	player.SummonFriendRequester
 }
 
 type summonFriendTargetState interface {
@@ -55,9 +55,9 @@ type summonFriendTargetState interface {
 // with the caster forwarded opaquely, matching #1519/#1497's precedent for a
 // value used only for identity/state, not behavior, at this layer.
 type summonFriendRequester interface {
-	TeleportRequest(caster any, skill modelskill.Definition) bool
+	TeleportRequest(caster player.SummonFriendRequester, skill modelskill.Definition) bool
 	ClearTeleportRequest()
-	ConfirmSummon(caster any, skill modelskill.Definition, timeout time.Duration)
+	ConfirmSummon(caster player.SummonFriendRequester, skill modelskill.Definition, timeout time.Duration)
 }
 
 type summonFriendTraveler interface {
@@ -102,11 +102,11 @@ func (summonFriendHandler) Use(cast Cast) {
 			continue
 		}
 		requester, ok := target.(summonFriendRequester)
-		if !ok || !requester.TeleportRequest(cast.Caster, cast.Skill) {
+		if !ok || !requester.TeleportRequest(caster, cast.Skill) {
 			continue
 		}
 		if cast.Skill.ID == 1403 {
-			requester.ConfirmSummon(cast.Caster, cast.Skill, summonFriendConfirmTimeout)
+			requester.ConfirmSummon(caster, cast.Skill, summonFriendConfirmTimeout)
 			continue
 		}
 		teleportSummonedFriend(caster, target, cast.Skill)

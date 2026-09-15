@@ -32,6 +32,7 @@ func (Combatant) Knows(attackable.Combatant) bool                      { return 
 func (Combatant) SilentMoving() bool                                   { return false }
 func (Combatant) SpawnProtected() bool                                 { return false }
 func (Combatant) CanGiveDamage() bool                                  { return true }
+func (Combatant) TakeDamage(int, attackable.Combatant) bool            { return false }
 func (Combatant) RaidRelated() bool                                    { return false }
 func (Combatant) SiegeGuard() bool                                     { return false }
 func (Combatant) Guard() bool                                          { return false }

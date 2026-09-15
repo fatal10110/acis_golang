@@ -36,6 +36,9 @@ func (a characterStatActor) MPRatio() float64 {
 	return a.c.MPValue() / max
 }
 
+// CurrentHeading satisfies conditions.Actor.
+func (a characterStatActor) CurrentHeading() int { return a.c.CurrentHeading() }
+
 // X satisfies conditions.Actor.
 func (a characterStatActor) X() int { return a.c.X() }
 
@@ -69,19 +72,13 @@ func (a characterStatActor) IsFlying() bool { return a.c.Flying() }
 // the type assertion below always succeeds today; a target-side facing
 // condition (none exist in the shipped datapack) would fail it and read as
 // "not behind/in front" rather than panic.
-type headingActor interface{ CurrentHeading() int }
-
 // IsBehind satisfies conditions.Actor: reports whether a is positioned
 // behind other, using other's own facing (matching
 // creature.ResolveBlowInput's identical behind/front check).
 func (a characterStatActor) IsBehind(other conditions.Actor) bool {
-	h, ok := other.(headingActor)
-	if !ok {
-		return false
-	}
 	facing := location.OrientedLocation{
 		Location: location.Location{X: other.X(), Y: other.Y(), Z: other.Z()},
-		Heading:  h.CurrentHeading(),
+		Heading:  other.CurrentHeading(),
 	}
 	return facing.IsBehind(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }
@@ -89,13 +86,9 @@ func (a characterStatActor) IsBehind(other conditions.Actor) bool {
 // IsInFrontOf satisfies conditions.Actor: reports whether a is positioned in
 // front of other, using other's own facing.
 func (a characterStatActor) IsInFrontOf(other conditions.Actor) bool {
-	h, ok := other.(headingActor)
-	if !ok {
-		return false
-	}
 	facing := location.OrientedLocation{
 		Location: location.Location{X: other.X(), Y: other.Y(), Z: other.Z()},
-		Heading:  h.CurrentHeading(),
+		Heading:  other.CurrentHeading(),
 	}
 	return facing.IsInFrontOf(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }

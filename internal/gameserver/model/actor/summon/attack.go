@@ -14,13 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 func (a *Actor) AttackDisabled() bool { return a.DenyAIAction() }
 
 // MovementDisabled reports whether this summon cannot move. Fear is not
@@ -94,12 +87,7 @@ func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
-	other, ok := target.(physicalTarget)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-	formulaTarget, ok := target.(creature.FormulaActor)
+	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true
 		return hit
@@ -112,7 +100,7 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 		return hit
 	}
 	crit := formulas.CritSucceeds(a.CriticalRate(a.combatStats().CritRate), a.Roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(a, formulaTarget, crit)
+	in, shield := creature.ResolvePhysicalAttackInput(a, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
 	hit.Shield = shield

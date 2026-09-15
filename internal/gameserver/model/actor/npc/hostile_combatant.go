@@ -1,6 +1,11 @@
 package npc
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+import (
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+)
 
 // Karma reports 0: NPCs carry no PK karma.
 func (h *Hostile) Karma() int { return 0 }
@@ -34,3 +39,15 @@ func (h *Hostile) Owner() (attackable.Combatant, bool) { return nil, false }
 // EffectRangeInPeaceZone reports false: NPC effects are never suppressed by
 // peace zones.
 func (h *Hostile) EffectRangeInPeaceZone(x, y, z, effectRange int) bool { return false }
+
+// ShieldDefense reports ShieldFailed: NPCs carry no shield.
+func (h *Hostile) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
+}
+
+// TestCursesOnSkillSee reports false: raid skill-see curses target playable
+// casters only.
+func (h *Hostile) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool { return false }
+
+// NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
+func (h *Hostile) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}

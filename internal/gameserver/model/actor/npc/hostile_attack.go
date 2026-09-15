@@ -14,18 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// physicalTarget is the surface MakeAttackHit needs from an opponent to
-// resolve a physical hit and deliver its result: position for the attack's
-// altitude term, defense and evasion for the hit/damage rolls, and a way to
-// apply the computed damage. Any live combatant capable of exchanging
-// physical damage should satisfy this.
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 // AttackDisabled reports whether this NPC is unable to start an attack. No
 // abnormal-effect system (petrify, fear, attack-block) is wired to a live
 // NPC yet, so death is the only disabling condition modeled so far.
@@ -246,17 +234,11 @@ func (h *Hostile) Evasion() int {
 // MakeAttackHit resolves one physical attack against target: a hit/miss
 // roll, a critical roll, and a damage roll through the shared
 // physical-damage formula. A target that can't exchange physical damage (no
-// physicalTarget surface) always misses.
+// formula stats) always misses.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
 
-	other, ok := target.(physicalTarget)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-
-	formulaTarget, ok := target.(creature.FormulaActor)
+	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true
 		return hit
@@ -277,7 +259,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 
 	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(h, formulaTarget, crit)
+	in, shield := creature.ResolvePhysicalAttackInput(h, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
 	hit.Shield = shield

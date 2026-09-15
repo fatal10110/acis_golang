@@ -18,7 +18,7 @@ func (c *Character) SetRollSource(f func(int) int) {
 // MakeAttackHit resolves one physical attack result.
 func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
-	other, ok := target.(physicalTarget)
+	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true
 		return hit
@@ -26,11 +26,6 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 
 	tmpl := c.template()
 	if tmpl == nil {
-		hit.Miss = true
-		return hit
-	}
-	formulaTarget, ok := target.(creature.FormulaActor)
-	if !ok {
 		hit.Miss = true
 		return hit
 	}
@@ -48,7 +43,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	}
 
 	crit := formulas.CritSucceeds(c.CriticalRate(), c.rollValue(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(c, formulaTarget, crit)
+	in, shield := creature.ResolvePhysicalAttackInput(c, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
 	hit.Shield = shield

@@ -104,7 +104,7 @@ func TestDieConcurrentOnlyOneWinner(t *testing.T) {
 // randomDamageTestActor is a minimal FormulaActor stub for exercising
 // RandomDamageMultiplier in isolation.
 type randomDamageTestActor struct {
-	attackabletest.Combatant
+	effecttest.Actor
 	level         int
 	spread        int
 	roll          int
@@ -553,7 +553,7 @@ func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 }
 
 type physicalAttackActor struct {
-	attackabletest.Combatant
+	effecttest.Actor
 	id         int32
 	x, y, z    int
 	heading    int
@@ -740,3 +740,25 @@ func (*deathTestActor) Position() (x, y, z int) { return 0, 0, 0 }
 func (randomDamageTestActor) LethalRate() float64 { return 0 }
 
 func (physicalAttackActor) LethalRate() float64 { return 0 }
+
+func (randomDamageTestActor) Evasion() int { return 0 }
+
+func (randomDamageTestActor) Invul() bool { return false }
+
+func (randomDamageTestActor) MaxHPValue() float64 { return 0 }
+
+func (randomDamageTestActor) RaceMultiplier(FormulaActor) float64 { return 1 }
+
+func (randomDamageTestActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
+}
+
+func (physicalAttackActor) Evasion() int { return 0 }
+
+func (physicalAttackActor) Invul() bool { return false }
+
+func (physicalAttackActor) MaxHPValue() float64 { return 0 }
+
+func (physicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
+}
