@@ -913,7 +913,7 @@ func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duratio
 	f.reuseCalls++
 }
 func (f *fakeCaster) ShortBuffTaskSkillID() int32 { return f.shortBuffTaskSkillID }
-func (f *fakeCaster) IsFlying() bool              { return f.flying }
+func (f *fakeCaster) Flying() bool                { return f.flying }
 
 type fakeDefinitions struct {
 	def modelskill.Definition

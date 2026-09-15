@@ -321,17 +321,12 @@ func (c *Character) CanSee(target attackable.Combatant) bool {
 	return c.canSeePosition(tx, ty, tz, target.CollisionHeight())
 }
 
-// CanSeeTarget reports whether t is visible to this player, satisfying
-// handler/target.SightChecker for the cast pipeline's launch-phase
-// line-of-sight gate. Same geodata query as CanSee, keyed to t's own eye
-// height when it exposes one.
+// CanSeeTarget reports whether t is visible to this player for the cast
+// pipeline's launch-phase line-of-sight gate. Same geodata query as CanSee,
+// keyed to t's own eye height.
 func (c *Character) CanSeeTarget(t target.Actor) bool {
-	var theight float64
-	if h, ok := t.(interface{ CollisionHeight() float64 }); ok {
-		theight = h.CollisionHeight()
-	}
 	tx, ty, tz := t.Position()
-	return c.canSeePosition(tx, ty, tz, theight)
+	return c.canSeePosition(tx, ty, tz, t.CollisionHeight())
 }
 
 func (c *Character) canSeePosition(tx, ty, tz int, theight float64) bool {

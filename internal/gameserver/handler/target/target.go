@@ -15,6 +15,8 @@ type Actor interface {
 	world.Tracked
 	Position() (x, y, z int)
 	Heading() int
+	// CollisionHeight is the eye height line-of-sight checks use.
+	CollisionHeight() float64
 	Dead() bool
 
 	// AttackableBy reports whether caster may affect this actor offensively;

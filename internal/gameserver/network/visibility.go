@@ -50,11 +50,9 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	case groundItemObject:
-		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
-			if dropperID := dropped.DropperID(); dropperID != 0 {
-				p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
-				return
-			}
+		if dropperID := o.DropperID(); dropperID != 0 {
+			p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
+			return
 		}
 		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
@@ -132,6 +130,8 @@ type groundItemObject interface {
 	Count() int
 	Stackable() bool
 	Position() (int, int, int)
+	// DropperID is the object that dropped the item, or 0.
+	DropperID() int32
 }
 
 type doorObject interface {

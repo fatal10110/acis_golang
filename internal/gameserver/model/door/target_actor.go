@@ -46,3 +46,6 @@ func (o *Object) CorpseDeadline() (time.Time, bool)    { return time.Time{}, fal
 func (o *Object) CorpseTime() time.Duration            { return 0 }
 func (o *Object) Spoiled() bool                        { return false }
 func (o *Object) Seeded() bool                         { return false }
+
+// CollisionHeight reports 0: line of sight to a door uses its base.
+func (o *Object) CollisionHeight() float64 { return 0 }

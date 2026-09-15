@@ -66,3 +66,5 @@ func TestClaimChairRequiresEligibleUserAndChair(t *testing.T) {
 		})
 	}
 }
+
+func (testChairObject) StaticObjectID() int { return 0 }

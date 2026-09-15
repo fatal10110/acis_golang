@@ -93,6 +93,7 @@ var hpPotionSkillIDs = map[int32]bool{2031: true, 2032: true, 2037: true}
 // skill reuse/cooldown state.
 type SkillCaster interface {
 	skilltarget.Actor
+	conditions.SkillCaster
 	SkillDisabled(key int32) bool
 	DisableSkill(key int32, delay time.Duration)
 	AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration)

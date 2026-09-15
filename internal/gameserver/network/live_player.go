@@ -36,14 +36,11 @@ type livePlayer struct {
 	template *player.Template
 	npcs     *npc.Table
 	items    []*item.Instance
-	throne   interface {
-		staticobject.Chair
-		StaticObjectID() int
-	}
-	attack *attack.Controller
-	move   *move.Controller
-	combat *ai.PlayerAttack
-	cast   *actorcast.Controller
+	throne   staticobject.Chair
+	attack   *attack.Controller
+	move     *move.Controller
+	combat   *ai.PlayerAttack
+	cast     *actorcast.Controller
 	// summonSpawner is the pet/servitor spawner summon-request events reach.
 	// useSummonItem creates it on the first pet-collar use, from the
 	// connection goroutine; the cast timer goroutine reads it.

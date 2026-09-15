@@ -63,3 +63,6 @@ func (a *Actor) BroadcastSkillLaunched(int32, int32, []int32) error { return nil
 
 // NotePvPSkillTargets does nothing: PvP flagging tracks the owning player.
 func (a *Actor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+// Flying reports false: summons never fly.
+func (a *Actor) Flying() bool { return false }

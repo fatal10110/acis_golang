@@ -37,10 +37,12 @@ type Observer interface {
 // Player is a tracked player character. Only objects of KindPlayer keep a
 // Region active: entering or leaving a region's 3x3 neighborhood as a
 // player toggles Region.Active for the regions that lose or gain a nearby
-// player. CharacterName backs State.PlayerByName.
+// player. CharacterName backs State.PlayerByName; AccountName reports the
+// online roster to the login server.
 type Player interface {
 	Tracked
 	CharacterName() string
+	AccountName() string
 }
 
 func isPlayer(t Tracked) bool { return t.Kind() == actor.KindPlayer }

@@ -124,3 +124,7 @@ func TestState_AddRemovePlayer_ConcurrentSameID_NoStaleName(t *testing.T) {
 		t.Fatalf("PlayerByName(\"Newbie\") = %v, %v; want id %d — a stale name-index entry from id 1 blocked reuse", got, ok, other.id)
 	}
 }
+
+func (*namedPlayerObject) AccountName() string { return "" }
+
+func (*blockingNamedPlayer) AccountName() string { return "" }
