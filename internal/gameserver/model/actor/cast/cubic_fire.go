@@ -164,7 +164,7 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // outcome) back to the caller, matching useContinuousSkill (Cubic.java:439-444):
 // a failed offensive continuous roll must still reach the owner as
 // ATTACK_FAILED, not be dropped silently.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Caster, def modelskill.Definition, target Target) EffectResult {
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target) EffectResult {
 	if skills == nil {
 		return EffectResult{}
 	}

@@ -90,7 +90,7 @@ func reflectEffectTarget(cast Cast, obj Actor) (effect.Actor, bool) {
 	if !ok {
 		return nil, false
 	}
-	src, ok := obj.(skillReflectSource)
+	src, ok := asCreature(obj)
 	if !ok {
 		return target, false
 	}
@@ -425,7 +425,7 @@ type resistedMagicNotifier interface {
 // deliverMagicFailure sends the caster/target resist system messages a
 // magic-damage failure produces, for paths that do not return a skill
 // handler Result (signet ticks).
-func deliverMagicFailure(caster Caster, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
+func deliverMagicFailure(caster Creature, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
 	var result Result
 	reportMagicFailure(Cast{Caster: caster, Skill: def}, target, failure, &result)
 	if n, ok := caster.(attackFailedNotifier); ok {
@@ -633,7 +633,7 @@ func applyLethalHit(cast Cast, obj Actor, result *Result) {
 	if v, ok := obj.(lethalInvulTarget); ok && v.Invul() {
 		return
 	}
-	if v, ok := obj.(raidRelatedTarget); ok && v.RaidRelated() {
+	if v, ok := asCreature(obj); ok && v.RaidRelated() {
 		return
 	}
 	if v, ok := obj.(lethalableTarget); ok && !v.Lethalable() {

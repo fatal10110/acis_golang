@@ -44,6 +44,8 @@ type Owner interface {
 	// pet/servitor's "in combat" status is entirely owner-derived, never
 	// tracked on the summon itself.
 	InCombat() bool
+	// ServitorVanished tells the owner its servitor was erased.
+	ServitorVanished()
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.

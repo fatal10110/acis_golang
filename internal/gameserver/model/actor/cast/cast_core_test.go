@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -1031,7 +1033,7 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 // AIController's target on both sides of the bridge it builds.
 type fakeCastCreature struct {
 	world.Presence
-	targettest.Actor
+	skilltest.Creature
 	id      int32
 	x, y, z int
 	dead    bool
@@ -1152,7 +1154,7 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 // (Cubic.java:439-444), the case this test exercises.
 type fakeCubicEffectCaster struct {
 	world.Presence
-	effecttest.Actor
+	skilltest.Creature
 	id int32
 }
 
@@ -1162,7 +1164,7 @@ func (f *fakeCubicEffectCaster) Dead() bool                { return false }
 
 type fakeCubicEffectTarget struct {
 	world.Presence
-	effecttest.Actor
+	skilltest.Creature
 	id   int32
 	list *effect.List
 }
@@ -1309,7 +1311,7 @@ func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 // the live-player packet-handling type the player cast flow uses.
 type effectsActor struct {
 	world.Presence
-	targettest.Actor
+	skilltest.Creature
 	id      int32
 	x, y, z int
 	kind    modelactor.Kind
@@ -3107,3 +3109,5 @@ func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {
 func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return false
 }
+
+var _ handlerskill.Creature = (*fakeCubicEffectTarget)(nil)

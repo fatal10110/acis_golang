@@ -146,7 +146,7 @@ func (h signetHandler) useCasttime(cast Cast) {
 // self-effect templates, dispatching by the template's core-effect name. It
 // returns nil for a template this port doesn't carry a signet self-effect
 // kind for, matching newActorEffect's dispatch for actor-hosted templates.
-func (h signetHandler) newSelfEffect(caster Caster, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSelfEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	switch tmpl.Name {
 	case "SignetMDam":
 		return h.newSignetMDamEffect(caster, def, meta, tmpl)
@@ -337,7 +337,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 // the caster can't afford it) then deals magic damage, using the skill's
 // own formula inputs, to every living, non-peace-zone creature the actor
 // finds within skill radius.
-func (h signetHandler) newSignetMDamEffect(caster Caster, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Type: effect.TypeSignetGround, Effector: caster, Effected: caster}
 	var actor *npc.EffectPoint
 	e.OnStart = func(*effect.Effect) bool {

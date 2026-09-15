@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -766,7 +767,7 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 // any caster drives rather than a servitor-specific one.
 type fakeSummon struct {
 	world.Presence
-	targettest.Actor
+	skilltest.Creature
 	id int32
 }
 
@@ -893,7 +894,7 @@ func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Actor, int, fun
 // ---- from use_skill_test.go ----
 type fakeCaster struct {
 	world.Presence
-	targettest.Actor
+	skilltest.Creature
 	disabled             map[int32]bool
 	disableCalls         int
 	reuseCalls           int

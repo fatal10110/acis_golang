@@ -44,20 +44,11 @@ var (
 
 	// Effect-carrying targets: the destination of any effect-applying,
 	// effect-cancelling, or continuous (buff/debuff/over-time) skill.
-	_ effect.Actor         = (*player.Character)(nil)
-	_ effect.Actor         = (*npc.Hostile)(nil)
-	_ effect.Actor         = (*summon.Actor)(nil)
-	_ effect.Actor         = (*npc.EffectPoint)(nil)
-	_ continuousTarget     = (*player.Character)(nil)
-	_ continuousTarget     = (*npc.Hostile)(nil)
-	_ continuousTarget     = (*summon.Actor)(nil)
-	_ invulnerableEffected = (*player.Character)(nil)
-	_ invulnerableEffected = (*npc.Hostile)(nil)
-	_ invulnerableEffected = (*summon.Actor)(nil)
-	_ disablerTarget       = (*player.Character)(nil)
-	_ disablerTarget       = (*npc.Hostile)(nil)
-	_ disablerTarget       = (*summon.Actor)(nil)
-	_ cancelTarget         = (*player.Character)(nil)
+	_ effect.Actor = (*player.Character)(nil)
+	_ effect.Actor = (*npc.Hostile)(nil)
+	_ effect.Actor = (*summon.Actor)(nil)
+	_ effect.Actor = (*npc.EffectPoint)(nil)
+	_ cancelTarget = (*player.Character)(nil)
 
 	// Damage targets: PDAM/CHARGEDAM, MDAM/DEATHLINK, BLOW, and MANADAM
 	// each narrow to one of these before touching HP or MP.
@@ -88,16 +79,13 @@ var (
 
 	// Signet: the radius scan hands each found object to the tick as an
 	// Actor, and an anti-summon signet narrows that to a dismissable summon.
-	_ signetCastTarget    = (*player.Character)(nil)
-	_ signetCastTarget    = (*npc.Hostile)(nil)
-	_ signetUnsummonable  = (*summon.Actor)(nil)
-	_ spoilableTarget     = (*npc.Hostile)(nil)
-	_ effectSuccessSource = (*npc.Hostile)(nil)
+	_ signetCastTarget   = (*player.Character)(nil)
+	_ signetCastTarget   = (*npc.Hostile)(nil)
+	_ signetUnsummonable = (*summon.Actor)(nil)
+	_ spoilableTarget    = (*npc.Hostile)(nil)
 
 	// Erase: the servitor surface disableErase reaches through, and the
 	// owner-facing notification it fires once erased.
-	_ erasableSummon         = (*summon.Actor)(nil)
-	_ servitorVanishNotifier = (*player.Character)(nil)
 
 	// SummonFriend/SummonParty: the caster-side gate, the target-side gate,
 	// the pending teleport-request/confirm-summon surface, the required-item
@@ -126,6 +114,7 @@ func (fakeActor) Dead() bool { return false }
 
 // ---- from apply_test.go ----
 type effectLandingFake struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	list    *effect.List
@@ -140,6 +129,7 @@ func (f *effectLandingFake) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *effectLandingFake) Invul() bool { return f.invul }
 
 type damagePermissionFake struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	allow bool
@@ -149,6 +139,7 @@ func (f *damagePermissionFake) CanGiveDamage() bool { return f.allow }
 func (*damagePermissionFake) Heading() int          { return 0 }
 
 type positionedFakeActor struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	x, y, z int
@@ -356,6 +347,7 @@ func TestStopEffectOnATargetWithNoEffectListIsANoop(t *testing.T) {
 
 // ---- from cancel_test.go ----
 type cancelFakeActor struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	dead  bool
@@ -490,7 +482,7 @@ func TestCancelRefreshesCasterSelfEffect(t *testing.T) {
 // ---- from continuous_fixtures_test.go ----
 // reflect sources wired to a guaranteed-success roll by default.
 type continuousFake struct {
-	effecttest.Actor
+	neutralCreature
 	world.Presence
 	id                int32
 	dead, invul       bool
@@ -671,6 +663,7 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 
 // ---- from cubic_test.go ----
 type fakeCubicSummoner struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	added        map[cubic.ID]bool
@@ -786,7 +779,7 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 // 100 base chance always beats a [0,100) roll).
 type disablerFake struct {
 	world.Presence
-	effecttest.Actor
+	neutralCreature
 	id                     int32
 	dead, invul, paralyzed bool
 	list                   *effect.List
@@ -1196,6 +1189,7 @@ func TestAggRemoveClearsBothTablesOnSuccess(t *testing.T) {
 // bssCasterFake exposes a fixed blessed-spiritshot charge state for tests
 // asserting checkSkillSuccess resolves it from the caster.
 type bssCasterFake struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	bss bool
@@ -1399,6 +1393,7 @@ func TestCheckSkillSuccessResolvesCasterBlessedSpiritshotCharge(t *testing.T) {
 
 // ---- from extractable_test.go ----
 type extractableFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	granted  map[int32]int
@@ -1632,6 +1627,7 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 }
 
 type skillTarget struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	hp, maxHP float64
@@ -2773,6 +2769,7 @@ type manorFakeItem struct {
 func (i manorFakeItem) Seed() (manor.Seed, bool) { return i.seed, i.ok }
 
 type manorFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	id    int32
@@ -2873,6 +2870,7 @@ func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
 
 // ---- from resurrect_test.go ----
 type reviveFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	wit float64
@@ -3039,6 +3037,7 @@ func (s *spoilFakeTarget) Level() int                 { return s.level }
 func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
 type spoilFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	id             int32
@@ -3160,6 +3159,7 @@ func (t jumpFakeTarget) Y() int       { return t.y }
 func (t jumpFakeTarget) Z() int       { return t.z }
 
 type jumpFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	aborted     bool
@@ -3206,6 +3206,7 @@ func TestInstantJumpNoTargetsIsNoop(t *testing.T) {
 }
 
 type getPlayerFakeCaster struct {
+	neutralCreature
 	world.Presence
 	fakeActor
 	x, y, z int
@@ -3376,3 +3377,9 @@ func (*disablerFake) Kind() actor.Kind { return actor.KindNPC }
 func (disablerHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (disablerHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+var (
+	_ Creature = (*effectLandingFake)(nil)
+	_ Creature = (*positionedFakeActor)(nil)
+	_ Creature = (*damagePermissionFake)(nil)
+)

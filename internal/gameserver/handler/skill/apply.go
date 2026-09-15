@@ -2,25 +2,12 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
-
-type effectSuccessSource interface {
-	EffectSuccessInput(attackable.Combatant, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
-}
-
-type positionedActor interface {
-	Position() (int, int, int)
-}
-
-type invulnerableEffected interface {
-	Invul() bool
-}
 
 // applyEffects instantiates each of templates and adds it to effected's
 // effect list, attributed to effector. def carries the owning skill's
@@ -40,14 +27,15 @@ func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelski
 	if len(templates) == 0 {
 		return 0
 	}
-	if !withinEffectRange(effector, effected, def.EffectRange) {
-		return 0
-	}
-	if offensiveEffectApplyBlocked(effector, effected, def) {
-		return 0
-	}
+	// Only an effect participant owns an effect list to land on.
 	target, ok := effected.(effect.Actor)
 	if !ok {
+		return 0
+	}
+	if !withinEffectRange(effector, target, def.EffectRange) {
+		return 0
+	}
+	if offensiveEffectApplyBlocked(effector, target, def) {
 		return 0
 	}
 	list := target.EffectList()
@@ -59,7 +47,7 @@ func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelski
 	if shield == formulas.ShieldPerfect {
 		return 0
 	}
-	source, canRoll := effected.(effectSuccessSource)
+	source, canRoll := asCreature(effected)
 	for _, tmpl := range templates {
 		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 {
 			if !canRoll {
@@ -97,34 +85,26 @@ func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelski
 // withinEffectRange mirrors L2Skill.getEffects' landing-time 3D radius
 // check. Actors without a modeled position stay permissive like other
 // optional handler capabilities.
-func withinEffectRange(effector, effected Actor, effectRange int) bool {
+func withinEffectRange(effector, effected effect.Actor, effectRange int) bool {
 	if effectRange <= 0 || effector == nil || effector.ObjectID() == effected.ObjectID() {
 		return true
 	}
-	effectorPos, ok := effector.(positionedActor)
-	if !ok {
-		return true
-	}
-	effectedPos, ok := effected.(positionedActor)
-	if !ok {
-		return true
-	}
-	ax, ay, az := effectorPos.Position()
-	bx, by, bz := effectedPos.Position()
+	ax, ay, az := effector.Position()
+	bx, by, bz := effected.Position()
 	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
 }
 
 // offensiveEffectApplyBlocked is the landing-time refuse for offensive and
 // debuff skills aimed at someone else: target invulnerability, or a caster
 // not permitted to deal damage. Self-applies skip both.
-func offensiveEffectApplyBlocked(effector, effected Actor, def modelskill.Definition) bool {
+func offensiveEffectApplyBlocked(effector, effected effect.Actor, def modelskill.Definition) bool {
 	if !def.Offensive && !def.Debuff {
 		return false
 	}
 	if effector != nil && effected != nil && effector.ObjectID() == effected.ObjectID() {
 		return false
 	}
-	if inv, ok := effected.(invulnerableEffected); ok && inv.Invul() {
+	if c, ok := effected.(Creature); ok && c.Invul() {
 		return true
 	}
 	return !creature.CanDealDamage(combatantOf(effector))

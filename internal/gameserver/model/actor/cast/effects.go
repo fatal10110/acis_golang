@@ -45,7 +45,7 @@ type EffectResult struct {
 
 // SkillCaster is a creature whose skill effects the cast pipeline dispatches.
 type SkillCaster interface {
-	handlerskill.Caster
+	handlerskill.Creature
 	// TestCursesOnSkillSee applies the raid skill-see curse and reports
 	// whether it blocked the skill.
 	TestCursesOnSkillSee(def modelskill.Definition, targets []skilltarget.Actor) bool

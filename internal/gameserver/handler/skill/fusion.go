@@ -50,7 +50,7 @@ func (h fusionHandler) Use(cast Cast) {
 	}
 }
 
-func (h fusionHandler) applyTriggered(caster Caster, effected Actor, triggeredID modelskill.ID, level int) {
+func (h fusionHandler) applyTriggered(caster Creature, effected Actor, triggeredID modelskill.ID, level int) {
 	def, ok := h.defs.Definition(modelskill.Ref{ID: triggeredID, Level: level})
 	if !ok {
 		return
@@ -60,7 +60,7 @@ func (h fusionHandler) applyTriggered(caster Caster, effected Actor, triggeredID
 
 // DecreaseFusion removes one level from the target's triggered fusion effect.
 // It is called when the owning FUSION cast channel ends or aborts.
-func DecreaseFusion(defs Definitions, caster Caster, effected attackable.Combatant, castSkill modelskill.Definition) {
+func DecreaseFusion(defs Definitions, caster Creature, effected attackable.Combatant, castSkill modelskill.Definition) {
 	target, ok := effected.(effect.Actor)
 	if !ok || defs == nil {
 		return

@@ -522,3 +522,5 @@ func TestUseItemRejectsIneligibleFood(t *testing.T) {
 		t.Fatalf("UseItem = (%+v, %v), want UsePetCannotUseItem for food id not matching pet's Food1/Food2", res, failure)
 	}
 }
+
+func (*pickupTestOwner) ServitorVanished() {}

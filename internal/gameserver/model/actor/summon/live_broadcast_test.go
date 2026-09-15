@@ -124,3 +124,5 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 		t.Fatal("OwnerStillLinked() = true after owner cleared summon, want false")
 	}
 }
+
+func (*fakeSummonOwner) ServitorVanished() {}
