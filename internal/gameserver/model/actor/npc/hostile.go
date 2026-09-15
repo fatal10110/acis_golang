@@ -826,6 +826,8 @@ func (h *Hostile) DenyAIAction() bool {
 }
 
 // Knows reports whether target is currently visible to this NPC.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (h *Hostile) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(h, tracked)

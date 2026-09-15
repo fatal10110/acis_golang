@@ -209,9 +209,9 @@ func fireAggressionEvent(caster Caster, effected Actor, def modelskill.Definitio
 		if !ok {
 			return
 		}
-		tracked, isTracked := caster.(world.Tracked)
-		if !isTracked && caster != nil {
-			return
+		var tracked world.Tracked
+		if caster != nil {
+			tracked = caster
 		}
 		current, _ := r.CurrentTarget().(Actor)
 		if sameObject(current, caster) {

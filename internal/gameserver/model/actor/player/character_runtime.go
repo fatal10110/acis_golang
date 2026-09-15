@@ -308,6 +308,8 @@ func (c *Character) Position() (int, int, int) {
 }
 
 // Knows reports whether target is visible to this player.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (c *Character) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(c, tracked)

@@ -411,6 +411,8 @@ func (a *Actor) SetTeleporting(v bool) bool {
 }
 
 // Knows reports whether target is currently visible to this summon.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (a *Actor) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(a, tracked)

@@ -156,6 +156,7 @@ func (c *Controller) ObjectID() int32 {
 
 // RegionActor returns the world-tracked actor this controller advances, when
 // the actor participates in region activity.
+// Hostile movement drives a non-world forwarding ref, which reports nil.
 func (c *Controller) RegionActor() world.Tracked {
 	tracked, _ := c.self.(world.Tracked)
 	return tracked
