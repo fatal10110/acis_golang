@@ -48,3 +48,7 @@ func (h *Hostile) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Acto
 
 // NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
 func (h *Hostile) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+// OwnsOffensiveFollowTicker reports false: a hostile NPC's offensive follow
+// is rechecked by its move controller.
+func (h *Hostile) OwnsOffensiveFollowTicker() bool { return false }

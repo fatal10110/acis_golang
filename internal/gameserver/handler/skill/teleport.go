@@ -76,8 +76,8 @@ func (getPlayerHandler) Use(cast Cast) {
 		if alikeDead(obj) {
 			continue
 		}
-		// No live actor matches this surface: player.Character.TeleportTo
-		// also takes a scatter radius; see #2362.
+		// Inert: player.Character.TeleportTo also takes a scatter radius, and
+		// no datapack skill uses GET_PLAYER yet; see #2362.
 		target, ok := obj.(teleportTarget)
 		if !ok {
 			continue

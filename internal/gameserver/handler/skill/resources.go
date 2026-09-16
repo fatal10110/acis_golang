@@ -210,8 +210,10 @@ func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
-		// No live actor matches this surface: player.Character.Die reports
-		// the death transition, which this contract drops; see #2362.
+		// Inert until the damage path is ported: the reference applies this to
+		// every creature, but only player.Character has a matching death
+		// (with a bool result this contract drops), and summons have no
+		// death sequence yet; see #2362.
 		target, ok := obj.(realDamageTarget)
 		if !ok || target.Dead() {
 			continue

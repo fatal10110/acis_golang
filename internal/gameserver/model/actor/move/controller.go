@@ -28,6 +28,9 @@ type Actor interface {
 	SetHeading(int)
 	BroadcastMove(event.Move) error
 	BroadcastStop() error
+	// OwnsOffensiveFollowTicker reports that the actor's own AI already
+	// rechecks an offensive follow, so the controller must not track it.
+	OwnsOffensiveFollowTicker() bool
 }
 
 type pawnFollowActor interface {
@@ -40,10 +43,6 @@ type offensiveFollowLeadActor interface {
 
 type targetKnower interface {
 	Knows(attackable.Combatant) bool
-}
-
-type offensiveFollowTickerOwner interface {
-	OwnsOffensiveFollowTicker() bool
 }
 
 // homePathRecovery is implemented by hostile NPCs whose return-home path can
@@ -419,11 +418,7 @@ func (c *Controller) recheckOffensiveFollow() {
 }
 
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
-	// move sits below the actor packages that implement this, so the owner
-	// is resolved at runtime rather than required on the controller's own
-	// actor interface.
-	actor, ok := c.self.(offensiveFollowTickerOwner)
-	return ok && actor.OwnsOffensiveFollowTicker()
+	return c.self != nil && c.self.OwnsOffensiveFollowTicker()
 }
 
 func (c *Controller) selfHasOffensiveFollowLead() bool {

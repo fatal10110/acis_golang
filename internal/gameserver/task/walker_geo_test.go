@@ -143,3 +143,5 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 		t.Fatalf("GeoPathFailCount() after blocked wrap + routed fallback = %d, want 0", got)
 	}
 }
+
+func (*walkerCtlSelf) OwnsOffensiveFollowTicker() bool { return false }

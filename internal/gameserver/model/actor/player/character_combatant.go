@@ -19,3 +19,7 @@ func (c *Character) Owner() (attackable.Combatant, bool) { return nil, false }
 
 // RaceMultiplier reports 1: only NPC races scale damage.
 func (c *Character) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
+
+// OwnsOffensiveFollowTicker reports false: a player's offensive follow is
+// rechecked by its move controller.
+func (c *Character) OwnsOffensiveFollowTicker() bool { return false }

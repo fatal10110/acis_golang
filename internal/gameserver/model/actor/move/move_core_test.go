@@ -1721,3 +1721,5 @@ func (o *hookOwner) segmentAdvanced(ev event.Move) error {
 func (followTarget) Kind() actor.Kind { return actor.KindNPC }
 
 func (followTarget) Heading() int { return 0 }
+
+func (*playerFollowSelf) OwnsOffensiveFollowTicker() bool { return false }
