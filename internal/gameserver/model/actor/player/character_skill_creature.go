@@ -12,3 +12,7 @@ func (c *Character) StopAggroHate(attackable.Combatant)         {}
 func (c *Character) StopHateList(attackable.Combatant)          {}
 func (c *Character) ClearAggroTables()                          {}
 func (c *Character) EnableOverhit()                             {}
+
+// CursedWeaponEquipped reports false: cursed weapons are not modeled yet, so
+// no player ever holds one.
+func (c *Character) CursedWeaponEquipped() bool { return false }

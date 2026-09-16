@@ -17,18 +17,6 @@ var effectNotCancellable = map[string]bool{
 	"PROTECTION_BLESSING": true,
 }
 
-type cancelTarget interface {
-	effect.Actor
-	Level() int
-}
-
-// cancelVulnerabilitySource optionally supplies the target's already-
-// resolved cancel-vulnerability multiplier for skillType; a target without
-// one is treated as unmodified (1.0).
-type cancelVulnerabilitySource interface {
-	CancelVulnerability(skillType string) float64
-}
-
 type cancelHandler struct{}
 
 func (cancelHandler) Types() []string { return []string{"CANCEL", "MAGE_BANE", "WARRIOR_BANE"} }
@@ -44,7 +32,7 @@ func (cancelHandler) Use(cast Cast) {
 	}
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(cancelTarget)
+		target, ok := asEffected(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -54,11 +42,8 @@ func (cancelHandler) Use(cast Cast) {
 	applySelfEffects(cast, cast.Skill)
 }
 
-func cancelOne(cast Cast, target cancelTarget, skillType string, minRate, maxRate int) {
-	vuln := 1.0
-	if v, ok := target.(cancelVulnerabilitySource); ok {
-		vuln = v.CancelVulnerability(skillType)
-	}
+func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRate int) {
+	vuln := target.CancelVulnerability(skillType)
 
 	diffLevel := cast.Skill.MagicLevel - target.Level()
 	count := cast.Skill.MaxNegatedEffects

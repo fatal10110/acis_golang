@@ -2,24 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
-
-type healAmountSource interface {
-	HealAmount(modelskill.Definition) (float64, bool)
-}
-
-type restoredNotifier interface {
-	IsPlayer() bool
-	NotifyHPRestored(healerName string, amount int, byOther bool)
-	NotifyMPRestored(healerName string, amount int, byOther bool)
-	NotifyCPRestored(healerName string, amount int, byOther bool)
-}
-
-type playerCaster interface {
-	IsPlayer() bool
-}
 
 type restoredResource uint8
 
@@ -28,68 +11,6 @@ const (
 	restoredMP
 	restoredCP
 )
-
-type healTarget interface {
-	CanBeHealed() bool
-	AddHP(float64) float64
-}
-
-type healEffectivenessTarget interface {
-	HealEffectiveness() float64
-}
-
-type hpPercentTarget interface {
-	CanBeHealed() bool
-	MaxHPValue() float64
-	AddHP(float64) float64
-}
-
-type mpPercentTarget interface {
-	CanBeHealed() bool
-	MaxMPValue() float64
-	AddMP(float64) float64
-}
-
-type manaHealTarget interface {
-	CanBeHealed() bool
-	AddMP(float64) float64
-}
-
-type rechargeTarget interface {
-	RechargeMP(float64) float64
-}
-
-type cpHealTarget interface {
-	Actor
-	Invulnerable() bool
-	CP() float64
-	MaxCPValue() float64
-	SetCP(float64)
-}
-
-// cpDamagePercentTarget is a player-only contract: CPDAMPERCENT skips every
-// non-player target before the dead/invulnerable checks, so IsPlayer keeps
-// creatures that merely happen to expose CP accessors out of the assertion.
-// The cast-break roll is part of the contract, not an optional extra: it runs
-// unconditionally on every accepted target.
-type cpDamagePercentTarget interface {
-	Actor
-	IsPlayer() bool
-	Invulnerable() bool
-	CP() float64
-	SetCP(float64)
-	BreakCastOnDamage(damage float64)
-}
-
-// Compile-time proof that a real player still satisfies the narrowed contract.
-var _ cpDamagePercentTarget = (*player.Character)(nil)
-
-type balanceLifeTarget interface {
-	Actor
-	HP() float64
-	MaxHPValue() float64
-	SetHP(float64)
-}
 
 type expSPTarget interface {
 	AddExpAndSP(exp, sp int)
@@ -107,25 +28,20 @@ type healHandler struct{}
 func (healHandler) Types() []string { return []string{"HEAL", "HEAL_STATIC"} }
 
 func (healHandler) Use(cast Cast) {
-	source, ok := cast.Caster.(healAmountSource)
-	if !ok {
+	if cast.Caster == nil {
 		return
 	}
-	amount, ok := source.HealAmount(cast.Skill)
+	amount, ok := cast.Caster.HealAmount(cast.Skill)
 	if !ok {
 		return
 	}
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(healTarget)
+		target, ok := asEffected(obj)
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
-		effectiveness := 100.0
-		if eff, ok := obj.(healEffectivenessTarget); ok {
-			effectiveness = eff.HealEffectiveness()
-		}
-		restored := target.AddHP(amount * effectiveness / 100)
+		restored := target.AddHP(amount * target.HealEffectiveness() / 100)
 		notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 	}
 }
@@ -138,7 +54,7 @@ func (healPercentHandler) Use(cast Cast) {
 	if skillTypeKey(cast.Skill.SkillType) == "HEAL_PERCENT" {
 		for _, obj := range cast.Targets {
 			applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
-			target, ok := obj.(hpPercentTarget)
+			target, ok := asCreature(obj)
 			if !ok || !target.CanBeHealed() {
 				continue
 			}
@@ -150,7 +66,7 @@ func (healPercentHandler) Use(cast Cast) {
 
 	for _, obj := range cast.Targets {
 		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
-		target, ok := obj.(mpPercentTarget)
+		target, ok := asCreature(obj)
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
@@ -165,15 +81,13 @@ func (manaHealHandler) Types() []string { return []string{"MANAHEAL", "MANARECHA
 
 func (manaHealHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
-		target, ok := obj.(manaHealTarget)
+		target, ok := asEffected(obj)
 		if !ok || !target.CanBeHealed() {
 			continue
 		}
 		mp := float64(cast.Skill.Power)
 		if skillTypeKey(cast.Skill.SkillType) == "MANARECHARGE" {
-			if r, ok := obj.(rechargeTarget); ok {
-				mp = r.RechargeMP(mp)
-			}
+			mp = target.RechargeMP(mp)
 		}
 		restored := target.AddMP(mp)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
@@ -187,7 +101,7 @@ func (combatPointHealHandler) Types() []string { return []string{"COMBATPOINTHEA
 func (combatPointHealHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
 		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
-		target, ok := obj.(cpHealTarget)
+		target, ok := asPlayer(obj)
 		if !ok || target.Dead() || target.Invulnerable() {
 			continue
 		}
@@ -201,15 +115,15 @@ func (combatPointHealHandler) Use(cast Cast) {
 }
 
 func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
-	notifier, ok := target.(restoredNotifier)
-	if !ok || !notifier.IsPlayer() {
+	notifier, ok := asPlayer(target)
+	if !ok {
 		return
 	}
 	name := actorName(caster)
 	byOther := !sameObject(caster, target)
 	if playerCasterOnly {
-		casterPlayer, ok := caster.(playerCaster)
-		byOther = ok && casterPlayer.IsPlayer() && byOther
+		_, casterIsPlayer := asPlayer(caster)
+		byOther = casterIsPlayer && byOther
 	}
 	switch resource {
 	case restoredMP:
@@ -230,8 +144,8 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 		return
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(cpDamagePercentTarget)
-		if !ok || !target.IsPlayer() || target.Dead() || target.Invulnerable() {
+		target, ok := asPlayer(obj)
+		if !ok || target.Dead() || target.Invulnerable() {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
@@ -248,12 +162,12 @@ type balanceLifeHandler struct{}
 func (balanceLifeHandler) Types() []string { return []string{"BALANCE_LIFE"} }
 
 func (balanceLifeHandler) Use(cast Cast) {
-	targets := make([]balanceLifeTarget, 0, len(cast.Targets))
+	targets := make([]Creature, 0, len(cast.Targets))
 	var fullHP, currentHP float64
 	casterCursed := cursed(cast.Caster)
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(balanceLifeTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -282,6 +196,8 @@ func (giveSPHandler) Types() []string { return []string{"GIVE_SP"} }
 func (giveSPHandler) Use(cast Cast) {
 	sp := int(cast.Skill.Power)
 	for _, obj := range cast.Targets {
+		// Exp and SP gain needs the level table this handler has no access
+		// to, so no live actor reports it yet; see #2362.
 		if target, ok := obj.(expSPTarget); ok {
 			target.AddExpAndSP(0, sp)
 		}
@@ -294,6 +210,8 @@ func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
+		// No live actor matches this surface: player.Character.Die reports
+		// the death transition, which this contract drops; see #2362.
 		target, ok := obj.(realDamageTarget)
 		if !ok || target.Dead() {
 			continue

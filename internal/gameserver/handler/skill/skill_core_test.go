@@ -48,26 +48,15 @@ var (
 	_ effect.Actor = (*npc.Hostile)(nil)
 	_ effect.Actor = (*summon.Actor)(nil)
 	_ effect.Actor = (*npc.EffectPoint)(nil)
-	_ cancelTarget = (*player.Character)(nil)
 
-	// Damage targets: PDAM/CHARGEDAM, MDAM/DEATHLINK, BLOW, and MANADAM
-	// each narrow to one of these before touching HP or MP.
-	_ hpDamageTarget        = (*player.Character)(nil)
-	_ hpDamageTarget        = (*npc.Hostile)(nil)
-	_ hpDamageTarget        = (*summon.Actor)(nil)
-	_ physicalSkillTarget   = (*player.Character)(nil)
-	_ physicalSkillTarget   = (*npc.Hostile)(nil)
-	_ physicalSkillTarget   = (*summon.Actor)(nil)
-	_ magicDamageTarget     = (*player.Character)(nil)
-	_ magicDamageTarget     = (*npc.Hostile)(nil)
-	_ magicDamageTarget     = (*summon.Actor)(nil)
-	_ attackFailedNotifier  = (*player.Character)(nil)
-	_ resistedSkillNotifier = (*player.Character)(nil)
-	_ resistedMagicNotifier = (*player.Character)(nil)
-	_ blowDamageTarget      = (*player.Character)(nil)
-	_ blowDamageTarget      = (*npc.Hostile)(nil)
-	_ manaDamageTarget      = (*player.Character)(nil)
-	_ manaDamageTarget      = (*npc.Hostile)(nil)
+	// Damage and resource targets: PDAM/CHARGEDAM, MDAM/DEATHLINK, BLOW and
+	// MANADAM all reach HP and MP through Creature, and the player-only
+	// resources and notifications through Player.
+	_ Creature = (*player.Character)(nil)
+	_ Creature = (*npc.Hostile)(nil)
+	_ Creature = (*summon.Actor)(nil)
+	_ Player   = (*player.Character)(nil)
+	_ NPC      = (*npc.Hostile)(nil)
 
 	// Caster-side surfaces resolved from Cast.Caster. cancelTarget above
 	// and these three share a Level() int requirement that *player.Character
@@ -79,10 +68,7 @@ var (
 
 	// Signet: the radius scan hands each found object to the tick as an
 	// Actor, and an anti-summon signet narrows that to a dismissable summon.
-	_ signetCastTarget   = (*player.Character)(nil)
-	_ signetCastTarget   = (*npc.Hostile)(nil)
 	_ signetUnsummonable = (*summon.Actor)(nil)
-	_ spoilableTarget    = (*npc.Hostile)(nil)
 
 	// Erase: the servitor surface disableErase reaches through, and the
 	// owner-facing notification it fires once erased.
@@ -91,7 +77,6 @@ var (
 	// the pending teleport-request/confirm-summon surface, the required-item
 	// check, and the teleport itself.
 	_ summonFriendCaster       = (*player.Character)(nil)
-	_ summonFriendTargetState  = (*player.Character)(nil)
 	_ summonFriendRequester    = (*player.Character)(nil)
 	_ summonFriendItemConsumer = (*player.Character)(nil)
 	_ summonFriendTraveler     = (*player.Character)(nil)
@@ -320,8 +305,15 @@ func TestActiveEffectFindsAMatchingLiveInstance(t *testing.T) {
 	}
 }
 
+// placedFakeActor is a fakeActor with a world placement, for the call sites
+// that pass a bare actor rather than a positioned double.
+type placedFakeActor struct {
+	fakeActor
+	world.Presence
+}
+
 func TestActiveEffectOnATargetWithNoEffectListIsFalse(t *testing.T) {
-	if ActiveEffect(fakeActor{}, 288) {
+	if ActiveEffect(&placedFakeActor{}, 288) {
 		t.Fatal("ActiveEffect() = true, want false for a target with no effect list")
 	}
 }
@@ -342,7 +334,7 @@ func TestStopEffectRemovesTheMatchingLiveInstance(t *testing.T) {
 }
 
 func TestStopEffectOnATargetWithNoEffectListIsANoop(t *testing.T) {
-	StopEffect(fakeActor{}, 288)
+	StopEffect(&placedFakeActor{}, 288)
 }
 
 // ---- from cancel_test.go ----
@@ -1627,7 +1619,7 @@ func TestDefaultRegistryHasRepresentativeHandlers(t *testing.T) {
 }
 
 type skillTarget struct {
-	neutralCreature
+	neutralPlayer
 	world.Presence
 	fakeActor
 	hp, maxHP float64
@@ -1705,7 +1697,17 @@ func (t *skillTarget) CanBeHealed() bool {
 	return !t.dead && !t.invulnerable && !t.cursed
 }
 
-func (t *skillTarget) IsPlayer() bool        { return t.isPlayer }
+func (t *skillTarget) IsPlayer() bool { return t.isPlayer }
+
+// Kind follows the fake's isPlayer flag, so the player-only handler paths
+// resolve exactly when the test asks for a player.
+func (t *skillTarget) Kind() actor.Kind {
+	if t.isPlayer {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
+
 func (t *skillTarget) CharacterName() string { return t.name }
 func (t *skillTarget) NotifyHPRestored(name string, amount int, other bool) {
 	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "hp", name, amount, other
@@ -1859,7 +1861,7 @@ func TestHealPercentRestoresHPOrMP(t *testing.T) {
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "HEAL_PERCENT", Power: 25},
-		Targets: []Actor{target, dead, fakeActor{}},
+		Targets: []Actor{target, dead, &placedFakeActor{}},
 	})
 	if target.hp != 75 {
 		t.Fatalf("HEAL_PERCENT hp = %v, want 75", target.hp)
@@ -1886,7 +1888,7 @@ func TestHealRestoresResolvedAmount(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "HEAL", Power: 30},
-		Targets: []Actor{target, dead, fakeActor{}},
+		Targets: []Actor{target, dead, &placedFakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for HEAL")
 	}
@@ -1932,9 +1934,10 @@ func TestManaHealAndRecharge(t *testing.T) {
 
 func TestCombatPointHealClampsAndSkipsInvalidTargets(t *testing.T) {
 	registry := NewDefaultRegistry()
-	target := &skillTarget{cp: 80, maxCP: 100}
-	dead := &skillTarget{cp: 1, maxCP: 100, dead: true}
-	invulnerable := &skillTarget{cp: 1, maxCP: 100, invulnerable: true}
+	// COMBATPOINTHEAL is player-only: CP lives on a player character.
+	target := &skillTarget{isPlayer: true, cp: 80, maxCP: 100}
+	dead := &skillTarget{isPlayer: true, cp: 1, maxCP: 100, dead: true}
+	invulnerable := &skillTarget{isPlayer: true, cp: 1, maxCP: 100, invulnerable: true}
 
 	registry.Use(Cast{
 		Skill:   modelskill.Definition{SkillType: "COMBATPOINTHEAL", Power: 40},
@@ -1986,7 +1989,7 @@ func TestCPDamagePercentReducesCurrentCP(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 35},
-		Targets: []Actor{target, dead, invulnerable, nonPlayer, fakeActor{}},
+		Targets: []Actor{target, dead, invulnerable, nonPlayer, &placedFakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for CPDAMPERCENT")
 	}
@@ -2751,6 +2754,7 @@ func (s *manorFakeSeedState) Sow(sowerID int32, seed manor.Seed) {
 }
 
 type manorFakeTarget struct {
+	world.Presence
 	fakeActor
 	dead  bool
 	level int
@@ -2879,11 +2883,14 @@ type reviveFakeCaster struct {
 func (c *reviveFakeCaster) WITBonus() float64 { return c.wit }
 
 type reviveFakeTarget struct {
+	world.Presence
+	neutralPlayer
 	fakeActor
 	percent float64
 }
 
 func (t *reviveFakeTarget) Revive(percent float64) bool { t.percent = percent; return true }
+func (*reviveFakeTarget) Kind() actor.Kind              { return actor.KindPlayer }
 
 // reviveFakeExpTarget additionally implements expRestorer, matching
 // player.Character, to verify Resurrect wires both calls.
@@ -2903,7 +2910,7 @@ func TestResurrectRevivesEveryTarget(t *testing.T) {
 	if !registry.Use(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "RESURRECT", Power: 40},
-		Targets: []Actor{a, b, fakeActor{}},
+		Targets: []Actor{a, b, &placedFakeActor{}},
 	}) {
 		t.Fatal("Use() returned false for RESURRECT")
 	}
@@ -3026,18 +3033,21 @@ func TestSeedHandlerRecastLeavesOtherActiveSeedsInPlace(t *testing.T) {
 
 // ---- from spoil_test.go ----
 type spoilFakeTarget struct {
+	world.Presence
+	neutralNPC
 	fakeActor
 	dead  bool
 	level int
 	pool  *item.SpoilPool
 }
 
+func (*spoilFakeTarget) Kind() actor.Kind             { return actor.KindNPC }
 func (s *spoilFakeTarget) Dead() bool                 { return s.dead }
 func (s *spoilFakeTarget) Level() int                 { return s.level }
 func (s *spoilFakeTarget) SpoilPool() *item.SpoilPool { return s.pool }
 
 type spoilFakeCaster struct {
-	neutralCreature
+	neutralPlayer
 	world.Presence
 	fakeActor
 	id             int32
@@ -3050,6 +3060,7 @@ type spoilFakeCaster struct {
 }
 
 func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
+func (*spoilFakeCaster) Kind() actor.Kind  { return actor.KindPlayer }
 func (c *spoilFakeCaster) Level() int      { return c.level }
 func (c *spoilFakeCaster) AddEarnedItem(itemID int32, count int) {
 	if c.items == nil {
@@ -3149,14 +3160,16 @@ func TestSweepEmptyPoolIsNoop(t *testing.T) {
 
 // ---- from teleport_test.go ----
 type jumpFakeTarget struct {
+	world.Presence
 	fakeActor
 	heading, x, y, z int
 }
 
-func (t jumpFakeTarget) Heading() int { return t.heading }
-func (t jumpFakeTarget) X() int       { return t.x }
-func (t jumpFakeTarget) Y() int       { return t.y }
-func (t jumpFakeTarget) Z() int       { return t.z }
+func (t *jumpFakeTarget) Heading() int              { return t.heading }
+func (t *jumpFakeTarget) Position() (int, int, int) { return t.x, t.y, t.z }
+func (t *jumpFakeTarget) X() int                    { return t.x }
+func (t *jumpFakeTarget) Y() int                    { return t.y }
+func (t *jumpFakeTarget) Z() int                    { return t.z }
 
 type jumpFakeCaster struct {
 	neutralCreature
@@ -3175,7 +3188,7 @@ func TestInstantJumpRepositionsBehindTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
 	// Heading 0 faces due "east"; +180 degrees puts the jump point due
 	// west of the target, 25 units out: cos(pi) = -1, sin(pi) = 0.
-	target := jumpFakeTarget{heading: 0, x: 100, y: 100, z: 50}
+	target := &jumpFakeTarget{heading: 0, x: 100, y: 100, z: 50}
 	caster := &jumpFakeCaster{}
 
 	if !registry.Use(Cast{
@@ -3216,6 +3229,7 @@ func (c *getPlayerFakeCaster) AlikeDead() bool           { return false }
 func (c *getPlayerFakeCaster) Position() (int, int, int) { return c.x, c.y, c.z }
 
 type getPlayerFakeTarget struct {
+	world.Presence
 	fakeActor
 	dead       bool
 	teleported bool
@@ -3223,6 +3237,7 @@ type getPlayerFakeTarget struct {
 }
 
 func (t *getPlayerFakeTarget) AlikeDead() bool { return t.dead }
+func (t *getPlayerFakeTarget) Dead() bool      { return t.dead }
 func (t *getPlayerFakeTarget) TeleportTo(x, y, z int) {
 	t.teleported = true
 	t.tx, t.ty, t.tz = x, y, z
@@ -3250,6 +3265,7 @@ func TestGetPlayerPullsLivingTargetsToCaster(t *testing.T) {
 
 // ---- from unlock_test.go ----
 type doorFake struct {
+	world.Presence
 	fakeActor
 	unlockable, opened bool
 }
@@ -3298,6 +3314,7 @@ func TestUnlockDoorNotUnlockableIsSkipped(t *testing.T) {
 }
 
 type chestFake struct {
+	world.Presence
 	fakeActor
 	dead, interacted, box bool
 	level                 int

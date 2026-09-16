@@ -2,24 +2,12 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
-
-type spoilableTarget interface {
-	Actor
-	Level() int
-	SpoilPool() *item.SpoilPool
-}
 
 type magicCaster interface {
 	Actor
 	Level() int
-}
-
-type spoilNotifier interface {
-	NotifySpoilAlready()
-	NotifySpoilSuccess()
 }
 
 // weaponGradePenalized optionally reports whether the caster's equipped
@@ -46,13 +34,13 @@ func (spoilHandler) Use(cast Cast) {
 	}
 
 	for _, obj := range cast.Targets {
-		target, ok := obj.(spoilableTarget)
+		target, ok := asNPC(obj)
 		if !ok || target.Dead() {
 			continue
 		}
 		pool := target.SpoilPool()
 		if pool == nil || pool.IsSpoiled() {
-			if notify, ok := cast.Caster.(spoilNotifier); ok && pool != nil {
+			if notify, ok := asPlayer(cast.Caster); ok && pool != nil {
 				notify.NotifySpoilAlready()
 			}
 			continue
@@ -61,7 +49,7 @@ func (spoilHandler) Use(cast Cast) {
 		rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), cast.Skill.MagicLevel, cast.Skill.LevelDepend, penalty)
 		if formulas.MagicSucceeds(rate, rnd.Get(10000)) {
 			pool.Mark(caster.ObjectID())
-			if notify, ok := cast.Caster.(spoilNotifier); ok {
+			if notify, ok := asPlayer(cast.Caster); ok {
 				notify.NotifySpoilSuccess()
 			}
 		}
@@ -85,7 +73,7 @@ func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 // the skill's own self-targeted effects, if any.
 func (sweepHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
-		target, ok := obj.(spoilableTarget)
+		target, ok := asNPC(obj)
 		if !ok {
 			continue
 		}

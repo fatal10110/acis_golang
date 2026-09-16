@@ -39,15 +39,6 @@ type summonFriendCaster interface {
 	player.SummonFriendRequester
 }
 
-type summonFriendTargetState interface {
-	summonFriendActorState
-	AlikeDead() bool
-	Operating() bool
-	Rooted() bool
-	InCombat() bool
-	FestivalParticipant() bool
-}
-
 // summonFriendRequester is *player.Character's teleport-request/confirm-summon
 // surface (see actor_test.go's compile-time assertion). caster stays untyped
 // (any) rather than a Character-typed parameter: the plain
@@ -122,7 +113,7 @@ func canBeSummoned(caster, target Actor) bool {
 	if sameObject(caster, target) {
 		return false
 	}
-	state, ok := target.(summonFriendTargetState)
+	state, ok := asPlayer(target)
 	if !ok {
 		return false
 	}

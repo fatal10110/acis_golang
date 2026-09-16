@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -69,7 +68,7 @@ func (noopStatOwner) MaxBuffCount() int                  { return 0 }
 // dance-cancel and unsummon families).
 type signetFakeTarget struct {
 	world.Presence
-	effecttest.Actor
+	neutralCreature
 
 	id    int32
 	dead  bool

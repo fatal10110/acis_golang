@@ -419,6 +419,9 @@ func (c *Controller) recheckOffensiveFollow() {
 }
 
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
+	// move sits below the actor packages that implement this, so the owner
+	// is resolved at runtime rather than required on the controller's own
+	// actor interface.
 	actor, ok := c.self.(offensiveFollowTickerOwner)
 	return ok && actor.OwnsOffensiveFollowTicker()
 }

@@ -43,6 +43,8 @@ func (c TargetHpMinMax) Test(effector, effected Actor, skill Skill) bool {
 type TargetNpcID struct{ IDs []int }
 
 func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
+	// A door matches here; no live NPC does, because npc.Hostile reports
+	// its id as an int rather than the int32 this contract wants (#2362).
 	if npc, ok := effected.(npcTarget); ok {
 		return slices.Contains(c.IDs, int(npc.NpcID()))
 	}
@@ -57,6 +59,7 @@ func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
 type TargetRaceID struct{ IDs []int }
 
 func (c TargetRaceID) Test(effector, effected Actor, skill Skill) bool {
+	// No live actor reports a template race ordinal yet; see #2362.
 	npc, ok := effected.(raceTarget)
 	if !ok {
 		return false

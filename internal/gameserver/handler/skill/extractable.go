@@ -40,6 +40,8 @@ func (extractableHandler) Use(cast Cast) {
 			continue
 		}
 
+		// No live caster reports inventory capacity yet, so the check is
+		// skipped; see #2362.
 		if checker, ok := cast.Caster.(inventoryCapacityChecker); ok {
 			ids := make([]int32, len(product.Items))
 			for i, it := range product.Items {

@@ -40,14 +40,6 @@ type signetGrounded interface {
 	GroundTarget() (int, int, int)
 }
 
-// signetCastTarget is the minimal surface a found signet target must
-// expose to appear as the target endpoint of a broadcast skill-use/launch
-// packet pair.
-type signetCastTarget interface {
-	Actor
-	Position() (x, y, z int)
-}
-
 // signetPeaceZoned optionally reports whether a found object sits in a
 // peace zone; an object without one is never excluded on that basis.
 type signetPeaceZoned interface {
@@ -237,7 +229,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			applyEffects(actor, target, sub, sub.Effects)
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}
@@ -279,7 +271,7 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 					}
 				}
 			}
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}
@@ -367,7 +359,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
-			dmgTarget, ok := target.(magicDamageTarget)
+			dmgTarget, ok := asCreature(target)
 			if !ok {
 				return
 			}
@@ -380,7 +372,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			if damage > 0 {
 				dmgTarget.ReduceHP(float64(damage), caster, def)
 			}
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}

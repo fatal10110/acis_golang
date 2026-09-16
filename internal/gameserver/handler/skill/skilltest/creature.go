@@ -42,3 +42,32 @@ func (Creature) EnableOverhit()                             {}
 func (Creature) CurrentTarget() world.Tracked               { return nil }
 func (Creature) SetTarget(world.Tracked)                    {}
 func (Creature) AttackTarget(world.Tracked)                 {}
+
+// Damage and resource surface: the neutral creature takes no damage, rolls
+// no formula input and holds no resources.
+func (Creature) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {}
+func (Creature) PhysicalSkillInput(attackable.Combatant, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+	return formulas.PhysicalSkillInput{}, false
+}
+func (Creature) MagicDamageInput(attackable.Combatant, modelskill.Definition) (formulas.MagicDamageInput, bool) {
+	return formulas.MagicDamageInput{}, false
+}
+func (Creature) BlowInput(attackable.Combatant, modelskill.Definition) (formulas.BlowInput, bool) {
+	return formulas.BlowInput{}, false
+}
+func (Creature) ManaDamageInput(attackable.Combatant, modelskill.Definition) (formulas.ManaDamageInput, bool) {
+	return formulas.ManaDamageInput{}, false
+}
+func (Creature) LethalInput(attackable.Combatant, modelskill.Definition) (formulas.LethalInput, bool) {
+	return formulas.LethalInput{}, false
+}
+func (Creature) ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition) {
+}
+func (Creature) CounterSkillPhysical() float64 { return 0 }
+func (Creature) Invulnerable() bool            { return false }
+func (Creature) HealAmount(modelskill.Definition) (float64, bool) {
+	return 0, false
+}
+func (Creature) MaxHPValue() float64 { return 0 }
+func (Creature) MaxMPValue() float64 { return 0 }
+func (Creature) SetHP(float64)       {}
