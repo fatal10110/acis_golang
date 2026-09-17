@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
@@ -2305,3 +2306,17 @@ func TestGroundItemOptionsFromPropertiesSpecialItemsOverridesDefault(t *testing.
 }
 
 func (waterFakeActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (*attackStanceFakeActor) Queue() *sim.Queue { return nil }
+
+func (*decayFakeActor) Queue() *sim.Queue { return nil }
+
+func (*autosaveFakeActor) Queue() *sim.Queue { return nil }
+
+func (*pvpFlagFakeActor) Queue() *sim.Queue { return nil }
+
+func (*decayFakeSummon) Queue() *sim.Queue { return nil }
+
+func (*waterFakeActor) Queue() *sim.Queue { return nil }
+
+func (*inventoryUpdateOwnerStub) Queue() *sim.Queue { return nil }

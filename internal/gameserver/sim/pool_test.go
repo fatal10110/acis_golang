@@ -401,3 +401,34 @@ func panics(fn func()) (panicked bool) {
 	fn()
 	return false
 }
+
+func TestPoolLogsABacklogOncePerHighWaterCrossing(t *testing.T) {
+	var buf lockedBuffer
+	p := startPool(t, 1, zerolog.New(&buf))
+	q := p.NewQueue("player-7")
+	// burst holds the worker inside q's first task while more than
+	// highWater tasks pile up behind it, then waits for all of them to run.
+	burst := func() {
+		release, done := make(chan struct{}), make(chan struct{})
+		q.Post(func() { <-release })
+		for range highWater + drainSlice + 1 { // a drain may already hold drainSlice of them
+			q.Post(func() {})
+		}
+		q.Post(func() { close(done) })
+		close(release)
+		<-done
+	}
+	lines := func() int { return strings.Count(buf.String(), "high-water") }
+
+	burst()
+	if got := lines(); got != 1 {
+		t.Fatalf("after first backlog: %d log lines, want 1:\n%s", got, buf.String())
+	}
+	burst()
+	if got := lines(); got != 2 {
+		t.Fatalf("after a second backlog: %d log lines, want 2:\n%s", got, buf.String())
+	}
+	if !strings.Contains(buf.String(), `"queue":"player-7"`) {
+		t.Fatalf("backlog line missing queue id:\n%s", buf.String())
+	}
+}

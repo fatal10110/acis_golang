@@ -17,6 +17,7 @@ const WaterTick = time.Second
 // drowning countdown.
 type WaterActor interface {
 	ObjectID() int32
+	Queued
 	Dead() bool
 }
 
@@ -125,6 +126,6 @@ func (w *Water) Tick() {
 	w.mu.Unlock()
 
 	for _, actor := range due {
-		w.effects.Drown(actor)
+		post(actor.Queue(), func() { w.effects.Drown(actor) })
 	}
 }

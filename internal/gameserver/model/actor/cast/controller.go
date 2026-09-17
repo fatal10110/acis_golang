@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
 )
@@ -184,6 +185,14 @@ func (c *Controller) emit(e event.Event) {
 	if c.sink != nil {
 		c.sink.Emit(e)
 	}
+}
+
+// SetQueue runs the controller's scheduled launch, hit and finish callbacks
+// as tasks on q, the owning actor's queue.
+func (c *Controller) SetQueue(q *sim.Queue) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
 }
 
 // SetLogger records where a panic recovered from a scheduled cast callback

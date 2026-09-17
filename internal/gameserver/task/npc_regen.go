@@ -14,6 +14,7 @@ import (
 const NPCRegenTick = 3 * time.Second
 
 type npcRegenActor interface {
+	Queued
 	TickRegen()
 }
 
@@ -44,7 +45,8 @@ func (r *NPCRegen) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(NPCRegenTick, r.Tick, log)
 }
 
-// Tick advances every spawned attackable NPC's HP/MP regeneration once. It
+// Tick advances every spawned attackable NPC's HP/MP regeneration once, on
+// each NPC's queue. It
 // logs and returns without doing anything else if another Tick call is
 // already in flight.
 func (r *NPCRegen) Tick() {
@@ -58,9 +60,15 @@ func (r *NPCRegen) Tick() {
 
 	r.scratch = r.state.AppendObjects(r.scratch[:0])
 	for _, obj := range r.scratch {
-		if actor, ok := obj.(npcRegenActor); ok {
-			actor.TickRegen()
+		actor, ok := obj.(npcRegenActor)
+		if !ok {
+			continue
 		}
+		if q := actor.Queue(); q != nil {
+			q.Post(actor.TickRegen)
+			continue
+		}
+		actor.TickRegen()
 	}
 	// Drop references past this tick's length so a shrinking population
 	// doesn't keep despawned objects reachable through unused capacity.

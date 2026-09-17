@@ -59,7 +59,8 @@ func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 	return p.contains(actor.ObjectID())
 }
 
-// Tick advances every registered in-flight movement once. A PositionUpdate
+// Tick advances every registered in-flight movement once, on each actor's
+// queue. A PositionUpdate
 // return of false means the actor's own bookkeeping already deregistered
 // it (or decided it needs no further ticks) — Tick does not remove it
 // again, since by the time PositionUpdate returns, a concurrent goroutine
@@ -75,6 +76,6 @@ func (p *PositionUpdates) Tick() {
 	defer p.releaseSnapshot()
 
 	for _, actor := range p.snapshot() {
-		actor.PositionUpdate()
+		post(actor.Queue(), func() { actor.PositionUpdate() })
 	}
 }

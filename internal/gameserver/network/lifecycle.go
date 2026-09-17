@@ -125,6 +125,11 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// From here on the session no longer delivers this character's
 	// session-only events, and a kill reward can no longer apply a herb to it.
 	live.Character.DetachSession()
+	// Timers still armed on the queue are cancelled, and later posts to it
+	// (another actor's command, a straggling tick) are dropped.
+	if q := live.Queue(); q != nil {
+		q.Close()
+	}
 	return owners
 }
 

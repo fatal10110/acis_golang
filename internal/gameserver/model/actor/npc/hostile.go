@@ -816,6 +816,10 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	if respawn != nil {
 		respawn()
 	}
+	// A respawn is a new Hostile on a new queue; this one takes no more work.
+	if q := h.Queue(); q != nil {
+		q.Close()
+	}
 	return true
 }
 
@@ -966,7 +970,7 @@ func (h *Hostile) scheduleWanderRecheck() {
 		return
 	}
 	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
-	time.AfterFunc(delay, func() {
+	recheck := func() {
 		if h.brain.CurrentIntention() != ai.IntentionWander {
 			return
 		}
@@ -978,5 +982,10 @@ func (h *Hostile) scheduleWanderRecheck() {
 			Y: position.Y + int(float64(distance)*math.Sin(radians)),
 			Z: position.Z,
 		})
-	})
+	}
+	if q := h.Queue(); q != nil {
+		q.After(delay, recheck)
+		return
+	}
+	time.AfterFunc(delay, recheck)
 }

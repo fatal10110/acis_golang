@@ -37,6 +37,7 @@ func TestPlayerRegenTickRestoresResourcesAndSendsStatus(t *testing.T) {
 	p.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 10, MaxMP: 100, CurrentMP: 10, MaxCP: 100, CurrentCP: 10})
 
 	task.NewNPCRegen(srv.State).Tick()
+	srv.Settle(t) // the tick runs the regen on the player's queue
 
 	got := p.ResourceValues()
 	if got.CurrentHP <= 10 || got.CurrentMP <= 10 || got.CurrentCP <= 10 {

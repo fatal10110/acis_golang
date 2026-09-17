@@ -1,6 +1,7 @@
 package gameservertest
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -72,6 +73,10 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil)
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
+	}
+	live.SetQueue(s.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)))
+	if ctl, ok := attackCtl.(*attack.Controller); ok {
+		ctl.SetQueue(live.Queue())
 	}
 	hostile, err := npc.NewHostile(inst, live, parkedMove{}, attackCtl)
 	if err != nil {
@@ -252,6 +257,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
+	live.SetQueue(s.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)))
 	locRef := &movingHostileLocatedRef{}
 	control := &movingHostileControl{server: s}
 	moveCtl, err := move.NewController(live.Move(), locRef, control)
@@ -261,6 +267,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	moveCtl.SetPositionUpdates(s.positions)
 	actorRef := &hostileActorRef{}
 	attackCtl := attack.NewAttackable(actorRef, control)
+	attackCtl.SetQueue(live.Queue())
 	hostile, err := npc.NewHostile(inst, live, moveCtl, attackCtl)
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
@@ -311,10 +318,14 @@ func (s *Server) think(hostile *npc.Hostile) {
 }
 
 // TickEffects advances every spawned actor's live effect list once — the
-// production one-second effect sweep — so buff expiry and damage-over-time
-// ticks are deterministic instead of wall-clock driven.
+// production one-second effect sweep — and waits for the posted ticks to
+// run, so buff expiry and damage-over-time ticks are deterministic instead of
+// wall-clock driven.
 func (s *Server) TickEffects() {
 	s.Effects.Tick()
+	if err := s.queues.settle(); err != nil {
+		panic(err)
+	}
 }
 
 // parkedMove is a MoveController that never moves.

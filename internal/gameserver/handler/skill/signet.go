@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -168,6 +169,10 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 		return nil, false
 	}
 	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
+	// The point's periodic effect runs on its caster's queue.
+	if queued, ok := caster.(interface{ Queue() *sim.Queue }); ok {
+		actor.EffectList().SetQueue(queued.Queue())
+	}
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {

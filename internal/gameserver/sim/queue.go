@@ -46,6 +46,7 @@ type Queue struct {
 	mu        sync.Mutex
 	tasks     []func() // pending tasks; Pool only, Inline keeps one global FIFO
 	scheduled bool     // Pool only: q is in the run queue or being drained
+	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
 	timers    map[*Timer]struct{} // armed timers and tickers, cancelled by Close
 }

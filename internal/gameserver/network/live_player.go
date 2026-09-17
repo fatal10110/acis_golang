@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -21,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -133,6 +135,66 @@ func (p *livePlayer) kickClient() {
 	if p.kick != nil {
 		p.kick()
 	}
+}
+
+// after arms fn to run once d has elapsed, as a task on p's queue. Without a
+// queue (a link built with no Queues) it runs on a timer goroutine that logs
+// a panic instead of crashing.
+func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
+	if q := p.Queue(); q != nil {
+		return q.After(d, fn)
+	}
+	log := p.log
+	return time.AfterFunc(d, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Msg("scheduled callback panic")
+			}
+		}()
+		fn()
+	})
+}
+
+// onQueue runs fn as a task on q and returns once it has run, so work a
+// connection reads for an in-world player keeps its read order and runs
+// serialized with that player's timers and ticks. With no queue, or one
+// that no longer accepts tasks (the player detached, or the pool is
+// stopping), fn runs on the calling goroutine. A task must never call it for
+// its own queue: it would wait on itself.
+func onQueue(q *sim.Queue, fn func()) {
+	if q == nil {
+		fn()
+		return
+	}
+	done := make(chan struct{})
+	if !q.Post(func() {
+		defer close(done)
+		fn()
+	}) {
+		fn()
+		return
+	}
+	<-done
+}
+
+// postLive posts fn to live's queue without waiting, or runs it now when
+// live has no queue. A detached player's closed queue drops fn.
+func postLive(live *livePlayer, fn func()) {
+	if q := live.Queue(); q != nil {
+		q.Post(fn)
+		return
+	}
+	fn()
+}
+
+// onLive runs fn on live's queue, or on the calling goroutine when live is
+// nil; see onQueue.
+func onLive(live *livePlayer, fn func()) {
+	if live == nil {
+		fn()
+		return
+	}
+	onQueue(live.Queue(), fn)
 }
 
 func (p *livePlayer) Stop() {
@@ -333,6 +395,9 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 func (p *livePlayer) attackController() *attack.Controller {
 	if p.attack == nil {
 		p.attack = attack.NewPlayer(p.Character, nil)
+		if q := p.Queue(); q != nil {
+			p.attack.SetQueue(q)
+		}
 	}
 	return p.attack
 }
@@ -343,6 +408,9 @@ func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller 
 	if live.cast == nil {
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
 		live.cast.SetLogger(live.log)
+		if q := live.Queue(); q != nil {
+			live.cast.SetQueue(q)
+		}
 		live.Character.SetCastController(live.cast)
 	}
 	return live.cast

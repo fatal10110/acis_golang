@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
@@ -77,6 +78,7 @@ type CreatureMove struct {
 	timer                scheduledTimer
 	moveSeq              uint64
 	afterFunc            func(time.Duration, func()) scheduledTimer
+	queue                *sim.Queue
 	log                  zerolog.Logger
 }
 
@@ -152,6 +154,22 @@ func (m *CreatureMove) SetLogger(log zerolog.Logger) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.log = log
+}
+
+// SetQueue runs this movement's arrival callbacks as tasks on q, the owning
+// actor's queue.
+func (m *CreatureMove) SetQueue(q *sim.Queue) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.queue = q
+	m.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
+}
+
+// Queue returns the queue SetQueue installed, or nil.
+func (m *CreatureMove) Queue() *sim.Queue {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.queue
 }
 
 // SetWaterSurface records the query used to cap underwater movement at a

@@ -15,6 +15,7 @@ const DecayTick = time.Second
 // DecayActor is the narrow actor surface tracked by the corpse decay task.
 type DecayActor interface {
 	ObjectID() int32
+	Queued
 }
 
 // SummonDecayActor is a corpse-decay entry whose owner linkage is rechecked
@@ -113,7 +114,13 @@ func (d *Decay) Tick() error {
 	defer d.endTick()
 
 	d.cancelUnlinkedSummons()
-	d.tickDue(d.now(), d.effects.Decay)
+	d.tickDue(d.now(), func(actor DecayActor) {
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { d.effects.Decay(actor) })
+			return
+		}
+		d.effects.Decay(actor)
+	})
 	return nil
 }
 

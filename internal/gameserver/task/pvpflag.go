@@ -28,6 +28,7 @@ const (
 // PvPFlagActor is the narrow player surface the PvP flag task updates.
 type PvPFlagActor interface {
 	ObjectID() int32
+	Queued
 	UpdatePvPFlag(PvPFlagState)
 }
 
@@ -151,16 +152,25 @@ func (p *PvPFlags) Tick() {
 	now := p.now()
 	p.tickExpiry(now,
 		func(actor PvPFlagActor) {
-			actor.UpdatePvPFlag(PvPFlagNone)
+			updatePvPFlag(actor, PvPFlagNone)
 		},
 		func(actor PvPFlagActor, expiresAt time.Time) {
 			if now.After(expiresAt.Add(-5 * time.Second)) {
-				actor.UpdatePvPFlag(PvPFlagBlinking)
+				updatePvPFlag(actor, PvPFlagBlinking)
 				return
 			}
-			actor.UpdatePvPFlag(PvPFlagOn)
+			updatePvPFlag(actor, PvPFlagOn)
 		},
 	)
+}
+
+// updatePvPFlag sets actor's flag state on its queue.
+func updatePvPFlag(actor PvPFlagActor, state PvPFlagState) {
+	if q := actor.Queue(); q != nil {
+		q.Post(func() { actor.UpdatePvPFlag(state) })
+		return
+	}
+	actor.UpdatePvPFlag(state)
 }
 
 // Len returns the number of tracked actors.

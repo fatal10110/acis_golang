@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -29,6 +30,24 @@ func (a *Actor) Move() *move.CreatureMove { return &a.movement }
 // zero-value CreatureMove.
 func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.Geo) error {
 	return a.movement.Init(origin, speed, geo)
+}
+
+// SetQueue makes q, the owner's queue, the queue this summon's work runs on,
+// movement arrivals included. Call it once, before the summon is published
+// into the world.
+func (a *Actor) SetQueue(q *sim.Queue) {
+	a.queue = q
+	a.movement.SetQueue(q)
+	a.effects.SetQueue(q)
+}
+
+// Queue returns the queue this summon's work runs on, or nil when none was
+// set.
+func (a *Actor) Queue() *sim.Queue {
+	if a == nil {
+		return nil
+	}
+	return a.queue
 }
 
 // Kind reports KindSummon.

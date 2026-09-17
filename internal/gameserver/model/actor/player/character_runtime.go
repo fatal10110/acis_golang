@@ -2,6 +2,7 @@ package player
 
 import (
 	"math/rand/v2"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -197,6 +198,27 @@ func (c *Character) Attach(live *creature.Live, sink event.Sink) {
 	defer c.stateMu.Unlock()
 	c.Live = live
 	c.sink = sink
+}
+
+// stopper is an armed one-shot timer.
+type stopper interface{ Stop() bool }
+
+// afterLocked arms fn to run once d has elapsed: as a task on the
+// character's queue once Attach installed one, otherwise on a timer
+// goroutine that logs a panic as name's. The caller holds stateMu.
+func (c *Character) afterLocked(d time.Duration, name string, fn func()) stopper {
+	if q := c.Live.Queue(); q != nil {
+		return q.After(d, fn)
+	}
+	log := c.log
+	return time.AfterFunc(d, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Msg("character: recovered panic in " + name + " callback")
+			}
+		}()
+		fn()
+	})
 }
 
 // DetachSession marks the owning session gone. Events the session alone
