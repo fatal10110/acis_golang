@@ -80,7 +80,7 @@ func (c *Character) ClearCharges() {
 
 func (c *Character) restartChargeTimerLocked() {
 	c.stopChargeTimerLocked()
-	c.chargeTimer = c.afterLocked(chargeAutoClearDelay, "charge auto-clear", c.ClearCharges)
+	c.chargeTimer = c.afterLocked(chargeAutoClearDelay, c.ClearCharges)
 }
 
 func (c *Character) stopChargeTimerLocked() {

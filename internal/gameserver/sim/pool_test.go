@@ -432,3 +432,28 @@ func TestPoolLogsABacklogOncePerHighWaterCrossing(t *testing.T) {
 		t.Fatalf("backlog line missing queue id:\n%s", buf.String())
 	}
 }
+
+func TestAfterOrRunsOnTheQueueOrRecoversWithoutOne(t *testing.T) {
+	var buf lockedBuffer
+	p := startPool(t, 1, zerolog.Nop())
+	q := p.NewQueue("q")
+	onQueue := make(chan bool, 1)
+	AfterOr(q, time.Millisecond, func() { onQueue <- !q.draining.TryLock() }, zerolog.Nop())
+	if !<-onQueue {
+		t.Fatal("AfterOr with a queue: fn ran off the queue")
+	}
+
+	ran := make(chan struct{})
+	AfterOr(nil, time.Millisecond, func() { defer close(ran); panic("boom") }, zerolog.New(&buf))
+	<-ran
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(buf.String(), `"panic":"boom"`) {
+		if time.Now().After(deadline) {
+			t.Fatalf("AfterOr without a queue: panic not logged:\n%s", buf.String())
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if AfterOr(nil, time.Hour, func() {}, zerolog.Nop()).Stop() != true {
+		t.Fatal("Stop on an armed fallback timer = false, want true")
+	}
+}

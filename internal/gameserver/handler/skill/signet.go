@@ -170,7 +170,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
 	// The point's periodic effect runs on its caster's queue.
-	if queued, ok := caster.(interface{ Queue() *sim.Queue }); ok {
+	if queued, ok := caster.(signetQueued); ok {
 		actor.EffectList().SetQueue(queued.Queue())
 	}
 
@@ -190,6 +190,11 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 	actor.Spawn(x, y, z, heading)
 	return actor, true
+}
+
+// signetQueued is a caster whose work runs on a queue.
+type signetQueued interface {
+	Queue() *sim.Queue
 }
 
 // signetEffectMeta builds the effect metadata a signet-family effect

@@ -30,7 +30,7 @@ func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 		c.shortBuffTimer.Stop()
 	}
 	c.shortBuffTaskSkillID = skillID
-	c.shortBuffTimer = c.afterLocked(time.Duration(durationSeconds)*time.Second, "short-buff clear", c.clearShortBuff)
+	c.shortBuffTimer = c.afterLocked(time.Duration(durationSeconds)*time.Second, c.clearShortBuff)
 	c.stateMu.Unlock()
 
 	c.emit(event.ShortBuff{SkillID: skillID, Level: level, DurationSeconds: durationSeconds})

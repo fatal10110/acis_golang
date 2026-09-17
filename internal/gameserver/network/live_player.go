@@ -137,22 +137,10 @@ func (p *livePlayer) kickClient() {
 	}
 }
 
-// after arms fn to run once d has elapsed, as a task on p's queue. Without a
-// queue (a link built with no Queues) it runs on a timer goroutine that logs
-// a panic instead of crashing.
+// after arms fn to run once d has elapsed, as a task on p's queue; see
+// sim.AfterOr for a player built without one.
 func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
-	if q := p.Queue(); q != nil {
-		return q.After(d, fn)
-	}
-	log := p.log
-	return time.AfterFunc(d, func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Msg("scheduled callback panic")
-			}
-		}()
-		fn()
-	})
+	return sim.AfterOr(p.Queue(), d, fn, p.log)
 }
 
 // onQueue runs fn as a task on q and returns once it has run, so work a

@@ -149,7 +149,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: attach live player")
 		return nil, false
 	}
-	l.activateSpawnProtection(live)
 	if l.roster != nil {
 		// Mark the row online at login (the reference updates the online
 		// status when a client enters the world), so external DB consumers
@@ -158,10 +157,25 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: save player online recency")
 		}
 	}
+	// From here on the player has a queue: the rest of the login runs on it,
+	// and this goroutine waits, so the burst keeps its order.
+	entered := false
+	onLive(live, func() { entered = l.finishEnterWorld(client, c, live, itemListFrame) })
+	if !entered {
+		return nil, false
+	}
+	return live, true
+}
+
+// finishEnterWorld publishes the attached player live into the world and
+// sends the rest of the EnterWorld burst, on live's queue. It reports false
+// when the login cannot complete.
+func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer, itemListFrame wire.Frame) bool {
+	l.activateSpawnProtection(live)
 	if l.skills != nil {
 		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")
-			return nil, false
+			return false
 		}
 	}
 	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
@@ -220,7 +234,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
-	return live, true
+	return true
 }
 
 // sevenSignsPeriodMessage maps a Seven Signs period onto the system message
