@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -68,6 +69,9 @@ const HomeGeoFailLimit = 10
 type PositionUpdater interface {
 	ObjectID() int32
 	PositionUpdate() bool
+	// Queue is the queue position updates run on; nil runs them on the
+	// ticking goroutine.
+	Queue() *sim.Queue
 }
 
 // PositionUpdateRegistry tracks actors that need position-update ticks.
@@ -367,6 +371,11 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 func (c *Controller) BroadcastBlockedCorrection() {
 	pos := c.move.Position()
 	_ = c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
+}
+
+// Queue returns the queue the moving actor's work runs on, or nil.
+func (c *Controller) Queue() *sim.Queue {
+	return c.move.Queue()
 }
 
 // PositionUpdate advances one movement correction tick, syncing this

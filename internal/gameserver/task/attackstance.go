@@ -23,6 +23,7 @@ const LifeCubicID = 3
 // AttackStanceActor is the narrow actor surface tracked by combat stance.
 type AttackStanceActor interface {
 	ObjectID() int32
+	Queued
 }
 
 type attackStanceCombatant interface {
@@ -120,7 +121,8 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 	return a.tracked(actor.ObjectID())
 }
 
-// Tick stops combat stance for actors whose inactivity period has elapsed.
+// Tick stops combat stance, on each actor's queue, for actors whose
+// inactivity period has elapsed.
 // It logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AttackStance) Tick() error {
@@ -130,17 +132,26 @@ func (a *AttackStance) Tick() error {
 	defer a.endTick()
 
 	a.tickDue(a.now(), func(actor AttackStanceActor) {
-		if combatant, ok := actor.(attackStanceCombatant); ok {
-			combatant.SetInCombat(false)
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { a.stop(actor) })
+			return
 		}
-		a.effects.AutoAttackStop(actor)
-		if s, ok := actor.(attackStanceSummoner); ok {
-			if summon := s.Summon(); summon != nil {
-				a.effects.AutoAttackStop(summon)
-			}
-		}
+		a.stop(actor)
 	})
 	return nil
+}
+
+// stop ends actor's combat stance and its summon's.
+func (a *AttackStance) stop(actor AttackStanceActor) {
+	if combatant, ok := actor.(attackStanceCombatant); ok {
+		combatant.SetInCombat(false)
+	}
+	a.effects.AutoAttackStop(actor)
+	if s, ok := actor.(attackStanceSummoner); ok {
+		if summon := s.Summon(); summon != nil {
+			a.effects.AutoAttackStop(summon)
+		}
+	}
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {

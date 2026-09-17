@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 const summonFollowOffset = 70
@@ -169,9 +170,13 @@ func (s *Summon) TryToIdle() {
 }
 
 // StartOffensiveFollowTicker launches the 500 ms offensive-follow recheck
-// loop and returns its Ticker for the caller to Stop on despawn.
-func (s *Summon) StartOffensiveFollowTicker(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(summonOffensiveFollowTick, s.recheckOffensiveFollow, log)
+// loop on q, the owner's queue, and returns the func the caller stops it
+// with on despawn. A nil q runs the loop on its own ticker goroutine.
+func (s *Summon) StartOffensiveFollowTicker(q *sim.Queue, log zerolog.Logger) (stop func()) {
+	if q != nil {
+		return q.Every(summonOffensiveFollowTick, s.recheckOffensiveFollow).Stop
+	}
+	return scheduler.Start(summonOffensiveFollowTick, s.recheckOffensiveFollow, log).Stop
 }
 
 // recheckOffensiveFollow re-evaluates only the in-flight attack/cast

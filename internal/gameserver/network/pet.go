@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -90,6 +91,9 @@ type petInventoryOwner struct {
 
 func (o *petInventoryOwner) Visible() bool     { return o.pet.Visible() }
 func (o *petInventoryOwner) Teleporting() bool { return false }
+
+// Queue is the pet owner's queue, which the pet's inventory updates run on.
+func (o *petInventoryOwner) Queue() *sim.Queue { return o.live.Queue() }
 
 func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) {
 	if len(updates) == 0 {

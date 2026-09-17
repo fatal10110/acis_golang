@@ -24,6 +24,7 @@ const (
 // AutosaveActor is the narrow actor surface the autosave task tracks.
 type AutosaveActor interface {
 	ObjectID() int32
+	Queued
 }
 
 // AutosaveEffects persists actor's full character state on each autosave
@@ -105,6 +106,6 @@ func (a *Autosave) Tick() {
 	a.mu.Unlock()
 
 	for _, actor := range due {
-		a.effects.Save(actor)
+		post(actor.Queue(), func() { a.effects.Save(actor) })
 	}
 }

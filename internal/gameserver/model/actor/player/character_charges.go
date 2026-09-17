@@ -80,15 +80,7 @@ func (c *Character) ClearCharges() {
 
 func (c *Character) restartChargeTimerLocked() {
 	c.stopChargeTimerLocked()
-	log := c.log
-	c.chargeTimer = time.AfterFunc(chargeAutoClearDelay, func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Msg("character: recovered panic in charge auto-clear callback")
-			}
-		}()
-		c.ClearCharges()
-	})
+	c.chargeTimer = c.afterLocked(chargeAutoClearDelay, c.ClearCharges)
 }
 
 func (c *Character) stopChargeTimerLocked() {

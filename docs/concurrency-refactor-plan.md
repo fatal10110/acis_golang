@@ -220,6 +220,18 @@ pool (Phase 2), so no queued task can block on the DB.
 - Gate: unit + behavior suites, `-race`, `-tags simdebug`, in **both** modes — `sim.Inline`
   (deterministic) and a real `Pool` with `GOMAXPROCS=1` and default (real interleavings); perf
   baseline re-run with no p99 regression; no packet-byte change.
+  *Landed (#2270) as:* the queue lives on `creature.Live` (players, NPCs) and `summon.Actor`
+  (the owner's queue); `SetQueue` also routes the movement, attack and cast controllers' timers
+  and the effect list's ticks onto it, and `Queue()` is part of every `task` actor interface.
+  The connection goroutine posts each in-world frame's work to the player's queue and **waits**
+  for it before reading the next frame (`network.onLive`), so frames keep read order,
+  flood/decode gates and disconnect returns stay on the connection goroutine, and
+  Logout/Restart run the exit check and detach on the queue while the persistence wait stays
+  on the connection. Ticks post only each actor's share (drain + send, save, flag update);
+  registries keep their lock and bookkeeping. The login-link reader needed no change: it
+  resolves pre-world auth only. The harness picks the executor with
+  `ACIS_SIM_EXECUTOR=pool|inline` (`gameservertest.SimExecutorEnv`); `Server.Settle` waits
+  for posted work. Synchronous DB calls still reachable from queue tasks are #2364.
 
 ### Phase 3 — cross-actor boundary (synchronous subset + inventory container) — #2271
 - Introduce `vitalsMu` on `Character`/`Hostile`/`summon.Actor` guarding HP/MP/CP, dead, hate,

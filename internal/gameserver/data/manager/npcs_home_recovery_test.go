@@ -57,7 +57,7 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
-	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil)
+	hostile, walkerRef, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil, nil)
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
 		Kind:     "Monster",
 	}
 	state := world.New()
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil)
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil, nil)
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
