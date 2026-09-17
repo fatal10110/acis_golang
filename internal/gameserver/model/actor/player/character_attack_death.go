@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -16,7 +17,7 @@ import (
 // HP/CP change itself is dropped. A Playable attacker other than the actor
 // itself drains CP before HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
 // PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
-func (c *Character) TakeDamage(dmg int, attacker creature.DeathActor) bool {
+func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if c.AlikeDead() || c.Invul() {
 		return false
 	}
@@ -73,7 +74,7 @@ func (c *Character) Revive(fraction float64) bool {
 // transition, then the death packet broadcast to this player's own session
 // and every observer, so the corpse-fall animation plays live instead of
 // only on a later dead reconnect.
-func (c *Character) Die(killer creature.DeathActor) bool {
+func (c *Character) Die(killer attackable.Combatant) bool {
 	if !creature.Die(c, killer, nil) {
 		return false
 	}

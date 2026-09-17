@@ -3,6 +3,7 @@ package npc
 import (
 	"errors"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -44,3 +45,6 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 		SummonAnimation: 2, Name: name, Title: d.title,
 	}
 }
+
+// Kind reports KindNPC.
+func (d *Decoration) Kind() actor.Kind { return actor.KindNPC }

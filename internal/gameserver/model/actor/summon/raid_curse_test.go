@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func TestSummonRaidCursePetrifiesAndBlocks(t *testing.T) {
@@ -50,7 +53,7 @@ func TestSummonRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 	a := mustServitor(t, ServitorConfig{ObjectID: 7, Level: 80, SkillDefs: newRaidCurseSkillTable()})
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
-	if !a.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []skilltarget.Creature{target}) {
+	if !a.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []skilltarget.Actor{target}) {
 		t.Fatal("TestCursesOnSkillSee() = false, want true")
 	}
 	if target.hateStops != 1 {
@@ -66,7 +69,7 @@ func TestSummonRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 	a.SetRaidCursesDisabled(true)
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 
-	if a.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []skilltarget.Creature{target}) {
+	if a.TestCursesOnSkillSee(modelskill.Definition{Offensive: true}, []skilltarget.Actor{target}) {
 		t.Fatal("disabled TestCursesOnSkillSee() = true, want false")
 	}
 }
@@ -86,6 +89,8 @@ func TestSummonRaidCurseEmitsCasterToTargetSkillUse(t *testing.T) {
 }
 
 type raidCurseNPC struct {
+	world.Presence
+	targettest.Actor
 	id          int32
 	npcID       int
 	level       int
@@ -94,17 +99,16 @@ type raidCurseNPC struct {
 	hateStops   int
 }
 
-func (n *raidCurseNPC) ObjectID() int32                { return n.id }
-func (n *raidCurseNPC) SiegeGuard() bool               { return false }
-func (n *raidCurseNPC) AlikeDead() bool                { return false }
-func (n *raidCurseNPC) Dead() bool                     { return false }
-func (n *raidCurseNPC) Attackable() bool               { return n.attackable }
-func (n *raidCurseNPC) Level() int                     { return n.level }
-func (n *raidCurseNPC) NpcID() int                     { return n.npcID }
-func (n *raidCurseNPC) Position() (int, int, int)      { return 0, 0, 0 }
-func (n *raidCurseNPC) Heading() int                   { return 0 }
-func (n *raidCurseNPC) Category() skilltarget.Category { return skilltarget.CategoryAttackable }
-func (n *raidCurseNPC) RaidRelated() bool              { return n.raidRelated }
+func (n *raidCurseNPC) ObjectID() int32           { return n.id }
+func (n *raidCurseNPC) SiegeGuard() bool          { return false }
+func (n *raidCurseNPC) AlikeDead() bool           { return false }
+func (n *raidCurseNPC) Dead() bool                { return false }
+func (n *raidCurseNPC) Attackable() bool          { return n.attackable }
+func (n *raidCurseNPC) Level() int                { return n.level }
+func (n *raidCurseNPC) NpcID() int                { return n.npcID }
+func (n *raidCurseNPC) Position() (int, int, int) { return 0, 0, 0 }
+func (n *raidCurseNPC) Heading() int              { return 0 }
+func (n *raidCurseNPC) RaidRelated() bool         { return n.raidRelated }
 func (n *raidCurseNPC) StopAggroHate(attackable.Combatant) {
 	n.hateStops++
 }
@@ -147,3 +151,5 @@ func newRaidCurseSkillTable() raidCurseSkillTable {
 		},
 	}
 }
+
+func (*raidCurseNPC) Kind() actor.Kind { return actor.KindNPC }

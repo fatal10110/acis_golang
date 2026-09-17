@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -13,11 +15,13 @@ import (
 
 // ---- from service_test.go ----
 type pickupTestOwner struct {
+	attackabletest.Combatant
 	world.Presence
 	id int32
 }
 
 func (o *pickupTestOwner) ObjectID() int32 { return o.id }
+func (*pickupTestOwner) Kind() actor.Kind  { return actor.KindPlayer }
 
 func mustTestPet(t *testing.T, cfg summon.PetConfig) *summon.Actor {
 	t.Helper()
@@ -518,3 +522,5 @@ func TestUseItemRejectsIneligibleFood(t *testing.T) {
 		t.Fatalf("UseItem = (%+v, %v), want UsePetCannotUseItem for food id not matching pet's Food1/Food2", res, failure)
 	}
 }
+
+func (*pickupTestOwner) ServitorVanished() {}

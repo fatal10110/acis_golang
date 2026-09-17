@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -437,6 +438,7 @@ type visibleGroundItem struct {
 }
 
 func (g *visibleGroundItem) ObjectID() int32  { return g.id }
+func (*visibleGroundItem) Kind() actor.Kind   { return actor.KindItem }
 func (g *visibleGroundItem) ItemID() int32    { return g.itemID }
 func (g *visibleGroundItem) Count() int       { return g.count }
 func (g *visibleGroundItem) Stackable() bool  { return g.stackable }
@@ -449,6 +451,7 @@ type visibleDoor struct {
 }
 
 func (d *visibleDoor) ObjectID() int32 { return d.id }
+func (*visibleDoor) Kind() actor.Kind  { return actor.KindDoor }
 func (d *visibleDoor) DoorID() int     { return d.doorID }
 func (d *visibleDoor) Opened() bool    { return false }
 func (d *visibleDoor) MaxHP() int      { return 100 }
@@ -462,6 +465,7 @@ type visibleStaticObject struct {
 }
 
 func (o *visibleStaticObject) ObjectID() int32     { return o.id }
+func (*visibleStaticObject) Kind() actor.Kind      { return actor.KindStatic }
 func (o *visibleStaticObject) StaticObjectID() int { return o.staticID }
 
 type invisibleTracked struct {
@@ -470,3 +474,4 @@ type invisibleTracked struct {
 }
 
 func (o *invisibleTracked) ObjectID() int32 { return o.id }
+func (*invisibleTracked) Kind() actor.Kind  { return actor.KindStatic }

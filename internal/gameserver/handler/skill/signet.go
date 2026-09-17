@@ -40,14 +40,6 @@ type signetGrounded interface {
 	GroundTarget() (int, int, int)
 }
 
-// signetCastTarget is the minimal surface a found signet target must
-// expose to appear as the target endpoint of a broadcast skill-use/launch
-// packet pair.
-type signetCastTarget interface {
-	Actor
-	Position() (x, y, z int)
-}
-
 // signetPeaceZoned optionally reports whether a found object sits in a
 // peace zone; an object without one is never excluded on that basis.
 type signetPeaceZoned interface {
@@ -123,7 +115,7 @@ func (h signetHandler) useSignet(cast Cast) {
 // recognized kind's own onStart spawns the actor, since the caster - not a
 // pre-spawned actor - is the effect's target.
 func (h signetHandler) useCasttime(cast Cast) {
-	target, ok := cast.Caster.(effectListTarget)
+	target, ok := cast.Caster.(effect.Actor)
 	if !ok {
 		return
 	}
@@ -146,7 +138,7 @@ func (h signetHandler) useCasttime(cast Cast) {
 // self-effect templates, dispatching by the template's core-effect name. It
 // returns nil for a template this port doesn't carry a signet self-effect
 // kind for, matching newActorEffect's dispatch for actor-hosted templates.
-func (h signetHandler) newSelfEffect(caster Actor, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSelfEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	switch tmpl.Name {
 	case "SignetMDam":
 		return h.newSignetMDamEffect(caster, def, meta, tmpl)
@@ -237,7 +229,7 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			applyEffects(actor, target, sub, sub.Effects)
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}
@@ -279,7 +271,7 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 					}
 				}
 			}
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}
@@ -337,7 +329,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 // the caster can't afford it) then deals magic damage, using the skill's
 // own formula inputs, to every living, non-peace-zone creature the actor
 // finds within skill radius.
-func (h signetHandler) newSignetMDamEffect(caster Actor, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
+func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Type: effect.TypeSignetGround, Effector: caster, Effected: caster}
 	var actor *npc.EffectPoint
 	e.OnStart = func(*effect.Effect) bool {
@@ -367,7 +359,7 @@ func (h signetHandler) newSignetMDamEffect(caster Actor, def modelskill.Definiti
 
 		var ids []int32
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
-			dmgTarget, ok := target.(magicDamageTarget)
+			dmgTarget, ok := asCreature(target)
 			if !ok {
 				return
 			}
@@ -380,7 +372,7 @@ func (h signetHandler) newSignetMDamEffect(caster Actor, def modelskill.Definiti
 			if damage > 0 {
 				dmgTarget.ReduceHP(float64(damage), caster, def)
 			}
-			if ct, ok := target.(signetCastTarget); ok {
+			if ct := target; ct != nil {
 				if err := actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level)); err != nil {
 					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
 				}

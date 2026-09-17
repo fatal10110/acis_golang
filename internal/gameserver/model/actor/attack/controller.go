@@ -8,7 +8,6 @@ import (
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -31,6 +30,7 @@ const (
 // updates while starting attacks.
 type CreatureActor interface {
 	attackable.Combatant
+	skilltarget.Actor
 
 	AttackDisabled() bool
 	MovementDisabled() bool
@@ -52,7 +52,6 @@ type CreatureActor interface {
 	Position() (int, int, int)
 	Heading() int
 	Dead() bool
-	Category() skilltarget.Category
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(event.Attack) error
@@ -65,6 +64,9 @@ type PlayableActor interface {
 
 	InPeaceZone() bool
 	TryToIdle()
+	// TestCursesOnAttack applies the raid curse for attacking a raid-related
+	// target and reports whether it blocked the attack.
+	TestCursesOnAttack(attackable.Combatant) bool
 }
 
 // PlayerActor is the player-only attack surface.
@@ -78,14 +80,8 @@ type PlayerActor interface {
 	NotifyBowDraw(gaugeMs int)
 	ClearRecentFakeDeath()
 	ClientActionFailed()
-}
-
-type raidRelatedTarget interface {
-	RaidRelated() bool
-}
-
-type raidCurseTester interface {
-	TestCursesOnAttack(attackable.Combatant) bool
+	// NotePvPAttack records a resolved physical hit for PvP flagging.
+	NotePvPAttack(attackable.Combatant)
 }
 
 // Hit is one precomputed physical attack result.
@@ -209,9 +205,7 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	if !c.actor.Knows(target) {
 		return false
 	}
-	if t, ok := target.(interface {
-		AttackableBy(skilltarget.Creature) bool
-	}); !ok || !t.AttackableBy(c.actor) {
+	if t, ok := target.(skilltarget.Actor); !ok || !t.AttackableBy(c.actor) {
 		return false
 	}
 	if !c.actor.CanSee(target) {
@@ -219,11 +213,8 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	}
 
 	if c.playable != nil {
-		if t, ok := target.(interface {
-			Playable() bool
-			InPeaceZone() bool
-		}); ok && t.Playable() {
-			if c.playable.InPeaceZone() || t.InPeaceZone() {
+		if target.Kind().Playable() {
+			if c.playable.InPeaceZone() || target.InPeaceZone() {
 				return false
 			}
 		}
@@ -244,7 +235,7 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	}
 
 	if c.attackable {
-		if t, ok := target.(interface{ FakeDeath() bool }); ok && t.FakeDeath() {
+		if target.FakeDeath() {
 			return false
 		}
 	}
@@ -296,27 +287,21 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 				Heading:  c.actor.Heading(),
 			}
 			angle := c.actor.PoleAttackAngle()
-			primary, primaryIsCreature := target.(skilltarget.Creature)
-			primaryIsPlayable := primaryIsCreature && primary.Category().Has(skilltarget.CategoryPlayable)
+			primaryIsPlayable := target.Kind().Playable()
 			c.actor.ForEachKnownCombatantInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
 				if len(hits) >= maxTargets || candidate.ObjectID() == c.actor.ObjectID() || candidate.ObjectID() == target.ObjectID() {
 					return
 				}
-				creatureTarget, ok := candidate.(skilltarget.Creature)
-				if !ok {
-					return
-				}
-				tx, ty, tz := creatureTarget.Position()
+				tx, ty, tz := candidate.Position()
 				if !origin.IsFacing(location.Location{X: tx, Y: ty, Z: tz}, angle) {
 					return
 				}
-				rules, ok := candidate.(skilltarget.AttackRules)
+				rules, ok := candidate.(skilltarget.Actor)
 				if !ok || !rules.AttackableBy(c.actor) {
 					return
 				}
-				if c.playable != nil && creatureTarget.Category().Has(skilltarget.CategoryPlayable) {
-					peace, _ := candidate.(interface{ InPeaceZone() bool })
-					if (peace != nil && peace.InPeaceZone()) || !primaryIsPlayable || !rules.AttackableWithoutForceBy(c.playable) {
+				if c.playable != nil && candidate.Kind().Playable() {
+					if candidate.InPeaceZone() || !primaryIsPlayable || !rules.AttackableWithoutForceBy(c.playable) {
 						return
 					}
 				}
@@ -458,14 +443,6 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 	return flags
 }
 
-type damageReceiver interface {
-	TakeDamage(int, creature.DeathActor) bool
-}
-
-type pvpAttackNotifier interface {
-	NotePvPAttack(any)
-}
-
 func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 	c.mu.RLock()
 	active := seq == c.attackSeq
@@ -477,8 +454,8 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) {
 		c.Stop()
 		return
 	}
-	if target, ok := hits[0].Target.(raidRelatedTarget); ok && target.RaidRelated() {
-		if tester, ok := c.playable.(raidCurseTester); ok && tester.TestCursesOnAttack(hits[0].Target) {
+	if hits[0].Target.RaidRelated() {
+		if c.playable != nil && c.playable.TestCursesOnAttack(hits[0].Target) {
 			c.Stop()
 			return
 		}
@@ -500,17 +477,13 @@ func (c *Controller) deliverHit(hit Hit) {
 		// passes.
 		c.actor.SetChargedShot(item.ShotSoul, false)
 	}
-	if notifier, ok := c.player.(pvpAttackNotifier); ok {
-		notifier.NotePvPAttack(hit.Target)
+	if c.player != nil {
+		c.player.NotePvPAttack(hit.Target)
 	}
 	if hit.Miss || hit.Damage <= 0 {
 		return
 	}
-	target, ok := hit.Target.(damageReceiver)
-	if !ok {
-		return
-	}
-	target.TakeDamage(hit.Damage, c.actor)
+	hit.Target.TakeDamage(hit.Damage, c.actor)
 }
 
 func (c *Controller) finishBow(seq uint64, reuse time.Duration) {

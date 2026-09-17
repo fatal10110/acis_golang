@@ -200,16 +200,15 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.MagicResisted:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, e.AttackerName))
 	case event.AttackRequested:
-		if target, ok := e.Target.(world.Tracked); ok {
-			l.attackLiveTarget(live, target)
+		if e.Target != nil {
+			l.attackLiveTarget(live, e.Target)
 		}
 	case event.Retargeted:
-		target, _ := e.Target.(world.Tracked)
-		if target == nil {
+		if e.Target == nil {
 			l.clearLiveTarget(live)
 			return
 		}
-		l.selectLiveTarget(live, target)
+		l.selectLiveTarget(live, e.Target)
 	case event.HerbConsumed:
 		l.consumeHerb(live, e.ItemID)
 	case event.SummonConfirmRequested:

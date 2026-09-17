@@ -1,6 +1,10 @@
 package world
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+)
 
 // spawnOrderObject is a minimal Tracked+Observer double for asserting the
 // order of State.Spawn's registry write against its Discover callbacks.
@@ -11,6 +15,7 @@ type spawnOrderObject struct {
 }
 
 func (o *spawnOrderObject) ObjectID() int32 { return o.id }
+func (*spawnOrderObject) Kind() actor.Kind  { return actor.KindNPC }
 func (o *spawnOrderObject) Discover(t Tracked) {
 	if o.on != nil {
 		o.on(t)

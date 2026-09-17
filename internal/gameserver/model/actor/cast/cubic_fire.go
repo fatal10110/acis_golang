@@ -6,6 +6,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -130,26 +131,8 @@ func cubicWithinRange(a, b Target) bool {
 	dz := float64(az - bz)
 	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
 
-	total := float64(cubicMaxMagicRange) + cubicCollisionRadius(a) + cubicCollisionRadius(b)
+	total := float64(cubicMaxMagicRange) + collisionRadius(a) + collisionRadius(b)
 	return dist <= total
-}
-
-func cubicCollisionRadius(t Target) float64 {
-	if cr, ok := t.(interface{ CollisionRadius() float64 }); ok {
-		return cr.CollisionRadius()
-	}
-	return 0
-}
-
-// cubicHealTarget and cubicHealEffectiveness are the narrow surfaces
-// ApplyCubicHeal needs from a Life Cubic's heal target.
-type cubicHealTarget interface {
-	CanBeHealed() bool
-	AddHP(float64) float64
-}
-
-type cubicHealEffectiveness interface {
-	HealEffectiveness() float64
 }
 
 // ApplyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
@@ -159,15 +142,12 @@ type cubicHealEffectiveness interface {
 // MATK and healing proficiency. healed reports whether the target actually
 // received HP, so the caller knows whether to send the heal feedback packet.
 func ApplyCubicHeal(power float32, target Target) (healed bool) {
-	healable, ok := target.(cubicHealTarget)
+	// Only an effect participant has HP to restore.
+	healable, ok := target.(effect.Actor)
 	if !ok || !healable.CanBeHealed() {
 		return false
 	}
-	effectiveness := 100.0
-	if eff, ok := target.(cubicHealEffectiveness); ok {
-		effectiveness = eff.HealEffectiveness()
-	}
-	healable.AddHP(float64(power) * effectiveness / 100)
+	healable.AddHP(float64(power) * healable.HealEffectiveness() / 100)
 	return true
 }
 
@@ -184,7 +164,7 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // outcome) back to the caller, matching useContinuousSkill (Cubic.java:439-444):
 // a failed offensive continuous roll must still reach the owner as
 // ATTACK_FAILED, not be dropped silently.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Actor, def modelskill.Definition, target Target) EffectResult {
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target) EffectResult {
 	if skills == nil {
 		return EffectResult{}
 	}

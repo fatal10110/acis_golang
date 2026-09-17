@@ -3,7 +3,7 @@ package skill
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -36,17 +36,7 @@ type summonFriendActorState interface {
 }
 
 type summonFriendCaster interface {
-	summonFriendActorState
-	Position() (x, y, z int)
-}
-
-type summonFriendTargetState interface {
-	summonFriendActorState
-	AlikeDead() bool
-	Operating() bool
-	Rooted() bool
-	InCombat() bool
-	FestivalParticipant() bool
+	player.SummonFriendRequester
 }
 
 // summonFriendRequester is *player.Character's teleport-request/confirm-summon
@@ -56,9 +46,9 @@ type summonFriendTargetState interface {
 // with the caster forwarded opaquely, matching #1519/#1497's precedent for a
 // value used only for identity/state, not behavior, at this layer.
 type summonFriendRequester interface {
-	TeleportRequest(caster any, skill modelskill.Definition) bool
+	TeleportRequest(caster player.SummonFriendRequester, skill modelskill.Definition) bool
 	ClearTeleportRequest()
-	ConfirmSummon(caster any, skill modelskill.Definition, timeout time.Duration)
+	ConfirmSummon(caster player.SummonFriendRequester, skill modelskill.Definition, timeout time.Duration)
 }
 
 type summonFriendTraveler interface {
@@ -71,7 +61,7 @@ type summonFriendItemConsumer interface {
 }
 
 type summonPartyProvider interface {
-	PartyMembers() []creature.DeathActor
+	PartyMembers() []Actor
 }
 
 type summonFriendHandler struct{}
@@ -103,11 +93,11 @@ func (summonFriendHandler) Use(cast Cast) {
 			continue
 		}
 		requester, ok := target.(summonFriendRequester)
-		if !ok || !requester.TeleportRequest(cast.Caster, cast.Skill) {
+		if !ok || !requester.TeleportRequest(caster, cast.Skill) {
 			continue
 		}
 		if cast.Skill.ID == 1403 {
-			requester.ConfirmSummon(cast.Caster, cast.Skill, summonFriendConfirmTimeout)
+			requester.ConfirmSummon(caster, cast.Skill, summonFriendConfirmTimeout)
 			continue
 		}
 		teleportSummonedFriend(caster, target, cast.Skill)
@@ -119,16 +109,11 @@ func canSummonFriend(actor summonFriendActorState) bool {
 	return !actor.Mounted() && !actor.OlympiadMode() && !actor.ObserverMode() && !actor.NoSummonFriendZone()
 }
 
-// canBeSummoned takes target as creature.DeathActor because a SUMMON_PARTY
-// cast walks the caster's own party list rather than a resolved target set;
-// a party member that isn't actor-shaped fails the self-exclusion check the
-// same way an unrelated value did before.
-func canBeSummoned(caster Actor, target creature.DeathActor) bool {
-	other, _ := target.(Actor)
-	if sameObject(caster, other) {
+func canBeSummoned(caster, target Actor) bool {
+	if sameObject(caster, target) {
 		return false
 	}
-	state, ok := target.(summonFriendTargetState)
+	state, ok := asPlayer(target)
 	if !ok {
 		return false
 	}
@@ -141,7 +126,7 @@ func canBeSummoned(caster Actor, target creature.DeathActor) bool {
 	return !state.ObserverMode() && !state.NoSummonFriendZone()
 }
 
-func teleportSummonedFriend(caster summonFriendCaster, target creature.DeathActor, skill modelskill.Definition) {
+func teleportSummonedFriend(caster summonFriendCaster, target Actor, skill modelskill.Definition) {
 	if skill.TargetConsumeID > 0 && skill.TargetConsumeCount > 0 {
 		consumer, ok := target.(summonFriendItemConsumer)
 		if !ok || consumer.ItemCount(skill.TargetConsumeID) < skill.TargetConsumeCount {

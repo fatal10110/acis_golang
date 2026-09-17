@@ -4,16 +4,22 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from death_test.go ----
 type deathTestActor struct {
+	attackabletest.Combatant
 	id   int32
 	mu   sync.Mutex
 	dead bool
@@ -32,10 +38,10 @@ func (a *deathTestActor) MarkDead() bool {
 }
 
 type recordingRewarder struct {
-	calls []DeathActor
+	calls []attackable.Combatant
 }
 
-func (r *recordingRewarder) CalculateRewards(killer DeathActor) {
+func (r *recordingRewarder) CalculateRewards(killer attackable.Combatant) {
 	r.calls = append(r.calls, killer)
 }
 
@@ -98,6 +104,7 @@ func TestDieConcurrentOnlyOneWinner(t *testing.T) {
 // randomDamageTestActor is a minimal FormulaActor stub for exercising
 // RandomDamageMultiplier in isolation.
 type randomDamageTestActor struct {
+	effecttest.Actor
 	level         int
 	spread        int
 	roll          int
@@ -325,11 +332,12 @@ func newTestLive(t *testing.T) *Live {
 // ccTestTarget satisfies every optional target interface a core effect's
 // hooks type-assert against, so the effect always activates regardless of
 // which one is under test.
-type ccTestTarget struct{}
+type ccTestTarget struct {
+	world.Presence
+	effecttest.Actor
+}
 
-func (ccTestTarget) ObjectID() int32                                    { return 0 }
-func (ccTestTarget) Dead() bool                                         { return false }
-func (ccTestTarget) FleeFrom(effector effect.Participant, distance int) {}
+func (*ccTestTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
 
 func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	t.Helper()
@@ -337,7 +345,7 @@ func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	if err != nil {
 		t.Fatalf("effect.New(%q) error: %v", name, err)
 	}
-	e.Effected = ccTestTarget{}
+	e.Effected = &ccTestTarget{}
 	live.EffectList().Add(e)
 	return e
 }
@@ -480,18 +488,12 @@ func TestLiveInvulReportsChange(t *testing.T) {
 }
 
 type facingStub struct {
+	attackabletest.Combatant
 	x, y, z, heading int
 }
 
 func (s facingStub) Position() (int, int, int) { return s.x, s.y, s.z }
 func (s facingStub) Heading() int              { return s.heading }
-
-type currentHeadingStub struct {
-	facingStub
-	current int
-}
-
-func (s currentHeadingStub) CurrentHeading() int { return s.current }
 
 type nightStub bool
 
@@ -513,16 +515,6 @@ func TestAttackFacingBehindFrontAndSide(t *testing.T) {
 	behind, inFront = AttackFacing(target, facingStub{y: 100})
 	if behind || inFront {
 		t.Fatalf("side attacker: behind=%v inFront=%v, want false, false", behind, inFront)
-	}
-}
-
-func TestAttackFacingPrefersCurrentHeading(t *testing.T) {
-	// Heading() faces north (16384); CurrentHeading faces east (0).
-	target := currentHeadingStub{facingStub: facingStub{heading: 16384}, current: 0}
-
-	behind, inFront := AttackFacing(target, facingStub{x: -100})
-	if !behind || inFront {
-		t.Fatalf("CurrentHeading 0, attacker x=-100: behind=%v inFront=%v, want true, false", behind, inFront)
 	}
 }
 
@@ -561,6 +553,7 @@ func TestLiveNilReceiverGettersDoNotPanic(t *testing.T) {
 }
 
 type physicalAttackActor struct {
+	effecttest.Actor
 	id         int32
 	x, y, z    int
 	heading    int
@@ -617,7 +610,7 @@ type shieldedPhysicalAttackActor struct {
 	shield formulas.ShieldDefense
 }
 
-func (a *shieldedPhysicalAttackActor) ShieldDefense(DeathActor, modelskill.Definition, bool) formulas.ShieldDefense {
+func (a *shieldedPhysicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
 	return a.shield
 }
 
@@ -725,4 +718,47 @@ func TestResolvePhysicalAttackInputWiresPosPvpWeaponRaceCritShieldAndSoulshot(t 
 	if got := ApplyPhysicalAttackDamage(in, shield, false); got != 1 {
 		t.Fatalf("perfect-block damage = %d, want 1", got)
 	}
+}
+
+func (randomDamageTestActor) Kind() actor.Kind { return actor.KindNPC }
+
+func (randomDamageTestActor) WeaponGradePenalty() bool { return false }
+
+func (a physicalAttackActor) Kind() actor.Kind {
+	if a.playable {
+		return actor.KindPlayer
+	}
+	return actor.KindNPC
+}
+
+func (physicalAttackActor) WeaponGradePenalty() bool { return false }
+
+func (*deathTestActor) Heading() int { return 0 }
+
+func (*deathTestActor) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (randomDamageTestActor) LethalRate() float64 { return 0 }
+
+func (physicalAttackActor) LethalRate() float64 { return 0 }
+
+func (randomDamageTestActor) Evasion() int { return 0 }
+
+func (randomDamageTestActor) Invul() bool { return false }
+
+func (randomDamageTestActor) MaxHPValue() float64 { return 0 }
+
+func (randomDamageTestActor) RaceMultiplier(FormulaActor) float64 { return 1 }
+
+func (randomDamageTestActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
+}
+
+func (physicalAttackActor) Evasion() int { return 0 }
+
+func (physicalAttackActor) Invul() bool { return false }
+
+func (physicalAttackActor) MaxHPValue() float64 { return 0 }
+
+func (physicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+	return formulas.ShieldFailed
 }

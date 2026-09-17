@@ -7,7 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -16,13 +16,13 @@ import (
 // meleeVictim is the melee-damage surface under test on both Character and
 // Hostile: apply a hit, report whether it newly killed the target.
 type meleeVictim interface {
-	TakeDamage(int, creature.DeathActor) bool
+	TakeDamage(int, attackable.Combatant) bool
 	SetInvul(bool) bool
 }
 
 // meleeAttacker is the damage-permission surface under test on Character.
 type meleeAttacker interface {
-	creature.DeathActor
+	attackable.Combatant
 	SetCanGiveDamage(bool)
 }
 
@@ -164,12 +164,15 @@ func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
 	}
 }
 
-// deniedDamageAttacker is a minimal creature.DeathActor standing in for a GM
+// deniedDamageAttacker is a minimal attackable.Combatant standing in for a GM
 // whose access level has canGiveDamage=false (character_effects.go:107):
 // production code only reaches CanGiveDamage() through this interface, so
 // the melee target under test cannot distinguish this from a real GM
 // character.
-type deniedDamageAttacker struct{ objID int32 }
+type deniedDamageAttacker struct {
+	attackabletest.Combatant
+	objID int32
+}
 
 func (deniedDamageAttacker) CanGiveDamage() bool { return false }
 func (a deniedDamageAttacker) ObjectID() int32   { return a.objID }
@@ -266,3 +269,7 @@ func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 		t.Fatalf("NPC HP after damage-denied melee = %d, want unchanged %d", got, beforeHP)
 	}
 }
+
+func (deniedDamageAttacker) Heading() int { return 0 }
+
+func (deniedDamageAttacker) Position() (x, y, z int) { return 0, 0, 0 }

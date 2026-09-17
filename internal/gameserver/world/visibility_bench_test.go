@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
 
 // relocateBenchPlayer is a Player+Observer double for the region-crossing
@@ -18,7 +20,7 @@ type relocateBenchPlayer struct {
 func (p *relocateBenchPlayer) ObjectID() int32       { return p.id }
 func (p *relocateBenchPlayer) Discover(Tracked)      {}
 func (p *relocateBenchPlayer) Forget(Tracked)        {}
-func (p *relocateBenchPlayer) WorldPlayer()          {}
+func (p *relocateBenchPlayer) Kind() actor.Kind      { return actor.KindPlayer }
 func (p *relocateBenchPlayer) CharacterName() string { return "" }
 
 type relocateBenchObserver struct {
@@ -27,6 +29,7 @@ type relocateBenchObserver struct {
 }
 
 func (o *relocateBenchObserver) ObjectID() int32  { return o.id }
+func (*relocateBenchObserver) Kind() actor.Kind   { return actor.KindNPC }
 func (o *relocateBenchObserver) Discover(Tracked) {}
 func (o *relocateBenchObserver) Forget(Tracked)   {}
 

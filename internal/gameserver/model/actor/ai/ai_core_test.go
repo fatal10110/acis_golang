@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -513,6 +516,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 // so ai's own test package cannot import npc back without an import cycle.
 // Kept as-is per docs/agents/test-strategy.md.
 type fakeActor struct {
+	attackabletest.Combatant
 	world.Presence
 	id              int32
 	siegeGuard      bool
@@ -542,9 +546,10 @@ func actor(id int32) *fakeActor {
 	return &fakeActor{id: id, attackRange: 40, known: make(map[int32]bool), inTerritory: true}
 }
 
-func (a *fakeActor) ObjectID() int32  { return a.id }
-func (a *fakeActor) SiegeGuard() bool { return a.siegeGuard }
-func (a *fakeActor) AlikeDead() bool  { return a.alikeDead }
+func (a *fakeActor) ObjectID() int32     { return a.id }
+func (*fakeActor) Kind() modelactor.Kind { return modelactor.KindNPC }
+func (a *fakeActor) SiegeGuard() bool    { return a.siegeGuard }
+func (a *fakeActor) AlikeDead() bool     { return a.alikeDead }
 func (a *fakeActor) DenyAIAction() bool {
 	return a.denyAction
 }
@@ -2836,3 +2841,9 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 		t.Fatalf("attack target = %v, want the queued attacker", strike.target)
 	}
 }
+
+func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
+
+func (*fakeActor) ThinkFollow(attackable.Combatant, bool) bool { return false }

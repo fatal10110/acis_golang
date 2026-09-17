@@ -14,18 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// physicalTarget is the surface MakeAttackHit needs from an opponent to
-// resolve a physical hit and deliver its result: position for the attack's
-// altitude term, defense and evasion for the hit/damage rolls, and a way to
-// apply the computed damage. Any live combatant capable of exchanging
-// physical damage should satisfy this.
-type physicalTarget interface {
-	attackable.Combatant
-	Position() (int, int, int)
-	PDef() float64
-	Evasion() int
-}
-
 // AttackDisabled reports whether this NPC is unable to start an attack. No
 // abnormal-effect system (petrify, fear, attack-block) is wired to a live
 // NPC yet, so death is the only disabling condition modeled so far.
@@ -63,23 +51,14 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 	if h.los == nil {
 		return true
 	}
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var theight float64
-	if th, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		theight = th.CollisionHeight()
-	}
-
 	ox, oy, oz := h.Position()
-	tx, ty, tz := other.Position()
-	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
+	tx, ty, tz := target.Position()
+	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
 }
 
 // CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
 // surface.
-func (h *Hostile) CanSeeTarget(target skilltarget.Creature) bool {
+func (h *Hostile) CanSeeTarget(target skilltarget.Actor) bool {
 	combatant, ok := target.(attackable.Combatant)
 	return ok && h.CanSee(combatant)
 }
@@ -233,15 +212,10 @@ func (h *Hostile) broadcastShotRecharge(skillID int32) {
 	h.emit(event.ShotRecharged{SkillID: skillID, At: location.Location{X: x, Y: y, Z: z}})
 }
 
-// SetHeadingTo orients this NPC toward target. A target with no known
-// position is ignored.
+// SetHeadingTo orients this NPC toward target.
 func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return
-	}
 	sx, sy, _ := h.Position()
-	tx, ty, _ := other.Position()
+	tx, ty, _ := target.Position()
 	h.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
@@ -260,17 +234,11 @@ func (h *Hostile) Evasion() int {
 // MakeAttackHit resolves one physical attack against target: a hit/miss
 // roll, a critical roll, and a damage roll through the shared
 // physical-damage formula. A target that can't exchange physical damage (no
-// physicalTarget surface) always misses.
+// formula stats) always misses.
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
 
-	other, ok := target.(physicalTarget)
-	if !ok {
-		hit.Miss = true
-		return hit
-	}
-
-	formulaTarget, ok := target.(creature.FormulaActor)
+	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true
 		return hit
@@ -291,7 +259,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 
 	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
 	crit := formulas.CritSucceeds(critRate, h.roll(1000))
-	in, shield := creature.ResolvePhysicalAttackInput(h, formulaTarget, crit)
+	in, shield := creature.ResolvePhysicalAttackInput(h, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit
 	hit.Shield = shield
@@ -344,16 +312,11 @@ func (h *Hostile) BroadcastMove(ev event.Move) error {
 
 // BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
 // target, matching the reference's fallback when an AI-initiated cast is
-// rejected after movement has already turned the actor toward target. A
-// target that exposes no position is ignored.
+// rejected after movement has already turned the actor toward target.
 func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
-	located, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return nil
-	}
 	sx, sy, sz := h.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
-	tx, ty, tz := located.Position()
+	tx, ty, tz := target.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	h.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
 	return nil
@@ -373,11 +336,11 @@ func (h *Hostile) BroadcastStatus() error {
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.
-func (h *Hostile) AttackableBy(attacker skilltarget.Creature) bool {
+func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
 }
 
 // AttackableWithoutForceBy uses the ordinary NPC attackability rule.
-func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Creature) bool {
+func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	return h.AttackableBy(caster)
 }

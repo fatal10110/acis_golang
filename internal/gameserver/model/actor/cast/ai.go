@@ -20,7 +20,7 @@ type AIController struct {
 	Effects     EffectHandlers
 	// Caster is the actor casting the skill, used both to start the cast
 	// and as ApplyEffects' caster.
-	Caster skilltarget.Creature
+	Caster AICaster
 	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
@@ -44,10 +44,7 @@ func (a *AIController) Disabled() bool {
 	if a.Controller.CastingNow() {
 		return true
 	}
-	if d, ok := a.Controller.actor.(interface{ AllSkillsDisabled() bool }); ok {
-		return d.AllSkillsDisabled()
-	}
-	return false
+	return a.Controller.actor.AllSkillsDisabled()
 }
 
 func (a *AIController) CastingNow() bool {
@@ -136,8 +133,8 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 	return a.Controller.MeetsHPMPDisabled(castTarget, def) == nil
 }
 
-// magicCastBroadcaster is the observer-broadcast surface an AI-initiated
-// cast's caster optionally exposes, mirroring the reference sequence in
+// AICaster is an AI-driven caster: the launch-revalidated creature plus the
+// observer broadcasts of its cast, mirroring the reference sequence in
 // CreatureCast.java (the same doCast/onMagicLaunch/stop path PlayerCast
 // chains into via super.doCast/super.stop, so player and AI casts share
 // it): MagicSkillUse broadcasts at cast start with the computed
@@ -146,9 +143,10 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 // target list (CreatureCast.java:165,232-234), and MagicSkillCanceled
 // broadcasts whenever an in-flight cast aborts (CreatureCast.java:416-419,
 // `if (isCastingNow()) _actor.broadcastPacket(new
-// MagicSkillCanceled(...))`, unmodified by NpcCast). A caster that doesn't
-// implement it (e.g. in tests) simply broadcasts nothing.
-type magicCastBroadcaster interface {
+// MagicSkillCanceled(...))`, unmodified by NpcCast). Casters without
+// observers to notify report nil.
+type AICaster interface {
+	LaunchCaster
 	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
 	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
 }
@@ -164,27 +162,20 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	if !ok {
 		return
 	}
-	castTarget, ok := any(target).(Target)
-	if !ok {
-		return
-	}
+	castTarget := Target(target)
 
 	plan, err := a.Controller.Start(time.Now(), castTarget, def)
 	if err != nil {
 		return
 	}
 
-	broadcaster, _ := a.Caster.(magicCastBroadcaster)
-
-	if broadcaster != nil {
-		// MagicSkillUse broadcasts the instant the cast starts, matching
-		// CreatureCast.doCast's broadcastPacket call before the launch
-		// timer is even scheduled (CreatureCast.java:148,165).
-		tx, ty, tz := castTarget.Position()
-		if err := broadcaster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
-			int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
-			a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
-		}
+	// MagicSkillUse broadcasts the instant the cast starts, matching
+	// CreatureCast.doCast's broadcastPacket call before the launch
+	// timer is even scheduled (CreatureCast.java:148,165).
+	tx, ty, tz := castTarget.Position()
+	if err := a.Caster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+		int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
+		a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
 	}
 
 	// launchTargets is resolved once, in the Launch hook, and reused
@@ -194,7 +185,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// re-derived. That keeps the MagicSkillLaunched broadcast and the
 	// effect-affected set as one snapshot instead of two independent
 	// resolutions 400ms apart.
-	var launchTargets []skilltarget.Creature
+	var launchTargets []skilltarget.Actor
 	var launchResolved bool
 
 	a.Controller.Schedule(plan, Hooks{
@@ -206,20 +197,18 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				return false
 			}
 			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
-			if broadcaster != nil {
-				// The reference recomputes _targets = getTargetList(...) at
-				// the launch timer and broadcasts that full set
-				// (CreatureCast.java:232-234); when resolution finds no
-				// affected targets, it broadcasts the empty list as-is
-				// (no skip, no synthesized fallback target) — the wire
-				// builder already writes that form (0,0) unconditionally.
-				targetIDs := make([]int32, len(launchTargets))
-				for i, t := range launchTargets {
-					targetIDs[i] = t.ObjectID()
-				}
-				if err := broadcaster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs); err != nil {
-					a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
-				}
+			// The reference recomputes _targets = getTargetList(...) at
+			// the launch timer and broadcasts that full set
+			// (CreatureCast.java:232-234); when resolution finds no
+			// affected targets, it broadcasts the empty list as-is
+			// (no skip, no synthesized fallback target) — the wire
+			// builder already writes that form (0,0) unconditionally.
+			targetIDs := make([]int32, len(launchTargets))
+			for i, t := range launchTargets {
+				targetIDs[i] = t.ObjectID()
+			}
+			if err := a.Caster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs); err != nil {
+				a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
 			}
 			return true
 		},

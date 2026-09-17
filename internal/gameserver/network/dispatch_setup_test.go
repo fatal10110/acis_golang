@@ -445,3 +445,7 @@ func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
 func (testHostileAttack) DoAttack(attackable.Combatant) error { return nil }
 func (testHostileAttack) Stop()                               {}
+
+func (testHostileMove) CanMoveTo(location.Location) bool { return true }
+
+func (testHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }

@@ -7,9 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
+	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -22,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -582,8 +587,8 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+	caster := &fakeCastCreature{id: 1, kind: modelactor.KindNPC}
+	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
 
 	ai := &AIController{
 		Controller:  ctrl,
@@ -637,8 +642,8 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	target := &fakeCastCreature{id: 2, x: 10, y: 20, z: 30, category: skilltarget.CategoryAttackable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	target := &fakeCastCreature{id: 2, x: 10, y: 20, z: 30, kind: modelactor.KindNPC}
 
 	ai := &AIController{
 		Controller:  ctrl,
@@ -706,9 +711,9 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	selected := &fakeCastCreature{id: 2, x: 10, category: skilltarget.CategoryPlayable}
-	bystander := &fakeCastCreature{id: 3, x: 20, category: skilltarget.CategoryPlayable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
+	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
 
 	ai := &AIController{
 		Controller:  ctrl,
@@ -740,10 +745,10 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 // a value resolved once at Launch survives unchanged through Hit even if
 // the underlying known-creature set has since moved on.
 type mutableKnown struct {
-	creatures []skilltarget.Creature
+	creatures []skilltarget.Actor
 }
 
-func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Creature, _ int, fn func(skilltarget.Creature)) {
+func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ int, fn func(skilltarget.Actor)) {
 	for _, c := range k.creatures {
 		if c.ObjectID() == anchor.ObjectID() {
 			continue
@@ -773,11 +778,11 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{skillTypes: []string{"DUMMYCAST"}}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	selected := &fakeCastCreature{id: 2, x: 10, category: skilltarget.CategoryPlayable}
-	bystander := &fakeCastCreature{id: 3, x: 20, category: skilltarget.CategoryPlayable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
+	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
 
-	known := &mutableKnown{creatures: []skilltarget.Creature{caster, selected, bystander}}
+	known := &mutableKnown{creatures: []skilltarget.Actor{caster, selected, bystander}}
 	ai := &AIController{
 		Controller:  ctrl,
 		Definitions: fakeDefinitions{ref: def},
@@ -794,7 +799,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 
 	// bystander leaves the known set entirely before Hit fires — a fresh
 	// resolution at Hit would miss it.
-	known.creatures = []skilltarget.Creature{caster, selected}
+	known.creatures = []skilltarget.Actor{caster, selected}
 
 	clock.fire(400 * time.Millisecond) // Hit
 
@@ -823,8 +828,8 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 	def.Target = modelskill.TargetOne
 	def.SkillType = "DUMMYCAST"
 
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
 
 	ai := &AIController{
 		Controller:  ctrl,
@@ -863,14 +868,14 @@ func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 	def.EffectRange = 100
 
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	ai := &AIController{
 		Controller:  ctrl,
 		Definitions: fakeDefinitions{ref: def},
 		Caster:      caster,
 	}
 
-	ai.Cast(&fakeCastCreature{id: 2, x: 200, category: skilltarget.CategoryAttackable}, ref)
+	ai.Cast(&fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}, ref)
 	clock.fire(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
 
 	if got := event.Count[event.CastAborted](rec); got != 1 {
@@ -896,13 +901,13 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	ai := &AIController{
 		Controller:  ctrl,
 		Definitions: fakeDefinitions{ref: def},
-		Caster:      &fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable},
+		Caster:      &fakeCastCreature{id: 1, kind: modelactor.KindNPC},
 		OnLaunchAbort: func(reason LaunchAbortReason) {
 			got = reason
 		},
 	}
 
-	ai.Cast(&fakeCastCreature{id: 2, x: 200, category: skilltarget.CategoryAttackable}, ref)
+	ai.Cast(&fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}, ref)
 	clock.fire(125 * time.Millisecond)
 
 	if got != LaunchAbortTooFar {
@@ -928,8 +933,8 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{result: handlerskill.Result{AttackFailed: 1}}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
 
 	var got EffectResult
 	var calls int
@@ -974,8 +979,8 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	def.SkillType = "FUSION"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, category: skilltarget.CategoryAttackable}}
-	target := &fakeCastCreature{id: 2, category: skilltarget.CategoryAttackable}
+	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
 
 	ai := &AIController{
 		Controller:  ctrl,
@@ -1023,28 +1028,30 @@ func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, 
 }
 
 // fakeCastCreature satisfies both attackable.Combatant (the ai package's
-// desire/target surface) and skilltarget.Creature (the target-resolution
+// desire/target surface) and skilltarget.Actor (the target-resolution
 // surface ApplyEffects needs), so the same fake can stand in for an
 // AIController's target on both sides of the bridge it builds.
 type fakeCastCreature struct {
-	id       int32
-	x, y, z  int
-	dead     bool
-	category skilltarget.Category
+	world.Presence
+	skilltest.Creature
+	id      int32
+	x, y, z int
+	dead    bool
+	kind    modelactor.Kind
 }
 
-func (f *fakeCastCreature) ObjectID() int32                                    { return f.id }
-func (f *fakeCastCreature) Position() (int, int, int)                          { return f.x, f.y, f.z }
-func (f *fakeCastCreature) Heading() int                                       { return 0 }
-func (f *fakeCastCreature) Dead() bool                                         { return f.dead }
-func (f *fakeCastCreature) Category() skilltarget.Category                     { return f.category }
-func (f *fakeCastCreature) SiegeGuard() bool                                   { return false }
-func (f *fakeCastCreature) AlikeDead() bool                                    { return f.dead }
-func (f *fakeCastCreature) AttackableBy(skilltarget.Creature) bool             { return true }
-func (f *fakeCastCreature) AttackableWithoutForceBy(skilltarget.Creature) bool { return true }
+func (f *fakeCastCreature) ObjectID() int32                                 { return f.id }
+func (f *fakeCastCreature) Position() (int, int, int)                       { return f.x, f.y, f.z }
+func (f *fakeCastCreature) Heading() int                                    { return 0 }
+func (f *fakeCastCreature) Dead() bool                                      { return f.dead }
+func (f *fakeCastCreature) Kind() modelactor.Kind                           { return f.kind }
+func (f *fakeCastCreature) SiegeGuard() bool                                { return false }
+func (f *fakeCastCreature) AlikeDead() bool                                 { return f.dead }
+func (f *fakeCastCreature) AttackableBy(skilltarget.Actor) bool             { return true }
+func (f *fakeCastCreature) AttackableWithoutForceBy(skilltarget.Actor) bool { return true }
 
 var _ attackable.Combatant = (*fakeCastCreature)(nil)
-var _ skilltarget.Creature = (*fakeCastCreature)(nil)
+var _ skilltarget.Actor = (*fakeCastCreature)(nil)
 var _ Target = (*fakeCastCreature)(nil)
 
 type skillUseCall struct {
@@ -1078,8 +1085,6 @@ func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, ta
 	return nil
 }
 
-var _ magicCastBroadcaster = (*fakeBroadcastingCaster)(nil)
-
 // ---- from cubic_fire_test.go ----
 func TestCubicGrantedLevel(t *testing.T) {
 	tests := []struct {
@@ -1102,6 +1107,8 @@ func TestCubicGrantedLevel(t *testing.T) {
 }
 
 type fakeCubicHealTarget struct {
+	world.Presence
+	effecttest.Actor
 	healable      bool
 	effectiveness float64
 	added         float64
@@ -1145,13 +1152,19 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 // skill (DEBUFF/DOT/etc.) always fails its landing roll — matching
 // Cubic.useContinuousSkill's calcCubicSkillSuccess()==false branch
 // (Cubic.java:439-444), the case this test exercises.
-type fakeCubicEffectCaster struct{ id int32 }
+type fakeCubicEffectCaster struct {
+	world.Presence
+	skilltest.Creature
+	id int32
+}
 
 func (f *fakeCubicEffectCaster) ObjectID() int32           { return f.id }
 func (f *fakeCubicEffectCaster) Position() (int, int, int) { return 0, 0, 0 }
 func (f *fakeCubicEffectCaster) Dead() bool                { return false }
 
 type fakeCubicEffectTarget struct {
+	world.Presence
+	skilltest.Creature
 	id   int32
 	list *effect.List
 }
@@ -1218,6 +1231,7 @@ func (f *fakeCubicFireOwner) Roll(n int) int {
 }
 
 type fakeCubicTarget struct {
+	effecttest.Actor
 	world.Presence
 	objectID   int32
 	x, y, z    int
@@ -1226,6 +1240,7 @@ type fakeCubicTarget struct {
 }
 
 func (f *fakeCubicTarget) ObjectID() int32           { return f.objectID }
+func (*fakeCubicTarget) Kind() modelactor.Kind       { return modelactor.KindNPC }
 func (f *fakeCubicTarget) Position() (int, int, int) { return f.x, f.y, f.z }
 func (f *fakeCubicTarget) AlikeDead() bool           { return f.alikeDead }
 func (f *fakeCubicTarget) SiegeGuard() bool          { return f.siegeGuard }
@@ -1291,17 +1306,19 @@ func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 }
 
 // ---- from effects_test.go ----
-// effectsActor is a minimal skilltarget.Creature usable as a non-player
+// effectsActor is a minimal skilltarget.Actor usable as a non-player
 // caster, proving the resolution path ApplyEffects drives doesn't require
 // the live-player packet-handling type the player cast flow uses.
 type effectsActor struct {
-	id       int32
-	x, y, z  int
-	category skilltarget.Category
-	dead     bool
-	corpse   bool
-	monster  bool
-	summon   *effectsActor
+	world.Presence
+	skilltest.Creature
+	id      int32
+	x, y, z int
+	kind    modelactor.Kind
+	dead    bool
+	corpse  bool
+	monster bool
+	summon  *effectsActor
 }
 
 type pvpEffectsActor struct {
@@ -1310,13 +1327,13 @@ type pvpEffectsActor struct {
 }
 
 type pvpSkillCall struct {
-	targets   []creature.DeathActor
+	targets   []attackable.Combatant
 	offensive bool
 	skillType string
 }
 
-func (a *pvpEffectsActor) NotePvPSkillTargets(targets []creature.DeathActor, offensive bool, skillType string) {
-	a.calls = append(a.calls, pvpSkillCall{targets: append([]creature.DeathActor(nil), targets...), offensive: offensive, skillType: skillType})
+func (a *pvpEffectsActor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+	a.calls = append(a.calls, pvpSkillCall{targets: append([]attackable.Combatant(nil), targets...), offensive: offensive, skillType: skillType})
 }
 
 type cursePvpEffectsActor struct {
@@ -1324,22 +1341,22 @@ type cursePvpEffectsActor struct {
 	block bool
 }
 
-func (a *cursePvpEffectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Creature) bool {
+func (a *cursePvpEffectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
 	return a.block
 }
 
-func (a *effectsActor) ObjectID() int32                { return a.id }
-func (a *effectsActor) Position() (int, int, int)      { return a.x, a.y, a.z }
-func (a *effectsActor) Heading() int                   { return 0 }
-func (a *effectsActor) Dead() bool                     { return a.dead }
-func (a *effectsActor) Category() skilltarget.Category { return a.category }
+func (a *effectsActor) ObjectID() int32           { return a.id }
+func (a *effectsActor) Position() (int, int, int) { return a.x, a.y, a.z }
+func (a *effectsActor) Heading() int              { return 0 }
+func (a *effectsActor) Dead() bool                { return a.dead }
+func (a *effectsActor) Kind() modelactor.Kind     { return a.kind }
 
-func (a *effectsActor) AttackableBy(skilltarget.Creature) bool             { return true }
-func (a *effectsActor) AttackableWithoutForceBy(skilltarget.Creature) bool { return true }
-func (a *effectsActor) HasCorpse() bool                                    { return a.corpse }
-func (a *effectsActor) MonsterKind() bool                                  { return a.monster }
+func (a *effectsActor) AttackableBy(skilltarget.Actor) bool             { return true }
+func (a *effectsActor) AttackableWithoutForceBy(skilltarget.Actor) bool { return true }
+func (a *effectsActor) HasCorpse() bool                                 { return a.corpse }
+func (a *effectsActor) MonsterKind() bool                               { return a.monster }
 
-func (a *effectsActor) Summon() (skilltarget.Creature, bool) {
+func (a *effectsActor) Summon() (skilltarget.Actor, bool) {
 	if a.summon == nil {
 		return nil, false
 	}
@@ -1348,9 +1365,9 @@ func (a *effectsActor) Summon() (skilltarget.Creature, bool) {
 
 // effectsKnown is a fixed roster used as the radius-scan source for
 // area/aura target handlers under test.
-type effectsKnown []skilltarget.Creature
+type effectsKnown []skilltarget.Actor
 
-func (k effectsKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Creature, _ int, fn func(skilltarget.Creature)) {
+func (k effectsKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ int, fn func(skilltarget.Actor)) {
 	for _, c := range k {
 		if c.ObjectID() == anchor.ObjectID() {
 			continue
@@ -1386,7 +1403,7 @@ func newEffectHandlers(known skilltarget.Known, skillType string, rec *recording
 }
 
 func TestApplyEffectsResultCarriesSkillHandlerAttackFailed(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{result: handlerskill.Result{AttackFailed: 2}}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 99, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
@@ -1401,8 +1418,8 @@ func TestApplyEffectsResultCarriesSkillHandlerAttackFailed(t *testing.T) {
 }
 
 func TestApplyEffectsResultCarriesCubicTargets(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
-	other := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
+	other := &effectsActor{id: 2, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{result: handlerskill.Result{
 		CubicTargets:      []handlerskill.Actor{other},
 		CubicAddedTargets: []handlerskill.Actor{other},
@@ -1420,7 +1437,7 @@ func TestApplyEffectsResultCarriesCubicTargets(t *testing.T) {
 }
 
 func TestApplyEffectsResultCarriesSkillHandlerCounterattack(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{result: handlerskill.Result{Counterattacks: []handlerskill.Counterattack{{
 		AttackerID: 1, AttackerName: "Attacker", DefenderID: 2, DefenderName: "Defender",
 	}}}}
@@ -1434,8 +1451,8 @@ func TestApplyEffectsResultCarriesSkillHandlerCounterattack(t *testing.T) {
 }
 
 func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
-	caster := &pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}}
-	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	caster := &pvpEffectsActor{effectsActor: effectsActor{id: 1, kind: modelactor.KindPlayer}}
+	target := &effectsActor{id: 2, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
@@ -1447,17 +1464,17 @@ func TestApplyEffectsNotifiesPvPStatusBeforeSkillHandling(t *testing.T) {
 		t.Fatalf("PvP status calls = %d, want 1", len(caster.calls))
 	}
 	call := caster.calls[0]
-	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != target {
+	if !call.offensive || call.skillType != "DUMMY" || len(call.targets) != 1 || call.targets[0] != attackable.Combatant(target) {
 		t.Fatalf("PvP status call = %+v, want offensive selected target", call)
 	}
 }
 
 func TestApplyEffectsAbortsWhenPlayableSkillSeeCurseBlocks(t *testing.T) {
 	caster := &cursePvpEffectsActor{
-		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, kind: modelactor.KindPlayer}},
 		block:           true,
 	}
-	target := &effectsActor{id: 2, category: skilltarget.CategoryAttackable}
+	target := &effectsActor{id: 2, kind: modelactor.KindNPC}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
@@ -1475,9 +1492,9 @@ func TestApplyEffectsAbortsWhenPlayableSkillSeeCurseBlocks(t *testing.T) {
 
 func TestApplyEffectsContinuesWhenPlayableSkillSeeCurseAllows(t *testing.T) {
 	caster := &cursePvpEffectsActor{
-		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, kind: modelactor.KindPlayer}},
 	}
-	target := &effectsActor{id: 2, category: skilltarget.CategoryAttackable}
+	target := &effectsActor{id: 2, kind: modelactor.KindNPC}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Offensive: true, SkillType: "DUMMY"}
@@ -1492,10 +1509,10 @@ func TestApplyEffectsContinuesWhenPlayableSkillSeeCurseAllows(t *testing.T) {
 
 func TestApplyEffectsToggleSkipsSkillSeeCurse(t *testing.T) {
 	caster := &cursePvpEffectsActor{
-		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, category: skilltarget.CategoryPlayable}},
+		pvpEffectsActor: pvpEffectsActor{effectsActor: effectsActor{id: 1, kind: modelactor.KindPlayer}},
 		block:           true,
 	}
-	target := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	target := &effectsActor{id: 2, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetOne, Activation: modelskill.ActivationToggle, SkillType: "DUMMY"}
@@ -1509,9 +1526,9 @@ func TestApplyEffectsToggleSkipsSkillSeeCurse(t *testing.T) {
 }
 
 func TestApplyEffectsAreaTargetReachesEveryAffectedCreature(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryAttackable}
-	selected := &effectsActor{id: 2, x: 10, category: skilltarget.CategoryPlayable}
-	bystander := &effectsActor{id: 3, x: 20, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindNPC}
+	selected := &effectsActor{id: 2, x: 10, kind: modelactor.KindPlayer}
+	bystander := &effectsActor{id: 3, x: 20, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{caster, selected, bystander}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 100, Target: modelskill.TargetArea, Offensive: true, Radius: 900, SkillType: "DUMMY"}
@@ -1531,8 +1548,8 @@ func TestApplyEffectsAreaTargetReachesEveryAffectedCreature(t *testing.T) {
 }
 
 func TestApplyEffectsAuraTargetSweepsRadiusAroundCaster(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryAttackable}
-	nearby := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindNPC}
+	nearby := &effectsActor{id: 2, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{caster, nearby}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 101, Target: modelskill.TargetAura, Radius: 300, SkillType: "DUMMY"}
@@ -1551,9 +1568,9 @@ func TestApplyEffectsAuraTargetSweepsRadiusAroundCaster(t *testing.T) {
 }
 
 func TestApplyEffectsCorpseMobTargetRequiresPendingCorpse(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
-	corpse := &effectsActor{id: 2, category: skilltarget.CategoryAttackable, dead: true, corpse: true, monster: true}
-	live := &effectsActor{id: 3, category: skilltarget.CategoryAttackable, corpse: false}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
+	corpse := &effectsActor{id: 2, kind: modelactor.KindNPC, dead: true, corpse: true, monster: true}
+	live := &effectsActor{id: 3, kind: modelactor.KindNPC, corpse: false}
 	def := modelskill.Definition{ID: 102, Target: modelskill.TargetCorpseMob, SkillType: "SWEEP"}
 
 	rec := &recordingSkillHandler{}
@@ -1576,8 +1593,8 @@ func TestApplyEffectsCorpseMobTargetRequiresPendingCorpse(t *testing.T) {
 }
 
 func TestApplyEffectsSummonTargetResolvesCasterOwnedSummon(t *testing.T) {
-	summon := &effectsActor{id: 2, category: skilltarget.CategoryPlayable}
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable, summon: summon}
+	summon := &effectsActor{id: 2, kind: modelactor.KindPlayer}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer, summon: summon}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 103, Target: modelskill.TargetSummon, SkillType: "DUMMY"}
@@ -1592,7 +1609,7 @@ func TestApplyEffectsSummonTargetResolvesCasterOwnedSummon(t *testing.T) {
 	// A caster without a summon must not reach the skill handler at all.
 	rec2 := &recordingSkillHandler{}
 	handlers2 := newEffectHandlers(effectsKnown{}, "DUMMY", rec2)
-	summonless := &effectsActor{id: 4, category: skilltarget.CategoryPlayable}
+	summonless := &effectsActor{id: 4, kind: modelactor.KindPlayer}
 	if ApplyEffects(handlers2, summonless, nil, def) {
 		t.Fatal("ApplyEffects(summon, no summon) = true, want false")
 	}
@@ -1602,7 +1619,7 @@ func TestApplyEffectsSummonTargetResolvesCasterOwnedSummon(t *testing.T) {
 }
 
 func TestApplyEffectsUnresolvedTargetTypeIsNoop(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
 	def := modelskill.Definition{ID: 104, Target: modelskill.TargetEnemySummon, SkillType: "DUMMY"}
@@ -1616,7 +1633,7 @@ func TestApplyEffectsUnresolvedTargetTypeIsNoop(t *testing.T) {
 }
 
 func TestApplyEffectsNilRegistriesAreNoop(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	def := modelskill.Definition{ID: 105, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
 
 	if ApplyEffects(EffectHandlers{}, caster, nil, def) {
@@ -1628,14 +1645,15 @@ func TestApplyEffectsNilRegistriesAreNoop(t *testing.T) {
 }
 
 // nonCreatureSelection is a world.Tracked value that does not satisfy
-// skilltarget.Creature — a door, static object, or similar world object a
+// skilltarget.Actor — a door, static object, or similar world object a
 // player can select but that carries no combat-relevant state.
 type nonCreatureSelection struct {
 	world.Presence
 	id int32
 }
 
-func (s *nonCreatureSelection) ObjectID() int32 { return s.id }
+func (s *nonCreatureSelection) ObjectID() int32     { return s.id }
+func (*nonCreatureSelection) Kind() modelactor.Kind { return modelactor.KindStatic }
 
 var _ world.Tracked = (*nonCreatureSelection)(nil)
 var _ Target = (*nonCreatureSelection)(nil)
@@ -1643,11 +1661,11 @@ var _ Target = (*nonCreatureSelection)(nil)
 // TestApplyEffectsRejectsNonCreatureSelection pins the quirk #1502 preserves:
 // typing Selected to world.Tracked doesn't tighten what TargetOne admits at
 // selection time (a door still satisfies cast.Target, so SelectTarget still
-// accepts it), but resolveAffected's skilltarget.Creature narrowing still
+// accepts it), but resolveAffected's skilltarget.Actor narrowing still
 // rejects it before any skill handler runs — the same branch as before the
 // caster/selection types were tightened.
 func TestApplyEffectsRejectsNonCreatureSelection(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	door := &nonCreatureSelection{id: 2}
 	rec := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", rec)
@@ -1702,7 +1720,7 @@ func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
 }
 
 func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	recorder := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", recorder)
 
@@ -1741,7 +1759,7 @@ func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 }
 
 func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) {
-	caster := &effectsActor{id: 1, category: skilltarget.CategoryPlayable}
+	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	skillDoor, err := door.NewObject(2, &door.Template{ID: 2, OpenKind: door.OpenSkill}, castDoorShape{})
 	if err != nil {
 		t.Fatal(err)
@@ -1774,25 +1792,27 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 // RevalidateLaunch's gates consult, each independently controllable so
 // tests can isolate one gate at a time.
 type launchActor struct {
+	world.Presence
+	targettest.Actor
 	id          int32
 	x, y, z     int
-	category    skilltarget.Category
+	kind        modelactor.Kind
 	radius      float64
 	sees        bool
 	knows       bool
 	inPeaceZone bool
 }
 
-func (a *launchActor) ObjectID() int32                        { return a.id }
-func (a *launchActor) Position() (int, int, int)              { return a.x, a.y, a.z }
-func (a *launchActor) Heading() int                           { return 0 }
-func (a *launchActor) Dead() bool                             { return false }
-func (a *launchActor) Category() skilltarget.Category         { return a.category }
-func (a *launchActor) CollisionRadius() float64               { return a.radius }
-func (a *launchActor) SiegeGuard() bool                       { return false }
-func (a *launchActor) AlikeDead() bool                        { return false }
-func (a *launchActor) CanSeeTarget(skilltarget.Creature) bool { return a.sees }
-func (a *launchActor) Knows(attackable.Combatant) bool        { return a.knows }
+func (a *launchActor) ObjectID() int32                     { return a.id }
+func (a *launchActor) Position() (int, int, int)           { return a.x, a.y, a.z }
+func (a *launchActor) Heading() int                        { return 0 }
+func (a *launchActor) Dead() bool                          { return false }
+func (a *launchActor) Kind() modelactor.Kind               { return a.kind }
+func (a *launchActor) CollisionRadius() float64            { return a.radius }
+func (a *launchActor) SiegeGuard() bool                    { return false }
+func (a *launchActor) AlikeDead() bool                     { return false }
+func (a *launchActor) CanSeeTarget(skilltarget.Actor) bool { return a.sees }
+func (a *launchActor) Knows(attackable.Combatant) bool     { return a.knows }
 func (a *launchActor) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 	return a.inPeaceZone
 }
@@ -1922,21 +1942,21 @@ func TestRevalidateLaunchLineOfSight(t *testing.T) {
 func TestRevalidateLaunchPeaceZone(t *testing.T) {
 	def := modelskill.Definition{Offensive: true, Radius: 0}
 
-	casterInZone := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable, inPeaceZone: true}
-	target := &launchActor{id: 2, category: skilltarget.CategoryPlayable}
+	casterInZone := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer, inPeaceZone: true}
+	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
 	if got := RevalidateLaunch(casterInZone, target, def); got != LaunchAbortCasterPeaceZone {
 		t.Fatalf("RevalidateLaunch(caster in peace zone) = %v, want LaunchAbortCasterPeaceZone", got)
 	}
 
-	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
-	targetInZone := &launchActor{id: 2, category: skilltarget.CategoryPlayable, inPeaceZone: true}
+	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer}
+	targetInZone := &launchActor{id: 2, kind: modelactor.KindPlayer, inPeaceZone: true}
 	if got := RevalidateLaunch(caster, targetInZone, def); got != LaunchAbortTargetPeaceZone {
 		t.Fatalf("RevalidateLaunch(target in peace zone) = %v, want LaunchAbortTargetPeaceZone", got)
 	}
 }
 
 func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
-	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
+	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer}
 	target, err := summon.NewPet(summon.PetConfig{ObjectID: 2, Zones: launchZoneQuery(true)})
 	if err != nil {
 		t.Fatal(err)
@@ -1952,15 +1972,15 @@ type launchZoneQuery bool
 func (q launchZoneQuery) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
 
 func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testing.T) {
-	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable, inPeaceZone: true}
-	target := &launchActor{id: 2, category: skilltarget.CategoryPlayable}
+	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer, inPeaceZone: true}
+	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
 
 	nonOffensive := modelskill.Definition{Offensive: false}
 	if got := RevalidateLaunch(caster, target, nonOffensive); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(non-offensive) = %v, want LaunchAbortNone", got)
 	}
 
-	npcTarget := &launchActor{id: 3, category: skilltarget.CategoryAttackable}
+	npcTarget := &launchActor{id: 3, kind: modelactor.KindNPC}
 	offensive := modelskill.Definition{Offensive: true}
 	if got := RevalidateLaunch(caster, npcTarget, offensive); got != LaunchAbortNone {
 		t.Fatalf("RevalidateLaunch(caster peace zone, non-playable target) = %v, want LaunchAbortNone", got)
@@ -1968,8 +1988,8 @@ func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testin
 }
 
 func TestRevalidateLaunchAllGatesPass(t *testing.T) {
-	caster := &launchActor{id: 1, knows: true, sees: true, category: skilltarget.CategoryPlayable}
-	target := &launchActor{id: 2, category: skilltarget.CategoryPlayable}
+	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer}
+	target := &launchActor{id: 2, kind: modelactor.KindPlayer}
 	def := modelskill.Definition{Offensive: true, EffectRange: 100, Radius: 100}
 
 	if got := RevalidateLaunch(caster, target, def); got != LaunchAbortNone {
@@ -2090,7 +2110,7 @@ func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
 
 // TestPlayerActorAllSkillsDisabledReflectsCrowdControl covers Java's
 // Creature.isAllSkillsDisabled(): a live crowd-control state (here, Stun)
-// blocks casting through the same allSkillsDisabler seam Controller.CanCast
+// blocks casting through the same Actor.AllSkillsDisabled seam Controller.CanCast
 // and Controller.Stop both probe, and EnableAllSkills stays a no-op since
 // this port doesn't model the raw Duel-defeat lock.
 func TestPlayerActorAllSkillsDisabledReflectsCrowdControl(t *testing.T) {
@@ -2699,7 +2719,8 @@ type requestTarget struct {
 	id int32
 }
 
-func (t *requestTarget) ObjectID() int32 { return t.id }
+func (t *requestTarget) ObjectID() int32     { return t.id }
+func (*requestTarget) Kind() modelactor.Kind { return modelactor.KindNPC }
 
 // ---- from target_test.go ----
 func TestSelectTarget(t *testing.T) {
@@ -2736,7 +2757,8 @@ type castTarget struct {
 	id int32
 }
 
-func (t *castTarget) ObjectID() int32 { return t.id }
+func (t *castTarget) ObjectID() int32     { return t.id }
+func (*castTarget) Kind() modelactor.Kind { return modelactor.KindNPC }
 
 // ---- from testfakes_test.go ----
 type testTarget struct{}
@@ -2910,7 +2932,7 @@ type groundTestActor struct {
 	gx, gy, gz int
 }
 
-func (a *groundTestActor) GroundTarget() (x, y, z int) { return a.gx, a.gy, a.gz }
+func (a *groundTestActor) GroundTargetUnset() bool { return a.gx == 0 && a.gy == 0 && a.gz == 0 }
 
 // TestCanAttemptCastRejectsUnsetGroundTarget covers PlayerCast.canAttemptCast
 // (PlayerCast.java:224): a GROUND skill requested before any
@@ -3028,3 +3050,64 @@ func TestCastToggleNeverInstallsAReuseDelay(t *testing.T) {
 		t.Fatalf("cooldown state after activate = disabled %+v reuses %+v, want none", actor.disabled, actor.reuses)
 	}
 }
+
+func (*fakeCubicEffectTarget) Kind() modelactor.Kind { return modelactor.KindNPC }
+
+func (castHostileMove) CanMoveTo(location.Location) bool { return true }
+
+func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+func (*fakeCastCreature) CanSeeTarget(skilltarget.Actor) bool { return true }
+
+func (abortActor) DecreaseCharges(int) bool { return false }
+
+func (abortActor) GroundTargetUnset() bool { return false }
+
+func (abortActor) IncreaseCharges(int, int) bool { return false }
+
+func (reentrantCostActor) DecreaseCharges(int) bool { return false }
+
+func (reentrantCostActor) ExitSignetGround() {}
+
+func (reentrantCostActor) GroundTargetUnset() bool { return false }
+
+func (reentrantCostActor) IncreaseCharges(int, int) bool { return false }
+
+func (testActor) DecreaseCharges(int) bool { return false }
+
+func (testActor) ExitSignetGround() {}
+
+func (testActor) GroundTargetUnset() bool { return false }
+
+func (testActor) IncreaseCharges(int, int) bool { return false }
+
+func (*fakeCastCreature) BroadcastSkillLaunched(int32, int32, []int32) error { return nil }
+
+func (*fakeCastCreature) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) error {
+	return nil
+}
+
+var (
+	_ SkillCaster  = (*fakeCastCreature)(nil)
+	_ SkillCaster  = (*fakeBroadcastingCaster)(nil)
+	_ SkillCaster  = (*effectsActor)(nil)
+	_ SkillCaster  = (*pvpEffectsActor)(nil)
+	_ SkillCaster  = (*cursePvpEffectsActor)(nil)
+	_ AICaster     = (*fakeCastCreature)(nil)
+	_ AICaster     = (*fakeBroadcastingCaster)(nil)
+	_ effect.Actor = (*fakeCubicHealTarget)(nil)
+)
+
+func (*fakeCastCreature) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*fakeCastCreature) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}
+
+func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}
+
+var _ handlerskill.Creature = (*fakeCubicEffectTarget)(nil)

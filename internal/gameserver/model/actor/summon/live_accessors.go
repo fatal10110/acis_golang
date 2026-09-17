@@ -1,8 +1,8 @@
 package summon
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -31,11 +31,8 @@ func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.G
 	return a.movement.Init(origin, speed, geo)
 }
 
-// ActingPlayer returns the owner for player-attributed outcomes.
-func (a *Actor) ActingPlayer() creature.DeathActor {
-	owner, _ := a.owner.(creature.DeathActor)
-	return owner
-}
+// Kind reports KindSummon.
+func (a *Actor) Kind() actor.Kind { return actor.KindSummon }
 
 // OwnerID returns the owning player's world object id.
 func (a *Actor) OwnerID() int32 {
@@ -94,12 +91,8 @@ func (a *Actor) SyncControlItemEnchant() bool {
 	return a.ownerInventory.SetEnchantLevel(inst, level)
 }
 
-func (a *Actor) notifyDamage(attacker any, amount float64) {
-	named, ok := attacker.(interface{ CharacterName() string })
-	if !ok {
-		return
-	}
-	a.emit(event.Damaged{AttackerName: named.CharacterName(), Damage: int32(amount)})
+func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
+	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: int32(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.
@@ -418,6 +411,8 @@ func (a *Actor) SetTeleporting(v bool) bool {
 }
 
 // Knows reports whether target is currently visible to this summon.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (a *Actor) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(a, tracked)
@@ -494,12 +489,6 @@ func (a *Actor) InCombat() bool {
 // — the summon's own attack component, not the owner's.
 func (a *Actor) IsAttackingNow() bool {
 	return a.brain != nil && a.brain.AttackingNow()
-}
-
-// OwnerCombatant returns the owning player when it can be targeted by AI.
-func (a *Actor) OwnerCombatant() attackable.Combatant {
-	owner, _ := a.owner.(attackable.Combatant)
-	return owner
 }
 
 // CurrentTarget returns the summon target selected by its current command.

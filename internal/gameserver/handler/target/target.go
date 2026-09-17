@@ -3,149 +3,87 @@ package target
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// Category classifies the runtime shape a target handler needs for
-// selection rules.
-type Category uint8
-
-const (
-	// CategoryPlayable marks player-controlled actors and summons.
-	CategoryPlayable Category = 1 << iota
-	// CategoryAttackable marks hostile or otherwise attackable NPC actors.
-	CategoryAttackable
-	// CategoryFolk marks NPC actors that can affect nearby playable actors.
-	CategoryFolk
-)
-
-// Has reports whether c includes all bits in want.
-func (c Category) Has(want Category) bool { return c&want == want }
-
-// Creature is the actor surface target handlers need to resolve affected
-// skill targets.
-type Creature interface {
-	ObjectID() int32
+// Actor is a skill caster or target: a player, NPC, summon or door. Every
+// kind implements every method; a method that does not apply to a kind
+// returns the neutral value documented at its implementation.
+type Actor interface {
+	world.Tracked
 	Position() (x, y, z int)
 	Heading() int
+	// CollisionHeight is the eye height line-of-sight checks use.
+	CollisionHeight() float64
 	Dead() bool
-	Category() Category
-}
 
-// AttackRules is implemented by creatures that can answer whether a caster
-// may affect them offensively.
-type AttackRules interface {
-	AttackableBy(caster Creature) bool
-	AttackableWithoutForceBy(caster Creature) bool
-}
+	// AttackableBy reports whether caster may affect this actor offensively;
+	// AttackableWithoutForceBy whether it may without a forced attack.
+	AttackableBy(caster Actor) bool
+	AttackableWithoutForceBy(caster Actor) bool
+	// CanSeeTarget reports line of sight from this actor to target.
+	CanSeeTarget(target Actor) bool
+	InPeaceZone() bool
+	// EffectRangeInPeaceZone reports whether an effect of effectRange centered
+	// on (x, y, z) overlaps a peace zone in the actor's region.
+	EffectRangeInPeaceZone(x, y, z, effectRange int) bool
+	// GroundTarget is the pending ground-click point of a ground-targeted
+	// cast, and CanSeePoint the line of sight to a point; only players track
+	// one.
+	GroundTarget() (x, y, z int)
+	CanSeePoint(x, y, z int) bool
 
-// SightChecker is implemented by creatures that can answer line-of-sight
-// checks against another creature.
-type SightChecker interface {
-	CanSeeTarget(target Creature) bool
-}
-
-// Summoner is implemented by creatures that expose a current summon.
-type Summoner interface {
-	Summon() (Creature, bool)
-}
-
-// OwnedCreature is implemented by summons that expose their owner.
-type OwnedCreature interface {
-	Owner() (Creature, bool)
-}
-
-// HolyTarget is implemented by creatures that can receive artifact-targeted
-// skills.
-type HolyTarget interface {
-	Holy() bool
-}
-
-// UnlockableTarget is implemented by creatures that can receive unlock
-// skills.
-type UnlockableTarget interface {
-	Unlockable() bool
-}
-
-// UndeadTarget is implemented by creatures that expose undead race state to
-// skill targeting.
-type UndeadTarget interface {
-	Undead() bool
-}
-
-// CorpseTarget is implemented by creatures that can report whether they
-// currently have a pending, lootable corpse available to corpse-targeted
-// skills.
-type CorpseTarget interface {
-	HasCorpse() bool
-}
-
-// MonsterTarget identifies the Monster-family corpses accepted by harvest and
-// sweep skills.
-type MonsterTarget interface {
-	MonsterKind() bool
-}
-
-// FolkOrGuardTarget identifies the civilian NPC kinds that accept only
-// CTRL-pressed damage skills as offensive ONE targets.
-type FolkOrGuardTarget interface {
+	// Folk reports a civilian NPC that can affect nearby playable actors.
+	Folk() bool
+	// FolkOrGuard reports a civilian NPC kind that only accepts CTRL-pressed
+	// damage skills as offensive single targets.
 	FolkOrGuard() bool
-}
+	MonsterKind() bool
+	Undead() bool
+	// Holy reports an artifact that accepts holy-targeted skills.
+	Holy() bool
+	Unlockable() bool
+	// IsPet reports a pet rather than a servitor.
+	IsPet() bool
 
-// DoorTarget identifies doors, whose attackability is distinct from hostile
-// NPC attackability.
-type DoorTarget interface {
-	Door() bool
-}
-
-// PlayableCastRules lets a playable caster apply its relationship policy to
-// another playable target.
-type PlayableCastRules interface {
-	CanCastOnPlayable(target Creature, skill *modelskill.Definition, ctrl, offensive bool) bool
-}
-
-// OlympiadCastState identifies the pre-match Olympiad gate for playable
-// targets.
-type OlympiadCastState interface {
-	OlympiadMode() bool
-	OlympiadStarted() bool
-}
-
-// CorpseDeadlineTarget is optionally implemented by mob corpses that expose
-// the decay deadline used for Java's too-old corpse targeting cutoff.
-type CorpseDeadlineTarget interface {
+	// HasCorpse reports a pending, lootable corpse.
+	HasCorpse() bool
+	// CorpseDeadline and CorpseTime drive the too-old corpse cutoff.
 	CorpseDeadline() (time.Time, bool)
 	CorpseTime() time.Duration
-}
-
-// SpoiledCorpse is optionally implemented by mob corpses that bypass the
-// too-old targeting cutoff after a successful spoil.
-type SpoiledCorpse interface {
+	// Spoiled and Seeded bypass the too-old corpse cutoff.
 	Spoiled() bool
-}
-
-// SeededCorpse is optionally implemented by mob corpses that bypass the
-// too-old targeting cutoff after being sown.
-type SeededCorpse interface {
 	Seeded() bool
-}
 
-// PetTarget is implemented by summons that can report whether they are pets
-// rather than servitors.
-type PetTarget interface {
-	IsPet() bool
-}
+	// Summon returns the actor's active summon.
+	Summon() (Actor, bool)
+	// Owner returns the player controlling a summon.
+	Owner() (attackable.Combatant, bool)
 
-// PeaceZoner is implemented by creatures that can report whether hostilities
-// are blocked by their current zone.
-type PeaceZoner interface {
-	InPeaceZone() bool
+	// CanCastOnPlayable applies a playable caster's relationship policy to a
+	// playable target.
+	CanCastOnPlayable(target Actor, skill *modelskill.Definition, ctrl, offensive bool) bool
+	OlympiadMode() bool
+	OlympiadStarted() bool
+	IsInParty() bool
+	PartyContains(other Actor) bool
+	IsInSameParty(other Actor) bool
+	IsInSameClan(other Actor) bool
+	IsInSameAlly(other Actor) bool
+	HasClan() bool
+	// DuelID is 0 when not dueling.
+	DuelID() int32
+	DuelTeam() int
+	MageClass() bool
+	// ClanGroups are the social-group tags a monster template carries.
+	ClanGroups() []string
 }
 
 // Known enumerates nearby creatures for radius-based target handlers.
 type Known interface {
-	ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature))
+	ForEachKnownCreatureInRadius(anchor Actor, radius int, fn func(Actor))
 }
 
 // WorldKnown adapts the world grid to target-handler radius scans.
@@ -155,18 +93,14 @@ type WorldKnown struct {
 
 // ForEachKnownCreatureInRadius calls fn for every known creature within
 // radius of anchor.
-func (w WorldKnown) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn func(Creature)) {
-	if w.State == nil {
+func (w WorldKnown) ForEachKnownCreatureInRadius(anchor Actor, radius int, fn func(Actor)) {
+	if w.State == nil || anchor == nil {
 		return
 	}
-	tracked, ok := anchor.(world.Tracked)
-	if !ok {
-		return
-	}
-	w.State.ForEachKnownInRadius(tracked, radius, func(obj world.Tracked) {
-		creature, ok := obj.(Creature)
-		if ok {
-			fn(creature)
+	w.State.ForEachKnownInRadius(anchor, radius, func(obj world.Tracked) {
+		// Items and static objects on the grid are never skill targets.
+		if a, ok := obj.(Actor); ok {
+			fn(a)
 		}
 	})
 }
@@ -174,9 +108,9 @@ func (w WorldKnown) ForEachKnownCreatureInRadius(anchor Creature, radius int, fn
 // Handler resolves a skill's final target and affected target list.
 type Handler interface {
 	Target() modelskill.Target
-	Targets(caster, target Creature, skill *modelskill.Definition) []Creature
-	FinalTarget(caster, target Creature, skill *modelskill.Definition) Creature
-	CanCast(caster, target Creature, skill *modelskill.Definition, ctrl bool) bool
+	Targets(caster, target Actor, skill *modelskill.Definition) []Actor
+	FinalTarget(caster, target Actor, skill *modelskill.Definition) Actor
+	CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool
 }
 
 // Registry owns the target handlers available to the cast pipeline.

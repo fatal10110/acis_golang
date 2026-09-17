@@ -2,51 +2,12 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
-
-type hpDamageTarget interface {
-	Actor
-	ReduceHP(amount float64, attacker creature.DeathActor, skill modelskill.Definition)
-}
-
-type physicalSkillTarget interface {
-	hpDamageTarget
-	PhysicalSkillInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
-}
-
-type magicDamageTarget interface {
-	hpDamageTarget
-	MagicDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
-}
-
-type blowDamageTarget interface {
-	hpDamageTarget
-	BlowInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.BlowInput, bool)
-}
-
-type counterSkillPhysicalTarget interface {
-	CounterSkillPhysical() float64
-}
-
-type chargeDamageCaster interface {
-	Charges() int
-}
-
-type characterNameTarget interface {
-	CharacterName() string
-}
-
-type manaDamageTarget interface {
-	Actor
-	MPValue() float64
-	ReduceMP(float64) float64
-	ManaDamageInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
-}
 
 type shotCharger interface {
 	SetChargedShot(modelitem.ShotKind, bool)
@@ -57,39 +18,22 @@ type chargedShotUser interface {
 	ChargedShot(modelitem.ShotKind) bool
 }
 
-type lethalTarget interface {
-	LethalInput(caster creature.DeathActor, skill modelskill.Definition) (formulas.LethalInput, bool)
-	ApplyLethalOutcome(formulas.LethalOutcome, creature.DeathActor, modelskill.Definition)
-}
-
-type lethalInvulnerableTarget interface {
-	Invulnerable() bool
-}
-
-type lethalInvulTarget interface {
-	Invul() bool
-}
-
-type lethalableTarget interface {
-	Lethalable() bool
-}
-
 // reflectEffectTarget returns the effect-list-owning destination for def's
 // effects cast at obj: obj itself, or cast.Caster when obj reflects the
 // skill back — the rule disablers.go's reflectTarget applies, generalized
-// to whatever satisfies effectListTarget rather than the fuller
+// to whatever satisfies effect.Actor rather than the fuller
 // disablerTarget surface (Dead/Invul/Paralyzed) a damage handler's own
 // Dead()/evasion checks already cover before this runs. Returns nil when
 // reflect fires but the caster doesn't expose an effect list to redirect
 // onto — a duck-typing gap safer to drop than to guess through, matching
 // reflectTarget's own behavior. The second return reports whether reflect
 // fired.
-func reflectEffectTarget(cast Cast, obj Actor) (effectListTarget, bool) {
-	target, ok := obj.(effectListTarget)
+func reflectEffectTarget(cast Cast, obj Actor) (effect.Actor, bool) {
+	target, ok := obj.(effect.Actor)
 	if !ok {
 		return nil, false
 	}
-	src, ok := obj.(skillReflectSource)
+	src, ok := asCreature(obj)
 	if !ok {
 		return target, false
 	}
@@ -98,7 +42,7 @@ func reflectEffectTarget(cast Cast, obj Actor) (effectListTarget, bool) {
 	if !formulas.SkillReflects(in, rnd.Get(100)) {
 		return target, false
 	}
-	caster, ok := cast.Caster.(effectListTarget)
+	caster, ok := cast.Caster.(effect.Actor)
 	if !ok {
 		return nil, true
 	}
@@ -119,7 +63,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(physicalSkillTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -166,11 +110,11 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	modifier := 0.0
-	if caster, ok := cast.Caster.(chargeDamageCaster); ok {
+	if caster, ok := asPlayer(cast.Caster); ok {
 		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.NumCharges)
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(physicalSkillTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -204,7 +148,7 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	elt, ok := obj.(effectListTarget)
+	elt, ok := obj.(effect.Actor)
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
@@ -230,7 +174,7 @@ func (mdamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(magicDamageTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -267,7 +211,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	elt, ok := obj.(effectListTarget)
+	elt, ok := obj.(effect.Actor)
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
@@ -307,7 +251,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(blowDamageTarget)
+		target, ok := asCreature(obj)
 		if !ok || alikeDead(target) {
 			continue
 		}
@@ -351,17 +295,13 @@ func (blowHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyPhysicalSkillCounter(cast Cast, target hpDamageTarget, damage float64, result *Result) bool {
-	source, ok := target.(counterSkillPhysicalTarget)
-	if !ok {
-		return false
-	}
-	counter := source.CounterSkillPhysical()
+func applyPhysicalSkillCounter(cast Cast, target Creature, damage float64, result *Result) bool {
+	counter := target.CounterSkillPhysical()
 	if !counterSkillReflects(cast.Skill, counter) {
 		return false
 	}
-	if caster, ok := cast.Caster.(hpDamageTarget); ok {
-		caster.ReduceHP(damage*counter/100, target, cast.Skill)
+	if cast.Caster != nil {
+		cast.Caster.ReduceHP(damage*counter/100, target, cast.Skill)
 	}
 	if result != nil {
 		result.Counterattacks = append(result.Counterattacks, Counterattack{
@@ -382,14 +322,10 @@ func counterattackObjectID(obj Actor) int32 {
 }
 
 func actorName(obj Actor) string {
-	if target, ok := obj.(characterNameTarget); ok {
+	if target, ok := asEffected(obj); ok {
 		return target.CharacterName()
 	}
 	return ""
-}
-
-type worldPlayerTarget interface {
-	WorldPlayer()
 }
 
 func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, result *Result) {
@@ -405,7 +341,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 		// so it never reaches a Summon's owner in the reference.
 		appendResisted(result, target, cast.Skill, false)
 	}
-	if _, ok := target.(worldPlayerTarget); ok {
+	if target.Kind() == actor.KindPlayer {
 		result.MagicResists = append(result.MagicResists, MagicResist{
 			TargetID:     target.ObjectID(),
 			AttackerName: actorName(cast.Caster),
@@ -428,20 +364,20 @@ type resistedMagicNotifier interface {
 // deliverMagicFailure sends the caster/target resist system messages a
 // magic-damage failure produces, for paths that do not return a skill
 // handler Result (signet ticks).
-func deliverMagicFailure(caster, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
+func deliverMagicFailure(caster Creature, target Actor, def modelskill.Definition, failure formulas.MagicFailure) {
 	var result Result
 	reportMagicFailure(Cast{Caster: caster, Skill: def}, target, failure, &result)
-	if n, ok := caster.(attackFailedNotifier); ok {
+	if n, ok := asPlayer(caster); ok {
 		for i := 0; i < result.AttackFailed; i++ {
 			n.NotifyAttackFailed()
 		}
 	}
-	if n, ok := caster.(resistedSkillNotifier); ok {
+	if n, ok := asPlayer(caster); ok {
 		for _, r := range result.Resisted {
 			n.NotifyResistedSkill(r.TargetName, r.SkillID, r.SkillLevel)
 		}
 	}
-	if n, ok := target.(resistedMagicNotifier); ok {
+	if n, ok := asPlayer(target); ok {
 		for _, r := range result.MagicResists {
 			n.NotifyResistedMagic(r.AttackerName)
 		}
@@ -491,7 +427,7 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 	}
 	effected, reflected := reflectEffectTarget(cast, obj)
 	if countered && reflected {
-		effected, _ = obj.(effectListTarget)
+		effected, _ = obj.(effect.Actor)
 	}
 	if effected == nil {
 		return
@@ -544,28 +480,26 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := obj.(manaDamageTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
-		var effected effectListTarget
+		var effected effect.Actor
 		var effective Actor = target
-		if _, ok := obj.(effectListTarget); ok {
+		if _, ok := obj.(effect.Actor); ok {
 			effected, _ = reflectEffectTarget(cast, obj)
 			if effected == nil {
 				continue
 			}
 			effective = effected
 		}
-		target, ok = effective.(manaDamageTarget)
+		target, ok = asCreature(effective)
 		if !ok || target.Dead() {
 			continue
 		}
 		in, ok := target.ManaDamageInput(cast.Caster, cast.Skill)
 		if !ok {
-			if v, invOk := target.(lethalInvulnerableTarget); invOk && v.Invulnerable() {
-				result.ManaDamageMissed++
-			} else if v, invOk := target.(lethalInvulTarget); invOk && v.Invul() {
+			if target.Invulnerable() || target.Invul() {
 				result.ManaDamageMissed++
 			}
 			continue
@@ -591,14 +525,14 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if mp > 0 {
 			target.ReduceMP(mp)
 		}
-		if _, ok := obj.(worldPlayerTarget); ok {
+		if obj.Kind() == actor.KindPlayer {
 			result.ManaDrains = append(result.ManaDrains, ManaDrain{
 				TargetID:   obj.ObjectID(),
 				CasterName: actorName(cast.Caster),
 				MP:         int32(mp),
 			})
 		}
-		if _, ok := cast.Caster.(worldPlayerTarget); ok {
+		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
 			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
@@ -607,7 +541,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		// through the same effect-list removal path stopEffectsBySkillID
 		// uses rather than a type assertion that only test fakes satisfy.
 		if rawDamage > 0 {
-			if elt, ok := effective.(effectListTarget); ok {
+			if elt, ok := effective.(effect.Actor); ok {
 				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
 					return e.Type == effect.TypeSleep || e.Type == effect.TypeImmobileUntilAttacked
 				})
@@ -626,20 +560,15 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 }
 
 func applyLethalHit(cast Cast, obj Actor, result *Result) {
-	target, ok := obj.(lethalTarget)
+	target, ok := asCreature(obj)
 	if !ok {
 		return
 	}
-	if v, ok := obj.(lethalInvulnerableTarget); ok && v.Invulnerable() {
+	if target.Invulnerable() || target.Invul() || target.RaidRelated() {
 		return
 	}
-	if v, ok := obj.(lethalInvulTarget); ok && v.Invul() {
-		return
-	}
-	if v, ok := obj.(raidRelatedTarget); ok && v.RaidRelated() {
-		return
-	}
-	if v, ok := obj.(lethalableTarget); ok && !v.Lethalable() {
+	// Only an NPC limits which lethal strikes may apply to it.
+	if n, ok := asNPC(obj); ok && !n.Lethalable() {
 		return
 	}
 	in, ok := target.LethalInput(cast.Caster, cast.Skill)

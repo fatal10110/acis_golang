@@ -4,10 +4,17 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -19,12 +26,159 @@ import (
 // as an inert `any` that every one of those assertions then misses.
 type Actor interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	Dead() bool
+	Position() (x, y, z int)
+	Heading() int
+}
+
+// Creature is a creature cast participant, caster or target: every player,
+// NPC and summon. It takes part in combat and in effects; a method that does
+// not apply to a kind returns the neutral value documented at its
+// implementation.
+type Creature interface {
+	attackable.Combatant
+	effect.Actor
+
+	Invul() bool
+	Paralyzed() bool
+	Undead() bool
+	BlessedSpiritshotCharged() bool
+	// SkillSuccessInput and EffectSuccessInput resolve an effect-landing roll
+	// of caster's skill against this creature; ok is false when it can't be
+	// rolled at all.
+	SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+	EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
+	// SkillReflectInput is the state deciding whether this creature reflects
+	// def back onto its caster.
+	SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput
+	// ShieldDefense resolves this creature's shield block against caster.
+	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+
+	// Attackable reports an NPC combat target; the aggro controls below only
+	// act on one.
+	Attackable() bool
+	NotifyAggression(source attackable.Combatant, power int)
+	ReduceAllAggroHate(amount float64)
+	StopAggroHate(attacker attackable.Combatant)
+	StopHateList(attacker attackable.Combatant)
+	ClearAggroTables()
+	// EnableOverhit arms overhit damage tracking for the current hit; only
+	// attackable NPCs track it.
+	EnableOverhit()
+
+	// CurrentTarget, SetTarget and AttackTarget retarget a playable creature
+	// provoked by aggression.
+	CurrentTarget() world.Tracked
+	SetTarget(world.Tracked)
+	AttackTarget(world.Tracked)
+
+	// Damage and resource surface. ReduceHP applies skill damage; the
+	// *Input methods resolve a formula roll against this creature and
+	// report false when it cannot be rolled.
+	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
+	PhysicalSkillInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
+	BlowInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.BlowInput, bool)
+	ManaDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
+	LethalInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.LethalInput, bool)
+	ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition)
+	CounterSkillPhysical() float64
+	Invulnerable() bool
+	HealAmount(modelskill.Definition) (float64, bool)
+	MaxHPValue() float64
+	MaxMPValue() float64
+	SetHP(float64)
+}
+
+// Player is the player-only cast participant surface: the resources, cast
+// state and client notifications only a player character carries.
+type Player interface {
+	Creature
+
+	CP() float64
+	MaxCPValue() float64
+	SetCP(float64)
+	BreakCastOnDamage(damage float64)
+	Charges() int
+	Revive(percent float64) bool
+	RestoreExp(restorePercent float64)
+	// CursedWeaponEquipped reports a cursed weapon in hand.
+	CursedWeaponEquipped() bool
+	// Summon-friend eligibility state.
+	Operating() bool
+	Rooted() bool
+	InCombat() bool
+	FestivalParticipant() bool
+	// Client notifications.
+	NotifyHPRestored(healerName string, amount int, byOther bool)
+	NotifyMPRestored(healerName string, amount int, byOther bool)
+	NotifyCPRestored(healerName string, amount int, byOther bool)
+	NotifyAttackFailed()
+	NotifyResistedSkill(targetName string, skillID modelskill.ID, level int)
+	NotifyResistedMagic(attackerName string)
+	NotifySpoilAlready()
+	NotifySpoilSuccess()
+	// Summon-friend eligibility state the caster and target share.
+	Mounted() bool
+	OlympiadMode() bool
+	ObserverMode() bool
+	NoSummonFriendZone() bool
+}
+
+// NPC is the NPC-only cast participant surface.
+type NPC interface {
+	Creature
+
+	// Lethalable reports whether a lethal strike may apply at all.
+	Lethalable() bool
+	// SpoilPool is the NPC's sweepable drop pool, nil when it has none.
+	SpoilPool() *item.SpoilPool
+}
+
+// Summon is the summon-only cast participant surface.
+type Summon interface {
+	Creature
+	SiegeSummon() bool
+	SummonOwner() summon.Owner
+	UnSummon(owner summon.Owner)
+}
+
+// asCreature returns a as a creature, or false for a cast participant that
+// is not one (a door or a signet effect point).
+func asCreature(a Actor) (Creature, bool) {
+	c, ok := a.(Creature)
+	return c, ok
+}
+
+// asPlayer returns a as a player character, or false for any other kind.
+func asPlayer(a Actor) (Player, bool) {
+	if a == nil || a.Kind() != actor.KindPlayer {
+		return nil, false
+	}
+	p, ok := a.(Player)
+	return p, ok
+}
+
+// asNPC returns a as an NPC, or false for any other kind.
+func asNPC(a Actor) (NPC, bool) {
+	if a == nil || a.Kind() != actor.KindNPC {
+		return nil, false
+	}
+	n, ok := a.(NPC)
+	return n, ok
+}
+
+// asEffected returns a as an effect target: every creature plus a signet
+// effect point, which holds an effect list without taking part in combat.
+func asEffected(a Actor) (effect.Actor, bool) {
+	e, ok := a.(effect.Actor)
+	return e, ok
 }
 
 // Cast carries the already-resolved inputs a skill handler needs.
 type Cast struct {
-	Caster  Actor
+	Caster  Creature
 	Skill   modelskill.Definition
 	Targets []Actor
 	// Item is a genuinely heterogeneous payload with unrelated consumers
@@ -272,21 +426,14 @@ func (dummyHandler) Types() []string { return []string{"DUMMY", "BEAST_FEED"} }
 
 func (dummyHandler) Use(Cast) {}
 
-// alikeDeadSource optionally reports an actor's death-like state (fake
-// death, a pending resurrect) on top of plain death; an actor without one
-// is alike-dead exactly when it is dead.
-type alikeDeadSource interface {
-	AlikeDead() bool
-}
-
 // alikeDead reports whether a is dead or in a death-like state, matching the
 // reference's isAlikeDead() default of falling back to isDead().
 func alikeDead(a Actor) bool {
 	if a == nil {
 		return false
 	}
-	if d, ok := a.(alikeDeadSource); ok {
-		return d.AlikeDead()
+	if c, ok := asCreature(a); ok {
+		return c.AlikeDead()
 	}
 	return a.Dead()
 }
@@ -305,13 +452,24 @@ func sameObject(a, b Actor) bool {
 	return a == b
 }
 
-// cursedWeaponHolder optionally reports whether an actor currently wields a
-// cursed weapon; an actor without one never does.
-type cursedWeaponHolder interface {
-	CursedWeaponEquipped() bool
+// cursed reports whether a wields a cursed weapon; only a player can.
+func cursed(a Actor) bool {
+	p, ok := asPlayer(a)
+	return ok && p.CursedWeaponEquipped()
 }
 
-func cursed(a Actor) bool {
-	c, ok := a.(cursedWeaponHolder)
-	return ok && c.CursedWeaponEquipped()
+// combatantOf returns a as a combatant, or nil for a cast participant that is
+// not a creature (a door or a signet effect point). Formula inputs treat a nil
+// caster as one that cannot roll.
+func combatantOf(a Actor) attackable.Combatant {
+	c, _ := a.(attackable.Combatant)
+	return c
 }
+
+var (
+	_ Player   = (*player.Character)(nil)
+	_ NPC      = (*npc.Hostile)(nil)
+	_ Creature = (*player.Character)(nil)
+	_ Creature = (*npc.Hostile)(nil)
+	_ Summon   = (*summon.Actor)(nil)
+)

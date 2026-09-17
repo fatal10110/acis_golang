@@ -3,6 +3,7 @@ package target
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -14,82 +15,53 @@ func skillRadius(skill *modelskill.Definition) int {
 	return skill.Radius
 }
 
-func sameCreature(a, b Creature) bool {
+func sameCreature(a, b Actor) bool {
 	return a != nil && b != nil && a.ObjectID() == b.ObjectID()
 }
 
-func canSee(origin, target Creature) bool {
-	checker, ok := origin.(SightChecker)
-	return !ok || checker.CanSeeTarget(target)
-}
+// isPlayable reports a player-controlled actor: a player or its summon.
+func isPlayable(a Actor) bool { return a.Kind().Playable() }
 
-func areaCanAffect(caster, creature Creature) bool {
-	if caster.Category().Has(CategoryPlayable) && creature.Category()&(CategoryAttackable|CategoryPlayable) != 0 {
-		return attackableWithoutForceBy(creature, caster)
+// isAttackable reports an attackable NPC.
+func isAttackable(a Actor) bool { return a.Kind() == actor.KindNPC }
+
+func areaCanAffect(caster, creature Actor) bool {
+	if isPlayable(caster) && (isAttackable(creature) || isPlayable(creature)) {
+		return creature.AttackableWithoutForceBy(caster)
 	}
-	if caster.Category().Has(CategoryAttackable) && creature.Category().Has(CategoryPlayable) {
-		return attackableBy(creature, caster)
+	if isAttackable(caster) && isPlayable(creature) {
+		return creature.AttackableBy(caster)
 	}
 	return false
 }
 
-func auraCanAffect(caster, creature Creature) bool {
+func auraCanAffect(caster, creature Actor) bool {
 	if areaCanAffect(caster, creature) {
 		return true
 	}
-	return caster.Category().Has(CategoryFolk) && creature.Category().Has(CategoryPlayable)
+	return caster.Folk() && isPlayable(creature)
 }
 
-func attackableBy(creature, caster Creature) bool {
-	rules, ok := creature.(AttackRules)
-	return ok && rules.AttackableBy(caster)
-}
-
-func attackableWithoutForceBy(creature, caster Creature) bool {
-	rules, ok := creature.(AttackRules)
-	return ok && rules.AttackableWithoutForceBy(caster)
-}
-
-func validUndeadSingleTarget(creature Creature) bool {
-	if creature == nil || creature.Dead() || !isUndead(creature) {
+func validUndeadSingleTarget(creature Actor) bool {
+	if creature == nil || creature.Dead() || !creature.Undead() {
 		return false
 	}
-	if creature.Category().Has(CategoryAttackable) {
-		return monsterKind(creature)
+	if isAttackable(creature) {
+		return creature.MonsterKind()
 	}
-	if creature.Category().Has(CategoryPlayable) {
+	if isPlayable(creature) {
 		_, ok := ownerOf(creature)
-		pet, isPet := creature.(PetTarget)
-		return ok && isPet && !pet.IsPet()
+		return ok && !creature.IsPet()
 	}
 	return false
 }
 
-func isUndead(creature Creature) bool {
-	undead, ok := creature.(UndeadTarget)
-	return ok && undead.Undead()
-}
-
-func hasCorpse(creature Creature) bool {
-	corpse, ok := creature.(CorpseTarget)
-	return ok && corpse.HasCorpse()
-}
-
-func monsterKind(creature Creature) bool {
-	monster, ok := creature.(MonsterTarget)
-	return ok && monster.MonsterKind()
-}
-
-func corpseTooOld(creature Creature) bool {
-	target, ok := creature.(CorpseDeadlineTarget)
+func corpseTooOld(creature Actor) bool {
+	deadline, ok := creature.CorpseDeadline()
 	if !ok {
 		return false
 	}
-	deadline, ok := target.CorpseDeadline()
-	if !ok {
-		return false
-	}
-	corpseTime := target.CorpseTime()
+	corpseTime := creature.CorpseTime()
 	if corpseTime <= 0 {
 		return false
 	}
@@ -97,38 +69,27 @@ func corpseTooOld(creature Creature) bool {
 	return !time.Now().Before(cutoff)
 }
 
-func corpseAgeBypass(creature Creature) bool {
-	if spoiled, ok := creature.(SpoiledCorpse); ok && spoiled.Spoiled() {
-		return true
-	}
-	seeded, ok := creature.(SeededCorpse)
-	return ok && seeded.Seeded()
+func corpseAgeBypass(creature Actor) bool {
+	return creature.Spoiled() || creature.Seeded()
 }
 
-func inPeaceZone(creature Creature) bool {
-	zoner, ok := creature.(PeaceZoner)
-	return ok && zoner.InPeaceZone()
-}
-
-func summonOf(creature Creature) (Creature, bool) {
-	summoner, ok := creature.(Summoner)
-	if !ok {
-		return nil, false
-	}
-	summon, ok := summoner.Summon()
+func summonOf(creature Actor) (Actor, bool) {
+	summon, ok := creature.Summon()
 	return summon, ok && summon != nil
 }
 
-func ownerOf(creature Creature) (Creature, bool) {
-	owned, ok := creature.(OwnedCreature)
+// ownerOf returns the player controlling a summon.
+func ownerOf(creature Actor) (Actor, bool) {
+	owner, ok := creature.Owner()
 	if !ok {
 		return nil, false
 	}
-	owner, ok := owned.Owner()
-	return owner, ok && owner != nil
+	// Summon owners are players, which are always skill actors.
+	player, ok := owner.(Actor)
+	return player, ok
 }
 
-func creatureLocation(creature Creature) location.Location {
+func creatureLocation(creature Actor) location.Location {
 	if creature == nil {
 		return location.Location{}
 	}
@@ -136,7 +97,7 @@ func creatureLocation(creature Creature) location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
-func creatureOrientedLocation(creature Creature) location.OrientedLocation {
+func creatureOrientedLocation(creature Actor) location.OrientedLocation {
 	if creature == nil {
 		return location.OrientedLocation{}
 	}

@@ -5,36 +5,32 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func spoilStart(e *Effect) bool {
-	caster, ok := e.Effector.(spoilCaster)
-	if !ok {
+	caster := e.Effector
+	if caster == nil {
 		return false
 	}
-	target, ok := e.Effected.(spoilTarget)
+	target, ok := asNPC(e.Effected)
 	if !ok || target.Dead() {
 		return false
 	}
+	player, casterIsPlayer := asPlayer(caster)
 	pool := target.SpoilPool()
 	if pool == nil || pool.IsSpoiled() {
-		if notify, ok := e.Effector.(spoilNotifier); ok && pool != nil {
-			notify.NotifySpoilAlready()
+		if casterIsPlayer && pool != nil {
+			player.NotifySpoilAlready()
 		}
 		return false
 	}
 
-	penalty := false
-	if p, ok := e.Effector.(weaponGradePenalized); ok {
-		penalty = p.WeaponGradePenalty()
-	}
-
+	penalty := casterIsPlayer && player.WeaponGradePenalty()
 	rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, penalty)
 	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
 		pool.Mark(caster.ObjectID())
-		if notify, ok := e.Effector.(spoilNotifier); ok {
-			notify.NotifySpoilSuccess()
+		if casterIsPlayer {
+			player.NotifySpoilSuccess()
 		}
 	}
 	return true
@@ -50,36 +46,29 @@ const distrustRadius = 600
 // nearby candidate, or no radius-search capability at all, still reports
 // success.
 func distrustStart(e *Effect) bool {
-	target, ok := e.Effected.(hateRaiser)
-	if !ok {
+	target, ok := asNPC(e.Effected)
+	if !ok || !target.MonsterKind() {
 		return false
 	}
-	if m, ok := e.Effected.(monsterKindTarget); !ok || !m.MonsterKind() {
-		return false
-	}
-	finder, ok := e.Effected.(nearbyMonsterFinder)
-	if !ok {
-		return true
-	}
-	candidate, ok := finder.RandomNearbyMonster(distrustRadius)
+	candidate, ok := target.RandomNearbyMonster(distrustRadius)
 	if !ok {
 		return true
 	}
 
 	level := 0
-	if lv, ok := e.Effector.(levelTarget); ok {
-		level = lv.Level()
+	if e.Effector != nil {
+		level = e.Effector.Level()
 	}
 	aggro := float64((5 + rnd.Get(5)) * level)
 	target.AddDamageHate(candidate, 0, aggro)
 	return true
 }
 
-// growTarget is implemented by an Npc-shaped actor whose collision radius
-// can be overridden at runtime and later restored to its template value.
-
+// growStart ports EffectGrow.onStart(): rejects a target that isn't
+// Npc-shaped (a player target never grows), otherwise scales its collision
+// radius by growRadiusScale and refreshes its visible state.
 func growStart(e *Effect) bool {
-	target, ok := e.Effected.(growTarget)
+	target, ok := asNPC(e.Effected)
 	if !ok {
 		return false
 	}
@@ -91,7 +80,7 @@ func growStart(e *Effect) bool {
 // growExit ports EffectGrow.onExit(): restores the target's runtime
 // collision-radius override to its template value.
 func growExit(e *Effect) {
-	target, ok := e.Effected.(growTarget)
+	target, ok := asNPC(e.Effected)
 	if !ok {
 		return
 	}
@@ -99,11 +88,12 @@ func growExit(e *Effect) {
 	stopAbnormalEffect(e.Effected, 0x010000)
 }
 
-// recoveryTarget is implemented by a player-shaped actor that tracks a
-// death-penalty debuff level.
-
+// recoveryStart lowers the target's death-penalty debuff level by one,
+// rejecting a target that isn't player-shaped. Reapplying the debuff skill
+// at its new level and refreshing the client's status window are the live
+// character's own concern, not this effect's.
 func recoveryStart(e *Effect) bool {
-	target, ok := e.Effected.(recoveryTarget)
+	target, ok := asPlayer(e.Effected)
 	if !ok {
 		return false
 	}
@@ -115,7 +105,7 @@ func recoveryStart(e *Effect) bool {
 // that isn't an Attackable-shaped actor, otherwise delegates the swap to
 // its threat table.
 func randomizeHateStart(e *Effect) bool {
-	target, ok := e.Effected.(hateRandomizer)
+	target, ok := asNPC(e.Effected)
 	if !ok {
 		return false
 	}
@@ -139,22 +129,18 @@ func confusionStart(e *Effect) bool {
 	if isPlayer(e.Effected) {
 		return true
 	}
-	if target, ok := e.Effected.(moveStopper); ok {
-		target.StopMove()
-	}
+	e.Effected.StopMove()
 	refresh(e.Effected)
 
-	finder, ok := e.Effected.(nearbyCombatTarget)
+	target, ok := asNPC(e.Effected)
 	if !ok {
 		return true
 	}
-	candidate, ok := finder.RandomNearbyCombatant(confusionRadius)
+	candidate, ok := target.RandomNearbyCombatant(confusionRadius)
 	if !ok {
 		return true
 	}
-	if target, ok := e.Effected.(attackDesireRaiser); ok {
-		target.AddAttackDesire(candidate, math.MaxInt32)
-	}
+	target.AddAttackDesire(candidate, math.MaxInt32)
 	return true
 }
 
@@ -163,41 +149,31 @@ func confusionExit(e *Effect) {
 	if isPlayer(e.Effected) {
 		return
 	}
-	if target, ok := e.Effected.(mostHatedResetter); ok {
+	if target, ok := asNPC(e.Effected); ok {
 		target.StopMostHatedTarget()
 	}
 }
 
 func betrayStart(e *Effect) bool {
-	summon, ok := e.Effected.(summonOwnerAttacker)
+	summon, ok := asSummon(e.Effected)
 	if !ok {
 		return false
 	}
-	ownerSource, ok := e.Effected.(summonOwnerCombatant)
+	owner, ok := summon.OwnerObject()
 	if !ok {
 		return false
 	}
-	owner := ownerSource.OwnerCombatant()
-	if owner == nil {
-		return false
-	}
-	if tracked, ok := owner.(world.Tracked); ok {
-		summon.TryToAttack(tracked)
-	}
+	summon.TryToAttack(owner)
 	return true
 }
 
 func betrayExit(e *Effect) {
-	summon, ok := e.Effected.(summonOwnerAttacker)
+	summon, ok := asSummon(e.Effected)
 	if !ok {
 		return
 	}
-	ownerSource, ok := e.Effected.(summonOwnerCombatant)
-	if !ok {
-		return
-	}
-	if tracked, ok := ownerSource.OwnerCombatant().(world.Tracked); ok {
-		summon.TryToFollow(tracked)
+	if owner, ok := summon.OwnerObject(); ok {
+		summon.TryToFollow(owner)
 	}
 }
 
@@ -212,20 +188,16 @@ func relaxStart(e *Effect) bool {
 // mana-drain ticks in this file. Unlike TypeChameleonRest, this tick has no
 // continuous-skill gate: the reference effect never checks one.
 func relaxAction(e *Effect) bool {
-	target, ok := e.Effected.(mpDotTarget)
-	if !ok {
-		return false
-	}
-	if st, ok := e.Effected.(standingTarget); ok && st.Standing() {
-		return false
-	}
-	if full, ok := e.Effected.(hpFullTarget); ok && full.HPFull() {
-		if notify, ok := e.Effected.(relaxHPFullNotifier); ok {
-			notify.NotifyRelaxDeactivatedHPFull(e)
+	if player, ok := asPlayer(e.Effected); ok {
+		if player.Standing() {
+			return false
 		}
-		return false
+		if player.HPFull() {
+			player.NotifyRelaxDeactivatedHPFull(e)
+			return false
+		}
 	}
-	return manaDrainTick(e, target)
+	return manaDrainTick(e)
 }
 
 // chameleonRestStart sits the target down; it always reports success.
@@ -241,33 +213,15 @@ func chameleonRestAction(e *Effect) bool {
 	if e.Skill.SkillType != "CONT" {
 		return false
 	}
-	target, ok := e.Effected.(mpDotTarget)
-	if !ok {
+	if player, ok := asPlayer(e.Effected); ok && player.Standing() {
 		return false
 	}
-	if st, ok := e.Effected.(standingTarget); ok && st.Standing() {
-		return false
-	}
-	return manaDrainTick(e, target)
+	return manaDrainTick(e)
 }
 
-// manaDrainTick runs one ManaDamageOverTimeTick against target and applies
-// its result, shared by relaxAction and chameleonRestAction.
-//
-// Toggle is forced true regardless of e.Skill.Toggle: the reference Relax
-// and ChameleonRest effects check "cost exceeds current MP" unconditionally,
-// not only for toggle skills (unlike EffectManaDamOverTime, whose lack-MP
-// check really is toggle-gated). Every skill carrying either effect in the
-// current datapack happens to be TOGGLE-typed, so reading e.Skill.Toggle
-// would produce the same result today — but that's a data coincidence, not
-// a contract; force true here so a future non-toggle skill using these
-// effects still gets the unconditional check Java requires.
-
 func fakeDeathStart(e *Effect) bool {
-	if target, ok := e.Effected.(fakeDeathStanceTarget); ok {
-		target.StartFakeDeath()
-	} else {
-		sit(e.Effected)
+	if player, ok := asPlayer(e.Effected); ok {
+		player.StartFakeDeath()
 	}
 	refresh(e.Effected)
 	return true
@@ -276,32 +230,23 @@ func fakeDeathStart(e *Effect) bool {
 // fakeDeathAction drains MP each tick, reusing the same lack-MP handling
 // as the other mana-drain ticks in this file.
 func fakeDeathAction(e *Effect) bool {
-	target, ok := e.Effected.(mpDotTarget)
-	if !ok {
-		return false
-	}
-	return manaDrainTick(e, target)
+	return manaDrainTick(e)
 }
 
 // fakeDeathExit stands the target back up and starts its recent-fake-death
 // grace period, during which hostile NPC AI won't retarget it.
 func fakeDeathExit(e *Effect) {
-	if target, ok := e.Effected.(recentFakeDeathMarker); ok {
-		target.MarkRecentFakeDeath()
-	}
-	if target, ok := e.Effected.(fakeDeathStanceTarget); ok {
-		target.StopFakeDeath()
-	} else if target, ok := e.Effected.(sitTarget); ok {
-		target.SetStanding(true)
+	if player, ok := asPlayer(e.Effected); ok {
+		player.MarkRecentFakeDeath()
+		player.StopFakeDeath()
 	}
 	refresh(e.Effected)
 }
 
-func sit(effected Participant) {
-	if target, ok := effected.(stanceTarget); ok {
-		target.Sit()
-	} else if target, ok := effected.(sitTarget); ok {
-		target.SetStanding(false)
+// sit seats a player target; other kinds have no sitting stance.
+func sit(effected Actor) {
+	if player, ok := asPlayer(effected); ok {
+		player.Sit()
 	}
 }
 

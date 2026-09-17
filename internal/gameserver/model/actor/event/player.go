@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // VitalsChanged reports a change to the actor's current HP (and, with
@@ -165,11 +166,11 @@ type MagicResisted struct{ AttackerName string }
 type HerbConsumed struct{ ItemID int32 }
 
 // AttackRequested reports an aggression effect provoking an attack on Target.
-type AttackRequested struct{ Target Object }
+type AttackRequested struct{ Target world.Tracked }
 
 // Retargeted reports a domain-driven selection change; a nil Target clears
 // the selection.
-type Retargeted struct{ Target Object }
+type Retargeted struct{ Target world.Tracked }
 
 // SummonConfirmRequested reports a summon-friend request awaiting the
 // character's answer.

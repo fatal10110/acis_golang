@@ -7,7 +7,7 @@ import (
 	"sort"
 	"testing"
 
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -15,6 +15,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -430,10 +431,12 @@ func TestSummonImmobilizedIsIndependentOfRooted(t *testing.T) {
 	}
 }
 
-// fakePlayerEffector is a minimal cast-effector satisfying the Participant,
+// fakePlayerEffector is a minimal cast-effector satisfying effect.Actor,
 // objectIDTarget, and playerTarget surfaces immobilizePetBuffStart checks
 // (isPlayer(e.Effector), e.Effector.(objectIDTarget)).
 type fakePlayerEffector struct {
+	world.Presence
+	effecttest.Actor
 	id int32
 }
 
@@ -678,8 +681,8 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		{Stat: stat.HealEffectiveness, Op: effect.OpMul, Value: 1.2, Owner: owner},
 	})
 
-	if got := target.Category(); got != skilltarget.CategoryPlayable {
-		t.Fatalf("Category() = %v, want playable", got)
+	if got := target.Kind(); got != actor.KindSummon {
+		t.Fatalf("Kind() = %v, want summon", got)
 	}
 	if !target.Playable() {
 		t.Fatal("Playable() = false for a pet")
@@ -1097,19 +1100,13 @@ func TestSummonChargedShotStateAndCounts(t *testing.T) {
 }
 
 // ---- from status_update_test.go ----
-type namedDamageAttacker struct{ name string }
+type namedDamageAttacker struct {
+	world.Presence
+	effecttest.Actor
+	name string
+}
 
-func (a namedDamageAttacker) ObjectID() int32       { return 1 }
-func (a namedDamageAttacker) Dead() bool            { return false }
-func (a namedDamageAttacker) CharacterName() string { return a.name }
-
-// anonymousAttacker satisfies effect.Participant but not the
-// CharacterName-having surface notifyDamage looks for, so it stands in for
-// an attacker whose identity the notifier doesn't recognize.
-type anonymousAttacker struct{}
-
-func (anonymousAttacker) ObjectID() int32 { return 0 }
-func (anonymousAttacker) Dead() bool      { return false }
+func (a *namedDamageAttacker) CharacterName() string { return a.name }
 
 func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 	for _, damage := range []struct {
@@ -1137,22 +1134,18 @@ func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		new    func() *Actor
-		apply  func(*Actor, effect.Participant)
+		apply  func(*Actor, *namedDamageAttacker)
 		called bool
 	}{
-		{"pet direct", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"servitor direct", func() *Actor { return mustServitor(t, ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
-		{"dot", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
-		{"unknown attacker", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker effect.Participant) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, false},
+		{"pet direct", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker *namedDamageAttacker) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"servitor direct", func() *Actor { return mustServitor(t, ServitorConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker *namedDamageAttacker) { a.ReduceHP(12.9, attacker, modelskill.Definition{}) }, true},
+		{"dot", func() *Actor { return mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100}}) }, func(a *Actor, attacker *namedDamageAttacker) { a.ReduceHPByDOT(12.9, attacker, true) }, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := tc.new()
 			rec := &event.Recorder{}
 			a.Attach(Runtime{Sink: rec})
-			var attacker effect.Participant = namedDamageAttacker{name: "Attacker"}
-			if tc.name == "unknown attacker" {
-				attacker = anonymousAttacker{}
-			}
+			attacker := &namedDamageAttacker{name: "Attacker"}
 			tc.apply(a, attacker)
 			got := event.Of[event.Damaged](rec)
 			if tc.called {
@@ -1390,3 +1383,5 @@ func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
 		t.Fatalf("Cursed Man crit=8: miss=%v crit=%v, want hit crit (roll %d)", hit.Miss, hit.Crit, betweenDefaultAndCursedMan)
 	}
 }
+
+func (*fakePlayerEffector) Kind() actor.Kind { return actor.KindPlayer }

@@ -30,15 +30,18 @@ const (
 	LaunchAbortTargetPeaceZone
 )
 
+// LaunchCaster is the creature whose skill launch is revalidated.
+type LaunchCaster interface {
+	attackable.Combatant
+	skilltarget.Actor
+}
+
 // RevalidateLaunch runs the oracle's launch-phase mid-cast recheck
 // (CreatureCast.onMagicLaunch: target-lost, escape range, line of sight,
-// peace zone), skipped entirely when target is the caster itself. caster
-// and target only need to satisfy the optional surfaces each gate uses
-// (Knows, CollisionRadius, SightChecker, EffectRangeInPeaceZone,
-// skilltarget.Creature); a caster or target that doesn't implement one
-// leaves that gate permissive, matching the graceful-degradation pattern
-// this port already uses for actor state not modeled yet.
-func RevalidateLaunch(caster, target Target, def modelskill.Definition) LaunchAbortReason {
+// peace zone), skipped entirely when target is the caster itself. A target
+// that is not a creature (a door) is never lost, has no collision radius and
+// no peace zone of its own.
+func RevalidateLaunch(caster LaunchCaster, target Target, def modelskill.Definition) LaunchAbortReason {
 	if caster == nil || target == nil || sameLaunchTarget(caster, target) {
 		return LaunchAbortNone
 	}
@@ -55,11 +58,11 @@ func RevalidateLaunch(caster, target Target, def modelskill.Definition) LaunchAb
 		return LaunchAbortNoLineOfSight
 	}
 
-	if def.Offensive && isLaunchPlayable(caster) && isLaunchPlayable(target) {
+	if creature, ok := target.(attackable.Combatant); ok && def.Offensive && caster.Kind().Playable() && creature.Kind().Playable() {
 		if inOwnPeaceZone(caster) {
 			return LaunchAbortCasterPeaceZone
 		}
-		if inOwnPeaceZone(target) {
+		if inOwnPeaceZone(creature) {
 			return LaunchAbortTargetPeaceZone
 		}
 	}
@@ -69,11 +72,11 @@ func RevalidateLaunch(caster, target Target, def modelskill.Definition) LaunchAb
 
 // FusionChannelValid reports whether a live fusion channel still has range
 // and line of sight to its target. Fusion does not run normal launch gates.
-func FusionChannelValid(caster, target Target, castRange int) bool {
+func FusionChannelValid(caster LaunchCaster, target Target, castRange int) bool {
 	return caster != nil && target != nil && withinLaunchRange(castRange, caster, target) && launchCanSee(caster, target)
 }
 
-func sameLaunchTarget(a, b Target) bool {
+func sameLaunchTarget(a LaunchCaster, b Target) bool {
 	return a.ObjectID() == b.ObjectID()
 }
 
@@ -102,58 +105,33 @@ func withinLaunchRange(rangeVal int, a, b Target) bool {
 	dz := int64(az - bz)
 	distSq := dx*dx + dy*dy + dz*dz
 
-	total := float64(rangeVal) + launchCollisionRadius(a) + launchCollisionRadius(b)
+	total := float64(rangeVal) + collisionRadius(a) + collisionRadius(b)
 	return float64(distSq) <= total*total
 }
 
-func launchCollisionRadius(t Target) float64 {
-	if cr, ok := t.(interface{ CollisionRadius() float64 }); ok {
-		return cr.CollisionRadius()
+// collisionRadius is t's body radius, or 0 for a target that is not a
+// creature.
+func collisionRadius(t Target) float64 {
+	if c, ok := t.(attackable.Combatant); ok {
+		return c.CollisionRadius()
 	}
 	return 0
 }
 
-func launchCanSee(caster, target Target) bool {
-	creature, ok := target.(skilltarget.Creature)
-	if !ok {
-		return true
-	}
-	checker, ok := caster.(skilltarget.SightChecker)
-	if !ok {
-		return true
-	}
-	return checker.CanSeeTarget(creature)
+func launchCanSee(caster LaunchCaster, target Target) bool {
+	creature, ok := target.(skilltarget.Actor)
+	return !ok || caster.CanSeeTarget(creature)
 }
 
-func launchTargetLost(caster, target Target, skillType string) bool {
+func launchTargetLost(caster LaunchCaster, target Target, skillType string) bool {
 	if skillType == "SUMMON_FRIEND" {
 		return false
 	}
-	knower, ok := caster.(interface {
-		Knows(attackable.Combatant) bool
-	})
-	if !ok {
-		return false
-	}
 	combatant, ok := target.(attackable.Combatant)
-	if !ok {
-		return false
-	}
-	return !knower.Knows(combatant)
+	return ok && !caster.Knows(combatant)
 }
 
-func isLaunchPlayable(t Target) bool {
-	creature, ok := t.(skilltarget.Creature)
-	return ok && creature.Category().Has(skilltarget.CategoryPlayable)
-}
-
-func inOwnPeaceZone(t Target) bool {
-	zoned, ok := t.(interface {
-		EffectRangeInPeaceZone(x, y, z, effectRange int) bool
-	})
-	if !ok {
-		return false
-	}
-	x, y, z := t.Position()
-	return zoned.EffectRangeInPeaceZone(x, y, z, 0)
+func inOwnPeaceZone(c attackable.Combatant) bool {
+	x, y, z := c.Position()
+	return c.EffectRangeInPeaceZone(x, y, z, 0)
 }

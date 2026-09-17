@@ -8,15 +8,15 @@ type corpseMobHandler struct{}
 
 func (corpseMobHandler) Target() modelskill.Target { return modelskill.TargetCorpseMob }
 
-func (corpseMobHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (corpseMobHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (corpseMobHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (corpseMobHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (corpseMobHandler) CanCast(_, target Creature, skill *modelskill.Definition, _ bool) bool {
+func (corpseMobHandler) CanCast(_, target Actor, skill *modelskill.Definition, _ bool) bool {
 	return corpseMobCanCast(target, skill)
 }
 
@@ -31,20 +31,20 @@ func (areaCorpseMobHandler) Target() modelskill.Target { return modelskill.Targe
 // attackable creature nearby, instead of the usual live-target splash.
 const harvestGrandBoxSkillID = 444
 
-func (h areaCorpseMobHandler) Targets(caster, target Creature, skill *modelskill.Definition) []Creature {
+func (h areaCorpseMobHandler) Targets(caster, target Actor, skill *modelskill.Definition) []Actor {
 	if target == nil {
 		return nil
 	}
-	out := []Creature{target}
+	out := []Actor{target}
 	if h.known == nil {
 		return out
 	}
-	h.known.ForEachKnownCreatureInRadius(target, skillRadius(skill), func(creature Creature) {
-		if sameCreature(caster, creature) || !canSee(target, creature) {
+	h.known.ForEachKnownCreatureInRadius(target, skillRadius(skill), func(creature Actor) {
+		if sameCreature(caster, creature) || !target.CanSeeTarget(creature) {
 			return
 		}
 		if skill != nil && skill.ID == harvestGrandBoxSkillID {
-			if creature.Category().Has(CategoryAttackable) && creature.Dead() {
+			if isAttackable(creature) && creature.Dead() {
 				out = append(out, creature)
 			}
 			return
@@ -59,11 +59,11 @@ func (h areaCorpseMobHandler) Targets(caster, target Creature, skill *modelskill
 	return out
 }
 
-func (areaCorpseMobHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (areaCorpseMobHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (areaCorpseMobHandler) CanCast(_, target Creature, skill *modelskill.Definition, _ bool) bool {
+func (areaCorpseMobHandler) CanCast(_, target Actor, skill *modelskill.Definition, _ bool) bool {
 	return corpseMobCanCast(target, skill)
 }
 
@@ -78,25 +78,25 @@ const (
 	CorpseCastSweepNotMonster
 )
 
-func corpseMobCanCast(target Creature, skill *modelskill.Definition) bool {
+func corpseMobCanCast(target Actor, skill *modelskill.Definition) bool {
 	return CorpseCastFailureFor(target, skill) == CorpseCastAllowed
 }
 
 // CorpseCastFailureFor applies the shared corpse-mob eligibility rule.
-func CorpseCastFailureFor(target Creature, skill *modelskill.Definition) CorpseCastFailure {
-	if target == nil || !hasCorpse(target) || target.Category().Has(CategoryPlayable) {
+func CorpseCastFailureFor(target Actor, skill *modelskill.Definition) CorpseCastFailure {
+	if target == nil || !target.HasCorpse() || isPlayable(target) {
 		return CorpseCastInvalidTarget
 	}
 	if skill != nil && skill.SkillType == "HARVEST" {
-		if !monsterKind(target) {
+		if !target.MonsterKind() {
 			return CorpseCastHarvestNotMonster
 		}
 		return CorpseCastAllowed
 	}
-	if target.Category().Has(CategoryAttackable) && corpseTooOld(target) && !corpseAgeBypass(target) {
+	if isAttackable(target) && corpseTooOld(target) && !corpseAgeBypass(target) {
 		return CorpseCastTooOld
 	}
-	if skill != nil && skill.SkillType == "SWEEP" && !monsterKind(target) {
+	if skill != nil && skill.SkillType == "SWEEP" && !target.MonsterKind() {
 		return CorpseCastSweepNotMonster
 	}
 	return CorpseCastAllowed
@@ -106,26 +106,26 @@ type corpsePlayerHandler struct{}
 
 func (corpsePlayerHandler) Target() modelskill.Target { return modelskill.TargetCorpsePlayer }
 
-func (corpsePlayerHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (corpsePlayerHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (corpsePlayerHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (corpsePlayerHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (corpsePlayerHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+func (corpsePlayerHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
 	return target != nil && corpsePlayerCastRejection(target) == CastRejectNone
 }
 
-func corpsePlayerCastRejection(target Creature) CastRejection {
+func corpsePlayerCastRejection(target Actor) CastRejection {
 	if target == nil {
 		return CastRejectNone
 	}
 	if !target.Dead() {
 		return CastRejectInvalidTarget
 	}
-	if !target.Category().Has(CategoryPlayable) {
+	if !isPlayable(target) {
 		return CastRejectCannotUseSkill
 	}
 	return CastRejectNone
@@ -135,27 +135,26 @@ type corpsePetHandler struct{}
 
 func (corpsePetHandler) Target() modelskill.Target { return modelskill.TargetCorpsePet }
 
-func (corpsePetHandler) Targets(_, target Creature, _ *modelskill.Definition) []Creature {
-	return []Creature{target}
+func (corpsePetHandler) Targets(_, target Actor, _ *modelskill.Definition) []Actor {
+	return []Actor{target}
 }
 
-func (corpsePetHandler) FinalTarget(_, target Creature, _ *modelskill.Definition) Creature {
+func (corpsePetHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Actor {
 	return target
 }
 
-func (corpsePetHandler) CanCast(_, target Creature, _ *modelskill.Definition, _ bool) bool {
+func (corpsePetHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
 	return target != nil && corpsePetCastRejection(target) == CastRejectNone
 }
 
-func corpsePetCastRejection(target Creature) CastRejection {
+func corpsePetCastRejection(target Actor) CastRejection {
 	if target == nil {
 		return CastRejectNone
 	}
 	if !target.Dead() {
 		return CastRejectInvalidTarget
 	}
-	pet, ok := target.(PetTarget)
-	if !ok || !pet.IsPet() {
+	if !target.IsPet() {
 		return CastRejectCannotUseSkill
 	}
 	return CastRejectNone

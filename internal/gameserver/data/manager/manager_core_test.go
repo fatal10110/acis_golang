@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -59,11 +60,15 @@ func (f fakeGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 }
 func (f fakeGeo) Walkable(x, y, z int) bool { return true }
 
-type nopKiller struct{ id int32 }
+type nopKiller struct {
+	attackabletest.Combatant
+	id int32
+}
 
 func (n nopKiller) ObjectID() int32 { return n.id }
 
 type lootKiller struct {
+	attackabletest.Combatant
 	id    int32
 	items map[int32]int
 	herbs []int32
@@ -414,7 +419,7 @@ var _ creature.Rewarder = (*KillReward)(nil)
 
 // ---- from npcs_hostile_test.go ----
 func TestCreatureActorRefSatisfiesTargetCreature(t *testing.T) {
-	var _ skilltarget.Creature = (*creatureActorRef)(nil)
+	var _ skilltarget.Actor = (*creatureActorRef)(nil)
 }
 
 // ---- from npcs_territory_test.go ----
@@ -645,3 +650,11 @@ func writeSpawnFixture(t *testing.T, path, body string) {
 		t.Fatalf("write fixture: %v", err)
 	}
 }
+
+func (nopKiller) Heading() int { return 0 }
+
+func (nopKiller) Position() (x, y, z int) { return 0, 0, 0 }
+
+func (lootKiller) Heading() int { return 0 }
+
+func (lootKiller) Position() (x, y, z int) { return 0, 0, 0 }

@@ -154,8 +154,8 @@ func (master *Hostile) slotOccupant(id int32) *Hostile {
 }
 
 func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {
-	pos, ok := combatantLocation(target)
-	if !ok || h.IsMoving() {
+	pos := combatantLocation(target)
+	if h.IsMoving() {
 		return
 	}
 	if h.location().Distance2D(pos) <= float64(escortLooseRadius) {
@@ -173,10 +173,7 @@ func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {
 }
 
 func (h *Hostile) teleportNear(target attackable.Combatant, offset int) {
-	pos, ok := combatantLocation(target)
-	if !ok {
-		return
-	}
+	pos := combatantLocation(target)
 	if offset > 0 {
 		pos.X += rnd.GetRange(-offset, offset)
 		pos.Y += rnd.GetRange(-offset, offset)
@@ -185,20 +182,10 @@ func (h *Hostile) teleportNear(target attackable.Combatant, offset int) {
 }
 
 func (h *Hostile) moveTo(dest location.Location) {
-	mover, ok := h.move.(interface {
-		MoveToLocation(location.Location) (bool, error)
-	})
-	if !ok {
-		return
-	}
-	_, _ = mover.MoveToLocation(dest)
+	_, _ = h.move.MoveToLocation(dest)
 }
 
-func combatantLocation(target attackable.Combatant) (location.Location, bool) {
-	pos, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return location.Location{}, false
-	}
-	x, y, z := pos.Position()
-	return location.Location{X: x, Y: y, Z: z}, true
+func combatantLocation(target attackable.Combatant) location.Location {
+	x, y, z := target.Position()
+	return location.Location{X: x, Y: y, Z: z}
 }

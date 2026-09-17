@@ -4,7 +4,8 @@ import (
 	"math"
 	"sync"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
 // overhitState records one lethal overhit strike against a hostile NPC.
@@ -14,7 +15,7 @@ type overhitState struct {
 	mu       sync.Mutex
 	enabled  bool
 	damage   float64
-	attacker creature.DeathActor
+	attacker attackable.Combatant
 }
 
 func (o *overhitState) set(enabled bool) {
@@ -23,7 +24,7 @@ func (o *overhitState) set(enabled bool) {
 	o.enabled = enabled
 }
 
-func (o *overhitState) test(attacker creature.DeathActor, currentHP, damage float64) {
+func (o *overhitState) test(attacker attackable.Combatant, currentHP, damage float64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if !o.enabled {
@@ -52,7 +53,7 @@ func (o *overhitState) bonusExp(normalExp int64, maxHP float64) int64 {
 	return int64(math.Round((percentage / 100) * float64(normalExp)))
 }
 
-func (o *overhitState) valid(player creature.DeathActor) bool {
+func (o *overhitState) valid(player attackable.Combatant) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if !o.enabled || o.attacker == nil || player == nil {
@@ -62,13 +63,10 @@ func (o *overhitState) valid(player creature.DeathActor) bool {
 	return acting != nil && acting == player
 }
 
-type overhitOwner interface {
-	ActingPlayer() creature.DeathActor
-}
-
-func overhitActingPlayer(a creature.DeathActor) creature.DeathActor {
-	if owner, ok := a.(overhitOwner); ok {
-		return owner.ActingPlayer()
+func overhitActingPlayer(a attackable.Combatant) attackable.Combatant {
+	if a.Kind() == actor.KindSummon {
+		owner, _ := a.Owner()
+		return owner
 	}
 	return a
 }
@@ -78,13 +76,13 @@ func (h *Hostile) EnableOverhit() {
 	h.overhit.set(true)
 }
 
-func (h *Hostile) testOverhit(attacker creature.DeathActor, damage float64) {
+func (h *Hostile) testOverhit(attacker attackable.Combatant, damage float64) {
 	h.overhit.test(attacker, h.HP(), damage)
 }
 
 // OverhitValid reports whether player is the acting player of a successful
 // overhit strike stored on this NPC.
-func (h *Hostile) OverhitValid(player creature.DeathActor) bool {
+func (h *Hostile) OverhitValid(player attackable.Combatant) bool {
 	return h.overhit.valid(player)
 }
 

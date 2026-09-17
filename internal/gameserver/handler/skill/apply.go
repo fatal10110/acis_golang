@@ -9,32 +9,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-// effectListTarget is implemented by anything that owns a live effect list:
-// a target an effect-applying or effect-cancelling skill can act on.
-type effectListTarget interface {
-	Actor
-	EffectList() *effect.List
-}
-
-type effectSuccessSource interface {
-	EffectSuccessInput(creature.DeathActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
-}
-
-type positionedActor interface {
-	Position() (int, int, int)
-}
-
-type invulnerableEffected interface {
-	Invul() bool
-}
-
 // applyEffects instantiates each of templates and adds it to effected's
 // effect list, attributed to effector. def carries the owning skill's
 // identity and stacking classification. A template naming an effect core
 // this port hasn't wired yet (see effect.New) is skipped rather than
 // failing the whole batch, matching how partially-modeled skill data
 // degrades elsewhere in this package.
-func applyEffects(effector, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
+func applyEffects(effector effect.Actor, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
 	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
 }
 
@@ -42,18 +23,19 @@ func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, temp
 	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, formulas.ShieldFailed, false))
 }
 
-func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
+func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
 	if len(templates) == 0 {
 		return 0
 	}
-	if !withinEffectRange(effector, effected, def.EffectRange) {
-		return 0
-	}
-	if offensiveEffectApplyBlocked(effector, effected, def) {
-		return 0
-	}
-	target, ok := effected.(effectListTarget)
+	// Only an effect participant owns an effect list to land on.
+	target, ok := effected.(effect.Actor)
 	if !ok {
+		return 0
+	}
+	if !withinEffectRange(effector, target, def.EffectRange) {
+		return 0
+	}
+	if offensiveEffectApplyBlocked(effector, target, def) {
 		return 0
 	}
 	list := target.EffectList()
@@ -65,7 +47,7 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 	if shield == formulas.ShieldPerfect {
 		return 0
 	}
-	source, canRoll := effected.(effectSuccessSource)
+	source, canRoll := asCreature(effected)
 	for _, tmpl := range templates {
 		if tmpl.EffectPowerSet && tmpl.EffectPower >= 0 {
 			if !canRoll {
@@ -74,7 +56,7 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 				}
 				continue
 			}
-			in, ok := source.EffectSuccessInput(effector, def, tmpl, bss, shield)
+			in, ok := source.EffectSuccessInput(combatantOf(effector), def, tmpl, bss, shield)
 			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
 				if tmpl.Icon {
 					resisted++
@@ -88,14 +70,13 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 		}
 		owner := list
 		if e.SelfTarget {
-			self, ok := effector.(effectListTarget)
-			if !ok || self.EffectList() == nil {
+			if effector == nil || effector.EffectList() == nil {
 				continue
 			}
-			owner = self.EffectList()
+			owner = effector.EffectList()
 		}
 		e.Effector = effector
-		e.Effected = effected
+		e.Effected = target
 		owner.Add(e)
 	}
 	return resisted
@@ -104,37 +85,29 @@ func applyEffectsWithLanding(effector, effected Actor, def modelskill.Definition
 // withinEffectRange mirrors L2Skill.getEffects' landing-time 3D radius
 // check. Actors without a modeled position stay permissive like other
 // optional handler capabilities.
-func withinEffectRange(effector, effected Actor, effectRange int) bool {
+func withinEffectRange(effector, effected effect.Actor, effectRange int) bool {
 	if effectRange <= 0 || effector == nil || effector.ObjectID() == effected.ObjectID() {
 		return true
 	}
-	effectorPos, ok := effector.(positionedActor)
-	if !ok {
-		return true
-	}
-	effectedPos, ok := effected.(positionedActor)
-	if !ok {
-		return true
-	}
-	ax, ay, az := effectorPos.Position()
-	bx, by, bz := effectedPos.Position()
+	ax, ay, az := effector.Position()
+	bx, by, bz := effected.Position()
 	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
 }
 
 // offensiveEffectApplyBlocked is the landing-time refuse for offensive and
 // debuff skills aimed at someone else: target invulnerability, or a caster
 // not permitted to deal damage. Self-applies skip both.
-func offensiveEffectApplyBlocked(effector, effected Actor, def modelskill.Definition) bool {
+func offensiveEffectApplyBlocked(effector, effected effect.Actor, def modelskill.Definition) bool {
 	if !def.Offensive && !def.Debuff {
 		return false
 	}
 	if effector != nil && effected != nil && effector.ObjectID() == effected.ObjectID() {
 		return false
 	}
-	if inv, ok := effected.(invulnerableEffected); ok && inv.Invul() {
+	if c, ok := effected.(Creature); ok && c.Invul() {
 		return true
 	}
-	return !creature.CanDealDamage(effector)
+	return !creature.CanDealDamage(combatantOf(effector))
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
@@ -164,7 +137,7 @@ func firstEffectByID(list *effect.List, id modelskill.ID) *effect.Effect {
 // active instance of skill id — the caller-side lookup a toggle skill's
 // on/off decision needs before driving cast.Controller.CastToggle.
 func ActiveEffect(target Actor, id modelskill.ID) bool {
-	t, ok := target.(effectListTarget)
+	t, ok := target.(effect.Actor)
 	if !ok {
 		return false
 	}
@@ -175,7 +148,7 @@ func ActiveEffect(target Actor, id modelskill.ID) bool {
 // effect list, if one exists, running that instance's exit hook. This is
 // how deactivating an already-active toggle turns it off.
 func StopEffect(target Actor, id modelskill.ID) {
-	t, ok := target.(effectListTarget)
+	t, ok := target.(effect.Actor)
 	if !ok {
 		return
 	}
@@ -209,7 +182,7 @@ func applySelfEffects(cast Cast, def modelskill.Definition) {
 	if len(def.SelfEffects) == 0 {
 		return
 	}
-	if target, ok := cast.Caster.(effectListTarget); ok {
+	if target, ok := cast.Caster.(effect.Actor); ok {
 		list := target.EffectList()
 		if e := firstEffectByID(list, def.ID); e != nil && e.Template.Self {
 			list.Remove(e)

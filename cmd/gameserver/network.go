@@ -168,11 +168,7 @@ func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConf
 func onlineAccounts(state *world.State) []string {
 	var out []string
 	for _, obj := range state.Players() {
-		p, ok := obj.(interface{ AccountName() string })
-		if !ok {
-			continue
-		}
-		if name := p.AccountName(); name != "" {
+		if name := obj.AccountName(); name != "" {
 			out = append(out, name)
 		}
 	}

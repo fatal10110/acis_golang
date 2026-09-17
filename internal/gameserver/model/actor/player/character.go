@@ -26,8 +26,6 @@ import (
 // at, matching the shipped server default.
 const defaultAccessLevel = 0
 
-var _ world.Player = (*Character)(nil)
-
 // Character is one persisted characters-table row plus the runtime state
 // needed once that row enters the live world.
 type Character struct {
@@ -148,7 +146,7 @@ type Character struct {
 	// matching Player._summonTargetRequest/_summonSkillRequest
 	// (Player.java:452-453).
 	summonFriendMu    sync.Mutex
-	summonRequester   any
+	summonRequester   SummonFriendRequester
 	summonRequesterID int32
 	summonSkill       modelskill.Definition
 
@@ -281,6 +279,10 @@ func (c *Character) CurrentLocation() location.Location {
 	x, y, z := c.Position()
 	return location.Location{X: x, Y: y, Z: z}
 }
+
+// Heading is CurrentHeading: the live heading while spawned, the last-known
+// heading otherwise, matching Position.
+func (c *Character) Heading() int { return c.CurrentHeading() }
 
 // CurrentHeading returns the synchronized live heading when c is spawned,
 // otherwise the persisted last-known heading.

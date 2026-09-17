@@ -7,7 +7,7 @@ import "slices"
 // (keyed by its static door id). door.Object already exposes DoorID();
 // giving a world NPC instance a matching NpcID accessor is the world/NPC
 // package's call to make once it wires targets through this engine.
-type npcTarget interface{ NpcID() int32 }
+type npcTarget interface{ NpcID() int }
 type doorTarget interface{ DoorID() int }
 
 // raceTarget is an NPC target's template race ordinal, as
@@ -43,8 +43,10 @@ func (c TargetHpMinMax) Test(effector, effected Actor, skill Skill) bool {
 type TargetNpcID struct{ IDs []int }
 
 func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
+	// The skill-condition parser does not build TargetNpcID or TargetRaceID
+	// yet, so these id checks only run in tests (#2362).
 	if npc, ok := effected.(npcTarget); ok {
-		return slices.Contains(c.IDs, int(npc.NpcID()))
+		return slices.Contains(c.IDs, npc.NpcID())
 	}
 	if door, ok := effected.(doorTarget); ok {
 		return slices.Contains(c.IDs, door.DoorID())
@@ -57,6 +59,7 @@ func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
 type TargetRaceID struct{ IDs []int }
 
 func (c TargetRaceID) Test(effector, effected Actor, skill Skill) bool {
+	// No live actor reports a template race ordinal yet; see #2362.
 	npc, ok := effected.(raceTarget)
 	if !ok {
 		return false

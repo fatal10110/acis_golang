@@ -50,11 +50,9 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	case groundItemObject:
-		if dropped, ok := o.(interface{ DropperID() int32 }); ok {
-			if dropperID := dropped.DropperID(); dropperID != 0 {
-				p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
-				return
-			}
+		if dropperID := o.DropperID(); dropperID != 0 {
+			p.sendVisibilityFrame(serverpackets.FrameDropItem(o, dropperID))
+			return
 		}
 		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
@@ -65,6 +63,13 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	}
 }
 
+// liveSummonOwner returns the connected player controlling a.
+func liveSummonOwner(a *summon.Actor) (*livePlayer, bool) {
+	owner, _ := a.Owner()
+	live, ok := owner.(*livePlayer)
+	return live, ok
+}
+
 // sendSummonInfosToOwner republishes the owner-only pet window. PetInfo
 // wipes PartySpelled icons; re-push is deferred with #1268 — that issue's
 // notifyAbnormalUpdate wiring does not cover this trigger.
@@ -72,7 +77,7 @@ func sendSummonInfosToOwner(a *summon.Actor) {
 	if a == nil {
 		return
 	}
-	owner, ok := a.ActingPlayer().(*livePlayer)
+	owner, ok := liveSummonOwner(a)
 	if !ok {
 		return
 	}
@@ -125,6 +130,8 @@ type groundItemObject interface {
 	Count() int
 	Stackable() bool
 	Position() (int, int, int)
+	// DropperID is the object that dropped the item, or 0.
+	DropperID() int32
 }
 
 type doorObject interface {
@@ -160,7 +167,7 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 	}
 	x, y, z := a.Position()
 	title, pvpFlag, karma := "", 0, 0
-	if owner, ok := a.ActingPlayer().(*livePlayer); ok {
+	if owner, ok := liveSummonOwner(a); ok {
 		title = owner.Name
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()

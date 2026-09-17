@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -12,9 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
-
-// Character satisfies the cast pipeline's line-of-sight surface.
-var _ target.SightChecker = (*Character)(nil)
 
 // LineOfSight is the geodata query CanSee needs to gate targeting on real
 // terrain occlusion between two actors.
@@ -273,12 +271,11 @@ func (c *Character) ObjectID() int32 {
 	return c.ID
 }
 
+// Kind reports KindPlayer.
+func (c *Character) Kind() actor.Kind { return actor.KindPlayer }
+
 // CharacterName returns this player's display name for character-name packets.
 func (c *Character) CharacterName() string { return c.Name }
-
-// WorldPlayer satisfies world.Player: a Character's presence keeps its
-// world Region active.
-func (c *Character) WorldPlayer() {}
 
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {
@@ -311,6 +308,8 @@ func (c *Character) Position() (int, int, int) {
 }
 
 // Knows reports whether target is visible to this player.
+// attackable stays a leaf, so a Combatant is not statically a world object;
+// one that is not on the grid is never known.
 func (c *Character) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(c, tracked)
@@ -320,29 +319,16 @@ func (c *Character) Knows(target attackable.Combatant) bool {
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
 func (c *Character) CanSee(target attackable.Combatant) bool {
-	other, ok := target.(interface{ Position() (int, int, int) })
-	if !ok {
-		return false
-	}
-	var theight float64
-	if h, ok := target.(interface{ CollisionHeight() float64 }); ok {
-		theight = h.CollisionHeight()
-	}
-	tx, ty, tz := other.Position()
-	return c.canSeePosition(tx, ty, tz, theight)
+	tx, ty, tz := target.Position()
+	return c.canSeePosition(tx, ty, tz, target.CollisionHeight())
 }
 
-// CanSeeTarget reports whether t is visible to this player, satisfying
-// handler/target.SightChecker for the cast pipeline's launch-phase
-// line-of-sight gate. Same geodata query as CanSee, keyed to t's own eye
-// height when it exposes one.
-func (c *Character) CanSeeTarget(t target.Creature) bool {
-	var theight float64
-	if h, ok := t.(interface{ CollisionHeight() float64 }); ok {
-		theight = h.CollisionHeight()
-	}
+// CanSeeTarget reports whether t is visible to this player for the cast
+// pipeline's launch-phase line-of-sight gate. Same geodata query as CanSee,
+// keyed to t's own eye height.
+func (c *Character) CanSeeTarget(t target.Actor) bool {
 	tx, ty, tz := t.Position()
-	return c.canSeePosition(tx, ty, tz, theight)
+	return c.canSeePosition(tx, ty, tz, t.CollisionHeight())
 }
 
 func (c *Character) canSeePosition(tx, ty, tz int, theight float64) bool {

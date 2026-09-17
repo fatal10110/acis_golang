@@ -28,6 +28,9 @@ type Actor interface {
 	SetHeading(int)
 	BroadcastMove(event.Move) error
 	BroadcastStop() error
+	// OwnsOffensiveFollowTicker reports that the actor's own AI already
+	// rechecks an offensive follow, so the controller must not track it.
+	OwnsOffensiveFollowTicker() bool
 }
 
 type pawnFollowActor interface {
@@ -40,10 +43,6 @@ type offensiveFollowLeadActor interface {
 
 type targetKnower interface {
 	Knows(attackable.Combatant) bool
-}
-
-type offensiveFollowTickerOwner interface {
-	OwnsOffensiveFollowTicker() bool
 }
 
 // homePathRecovery is implemented by hostile NPCs whose return-home path can
@@ -156,6 +155,7 @@ func (c *Controller) ObjectID() int32 {
 
 // RegionActor returns the world-tracked actor this controller advances, when
 // the actor participates in region activity.
+// Hostile movement drives a non-world forwarding ref, which reports nil.
 func (c *Controller) RegionActor() world.Tracked {
 	tracked, _ := c.self.(world.Tracked)
 	return tracked
@@ -217,7 +217,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 
 	totalRadius := followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())
-	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && targetMoving(target) {
+	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && target.IsMoving() {
 		totalRadius += 50
 	}
 	inRange := origin.In2DRadius(dest, totalRadius)
@@ -418,23 +418,12 @@ func (c *Controller) recheckOffensiveFollow() {
 }
 
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
-	actor, ok := c.self.(offensiveFollowTickerOwner)
-	return ok && actor.OwnsOffensiveFollowTicker()
+	return c.self != nil && c.self.OwnsOffensiveFollowTicker()
 }
 
 func (c *Controller) selfHasOffensiveFollowLead() bool {
 	actor, ok := c.self.(offensiveFollowLeadActor)
 	return ok && actor.OffensiveFollowLead()
-}
-
-func targetMoving(target attackable.Combatant) bool {
-	if target, ok := target.(interface{ IsMoving() bool }); ok {
-		return target.IsMoving()
-	}
-	if target, ok := target.(interface{ Move() *CreatureMove }); ok {
-		return target.Move().Moving()
-	}
-	return false
 }
 
 func (c *Controller) clearOffensiveFollow() {

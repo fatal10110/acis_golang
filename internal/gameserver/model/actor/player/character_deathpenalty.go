@@ -1,6 +1,7 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -8,13 +9,6 @@ import (
 // maxDeathPenaltyLevel is the reference's hard cap on the death-penalty
 // debuff level (skill 5076).
 const maxDeathPenaltyLevel = 15
-
-// raidRelatedKiller is implemented by a killer that can identify as tied to
-// a raid encounter, exempting a Charm-of-Luck death from the penalty even
-// without an identified killer.
-type raidRelatedKiller interface {
-	RaidRelated() bool
-}
 
 // DeathPenaltyLevel returns the current death-penalty debuff level.
 func (c *Character) DeathPenaltyLevel() int {
@@ -71,7 +65,7 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 // passing gate it emits DeathPenaltyChanged with the new level, matching the
 // reference's
 // EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send (Player.java:6527-6528).
-func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
+func (c *Character) RaiseDeathPenaltyLevel(killer attackable.Combatant, roll int) (int, bool) {
 	c.stateMu.Lock()
 
 	if c.deathPenaltyLevel >= maxDeathPenaltyLevel {
@@ -91,8 +85,7 @@ func (c *Character) RaiseDeathPenaltyLevel(killer any, roll int) (int, bool) {
 		return c.deathPenaltyLevel, false
 	}
 	if c.EffectList().IsAffected(effect.FlagCharmOfLuck) {
-		rr, _ := killer.(raidRelatedKiller)
-		if killer == nil || (rr != nil && rr.RaidRelated()) {
+		if killer == nil || killer.RaidRelated() {
 			c.stateMu.Unlock()
 			return c.deathPenaltyLevel, false
 		}

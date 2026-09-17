@@ -60,6 +60,9 @@ func (sowHandler) Use(cast Cast) {
 	if !ok {
 		return
 	}
+	// Inert: npc.Hostile already carries seed state, but its SeedState
+	// returns *npc.SeedState rather than this handler's seedState, and no
+	// item resolves to a manor.Seed for the check above; see #2362.
 	target, ok := cast.Targets[0].(seedableTarget)
 	if !ok || target.Dead() {
 		return
@@ -110,6 +113,8 @@ func (harvestHandler) Use(cast Cast) {
 	if len(cast.Targets) == 0 {
 		return
 	}
+	// Inert: *npc.SeedState return-type drift, and no sown target exists
+	// while SOW is inert; see #2362.
 	target, ok := cast.Targets[0].(seedableTarget)
 	if !ok {
 		return

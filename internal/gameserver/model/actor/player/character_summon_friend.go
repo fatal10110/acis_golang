@@ -7,26 +7,17 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// summonFriendCasterInfo is what ConfirmSummon and TeleportAnswer's accept
-// path need from the untyped caster handed to TeleportRequest/ConfirmSummon:
-// identity for the client-facing dialog and the requesterId anti-spoof
-// check (Player.java:6917), and position for the eventual teleport
-// (SummonFriend.teleportTo, Player.java:198).
-type summonFriendCasterInfo interface {
+// SummonFriendRequester is the caster of a summon-friend request. Its
+// identity feeds the client-facing dialog and the requesterId anti-spoof
+// check (Player.java:6917), its position the eventual teleport
+// (SummonFriend.teleportTo, Player.java:198), and its state the accept
+// path's re-validation, matching SummonFriend.teleportTo's own defensive
+// checkSummoner/checkSummoned re-check at accept time (Player.java:6919
+// calling SummonFriend.java:183-199).
+type SummonFriendRequester interface {
 	ObjectID() int32
 	CharacterName() string
 	Position() (int, int, int)
-}
-
-// summonFriendRequesterState is what TeleportAnswer's accept path needs to
-// re-validate the pending requester, matching SummonFriend.teleportTo's own
-// defensive checkSummoner/checkSummoned re-check at accept time
-// (Player.java:6919 calling SummonFriend.java:183-199): teleportTo's
-// `player` parameter (the one being teleported — the accepting character,
-// `c` itself here) is re-checked via checkSummoner, and its `target`
-// parameter (the original requester) via checkSummoned.
-type summonFriendRequesterState interface {
-	summonFriendCasterInfo
 	AlikeDead() bool
 	Operating() bool
 	Rooted() bool
@@ -83,7 +74,7 @@ func (c *Character) ConsumeItem(itemID, count int) bool {
 // target), while every other call — including the plain
 // SUMMON_FRIEND/SUMMON_PARTY path's post-teleport `nil` call — records the
 // request unconditionally.
-func (c *Character) TeleportRequest(caster any, skill modelskill.Definition) bool {
+func (c *Character) TeleportRequest(caster SummonFriendRequester, skill modelskill.Definition) bool {
 	c.summonFriendMu.Lock()
 	defer c.summonFriendMu.Unlock()
 	if c.summonRequester != nil && caster != nil {
@@ -91,10 +82,9 @@ func (c *Character) TeleportRequest(caster any, skill modelskill.Definition) boo
 	}
 	c.summonRequester = caster
 	c.summonSkill = skill
-	if info, ok := caster.(summonFriendCasterInfo); ok {
-		c.summonRequesterID = info.ObjectID()
-	} else {
-		c.summonRequesterID = 0
+	c.summonRequesterID = 0
+	if caster != nil {
+		c.summonRequesterID = caster.ObjectID()
 	}
 	return true
 }
@@ -117,13 +107,12 @@ func (c *Character) ClearTeleportRequest() {
 // stays in place until TeleportAnswer resolves it or another cast
 // overwrites/clears it — Java enforces no server-side timeout either (the
 // timeout argument is a client-UI-only countdown, ConfirmDlg.addTime).
-func (c *Character) ConfirmSummon(caster any, skill modelskill.Definition, timeout time.Duration) {
-	info, ok := caster.(summonFriendCasterInfo)
-	if !ok {
+func (c *Character) ConfirmSummon(caster SummonFriendRequester, skill modelskill.Definition, timeout time.Duration) {
+	if caster == nil {
 		return
 	}
-	x, y, z := info.Position()
-	c.emit(event.SummonConfirmRequested{CasterName: info.CharacterName(), CasterID: info.ObjectID(), X: x, Y: y, Z: z, Timeout: timeout})
+	x, y, z := caster.Position()
+	c.emit(event.SummonConfirmRequested{CasterName: caster.CharacterName(), CasterID: caster.ObjectID(), X: x, Y: y, Z: z, Timeout: timeout})
 }
 
 // TeleportAnswer handles the client's DlgAnswer response to ConfirmSummon,
@@ -148,10 +137,7 @@ func (c *Character) TeleportAnswer(answer, requesterID int32) {
 	if requester == nil || answer != 1 || storedID != requesterID {
 		return
 	}
-	info, ok := requester.(summonFriendRequesterState)
-	if !ok {
-		return
-	}
+	info := requester
 	if c.Mounted() || c.OlympiadMode() || c.ObserverMode() || c.NoSummonFriendZone() {
 		return
 	}

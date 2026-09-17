@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -37,7 +37,7 @@ type playerRewardEntry struct {
 }
 
 // CalculateRewards implements creature.Rewarder.
-func (d *deathRewards) CalculateRewards(killer creature.DeathActor) {
+func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	d.scheduleDecay()
 
 	entries, totalDamage, maxDealer, highestLevel := d.rewardEntries()
@@ -72,7 +72,8 @@ func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Ch
 			if !ok || !pet.IsPet() {
 				continue
 			}
-			attacker, ok = pet.ActingPlayer().(*player.Character)
+			owner, _ := pet.Owner()
+			attacker, ok = owner.(*player.Character)
 		}
 		if !ok || attacker.AlikeDead() || !attacker.Knows(d.hostile) {
 			continue
@@ -118,7 +119,7 @@ func rewardLeader(entries []playerRewardEntry) (*player.Character, int) {
 	return maxDealer, highestLevel
 }
 
-func (d *deathRewards) rollDrops(killer creature.DeathActor, maxDealer *player.Character, highestLevel int) {
+func (d *deathRewards) rollDrops(killer attackable.Combatant, maxDealer *player.Character, highestLevel int) {
 	if len(d.categories) == 0 {
 		return
 	}

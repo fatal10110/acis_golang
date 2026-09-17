@@ -9,23 +9,10 @@ type reviveCaster interface {
 	WITBonus() float64
 }
 
-type reviveTarget interface {
-	Revive(percent float64) bool
-}
-
-// expRestorer is implemented by player targets that track exp lost at
-// death (player.Character.RestoreExp); other revivable targets don't.
-type expRestorer interface {
-	RestoreExp(restorePercent float64)
-}
-
-// Compile-time proof that a real player satisfies both interfaces above —
-// resurrect.go's type assertions once silently missed every live player
-// because reviveTarget's Revive dropped Character.Revive's bool return.
-var (
-	_ reviveTarget = (*player.Character)(nil)
-	_ expRestorer  = (*player.Character)(nil)
-)
+// Compile-time proof that a real player is revivable — this handler's type
+// assertion once silently missed every live player because its interface
+// dropped Character.Revive's bool return.
+var _ Player = (*player.Character)(nil)
 
 type resurrectHandler struct{}
 
@@ -44,16 +31,14 @@ func (resurrectHandler) Use(cast Cast) {
 
 	percent := formulas.RevivePower(caster.WITBonus(), float64(cast.Skill.Power))
 	for _, obj := range cast.Targets {
-		target, ok := obj.(reviveTarget)
+		target, ok := asPlayer(obj)
 		if !ok {
 			continue
 		}
 		// Player.doRevive(double) restores exp before the HP/MP/CP revive
 		// (Player.java:6008-6012); RestoreExp self-guards on there being an
 		// actual death to restore from.
-		if er, ok := obj.(expRestorer); ok {
-			er.RestoreExp(percent)
-		}
+		target.RestoreExp(percent)
 		target.Revive(percent)
 	}
 }

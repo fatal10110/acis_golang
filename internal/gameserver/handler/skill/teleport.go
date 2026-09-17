@@ -6,13 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
-type facingTarget interface {
-	Heading() int
-	X() int
-	Y() int
-	Z() int
-}
-
 type jumpCaster interface {
 	AbortAll(force bool)
 	SetXYZ(x, y, z int)
@@ -29,8 +22,8 @@ func (instantJumpHandler) Use(cast Cast) {
 	if len(cast.Targets) == 0 {
 		return
 	}
-	target, ok := cast.Targets[0].(facingTarget)
-	if !ok {
+	target := cast.Targets[0]
+	if target == nil {
 		return
 	}
 	caster, ok := cast.Caster.(jumpCaster)
@@ -44,11 +37,12 @@ func (instantJumpHandler) Use(cast Cast) {
 	}
 	radians := math.Pi * degrees / 180
 
-	x := target.X() + int(25*math.Cos(radians))
-	y := target.Y() + int(25*math.Sin(radians))
+	tx, ty, tz := target.Position()
+	x := tx + int(25*math.Cos(radians))
+	y := ty + int(25*math.Sin(radians))
 
 	caster.AbortAll(false)
-	caster.SetXYZ(x, y, target.Z())
+	caster.SetXYZ(x, y, tz)
 	caster.BroadcastPosition()
 }
 
@@ -82,6 +76,8 @@ func (getPlayerHandler) Use(cast Cast) {
 		if alikeDead(obj) {
 			continue
 		}
+		// Inert: player.Character.TeleportTo also takes a scatter radius, and
+		// no datapack skill uses GET_PLAYER yet; see #2362.
 		target, ok := obj.(teleportTarget)
 		if !ok {
 			continue

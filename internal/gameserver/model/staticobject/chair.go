@@ -18,6 +18,7 @@ type ChairUser interface {
 
 // Chair is a static object that can be claimed for sitting.
 type Chair interface {
+	StaticObjectID() int
 	Position() (int, int, int)
 	Type() int
 	SetBusy(bool) bool

@@ -223,8 +223,7 @@ func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.C
 // task)") — AlikeDead() would also reject a fake-dead target, which Java's
 // attack command does not.
 func summonTargetIsDead(target attackable.Combatant) bool {
-	dead, ok := target.(interface{ Dead() bool })
-	return ok && dead.Dead()
+	return target.Dead()
 }
 
 // summonTargetAttackable decides attack-vs-follow the way
@@ -237,7 +236,7 @@ func summonTargetAttackable(live *livePlayer, target attackable.Combatant, ctrlP
 	if live == nil || target == nil {
 		return false
 	}
-	rules, ok := target.(skilltarget.AttackRules)
+	rules, ok := target.(skilltarget.Actor)
 	if !ok {
 		return false
 	}

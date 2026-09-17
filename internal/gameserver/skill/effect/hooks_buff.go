@@ -9,8 +9,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+// increaseChargesStart adds the template's charge amount, capped at the
+// template's count (repurposed here as the max-charges cap, not a tick
+// count), matching the reference's one-shot onStart call into
+// Player.increaseCharges. It always reports success: whether the target
+// was already at the cap is the target method's own no-op/system-message
+// concern, not this effect's.
 func increaseChargesStart(e *Effect) bool {
-	target, ok := e.Effected.(chargesTarget)
+	target, ok := asPlayer(e.Effected)
 	if !ok {
 		return false
 	}
@@ -19,16 +25,13 @@ func increaseChargesStart(e *Effect) bool {
 }
 
 func targetMeStart(e *Effect) bool {
-	target, ok := e.Effected.(targetRedirectTarget)
+	target, ok := asPlayer(e.Effected)
 	if !ok {
 		return false
 	}
-	if pt, ok := e.Effected.(playerTarget); !ok || !pt.IsPlayer() {
-		return false
-	}
-	effector, ok := e.Effector.(world.Tracked)
-	if !ok && e.Effector != nil {
-		return true
+	var effector world.Tracked
+	if e.Effector != nil {
+		effector = e.Effector
 	}
 	if target.CurrentTarget() == effector {
 		target.TryToAttack(effector)
@@ -39,37 +42,25 @@ func targetMeStart(e *Effect) bool {
 }
 
 func bluffStart(e *Effect) bool {
-	if rt, ok := e.Effected.(raidTarget); ok && rt.RaidRelated() {
+	if e.Effected.RaidRelated() || e.Effected.BluffExempt() || e.Effector == nil {
 		return false
 	}
-	if ex, ok := e.Effected.(bluffExemptTarget); ok && ex.BluffExempt() {
-		return false
-	}
-	target, ok := e.Effected.(headingTarget)
-	if !ok {
-		return false
-	}
-	effector, ok := e.Effector.(headingTarget)
-	if !ok {
-		return false
-	}
-	target.SetHeading(effector.Heading())
+	e.Effected.SetHeading(e.Effector.Heading())
 	return true
 }
 
 func charmOfCourageStart(e *Effect) bool {
-	target, ok := e.Effected.(playerTarget)
-	return ok && target.IsPlayer()
+	return isPlayer(e.Effected)
 }
 
 func charmOfLuckExit(e *Effect) {
-	if target, ok := e.Effected.(charmOfLuckStopper); ok {
+	if target, ok := asPlayer(e.Effected); ok {
 		target.StopCharmOfLuck(e)
 	}
 }
 
 func phoenixBlessExit(e *Effect) {
-	if target, ok := e.Effected.(phoenixBlessStopper); ok {
+	if target, ok := asPlayer(e.Effected); ok {
 		target.StopPhoenixBlessing(e)
 	}
 }
@@ -88,14 +79,10 @@ func phoenixBlessExit(e *Effect) {
 // guards them. This is the required behavior; do not "fix" it by checking
 // the candidate's tag instead.
 func cancelStart(e *Effect) bool {
-	if target, ok := e.Effected.(deadChecker); ok && target.Dead() {
+	if e.Effected.Dead() {
 		return false
 	}
-	owner, ok := e.Effected.(effectListOwner)
-	if !ok {
-		return true
-	}
-	list := owner.EffectList()
+	list := e.Effected.EffectList()
 	if list == nil {
 		return true
 	}
@@ -103,10 +90,7 @@ func cancelStart(e *Effect) bool {
 		return true
 	}
 
-	vuln := 1.0
-	if v, ok := e.Effected.(cancelVulnerabilitySource); ok {
-		vuln = v.CancelVulnerability(e.ClassTag())
-	}
+	vuln := e.Effected.CancelVulnerability(e.ClassTag())
 
 	count := e.Skill.MaxNegatedEffects
 	candidates := list.All()
@@ -157,11 +141,7 @@ func shuffleEffects(candidates []*Effect) {
 // when its owning skill sets EffectType, per-skill otherwise) is within
 // e.Skill.NegateLevel — or any level when NegateLevel is -1.
 func negateStart(e *Effect) bool {
-	owner, ok := e.Effected.(effectListOwner)
-	if !ok {
-		return true
-	}
-	list := owner.EffectList()
+	list := e.Effected.EffectList()
 	if list == nil {
 		return true
 	}
@@ -230,16 +210,12 @@ func fusionAction(*Effect) bool {
 // once the effect is already maxed out.
 
 func chanceSkillTriggerStart(e *Effect) bool {
-	if target, ok := e.Effected.(chanceTriggerTarget); ok {
-		target.AddChanceTrigger(e)
-	}
+	e.Effected.AddChanceTrigger(e)
 	return true
 }
 
 func chanceSkillTriggerExit(e *Effect) {
-	if target, ok := e.Effected.(chanceTriggerTarget); ok {
-		target.RemoveChanceTrigger(e)
-	}
+	e.Effected.RemoveChanceTrigger(e)
 }
 
 // spoilRoll is the upper bound of the uniform random draw a spoil effect's
@@ -252,26 +228,15 @@ const spoilRoll = 10000
 // success once the roll is attempted, regardless of the roll's outcome.
 
 func cancelDebuffStart(e *Effect) bool {
-	target, ok := e.Effected.(playerTarget)
-	if !ok || !target.IsPlayer() {
+	if !isPlayer(e.Effected) || e.Effected.Dead() {
 		return false
 	}
-	if dc, ok := e.Effected.(deadChecker); ok && dc.Dead() {
-		return false
-	}
-	owner, ok := e.Effected.(effectListOwner)
-	if !ok {
-		return true
-	}
-	list := owner.EffectList()
+	list := e.Effected.EffectList()
 	if list == nil {
 		return true
 	}
 
-	vuln := 1.0
-	if v, ok := e.Effected.(cancelVulnerabilitySource); ok {
-		vuln = v.CancelVulnerability(e.ClassTag())
-	}
+	vuln := e.Effected.CancelVulnerability(e.ClassTag())
 
 	candidates := list.All()
 	count := cancelDebuffPass(list, candidates, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
