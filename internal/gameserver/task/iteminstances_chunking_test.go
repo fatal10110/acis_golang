@@ -207,3 +207,27 @@ func TestItemInstancesSaveWritesInlineOnceWorkerIsClosed(t *testing.T) {
 		t.Fatal("written item must leave pending")
 	}
 }
+
+// TestLaneKeyKeepsDestroyedItemOnItsOwnersLane pins which persistence lane a
+// destroyed item's delete runs on. item.Instance.DestroyState zeroes OwnerID
+// along with the count, so a lane keyed off the flush-time snapshot would send
+// every destroyed non-collar item's delete to owner 0's lane while that row's
+// earlier writes sit on its real owner's — and an upserting save left behind
+// there would put the deleted row back.
+func TestLaneKeyKeepsDestroyedItemOnItsOwnersLane(t *testing.T) {
+	instances := NewItemInstances(&chunkTrackingFlusher{}, item.NewTable(nil), nil)
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	instances.Add(inst)
+
+	// The destroy is what reports the row again, with its owner already gone.
+	inst.DestroyState()
+	instances.Add(inst)
+
+	entry, ok := instances.pending[inst.ObjectID]
+	if !ok {
+		t.Fatal("destroyed item left the pending set")
+	}
+	if got := instances.laneKey(inst.Snapshot(), entry.ownerID); got != 7 {
+		t.Fatalf("destroyed item's lane key = %d, want its owner 7", got)
+	}
+}

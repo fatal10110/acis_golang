@@ -1,8 +1,6 @@
 package skill
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -110,7 +108,7 @@ func FishingOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 }
 
 // LearnGeneral applies a general trainer skill-learning request.
-func LearnGeneral(ctx context.Context, c *player.Character, tmpl *player.Template, skills *Persistence, books modelskill.BookPolicy, skillID, level int) (LearnResult, LearnOutcome, error) {
+func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistence, books modelskill.BookPolicy, skillID, level int) (LearnResult, LearnOutcome, error) {
 	if c == nil {
 		return LearnResult{}, LearnUnavailable, nil
 	}
@@ -131,7 +129,7 @@ func LearnGeneral(ctx context.Context, c *player.Character, tmpl *player.Templat
 			return result, LearnMissingItem, nil
 		}
 	}
-	if err := setKnownSkill(ctx, skills, c, grant.SkillID, grant.Level); err != nil {
+	if err := setKnownSkill(skills, c, grant.SkillID, grant.Level); err != nil {
 		return result, LearnDone, err
 	}
 	if result.Cost > 0 {
@@ -141,7 +139,7 @@ func LearnGeneral(ctx context.Context, c *player.Character, tmpl *player.Templat
 }
 
 // LearnFishing applies a fishing trainer skill-learning request.
-func LearnFishing(ctx context.Context, c *player.Character, trees *modelskill.Trees, skills *Persistence, skillID, level int) (LearnResult, LearnOutcome, error) {
+func LearnFishing(c *player.Character, trees *modelskill.Trees, skills *Persistence, skillID, level int) (LearnResult, LearnOutcome, error) {
 	offer, ok := FishingOfferFor(c, trees, skills, skillID, level)
 	if !ok {
 		return LearnResult{}, LearnUnavailable, nil
@@ -155,7 +153,7 @@ func LearnFishing(ctx context.Context, c *player.Character, trees *modelskill.Tr
 	if c.Inventory() == nil || c.Inventory().DestroyByTemplateID(node.ItemID, node.ItemCount) == nil {
 		return result, LearnMissingItem, nil
 	}
-	if err := setKnownSkill(ctx, skills, c, skillID, level); err != nil {
+	if err := setKnownSkill(skills, c, skillID, level); err != nil {
 		return result, LearnDone, err
 	}
 	return result, LearnDone, nil
@@ -181,9 +179,9 @@ func definitionLoaded(skills *Persistence, skillID, level int) bool {
 	return skills != nil && skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 }
 
-func setKnownSkill(ctx context.Context, skills *Persistence, c *player.Character, skillID, level int) error {
+func setKnownSkill(skills *Persistence, c *player.Character, skillID, level int) error {
 	if skills != nil {
-		return skills.SetKnownSkill(ctx, c, skillID, level)
+		return skills.SetKnownSkill(c, skillID, level)
 	}
 	c.SetSkillLevel(skillID, level)
 	return nil

@@ -329,7 +329,7 @@ func (l *GameClientLink) transferTradeInventoryItem(ctx context.Context, source,
 		return false
 	}
 	if ok {
-		l.applyPersistActions(ctx, res.Persist)
+		l.applyPersistActions(res.Persist)
 	}
 	return ok
 }

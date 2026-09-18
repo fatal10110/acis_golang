@@ -1,8 +1,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -36,11 +34,11 @@ func (l *GameClientLink) sendEnchantSkillInfo(live *livePlayer, req clientpacket
 	live.SendFrame(serverpackets.FrameExEnchantSkillInfo(info))
 }
 
-func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestExEnchantSkill) {
+func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.RequestExEnchantSkill) {
 	if live == nil {
 		return
 	}
-	result, status, err := skillstate.Enchant(ctx, live.Character, l.levels, live.template, l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
+	result, status, err := skillstate.Enchant(live.Character, l.levels, live.template, l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -61,7 +59,7 @@ func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer
 		return
 	}
 
-	l.refreshSkillShortcuts(ctx, live, int32(result.SkillID), int32(result.AppliedLevel))
+	l.refreshSkillShortcuts(live, int32(result.SkillID), int32(result.AppliedLevel))
 	if status == skillstate.EnchantSucceeded {
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageSucceededEnchantingSkillS1, req.SkillID, req.SkillLevel))
 	} else {

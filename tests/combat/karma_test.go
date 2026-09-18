@@ -66,6 +66,7 @@ func TestKarmaBlocksRecallTeleportItemUse(t *testing.T) {
 		t.Fatalf("karma-blocked item use reply = opcode %#x, want no reply (silent reject)", reply[0])
 	}
 
+	srv.FlushItems(t)
 	instances, err := srv.Items.ListByOwner(context.Background(), objID)
 	if err != nil {
 		t.Fatalf("list items: %v", err)

@@ -157,7 +157,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 }
 
 func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
@@ -187,7 +187,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	if !ok {
 		return
 	}
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	if res.WasWorn {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 	}
@@ -256,7 +256,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if result.Herb != nil {
 		l.consumePetHerb(live, pet, petInv, result.Herb)
 	}
-	l.applyPersistActions(ctx, result.Persist)
+	l.applyPersistActions(result.Persist)
 }
 
 // broadcastPetPickupAttention mirrors SummonAI.java:214-222: after a pet
@@ -322,7 +322,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	if res.Outcome == petitem.Unequipped {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 		return

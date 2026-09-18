@@ -53,7 +53,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	if err != nil {
 		l.log.Error().Err(err).Msg("enchant item")
 	}
-	l.applyPersistActions(ctx, result.Persist)
+	l.applyPersistActions(result.Persist)
 	if len(result.Steps) == 0 {
 		return
 	}
@@ -121,30 +121,68 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 	}
 }
 
-func (l *GameClientLink) applyPersistActions(ctx context.Context, actions []invops.Persist) {
+// applyPersistActions queues actions' item-row writes on the persistence
+// worker instead of writing them here: this runs on an actor queue, where a
+// slow database would hold a pool worker and stall unrelated actors.
+//
+// The lane is the row owner's at the moment the action is produced, so one
+// owner's writes of one row keep their production order. The state itself is
+// read when the write runs, not frozen here, because a lane is not enough on
+// its own: an item that changes hands has its next write queued on the new
+// owner's lane, and if the old owner's lane drains later, a frozen snapshot
+// would overwrite the row with the previous owner. Reading at write time
+// means every queued write lands the row's current state, so two lanes
+// writing one row converge instead of fighting. item.Instance.Snapshot is
+// mutex-guarded, so the read is safe from a worker goroutine.
+//
+// An item that has been destroyed or moved out of the world by the time the
+// write runs becomes a delete, the same rule task.ItemInstances.addToBatch
+// applies: an ItemStore save is an upsert, so writing that state as a row
+// would resurrect what another writer has already deleted.
+//
+// A count-zero pet collar is the one row whose pets-row delete needs the
+// collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
+// here touches no pets row, and both deletes are idempotent, so it stays on
+// the owner's lane with everything else.
+func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return
 	}
 	for _, action := range actions {
 		switch action.Action {
-		case invops.PersistSave:
+		case invops.PersistSave, invops.PersistUpdate:
 			if action.Item == nil {
 				continue
 			}
-			if err := l.items.Save(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("save item")
-			}
-		case invops.PersistUpdate:
-			if action.Item == nil {
-				continue
-			}
-			if err := l.items.Update(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("update item")
-			}
+			insert := action.Action == invops.PersistSave
+			inst := action.Item
+			l.persist.Enqueue(inst.Snapshot().OwnerID, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				st := inst.Snapshot()
+				if st.Count <= 0 || st.Location == item.LocationVoid {
+					if err := l.items.Delete(ctx, st.ObjectID); err != nil {
+						l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("delete item")
+					}
+					return
+				}
+				write, op := l.items.UpdateState, "update item"
+				if insert {
+					write, op = l.items.SaveState, "save item"
+				}
+				if err := write(ctx, st); err != nil {
+					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg(op)
+				}
+			})
 		case invops.PersistDelete:
-			if err := l.items.Delete(ctx, action.ObjectID); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.ObjectID).Msg("delete item")
-			}
+			objectID := action.ObjectID
+			l.persist.Enqueue(action.OwnerID, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.Delete(ctx, objectID); err != nil {
+					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
+				}
+			})
 		}
 	}
 }
