@@ -121,8 +121,21 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 // destroy, a trade transfer — can run between the cast's Hit phase and this
 // task, and a pet built from a collar someone else now holds would answer to
 // two players through one pets row.
+//
+// A logout in that window is the same problem one step further: sim.Queue
+// refuses later posts but still runs every task it has already accepted, so a
+// continuation queued just before detachLivePlayer closed the queue would run
+// after the session left the world — publishing a pet for an offline owner,
+// past the only cleanup that would have removed it. The reference cannot
+// reach that state: Player.cleanup aborts the cast and unsummons the pet
+// (Player.java:6266-6283), and its spawn had no separate continuation to
+// leave behind. The detaching flag is the same one taskeffects.go checks
+// before applying a deferred effect to a departing session.
 func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
 	link, live := s.link, s.live
+	if live.detached() {
+		return
+	}
 	inv := live.Inventory()
 	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
 		return

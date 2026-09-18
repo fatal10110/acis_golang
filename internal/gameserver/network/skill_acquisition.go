@@ -1,8 +1,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -48,15 +46,15 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 	}
 }
 
-func (l *GameClientLink) learnAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
 		return
 	}
 	switch req.SkillType {
 	case acquireSkillTypeUsual:
-		l.learnGeneralAcquireSkill(ctx, live, req)
+		l.learnGeneralAcquireSkill(live, req)
 	case acquireSkillTypeFishing:
-		l.learnFishingAcquireSkill(ctx, live, req)
+		l.learnFishingAcquireSkill(live, req)
 	default:
 		// Pledge-skill learning is deferred for the same reason as the
 		// info path: it needs the unported pledge runtime.
@@ -78,7 +76,7 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(offer.Grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
 }
 
-func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if live == nil {
 		return
 	}
@@ -123,7 +121,7 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, 0, acquireSkillTypeFishing, reqs))
 }
 
-func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if live == nil {
 		return
 	}

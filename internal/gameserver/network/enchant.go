@@ -125,13 +125,20 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // worker instead of writing them here: this runs on an actor queue, where a
 // slow database would hold a pool worker and stall unrelated actors.
 //
-// Each write carries a state copied here, on the queue that produced the
-// action, and runs on the lane of the row's owner at that moment. That keeps
-// every write of one row on one lane, in production order: an ItemStore save
-// is an upsert, so a save that overtook the delete of the same object would
-// put the row back. A trade that hands an item over produces its write with
-// the receiver already recorded as owner, so the receiver's later destroy
-// lands on the same lane as the transfer.
+// The lane is the row owner's at the moment the action is produced, so one
+// owner's writes of one row keep their production order. The state itself is
+// read when the write runs, not frozen here, because a lane is not enough on
+// its own: an item that changes hands has its next write queued on the new
+// owner's lane, and if the old owner's lane drains later, a frozen snapshot
+// would overwrite the row with the previous owner. Reading at write time
+// means every queued write lands the row's current state, so two lanes
+// writing one row converge instead of fighting. item.Instance.Snapshot is
+// mutex-guarded, so the read is safe from a worker goroutine.
+//
+// An item that has been destroyed or moved out of the world by the time the
+// write runs becomes a delete, the same rule task.ItemInstances.addToBatch
+// applies: an ItemStore save is an upsert, so writing that state as a row
+// would resurrect what another writer has already deleted.
 //
 // A count-zero pet collar is the one row whose pets-row delete needs the
 // collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
@@ -148,10 +155,17 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				continue
 			}
 			insert := action.Action == invops.PersistSave
-			st := action.Item.Snapshot()
-			l.persist.Enqueue(st.OwnerID, func() {
+			inst := action.Item
+			l.persist.Enqueue(inst.Snapshot().OwnerID, func() {
 				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 				defer cancel()
+				st := inst.Snapshot()
+				if st.Count <= 0 || st.Location == item.LocationVoid {
+					if err := l.items.Delete(ctx, st.ObjectID); err != nil {
+						l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("delete item")
+					}
+					return
+				}
 				write, op := l.items.UpdateState, "update item"
 				if insert {
 					write, op = l.items.SaveState, "save item"
