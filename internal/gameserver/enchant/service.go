@@ -192,13 +192,17 @@ func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, obje
 	}
 
 	out := Result{}
+	// Read the scroll's owner before consuming it: a fully consumed stack
+	// comes back from DestroyItem with its owner zeroed, and the row's write
+	// has to stay on the lane its earlier writes used.
+	scrollOwnerID := scrollInst.Snapshot().OwnerID
 	destroyedScroll := inv.DestroyItem(scrollInst, 1)
 	if destroyedScroll == nil {
 		s.state.Clear(playerID)
 		out.Steps = append(out.Steps, messageStep(Message{Code: MessageNotEnoughItems}), resultStep(ResultCancelled))
 		return out, nil
 	}
-	out.Persist = append(out.Persist, inventory.DestroyedOrUpdated(destroyedScroll))
+	out.Persist = append(out.Persist, inventory.DestroyedOrUpdated(scrollOwnerID, destroyedScroll))
 
 	chance := scrollDef.chance(target, targetTemplate)
 	if target.Snapshot().OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {

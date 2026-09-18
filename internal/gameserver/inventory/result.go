@@ -56,14 +56,21 @@ func Delete(ownerID, objectID int32) Persist {
 	return Persist{Action: PersistDelete, ObjectID: objectID, OwnerID: ownerID}
 }
 
-// DestroyedOrUpdated returns delete when inst is fully consumed, otherwise update.
-func DestroyedOrUpdated(inst *item.Instance) Persist {
+// DestroyedOrUpdated returns delete when inst is fully consumed, otherwise
+// update.
+//
+// ownerID is the owner the row held before the destroy, which the caller has
+// to read before it destroys: a fully consumed instance has already been
+// through item.Instance.DestroyState, which zeroes OwnerID along with the
+// count, so the delete cannot recover the lane its earlier writes used from
+// inst itself.
+func DestroyedOrUpdated(ownerID int32, inst *item.Instance) Persist {
 	if inst == nil {
 		return Persist{}
 	}
 	st := inst.Snapshot()
 	if st.Count == 0 {
-		return Delete(st.OwnerID, st.ObjectID)
+		return Delete(ownerID, st.ObjectID)
 	}
 	return Update(inst)
 }

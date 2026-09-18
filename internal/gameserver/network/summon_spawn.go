@@ -109,10 +109,24 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 }
 
 // spawnRestoredPet builds and publishes the pet from its resolved pets-row
-// state, on the owner's queue. It re-checks the one-summon gate: the state
-// read may have run while another cast's pet reached the world.
+// state, on the owner's queue. It re-checks both gates that the caster's own
+// state can have invalidated while the pets-row read was outstanding: the
+// control item still being held, and no other summon having reached the
+// world.
+//
+// The reference re-resolves the control item from the caster's inventory at
+// use time and drops out silently when it is gone or no longer theirs
+// (SummonCreature.java:34-41). Go needs that check on this side of the read:
+// the read runs off the owner's queue, so the owner's own handlers — drop,
+// destroy, a trade transfer — can run between the cast's Hit phase and this
+// task, and a pet built from a collar someone else now holds would answer to
+// two players through one pets row.
 func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
 	link, live := s.link, s.live
+	inv := live.Inventory()
+	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
+		return
+	}
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
