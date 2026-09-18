@@ -137,6 +137,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 // player's saves: a detach with an active pet queues three jobs on the
 // player's lane, each under livePlayerDetachSaveTimeout, and one item-tick
 // chunk under task.ItemInstanceSaveTimeout can be running ahead of them.
+//
+// The player's lane also carries the single-row writes its handlers queued
+// (item rows, shortcut rows, character_skills rows), so a degraded database
+// can put more than those four jobs in front of this wait. The wait is a
+// bound, not a guarantee: awaitPersistence logs a wait it gave up on and the
+// caller continues, exactly as it does when the saves themselves fail.
 const livePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
 
 // awaitPersistence waits until every save already enqueued for owners has

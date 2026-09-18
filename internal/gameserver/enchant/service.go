@@ -293,7 +293,7 @@ func (s *Service) normalFailure(playerID int32, inv *itemcontainer.Inventory, ta
 		out.Steps = append(out.Steps, resultStep(ResultCancelled))
 		return out, nil
 	}
-	out.Persist = append(out.Persist, inventory.Delete(target.ObjectID))
+	out.Persist = append(out.Persist, inventory.Delete(st.OwnerID, st.ObjectID))
 
 	var err error
 	if crystalID != 0 {

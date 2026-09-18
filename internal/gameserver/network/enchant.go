@@ -53,7 +53,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	if err != nil {
 		l.log.Error().Err(err).Msg("enchant item")
 	}
-	l.applyPersistActions(ctx, result.Persist)
+	l.applyPersistActions(result.Persist)
 	if len(result.Steps) == 0 {
 		return
 	}
@@ -121,30 +121,54 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 	}
 }
 
-func (l *GameClientLink) applyPersistActions(ctx context.Context, actions []invops.Persist) {
+// applyPersistActions queues actions' item-row writes on the persistence
+// worker instead of writing them here: this runs on an actor queue, where a
+// slow database would hold a pool worker and stall unrelated actors.
+//
+// Each write carries a state copied here, on the queue that produced the
+// action, and runs on the lane of the row's owner at that moment. That keeps
+// every write of one row on one lane, in production order: an ItemStore save
+// is an upsert, so a save that overtook the delete of the same object would
+// put the row back. A trade that hands an item over produces its write with
+// the receiver already recorded as owner, so the receiver's later destroy
+// lands on the same lane as the transfer.
+//
+// A count-zero pet collar is the one row whose pets-row delete needs the
+// collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
+// here touches no pets row, and both deletes are idempotent, so it stays on
+// the owner's lane with everything else.
+func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return
 	}
 	for _, action := range actions {
 		switch action.Action {
-		case invops.PersistSave:
+		case invops.PersistSave, invops.PersistUpdate:
 			if action.Item == nil {
 				continue
 			}
-			if err := l.items.Save(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("save item")
-			}
-		case invops.PersistUpdate:
-			if action.Item == nil {
-				continue
-			}
-			if err := l.items.Update(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("update item")
-			}
+			insert := action.Action == invops.PersistSave
+			st := action.Item.Snapshot()
+			l.persist.Enqueue(st.OwnerID, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				write, op := l.items.UpdateState, "update item"
+				if insert {
+					write, op = l.items.SaveState, "save item"
+				}
+				if err := write(ctx, st); err != nil {
+					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg(op)
+				}
+			})
 		case invops.PersistDelete:
-			if err := l.items.Delete(ctx, action.ObjectID); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.ObjectID).Msg("delete item")
-			}
+			objectID := action.ObjectID
+			l.persist.Enqueue(action.OwnerID, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.Delete(ctx, objectID); err != nil {
+					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
+				}
+			})
 		}
 	}
 }

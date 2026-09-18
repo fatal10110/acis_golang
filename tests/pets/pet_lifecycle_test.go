@@ -337,6 +337,7 @@ func findSystemMessage(t *testing.T, frames [][]byte, messageID int) []byte {
 
 func mustPersistedItem(t *testing.T, srv *gameservertest.Server, ownerID, objectID int32) *item.Instance {
 	t.Helper()
+	srv.FlushItems(t)
 	rows, err := srv.Items.ListByOwner(petCtx(), ownerID)
 	if err != nil {
 		t.Fatalf("list items: %v", err)

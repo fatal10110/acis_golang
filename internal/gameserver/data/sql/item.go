@@ -36,7 +36,13 @@ func (s *ItemStore) Create(ctx context.Context, ownerID int32, inst item.Instanc
 
 // Save inserts or updates inst in the items table.
 func (s *ItemStore) Save(ctx context.Context, inst *item.Instance) error {
-	st := inst.Snapshot()
+	return s.SaveState(ctx, inst.Snapshot())
+}
+
+// SaveState inserts or updates the row st describes. Callers that write off
+// the goroutine owning the instance pass a state copied while they still
+// owned it, so a later mutation cannot change what this write lands.
+func (s *ItemStore) SaveState(ctx context.Context, st item.InstanceState) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO items
 				(owner_id, object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time)
@@ -132,7 +138,12 @@ func scanItems(rows *sql.Rows, ownerID int32) ([]*item.Instance, error) {
 
 // Update overwrites the persisted state of inst's row.
 func (s *ItemStore) Update(ctx context.Context, inst *item.Instance) error {
-	st := inst.Snapshot()
+	return s.UpdateState(ctx, inst.Snapshot())
+}
+
+// UpdateState overwrites the row st describes, from a state copied by the
+// caller (see SaveState).
+func (s *ItemStore) UpdateState(ctx context.Context, st item.InstanceState) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE items SET owner_id=?, item_id=?, count=?, enchant_level=?, loc=?, loc_data=?,
 				custom_type1=?, custom_type2=?, mana_left=?, time=?

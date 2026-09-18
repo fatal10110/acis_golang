@@ -110,6 +110,8 @@ func assertAcquireSkillListEmpty(t *testing.T, frame []byte, wantType serverpack
 // compares them with want.
 func assertKnownSkills(t *testing.T, srv *gameservertest.Server, objID int32, want map[int]int) {
 	t.Helper()
+	// character_skills writes run on the persistence worker.
+	srv.FlushPersistence(t)
 	known, err := srv.KnownSkills.ListKnownSkills(context.Background(), objID, 0)
 	if err != nil {
 		t.Fatalf("list known skills: %v", err)

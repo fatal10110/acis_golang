@@ -40,10 +40,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// itemStore writes single item rows from a state the caller copied while it
+// owned the instance: the write runs on a persistence lane, after the queue
+// task that produced it has moved on (applyPersistActions).
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
-	Save(ctx context.Context, inst *item.Instance) error
-	Update(ctx context.Context, inst *item.Instance) error
+	SaveState(ctx context.Context, st item.InstanceState) error
+	UpdateState(ctx context.Context, st item.InstanceState) error
 	Delete(ctx context.Context, objectID int32) error
 }
 
