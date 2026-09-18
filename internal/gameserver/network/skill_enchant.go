@@ -1,8 +1,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -36,7 +34,7 @@ func (l *GameClientLink) sendEnchantSkillInfo(live *livePlayer, req clientpacket
 	live.SendFrame(serverpackets.FrameExEnchantSkillInfo(info))
 }
 
-func (l *GameClientLink) applyEnchantSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestExEnchantSkill) {
+func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.RequestExEnchantSkill) {
 	if live == nil {
 		return
 	}

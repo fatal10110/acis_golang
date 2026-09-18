@@ -39,6 +39,19 @@ func (s slowItemStore) Delete(ctx context.Context, objectID int32) error {
 	return s.ItemStore.Delete(ctx, objectID)
 }
 
+// Save and Update are the instance-taking forms of the two writes above.
+// Nothing in the link routes through them today, but they are part of the
+// embedded store's method set, so a caller that reached them would otherwise
+// run at full speed and escape the fixture unnoticed.
+
+func (s slowItemStore) Save(ctx context.Context, inst *item.Instance) error {
+	return s.SaveState(ctx, inst.Snapshot())
+}
+
+func (s slowItemStore) Update(ctx context.Context, inst *item.Instance) error {
+	return s.UpdateState(ctx, inst.Snapshot())
+}
+
 type slowShortcutStore struct {
 	*gamesql.ShortcutStore
 	delay time.Duration

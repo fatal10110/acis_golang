@@ -439,7 +439,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				if live != nil {
-					onLive(live, func() { l.applyEnchantSkill(ctx, live, req) })
+					onLive(live, func() { l.applyEnchantSkill(live, req) })
 				}
 			case clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
@@ -750,7 +750,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				onLive(live, func() { l.learnAcquireSkill(ctx, live, req) })
+				onLive(live, func() { l.learnAcquireSkill(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestActionUse:
