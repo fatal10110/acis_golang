@@ -17,10 +17,16 @@ const (
 )
 
 // Persist is one item-store operation produced by an inventory mutation.
+//
+// OwnerID is the owner the item's row holds at the moment the action is
+// produced. It is the ordering key for the write: every write of one row has
+// to run behind the previous one, and a PersistDelete carries no instance to
+// read that owner from later.
 type Persist struct {
 	Action   PersistAction
 	Item     *item.Instance
 	ObjectID int32
+	OwnerID  int32
 }
 
 // Result carries side effects common to inventory workflows.
@@ -44,9 +50,10 @@ func Update(inst *item.Instance) Persist {
 	return Persist{Action: PersistUpdate, Item: inst}
 }
 
-// Delete returns a persistence action for deleting an item row.
-func Delete(objectID int32) Persist {
-	return Persist{Action: PersistDelete, ObjectID: objectID}
+// Delete returns a persistence action for deleting an item row. ownerID is
+// the owner the row currently holds, not whoever caused the delete.
+func Delete(ownerID, objectID int32) Persist {
+	return Persist{Action: PersistDelete, ObjectID: objectID, OwnerID: ownerID}
 }
 
 // DestroyedOrUpdated returns delete when inst is fully consumed, otherwise update.
@@ -54,8 +61,9 @@ func DestroyedOrUpdated(inst *item.Instance) Persist {
 	if inst == nil {
 		return Persist{}
 	}
-	if inst.Snapshot().Count == 0 {
-		return Delete(inst.ObjectID)
+	st := inst.Snapshot()
+	if st.Count == 0 {
+		return Delete(st.OwnerID, st.ObjectID)
 	}
 	return Update(inst)
 }

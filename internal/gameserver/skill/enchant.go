@@ -1,8 +1,6 @@
 package skill
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -94,7 +92,7 @@ type EnchantResult struct {
 // return a value in [0,99]; the attempt succeeds when roll <= the offer's
 // rate, raising the skill to the requested level, and otherwise resets it
 // to its current max normal (non-enchanted) level.
-func Enchant(ctx context.Context, c *player.Character, table *player.LevelTable, tmpl *player.Template, trees *modelskill.Trees, skills *Persistence, spBookNeeded bool, roll func() int, skillID, level int) (EnchantResult, EnchantOutcome, error) {
+func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Template, trees *modelskill.Trees, skills *Persistence, spBookNeeded bool, roll func() int, skillID, level int) (EnchantResult, EnchantOutcome, error) {
 	if c == nil {
 		return EnchantResult{}, EnchantUnavailable, nil
 	}
@@ -125,7 +123,7 @@ func Enchant(ctx context.Context, c *player.Character, table *player.LevelTable,
 	}
 	if rolled <= offer.Rate {
 		result.AppliedLevel = level
-		if err := setKnownSkill(ctx, skills, c, skillID, level); err != nil {
+		if err := setKnownSkill(skills, c, skillID, level); err != nil {
 			return result, EnchantSucceeded, err
 		}
 		return result, EnchantSucceeded, nil
@@ -133,7 +131,7 @@ func Enchant(ctx context.Context, c *player.Character, table *player.LevelTable,
 
 	maxLevel := skills.skills.MaxLevel(modelskill.ID(skillID))
 	result.AppliedLevel = maxLevel
-	if err := setKnownSkill(ctx, skills, c, skillID, maxLevel); err != nil {
+	if err := setKnownSkill(skills, c, skillID, maxLevel); err != nil {
 		return result, EnchantFailed, err
 	}
 	return result, EnchantFailed, nil

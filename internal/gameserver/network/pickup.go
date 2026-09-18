@@ -116,7 +116,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.world.Despawn(ground)
 	l.lockPickupParalysis(live)
 
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	return true
 }
 

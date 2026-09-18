@@ -192,6 +192,9 @@ func groundRows(t *testing.T, srv *gameservertest.Server) ([]item.GroundSnapshot
 
 func persistedItems(t *testing.T, srv *gameservertest.Server, ownerID int32) []*item.Instance {
 	t.Helper()
+	// A handler's item-row writes run on the persistence worker, so the rows
+	// are only complete once it has drained.
+	srv.FlushPersistence(t)
 	instances, err := srv.Items.ListByOwner(context.Background(), ownerID)
 	if err != nil {
 		t.Fatalf("list items: %v", err)

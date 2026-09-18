@@ -17,7 +17,7 @@ import (
 // class behind #829 freezes it, and the reference handler itself stays silent
 // on every rejection path — so this is left intentionally silent instead of
 // patched with ActionFailed the way the action-locked handlers in #873 were.
-func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutReg) {
+func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.RequestShortCutReg) {
 	if live == nil {
 		return
 	}
@@ -29,12 +29,8 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 	if !ok {
 		return
 	}
-	if l.shortcuts != nil {
-		if err := l.shortcuts.Save(ctx, live.ObjectID(), sc); err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("register shortcut")
-		}
-	}
 	live.shortcuts.Register(sc)
+	l.saveShortcut(live, sc, "register shortcut")
 	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
 }
 
@@ -42,19 +38,24 @@ func (l *GameClientLink) registerShortcut(ctx context.Context, live *livePlayer,
 // the valid range, or for a slot the player has nothing in, returns nothing.
 // Same reasoning as registerShortcut above — silent rejection is intentional
 // Java parity for a UI packet that doesn't lock client input.
-func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, req clientpackets.RequestShortCutDel) {
+func (l *GameClientLink) deleteShortcut(live *livePlayer, req clientpackets.RequestShortCutDel) {
 	if live == nil || !shortcut.ValidDeletePage(req.Page) {
 		return
 	}
 	if !live.shortcuts.Has(req.Slot, req.Page) {
 		return
 	}
-	if l.shortcuts != nil {
-		if err := l.shortcuts.Delete(ctx, live.ObjectID(), req.Slot, req.Page); err != nil {
-			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("delete shortcut")
-		}
-	}
 	live.shortcuts.Delete(req.Slot, req.Page)
+	if l.shortcuts != nil {
+		ownerID, slot, page := live.ObjectID(), req.Slot, req.Page
+		l.persist.Enqueue(ownerID, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+			defer cancel()
+			if err := l.shortcuts.Delete(ctx, ownerID, slot, page); err != nil {
+				l.log.Error().Err(err).Int32("object_id", ownerID).Msg("delete shortcut")
+			}
+		})
+	}
 	live.SendFrame(serverpackets.FrameShortCutDelete(req.Slot, req.Page))
 }
 
@@ -65,20 +66,34 @@ func (l *GameClientLink) deleteShortcut(ctx context.Context, live *livePlayer, r
 // learn-a-skill acquisition both pass that flag (Player.java:3283,
 // RequestAcquireSkill.java:95,125), so a skill upgrade there must not leave
 // the shortcut bar showing the previous level.
-func (l *GameClientLink) refreshSkillShortcuts(ctx context.Context, live *livePlayer, skillID, level int32) {
+func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level int32) {
 	if live == nil || live.shortcuts == nil {
 		return
 	}
 	updated := live.shortcuts.RefreshSkillLevel(skillID, level)
 	for _, sc := range updated {
-		if l.shortcuts != nil {
-			if err := l.shortcuts.Save(ctx, live.ObjectID(), sc); err != nil {
-				l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("refresh skill shortcut")
-				continue
-			}
-		}
+		l.saveShortcut(live, sc, "refresh skill shortcut")
 		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
 	}
+}
+
+// saveShortcut queues one shortcut row's write on the owner's persistence
+// lane. Nothing waits for it: the reference registers the shortcut in memory
+// and sends ShortCutRegister first, and only logs a failed insert
+// (ShortcutList.addShortcut, ShortcutList.refreshShortcuts), so the client's
+// reply never depends on the row landing.
+func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op string) {
+	if l.shortcuts == nil {
+		return
+	}
+	ownerID := live.ObjectID()
+	l.persist.Enqueue(ownerID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := l.shortcuts.Save(ctx, ownerID, sc); err != nil {
+			l.log.Error().Err(err).Int32("object_id", ownerID).Msg(op)
+		}
+	})
 }
 
 func serverShortcutList(shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {

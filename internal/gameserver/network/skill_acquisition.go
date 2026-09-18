@@ -82,7 +82,7 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 	if live == nil {
 		return
 	}
-	_, status, err := skillstate.LearnGeneral(ctx, live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -106,7 +106,7 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(l.acquireSkillList(live))
 }
 
@@ -127,7 +127,7 @@ func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *liv
 	if live == nil {
 		return
 	}
-	result, status, err := skillstate.LearnFishing(ctx, live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
+	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -148,7 +148,7 @@ func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *liv
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(l.fishingAcquireSkillList(live))
 }
 

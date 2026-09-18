@@ -107,7 +107,7 @@ func TestEnchantSucceeds(t *testing.T) {
 	skills := enchantTestPersistence()
 	roll := func() int { return 0 }
 
-	result, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestEnchantFailsResetsToMaxNormalLevel(t *testing.T) {
 	skills := enchantTestPersistence()
 	roll := func() int { return 99 }
 
-	result, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestEnchantNeedsSP(t *testing.T) {
 	trees := enchantTestTree()
 	skills := enchantTestPersistence()
 
-	result, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -185,7 +185,7 @@ func TestEnchantNeedsExp(t *testing.T) {
 	trees := enchantTestTree()
 	skills := enchantTestPersistence()
 
-	_, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	_, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -205,7 +205,7 @@ func TestEnchantMissingItemWhenSPBookNeeded(t *testing.T) {
 	}}
 	skills := enchantTestPersistence()
 
-	result, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, true, func() int { return 0 }, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, true, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestEnchantSkipsItemCheckWhenConfigDisabled(t *testing.T) {
 	}}
 	skills := enchantTestPersistence()
 
-	_, status, err := Enchant(context.Background(), ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	_, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -756,7 +756,7 @@ func TestGiveSkillsGrantsFreeSkillsWithoutPersisting(t *testing.T) {
 		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
 	}}
 
-	if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+	if err := p.GiveSkills(c, tmpl); err != nil {
 		t.Fatalf("GiveSkills() error: %v", err)
 	}
 	if got := c.SkillLevel(249); got != 2 {
@@ -780,7 +780,7 @@ func TestRewardSkillsGrantsAllAvailableSkillsWithSelectivePersistence(t *testing
 		{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
 	}}
 
-	if err := p.RewardSkills(context.Background(), c, tmpl); err != nil {
+	if err := p.RewardSkills(c, tmpl); err != nil {
 		t.Fatalf("RewardSkills() error: %v", err)
 	}
 	if got := c.SkillLevel(249); got != 2 {
@@ -805,7 +805,7 @@ func TestGiveSkillsDropsLuckyAtMaxLevel(t *testing.T) {
 		store := &recordingSkillLevelStore{}
 		p := newLevelingPersistence(store)
 		c := &player.Character{ID: 1, CharLevel: 9}
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(194); got != 1 {
@@ -818,7 +818,7 @@ func TestGiveSkillsDropsLuckyAtMaxLevel(t *testing.T) {
 		p := newLevelingPersistence(store)
 		c := &player.Character{ID: 1, CharLevel: 10}
 		c.SetSkillLevel(194, 1)
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(194); got != 0 {
@@ -845,7 +845,7 @@ func TestGiveSkillsCorrectsSkillsTheLevelNoLongerSupports(t *testing.T) {
 		p := newLevelingPersistence(store)
 		c := &player.Character{ID: 1, CharLevel: 11}
 		c.SetSkillLevel(3, 3)
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		// Level 11 reaches the MinLevel-20 grant through the nine-level
@@ -869,7 +869,7 @@ func TestGiveSkillsCorrectsSkillsTheLevelNoLongerSupports(t *testing.T) {
 			{SkillID: 3, Level: 2, MinLevel: 20, Cost: 50},
 			{SkillID: 3, Level: 3, MinLevel: 40, Cost: 50},
 		}}
-		if err := p.GiveSkills(context.Background(), c, highOnly); err != nil {
+		if err := p.GiveSkills(c, highOnly); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(3); got != 0 {
@@ -886,7 +886,7 @@ func TestGiveSkillsCorrectsSkillsTheLevelNoLongerSupports(t *testing.T) {
 		c := &player.Character{ID: 1, CharLevel: 1}
 		// 4267 comes from equipment state, not the profession line.
 		c.SetSkillLevel(4267, 1)
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(4267); got != 1 {
@@ -913,7 +913,7 @@ func TestGiveSkillsKeepsEnchantOnlyAtHighLevel(t *testing.T) {
 		p := newLevelingPersistence(store)
 		c := &player.Character{ID: 1, CharLevel: 76}
 		c.SetSkillLevel(3, 101)
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(3); got != 101 {
@@ -926,7 +926,7 @@ func TestGiveSkillsKeepsEnchantOnlyAtHighLevel(t *testing.T) {
 		p := newLevelingPersistence(store)
 		c := &player.Character{ID: 1, CharLevel: 75}
 		c.SetSkillLevel(3, 101)
-		if err := p.GiveSkills(context.Background(), c, tmpl); err != nil {
+		if err := p.GiveSkills(c, tmpl); err != nil {
 			t.Fatalf("GiveSkills() error: %v", err)
 		}
 		if got := c.SkillLevel(3); got != 3 {

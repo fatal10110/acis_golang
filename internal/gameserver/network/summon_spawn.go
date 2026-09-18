@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -43,55 +44,78 @@ const petRestoreTimeout = 5 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
 // beside the owner, and registers it as the owner's active summon,
-// mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and reports
-// false if the owner already has a pet or servitor tracked — the reference
-// re-checks this at the handler layer even though SummonItems.java already
-// gated it once before the cast started.
+// mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and stops if
+// the owner already has a pet or servitor tracked — the reference re-checks
+// this at the handler layer even though SummonItems.java already gated it
+// once before the cast started.
 //
 // Every other rejection below (missing template, unmapped or non-pet
 // summon item, missing npc template, a restore-state error, ID exhaustion,
-// an unresolvable level) sends no further packet and only reports false.
-// This runs inside the cast's already-committed Hit phase — MagicSkillUse,
-// the SUMMON_A_PET system message and MagicSkillLaunched are already sent
-// by the caller before SpawnPet runs — and Java's own handler is silent
-// for the identical set of conditions (SummonCreature.java:36,40,44,49,54,
-// 59 are all bare `return;`, with no packet beyond what the cast itself
-// already sent).
-func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) bool {
+// an unresolvable level) sends no further packet and simply stops. This runs
+// inside the cast's already-committed Hit phase — MagicSkillUse, the
+// SUMMON_A_PET system message and MagicSkillLaunched are already sent by the
+// caller before SpawnPet runs — and Java's own handler is silent for the
+// identical set of conditions (SummonCreature.java:36,40,44,49,54, 59 are
+// all bare `return;`, with no packet beyond what the cast itself already
+// sent).
+//
+// When the pets row has to be read, the spawn finishes on the owner's queue
+// after the read (see spawnRestoredPet), so it reports nothing to its caller.
+func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) {
 	link, live := s.link, s.live
 	if link == nil || live == nil || controlItem == nil {
-		return false
+		return
 	}
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
-		return false
+		return
 	}
 
 	tmpl, ok := live.Inventory().Templates().Get(controlItem.TemplateID)
 	if !ok {
-		return false
+		return
 	}
 	summonItem, ok := link.summonItems.Item(tmpl.ID)
 	if !ok || summonItem.SummonType != summonItemTypePet {
-		return false
+		return
 	}
 	npcTmpl, ok := link.npcs.Get(int(summonItem.NPCID))
 	if !ok || npcTmpl.Pet == nil {
-		return false
+		return
 	}
 
 	// An unsummon or logout whose pets-row write is still queued restores
-	// from the state it queued; otherwise the row is current.
-	state, hasSaved := link.queuedPets.latest(controlItem.ObjectID)
-	if !hasSaved {
+	// from the state it queued; otherwise the row has to be read.
+	if state, hasSaved := link.queuedPets.latest(controlItem.ObjectID); hasSaved {
+		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true)
+		return
+	}
+	// The read runs on the control item's persistence lane: behind every
+	// pets-row write queued for that item, and off this actor queue, where a
+	// slow database would hold a pool worker and stall unrelated actors. The
+	// spawn continues on the owner's queue with the row, so the packets it
+	// sends keep their own order; a closed queue (the owner logged out while
+	// the read ran) drops it.
+	link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
-		var err error
-		state, hasSaved, err = link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
-			return false
+			return
 		}
+		postLive(live, func() { s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved) })
+	})
+}
+
+// spawnRestoredPet builds and publishes the pet from its resolved pets-row
+// state, on the owner's queue. It re-checks the one-summon gate: the state
+// read may have run while another cast's pet reached the world.
+func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
+	link, live := s.link, s.live
+	if _, ok := link.world.Summon(live.ObjectID()); ok {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+		return
 	}
 
 	// Java's unsaved branch commits the seeded row immediately
@@ -114,7 +138,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		// with zero-value combat/feeding stats, matching Pet.restore
 		// returning null on bad data (SummonCreature.java:59's pet==null
 		// check, itself a silent no-op — see this file's own SpawnPet doc).
-		return false
+		return
 	}
 	fed, curHP, curMP := levelStats.MaxMeal, levelStats.MaxHP, levelStats.MaxMP
 	exp := levelStats.MaxExp
@@ -125,7 +149,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	objID, err := link.ids.NextID()
 	if err != nil {
-		return false
+		return
 	}
 
 	name := npcTmpl.Name
@@ -190,7 +214,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
-		return false
+		return
 	}
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
@@ -228,7 +252,6 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
 
-	return true
 }
 
 // SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its

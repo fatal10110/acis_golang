@@ -1065,7 +1065,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				onLive(live, func() { l.registerShortcut(ctx, live, req) })
+				onLive(live, func() { l.registerShortcut(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestShortCutDel:
@@ -1077,7 +1077,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				onLive(live, func() { l.deleteShortcut(ctx, live, req) })
+				onLive(live, func() { l.deleteShortcut(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestChangePetName:
@@ -1089,7 +1089,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				onLive(live, func() { l.handleRequestChangePetName(ctx, live, req) })
+				// Runs its own queue hops: the pets-table read in the middle
+				// stays here, off the queue (see handleRequestChangePetName).
+				l.handleRequestChangePetName(ctx, live, req)
 			}
 
 		case clientpackets.OpcodeDlgAnswer:

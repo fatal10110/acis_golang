@@ -155,7 +155,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.DeathPenaltyChanged:
 		l.applyLiveDeathPenalty(live, e)
 	case event.LevelChanged:
-		l.refreshLiveLevelSkills(p.ctx, live)
+		l.refreshLiveLevelSkills(live)
 	case event.ShortBuff:
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(e.SkillID, e.Level, e.DurationSeconds))
 	case event.RegenMax:

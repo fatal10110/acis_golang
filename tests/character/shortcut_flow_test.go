@@ -3,6 +3,7 @@ package character
 import (
 	"bytes"
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -135,6 +136,10 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithLog(zerolog.New(logs)),
 		gameservertest.WithReuseDelays(0, 0),
+		// Every shortcut row write takes longer than the sim pool's 50 ms
+		// slow-task budget, so a write still made on the player's queue
+		// would show up in the watchdog's log below.
+		gameservertest.WithSlowStores(150*time.Millisecond),
 	)
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -183,6 +188,8 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		t.Fatalf("registration for missing object answered %#x, want silence", frame[0])
 	}
 
+	// Shortcut rows are written on the persistence worker.
+	srv.FlushPersistence(t)
 	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID)
 	if err != nil {
 		t.Fatalf("list shortcuts: %v", err)
@@ -206,6 +213,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeShortCutDelete {
 		t.Fatalf("delete opcode = %#x, want ShortCutDelete (%#x)", reply[0], serverpackets.OpcodeShortCutDelete)
 	}
+	srv.FlushPersistence(t)
 	rows, err = srv.Shortcuts.ListByOwner(context.Background(), objID)
 	if err != nil {
 		t.Fatalf("list shortcuts after delete: %v", err)
@@ -214,6 +222,17 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		if row.Type == shortcut.Action && row.ID == 5 {
 			t.Fatalf("deleted action shortcut still persisted: %+v", rows)
 		}
+	}
+
+	// The register and delete above ran on the player's queue while every
+	// shortcut write took 150 ms: the writes are queued on the persistence
+	// worker, so no queue task waited for one.
+	srv.Settle(t)
+	logs.mu.Lock()
+	logged := logs.buf.String()
+	logs.mu.Unlock()
+	if strings.Contains(logged, "sim: slow task") {
+		t.Fatalf("queue task blocked on the shortcut store:\n%s", logged)
 	}
 
 	// Restart back to selection and re-enter: the surviving potion shortcut
