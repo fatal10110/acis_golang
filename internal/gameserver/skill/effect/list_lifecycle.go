@@ -66,7 +66,7 @@ func (l *List) Remove(e *Effect) {
 
 // notifyActivityTransition reconciles l's recorded registration state
 // (l.tracked) against its actual current emptiness and calls the activity
-// hook if they disagree, in one critical section under l.mu.
+// registry if they disagree, in one critical section under l.mu.
 //
 // It is called after runHooks has already run, rather than deciding the
 // transition immediately after add/remove: a queued OnStart hook can still
@@ -77,7 +77,7 @@ func (l *List) Remove(e *Effect) {
 // deregisters a list that's actually still live.
 //
 // Comparing against l.tracked instead of a wasEmpty value the caller
-// captured before releasing mu — and calling the hook without releasing
+// captured before releasing mu — and calling the registry without releasing
 // mu in between — matters because Add and Remove run concurrently on the
 // same list in the ordinary case (Effects.Tick draining an expiring
 // effect on its own goroutine while a skill lands a new one on another).
@@ -88,7 +88,7 @@ func (l *List) Remove(e *Effect) {
 // one lock hold serializes concurrent transitions through l.mu itself, so
 // whichever call enters second always reconciles against the first call's
 // already-applied result instead of a snapshot taken before it ran.
-// callActivityHook only takes the registry's own separate mutex and never
+// The registry only takes its own separate mutex and never
 // re-enters List, so calling it here does not risk l.mu deadlocking
 // against itself — but it does establish an l.mu -> registry.mu lock
 // order that any future caller on the registry side must not invert.
@@ -101,7 +101,9 @@ func (l *List) notifyActivityTransition() {
 		return
 	}
 	l.tracked = active
-	callActivityHook(l, active)
+	if l.activity != nil {
+		l.activity.SetActive(l, active)
+	}
 }
 
 // StopByType removes every active effect of the given type, running each

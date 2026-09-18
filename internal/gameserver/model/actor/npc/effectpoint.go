@@ -28,13 +28,13 @@ type EffectPoint struct {
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
 // to ownerID (the acting player's object id).
-func NewEffectPoint(objectID int32, template *Template, ownerID int32) (*EffectPoint, error) {
+func NewEffectPoint(objectID int32, template *Template, ownerID int32, opts ...effect.Option) (*EffectPoint, error) {
 	inst, err := NewInstance(objectID, template)
 	if err != nil {
 		return nil, err
 	}
 	ep := &EffectPoint{objectID: objectID, Instance: inst, ownerID: ownerID}
-	ep.effects = effect.NewList(ep)
+	ep.effects = effect.NewList(ep, opts...)
 	return ep, nil
 }
 

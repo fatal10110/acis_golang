@@ -350,6 +350,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 // SignetDeps carries the world-spawning collaborators the signet cast
 // shape needs beyond skill definitions.
 type SignetDeps struct {
+	Activity  effect.ActivityRegistry
 	Templates signetTemplates
 	IDs       signetIDAllocator
 	World     *world.State
@@ -364,7 +365,7 @@ type SignetDeps struct {
 // signet's own world-spawning collaborators.
 func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
 	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, log: signet.Log})
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, activity: signet.Activity, log: signet.Log})
 	return r
 }
 
