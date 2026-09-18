@@ -262,6 +262,13 @@ and `SetSummonSpawner` are consumer-defined interfaces for network-owned control
 seams); pass them through `Runtime` or a second `AttachControllers(cast, spawner)` call instead of
 two setters — implementer's choice, but no more per-hook setters.
 
+Phase B excludes these non-actor callbacks from its setter gate:
+
+- `itemcontainer.Inventory.SetUpdateNotifier` retains inventory-update batching.
+- `itemcontainer.Inventory.SetWeightNotifier` retains owner-only weight delivery.
+- `item.Instance.SetPersistNotifier` remains the container-installed lazy-persistence dependency.
+- `effect.SetActivityHook` remains the process-wide effect-list scheduler registrar.
+
 ### Network side (player)
 
 `network/live_player.go`: `livePlayer` gains `link *GameClientLink` and implements
