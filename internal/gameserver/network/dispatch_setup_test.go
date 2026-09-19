@@ -343,7 +343,7 @@ func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name s
 	}
 	return ch.ID
 }
-func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture) *livePlayer {
+func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture, delivery ...itemcontainer.Delivery) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
@@ -356,7 +356,11 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
 	ch.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 80, MaxMP: 30, CurrentMP: 30})
-	ch.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil))
+	inv := itemcontainer.RestorePlayerInventory(ch.ID, testItemTemplates(), nil)
+	if len(delivery) > 0 {
+		inv = itemcontainer.RestorePlayerInventoryWithDelivery(ch.ID, testItemTemplates(), nil, delivery[0])
+	}
+	ch.AttachRuntime(tmpl, inv)
 
 	x, y, z := ch.Position()
 	live, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, tmpl.RunSpeed, testGeo{}, ch)

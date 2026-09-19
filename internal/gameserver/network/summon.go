@@ -43,14 +43,11 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 		// sends the owner PetDelete (network/visibility.go) — no explicit
 		// send needed here.
 		//
-		// Unsummoning detaches the pet inventory's notifier so its closure
-		// stops holding live; lifecycle.go does the same for a still-active
-		// pet on logout. The pet's container also goes away here, so its
+		// The pet's container goes away here, so its
 		// items are flushed and unregistered on the same path logout uses —
 		// otherwise they'd sit in the persistence task's pending set
 		// referencing a despawned pet.
 		if inv := actor.PetInventory(); inv != nil {
-			inv.SetUpdateNotifier(nil)
 			l.flushItemPersistence(inv)
 		}
 	}

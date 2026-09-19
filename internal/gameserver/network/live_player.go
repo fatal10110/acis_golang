@@ -66,6 +66,7 @@ type livePlayer struct {
 	spawnProtectionMu  sync.Mutex
 	spawnProtectionGen uint64
 	detaching          bool
+	deliveryStopped    atomic.Bool
 	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
 	pickup             *pickupIntention
 	deferredPickup     *pickupIntention
@@ -161,13 +162,10 @@ func (p *livePlayer) Stop() {
 	p.stopCubics()
 }
 
-// detached reports whether p's session has begun detaching (logout), the
-// same shadowExpiryMu-guarded flag taskeffects.go checks before applying a
-// deferred effect against an already-detached session.
+// detached reports whether p's session has begun detaching (logout) without
+// taking shadowExpiryMu: expiry delivery may already hold that lock.
 func (p *livePlayer) detached() bool {
-	p.shadowExpiryMu.RLock()
-	defer p.shadowExpiryMu.RUnlock()
-	return p.detaching
+	return p.deliveryStopped.Load()
 }
 
 // stopCubics cancels every live cubic runtime's timers on detach, so a

@@ -62,11 +62,16 @@ func petTestTemplates() *item.Table {
 
 func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *testsupport.FrameCapture, *testsupport.FrameCapture, *livePlayer, *livePlayer) {
 	t.Helper()
+	updates := task.NewInventoryUpdates()
 	state := world.New()
 	firstCap, secondCap := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
-	first := newTestLivePlayer(t, 1, firstCap)
+	firstDelivery := &playerInventoryDelivery{updates: updates}
+	first := newTestLivePlayer(t, 1, firstCap, firstDelivery)
+	firstDelivery.live, firstDelivery.character = first, first.Character
 	first.Name = "TraderOne"
-	second := newTestLivePlayer(t, 2, secondCap)
+	secondDelivery := &playerInventoryDelivery{updates: updates}
+	second := newTestLivePlayer(t, 2, secondCap, secondDelivery)
+	secondDelivery.live, secondDelivery.character = second, second.Character
 	second.Name = "TraderTwo"
 	state.Spawn(first, 0, 0, 0, 0)
 	state.AddPlayer(first)
@@ -76,7 +81,6 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 
 	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	ids := &sequentialIDs{next: 1000}
-	updates := task.NewInventoryUpdates()
 	link := &GameClientLink{
 		world:            state,
 		itemTemplates:    testItemTemplates(),
@@ -86,13 +90,6 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 		trades:           tradebook.NewBook(time.Now),
 		inventoryUpdates: updates,
 		log:              zerolog.Nop(),
-	}
-	for _, live := range []*livePlayer{first, second} {
-		inv := live.Inventory()
-		live := live
-		inv.SetUpdateNotifier(func() {
-			updates.Add(inv, live)
-		})
 	}
 	return link, store, firstCap, secondCap, first, second
 }

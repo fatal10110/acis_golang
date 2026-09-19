@@ -29,6 +29,7 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 
 	live := &livePlayer{Character: &player.Character{ID: 42}, log: zerolog.Nop()}
 	live.detaching = true
+	live.deliveryStopped.Store(true)
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
