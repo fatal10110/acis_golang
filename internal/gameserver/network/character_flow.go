@@ -427,7 +427,8 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 }
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, l.itemTemplates, items))
+	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery))
 	// The characters row stores finalized max snapshots (Save writes
 	// ResourceValues), but the vitals fields are raw calculator bases once a
 	// template is attached — re-seed them from the class tables so the CON/MEN
@@ -483,6 +484,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
 	if err != nil {
@@ -502,22 +504,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
-	// Register the inventory with the batching task the moment it queues an
-	// update, matching the reference's Inventory.addUpdate registering with
-	// InventoryUpdateTaskManager on every mutation. The task is the only
-	// drainer; it sends InventoryUpdate on its own 333ms cadence.
-	if inv := c.Inventory(); inv != nil && l.inventoryUpdates != nil {
-		inv.SetUpdateNotifier(func() {
-			l.inventoryUpdates.Add(inv, live)
-		})
-	}
 	if inv := c.Inventory(); inv != nil {
-		inv.SetWeightNotifier(func() {
-			live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
-				{Type: serverpackets.StatusCurrentLoad, Value: inv.TotalWeight()},
-			}))
-			c.RefreshWeightPenalty()
-		})
 		// Restored rows never queue update notifications, so totalWeight stays
 		// 0 unless recomputed here, matching the reference's ItemList
 		// constructor calling PcInventory.updateWeight() on every send
