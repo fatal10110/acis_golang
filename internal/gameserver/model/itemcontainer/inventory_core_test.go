@@ -637,27 +637,47 @@ func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
-	inv := NewPlayerInventory(0x10000001, templates)
-
-	notified := 0
-	inv.SetUpdateNotifier(func() { notified++ })
+	delivery := &inventoryDeliveryRecorder{}
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
 
 	inv.AddNew(1, 5, 0x30000001)
-	if notified != 1 {
-		t.Fatalf("notifier calls after AddNew = %d, want 1", notified)
+	if delivery.updates != 1 {
+		t.Fatalf("update deliveries after AddNew = %d, want 1", delivery.updates)
 	}
 
 	// A coalesced update still has to register the inventory: the batch it
 	// merges into may already have been drained.
 	inv.AddNew(1, 5, 0x30000002)
-	if notified != 2 {
-		t.Errorf("notifier calls after a coalesced add = %d, want 2", notified)
+	if delivery.updates != 2 {
+		t.Errorf("update deliveries after a coalesced add = %d, want 2", delivery.updates)
 	}
+}
 
-	inv.SetUpdateNotifier(nil)
-	inv.AddNew(1, 5, 0x30000003)
-	if notified != 2 {
-		t.Errorf("notifier calls after detach = %d, want 2", notified)
+type inventoryDeliveryRecorder struct {
+	updates int
+	weights int
+}
+
+func (r *inventoryDeliveryRecorder) QueueInventoryUpdate(*Inventory) { r.updates++ }
+
+func (r *inventoryDeliveryRecorder) UpdateInventoryWeight(*Inventory) { r.weights++ }
+
+func TestInventory_DeliveryReceivesQueuedUpdatesAndWeightChanges(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, Weight: 3, EtcItem: &item.EtcItemDetail{}},
+	})
+	delivery := &inventoryDeliveryRecorder{}
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
+
+	inv.AddNew(1, 5, 0x30000001)
+	if delivery.updates != 1 {
+		t.Fatalf("queued update deliveries = %d, want 1", delivery.updates)
+	}
+	if !inv.UpdateWeight() {
+		t.Fatal("UpdateWeight() = false, want true after an added item")
+	}
+	if delivery.weights != 1 {
+		t.Fatalf("weight deliveries = %d, want 1", delivery.weights)
 	}
 }
 
@@ -668,14 +688,12 @@ func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
 // in the batching task with nothing to send.
 func TestInventory_UpdateNotifierSkipsNoOpMutation(t *testing.T) {
 	templates := item.NewTable(nil)
-	inv := NewPlayerInventory(0x10000001, templates)
-
-	notified := 0
-	inv.SetUpdateNotifier(func() { notified++ })
+	delivery := &inventoryDeliveryRecorder{}
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
 
 	inv.UnequipSlot(RHand)
-	if notified != 0 {
-		t.Fatalf("notifier calls after unequipping an empty slot = %d, want 0", notified)
+	if delivery.updates != 0 {
+		t.Fatalf("update deliveries after unequipping an empty slot = %d, want 0", delivery.updates)
 	}
 }
 
