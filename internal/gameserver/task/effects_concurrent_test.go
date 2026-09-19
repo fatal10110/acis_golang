@@ -95,6 +95,9 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	if !e.contains(leftover) {
 		t.Fatal("leftover list not registered after Add")
 	}
+	other := NewEffects()
+	otherList := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(other))
+	otherList.Add(newEffect(2))
 
 	e.Reset()
 
@@ -103,6 +106,9 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	}
 	if len(leftover.All()) != 1 {
 		t.Fatalf("Reset touched leftover's contents: %d effects, want 1", len(leftover.All()))
+	}
+	if !other.contains(otherList) {
+		t.Fatal("Reset on one registry removed a list from another registry")
 	}
 
 	// leftover's owner is still alive in this scenario (Reset only fires

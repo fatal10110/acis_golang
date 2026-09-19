@@ -137,9 +137,13 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
+	return newLiveHostileWithActivity(inst, speed, geo, positions, log, castDefs, castEffects, walker, nil, maxBuffsAmount, zones)
+}
+
+func newLiveHostileWithActivity(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, activity effect.ActivityRegistry, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
 	control := &hostileControl{walker: walker, log: log}
 	statRef := &statOwnerRef{}
-	live, err := creature.NewLive(inst.Home, speed, geo, statRef)
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithActivityRegistry(activity))
 	if err != nil {
 		return nil, nil, err
 	}

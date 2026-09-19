@@ -844,7 +844,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(func() { loginLink.Close() })
 
 	state := world.New()
-	taskEffects := sharedTaskEffects()
+	taskEffects := task.NewEffects()
 	// Registered early so it runs last (t.Cleanup is LIFO): everything
 	// else this Boot registers for cleanup — including the connection
 	// teardown that Untracks a logged-out player's effect list — gets to
