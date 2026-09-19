@@ -33,6 +33,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -165,6 +166,7 @@ type GameClientLink struct {
 	attackStance  attackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
+	effects       effect.ActivityRegistry
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
 	gameClock     *task.GameClock
@@ -266,6 +268,7 @@ type GameClientLinkConfig struct {
 	AttackStance  attackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
+	Effects       effect.ActivityRegistry
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
@@ -341,6 +344,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		attackStance:  cfg.AttackStance,
 		ai:            cfg.AI,
 		pvpFlags:      cfg.PvPFlags,
+		effects:       cfg.Effects,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
@@ -371,6 +375,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			IDs:       cfg.IDs,
 			World:     cfg.World,
 			NewSink:   EffectPointSinks(cfg.World),
+			Activity:  cfg.Effects,
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
@@ -406,6 +411,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 // directly, or the pet's inventory never registers and PetInventoryUpdate
 // silently stops reaching the client.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
+	cfg.Activity = l.effects
 	cfg.Config = &l.petConfig
 	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
 	if cfg.SkillDefs == nil {

@@ -68,6 +68,7 @@ type signetHandler struct {
 	ids       signetIDAllocator
 	world     *world.State
 	newSink   func(*npc.EffectPoint) event.Sink
+	activity  effect.ActivityRegistry
 	log       zerolog.Logger
 }
 
@@ -163,7 +164,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 
 	ownerID := caster.ObjectID()
-	actor, err := npc.NewEffectPoint(id, tmpl, ownerID)
+	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, effect.WithActivityRegistry(h.activity))
 	if err != nil {
 		return nil, false
 	}

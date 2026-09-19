@@ -69,7 +69,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil)
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithActivityRegistry(s.Effects))
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
@@ -248,7 +248,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	inst.HasHome = true
 	inst.Home = home
 	statRef := &movingHostileStatRef{}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef)
+	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithActivityRegistry(s.Effects))
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
