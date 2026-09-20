@@ -159,8 +159,16 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			if action.Item == nil {
 				continue
 			}
-			st := action.Item.Snapshot()
-			l.queueItemWrite(st.OwnerID, l.itemWrites.Reserve(st.ObjectID), func() {
+			// The state and its place are taken together, under the
+			// instance, so no mutation can land between them and leave this
+			// write holding a place that does not match what it will write.
+			var st item.InstanceState
+			reserved := l.itemWrites.Begin()
+			action.Item.WithState(func(s item.InstanceState) {
+				st = s
+				reserved.Add(s.ObjectID)
+			})
+			l.queueItemWrite(st.OwnerID, reserved, func() {
 				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 				defer cancel()
 				if err := l.items.SaveState(ctx, st); err != nil {

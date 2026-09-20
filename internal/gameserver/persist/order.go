@@ -1,6 +1,7 @@
 package persist
 
 import (
+	"cmp"
 	"slices"
 	"sync"
 	"time"
@@ -50,10 +51,11 @@ func NewOrder() *Order {
 	return &Order{rows: make(map[int32]*orderRow)}
 }
 
-// Reserve takes ids' places in their rows' write order. Call it on the
-// goroutine that decides what the write will contain — for a queued write,
-// the actor queue that produced it — and Run the result where the write
-// itself happens. Duplicate ids are reserved once.
+// Reserve takes ids' places in their rows' write order, for a caller whose
+// rows are all read at once. Call it on the goroutine that decides what the
+// write will contain — for a queued write, the actor queue that produced it —
+// and Run the result where the write itself happens. Duplicate ids are
+// reserved once.
 //
 // The reservation has to be taken before whatever serialized the mutation
 // lets go of it, not merely before the write is queued: a gap between the two
@@ -66,29 +68,48 @@ func NewOrder() *Order {
 // Every reservation has to be handed back, by Run or by Cancel; a reservation
 // that is simply dropped keeps its row's entry alive.
 func (o *Order) Reserve(ids ...int32) *Write {
-	w := &Write{order: o, ids: slices.Clone(ids)}
-	slices.Sort(w.ids)
-	w.ids = slices.Compact(w.ids)
-	if o == nil {
-		return w
-	}
-	w.places = make([]uint64, len(w.ids))
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if o.rows == nil {
-		o.rows = make(map[int32]*orderRow)
-	}
-	for i, id := range w.ids {
-		r, ok := o.rows[id]
-		if !ok {
-			r = &orderRow{held: make(chan struct{}, 1)}
-			o.rows[id] = r
-		}
-		r.next++
-		r.outstanding++
-		w.places[i] = r.next
+	w := o.Begin()
+	unique := slices.Clone(ids)
+	slices.Sort(unique)
+	for _, id := range slices.Compact(unique) {
+		w.Add(id)
 	}
 	return w
+}
+
+// Begin starts a write whose rows are taken one at a time with Add, for a
+// caller that reads each row's state separately and has to pair each read
+// with that row's place — the persistence tick reads one instance at a time,
+// under that instance's own lock.
+func (o *Order) Begin() *Write {
+	return &Write{order: o}
+}
+
+// Add takes id's place in its row's order. Call it where the state this write
+// will land is read, inside whatever holds that row against mutation, and
+// never twice for one id in one write.
+func (w *Write) Add(id int32) {
+	if w == nil {
+		return
+	}
+	if w.order == nil {
+		w.ids = append(w.ids, id)
+		return
+	}
+	w.order.mu.Lock()
+	defer w.order.mu.Unlock()
+	if w.order.rows == nil {
+		w.order.rows = make(map[int32]*orderRow)
+	}
+	r, ok := w.order.rows[id]
+	if !ok {
+		r = &orderRow{held: make(chan struct{}, 1)}
+		w.order.rows[id] = r
+	}
+	r.next++
+	r.outstanding++
+	w.ids = append(w.ids, id)
+	w.places = append(w.places, r.next)
 }
 
 // Write is one reserved place in each of its rows' write order.
@@ -96,6 +117,31 @@ type Write struct {
 	order  *Order
 	ids    []int32
 	places []uint64
+	sorted bool
+}
+
+// sort puts the rows in ascending id order, which is the order they are taken
+// in, so two writes that overlap cannot deadlock against each other. Places
+// move with their ids.
+func (w *Write) sort() {
+	if w.sorted {
+		return
+	}
+	w.sorted = true
+	if len(w.places) != len(w.ids) {
+		slices.Sort(w.ids)
+		return
+	}
+	order := make([]int, len(w.ids))
+	for i := range order {
+		order[i] = i
+	}
+	slices.SortFunc(order, func(a, b int) int { return cmp.Compare(w.ids[a], w.ids[b]) })
+	ids, places := make([]int32, len(w.ids)), make([]uint64, len(w.places))
+	for to, from := range order {
+		ids[to], places[to] = w.ids[from], w.places[from]
+	}
+	w.ids, w.places = ids, places
 }
 
 // Run calls write with the rows still worth writing — those no later write
@@ -130,6 +176,7 @@ func (w *Write) Cancel() {
 	if w == nil || w.order == nil {
 		return
 	}
+	w.sort()
 	w.order.forget(w.ids)
 }
 
@@ -137,6 +184,7 @@ func (w *Write) run(write func(ids []int32), wait *time.Duration) bool {
 	if w == nil {
 		return true
 	}
+	w.sort()
 	if w.order == nil {
 		write(w.ids)
 		return true
@@ -155,6 +203,20 @@ func (w *Write) run(write func(ids []int32), wait *time.Duration) bool {
 		w.order.applied(w, rows)
 	}
 	return true
+}
+
+// Reserved reports how many places a row has handed out, for a test that has
+// to know a write has taken its place before it produces the next one.
+func (o *Order) Reserved(id int32) uint64 {
+	if o == nil {
+		return 0
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if r, ok := o.rows[id]; ok {
+		return r.next
+	}
+	return 0
 }
 
 // take holds every row in ids, in ascending id order. With a wait it gives up

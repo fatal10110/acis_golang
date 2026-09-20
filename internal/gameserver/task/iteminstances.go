@@ -406,34 +406,44 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
-	// The state each row is written with is read here, so this is where the
-	// flush takes its place in those rows' write order: it is then newer than
-	// every single-row write produced before it, and a row a newer write has
-	// already landed is left out rather than pushed back to an older state.
-	ids := make([]int32, 0, len(items))
+	// Each row's state and its place in that row's write order are taken
+	// together, under the instance: the state this flush will land is fixed
+	// here, not when the write finally runs, so a single-row write produced
+	// after it always holds the later place — and one produced before it the
+	// earlier, however long this flush then waits for the rows. Reading the
+	// state later than the place is what let a flush hold an older place
+	// while carrying a newer state, and an older write then landed on top of
+	// its delete.
+	write := i.writes.Begin()
+	states := make([]item.InstanceState, 0, len(items))
 	for _, inst := range items {
-		ids = append(ids, inst.ObjectID)
+		inst.WithState(func(st item.InstanceState) {
+			write.Add(st.ObjectID)
+			states = append(states, st)
+		})
 	}
 	var err error
-	i.writes.Reserve(ids...).Run(func(keep []int32) {
+	write.Run(func(keep []int32) {
 		var batch item.FlushBatch
-		for _, inst := range items {
-			if _, found := slices.BinarySearch(keep, inst.ObjectID); !found {
+		for _, st := range states {
+			if _, found := slices.BinarySearch(keep, st.ObjectID); !found {
 				continue
 			}
-			i.addToBatch(&batch, inst)
+			i.addToBatch(&batch, st)
 		}
 		err = i.flusher.Flush(ctx, batch)
 	})
 	return err
 }
 
-// addToBatch resolves inst's persistence effect and appends it to batch,
+// addToBatch resolves st's persistence effect and appends it to batch,
 // matching the per-item semantics updateItem used to apply immediately:
 // delete when count <= 0 or location == VOID, augmentation delete/save
 // only for weapons, pet-row delete only for a pet collar at zero count.
-func (i *ItemInstances) addToBatch(batch *item.FlushBatch, inst *item.Instance) {
-	st := inst.Snapshot()
+//
+// It takes the state rather than the instance because the state is read where
+// the write's place in its row's order is taken (UpdateItems), not here.
+func (i *ItemInstances) addToBatch(batch *item.FlushBatch, st item.InstanceState) {
 	tmpl, _ := i.templates.Get(st.TemplateID)
 	isWeapon := tmpl != nil && tmpl.Kind == item.KindWeapon
 
