@@ -40,10 +40,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// itemStore writes single item rows from a state the caller copied while it
+// owned the instance: the write runs on a persistence lane, after the queue
+// task that produced it has moved on (applyPersistActions).
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
-	Save(ctx context.Context, inst *item.Instance) error
-	Update(ctx context.Context, inst *item.Instance) error
+	SaveState(ctx context.Context, st item.InstanceState) error
+	UpdateState(ctx context.Context, st item.InstanceState) error
 	Delete(ctx context.Context, objectID int32) error
 }
 
@@ -182,7 +185,11 @@ type GameClientLink struct {
 	itemInstances *task.ItemInstances
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
-	persist          *persist.Worker
+	persist *persist.Worker
+	// itemWrites orders the writes of one items row against each other, which
+	// the lanes alone cannot: a row outlives its owner's lane (see
+	// applyPersistActions).
+	itemWrites       *persist.Order
 	persistWait      time.Duration
 	queues           Queues // nil runs player work on the goroutine that triggers it
 	queuedPets       queuedPets
@@ -291,6 +298,9 @@ type GameClientLinkConfig struct {
 	ItemInstances *task.ItemInstances
 	// Persist runs detach, pet and container saves; nil writes inline.
 	Persist *persist.Worker
+	// ItemWrites orders one items row's writes; the item persistence task
+	// shares it, since it writes the same rows.
+	ItemWrites *persist.Order
 	// PersistWait bounds how long a connection waits for queued saves before
 	// reading rows back; zero means livePlayerPersistWait.
 	PersistWait time.Duration
@@ -363,6 +373,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
 		persist:          cfg.Persist,
+		itemWrites:       cfg.ItemWrites,
 		persistWait:      cfg.PersistWait,
 		queues:           cfg.Queues,
 		restarts:         cfg.Restarts,

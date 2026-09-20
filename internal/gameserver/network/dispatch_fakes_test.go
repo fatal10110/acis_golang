@@ -261,7 +261,10 @@ func (s *fakeItemStore) ListByOwner(_ context.Context, ownerID int32) ([]*item.I
 }
 
 func (s *fakeItemStore) Save(_ context.Context, inst *item.Instance) error {
-	st := inst.Snapshot()
+	return s.SaveState(context.Background(), inst.Snapshot())
+}
+
+func (s *fakeItemStore) SaveState(_ context.Context, st item.InstanceState) error {
 	cp := item.Instance{
 		ObjectID: st.ObjectID, TemplateID: st.TemplateID, OwnerID: st.OwnerID,
 		Count: st.Count, EnchantLevel: st.EnchantLevel,
@@ -286,6 +289,10 @@ func (s *fakeItemStore) Save(_ context.Context, inst *item.Instance) error {
 
 func (s *fakeItemStore) Update(ctx context.Context, inst *item.Instance) error {
 	return s.Save(ctx, inst)
+}
+
+func (s *fakeItemStore) UpdateState(ctx context.Context, st item.InstanceState) error {
+	return s.SaveState(ctx, st)
 }
 
 func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {

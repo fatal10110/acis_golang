@@ -66,6 +66,49 @@ func TestServiceSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	}
 }
 
+// TestConsumedScrollDeleteCarriesPreDestroyOwner pins which persistence lane
+// a consumed scroll's delete runs on. DestroyItem takes the exhausted stack
+// through item.Instance.DestroyState, which zeroes OwnerID, so an action built
+// from the post-destroy snapshot would carry owner 0 and go to lane 0 while
+// the same row's earlier updates sit on the owner's lane — and an upserting
+// save that overtook the delete there would put the row back.
+func TestConsumedScrollDeleteCarriesPreDestroyOwner(t *testing.T) {
+	const ownerID = 101
+	state := NewState()
+	inv := itemcontainer.NewPlayerInventory(ownerID, testTemplates())
+	weapon := inv.AddNew(30, 1, 500)
+	scroll := inv.AddNew(955, 2, 600)
+	inv.DrainUpdates()
+
+	// First enchant leaves one scroll: an update, on the owner's lane.
+	state.Select(ownerID, scroll.ObjectID)
+	res, err := NewService(state, nil, func() float64 { return 0 }).EnchantItem(ownerID, inv, weapon.ObjectID)
+	if err != nil {
+		t.Fatalf("first EnchantItem error = %v", err)
+	}
+	if got := res.Persist[0]; got.Action != inventory.PersistUpdate || got.Item != scroll {
+		t.Fatalf("first scroll action = %+v, want an update of the scroll", got)
+	}
+	if got := scroll.Snapshot().OwnerID; got != ownerID {
+		t.Fatalf("remaining scroll owner = %d, want %d", got, ownerID)
+	}
+
+	// Second enchant consumes it: the delete of the same row must name the
+	// same owner, or it lands on another lane than the update above.
+	state.Select(ownerID, scroll.ObjectID)
+	res, err = NewService(state, nil, func() float64 { return 0 }).EnchantItem(ownerID, inv, weapon.ObjectID)
+	if err != nil {
+		t.Fatalf("second EnchantItem error = %v", err)
+	}
+	del := res.Persist[0]
+	if del.Action != inventory.PersistDelete || del.ObjectID != scroll.ObjectID {
+		t.Fatalf("second scroll action = %+v, want a delete of object %d", del, scroll.ObjectID)
+	}
+	if del.OwnerID != ownerID {
+		t.Fatalf("consumed scroll delete owner = %d, want %d (the owner the row held)", del.OwnerID, ownerID)
+	}
+}
+
 func TestServiceNormalFailureAddsCrystalReward(t *testing.T) {
 	state := NewState()
 	templates := testTemplates()

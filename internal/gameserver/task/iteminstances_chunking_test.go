@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
@@ -77,7 +78,7 @@ func addSequentialPending(instances *ItemInstances, n int) []*item.Instance {
 // wall-clock deadline.
 func TestItemInstancesSaveDeadlineStopsUnattemptedChunksButKeepsEarlierCommits(t *testing.T) {
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil), nil)
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil, nil)
 
 	const total = 2 * ItemInstanceSaveChunkSize
 	items := addSequentialPending(instances, total)
@@ -121,7 +122,7 @@ func TestItemInstancesSaveDeadlineStopsUnattemptedChunksButKeepsEarlierCommits(t
 // both calls report the same (here: no) deadline and fail this assertion.
 func TestItemInstancesSaveGivesEachChunkAFreshTimeout(t *testing.T) {
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil), nil)
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil, nil)
 	addSequentialPending(instances, 2*ItemInstanceSaveChunkSize)
 
 	if err := instances.Save(context.Background()); err != nil {
@@ -152,7 +153,7 @@ func TestItemInstancesSaveReturnsOnCtxWhileLaneIsBackedUp(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	defer worker.Close(context.Background())
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil), worker)
+	instances := NewItemInstances(flusher, item.NewTable(nil), worker, nil)
 	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
 	instances.Add(inst)
 
@@ -193,7 +194,7 @@ func TestItemInstancesSaveWritesInlineOnceWorkerIsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	flusher := &chunkTrackingFlusher{}
-	instances := NewItemInstances(flusher, item.NewTable(nil), worker)
+	instances := NewItemInstances(flusher, item.NewTable(nil), worker, nil)
 	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
 	instances.Add(inst)
 
@@ -205,5 +206,65 @@ func TestItemInstancesSaveWritesInlineOnceWorkerIsClosed(t *testing.T) {
 	}
 	if instances.Contains(inst) {
 		t.Fatal("written item must leave pending")
+	}
+}
+
+// TestDestroyAfterFlushKeepsItsOwnersLane covers the same invariant as the
+// test below, one flush later. The owner a destroy needs is remembered in the
+// pending set, and Save swaps that set out, so the owner has to come from
+// somewhere a flush does not clear: the container's persister hook, which
+// knows the owner even when the instance no longer does. A restored item
+// whose first mutation is its destruction has the same shape — nothing has
+// registered an owned entry for it either.
+func TestDestroyAfterFlushKeepsItsOwnersLane(t *testing.T) {
+	const ownerID int32 = 7
+	templates := item.NewTable([]*item.Template{{ID: 1, Name: "Stackable", Kind: item.KindEtcItem, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
+	instances := NewItemInstances(&chunkTrackingFlusher{}, templates, nil, nil)
+	inv := itemcontainer.NewPlayerInventory(ownerID, templates)
+	inv.SetItemPersister(func(inst *item.Instance) { instances.AddOwned(inv.OwnerID(), inst) })
+
+	inst := inv.AddNew(1, 2, 400)
+	if err := instances.Save(context.Background()); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	if _, ok := instances.pending[inst.ObjectID]; ok {
+		t.Fatal("flush left the item pending: the test is not exercising the post-flush case")
+	}
+
+	// The destroy is the first thing to report this row since the flush, and
+	// it reports it with the owner already gone from the instance.
+	if inv.DestroyItem(inst, 2) == nil {
+		t.Fatal("DestroyItem() returned nil")
+	}
+	entry, ok := instances.pending[inst.ObjectID]
+	if !ok {
+		t.Fatal("destroy did not register the item for the next flush")
+	}
+	if got := instances.laneKey(inst.Snapshot(), entry.ownerID); got != ownerID {
+		t.Fatalf("destroy after flush uses lane owner %d, want %d", got, ownerID)
+	}
+}
+
+// TestLaneKeyKeepsDestroyedItemOnItsOwnersLane pins which persistence lane a
+// destroyed item's delete runs on. item.Instance.DestroyState zeroes OwnerID
+// along with the count, so a lane keyed off the flush-time snapshot would send
+// every destroyed non-collar item's delete to owner 0's lane while that row's
+// earlier writes sit on its real owner's — and an upserting save left behind
+// there would put the deleted row back.
+func TestLaneKeyKeepsDestroyedItemOnItsOwnersLane(t *testing.T) {
+	instances := NewItemInstances(&chunkTrackingFlusher{}, item.NewTable(nil), nil, nil)
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	instances.Add(inst)
+
+	// The destroy is what reports the row again, with its owner already gone.
+	inst.DestroyState()
+	instances.Add(inst)
+
+	entry, ok := instances.pending[inst.ObjectID]
+	if !ok {
+		t.Fatal("destroyed item left the pending set")
+	}
+	if got := instances.laneKey(inst.Snapshot(), entry.ownerID); got != 7 {
+		t.Fatalf("destroyed item's lane key = %d, want its owner 7", got)
 	}
 }

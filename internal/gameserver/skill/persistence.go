@@ -11,7 +11,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/rs/zerolog"
 )
 
 type skillSaveStore interface {
@@ -34,10 +36,14 @@ type skillLevelDeleter interface {
 
 // Persistence saves and restores a live player's buff and skill-reuse state.
 type Persistence struct {
-	store              skillSaveStore
-	levels             skillLevelStore
-	skills             *modelskill.Table
-	now                func() time.Time
+	store  skillSaveStore
+	levels skillLevelStore
+	skills *modelskill.Table
+	now    func() time.Time
+	// worker runs character_skills writes on the character's lane, off the
+	// actor queue that learned the skill. A nil worker writes inline.
+	worker             *persist.Worker
+	log                zerolog.Logger
 	storeSkillCooltime atomic.Bool
 }
 
@@ -58,12 +64,21 @@ func NewPersistenceWithStoreSkillCooltime(store skillSaveStore, skills *modelski
 // NewPersistenceWithClock returns a lifecycle persistence component using now
 // as its time source.
 func NewPersistenceWithClock(store skillSaveStore, skills *modelskill.Table, now func() time.Time, levels ...skillLevelStore) *Persistence {
-	p := &Persistence{store: store, skills: skills, now: now}
+	p := &Persistence{store: store, skills: skills, now: now, log: zerolog.Nop()}
 	p.storeSkillCooltime.Store(true)
 	if len(levels) > 0 {
 		p.levels = levels[0]
 	}
 	return p
+}
+
+// SetPersistWorker routes character_skills writes onto w, keyed by the
+// character, and logs a failed write to log. Without it the writes run on the
+// calling goroutine.
+func (p *Persistence) SetPersistWorker(w *persist.Worker, log zerolog.Logger) {
+	if p != nil {
+		p.worker, p.log = w, log
+	}
 }
 
 // SetStoreSkillCooltime controls persistence of effects and reuse timers.
@@ -221,8 +236,8 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 // live stat calculators so the bonus takes effect immediately; a prior
 // level's functions are dropped first so relearning at a new level doesn't
 // stack.
-func (p *Persistence) SetKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
-	return p.setKnownSkill(ctx, c, skillID, level, true)
+func (p *Persistence) SetKnownSkill(c *player.Character, skillID, level int) error {
+	return p.setKnownSkill(c, skillID, level, true)
 }
 
 // ApplyTransientPassiveSkill replaces a skill's passive stat functions
@@ -254,17 +269,15 @@ func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, o
 // character's level is re-derived on every level change, so it is held in
 // memory only: persisting it would leave a row behind that a later level
 // loss has to clean up, and the reference does not write one either.
-func (p *Persistence) setKnownSkill(ctx context.Context, c *player.Character, skillID, level int, persist bool) error {
+func (p *Persistence) setKnownSkill(c *player.Character, skillID, level int, persist bool) error {
 	if c == nil {
 		return nil
 	}
-	if persist {
-		if err := p.persistKnownSkill(ctx, c, skillID, level); err != nil {
-			return err
-		}
-	}
 	oldLevel := c.SkillLevel(skillID)
 	c.SetSkillLevel(skillID, level)
+	if persist {
+		p.persistKnownSkill(c, skillID, level)
+	}
 	if oldLevel > 0 {
 		c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(skillID), Level: oldLevel}))
 	}
@@ -283,33 +296,58 @@ func (p *Persistence) setKnownSkill(ctx context.Context, c *player.Character, sk
 	return nil
 }
 
-// persistKnownSkill writes one learned skill level through to
-// character_skills. A non-positive level is a removal, so it deletes the row
-// rather than storing a level of 0, which would restore as a known skill the
-// character does not have.
-func (p *Persistence) persistKnownSkill(ctx context.Context, c *player.Character, skillID, level int) error {
+// knownSkillWriteTimeout bounds one character_skills write queued off an
+// actor queue.
+const knownSkillWriteTimeout = 2 * time.Second
+
+// persistKnownSkill queues one learned skill level's write through to
+// character_skills, on the character's persistence lane. A non-positive level
+// is a removal, so it deletes the row rather than storing a level of 0, which
+// would restore as a known skill the character does not have.
+//
+// The write follows the in-memory change and cannot undo it: the reference
+// puts the skill in the character's map, attaches its stat functions and only
+// then calls storeSkill, which logs a failed insert and returns
+// (Player.addSkill, Player.storeSkill). A queued write must not decide
+// whether the character learned the skill either, so a failure is logged
+// here too.
+func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int) {
 	if p == nil || p.levels == nil {
-		return nil
+		return
 	}
-	classIndex := c.SkillSaveClassIndex()
-	if level <= 0 {
+	charID, classIndex := c.ID, c.SkillSaveClassIndex()
+	var write func(context.Context) error
+	switch {
+	case level <= 0:
 		deleter, ok := p.levels.(skillLevelDeleter)
 		if !ok {
+			return
+		}
+		write = func(ctx context.Context) error {
+			if err := deleter.DeleteKnownSkill(ctx, charID, classIndex, skillID); err != nil {
+				return fmt.Errorf("delete known skill for character %d: %w", charID, err)
+			}
 			return nil
 		}
-		if err := deleter.DeleteKnownSkill(ctx, c.ID, classIndex, skillID); err != nil {
-			return fmt.Errorf("delete known skill for character %d: %w", c.ID, err)
+	default:
+		writer, ok := p.levels.(skillLevelWriter)
+		if !ok {
+			return
 		}
-		return nil
+		write = func(ctx context.Context) error {
+			if err := writer.SetKnownSkill(ctx, charID, classIndex, skillID, level); err != nil {
+				return fmt.Errorf("set known skill for character %d: %w", charID, err)
+			}
+			return nil
+		}
 	}
-	writer, ok := p.levels.(skillLevelWriter)
-	if !ok {
-		return nil
-	}
-	if err := writer.SetKnownSkill(ctx, c.ID, classIndex, skillID, level); err != nil {
-		return fmt.Errorf("set known skill for character %d: %w", c.ID, err)
-	}
-	return nil
+	p.worker.Enqueue(charID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), knownSkillWriteTimeout)
+		defer cancel()
+		if err := write(ctx); err != nil {
+			p.log.Error().Err(err).Int32("char_id", charID).Int("skill_id", skillID).Msg("persist known skill")
+		}
+	})
 }
 
 // EquipItemStats attaches the stat functions inst's template contributes

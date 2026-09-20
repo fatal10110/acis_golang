@@ -161,7 +161,13 @@ type seedItem struct {
 
 func bootOwnerWithCollar(t *testing.T, seeds ...seedItem) *petWorld {
 	t.Helper()
-	srv := bootPets(t)
+	return bootOwnerWithCollarOpts(t, nil, seeds...)
+}
+
+// bootOwnerWithCollarOpts is bootOwnerWithCollar with extra boot options.
+func bootOwnerWithCollarOpts(t *testing.T, extra []gameservertest.Option, seeds ...seedItem) *petWorld {
+	t.Helper()
+	srv := bootPets(t, extra...)
 	ownerID := srv.SoleObjectID(t)
 	collarID := srv.GiveItem(t, ownerID, wolfCollarID, 1)
 	h := &petWorld{srv: srv, client: srv.Client, ownerID: ownerID, collarID: collarID, seeded: map[int32][]int32{}}

@@ -84,8 +84,23 @@ func (inst *Instance) lock() *sync.RWMutex {
 // state. Augmentation is copied so callers can safely pass the snapshot across
 // package boundaries.
 func (inst *Instance) Snapshot() InstanceState {
+	var out InstanceState
+	inst.WithState(func(st InstanceState) { out = st })
+	return out
+}
+
+// WithState calls fn with the same copy Snapshot returns, while still holding
+// the instance against mutation. A caller that has to pair the state with
+// something else — an ordering token for the row's write, say — does it here,
+// so no mutation can land between the two and leave them describing different
+// moments.
+//
+// fn must not mutate inst or take a lock that a mutation of inst could be
+// waiting behind.
+func (inst *Instance) WithState(fn func(st InstanceState)) {
 	if inst == nil {
-		return InstanceState{}
+		fn(InstanceState{})
+		return
 	}
 	mu := inst.lock()
 	mu.RLock()
@@ -110,7 +125,7 @@ func (inst *Instance) Snapshot() InstanceState {
 		aug := *inst.Augmentation
 		st.Augmentation = &aug
 	}
-	return st
+	fn(st)
 }
 
 // Clone returns a detached copy of inst's current state. The clone has its own

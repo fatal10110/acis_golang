@@ -1,8 +1,6 @@
 package network
 
 import (
-	"context"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -48,15 +46,15 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 	}
 }
 
-func (l *GameClientLink) learnAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
 		return
 	}
 	switch req.SkillType {
 	case acquireSkillTypeUsual:
-		l.learnGeneralAcquireSkill(ctx, live, req)
+		l.learnGeneralAcquireSkill(live, req)
 	case acquireSkillTypeFishing:
-		l.learnFishingAcquireSkill(ctx, live, req)
+		l.learnFishingAcquireSkill(live, req)
 	default:
 		// Pledge-skill learning is deferred for the same reason as the
 		// info path: it needs the unported pledge runtime.
@@ -78,11 +76,11 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(offer.Grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
 }
 
-func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if live == nil {
 		return
 	}
-	_, status, err := skillstate.LearnGeneral(ctx, live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -106,7 +104,7 @@ func (l *GameClientLink) learnGeneralAcquireSkill(ctx context.Context, live *liv
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(l.acquireSkillList(live))
 }
 
@@ -123,11 +121,11 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, 0, acquireSkillTypeFishing, reqs))
 }
 
-func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *livePlayer, req clientpackets.RequestAcquireSkill) {
+func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	if live == nil {
 		return
 	}
-	result, status, err := skillstate.LearnFishing(ctx, live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
+	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -148,7 +146,7 @@ func (l *GameClientLink) learnFishingAcquireSkill(ctx context.Context, live *liv
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(ctx, live, req.SkillID, req.Level)
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(l.fishingAcquireSkillList(live))
 }
 
