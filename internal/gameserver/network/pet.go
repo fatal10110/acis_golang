@@ -18,10 +18,8 @@ import (
 )
 
 // activePet is a pure lookup of live's currently spawned pet and its
-// inventory. It does not register anything with the batching task: that
-// happens once, structurally, wherever the pet becomes live for its owner
-// (registerPetInventoryUpdates), the way character_flow.go wires the
-// player's own inventory at spawn rather than on every lookup.
+// inventory. Delivery is attached when a live pet inventory is constructed;
+// this lookup only finds the resulting pet and inventory.
 func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontainer.Inventory, bool) {
 	if live == nil || l.world == nil {
 		return nil, nil, false
@@ -41,12 +39,8 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 	return pet, inv, true
 }
 
-// registerPetInventoryUpdates registers pet's inventory with the batching
-// task, matching the reference's Pet registering itself with
-// InventoryUpdateTaskManager: the task is the only drainer, addressed to
-// the owner's client. Call it once, when pet becomes live for live — from
-// newPet, or wherever else a pet is attached to its owner.
-func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *livePlayer) {
+// registerPetItemPersistence attaches persistence for pet's inventory.
+func (l *GameClientLink) registerPetItemPersistence(pet *summon.Actor) {
 	// A pet's inventory persists through the same lazy task the owner's
 	// does; its items carry the pet's own object id as owner.
 	if l.itemInstances != nil && pet != nil {

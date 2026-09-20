@@ -15,8 +15,8 @@ import (
 func TestInventoryDeliverySkipsDetachedOrDespawnedOwners(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}}})
 	updates := task.NewInventoryUpdates()
-	live := &livePlayer{Character: &player.Character{ID: 1}, detaching: true}
-	live.deliveryStopped.Store(true)
+	live := &livePlayer{Character: &player.Character{ID: 1}}
+	live.markDetaching()
 
 	playerInv := itemcontainer.NewPlayerInventoryWithDelivery(1, templates, &playerInventoryDelivery{updates: updates, live: live, character: live.Character})
 	playerInv.AddNew(1, 1, 1)

@@ -56,4 +56,5 @@ func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory
 	d.updates.Add(inv, &petInventoryOwner{live: d.live, pet: pet, log: d.log})
 }
 
+// TODO(#2381): match PetInventory.updateWeight's pet status and info refresh.
 func (*petInventoryDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
