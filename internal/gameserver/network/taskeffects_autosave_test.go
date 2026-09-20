@@ -28,7 +28,7 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
 	live := &livePlayer{Character: &player.Character{ID: 42}, log: zerolog.Nop()}
-	live.detaching = true
+	live.markDetaching()
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)

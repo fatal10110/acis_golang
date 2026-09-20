@@ -36,9 +36,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	l.cancelActiveTrade(live)
 	// Excludes TaskEffects.Save's check-and-enqueue: every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
-	live.shadowExpiryMu.Lock()
-	live.detaching = true
-	live.shadowExpiryMu.Unlock()
+	live.markDetaching()
 
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log
@@ -101,7 +99,6 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 				l.savePet(pet, live.Inventory())
 				l.transferPetInventory(pet, live.Inventory())
 				if inv := pet.PetInventory(); inv != nil {
-					inv.SetUpdateNotifier(nil)
 					l.flushItemPersistence(inv)
 					owners = append(owners, inv.OwnerID())
 				}
@@ -109,8 +106,6 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		}
 	}
 	if inv := live.Character.Inventory(); inv != nil {
-		inv.SetUpdateNotifier(nil)
-		inv.SetWeightNotifier(nil)
 		l.flushItemPersistence(inv)
 	}
 	if l.world != nil {

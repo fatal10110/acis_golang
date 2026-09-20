@@ -60,14 +60,16 @@ type livePlayer struct {
 	// previous session.
 	kick       func()
 	stopAttack func(*livePlayer)
-	// shadowExpiryMu guards detaching. Autosave enqueues its save while
-	// holding the read lock and detachLivePlayer sets detaching under the
-	// write lock before enqueuing its own, so every autosave job sits ahead
-	// of detach's offline write on the persistence lane.
+	// shadowExpiryMu guards detaching. deliveryStopped is its unlocked mirror
+	// for delivery invoked while this lock is already held; markDetaching sets
+	// it first, so detached never lags a pending write lock. Autosave enqueues
+	// its save while holding the read lock and detach then writes its own, so
+	// every autosave job sits ahead of detach's offline persistence write.
 	shadowExpiryMu     sync.RWMutex
 	spawnProtectionMu  sync.Mutex
 	spawnProtectionGen uint64
 	detaching          bool
+	deliveryStopped    atomic.Bool
 	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
 	pickup             *pickupIntention
 	deferredPickup     *pickupIntention
@@ -211,13 +213,17 @@ func (p *livePlayer) Stop() {
 	p.stopCubics()
 }
 
-// detached reports whether p's session has begun detaching (logout), the
-// same shadowExpiryMu-guarded flag taskeffects.go checks before applying a
-// deferred effect against an already-detached session.
+// detached reports whether p's session has begun detaching (logout) without
+// taking shadowExpiryMu: expiry delivery may already hold that lock.
 func (p *livePlayer) detached() bool {
-	p.shadowExpiryMu.RLock()
-	defer p.shadowExpiryMu.RUnlock()
-	return p.detaching
+	return p.deliveryStopped.Load()
+}
+
+func (p *livePlayer) markDetaching() {
+	p.deliveryStopped.Store(true)
+	p.shadowExpiryMu.Lock()
+	p.detaching = true
+	p.shadowExpiryMu.Unlock()
 }
 
 // stopCubics cancels every live cubic runtime's timers on detach, so a

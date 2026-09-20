@@ -1080,6 +1080,17 @@ func TestGameClockConcurrentAccess(t *testing.T) {
 }
 
 // ---- from inventoryupdates_test.go ----
+type inventoryUpdateDelivery struct {
+	updates *InventoryUpdates
+	owner   InventoryUpdateOwner
+}
+
+func (d inventoryUpdateDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory) {
+	d.updates.Add(inv, d.owner)
+}
+
+func (inventoryUpdateDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
+
 func TestInventoryUpdatesTickSendsVisibleOwnersAndUpdatesWeight(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 57, Kind: item.KindEtcItem, Weight: 2, Stackable: true}})
 	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)
@@ -1112,11 +1123,9 @@ func TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend(t *testing.T) {
 		{ID: 57, Kind: item.KindEtcItem, Weight: 2, Stackable: true},
 		{ID: 58, Kind: item.KindEtcItem, Weight: 1, Stackable: true},
 	})
-	inv := itemcontainer.NewPlayerInventory(0x10000001, templates)
-
 	owner := &inventoryUpdateOwnerStub{visible: true}
 	updates := NewInventoryUpdates()
-	inv.SetUpdateNotifier(func() { updates.Add(inv, owner) })
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(0x10000001, templates, inventoryUpdateDelivery{updates: updates, owner: owner})
 
 	inv.Add(&item.Instance{ObjectID: 1, TemplateID: 57, Count: 3})
 	inv.Add(&item.Instance{ObjectID: 2, TemplateID: 58, Count: 1})

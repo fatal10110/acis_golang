@@ -1884,6 +1884,12 @@ func TestConsumeHerbReportsWhetherAConsumerTookIt(t *testing.T) {
 	}
 }
 
+type rewardInventoryDelivery struct{ calls int }
+
+func (d *rewardInventoryDelivery) QueueInventoryUpdate(*itemcontainer.Inventory) { d.calls++ }
+
+func (*rewardInventoryDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
+
 // TestAddRewardItemNotifiesTheUpdateHook pins the delivery half of an
 // auto-looted kill reward: the mutation methods stay silent because they also
 // serve client requests, so this server-driven caller is the one that has to
@@ -1893,24 +1899,22 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 		{ID: 57, Name: "adena", Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
 	c := &Character{ID: 1}
-	inv := itemcontainer.RestorePlayerInventory(c.ID, templates, nil)
+	delivery := &rewardInventoryDelivery{}
+	inv := itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, templates, nil, delivery)
 	c.AttachRuntime(&Template{}, inv)
-
-	notified := 0
-	inv.SetUpdateNotifier(func() { notified++ })
 
 	if !c.AddRewardItem(57, 10, 0x30000001) {
 		t.Fatal("AddRewardItem() = false for a known stackable template")
 	}
-	if notified != 1 {
-		t.Fatalf("notifier calls = %d, want 1", notified)
+	if delivery.calls != 1 {
+		t.Fatalf("update deliveries = %d, want 1", delivery.calls)
 	}
 
 	if c.AddRewardItem(9999, 1, 0x30000002) {
 		t.Fatal("AddRewardItem() = true for an unknown template")
 	}
-	if notified != 1 {
-		t.Fatalf("notifier calls after a rejected add = %d, want 1", notified)
+	if delivery.calls != 1 {
+		t.Fatalf("update deliveries after a rejected add = %d, want 1", delivery.calls)
 	}
 }
 

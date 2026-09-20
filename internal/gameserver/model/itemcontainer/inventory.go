@@ -69,13 +69,19 @@ type Inventory struct {
 
 	WeightLimit int
 
-	mu           sync.Mutex
-	paperdoll    [item.PaperdollSlots]*item.Instance
-	wornMask     int32
-	totalWeight  int
-	updates      []Update
-	notify       func()
-	weightNotify func()
+	mu          sync.Mutex
+	paperdoll   [item.PaperdollSlots]*item.Instance
+	wornMask    int32
+	totalWeight int
+	updates     []Update
+	delivery    Delivery
+}
+
+// Delivery handles a live inventory's queued updates and weight changes.
+// Inventory itself retains its queue and weight calculation.
+type Delivery interface {
+	QueueInventoryUpdate(*Inventory)
+	UpdateInventoryWeight(*Inventory)
 }
 
 // NewInventory returns an empty inventory owned by ownerID: baseLocation
@@ -94,6 +100,14 @@ func NewPlayerInventory(ownerID int32, templates *item.Table) *Inventory {
 	return NewInventory(ownerID, item.LocationInventory, item.LocationPaperdoll, templates)
 }
 
+// NewPlayerInventoryWithDelivery returns a player inventory that reports live
+// changes through delivery.
+func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery) *Inventory {
+	inv := NewPlayerInventory(ownerID, templates)
+	inv.delivery = delivery
+	return inv
+}
+
 // RestorePlayerInventory rebuilds a player inventory from persisted item
 // rows without queuing client update notifications. Items outside the
 // inventory/paperdoll locations are ignored; those belong to warehouses,
@@ -104,10 +118,27 @@ func RestorePlayerInventory(ownerID int32, templates *item.Table, items []*item.
 	return inv
 }
 
+// RestorePlayerInventoryWithDelivery rebuilds a live player inventory without
+// queuing restore notifications, then attaches its delivery dependency.
+func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery) *Inventory {
+	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery)
+	inv.Restore(items)
+	return inv
+}
+
 // NewPetInventory returns an empty pet inventory for ownerID (the pet's
-// own world object id, not its owner's).
+// own world object id, not its owner's). A live pet must use
+// NewPetInventoryWithDelivery to send inventory updates.
 func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
 	return NewInventory(ownerID, item.LocationPet, item.LocationPetEquip, templates)
+}
+
+// NewPetInventoryWithDelivery returns a pet inventory that reports live
+// changes through delivery.
+func NewPetInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery) *Inventory {
+	inv := NewPetInventory(ownerID, templates)
+	inv.delivery = delivery
+	return inv
 }
 
 // Add adds inst to the inventory and queues an added/modified notification.
@@ -414,7 +445,7 @@ func (inv *Inventory) IsWearingType(mask int32) bool {
 // pieces share the same armor type.
 func (inv *Inventory) SetPaperdollItem(slot int, inst *item.Instance, tmpl *item.Template) *item.Instance {
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	return inv.setPaperdollItemLocked(slot, inst, tmpl)
 }
@@ -469,7 +500,7 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 // item plus any implicitly unequipped ones).
 func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	return inv.equipItemLocked(inst, tmpl)
 }
@@ -614,7 +645,7 @@ func (inv *Inventory) equipPaired(tmpl *item.Template, slotA, slotB int, set fun
 // unnecessary — it always round-trips to the same position.
 func (inv *Inventory) UnequipSlot(slot int) *item.Instance {
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	return inv.unequipSlotLocked(slot)
 }
@@ -639,7 +670,7 @@ func (inv *Inventory) ClearWornSlot(slot int, inst *item.Instance) bool {
 		return false
 	}
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	if inv.paperdoll[slot] != inst {
 		return false
@@ -667,10 +698,10 @@ func (inv *Inventory) UpdateWeight() bool {
 		return false
 	}
 	inv.totalWeight = weight
-	notify := inv.weightNotify
+	delivery := inv.delivery
 	inv.mu.Unlock()
-	if notify != nil {
-		notify()
+	if delivery != nil {
+		delivery.UpdateInventoryWeight(inv)
 	}
 	return true
 }
@@ -770,27 +801,6 @@ func (inv *Inventory) BuildAndDrainUpdates(build func(items []*item.Instance) er
 	return nil
 }
 
-// SetUpdateNotifier records the hook fired on every queued inventory
-// change, matching the reference's Inventory.addUpdate registering with
-// InventoryUpdateTaskManager unconditionally. Passing nil detaches the
-// hook; an inventory without one simply keeps queueing.
-//
-// The hook runs with no inventory lock held, but it is still meant only to
-// hand the inventory off (registering it with the batching task, say) rather
-// than to mutate it.
-func (inv *Inventory) SetUpdateNotifier(notify func()) {
-	inv.mu.Lock()
-	defer inv.mu.Unlock()
-	inv.notify = notify
-}
-
-// SetWeightNotifier records the owner hook run after a changed total weight.
-func (inv *Inventory) SetWeightNotifier(notify func()) {
-	inv.mu.Lock()
-	defer inv.mu.Unlock()
-	inv.weightNotify = notify
-}
-
 // HasUpdates reports whether any inventory-change notifications are queued.
 func (inv *Inventory) HasUpdates() bool {
 	inv.mu.Lock()
@@ -800,7 +810,7 @@ func (inv *Inventory) HasUpdates() bool {
 
 func (inv *Inventory) queueUpdate(inst *item.Instance, state UpdateState) {
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	inv.queueUpdateLocked(inst, state)
 }
@@ -815,7 +825,7 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 
 func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {
 	inv.mu.Lock()
-	defer inv.fireNotifier() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	inv.queueUpdateRecordLocked(objectID, templateID, count, state)
 }
@@ -837,19 +847,14 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
 }
 
-// fireNotifier notifies the update hook, if any, that inv has a pending
-// change, matching the reference's Inventory.addUpdate registering with
-// InventoryUpdateTaskManager on every mutation.
-//
-// It reads the hook under the lock and calls it outside, so a hook that
-// reaches back into inv cannot deadlock against the mutation that triggered
-// it.
-func (inv *Inventory) fireNotifier() {
+// fireDelivery reports a queued update after a mutation. It reads delivery
+// under the lock and calls it outside so the delivery can inspect inv safely.
+func (inv *Inventory) fireDelivery() {
 	inv.mu.Lock()
-	notify := inv.notify
+	delivery := inv.delivery
 	pending := len(inv.updates) > 0
 	inv.mu.Unlock()
-	if notify != nil && pending {
-		notify()
+	if delivery != nil && pending {
+		delivery.QueueInventoryUpdate(inv)
 	}
 }

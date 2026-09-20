@@ -14,15 +14,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // activePet is a pure lookup of live's currently spawned pet and its
-// inventory. It does not register anything with the batching task: that
-// happens once, structurally, wherever the pet becomes live for its owner
-// (registerPetInventoryUpdates), the way character_flow.go wires the
-// player's own inventory at spawn rather than on every lookup.
+// inventory. Delivery is attached when a live pet inventory is constructed;
+// this lookup only finds the resulting pet and inventory.
 func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontainer.Inventory, bool) {
 	if live == nil || l.world == nil {
 		return nil, nil, false
@@ -42,15 +39,8 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 	return pet, inv, true
 }
 
-// registerPetInventoryUpdates registers pet's inventory with the batching
-// task, matching the reference's Pet registering itself with
-// InventoryUpdateTaskManager: the task is the only drainer, addressed to
-// the owner's client. Call it once, when pet becomes live for live — from
-// newPet, or wherever else a pet is attached to its owner.
-func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *livePlayer) {
-	if l.inventoryUpdates != nil {
-		wirePetInventoryUpdates(l.inventoryUpdates, pet, live, l.log)
-	}
+// registerPetItemPersistence attaches persistence for pet's inventory.
+func (l *GameClientLink) registerPetItemPersistence(pet *summon.Actor) {
 	// A pet's inventory persists through the same lazy task the owner's
 	// does; its items carry the pet's own object id as owner.
 	if l.itemInstances != nil && pet != nil {
@@ -60,24 +50,6 @@ func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *li
 			inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 		}
 	}
-}
-
-// wirePetInventoryUpdates registers pet's inventory with updates, addressed
-// to live's connection. Factored out of registerPetInventoryUpdates so test
-// helpers that don't have a *GameClientLink handle can reach the same
-// wiring against a task looked up another way.
-func wirePetInventoryUpdates(updates *task.InventoryUpdates, pet *summon.Actor, live *livePlayer, log zerolog.Logger) {
-	if updates == nil || pet == nil || live == nil {
-		return
-	}
-	inv := pet.PetInventory()
-	if inv == nil {
-		return
-	}
-	owner := &petInventoryOwner{live: live, pet: pet, log: log}
-	inv.SetUpdateNotifier(func() {
-		updates.Add(inv, owner)
-	})
 }
 
 // petInventoryOwner adapts a pet's inventory to task.InventoryUpdateOwner:
