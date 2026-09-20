@@ -102,6 +102,9 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 	if loot == nil || !instances.Contains(loot) {
 		t.Fatal("pet inventory mutation did not reach the item persistence task")
 	}
+	// Internal consistency only, not reference parity: Java keys pet items on
+	// the player's id, Go on the pet's (tracked in the pet-inventory owner id
+	// issue).
 	// The recorded owner is the write's lane key; it must be the id the
 	// teardown flush enqueues on (flushItemPersistence uses inv.OwnerID()).
 	if owner, _ := instances.PendingOwner(loot.ObjectID); owner != petInv.OwnerID() {
