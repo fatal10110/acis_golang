@@ -1,8 +1,6 @@
 package network
 
 import (
-	"sync/atomic"
-
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -65,25 +63,17 @@ func (*petInventoryDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
 // ownerItemPersister is the live persistence dependency of one inventory: its
 // items' writes register with the lazy item task under the inventory's owner,
 // which names the row's lane even for a destroy that zeroes the item's own.
-// Close is the owner-lifecycle end (logout, unsummon): it stops new
-// scheduling while whatever is already pending stays flushable.
+// Logout and unsummon end it with Container.ReleasePersistence.
 type ownerItemPersister struct {
 	instances *task.ItemInstances
 	ownerID   int32
-	closed    atomic.Bool
 }
 
-func (p *ownerItemPersister) Persist(inst *item.Instance) {
-	if !p.closed.Load() {
-		p.instances.AddOwned(p.ownerID, inst)
-	}
-}
-
-func (p *ownerItemPersister) Close() { p.closed.Store(true) }
+func (p *ownerItemPersister) Persist(inst *item.Instance) { p.instances.AddOwned(p.ownerID, inst) }
 
 // itemPersister returns the persistence dependency for ownerID's inventory,
 // or nil when no item persistence task is wired.
-func (l *GameClientLink) itemPersister(ownerID int32) itemcontainer.Persister {
+func (l *GameClientLink) itemPersister(ownerID int32) item.Persister {
 	if l.itemInstances == nil {
 		return nil
 	}

@@ -1271,7 +1271,7 @@ func TestFreight_ValidateCapacity_ScopedToVisibleItems(t *testing.T) {
 
 // ---- from persist_test.go ----
 
-// recordingPersister is a closable Persister that records what it is asked
+// recordingPersister is a Persister that records what it is asked
 // to schedule.
 type recordingPersister struct {
 	ids       []int32
@@ -1281,17 +1281,12 @@ type recordingPersister struct {
 }
 
 func (p *recordingPersister) Persist(inst *item.Instance) {
-	if p.closed {
-		return
-	}
 	p.ids = append(p.ids, inst.ObjectID)
 	p.states = append(p.states, inst.Snapshot())
 	if p.onPersist != nil {
 		p.onPersist(inst)
 	}
 }
-
-func (p *recordingPersister) Close() { p.closed = true }
 
 // TestContainerItemPersisterCoversAddedItems proves an item entering a
 // wired container reports both the move that brought it in and every later
@@ -1471,10 +1466,10 @@ func TestInventoryRestoreNormalizesStacksAndEquipment(t *testing.T) {
 	}
 }
 
-// TestInventoryClosePersistenceStopsScheduling proves the dependency ends
-// with its owner, so a logged-out player's items stop registering with the
-// task.
-func TestInventoryClosePersistenceStopsScheduling(t *testing.T) {
+// TestInventoryReleasePersistenceStopsHeldItems proves the dependency ends
+// with its owner for the items still held, so a logged-out player's items
+// stop registering with the task.
+func TestInventoryReleasePersistenceStopsHeldItems(t *testing.T) {
 	rec := &recordingPersister{}
 	inv := NewPlayerInventoryWithDelivery(0x10000001, testTemplates(), nil, rec)
 
@@ -1484,9 +1479,53 @@ func TestInventoryClosePersistenceStopsScheduling(t *testing.T) {
 	}
 	before := len(rec.ids)
 
-	inv.ClosePersistence()
+	inv.ReleasePersistence()
 	inst.AddCount(1)
 	if len(rec.ids) != before {
-		t.Errorf("persist calls after close = %d, want %d", len(rec.ids), before)
+		t.Errorf("persist calls after release = %d, want %d", len(rec.ids), before)
+	}
+}
+
+// TestContainerReleasePersistenceKeepsItemsThatLeft pins that tearing a
+// container down only unwires what it still holds: an item that already
+// moved into an unwired container keeps its coverage.
+func TestContainerReleasePersistenceKeepsItemsThatLeft(t *testing.T) {
+	rec := &recordingPersister{}
+	source := NewContainerWithPersister(0x10000001, item.LocationInventory, testTemplates(), rec)
+	inst := source.AddNew(daggerTemplateID, 1, 0x20000001)
+	if inst == nil || !source.Remove(inst) {
+		t.Fatal("setup: could not add and remove the item")
+	}
+	target := NewContainer(0x10000002, item.LocationWarehouse, testTemplates())
+	target.Add(inst)
+	before := len(rec.ids)
+
+	source.ReleasePersistence()
+	inst.SetEnchantLevel(7)
+	if got := len(rec.ids) - before; got != 1 {
+		t.Errorf("persist calls for an item that left before release = %d, want 1", got)
+	}
+}
+
+// TestInventoryRestoreMergeDoesNotPersist proves a restore that merges
+// stacks schedules no write, though the persister is injected at
+// construction.
+func TestInventoryRestoreMergeDoesNotPersist(t *testing.T) {
+	rows := []*item.Instance{
+		{ObjectID: 0x20000001, TemplateID: adenaTemplateID, Count: 100, Location: item.LocationInventory, ManaLeft: -1},
+		{ObjectID: 0x20000002, TemplateID: adenaTemplateID, Count: 50, Location: item.LocationInventory, ManaLeft: -1},
+	}
+	rec := &recordingPersister{}
+	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), rows, nil, rec)
+	if len(rec.ids) != 0 {
+		t.Fatalf("restore persisted %d times, want 0", len(rec.ids))
+	}
+	held := inv.ItemByObjectID(0x20000001)
+	if held == nil {
+		t.Fatal("merged stack missing")
+	}
+	held.AddCount(1)
+	if len(rec.ids) != 1 {
+		t.Errorf("persist calls after mutating the merged stack = %d, want 1", len(rec.ids))
 	}
 }

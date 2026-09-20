@@ -29,7 +29,7 @@ type Freight struct {
 
 // NewFreightWithPersister returns an empty freight container whose items
 // persist through persist.
-func NewFreightWithPersister(ownerID int32, templates *item.Table, persist Persister) *Freight {
+func NewFreightWithPersister(ownerID int32, templates *item.Table, persist item.Persister) *Freight {
 	return &Freight{Container: NewContainerWithPersister(ownerID, item.LocationFreight, templates, persist)}
 }
 

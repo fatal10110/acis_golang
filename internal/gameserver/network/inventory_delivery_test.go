@@ -64,21 +64,3 @@ func TestPlayerInventoryDeliveryDoesNotReenterExpiryLock(t *testing.T) {
 	live.shadowExpiryMu.RUnlock()
 	<-writerDone
 }
-
-func TestOwnerItemPersisterStopsSchedulingAfterClose(t *testing.T) {
-	instances := task.NewItemInstances(nil, item.NewTable(nil), nil, nil)
-	p := &ownerItemPersister{instances: instances, ownerID: 9}
-	inst := &item.Instance{ObjectID: 1, Count: 1}
-
-	p.Persist(inst)
-	if !instances.Contains(inst) {
-		t.Fatal("open persister did not schedule the item")
-	}
-	instances.RemoveItems([]*item.Instance{inst})
-
-	p.Close()
-	p.Persist(inst)
-	if instances.Contains(inst) {
-		t.Error("closed persister scheduled the item")
-	}
-}

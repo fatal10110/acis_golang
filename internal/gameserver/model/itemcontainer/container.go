@@ -30,16 +30,7 @@ type Container struct {
 
 	mu      sync.RWMutex
 	items   map[int32]*item.Instance
-	persist Persister
-}
-
-// Persister is the live persistence dependency a container hands to every item
-// it holds. Close ends it when the container's owner goes away: the items
-// keep the dependency but it stops scheduling, while work already queued
-// stays flushable.
-type Persister interface {
-	item.Persister
-	Close()
+	persist item.Persister
 }
 
 // NewContainer returns an empty container owned by ownerID, holding items
@@ -55,7 +46,7 @@ func NewContainer(ownerID int32, location item.Location, templates *item.Table) 
 
 // NewContainerWithPersister returns an empty container whose items persist
 // through persist.
-func NewContainerWithPersister(ownerID int32, location item.Location, templates *item.Table, persist Persister) *Container {
+func NewContainerWithPersister(ownerID int32, location item.Location, templates *item.Table, persist item.Persister) *Container {
 	c := NewContainer(ownerID, location, templates)
 	c.persist = persist
 	return c
@@ -81,12 +72,18 @@ func (c *Container) Location() item.Location { return c.location }
 // against.
 func (c *Container) Templates() *item.Table { return c.templates }
 
-// ClosePersistence ends the container's persistence dependency so no item
-// schedules a write after the container's owner is torn down. It is a no-op
-// for a container built without one.
-func (c *Container) ClosePersistence() {
-	if c.persist != nil {
-		c.persist.Close()
+// ReleasePersistence ends the container's persistence dependency when its
+// owner is torn down: the items it still holds stop scheduling writes and a
+// later Add binds nothing. Items that already left keep the persister they
+// carry, so a transfer out never loses coverage; work already queued stays
+// flushable.
+func (c *Container) ReleasePersistence() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	p := c.persist
+	c.persist = nil
+	for _, inst := range c.items {
+		inst.ReleasePersister(p)
 	}
 }
 

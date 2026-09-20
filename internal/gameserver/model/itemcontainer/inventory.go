@@ -102,7 +102,7 @@ func NewPlayerInventory(ownerID int32, templates *item.Table) *Inventory {
 
 // NewPlayerInventoryWithDelivery returns a player inventory that reports live
 // changes through delivery and persists its items through persist.
-func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist Persister) *Inventory {
+func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist item.Persister) *Inventory {
 	inv := NewPlayerInventory(ownerID, templates)
 	inv.delivery = delivery
 	inv.Container.persist = persist
@@ -123,7 +123,7 @@ func RestorePlayerInventory(ownerID int32, templates *item.Table, items []*item.
 // queuing restore notifications; its delivery and persistence dependencies
 // are in place before the rows are restored, so restored items carry the
 // persister without being re-persisted.
-func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery, persist Persister) *Inventory {
+func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery, persist item.Persister) *Inventory {
 	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery, persist)
 	inv.Restore(items)
 	return inv
@@ -138,7 +138,7 @@ func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
 
 // NewPetInventoryWithDelivery returns a pet inventory that reports live
 // changes through delivery and persists its items through persist.
-func NewPetInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist Persister) *Inventory {
+func NewPetInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist item.Persister) *Inventory {
 	inv := NewPetInventory(ownerID, templates)
 	inv.delivery = delivery
 	inv.Container.persist = persist
@@ -192,12 +192,11 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 			continue
 		}
 
-		// Restoring a row is not a change to persist: attach the hook
-		// only once the instance already carries its stored owner and
-		// location, so a reload doesn't schedule a redundant write of
-		// what was just read.
+		// Restoring a row is not a change to persist: the persister is
+		// bound only once every row is in place, so neither the owner
+		// fix-up, nor a stack merge, nor an equip displacement schedules
+		// a redundant write of what was just read.
 		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
-		inst.BindPersister(inv.Container.persist)
 		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
@@ -227,6 +226,9 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		}
 	}
 	inv.updates = nil
+	for _, inst := range inv.Container.items {
+		inst.BindPersister(inv.Container.persist)
+	}
 }
 
 // Remove removes inst from the inventory: unequipping it first if it was

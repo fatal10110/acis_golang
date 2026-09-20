@@ -49,8 +49,8 @@ type Instance struct {
 }
 
 // Persister schedules the lazy write of a live item whose persisted state
-// changed. Instance calls it with no instance lock held, but container
-// mutations such as Container.Add may hold the container's own lock, so an
+// changed. Instance calls it with no instance lock held, but container and
+// inventory mutations such as Container.Add may hold their own locks, so an
 // implementation must not reach back into the container that supplied it.
 type Persister interface {
 	Persist(*Instance)
@@ -188,6 +188,20 @@ func (inst *Instance) BindPersister(p Persister) {
 	mu.Lock()
 	defer mu.Unlock()
 	inst.persist = p
+}
+
+// ReleasePersister ends inst's dependency on p, and only p: an item that has
+// since been bound to another owner's persister keeps that one.
+func (inst *Instance) ReleasePersister(p Persister) {
+	if inst == nil || p == nil {
+		return
+	}
+	mu := inst.lock()
+	mu.Lock()
+	defer mu.Unlock()
+	if inst.persist == p {
+		inst.persist = nil
+	}
 }
 
 // persisted schedules inst's write through its persistence dependency. Call it after releasing
