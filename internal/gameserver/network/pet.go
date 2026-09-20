@@ -18,8 +18,8 @@ import (
 )
 
 // activePet is a pure lookup of live's currently spawned pet and its
-// inventory. Delivery is attached when a live pet inventory is constructed;
-// this lookup only finds the resulting pet and inventory.
+// inventory. Delivery and persistence are attached when a live pet inventory
+// is constructed; this lookup only finds the resulting pet and inventory.
 func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontainer.Inventory, bool) {
 	if live == nil || l.world == nil {
 		return nil, nil, false
@@ -37,19 +37,6 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 		return nil, nil, false
 	}
 	return pet, inv, true
-}
-
-// registerPetItemPersistence attaches persistence for pet's inventory.
-func (l *GameClientLink) registerPetItemPersistence(pet *summon.Actor) {
-	// A pet's inventory persists through the same lazy task the owner's
-	// does; its items carry the pet's own object id as owner.
-	if l.itemInstances != nil && pet != nil {
-		if inv := pet.PetInventory(); inv != nil {
-			// The container supplies the owner, so a destroy — which zeroes
-			// the instance's own — still names the row's lane.
-			inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
-		}
-	}
 }
 
 // petInventoryOwner adapts a pet's inventory to task.InventoryUpdateOwner:

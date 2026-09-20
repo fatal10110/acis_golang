@@ -220,8 +220,7 @@ func TestDestroyAfterFlushKeepsItsOwnersLane(t *testing.T) {
 	const ownerID int32 = 7
 	templates := item.NewTable([]*item.Template{{ID: 1, Name: "Stackable", Kind: item.KindEtcItem, Stackable: true, Destroyable: true, EtcItem: &item.EtcItemDetail{}}})
 	instances := NewItemInstances(&chunkTrackingFlusher{}, templates, nil, nil)
-	inv := itemcontainer.NewPlayerInventory(ownerID, templates)
-	inv.SetItemPersister(func(inst *item.Instance) { instances.AddOwned(inv.OwnerID(), inst) })
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(ownerID, templates, nil, ownerPersister{instances: instances, ownerID: ownerID})
 
 	inst := inv.AddNew(1, 2, 400)
 	if err := instances.Save(context.Background()); err != nil {
@@ -268,3 +267,13 @@ func TestLaneKeyKeepsDestroyedItemOnItsOwnersLane(t *testing.T) {
 		t.Fatalf("destroyed item's lane key = %d, want its owner 7", got)
 	}
 }
+
+// ownerPersister registers persisted mutations under a fixed owner lane, the
+// way the composition root's per-owner dependency does.
+type ownerPersister struct {
+	instances *ItemInstances
+	ownerID   int32
+}
+
+func (p ownerPersister) Persist(inst *item.Instance) { p.instances.AddOwned(p.ownerID, inst) }
+func (ownerPersister) Close()                        {}

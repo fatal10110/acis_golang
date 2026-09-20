@@ -399,12 +399,12 @@ func TestInstancePersistNotifier(t *testing.T) {
 			}
 
 			notified := 0
-			inst.SetPersistNotifier(func(got *Instance) {
+			inst.BindPersister(persistFunc(func(got *Instance) {
 				if got != inst {
 					t.Errorf("notifier got instance %p, want %p", got, inst)
 				}
 				notified++
-			})
+			}))
 
 			tt.mutate(inst)
 
@@ -415,22 +415,23 @@ func TestInstancePersistNotifier(t *testing.T) {
 	}
 }
 
-// TestInstancePersistNotifierCleared proves the hook is releasable: an
-// instance whose owner detached must stop scheduling writes.
-func TestInstancePersistNotifierCleared(t *testing.T) {
+// persistFunc adapts a function to Persister.
+type persistFunc func(*Instance)
+
+func (f persistFunc) Persist(inst *Instance) { f(inst) }
+
+// TestInstanceBindPersisterNilKeepsDependency proves a nil binding never
+// unregisters a live item: ending a dependency is the persister's own
+// lifecycle, not a setter call.
+func TestInstanceBindPersisterNilKeepsDependency(t *testing.T) {
 	inst := newPersistTestInstance()
 
 	notified := 0
-	inst.SetPersistNotifier(func(*Instance) { notified++ })
+	inst.BindPersister(persistFunc(func(*Instance) { notified++ }))
+	inst.BindPersister(nil)
 	inst.AddCount(1)
 	if notified != 1 {
-		t.Fatalf("notifications before clearing = %d, want 1", notified)
-	}
-
-	inst.SetPersistNotifier(nil)
-	inst.AddCount(1)
-	if notified != 1 {
-		t.Errorf("notifications after clearing = %d, want 1", notified)
+		t.Errorf("notifications after nil bind = %d, want 1", notified)
 	}
 }
 
@@ -448,7 +449,7 @@ func TestInstancePersistNotifierUnset(t *testing.T) {
 func TestInstanceSnapshotDropsPersistNotifier(t *testing.T) {
 	inst := newPersistTestInstance()
 	notified := 0
-	inst.SetPersistNotifier(func(*Instance) { notified++ })
+	inst.BindPersister(persistFunc(func(*Instance) { notified++ }))
 
 	clone := inst.Clone()
 	clone.AddCount(5)
@@ -807,7 +808,7 @@ func TestParseLocation_ExactSpelling(t *testing.T) {
 func TestSetCustomType2PersistsChangedValue(t *testing.T) {
 	inst := &Instance{CustomType2: 0}
 	var persisted int
-	inst.SetPersistNotifier(func(*Instance) { persisted++ })
+	inst.BindPersister(persistFunc(func(*Instance) { persisted++ }))
 
 	if !inst.SetCustomType2(1) {
 		t.Fatal("SetCustomType2() = false, want true")
@@ -1059,3 +1060,15 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 }
 
 // ---- from summonitem_test.go ----
+
+func TestInstanceReleasePersisterIgnoresUncomparablePersister(t *testing.T) {
+	inst := newPersistTestInstance()
+	calls := 0
+	p := persistFunc(func(*Instance) { calls++ })
+	inst.BindPersister(p)
+	inst.ReleasePersister(p) // must not panic comparing func-typed values
+	inst.AddCount(1)
+	if calls == 0 {
+		t.Error("uncomparable persister was released; it can never match")
+	}
+}

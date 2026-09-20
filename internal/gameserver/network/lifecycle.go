@@ -276,8 +276,9 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 	l.groundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z, DropperID: actor.ObjectID()})
 }
 
-// flushItemPersistence unwires inv's items from the lazy persistence task
-// and writes their state on the owner's persistence lane, matching the
+// flushItemPersistence releases inv's persistence dependency, so its items stop
+// scheduling with the lazy persistence task, and writes their state on the
+// owner's persistence lane, matching the
 // reference's ItemContainer.deleteMe: a container that goes away drops out
 // of the pending set and is saved at once, rather than leaving rows for a
 // tick that will never see the container again. The items are read when the
@@ -290,7 +291,7 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // the container pending hands all of it to the next tick, or to the
 // shutdown flush, instead of dropping it on the floor.
 func (l *GameClientLink) flushItemPersistence(inv *itemcontainer.Inventory) {
-	inv.SetItemPersister(nil)
+	inv.ReleasePersistence()
 	if l.itemInstances == nil {
 		return
 	}

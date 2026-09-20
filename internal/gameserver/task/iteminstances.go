@@ -170,6 +170,15 @@ func (i *ItemInstances) AddOwned(ownerID int32, inst *item.Instance) {
 	i.mu.Unlock()
 }
 
+// PendingOwner returns the owner recorded for objectID's pending write, which
+// names the persistence lane it runs on, and whether that item is pending.
+func (i *ItemInstances) PendingOwner(objectID int32) (int32, bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	entry, ok := i.pending[objectID]
+	return entry.ownerID, ok
+}
+
 // Contains reports whether inst's object id is currently pending.
 func (i *ItemInstances) Contains(inst *item.Instance) bool {
 	if inst == nil {
@@ -220,7 +229,7 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 //
 // Save no longer gives callers UpdateItems's whole-batch atomicity: two
 // items that must land together (e.g. both legs of a trade reaching pending
-// through itemcontainer's SetItemPersister hook) can now fall on either
+// through the container's item persister) can now fall on either
 // side of a chunk boundary and commit, or fail, independently. This
 // narrows what a Save tick previously promised, but not past what the
 // Java reference already does: ItemInstanceTaskManager.updateItems commits

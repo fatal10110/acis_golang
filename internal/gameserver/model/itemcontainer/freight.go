@@ -27,6 +27,12 @@ type Freight struct {
 	ActiveLocation int
 }
 
+// NewFreightWithPersister returns an empty freight container whose items
+// persist through persist.
+func NewFreightWithPersister(ownerID int32, templates *item.Table, persist item.Persister) *Freight {
+	return &Freight{Container: NewContainerWithPersister(ownerID, item.LocationFreight, templates, persist)}
+}
+
 // NewFreight returns an empty freight container for ownerID.
 func NewFreight(ownerID int32, templates *item.Table) *Freight {
 	return &Freight{Container: NewContainer(ownerID, item.LocationFreight, templates)}
@@ -120,9 +126,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 	if f.ActiveLocation > 0 {
 		locData = f.ActiveLocation
 	}
-	if f.persist != nil {
-		inst.SetPersistNotifier(f.persist)
-	}
+	inst.BindPersister(f.persist)
 	inst.SetOwnerLocation(f.ownerID, f.location, locData)
 	f.items[inst.ObjectID] = inst
 	return inst, false

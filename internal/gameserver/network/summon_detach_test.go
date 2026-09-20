@@ -7,7 +7,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -62,7 +64,9 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 	if !ok {
 		t.Fatal("missing summon item fixture")
 	}
+	instances := task.NewItemInstances(nil, testItemTemplates(), nil, nil)
 	link := &GameClientLink{
+		itemInstances: instances,
 		world:         state,
 		npcs:          npc.NewTable([]*npc.Template{npcTmpl}),
 		summonItems:   summonItems,
@@ -86,8 +90,31 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 		return live, spawned
 	}
 
-	if _, spawned := spawnFor(t, 11, detachTestCollarObjI, false); !spawned {
+	owner, spawned := spawnFor(t, 11, detachTestCollarObjI, false)
+	if !spawned {
 		t.Fatal("no pet published for an in-world owner: the fixture is not reaching the spawn")
+	}
+	// The pet's inventory is built with its persistence dependency, under
+	// the pet's own object id as owner.
+	obj, _ := state.Summon(owner.ObjectID())
+	petInv := obj.(*summon.Actor).PetInventory()
+	loot := petInv.AddNew(item.AdenaID, 5, 7100)
+	if loot == nil || !instances.Contains(loot) {
+		t.Fatal("pet inventory mutation did not reach the item persistence task")
+	}
+	// Internal consistency only, not reference parity: Java keys pet items on
+	// the player's id, Go on the pet's (tracked in the pet-inventory owner id
+	// issue).
+	// The recorded owner is the write's lane key; it must be the id the
+	// teardown flush enqueues on (flushItemPersistence uses inv.OwnerID()).
+	if owner, _ := instances.PendingOwner(loot.ObjectID); owner != petInv.OwnerID() {
+		t.Errorf("pet item lane owner = %d, want the pet inventory's owner %d", owner, petInv.OwnerID())
+	}
+	petInv.ReleasePersistence()
+	instances.RemoveItems([]*item.Instance{loot})
+	loot.AddCount(1)
+	if instances.Contains(loot) {
+		t.Error("pet item scheduled a write after the inventory was released")
 	}
 	if _, spawned := spawnFor(t, 12, detachTestCollarObjD, true); spawned {
 		t.Fatal("pet published for an owner that had already detached")

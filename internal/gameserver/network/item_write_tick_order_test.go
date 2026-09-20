@@ -116,8 +116,13 @@ func TestTickWriteCannotBeOvertakenByAnEarlierHandlerWrite(t *testing.T) {
 	link.items = recordingItemStore{itemStore: link.items, log: flusher, watch: objectID}
 
 	inv := first.Inventory()
-	inv.SetItemPersister(func(inst *item.Instance) { instances.AddOwned(inv.OwnerID(), inst) })
+	// The fixture's inventory carries no persister of its own; the stack is
+	// bound explicitly. Container-to-persister scheduling is covered in
+	// itemcontainer's tests.
+	persister := &ownerItemPersister{instances: instances, ownerID: inv.OwnerID()}
 	stack := inv.AddNew(item.AdenaID, 101, objectID)
+	stack.BindPersister(persister)
+	persister.Persist(stack)
 	inv.DrainUpdates()
 
 	// Another lane holds the row, so the tick's flush waits for it with its

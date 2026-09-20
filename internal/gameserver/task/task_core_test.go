@@ -1125,7 +1125,7 @@ func TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend(t *testing.T) {
 	})
 	owner := &inventoryUpdateOwnerStub{visible: true}
 	updates := NewInventoryUpdates()
-	inv := itemcontainer.NewPlayerInventoryWithDelivery(0x10000001, templates, inventoryUpdateDelivery{updates: updates, owner: owner})
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(0x10000001, templates, inventoryUpdateDelivery{updates: updates, owner: owner}, nil)
 
 	inv.Add(&item.Instance{ObjectID: 1, TemplateID: 57, Count: 3})
 	inv.Add(&item.Instance{ObjectID: 2, TemplateID: 58, Count: 1})

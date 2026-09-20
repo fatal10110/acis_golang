@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -58,3 +59,23 @@ func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory
 
 // TODO(#2381): match PetInventory.updateWeight's pet status and info refresh.
 func (*petInventoryDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
+
+// ownerItemPersister is the live persistence dependency of one inventory: its
+// items' writes register with the lazy item task under the inventory's owner,
+// which names the row's lane even for a destroy that zeroes the item's own.
+// Logout and unsummon end it with Container.ReleasePersistence.
+type ownerItemPersister struct {
+	instances *task.ItemInstances
+	ownerID   int32
+}
+
+func (p *ownerItemPersister) Persist(inst *item.Instance) { p.instances.AddOwned(p.ownerID, inst) }
+
+// itemPersister returns the persistence dependency for ownerID's inventory,
+// or nil when no item persistence task is wired.
+func (l *GameClientLink) itemPersister(ownerID int32) item.Persister {
+	if l.itemInstances == nil {
+		return nil
+	}
+	return &ownerItemPersister{instances: l.itemInstances, ownerID: ownerID}
+}

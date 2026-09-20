@@ -638,7 +638,7 @@ func TestInventory_UpdateNotifierFiresOnQueuedUpdate(t *testing.T) {
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
 	delivery := &inventoryDeliveryRecorder{}
-	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery, nil)
 
 	inv.AddNew(1, 5, 0x30000001)
 	if delivery.updates != 1 {
@@ -667,7 +667,7 @@ func TestInventory_DeliveryReceivesQueuedUpdatesAndWeightChanges(t *testing.T) {
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, Weight: 3, EtcItem: &item.EtcItemDetail{}},
 	})
 	delivery := &inventoryDeliveryRecorder{}
-	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery, nil)
 
 	inv.AddNew(1, 5, 0x30000001)
 	if delivery.updates != 1 {
@@ -689,7 +689,7 @@ func TestInventory_DeliveryReceivesQueuedUpdatesAndWeightChanges(t *testing.T) {
 func TestInventory_UpdateNotifierSkipsNoOpMutation(t *testing.T) {
 	templates := item.NewTable(nil)
 	delivery := &inventoryDeliveryRecorder{}
-	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery)
+	inv := NewPlayerInventoryWithDelivery(0x10000001, templates, delivery, nil)
 
 	inv.UnequipSlot(RHand)
 	if delivery.updates != 0 {
@@ -1270,27 +1270,43 @@ func TestFreight_ValidateCapacity_ScopedToVisibleItems(t *testing.T) {
 }
 
 // ---- from persist_test.go ----
+
+// recordingPersister is a Persister that records what it is asked
+// to schedule.
+type recordingPersister struct {
+	ids       []int32
+	states    []item.InstanceState
+	closed    bool
+	onPersist func(*item.Instance)
+}
+
+func (p *recordingPersister) Persist(inst *item.Instance) {
+	p.ids = append(p.ids, inst.ObjectID)
+	p.states = append(p.states, inst.Snapshot())
+	if p.onPersist != nil {
+		p.onPersist(inst)
+	}
+}
+
 // TestContainerItemPersisterCoversAddedItems proves an item entering a
 // wired container reports both the move that brought it in and every later
 // mutation, so persistence follows the item rather than the call site.
 func TestContainerItemPersisterCoversAddedItems(t *testing.T) {
-	c := newTestContainer()
-
-	var changed []int32
-	c.SetItemPersister(func(inst *item.Instance) { changed = append(changed, inst.ObjectID) })
+	rec := &recordingPersister{}
+	c := NewContainerWithPersister(0x10000001, item.LocationWarehouse, testTemplates(), rec)
 
 	inst := c.AddNew(potionTemplateID, 5, 0x20000001)
 	if inst == nil {
 		t.Fatal("AddNew() = nil")
 	}
-	if len(changed) != 1 || changed[0] != 0x20000001 {
-		t.Fatalf("after AddNew, changed = %v, want [0x20000001]", changed)
+	if len(rec.ids) != 1 || rec.ids[0] != 0x20000001 {
+		t.Fatalf("after AddNew, changed = %v, want [0x20000001]", rec.ids)
 	}
 
 	// A count change made with no client involved must still be reported.
 	inst.ReduceCount(2)
-	if len(changed) != 2 {
-		t.Fatalf("after ReduceCount, changed = %v, want two entries", changed)
+	if len(rec.ids) != 2 {
+		t.Fatalf("after ReduceCount, changed = %v, want two entries", rec.ids)
 	}
 
 	// So must the destruction that removes it, since the row has to be
@@ -1298,8 +1314,8 @@ func TestContainerItemPersisterCoversAddedItems(t *testing.T) {
 	if got := c.DestroyAll(inst); got == nil {
 		t.Fatal("DestroyAll() = nil")
 	}
-	if len(changed) != 3 {
-		t.Fatalf("after DestroyAll, changed = %v, want three entries", changed)
+	if len(rec.ids) != 3 {
+		t.Fatalf("after DestroyAll, changed = %v, want three entries", rec.ids)
 	}
 }
 
@@ -1309,9 +1325,8 @@ func TestContainerItemPersisterCoversAddedItems(t *testing.T) {
 // silences the item afterwards. Dropping the hook there would leave the
 // items row pointing at the container the item just left.
 func TestContainerAddKeepsPersisterOfUnwiredDestination(t *testing.T) {
-	source := newTestContainer()
-	var changed []int32
-	source.SetItemPersister(func(inst *item.Instance) { changed = append(changed, inst.ObjectID) })
+	rec := &recordingPersister{}
+	source := NewContainerWithPersister(0x10000001, item.LocationWarehouse, testTemplates(), rec)
 
 	inst := source.AddNew(daggerTemplateID, 1, 0x20000001)
 	if inst == nil {
@@ -1320,20 +1335,20 @@ func TestContainerAddKeepsPersisterOfUnwiredDestination(t *testing.T) {
 	if !source.Remove(inst) {
 		t.Fatal("Remove() = false")
 	}
-	before := len(changed)
+	before := len(rec.ids)
 
 	// A destination with no persister of its own.
 	target := NewContainer(0x10000002, item.LocationWarehouse, testTemplates())
 	if _, absorbed := target.Add(inst); absorbed {
 		t.Fatal("Add() absorbed a non-stackable item")
 	}
-	if len(changed) != before+1 {
-		t.Fatalf("moving into an unwired container reported %d changes, want 1", len(changed)-before)
+	if len(rec.ids) != before+1 {
+		t.Fatalf("moving into an unwired container reported %d changes, want 1", len(rec.ids)-before)
 	}
 
 	inst.SetEnchantLevel(3)
-	if len(changed) != before+2 {
-		t.Errorf("mutating after the move reported %d changes, want 1", len(changed)-before-1)
+	if len(rec.ids) != before+2 {
+		t.Errorf("mutating after the move reported %d changes, want 1", len(rec.ids)-before-1)
 	}
 }
 
@@ -1342,8 +1357,7 @@ func TestContainerAddKeepsPersisterOfUnwiredDestination(t *testing.T) {
 // any row it had must be deleted rather than left behind double-counting
 // them after a restart.
 func TestContainerAddAbsorbedItemReportsDestruction(t *testing.T) {
-	c := newTestContainer()
-	c.SetItemPersister(func(*item.Instance) {})
+	c := NewContainerWithPersister(0x10000001, item.LocationWarehouse, testTemplates(), &recordingPersister{})
 
 	if first := c.AddNew(adenaTemplateID, 100, 0x20000001); first == nil {
 		t.Fatal("AddNew() = nil")
@@ -1351,8 +1365,9 @@ func TestContainerAddAbsorbedItemReportsDestruction(t *testing.T) {
 
 	// An incoming stack that already has a row of its own.
 	incoming := &item.Instance{ObjectID: 0x20000002, TemplateID: adenaTemplateID, Count: 50, OwnerID: 0x10000009, Location: item.LocationInventory, ManaLeft: -1}
-	var reported []item.InstanceState
-	incoming.SetPersistNotifier(func(inst *item.Instance) { reported = append(reported, inst.Snapshot()) })
+	incomingRec := &recordingPersister{}
+	incoming.BindPersister(incomingRec)
+	reported := &incomingRec.states
 
 	result, absorbed := c.Add(incoming)
 	if !absorbed {
@@ -1361,10 +1376,10 @@ func TestContainerAddAbsorbedItemReportsDestruction(t *testing.T) {
 	if got := result.CountValue(); got != 150 {
 		t.Errorf("merged stack count = %d, want 150", got)
 	}
-	if len(reported) == 0 {
+	if len(*reported) == 0 {
 		t.Fatal("absorbed item reported no change; its row would survive the merge")
 	}
-	last := reported[len(reported)-1]
+	last := (*reported)[len(*reported)-1]
 	if last.Count != 0 || last.Location != item.LocationVoid {
 		t.Errorf("absorbed item reported count=%d loc=%v, want a destroyed state", last.Count, last.Location)
 	}
@@ -1373,8 +1388,7 @@ func TestContainerAddAbsorbedItemReportsDestruction(t *testing.T) {
 // TestFreightAddAbsorbedItemReportsDestruction covers the same merge path
 // through Freight's own Add.
 func TestFreightAddAbsorbedItemReportsDestruction(t *testing.T) {
-	f := NewFreight(0x10000001, testTemplates())
-	f.SetItemPersister(func(*item.Instance) {})
+	f := NewFreightWithPersister(0x10000001, testTemplates(), &recordingPersister{})
 
 	if first := f.AddNew(adenaTemplateID, 100, 0x20000001); first == nil {
 		t.Fatal("AddNew() = nil")
@@ -1382,11 +1396,11 @@ func TestFreightAddAbsorbedItemReportsDestruction(t *testing.T) {
 
 	incoming := &item.Instance{ObjectID: 0x20000002, TemplateID: adenaTemplateID, Count: 50, OwnerID: 0x10000009, Location: item.LocationInventory, ManaLeft: -1}
 	destroyed := false
-	incoming.SetPersistNotifier(func(inst *item.Instance) {
+	incoming.BindPersister(&recordingPersister{onPersist: func(inst *item.Instance) {
 		if st := inst.Snapshot(); st.Count == 0 && st.Location == item.LocationVoid {
 			destroyed = true
 		}
-	})
+	}})
 
 	if _, absorbed := f.Add(incoming); !absorbed {
 		t.Fatal("Add() did not absorb a stackable item")
@@ -1397,19 +1411,17 @@ func TestFreightAddAbsorbedItemReportsDestruction(t *testing.T) {
 }
 
 // TestInventoryItemPersisterAppliesToRestoredItems covers the login order:
-// an inventory is restored from its persisted rows first and wired to the
-// persistence task afterwards. Restoring must not schedule a write of what
-// was just read, but the items must be covered from then on.
+// the inventory is built with its persistence dependency and restored from
+// its persisted rows. Restoring must not schedule a write of what was just
+// read, but the items must be covered from then on.
 func TestInventoryItemPersisterAppliesToRestoredItems(t *testing.T) {
 	restored := []*item.Instance{
 		{ObjectID: 0x20000001, TemplateID: potionTemplateID, Count: 5, Location: item.LocationInventory, ManaLeft: -1},
 	}
-	inv := RestorePlayerInventory(0x10000001, testTemplates(), restored)
-
-	notified := 0
-	inv.SetItemPersister(func(*item.Instance) { notified++ })
-	if notified != 0 {
-		t.Fatalf("wiring a restored inventory notified %d times, want 0", notified)
+	rec := &recordingPersister{}
+	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), restored, nil, rec)
+	if len(rec.ids) != 0 {
+		t.Fatalf("restoring an inventory persisted %d times, want 0", len(rec.ids))
 	}
 
 	held := inv.ItemByObjectID(0x20000001)
@@ -1417,8 +1429,8 @@ func TestInventoryItemPersisterAppliesToRestoredItems(t *testing.T) {
 		t.Fatal("restored item missing from inventory")
 	}
 	held.AddCount(1)
-	if notified != 1 {
-		t.Errorf("notifications after mutating a restored item = %d, want 1", notified)
+	if len(rec.ids) != 1 {
+		t.Errorf("persist calls after mutating a restored item = %d, want 1", len(rec.ids))
 	}
 }
 
@@ -1454,23 +1466,66 @@ func TestInventoryRestoreNormalizesStacksAndEquipment(t *testing.T) {
 	}
 }
 
-// TestInventoryItemPersisterClearedOnDetach proves the hook is releasable,
-// so a logged-out player's items stop registering with the task.
-func TestInventoryItemPersisterClearedOnDetach(t *testing.T) {
-	inv := RestorePlayerInventory(0x10000001, testTemplates(), nil)
-
-	notified := 0
-	inv.SetItemPersister(func(*item.Instance) { notified++ })
+// TestInventoryReleasePersistenceStopsHeldItems proves the dependency ends
+// with its owner for the items still held, so a logged-out player's items
+// stop registering with the task.
+func TestInventoryReleasePersistenceStopsHeldItems(t *testing.T) {
+	rec := &recordingPersister{}
+	inv := NewPlayerInventoryWithDelivery(0x10000001, testTemplates(), nil, rec)
 
 	inst := inv.AddNew(potionTemplateID, 5, 0x20000001)
 	if inst == nil {
 		t.Fatal("AddNew() = nil")
 	}
-	before := notified
+	before := len(rec.ids)
 
-	inv.SetItemPersister(nil)
+	inv.ReleasePersistence()
 	inst.AddCount(1)
-	if notified != before {
-		t.Errorf("notifications after clearing = %d, want %d", notified, before)
+	if len(rec.ids) != before {
+		t.Errorf("persist calls after release = %d, want %d", len(rec.ids), before)
+	}
+}
+
+// TestContainerReleasePersistenceKeepsItemsThatLeft pins that tearing a
+// container down only unwires what it still holds: an item that already
+// moved into an unwired container keeps its coverage.
+func TestContainerReleasePersistenceKeepsItemsThatLeft(t *testing.T) {
+	rec := &recordingPersister{}
+	source := NewContainerWithPersister(0x10000001, item.LocationInventory, testTemplates(), rec)
+	inst := source.AddNew(daggerTemplateID, 1, 0x20000001)
+	if inst == nil || !source.Remove(inst) {
+		t.Fatal("setup: could not add and remove the item")
+	}
+	target := NewContainer(0x10000002, item.LocationWarehouse, testTemplates())
+	target.Add(inst)
+	before := len(rec.ids)
+
+	source.ReleasePersistence()
+	inst.SetEnchantLevel(7)
+	if got := len(rec.ids) - before; got != 1 {
+		t.Errorf("persist calls for an item that left before release = %d, want 1", got)
+	}
+}
+
+// TestInventoryRestoreMergeDoesNotPersist proves a restore that merges
+// stacks schedules no write, though the persister is injected at
+// construction.
+func TestInventoryRestoreMergeDoesNotPersist(t *testing.T) {
+	rows := []*item.Instance{
+		{ObjectID: 0x20000001, TemplateID: adenaTemplateID, Count: 100, Location: item.LocationInventory, ManaLeft: -1},
+		{ObjectID: 0x20000002, TemplateID: adenaTemplateID, Count: 50, Location: item.LocationInventory, ManaLeft: -1},
+	}
+	rec := &recordingPersister{}
+	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), rows, nil, rec)
+	if len(rec.ids) != 0 {
+		t.Fatalf("restore persisted %d times, want 0", len(rec.ids))
+	}
+	held := inv.ItemByObjectID(0x20000001)
+	if held == nil {
+		t.Fatal("merged stack missing")
+	}
+	held.AddCount(1)
+	if len(rec.ids) != 1 {
+		t.Errorf("persist calls after mutating the merged stack = %d, want 1", len(rec.ids))
 	}
 }

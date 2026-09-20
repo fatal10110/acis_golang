@@ -30,7 +30,7 @@ type Container struct {
 
 	mu      sync.RWMutex
 	items   map[int32]*item.Instance
-	persist func(*item.Instance)
+	persist item.Persister
 }
 
 // NewContainer returns an empty container owned by ownerID, holding items
@@ -42,6 +42,14 @@ func NewContainer(ownerID int32, location item.Location, templates *item.Table) 
 		templates: templates,
 		items:     make(map[int32]*item.Instance),
 	}
+}
+
+// NewContainerWithPersister returns an empty container whose items persist
+// through persist.
+func NewContainerWithPersister(ownerID int32, location item.Location, templates *item.Table, persist item.Persister) *Container {
+	c := NewContainer(ownerID, location, templates)
+	c.persist = persist
+	return c
 }
 
 // NewWarehouse returns an empty private warehouse container for ownerID.
@@ -64,19 +72,18 @@ func (c *Container) Location() item.Location { return c.location }
 // against.
 func (c *Container) Templates() *item.Table { return c.templates }
 
-// SetItemPersister records the hook every item held by this container
-// reports its persisted-state mutations to, applying it to the items
-// already held as well as to every item added later.
-//
-// Passing nil clears the hook on this container and on the items it holds,
-// which is how a container being torn down stops registering. Moving an
-// item into an unwired container does not clear it, though — see Add.
-func (c *Container) SetItemPersister(persist func(*item.Instance)) {
+// ReleasePersistence ends the container's persistence dependency when its
+// owner is torn down: the items it still holds stop scheduling writes and a
+// later Add binds nothing. Items that already left keep the persister they
+// carry, so a transfer out never loses coverage; work already queued stays
+// flushable.
+func (c *Container) ReleasePersistence() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.persist = persist
+	p := c.persist
+	c.persist = nil
 	for _, inst := range c.items {
-		inst.SetPersistNotifier(persist)
+		inst.ReleasePersister(p)
 	}
 }
 
@@ -244,16 +251,12 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 		return nil, false
 	}
 
-	// Hand the item this container's persistence hook before the move
-	// itself mutates it, so the ownership/location change that brings it
-	// in is the first thing reported. A container with no persister of its
-	// own must not clear one the item already carries: moving between
-	// containers never unregisters an item, and dropping the hook here
-	// would both swallow this very move and silence every mutation after
-	// it.
-	if c.persist != nil {
-		inst.SetPersistNotifier(c.persist)
-	}
+	// Hand the item this container's persister before the move itself
+	// mutates it, so the ownership/location change that brings it in is the
+	// first thing reported. A container with no persister of its own leaves
+	// the one the item already carries in place: moving between containers
+	// never unregisters an item.
+	inst.BindPersister(c.persist)
 	inst.SetOwnerLocation(c.ownerID, c.location, 0)
 	c.items[inst.ObjectID] = inst
 	return inst, false
