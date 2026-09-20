@@ -193,20 +193,31 @@ const itemWriteRowWait = 20 * time.Millisecond
 // row can be held by the persistence tick's chunk for its whole transaction.
 // This comes back to the lane instead, which keeps the lane draining and
 // still lands the write in its reserved place.
+//
+// Coming back puts the write behind whatever the lane has taken meanwhile,
+// including a flush marker pushed after it was first queued, so the write is
+// also booked as work the lane owes: awaitPersistence waits for a lane to
+// report that what it queued has run, and a restart reads the items table
+// straight after. The debt is settled however the write ends — landed,
+// dropped as superseded, or cancelled.
 func (l *GameClientLink) queueItemWrite(ownerID int32, reserved *persist.Write, write func()) {
+	owed := l.persist.Owe(ownerID)
 	var attempt func()
 	attempt = func() {
 		if reserved.TryRun(itemWriteRowWait, func([]int32) { write() }) {
+			owed.Settle()
 			return
 		}
 		if !l.persist.Enqueue(ownerID, attempt) {
 			// Shutdown: nothing will come back for this, so take the wait
 			// here rather than dropping a write the row is still owed.
 			reserved.Run(func([]int32) { write() })
+			owed.Settle()
 		}
 	}
 	if !l.persist.Enqueue(ownerID, attempt) {
 		reserved.Cancel()
+		owed.Settle()
 	}
 }
 

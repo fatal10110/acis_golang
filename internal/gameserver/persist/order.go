@@ -145,12 +145,15 @@ func (w *Write) run(write func(ids []int32), wait *time.Duration) bool {
 	if !ok {
 		return false
 	}
+	// A row is a process-lifetime resource, not a lock a crashing goroutine
+	// takes down with it: a panic inside write would otherwise leave it held
+	// and every later write of it stuck.
+	defer w.order.release(w.ids, rows)
 	keep := w.order.keep(w, rows)
 	if len(keep) > 0 {
 		write(keep)
 		w.order.applied(w, rows)
 	}
-	w.order.release(w.ids, rows)
 	return true
 }
 

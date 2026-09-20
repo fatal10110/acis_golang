@@ -25,13 +25,22 @@ type Worker struct {
 	done  sync.WaitGroup
 }
 
-// lane is one FIFO of jobs. mu guards jobs and closed; cond wakes the lane
-// goroutine when either changes.
+// lane is one FIFO of jobs. mu guards jobs, closed and the owed set; cond
+// wakes the lane goroutine when jobs or closed change, and settled wakes a
+// Flush waiting for owed work.
 type lane struct {
-	mu     sync.Mutex
-	cond   sync.Cond
-	jobs   []func()
-	closed bool
+	mu      sync.Mutex
+	cond    sync.Cond
+	settled sync.Cond
+	jobs    []func()
+	closed  bool
+	// owed is the work accepted on this lane that outlives the job that
+	// started it, keyed by the order it was accepted in. A job that hands
+	// itself back to the lane has returned but is not finished, so a Flush
+	// that only waited for the jobs it can see would report a lane clear
+	// while such work is still queued behind its own marker.
+	owed     map[uint64]struct{}
+	nextOwed uint64
 }
 
 // New starts a worker's lane goroutines. Close stops them.
@@ -41,6 +50,7 @@ func New(log zerolog.Logger) *Worker {
 	for i := range w.lanes {
 		l := &w.lanes[i]
 		l.cond.L = &l.mu
+		l.settled.L = &l.mu
 		go w.run(l)
 	}
 	return w
@@ -60,8 +70,48 @@ func (w *Worker) Enqueue(ownerID int32, job func()) bool {
 	return true
 }
 
+// Owe records work accepted on ownerID's lane that outlives the job that
+// started it: a job that gives the lane back rather than waiting on it, and
+// comes back later to finish. Flush waits for that work too, so a caller that
+// waits for a lane still learns when nothing it queued is outstanding. Every
+// Owe has to be matched by one Settle, whichever way the work ends.
+func (w *Worker) Owe(ownerID int32) Owed {
+	if w == nil {
+		return Owed{}
+	}
+	l := w.lane(ownerID)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.nextOwed++
+	if l.owed == nil {
+		l.owed = make(map[uint64]struct{})
+	}
+	l.owed[l.nextOwed] = struct{}{}
+	return Owed{lane: l, seq: l.nextOwed}
+}
+
+// Owed is one piece of work a lane is still waiting on. The zero value
+// settles nothing, for code built without a worker.
+type Owed struct {
+	lane *lane
+	seq  uint64
+}
+
+// Settle reports the work as finished, however it ended — written, dropped as
+// superseded, or cancelled.
+func (o Owed) Settle() {
+	if o.lane == nil {
+		return
+	}
+	o.lane.mu.Lock()
+	defer o.lane.mu.Unlock()
+	delete(o.lane.owed, o.seq)
+	o.lane.settled.Broadcast()
+}
+
 // Flush waits until every job enqueued before the call on the lanes of
-// ownerIDs has run, or ctx ends. With no ownerIDs it waits on every lane.
+// ownerIDs has run and every piece of work those lanes already owed (Owe) has
+// settled, or ctx ends. With no ownerIDs it waits on every lane.
 func (w *Worker) Flush(ctx context.Context, ownerIDs ...int32) error {
 	if w == nil {
 		return nil
@@ -75,12 +125,17 @@ func (w *Worker) Flush(ctx context.Context, ownerIDs ...int32) error {
 		if len(ownerIDs) > 0 && !lanes[i] {
 			continue
 		}
-		pending.Add(1)
+		// Taken before the marker: work owed after this point belongs to a
+		// later caller, and waiting for it could hold this one open for as
+		// long as the lane keeps busy.
+		high := w.lanes[i].owedHigh()
+		pending.Add(2)
 		// A closed lane runs every job it accepted before exiting, and Close
 		// waits for that, so nothing is left to wait for.
 		if !w.lanes[i].push(pending.Done) {
 			pending.Done()
 		}
+		go w.lanes[i].waitSettled(high, pending.Done)
 	}
 	return wait(ctx, &pending)
 }
@@ -99,6 +154,34 @@ func (w *Worker) Close(ctx context.Context) error {
 		l.cond.Signal()
 	}
 	return wait(ctx, &w.done)
+}
+
+// owedHigh reports the last piece of work this lane has accepted.
+func (l *lane) owedHigh() uint64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.nextOwed
+}
+
+// waitSettled calls done once nothing the lane owed up to high is left.
+func (l *lane) waitSettled(high uint64, done func()) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for l.owedBefore(high) {
+		l.settled.Wait()
+	}
+	done()
+}
+
+// owedBefore reports whether any work accepted up to high is still owed. It
+// runs under l.mu.
+func (l *lane) owedBefore(high uint64) bool {
+	for seq := range l.owed {
+		if seq <= high {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *Worker) lane(ownerID int32) *lane {
