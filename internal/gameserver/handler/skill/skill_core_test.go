@@ -2831,8 +2831,15 @@ func TestHarvestRewardsAllowedHarvester(t *testing.T) {
 	if !target.state.Harvested() {
 		t.Error("target should be marked harvested")
 	}
-	if caster.items[5001] != 1 {
-		t.Fatalf("caster earned items = %v, want {5001: 1}", caster.items)
+	// Assert against the crop the seed state itself reports rather than a
+	// literal, so this still fails if the handler stops threading the count
+	// through and survives #240 changing what the count is.
+	wantID, wantCount := target.state.HarvestedCrop()
+	if wantID != 5001 {
+		t.Fatalf("sown state crop id = %d, want 5001", wantID)
+	}
+	if caster.items[wantID] != wantCount {
+		t.Fatalf("caster earned items = %v, want {%d: %d}", caster.items, wantID, wantCount)
 	}
 }
 
