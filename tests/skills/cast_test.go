@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // seedKnownSkill persists a known skill level for objID before the client
@@ -802,4 +803,102 @@ func TestToggleCostFailureBroadcastsCastAbort(t *testing.T) {
 
 func skillCase(skillID int32) string {
 	return fmt.Sprintf("skill-%d", skillID)
+}
+
+// TestExactlyLethalHPConsumeKillsCaster drives a real cast whose HP cost
+// ends up exactly equal to the caster's remaining HP when the hit timer
+// fires. The pre-cast gate rejects a cast at HP <= HPConsume, so the state
+// is only reachable by taking damage during the cast — ordinary combat. The
+// hit-timer re-check rejects only HPConsume > HP, so it accepts and pays
+// this cost; paying it must run the full death sequence instead of leaving
+// the caster alive at 0 HP while the hit runs on to completion.
+//
+// The skill's own buff landing on the now-dead caster is not asserted here:
+// the continuous handler skips dead targets, which issue #2384 tracks.
+func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
+	const skillID, hpConsume, hitTime = 291, 10, 1500
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: hitTime, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			HPConsume: hpConsume, SkillType: "BUFF", NumCharges: 1, MaxCharges: 3,
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "cast ack")
+
+	// Drain the caster down to exactly the cost while the cast is in flight.
+	// The pre-cast gate has already passed, so only the hit timer sees it.
+	hp := srv.PlayerCurrentHP(t, objID)
+	if hp <= hpConsume {
+		t.Fatalf("caster HP %d is not above the %d HP cost", hp, hpConsume)
+	}
+	srv.DamagePlayerHP(t, objID, hp-hpConsume)
+
+	waitFor(t, "caster death from its own HP cost", func() bool { return livePlayerDead(t, srv, objID) })
+
+	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
+		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
+		t.Fatal("no Die broadcast after the exactly-lethal HP cost")
+	}
+	// The hit runs to completion despite the death it just caused: the
+	// charge grant sits after the cost in the same hit step, and the death
+	// sequence cleared the charges on its way through, so a charge here can
+	// only have come from the hit continuing afterwards.
+	if got := livePlayerCharges(t, srv, objID); got != 1 {
+		t.Fatalf("charges after the lethal hit = %d, want 1 from the hit that killed the caster", got)
+	}
+}
+
+// livePlayerDead reports the live world player's dead state.
+func livePlayerDead(t *testing.T, srv *gameservertest.Server, objID int32) bool {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	dead, ok := obj.(interface{ Dead() bool })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no Dead()", objID, obj)
+	}
+	return dead.Dead()
+}
+
+// readsOpcode consumes frames until one carries want, reporting whether it
+// arrived before the client went quiet.
+func readsOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte) bool {
+	t.Helper()
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			return false
+		}
+		if frame[0] == want {
+			return true
+		}
+	}
+	return false
+}
+
+// livePlayerCharges reports the live world player's force/soul charge count.
+func livePlayerCharges(t *testing.T, srv *gameservertest.Server, objID int32) int {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	charged, ok := obj.(interface{ Charges() int })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no Charges()", objID, obj)
+	}
+	return charged.Charges()
 }
