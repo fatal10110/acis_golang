@@ -1063,7 +1063,12 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 
 func TestInstanceReleasePersisterIgnoresUncomparablePersister(t *testing.T) {
 	inst := newPersistTestInstance()
-	p := persistFunc(func(*Instance) {})
+	calls := 0
+	p := persistFunc(func(*Instance) { calls++ })
 	inst.BindPersister(p)
 	inst.ReleasePersister(p) // must not panic comparing func-typed values
+	inst.AddCount(1)
+	if calls == 0 {
+		t.Error("uncomparable persister was released; it can never match")
+	}
 }

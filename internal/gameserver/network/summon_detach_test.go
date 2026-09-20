@@ -102,6 +102,11 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 	if loot == nil || !instances.Contains(loot) {
 		t.Fatal("pet inventory mutation did not reach the item persistence task")
 	}
+	// The recorded owner is the write's lane key; it must be the id the
+	// teardown flush enqueues on (flushItemPersistence uses inv.OwnerID()).
+	if owner, _ := instances.PendingOwner(loot.ObjectID); owner != petInv.OwnerID() {
+		t.Errorf("pet item lane owner = %d, want the pet inventory's owner %d", owner, petInv.OwnerID())
+	}
 	petInv.ReleasePersistence()
 	instances.RemoveItems([]*item.Instance{loot})
 	loot.AddCount(1)
