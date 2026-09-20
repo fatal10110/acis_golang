@@ -18,13 +18,13 @@ func TestInventoryDeliverySkipsDetachedOrDespawnedOwners(t *testing.T) {
 	live := &livePlayer{Character: &player.Character{ID: 1}}
 	live.markDetaching()
 
-	playerInv := itemcontainer.NewPlayerInventoryWithDelivery(1, templates, &playerInventoryDelivery{updates: updates, live: live, character: live.Character})
+	playerInv := itemcontainer.NewPlayerInventoryWithDelivery(1, templates, &playerInventoryDelivery{updates: updates, live: live, character: live.Character}, nil)
 	playerInv.AddNew(1, 1, 1)
 	if updates.Contains(playerInv) {
 		t.Fatal("detached player inventory registered for delivery")
 	}
 
-	petInv := itemcontainer.NewPetInventoryWithDelivery(2, templates, &petInventoryDelivery{updates: updates, live: &livePlayer{Character: &player.Character{ID: 1}}, state: world.New()})
+	petInv := itemcontainer.NewPetInventoryWithDelivery(2, templates, &petInventoryDelivery{updates: updates, live: &livePlayer{Character: &player.Character{ID: 1}}, state: world.New()}, nil)
 	petInv.AddNew(1, 1, 2)
 	if updates.Contains(petInv) {
 		t.Fatal("despawned pet inventory registered for delivery")
@@ -63,4 +63,22 @@ func TestPlayerInventoryDeliveryDoesNotReenterExpiryLock(t *testing.T) {
 	}
 	live.shadowExpiryMu.RUnlock()
 	<-writerDone
+}
+
+func TestOwnerItemPersisterStopsSchedulingAfterClose(t *testing.T) {
+	instances := task.NewItemInstances(nil, item.NewTable(nil), nil, nil)
+	p := &ownerItemPersister{instances: instances, ownerID: 9}
+	inst := &item.Instance{ObjectID: 1, Count: 1}
+
+	p.Persist(inst)
+	if !instances.Contains(inst) {
+		t.Fatal("open persister did not schedule the item")
+	}
+	instances.RemoveItems([]*item.Instance{inst})
+
+	p.Close()
+	p.Persist(inst)
+	if instances.Contains(inst) {
+		t.Error("closed persister scheduled the item")
+	}
 }

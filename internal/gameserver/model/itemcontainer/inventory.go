@@ -101,10 +101,11 @@ func NewPlayerInventory(ownerID int32, templates *item.Table) *Inventory {
 }
 
 // NewPlayerInventoryWithDelivery returns a player inventory that reports live
-// changes through delivery.
-func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery) *Inventory {
+// changes through delivery and persists its items through persist.
+func NewPlayerInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist Persister) *Inventory {
 	inv := NewPlayerInventory(ownerID, templates)
 	inv.delivery = delivery
+	inv.Container.persist = persist
 	return inv
 }
 
@@ -119,9 +120,11 @@ func RestorePlayerInventory(ownerID int32, templates *item.Table, items []*item.
 }
 
 // RestorePlayerInventoryWithDelivery rebuilds a live player inventory without
-// queuing restore notifications, then attaches its delivery dependency.
-func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery) *Inventory {
-	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery)
+// queuing restore notifications; its delivery and persistence dependencies
+// are in place before the rows are restored, so restored items carry the
+// persister without being re-persisted.
+func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, items []*item.Instance, delivery Delivery, persist Persister) *Inventory {
+	inv := NewPlayerInventoryWithDelivery(ownerID, templates, delivery, persist)
 	inv.Restore(items)
 	return inv
 }
@@ -134,10 +137,11 @@ func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
 }
 
 // NewPetInventoryWithDelivery returns a pet inventory that reports live
-// changes through delivery.
-func NewPetInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery) *Inventory {
+// changes through delivery and persists its items through persist.
+func NewPetInventoryWithDelivery(ownerID int32, templates *item.Table, delivery Delivery, persist Persister) *Inventory {
 	inv := NewPetInventory(ownerID, templates)
 	inv.delivery = delivery
+	inv.Container.persist = persist
 	return inv
 }
 
@@ -193,7 +197,7 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		// location, so a reload doesn't schedule a redundant write of
 		// what was just read.
 		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
-		inst.SetPersistNotifier(inv.Container.persist)
+		inst.BindPersister(inv.Container.persist)
 		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {

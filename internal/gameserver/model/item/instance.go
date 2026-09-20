@@ -40,12 +40,20 @@ type Instance struct {
 	// sold, and only a private warehouse (not a public one) accepts it.
 	Augmentation *Augmentation
 
-	// persist is fired after every mutation that changes state the items
-	// table records, so lazy persistence follows the mutation itself
-	// rather than each call site remembering to schedule a write. nil
-	// (an instance nothing persists, or any domain test) is a silent
-	// no-op.
-	persist func(*Instance)
+	// persist is asked to schedule a write after every mutation that changes
+	// state the items table records, so lazy persistence follows the
+	// mutation itself rather than each call site remembering to schedule
+	// one. nil (a detached snapshot or clone, or any domain test) is a
+	// silent no-op.
+	persist Persister
+}
+
+// Persister schedules the lazy write of a live item whose persisted state
+// changed. Instance calls it with no instance lock held, but container
+// mutations such as Container.Add may hold the container's own lock, so an
+// implementation must not reach back into the container that supplied it.
+type Persister interface {
+	Persist(*Instance)
 }
 
 // InstanceState is a point-in-time copy of an instance's mutable live state,
@@ -168,33 +176,30 @@ func (st InstanceState) Equipped() bool {
 	return st.Location == LocationPaperdoll || st.Location == LocationPetEquip
 }
 
-// SetPersistNotifier records the hook fired whenever a mutation changes
-// state the items table records. Passing nil clears it.
-func (inst *Instance) SetPersistNotifier(notify func(*Instance)) {
-	if inst == nil {
+// BindPersister makes p the live persistence dependency of inst, as a live
+// container does when it takes the item in. A nil p leaves the current
+// dependency alone: moving an item into a container without one never
+// unregisters it.
+func (inst *Instance) BindPersister(p Persister) {
+	if inst == nil || p == nil {
 		return
 	}
 	mu := inst.lock()
 	mu.Lock()
 	defer mu.Unlock()
-	inst.persist = notify
+	inst.persist = p
 }
 
-// persisted fires inst's persistence notifier. Call it after releasing
+// persisted schedules inst's write through its persistence dependency. Call it after releasing
 // inst's lock, so a hook that reads inst back can't deadlock against the
 // mutation that fired it.
-//
-// That is the only lock the hook is guaranteed to be clear of: callers in
-// itemcontainer fire these mutations with the container's own lock held
-// (Container.Add, Container.DestroyAllItems, Inventory.Restore), so a
-// persister must not reach back into the container that installed it.
 func (inst *Instance) persisted() {
 	mu := inst.lock()
 	mu.RLock()
-	notify := inst.persist
+	p := inst.persist
 	mu.RUnlock()
-	if notify != nil {
-		notify(inst)
+	if p != nil {
+		p.Persist(inst)
 	}
 }
 

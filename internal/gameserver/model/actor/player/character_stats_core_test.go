@@ -1900,7 +1900,7 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 	})
 	c := &Character{ID: 1}
 	delivery := &rewardInventoryDelivery{}
-	inv := itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, templates, nil, delivery)
+	inv := itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, templates, nil, delivery, nil)
 	c.AttachRuntime(&Template{}, inv)
 
 	if !c.AddRewardItem(57, 10, 0x30000001) {

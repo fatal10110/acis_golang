@@ -217,7 +217,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 			live:    live,
 			state:   link.world,
 			log:     link.log,
-		}),
+		}, link.itemPersister(objID)),
 		Fed:           fed,
 		MaxMeal:       levelStats.MaxMeal,
 		MealInNormal:  levelStats.MealInNormal,

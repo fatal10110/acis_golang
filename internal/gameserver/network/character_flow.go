@@ -442,7 +442,7 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery))
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
 	// The characters row stores finalized max snapshots (Save writes
 	// ResourceValues), but the vitals fields are raw calculator bases once a
 	// template is attached — re-seed them from the class tables so the CON/MEN
@@ -530,16 +530,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		// constructor calling PcInventory.updateWeight() on every send
 		// (including the one EnterWorld makes right after this).
 		inv.UpdateWeight()
-	}
-	// Register every item mutation with the lazy persistence task, matching
-	// the reference registering an item with ItemInstanceTaskManager from
-	// the item's own setters: a count, location, enchant or mana change made
-	// without a client request still reaches the items table on the task's
-	// own cadence.
-	if inv := c.Inventory(); inv != nil && l.itemInstances != nil {
-		// The container supplies the owner, so a destroy — which zeroes the
-		// instance's own — still names the row's lane.
-		inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 	}
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {

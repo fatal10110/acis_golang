@@ -412,10 +412,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	return link
 }
 
-// newPet builds a pet and, for a connected owner, attaches item persistence.
-// A live pet inventory must be constructed with
-// itemcontainer.NewPetInventoryWithDelivery before calling this method;
-// NewPetInventory has no live update delivery.
+// newPet builds a pet with the shared effect, config and skill wiring. A live
+// pet inventory must be constructed with
+// itemcontainer.NewPetInventoryWithDelivery (delivery and persistence) before
+// calling this method; NewPetInventory has neither.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Activity = l.effects
 	cfg.Config = &l.petConfig
@@ -428,9 +428,6 @@ func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 		return nil, err
 	}
 	pet.SetRaidCursesDisabled(l.disableRaidCurse)
-	if _, ok := cfg.Owner.(*livePlayer); ok {
-		l.registerPetItemPersistence(pet)
-	}
 	return pet, nil
 }
 
