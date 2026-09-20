@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
@@ -9,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 func (l *GameClientLink) enchantStateStore() *enchantflow.State {
@@ -158,29 +160,53 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				continue
 			}
 			st := action.Item.Snapshot()
-			reserved := l.itemWrites.Reserve(st.ObjectID)
-			l.persist.Enqueue(st.OwnerID, func() {
-				reserved.Run(func([]int32) {
-					ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-					defer cancel()
-					if err := l.items.SaveState(ctx, st); err != nil {
-						l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("save item")
-					}
-				})
+			l.queueItemWrite(st.OwnerID, l.itemWrites.Reserve(st.ObjectID), func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.SaveState(ctx, st); err != nil {
+					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("save item")
+				}
 			})
 		case invops.PersistDelete:
 			objectID := action.ObjectID
-			reserved := l.itemWrites.Reserve(objectID)
-			l.persist.Enqueue(action.OwnerID, func() {
-				reserved.Run(func([]int32) {
-					ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-					defer cancel()
-					if err := l.items.Delete(ctx, objectID); err != nil {
-						l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
-					}
-				})
+			l.queueItemWrite(action.OwnerID, l.itemWrites.Reserve(objectID), func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.Delete(ctx, objectID); err != nil {
+					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
+				}
 			})
 		}
+	}
+}
+
+// itemWriteRowWait is how long a queued item write waits for its row before
+// giving its lane back. It only has to be long enough that an uncontended row
+// is taken on the first try; the wait for a row another write is holding is
+// paid by re-queueing, not by sitting on the lane.
+const itemWriteRowWait = 20 * time.Millisecond
+
+// queueItemWrite runs write on ownerID's persistence lane once reserved's row
+// is free. A lane serves every owner that maps to it (persist.Lanes of them
+// for the whole world), so a write that simply waited for its row would stall
+// the character, shortcut, skill and pet writes queued behind it — and the
+// row can be held by the persistence tick's chunk for its whole transaction.
+// This comes back to the lane instead, which keeps the lane draining and
+// still lands the write in its reserved place.
+func (l *GameClientLink) queueItemWrite(ownerID int32, reserved *persist.Write, write func()) {
+	var attempt func()
+	attempt = func() {
+		if reserved.TryRun(itemWriteRowWait, func([]int32) { write() }) {
+			return
+		}
+		if !l.persist.Enqueue(ownerID, attempt) {
+			// Shutdown: nothing will come back for this, so take the wait
+			// here rather than dropping a write the row is still owed.
+			reserved.Run(func([]int32) { write() })
+		}
+	}
+	if !l.persist.Enqueue(ownerID, attempt) {
+		reserved.Cancel()
 	}
 }
 

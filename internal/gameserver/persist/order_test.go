@@ -1,9 +1,13 @@
 package persist
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/rs/zerolog"
 )
 
 func TestLaterWriteSupersedesAnEarlierOne(t *testing.T) {
@@ -122,5 +126,101 @@ func TestRowStateIsDroppedOnceQuiet(t *testing.T) {
 	o.Reserve(1).Run(func([]int32) { ran = true })
 	if !ran {
 		t.Fatal("a write for a row that went quiet must run")
+	}
+}
+
+// A lane serves every owner mapped to it, so a write that waits for a row
+// another write is holding must not do it on the lane: everything queued
+// behind it — other owners' character, shortcut, skill and pet writes — waits
+// too. TryRun is what lets such a caller give the lane back.
+func TestTryRunGivesUpRatherThanHoldingItsCaller(t *testing.T) {
+	o := NewOrder()
+	w := New(zerolog.Nop())
+	defer w.Close(context.Background())
+
+	// Owner 4 is on lane 0; owners 1 and 5 share lane 1.
+	batch := o.Reserve(700, 701)
+	started, hold := make(chan struct{}), make(chan struct{})
+	w.Enqueue(4, func() {
+		batch.Run(func([]int32) {
+			close(started)
+			<-hold
+		})
+	})
+	<-started
+
+	// A write for one of the held rows, on the other lane.
+	contended := o.Reserve(700)
+	w.Enqueue(1, func() {
+		if contended.TryRun(time.Millisecond, func([]int32) {}) {
+			t.Error("took a row the batch is holding")
+		}
+	})
+
+	// An owner that shares that lane but no row with anyone.
+	ran := make(chan struct{})
+	w.Enqueue(5, func() { close(ran) })
+	select {
+	case <-ran:
+	case <-time.After(2 * time.Second):
+		close(hold)
+		t.Fatal("an unrelated owner's job stalled behind a row held on another lane")
+	}
+
+	close(hold)
+	if err := w.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	contended.Cancel()
+}
+
+// A write that gave up keeps its place: it still lands when it comes back,
+// and is still superseded by anything newer that landed meanwhile.
+func TestTryRunKeepsItsPlaceForALaterAttempt(t *testing.T) {
+	o := NewOrder()
+	held := o.Reserve(1)
+	waiting := o.Reserve(1)
+
+	taken, release := make(chan struct{}), make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		held.Run(func([]int32) {
+			close(taken)
+			<-release
+		})
+	}()
+	<-taken
+
+	if waiting.TryRun(time.Millisecond, func([]int32) { t.Error("wrote while the row was held") }) {
+		t.Fatal("TryRun reported a write it could not have made")
+	}
+	close(release)
+	<-done
+
+	landed := false
+	if !waiting.TryRun(time.Second, func([]int32) { landed = true }) {
+		t.Fatal("TryRun gave up on a free row")
+	}
+	if !landed {
+		t.Fatal("the write that came back did not land")
+	}
+}
+
+// Cancel hands a reservation back without writing, so a row whose write was
+// dropped at shutdown does not keep its entry alive.
+func TestCancelReleasesWithoutWriting(t *testing.T) {
+	o := NewOrder()
+	o.Reserve(1).Cancel()
+	o.mu.Lock()
+	rows := len(o.rows)
+	o.mu.Unlock()
+	if rows != 0 {
+		t.Fatalf("rows still tracked = %d, want 0 after a cancelled reservation", rows)
+	}
+	landed := false
+	o.Reserve(1).Run(func([]int32) { landed = true })
+	if !landed {
+		t.Fatal("a cancelled reservation must not supersede a later write")
 	}
 }
