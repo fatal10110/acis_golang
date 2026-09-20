@@ -29,7 +29,7 @@ func newActivityRecorder() *activityRecorder {
 	return &activityRecorder{active: make(map[*List]bool)}
 }
 
-func (r *activityRecorder) track(list *List, active bool) {
+func (r *activityRecorder) SetActive(list *List, active bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if active {
@@ -45,16 +45,9 @@ func (r *activityRecorder) isActive(list *List) bool {
 	return r.active[list]
 }
 
-// withActivityRecorder installs rec as the process-wide activity hook for
-// the duration of the test and restores the previous hook (nil, since no
-// production code installs one during `go test ./internal/gameserver/skill/effect/...`)
-// on cleanup.
 func withActivityRecorder(t *testing.T) *activityRecorder {
 	t.Helper()
-	rec := newActivityRecorder()
-	SetActivityHook(rec.track)
-	t.Cleanup(func() { SetActivityHook(nil) })
-	return rec
+	return newActivityRecorder()
 }
 
 func mustNewEffect(t *testing.T, skill Skill, name string) *Effect {
@@ -68,7 +61,7 @@ func mustNewEffect(t *testing.T, skill Skill, name string) *Effect {
 
 func TestListActivityRegistersOnFirstEffect(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := NewList(activityTestOwner{})
+	list := NewList(activityTestOwner{}, WithActivityRegistry(rec))
 
 	if rec.isActive(list) {
 		t.Fatal("empty list reported active before any Add")
@@ -83,7 +76,7 @@ func TestListActivityRegistersOnFirstEffect(t *testing.T) {
 
 func TestListActivityDeregistersOnLastRemove(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := NewList(activityTestOwner{})
+	list := NewList(activityTestOwner{}, WithActivityRegistry(rec))
 
 	e := mustNewEffect(t, Skill{ID: 1}, "Buff")
 	list.Add(e)
@@ -102,7 +95,7 @@ func TestListActivityDeregistersOnLastRemove(t *testing.T) {
 // to empty.
 func TestListActivityStaysRegisteredWithEffectsRemaining(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := NewList(activityTestOwner{})
+	list := NewList(activityTestOwner{}, WithActivityRegistry(rec))
 
 	e1 := mustNewEffect(t, Skill{ID: 1}, "Buff")
 	e2 := mustNewEffect(t, Skill{ID: 2}, "Buff")
@@ -125,7 +118,7 @@ func TestListActivityStaysRegisteredWithEffectsRemaining(t *testing.T) {
 // registration that Effects.Tick then scans forever.
 func TestListActivityRejectedOnStartNeverRegisters(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := NewList(activityTestOwner{})
+	list := NewList(activityTestOwner{}, WithActivityRegistry(rec))
 
 	e := mustNewEffect(t, Skill{ID: 1}, "AbortCast")
 	// e.Effected is left nil: abortCastStart rejects unconditionally.
@@ -141,7 +134,7 @@ func TestListActivityRejectedOnStartNeverRegisters(t *testing.T) {
 // ticking once its owner leaves the world for good.
 func TestListUntrackDeregistersRegardlessOfContents(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := NewList(activityTestOwner{})
+	list := NewList(activityTestOwner{}, WithActivityRegistry(rec))
 	list.Add(mustNewEffect(t, Skill{ID: 1}, "Buff"))
 
 	if !rec.isActive(list) {

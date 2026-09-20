@@ -81,6 +81,7 @@ func provideGameClientLink(
 	shadowItems *task.ShadowItems,
 	autosave *task.Autosave,
 	effects *network.TaskEffects,
+	activeEffects *task.Effects,
 	gameplay gameplayConfig,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
@@ -110,6 +111,7 @@ func provideGameClientLink(
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
+		Effects:       activeEffects,
 		NoCipher:      !cfg.UseBlowfishCipher,
 		LoginLink:     links.get,
 		Roster:        roster,

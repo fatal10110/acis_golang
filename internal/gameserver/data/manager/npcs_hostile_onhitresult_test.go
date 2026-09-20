@@ -51,7 +51,7 @@ func TestNewLiveHostileWiresOnHitResultFromEffects(t *testing.T) {
 		},
 	}
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), fakeHostileCastDefs{}, effects, nil, 20, nil, nil)
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), fakeHostileCastDefs{}, effects, nil, 20, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestNewLiveHostileLeavesOnHitResultUnsetWithoutCastDefs(t *testing.T) {
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil, nil)
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

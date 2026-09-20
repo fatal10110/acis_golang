@@ -15,16 +15,11 @@ import (
 // ever runs from the single scheduler goroutine per Effects' own contract.
 func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	e := NewEffects()
-	// NewEffects installs e as the process-wide effect.List activity
-	// registrar (effect.SetActivityHook); restore a clean slate so a later
-	// test in this package that builds its own effect.List doesn't
-	// register into this now-finished test's registry.
-	t.Cleanup(func() { effect.SetActivityHook(nil) })
 
 	const listCount = 20
 	lists := make([]*effect.List, listCount)
 	for i := range lists {
-		lists[i] = effect.NewList(benchNoopStatOwner{})
+		lists[i] = effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	}
 	newEffect := func(id int) *effect.Effect {
 		eff, err := effect.New(effect.Skill{ID: modelskill.ID(id)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -86,7 +81,6 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 // active, or leaving that other list unable to register again afterward.
 func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	e := NewEffects()
-	t.Cleanup(func() { effect.SetActivityHook(nil) })
 
 	newEffect := func(id int) *effect.Effect {
 		eff, err := effect.New(effect.Skill{ID: modelskill.ID(id)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -96,11 +90,14 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 		return eff
 	}
 
-	leftover := effect.NewList(benchNoopStatOwner{})
+	leftover := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	leftover.Add(newEffect(1))
 	if !e.contains(leftover) {
 		t.Fatal("leftover list not registered after Add")
 	}
+	other := NewEffects()
+	otherList := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(other))
+	otherList.Add(newEffect(2))
 
 	e.Reset()
 
@@ -109,6 +106,9 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	}
 	if len(leftover.All()) != 1 {
 		t.Fatalf("Reset touched leftover's contents: %d effects, want 1", len(leftover.All()))
+	}
+	if !other.contains(otherList) {
+		t.Fatal("Reset on one registry removed a list from another registry")
 	}
 
 	// leftover's owner is still alive in this scenario (Reset only fires
@@ -127,7 +127,7 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// A fresh owner (the next test server's own NPC) must still be able to
 	// register normally: Reset must not have wedged the hook or the
 	// registry into a state that rejects further registrations.
-	next := effect.NewList(benchNoopStatOwner{})
+	next := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	next.Add(newEffect(2))
 	if !e.contains(next) {
 		t.Fatal("a list added after Reset failed to register")

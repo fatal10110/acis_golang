@@ -13,12 +13,10 @@ import (
 const EffectTick = time.Second
 
 // Effects runs periodic actions for effect lists that currently hold at
-// least one buff or debuff. Lists register themselves through
-// effect.SetActivityHook (wired to trackActivity by NewEffects) the moment
-// their first effect lands, and deregister the moment they drain back to
-// empty, so Tick never scans lists with nothing to do.
+// least one buff or debuff. Lists register with their explicit activity
+// registry when their first effect lands and deregister when they drain.
 //
-// trackActivity is safe to call concurrently with Tick; Tick only ever runs
+// SetActive is safe to call concurrently with Tick; Tick only ever runs
 // on the scheduler ticker's single goroutine, one call at a time.
 type Effects struct {
 	log zerolog.Logger
@@ -26,18 +24,15 @@ type Effects struct {
 	*activeRegistry[*effect.List, *effect.List]
 }
 
-// NewEffects returns an empty active-effect-list registry and installs it as
-// the process-wide effect.List activity registrar. Call it once, before any
-// effect.List is constructed.
+// NewEffects returns an empty active-effect-list registry.
 func NewEffects() *Effects {
 	e := &Effects{activeRegistry: newActiveRegistry[*effect.List, *effect.List]()}
-	effect.SetActivityHook(e.trackActivity)
 	return e
 }
 
-// trackActivity registers or deregisters list depending on whether it just
+// SetActive registers or deregisters list depending on whether it just
 // gained or lost its last effect.
-func (e *Effects) trackActivity(list *effect.List, active bool) {
+func (e *Effects) SetActive(list *effect.List, active bool) {
 	if active {
 		e.add(list, list)
 	} else {
@@ -46,11 +41,8 @@ func (e *Effects) trackActivity(list *effect.List, active bool) {
 }
 
 // Reset deregisters every currently registered list, so Tick visits
-// nothing until something registers again. Production never calls this —
-// it is the mop-up gameservertest runs between test servers that share one
-// Effects instance per process (see NewEffects), for whatever a test left
-// registered without a clean despawn/logout/Untrack (a spawned NPC or
-// EffectPoint the test never killed, decayed, or explicitly tore down).
+// nothing until something registers again. It is test cleanup for a list
+// left registered without a clean despawn, logout, or Untrack.
 //
 // It goes through each list's own Untrack rather than clearing e.entries
 // directly: a list tracks its own registration state (List.tracked) so
@@ -60,7 +52,8 @@ func (e *Effects) trackActivity(list *effect.List, active bool) {
 // silently refuse to re-register on its next Add. Untrack keeps the two in
 // sync by clearing List.tracked itself. The snapshot is taken and released
 // before calling Untrack, not held across the calls: Untrack ends in
-// callActivityHook -> trackActivity -> e.remove, which needs e.mu itself,
+// List.Untrack -> List.activity.SetActive -> Effects.SetActive -> e.remove,
+// which needs e.mu itself,
 // so calling it while still holding e.mu here would deadlock.
 func (e *Effects) Reset() {
 	e.mu.Lock()
