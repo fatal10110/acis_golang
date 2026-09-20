@@ -238,6 +238,10 @@ func (h *Hostile) Evasion() int {
 func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
 
+	// attack.Actor, the world known-list and Hit all carry the
+	// attackable.Combatant leaf surface, which cannot name a weapon type
+	// without importing model/item. The narrowing stays here, at the one
+	// point where a combatant becomes a formula operand; see #2362.
 	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true

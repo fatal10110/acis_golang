@@ -4,9 +4,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -21,16 +24,16 @@ type neutralCreature struct {
 func (neutralCreature) Invul() bool                    { return false }
 func (neutralCreature) Paralyzed() bool                { return false }
 func (neutralCreature) BlessedSpiritshotCharged() bool { return false }
-func (neutralCreature) SkillSuccessInput(attackable.Combatant, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (neutralCreature) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
-func (neutralCreature) EffectSuccessInput(attackable.Combatant, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (neutralCreature) EffectSuccessInput(creature.FormulaActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
 func (neutralCreature) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
 	return formulas.SkillReflectInput{}
 }
-func (neutralCreature) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (neutralCreature) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
 func (neutralCreature) Attackable() bool                           { return false }
@@ -47,19 +50,19 @@ func (neutralCreature) AttackTarget(world.Tracked)                 {}
 // Damage and resource surface: the neutral creature takes no damage, rolls
 // no formula input and holds no resources.
 func (neutralCreature) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {}
-func (neutralCreature) PhysicalSkillInput(attackable.Combatant, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (neutralCreature) PhysicalSkillInput(creature.FormulaActor, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return formulas.PhysicalSkillInput{}, false
 }
-func (neutralCreature) MagicDamageInput(attackable.Combatant, modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (neutralCreature) MagicDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return formulas.MagicDamageInput{}, false
 }
-func (neutralCreature) BlowInput(attackable.Combatant, modelskill.Definition) (formulas.BlowInput, bool) {
+func (neutralCreature) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
 	return formulas.BlowInput{}, false
 }
-func (neutralCreature) ManaDamageInput(attackable.Combatant, modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (neutralCreature) ManaDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return formulas.ManaDamageInput{}, false
 }
-func (neutralCreature) LethalInput(attackable.Combatant, modelskill.Definition) (formulas.LethalInput, bool) {
+func (neutralCreature) LethalInput(creature.FormulaActor, modelskill.Definition) (formulas.LethalInput, bool) {
 	return formulas.LethalInput{}, false
 }
 func (neutralCreature) ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition) {
@@ -114,3 +117,31 @@ type neutralNPC struct {
 func (neutralNPC) Kind() actor.Kind           { return actor.KindNPC }
 func (neutralNPC) Lethalable() bool           { return true }
 func (neutralNPC) SpoilPool() *item.SpoilPool { return nil }
+
+// Formula surface: the neutral creature has no stats, no weapon and no
+// shots, so every formula term is the zero value and its rolls are 0.
+func (neutralCreature) STR() int                                     { return 0 }
+func (neutralCreature) CON() int                                     { return 0 }
+func (neutralCreature) DEX() int                                     { return 0 }
+func (neutralCreature) INT() int                                     { return 0 }
+func (neutralCreature) WIT() int                                     { return 0 }
+func (neutralCreature) MEN() int                                     { return 0 }
+func (neutralCreature) PAtk() float64                                { return 0 }
+func (neutralCreature) PDef() float64                                { return 0 }
+func (neutralCreature) MAtk() float64                                { return 0 }
+func (neutralCreature) MDef() float64                                { return 0 }
+func (neutralCreature) MagicCriticalRate() float64                   { return 0 }
+func (neutralCreature) AttackType() item.WeaponType                  { return item.WeaponNone }
+func (neutralCreature) SoulshotCharged() bool                        { return false }
+func (neutralCreature) SpiritshotCharged() bool                      { return false }
+func (neutralCreature) CalcStat(stat.Stat, float64) float64          { return 0 }
+func (neutralCreature) RandomDamageSpread() int                      { return 0 }
+func (neutralCreature) Roll(int) int                                 { return 0 }
+func (neutralCreature) WeaponGradePenalty() bool                     { return false }
+func (neutralCreature) Evasion() int                                 { return 0 }
+func (neutralCreature) LethalRate() float64                          { return 0 }
+func (neutralCreature) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
+
+// SeedState: the neutral NPC was never sown, so the manor handlers find no
+// lifecycle to act on.
+func (neutralNPC) SeedState() *npc.SeedState { return nil }

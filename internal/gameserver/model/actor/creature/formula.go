@@ -51,7 +51,7 @@ type FormulaActor interface {
 	Invul() bool
 	// ShieldDefense resolves this actor's shield block against caster;
 	// ShieldFailed for kinds that carry no shield.
-	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 	// RaceMultiplier is the NPC-race attack/resist multiplier against
 	// attacker; 1 for kinds without a race.
 	RaceMultiplier(attacker FormulaActor) float64
@@ -100,9 +100,8 @@ func CanDealDamage(attacker attackable.Combatant) bool {
 // ResolvePhysicalSkillInput builds a physical-skill damage input from the
 // caster/target pair. raceMul is supplied by NPC targets whose template race
 // has a matching attack/resistance stat pair.
-func ResolvePhysicalSkillInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
-	attacker, ok := caster.(FormulaActor)
-	if !ok || attacker == nil || target == nil {
+func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
+	if attacker == nil || target == nil {
 		return formulas.PhysicalSkillInput{}, false
 	}
 	if damageBlocked(attacker) {
@@ -121,7 +120,7 @@ func ResolvePhysicalSkillInput(caster attackable.Combatant, target FormulaActor,
 		pvpMul = attacker.CalcStat(stat.PvPPhysSkillDmg, 1)
 	}
 	crit := PhysicalSkillCrit(attacker, def)
-	shield := target.ShieldDefense(caster, def, crit)
+	shield := target.ShieldDefense(attacker, def, crit)
 	defence := target.PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
@@ -194,9 +193,8 @@ func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.
 
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
 // pair.
-func ResolveMagicDamageInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
-	attacker, ok := caster.(FormulaActor)
-	if !ok || attacker == nil || target == nil {
+func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
+	if attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
 	}
 	if damageBlocked(attacker) {
@@ -205,7 +203,7 @@ func ResolveMagicDamageInput(caster attackable.Combatant, target FormulaActor, d
 	sps, bsps := SpiritshotFlags(attacker)
 	// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit must not
 	// triple the shield rate.
-	shield := target.ShieldDefense(caster, def, false)
+	shield := target.ShieldDefense(attacker, def, false)
 	mDef := target.MDef()
 	if shield == formulas.ShieldSuccess {
 		mDef += target.CalcStat(stat.ShieldDefence, 0)
@@ -245,9 +243,8 @@ func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaAc
 }
 
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.
-func ResolveBlowInput(caster attackable.Combatant, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
-	attacker, ok := caster.(FormulaActor)
-	if !ok || attacker == nil || target == nil {
+func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
+	if attacker == nil || target == nil {
 		return formulas.BlowInput{}, false
 	}
 	if damageBlocked(attacker) {
@@ -285,7 +282,7 @@ func ResolveBlowInput(caster attackable.Combatant, target FormulaActor, def mode
 	crit := landed && PhysicalSkillCrit(attacker, def)
 	shield := formulas.ShieldFailed
 	if landed && !def.IgnoreShield {
-		shield = target.ShieldDefense(caster, def, crit)
+		shield = target.ShieldDefense(attacker, def, crit)
 	}
 	defence := target.PDef()
 	if shield == formulas.ShieldSuccess {
@@ -321,9 +318,8 @@ func ResolveBlowInput(caster attackable.Combatant, target FormulaActor, def mode
 // Manadam.java's handler and Formulas.calcMagicAffected/calcManaDam have no
 // canGiveDamage() gate, unlike the other three resolvers' formulas
 // (Formulas.java:390,492,575). A damage-denied attacker still drains MP.
-func ResolveManaDamageInput(caster attackable.Combatant, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
-	attacker, ok := caster.(FormulaActor)
-	if !ok || attacker == nil || target == nil {
+func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+	if attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false
 	}
 	if target.Invul() {
@@ -350,7 +346,7 @@ func ResolveManaDamageInput(caster attackable.Combatant, target FormulaActor, ma
 
 // ResolveSkillSuccessInput builds the effect-landing input from the
 // caster/target pair.
-func ResolveSkillSuccessInput(caster any, target FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func ResolveSkillSuccessInput(attacker, target FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if target == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
@@ -361,8 +357,7 @@ func ResolveSkillSuccessInput(caster any, target FormulaActor, def modelskill.De
 			Shield:        shield,
 		}, true
 	}
-	attacker, ok := caster.(FormulaActor)
-	if !ok || attacker == nil {
+	if attacker == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
 	return formulas.SkillSuccessInput{

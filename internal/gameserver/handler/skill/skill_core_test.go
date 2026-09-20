@@ -140,7 +140,7 @@ type effectListOnlyFake struct {
 
 func (f *effectListOnlyFake) EffectList() *effect.List { return f.list }
 
-func (*effectLandingFake) EffectSuccessInput(_ attackable.Combatant, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (*effectLandingFake) EffectSuccessInput(_ creature.FormulaActor, _ modelskill.Definition, tmpl modelskill.EffectTemplate, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 }
 
@@ -525,7 +525,7 @@ func (f *continuousFake) CursedWeaponEquipped() bool     { return f.cursed }
 func (f *continuousFake) EffectList() *effect.List       { return f.list }
 func (f *continuousFake) BlessedSpiritshotCharged() bool { return f.bss }
 
-func (f *continuousFake) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (f *continuousFake) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if f.recordSuccessInput != nil {
 		f.recordSuccessInput(caster, def, bss, shield)
 	}
@@ -813,7 +813,7 @@ func (d *disablerFake) Invul() bool              { return d.invul }
 func (d *disablerFake) Paralyzed() bool          { return d.paralyzed }
 func (d *disablerFake) EffectList() *effect.List { return d.list }
 
-func (d *disablerFake) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (d *disablerFake) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
@@ -821,7 +821,7 @@ func (d *disablerFake) SkillSuccessInput(caster attackable.Combatant, def models
 
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
 // exercise checkSkillSuccess's shield-block threading.
-func (d *disablerFake) ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (d *disablerFake) ShieldDefense(caster creature.FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	return d.shield
 }
 
@@ -1802,15 +1802,15 @@ func (t *skillTarget) SetChargedShot(kind modelitem.ShotKind, _ bool) {
 
 func (t *skillTarget) ChargedShot(kind modelitem.ShotKind) bool { return t.charged[kind] }
 
-func (t *skillTarget) PhysicalSkillInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (t *skillTarget) PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
 }
 
-func (t *skillTarget) MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *skillTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 
-func (t *skillTarget) SkillSuccessInput(_ attackable.Combatant, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (t *skillTarget) SkillSuccessInput(_ creature.FormulaActor, _ modelskill.Definition, _ bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	t.lastShield = shield
 	chance := 100.0
 	if t.skillSuccessChance != nil {
@@ -1819,15 +1819,15 @@ func (t *skillTarget) SkillSuccessInput(_ attackable.Combatant, _ modelskill.Def
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: chance, Shield: shield}, t.skillSuccessOK
 }
 
-func (t *skillTarget) BlowInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.BlowInput, bool) {
+func (t *skillTarget) BlowInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.BlowInput, bool) {
 	return t.blowInput, t.blowOK
 }
 
-func (t *skillTarget) ManaDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (t *skillTarget) ManaDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return t.manaInput, t.manaOK
 }
 
-func (t *skillTarget) LethalInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.LethalInput, bool) {
+func (t *skillTarget) LethalInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.LethalInput, bool) {
 	in := t.lethalInput
 	in.Chance1 = skill.LethalChance1
 	in.Chance2 = skill.LethalChance2
@@ -2733,37 +2733,27 @@ func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 }
 
 // ---- from manor_test.go ----
-type manorFakeSeedState struct {
-	seeded, harvested bool
-	allowed           bool
-	sownBy            int32
-	sownSeed          manor.Seed
-	cropID            int32
-	cropCount         int
-}
-
-func (s *manorFakeSeedState) Seeded() bool                         { return s.seeded }
-func (s *manorFakeSeedState) Harvested() bool                      { return s.harvested }
-func (s *manorFakeSeedState) MarkHarvested()                       { s.harvested = true }
-func (s *manorFakeSeedState) AllowedToHarvest(playerID int32) bool { return s.allowed }
-func (s *manorFakeSeedState) HarvestedCrop() (int32, int)          { return s.cropID, s.cropCount }
-func (s *manorFakeSeedState) Sow(sowerID int32, seed manor.Seed) {
-	s.seeded = true
-	s.sownBy = sowerID
-	s.sownSeed = seed
-}
-
 type manorFakeTarget struct {
+	neutralNPC
 	world.Presence
 	fakeActor
 	dead  bool
 	level int
-	state *manorFakeSeedState
+	state *npc.SeedState
 }
 
-func (m *manorFakeTarget) Dead() bool           { return m.dead }
-func (m *manorFakeTarget) Level() int           { return m.level }
-func (m *manorFakeTarget) SeedState() seedState { return m.state }
+func (m *manorFakeTarget) Kind() actor.Kind          { return actor.KindNPC }
+func (m *manorFakeTarget) Dead() bool                { return m.dead }
+func (m *manorFakeTarget) Level() int                { return m.level }
+func (m *manorFakeTarget) SeedState() *npc.SeedState { return m.state }
+
+// sownState is a seed state already sown by sowerID, carrying a crop that
+// matures into matureID.
+func sownState(sowerID int32, matureID int) *npc.SeedState {
+	state := &npc.SeedState{}
+	state.Sow(sowerID, manor.Seed{MatureID: matureID})
+	return state
+}
 
 type manorFakeItem struct {
 	seed manor.Seed
@@ -2800,7 +2790,7 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 	item := manorFakeItem{seed: manor.Seed{Level: 40, Alternative: false}, ok: true}
 
 	for i := 0; i < 300; i++ {
-		target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{}}
+		target := &manorFakeTarget{level: 40, state: &npc.SeedState{}}
 		if !registry.Use(Cast{
 			Caster:  caster,
 			Item:    item,
@@ -2809,9 +2799,9 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 		}) {
 			t.Fatal("Use() returned false for SOW")
 		}
-		if target.state.seeded {
-			if target.state.sownBy != 7 {
-				t.Fatalf("sown by = %d, want 7", target.state.sownBy)
+		if target.state.Seeded() {
+			if !target.state.AllowedToHarvest(7) {
+				t.Fatal("sown state does not record the casting player as its sower")
 			}
 			return
 		}
@@ -2822,38 +2812,38 @@ func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
 func TestSowAlreadySeededIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, sownBy: 3}}
+	target := &manorFakeTarget{level: 40, state: sownState(3, 0)}
 	item := manorFakeItem{seed: manor.Seed{Level: 40}, ok: true}
 
 	registry.Use(Cast{Caster: caster, Item: item, Skill: modelskill.Definition{SkillType: "SOW"}, Targets: []Actor{target}})
-	if target.state.sownBy != 3 {
-		t.Fatalf("already-seeded target should be untouched, sownBy = %d", target.state.sownBy)
+	if !target.state.AllowedToHarvest(3) {
+		t.Fatal("already-seeded target should keep its original sower")
 	}
 }
 
 func TestHarvestRewardsAllowedHarvester(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, allowed: true, cropID: 5001, cropCount: 12}}
+	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 
-	if !target.state.harvested {
+	if !target.state.Harvested() {
 		t.Error("target should be marked harvested")
 	}
-	if caster.items[5001] != 12 {
-		t.Fatalf("caster earned items = %v, want {5001: 12}", caster.items)
+	if caster.items[5001] != 1 {
+		t.Fatalf("caster earned items = %v, want {5001: 1}", caster.items)
 	}
 }
 
 func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, allowed: false, cropID: 5001, cropCount: 12}}
+	target := &manorFakeTarget{level: 40, state: sownState(3, 5001)}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 
-	if target.state.harvested {
+	if target.state.Harvested() {
 		t.Error("a disallowed harvester should not mark the target harvested")
 	}
 	if len(caster.items) != 0 {
@@ -2864,7 +2854,8 @@ func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
 func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: &manorFakeSeedState{seeded: true, harvested: true, allowed: true, cropID: 5001, cropCount: 12}}
+	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
+	target.state.MarkHarvested()
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
 	if len(caster.items) != 0 {

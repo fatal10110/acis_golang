@@ -566,19 +566,19 @@ func (a *Actor) HealAmount(def modelskill.Definition) (float64, bool) {
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against a.
-func (a *Actor) PhysicalSkillInput(caster attackable.Combatant, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (a *Actor) PhysicalSkillInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return creature.ResolvePhysicalSkillInput(caster, a, def, creature.Playable(caster), 1)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast by
 // caster against a.
-func (a *Actor) MagicDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (a *Actor) MagicDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return creature.ResolveMagicDamageInput(caster, a, def, creature.Playable(caster))
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by caster
 // against a.
-func (a *Actor) BlowInput(caster attackable.Combatant, def modelskill.Definition) (formulas.BlowInput, bool) {
+func (a *Actor) BlowInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.BlowInput, bool) {
 	return creature.ResolveBlowInput(caster, a, def, creature.Playable(caster))
 }
 
@@ -611,7 +611,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill cast
 // by caster against a.
-func (a *Actor) ManaDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (a *Actor) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, a, a.MaxMPValue(), def)
 }
 
@@ -621,14 +621,14 @@ func (a *Actor) LethalRate() float64 {
 }
 
 // LethalInput resolves a lethal-strike roll against a.
-func (a *Actor) LethalInput(caster attackable.Combatant, def modelskill.Definition) (formulas.LethalInput, bool) {
+func (a *Actor) LethalInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.LethalInput, bool) {
 	if a.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
-	attacker, ok := caster.(creature.FormulaActor)
-	if !ok {
+	if caster == nil {
 		return formulas.LethalInput{}, false
 	}
+	attacker := caster
 	return formulas.LethalInput{
 		Chance1:       def.LethalChance1,
 		Chance2:       def.LethalChance2,
@@ -654,11 +654,11 @@ func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attack
 var _ attackable.Combatant = (*Actor)(nil)
 
 // SkillSuccessInput returns the effect-landing roll input for def cast against a.
-func (a *Actor) SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (a *Actor) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)
 }
 
-func (a *Actor) EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (a *Actor) EffectSuccessInput(caster creature.FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if tmpl.EffectType == "" {
 		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
 	}

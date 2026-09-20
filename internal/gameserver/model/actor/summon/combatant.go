@@ -42,7 +42,7 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 func (a *Actor) CanSeeTarget(skilltarget.Actor) bool { return true }
 
 // ShieldDefense reports ShieldFailed: summons carry no shield.
-func (a *Actor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (a *Actor) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
 
