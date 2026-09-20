@@ -168,3 +168,73 @@ func TestFlushOwnersWaitsOnlyOnTheirLanes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Flush's promise is that nothing the caller queued is outstanding, which a
+// job that hands the lane back and comes round again would otherwise break:
+// it returns before its own re-queued work and lands behind the marker.
+func TestFlushWaitsForOwedWork(t *testing.T) {
+	w := New(zerolog.Nop())
+	defer w.Close(context.Background())
+
+	owed := w.Owe(1)
+	flushed := make(chan error, 1)
+	go func() { flushed <- w.Flush(context.Background(), 1) }()
+	select {
+	case err := <-flushed:
+		t.Fatalf("Flush returned (%v) with work still owed", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	owed.Settle()
+	select {
+	case err := <-flushed:
+		if err != nil {
+			t.Fatalf("Flush() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Flush did not return once the owed work settled")
+	}
+}
+
+// Work owed after a flush took its mark belongs to a later caller: waiting
+// for it would hold this one open for as long as the lane keeps taking work.
+// The mark is taken here where Flush takes it, so the two Owes are ordered
+// around it rather than racing.
+func TestLaneWaitIgnoresWorkOwedAfterItsMark(t *testing.T) {
+	w := New(zerolog.Nop())
+	defer w.Close(context.Background())
+
+	early := w.Owe(1)
+	high := w.lane(1).owedHigh()
+	late := w.Owe(1)
+	defer late.Settle()
+
+	done := make(chan struct{})
+	go w.lane(1).waitSettled(high, func() { close(done) })
+	select {
+	case <-done:
+		t.Fatal("settled while work from before the mark was still owed")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	early.Settle()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not settle once everything up to the mark was gone")
+	}
+}
+
+// A flush on another lane is unaffected by what this one owes.
+func TestFlushOfAnotherLaneIgnoresOwedWork(t *testing.T) {
+	w := New(zerolog.Nop())
+	defer w.Close(context.Background())
+
+	owed := w.Owe(1)
+	defer owed.Settle()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := w.Flush(ctx, 2); err != nil {
+		t.Fatalf("Flush(lane of owner 2) error = %v", err)
+	}
+}

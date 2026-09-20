@@ -98,7 +98,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		// calls giveSkills() right after restoreCharData()), so a free grant
 		// added by an in-session level-up — which lives in memory only —
 		// comes back instead of vanishing on relog.
-		if err := l.giveOrRewardSkills(ctx, c, tmpl); err != nil {
+		if err := l.giveOrRewardSkills(c, tmpl); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: give skills")
 			return nil, false
 		}
@@ -149,7 +149,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: attach live player")
 		return nil, false
 	}
-	l.activateSpawnProtection(live)
 	if l.roster != nil {
 		// Mark the row online at login (the reference updates the online
 		// status when a client enters the world), so external DB consumers
@@ -158,10 +157,25 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: save player online recency")
 		}
 	}
+	// From here on the player has a queue: the rest of the login runs on it,
+	// and this goroutine waits, so the burst keeps its order.
+	entered := false
+	onLive(live, func() { entered = l.finishEnterWorld(client, c, live, itemListFrame) })
+	if !entered {
+		return nil, false
+	}
+	return live, true
+}
+
+// finishEnterWorld publishes the attached player live into the world and
+// sends the rest of the EnterWorld burst, on live's queue. It reports false
+// when the login cannot complete.
+func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer, itemListFrame wire.Frame) bool {
+	l.activateSpawnProtection(live)
 	if l.skills != nil {
 		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore equipped item stats")
-			return nil, false
+			return false
 		}
 	}
 	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
@@ -220,7 +234,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
-	return live, true
+	return true
 }
 
 // sevenSignsPeriodMessage maps a Seven Signs period onto the system message
@@ -294,12 +308,12 @@ func sendKarmaChangeFrames(live *livePlayer, karma int) {
 // giveOrRewardSkills re-derives c's level-unlocked skills, calling
 // RewardSkills instead of GiveSkills whenever the server grants every
 // available skill automatically (Player.java:3256-3257).
-func (l *GameClientLink) giveOrRewardSkills(ctx context.Context, c *player.Character, tmpl *player.Template) error {
+func (l *GameClientLink) giveOrRewardSkills(c *player.Character, tmpl *player.Template) error {
 	refresh := l.skills.GiveSkills
 	if l.playerConfig.AutoLearnSkills {
 		refresh = l.skills.RewardSkills
 	}
-	return refresh(ctx, c, tmpl)
+	return refresh(c, tmpl)
 }
 
 // refreshLiveLevelSkills re-derives the skills live's new level entitles it
@@ -309,13 +323,13 @@ func (l *GameClientLink) giveOrRewardSkills(ctx context.Context, c *player.Chara
 // The skill list goes out even when the refresh failed part-way: the
 // character's in-memory skills have already moved, so the client's copy is
 // stale either way, and resending is what makes the two agree again.
-func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *livePlayer) {
+func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	if l.skills == nil || live == nil {
 		return
 	}
 	rewarding := l.playerConfig.AutoLearnSkills
 	before := live.SkillLevels()
-	if err := l.giveOrRewardSkills(ctx, live.Character, live.template); err != nil {
+	if err := l.giveOrRewardSkills(live.Character, live.template); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.RefreshExpertisePenalty()
@@ -334,7 +348,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(ctx context.Context, live *liveP
 		after := live.SkillLevels()
 		for id, level := range after {
 			if level > before[id] {
-				l.refreshSkillShortcuts(ctx, live, int32(id), int32(level))
+				l.refreshSkillShortcuts(live, int32(id), int32(level))
 			}
 		}
 	}
@@ -482,6 +496,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
+	if l.queues != nil {
+		creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
+	}
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
@@ -492,6 +509,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	attackCtl := attack.NewPlayer(c, live)
 	c.Move().SetLogger(l.log)
 	attackCtl.SetLogger(l.log)
+	if q := creatureLive.Queue(); q != nil {
+		attackCtl.SetQueue(q)
+	}
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
@@ -530,7 +550,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// without a client request still reaches the items table on the task's
 	// own cadence.
 	if inv := c.Inventory(); inv != nil && l.itemInstances != nil {
-		inv.SetItemPersister(l.itemInstances.Add)
+		// The container supplies the owner, so a destroy — which zeroes the
+		// instance's own — still names the row's lane.
+		inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 	}
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {

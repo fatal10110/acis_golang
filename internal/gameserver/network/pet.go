@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -54,7 +55,9 @@ func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *li
 	// does; its items carry the pet's own object id as owner.
 	if l.itemInstances != nil && pet != nil {
 		if inv := pet.PetInventory(); inv != nil {
-			inv.SetItemPersister(l.itemInstances.Add)
+			// The container supplies the owner, so a destroy — which zeroes
+			// the instance's own — still names the row's lane.
+			inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 		}
 	}
 }
@@ -90,6 +93,9 @@ type petInventoryOwner struct {
 
 func (o *petInventoryOwner) Visible() bool     { return o.pet.Visible() }
 func (o *petInventoryOwner) Teleporting() bool { return false }
+
+// Queue is the pet owner's queue, which the pet's inventory updates run on.
+func (o *petInventoryOwner) Queue() *sim.Queue { return o.live.Queue() }
 
 func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) {
 	if len(updates) == 0 {
@@ -153,7 +159,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 }
 
 func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
@@ -183,7 +189,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	if !ok {
 		return
 	}
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	if res.WasWorn {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 	}
@@ -252,7 +258,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	if result.Herb != nil {
 		l.consumePetHerb(live, pet, petInv, result.Herb)
 	}
-	l.applyPersistActions(ctx, result.Persist)
+	l.applyPersistActions(result.Persist)
 }
 
 // broadcastPetPickupAttention mirrors SummonAI.java:214-222: after a pet
@@ -318,7 +324,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	if res.Outcome == petitem.Unequipped {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 		return

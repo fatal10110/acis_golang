@@ -75,6 +75,9 @@ func sharedTaskEffects() *task.Effects {
 type Option func(*options)
 
 type options struct {
+	// slowStores delays every handler-issued persistence write (WithSlowStores).
+	slowStores             time.Duration
+	captureLog             bool
 	account                string
 	characters             []characterSpec
 	skills                 *skillstate.Persistence
@@ -289,6 +292,17 @@ func WithLevels(levels *player.LevelTable) Option {
 // WithLog sets the link logger (default zero-logger).
 func WithLog(log zerolog.Logger) Option { return func(o *options) { o.log = log } }
 
+// WithSlowStores makes every persistence write an in-world handler issues —
+// item rows, shortcut rows, character_skills rows, pets rows — and the
+// pets-row restore read take d, the way a degraded database would. A suite
+// pairs it with WithLog to prove no actor-queue task waits on persistence:
+// the sim pool's watchdog logs any task that runs longer than 50 ms.
+func WithSlowStores(d time.Duration) Option { return func(o *options) { o.slowStores = d } }
+
+// WithCapturedLog sends every component's log to an in-memory buffer the
+// suite reads back with Server.LogText or Server.SlowTaskLogs.
+func WithCapturedLog() Option { return func(o *options) { o.captureLog = true } }
+
 // WithGeo supplies the movement geodata collaborator wired into live
 // players. The default is the always-passable Geo double.
 func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
@@ -340,6 +354,8 @@ type Server struct {
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
 	persist          *persist.Worker
+	logs             *lockedBuffer
+	queues           *queues
 	log              zerolog.Logger
 
 	closeOnce    sync.Once
@@ -626,9 +642,15 @@ func (s *Server) PlayerMaxCP(tb testing.TB, objID int32) int {
 
 // FlushItems persists every pending item mutation the way the production
 // lazy-persistence tick does, so suites can assert the items rows mid-test.
+// It then waits for the persistence worker, which carries both the tick's own
+// writes and the per-action item writes a handler queued (network's
+// applyPersistActions).
 func (s *Server) FlushItems(tb testing.TB) {
 	tb.Helper()
 	if err := s.ItemInstances.Save(context.Background()); err != nil {
+		tb.Fatalf("flush items: %v", err)
+	}
+	if err := s.flushPersistence(); err != nil {
 		tb.Fatalf("flush items: %v", err)
 	}
 }
@@ -700,6 +722,11 @@ func (s *Server) QueueAutosave() {
 	}
 	s.autosaveClock.Advance(task.AutosaveInitialDelay)
 	s.autosave.Tick()
+	// The sweep runs each save on its player's queue; once those tasks
+	// have run, every write is on its persistence lane.
+	if err := s.queues.settle(); err != nil {
+		panic(err)
+	}
 }
 
 // HoldPersistenceLane blocks ownerID's persistence lane until the returned
@@ -734,6 +761,16 @@ func (s *Server) flushPersistence() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 	defer cancel()
 	return s.persist.Flush(ctx)
+}
+
+// Settle waits until every task already posted to an actor queue has run: a
+// packet handler's follow-up, a timer that fired, or the per-actor work a
+// tick fanned out. Work those tasks post in turn may still be pending.
+func (s *Server) Settle(tb testing.TB) {
+	tb.Helper()
+	if err := s.queues.settle(); err != nil {
+		tb.Fatal(err)
+	}
 }
 
 // NewObjectID allocates the next object id from the server's id sequence.
@@ -802,6 +839,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		opt(o)
 	}
 
+	var logs *lockedBuffer
+	if o.captureLog {
+		logs = &lockedBuffer{}
+		o.log = zerolog.New(logs)
+	}
+
 	prevCancelLesser := effect.CancelLesser()
 	effect.SetCancelLesser(o.cancelLesserEffect)
 	t.Cleanup(func() { effect.SetCancelLesser(prevCancelLesser) })
@@ -813,7 +856,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	hennas := gamesql.NewHennaStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
-		o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}), knownSkills)
+		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
+		if o.slowStores > 0 {
+			o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skillTable, slowCharacterSkillStore{CharacterSkillStore: knownSkills, delay: o.slowStores})
+		} else {
+			o.skills = skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skillTable, knownSkills)
+		}
 	}
 	o.skills.SetStoreSkillCooltime(o.storeSkillCooltime)
 	if o.seed != nil {
@@ -883,6 +931,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered before the listener's cleanup, so it drains only after
 	// every connection's detach has enqueued its saves.
 	persistWorker := persist.New(o.log)
+	// Known-skill writes run on the worker in production too, so suites see
+	// the same ordering (FlushPersistence waits for them).
+	o.skills.SetPersistWorker(persistWorker, o.log)
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 		defer cancel()
@@ -890,7 +941,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Errorf("close persistence worker: %v", err)
 		}
 	})
-	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker)
+	// Registered after the persistence worker and before the listener, so
+	// it stops once every connection has detached on its queue and before
+	// the worker drains.
+	queues := startQueues(t, o.log)
+	// Both writers of the items table share one ordering, as production does.
+	itemWrites := persist.NewOrder()
+	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker, itemWrites)
 	petStore := gamesql.NewPetStore(db)
 
 	// Mirror the production boot for the Seven Signs calendar: optional
@@ -971,7 +1028,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
+		ItemWrites:       itemWrites,
 		PersistWait:      o.persistWait,
+		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
@@ -982,6 +1041,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Log:              o.log,
+	}
+	if o.slowStores > 0 {
+		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
+		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
+		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
@@ -1121,7 +1185,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
 		persist:          persistWorker,
+		queues:           queues,
 		log:              o.log,
+		logs:             logs,
 		cancel:           cancel,
 		waitHandlers:     waitHandlers,
 	}

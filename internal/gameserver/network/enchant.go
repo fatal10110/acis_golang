@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
@@ -9,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 func (l *GameClientLink) enchantStateStore() *enchantflow.State {
@@ -53,7 +55,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	if err != nil {
 		l.log.Error().Err(err).Msg("enchant item")
 	}
-	l.applyPersistActions(ctx, result.Persist)
+	l.applyPersistActions(result.Persist)
 	if len(result.Steps) == 0 {
 		return
 	}
@@ -121,31 +123,124 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 	}
 }
 
-func (l *GameClientLink) applyPersistActions(ctx context.Context, actions []invops.Persist) {
+// applyPersistActions queues actions' item-row writes on the persistence
+// worker instead of writing them here: this runs on an actor queue, where a
+// slow database would hold a pool worker and stall unrelated actors.
+//
+// Each write carries the state this queue produced it with, and takes its
+// place in that row's write order before it is queued (persist.Order). The
+// lane it runs on is the row owner's at that moment, so one owner's writes of
+// one row also keep their order; the reservation is what covers the rest,
+// because a row does not stay with one owner. An item that changes hands has
+// its next write queued on the new owner's lane, a destroyed item's delete
+// comes from the persistence tick's own lane, and a dropped item is picked up
+// as a new instance carrying the same object id — in each case a second lane
+// writes the row this one is about to, and only the reservation decides which
+// of them the row keeps.
+//
+// Both a new row and a changed one are written as the same upsert, which is
+// what the persistence tick's own batch does for every live item
+// (task.ItemInstances.addToBatch). The distinction cannot survive ordering:
+// the write that creates a row may be the one a later write supersedes, and a
+// plain UPDATE from that later write would then touch nothing and lose the
+// row altogether.
+//
+// A count-zero pet collar is the one row whose pets-row delete needs the
+// collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
+// here touches no pets row, and both deletes are idempotent, so it stays on
+// the owner's lane with everything else.
+func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return
 	}
 	for _, action := range actions {
 		switch action.Action {
-		case invops.PersistSave:
+		case invops.PersistSave, invops.PersistUpdate:
 			if action.Item == nil {
 				continue
 			}
-			if err := l.items.Save(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("save item")
-			}
-		case invops.PersistUpdate:
-			if action.Item == nil {
-				continue
-			}
-			if err := l.items.Update(ctx, action.Item); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.Item.ObjectID).Msg("update item")
-			}
+			// The state and its place are taken together, under the
+			// instance, so no mutation can land between them and leave this
+			// write holding a place that does not match what it will write.
+			var st item.InstanceState
+			reserved := l.itemWrites.Begin()
+			action.Item.WithState(func(s item.InstanceState) {
+				st = s
+				reserved.Add(s.ObjectID)
+			})
+			l.queueItemWrite(st.OwnerID, reserved, func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.SaveState(ctx, st); err != nil {
+					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("save item")
+				}
+			})
 		case invops.PersistDelete:
-			if err := l.items.Delete(ctx, action.ObjectID); err != nil {
-				l.log.Error().Err(err).Int32("object_id", action.ObjectID).Msg("delete item")
-			}
+			objectID := action.ObjectID
+			l.queueItemWrite(action.OwnerID, l.itemWrites.Reserve(objectID), func() {
+				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+				defer cancel()
+				if err := l.items.Delete(ctx, objectID); err != nil {
+					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
+				}
+			})
 		}
+	}
+}
+
+// itemWriteRowWait is how long a queued item write waits for its row before
+// giving its lane back. It only has to be long enough that an uncontended row
+// is taken on the first try; the wait for a row another write is holding is
+// paid by re-queueing, not by sitting on the lane.
+const itemWriteRowWait = 20 * time.Millisecond
+
+// queueItemWrite runs write on ownerID's persistence lane once reserved's row
+// is free. A lane serves every owner that maps to it (persist.Lanes of them
+// for the whole world), so a write that simply waited for its row would stall
+// the character, shortcut, skill and pet writes queued behind it — and the
+// row can be held by the persistence tick's chunk for its whole transaction.
+// This comes back to the lane instead, which keeps the lane draining and
+// still lands the write in its reserved place.
+//
+// Coming back puts the write behind whatever the lane has taken meanwhile,
+// including a flush marker pushed after it was first queued, so the write is
+// also booked as work the lane owes: awaitPersistence waits for a lane to
+// report that what it queued has run, and a restart reads the items table
+// straight after. The debt is booked here, before the first Enqueue and on
+// the actor queue — booking it inside attempt instead would let the write
+// run, fail and hand itself forward after a flush had already read what the
+// lane owes, which is the hole the booking exists to close.
+//
+// The debt is settled however the write ends — landed, dropped as superseded,
+// cancelled, or panicking — on every exit but the one that hands it to
+// another attempt. A lane owing work that nothing will ever settle wedges
+// every later flush of it, so this follows the row release in persist.Order:
+// the worker recovers a panicking job, so a write that panics has to leave
+// the bookkeeping as it found it.
+func (l *GameClientLink) queueItemWrite(ownerID int32, reserved *persist.Write, write func()) {
+	owed := l.persist.Owe(ownerID)
+	var attempt func()
+	attempt = func() {
+		settle := true
+		defer func() {
+			if settle {
+				owed.Settle()
+			}
+		}()
+		if reserved.TryRun(itemWriteRowWait, func([]int32) { write() }) {
+			return
+		}
+		if l.persist.Enqueue(ownerID, attempt) {
+			settle = false // Still owed: whichever attempt ends it settles.
+			return
+		}
+		// Shutdown: nothing will come back for this, so take the wait here
+		// rather than dropping a write the row is still owed.
+		reserved.Run(func([]int32) { write() })
+	}
+	if !l.persist.Enqueue(ownerID, attempt) {
+		reserved.Cancel()
+		owed.Settle()
 	}
 }
 

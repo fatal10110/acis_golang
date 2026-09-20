@@ -19,6 +19,10 @@ const drainSlice = 64
 // slowTask is the task duration above which the watchdog logs the queue.
 const slowTask = 50 * time.Millisecond
 
+// highWater is the pending-task count above which a queue's backlog is
+// logged, once per crossing. Queues stay unbounded; the log is the signal.
+const highWater = 1024
+
 // Pool drains queues on a fixed set of worker goroutines. A queue is never
 // drained by two workers at once.
 type Pool struct {
@@ -116,6 +120,10 @@ func (p *Pool) enqueue(q *Queue, fn func()) bool {
 		q.scheduled = true
 	}
 	q.tasks = append(q.tasks, fn)
+	if len(q.tasks) > highWater && !q.backlog {
+		q.backlog = true
+		p.log.Warn().Str("queue", q.id).Int("pending", len(q.tasks)).Msg("sim: queue backlog over high-water mark")
+	}
 	return true
 }
 
@@ -169,6 +177,9 @@ func (p *Pool) drain(q *Queue, s *slot, batch *[drainSlice]func()) {
 	n := copy(batch[:], q.tasks)
 	clear(q.tasks[:n])
 	q.tasks = q.tasks[n:]
+	if len(q.tasks) <= highWater {
+		q.backlog = false
+	}
 	q.mu.Unlock()
 
 	i := 0

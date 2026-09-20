@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/rs/zerolog"
@@ -136,16 +137,15 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
-	return newLiveHostileWithActivity(inst, speed, geo, positions, log, castDefs, castEffects, walker, nil, maxBuffsAmount, zones)
-}
-
-func newLiveHostileWithActivity(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, activity effect.ActivityRegistry, maxBuffsAmount int, zones *zone.Index) (*npc.Hostile, *walkerActorRef, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index, activity effect.ActivityRegistry, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
 	control := &hostileControl{walker: walker, log: log}
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithActivityRegistry(activity))
 	if err != nil {
 		return nil, nil, err
+	}
+	if queue != nil {
+		live.SetQueue(queue)
 	}
 	if zones != nil {
 		live.Move().SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
@@ -168,6 +168,9 @@ func newLiveHostileWithActivity(inst *npc.Instance, speed float64, geo move.Geo,
 	attackCtl := attack.NewAttackable(actorRef, control)
 	live.Move().SetLogger(log)
 	attackCtl.SetLogger(log)
+	if queue != nil {
+		attackCtl.SetQueue(queue)
+	}
 
 	routeMove := &atomic.Bool{}
 	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
@@ -188,6 +191,9 @@ func newLiveHostileWithActivity(inst *npc.Instance, speed float64, geo move.Geo,
 	if castDefs != nil {
 		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
 		castController.SetLogger(log)
+		if queue != nil {
+			castController.SetQueue(queue)
+		}
 		aiController := &actorcast.AIController{
 			Controller:  castController,
 			Definitions: castDefs,

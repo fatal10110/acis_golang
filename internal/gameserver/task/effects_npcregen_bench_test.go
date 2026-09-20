@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -91,3 +92,5 @@ func (benchNoopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 func (benchNoopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (benchNoopStatOwner) UpdateEffectIcons() {}
+
+func (*benchRegenActor) Queue() *sim.Queue { return nil }

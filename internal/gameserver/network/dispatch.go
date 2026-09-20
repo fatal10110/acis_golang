@@ -32,6 +32,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -40,10 +41,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// itemStore writes single item rows from a state the caller copied while it
+// owned the instance: the write runs on a persistence lane, after the queue
+// task that produced it has moved on (applyPersistActions).
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
-	Save(ctx context.Context, inst *item.Instance) error
-	Update(ctx context.Context, inst *item.Instance) error
+	SaveState(ctx context.Context, st item.InstanceState) error
+	UpdateState(ctx context.Context, st item.InstanceState) error
 	Delete(ctx context.Context, objectID int32) error
 }
 
@@ -183,8 +187,13 @@ type GameClientLink struct {
 	itemInstances *task.ItemInstances
 	// persist runs this link's database writes for detached players, pets
 	// and containers on per-owner lanes.
-	persist          *persist.Worker
+	persist *persist.Worker
+	// itemWrites orders the writes of one items row against each other, which
+	// the lanes alone cannot: a row outlives its owner's lane (see
+	// applyPersistActions).
+	itemWrites       *persist.Order
 	persistWait      time.Duration
+	queues           Queues // nil runs player work on the goroutine that triggers it
 	queuedPets       queuedPets
 	restarts         *restart.Table
 	levels           *player.LevelTable
@@ -223,12 +232,11 @@ type GameClientLink struct {
 	afterFunc func(d time.Duration, fn func())
 
 	// cubicAfterFunc schedules a live cubic's recurring action tick and
-	// one-shot disappear timer; always set by NewGameClientLink (the raw,
-	// unrecovered time.AfterFunc default in cubic.NewRuntime is never
-	// reached in production). Overridden in tests for deterministic
-	// cubic-runtime timing, distinct from afterFunc since a cubic timer
-	// must be individually cancelable (StopAction/RefreshDisappear/Stop)
-	// rather than fire-and-forget.
+	// one-shot disappear timer; nil runs them on the owner's queue (see
+	// livePlayer.after). Overridden in tests for deterministic cubic-runtime
+	// timing, distinct from afterFunc since a cubic timer must be
+	// individually cancelable (StopAction/RefreshDisappear/Stop) rather than
+	// fire-and-forget.
 	cubicAfterFunc cubic.AfterFunc
 }
 
@@ -236,6 +244,12 @@ type GameClientLink struct {
 type AIRegistry interface {
 	Add(task.AIActor)
 	Remove(task.AIActor)
+}
+
+// Queues creates the queue one live actor's work runs on; id names it in
+// logs.
+type Queues interface {
+	NewQueue(id string) *sim.Queue
 }
 
 // GameClientLinkConfig contains the collaborators required by GameClientLink.
@@ -287,9 +301,16 @@ type GameClientLinkConfig struct {
 	ItemInstances *task.ItemInstances
 	// Persist runs detach, pet and container saves; nil writes inline.
 	Persist *persist.Worker
+	// ItemWrites orders one items row's writes; the item persistence task
+	// shares it, since it writes the same rows.
+	ItemWrites *persist.Order
 	// PersistWait bounds how long a connection waits for queued saves before
 	// reading rows back; zero means livePlayerPersistWait.
-	PersistWait  time.Duration
+	PersistWait time.Duration
+	// Queues creates each live player's queue, which its in-world packet
+	// handlers, timers and periodic ticks run on; nil runs that work on
+	// the goroutine that triggers it.
+	Queues       Queues
 	Restarts     *restart.Table
 	Levels       *player.LevelTable
 	Admin        *admin.Data
@@ -356,7 +377,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		inventoryUpdates: cfg.InventoryUpdates,
 		itemInstances:    cfg.ItemInstances,
 		persist:          cfg.Persist,
+		itemWrites:       cfg.ItemWrites,
 		persistWait:      cfg.PersistWait,
+		queues:           cfg.Queues,
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
@@ -385,16 +408,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	}
 	// Built here, not lazily: every client goroutine shares this link.
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
-	link.cubicAfterFunc = func(d time.Duration, fn func()) cubic.Timer {
-		return time.AfterFunc(d, func() {
-			defer func() {
-				if r := recover(); r != nil {
-					link.log.Error().Interface("panic", r).Msg("cubic: recovered panic in scheduled callback")
-				}
-			}()
-			fn()
-		})
-	}
 	link.wireWaterZones()
 	return link
 }
@@ -435,23 +448,20 @@ func (l *GameClientLink) rollEnchantSkill() int {
 	return rnd.Get(100)
 }
 
-// scheduleAfter runs fn once, after d elapses, on its own goroutine outside
-// the connection's read loop (and its accept-loop recover). fn is wrapped so
-// a panic there is recovered and logged instead of taking down the process.
-func (l *GameClientLink) scheduleAfter(d time.Duration, fn func()) {
-	wrapped := func() {
-		defer func() {
-			if r := recover(); r != nil {
-				l.log.Error().Interface("panic", r).Msg("scheduled callback panic")
-			}
-		}()
-		fn()
-	}
+// scheduleAfter runs fn once, after d elapses, as a task on live's queue.
+func (l *GameClientLink) scheduleAfter(live *livePlayer, d time.Duration, fn func()) {
 	if l.afterFunc != nil {
-		l.afterFunc(d, wrapped)
+		l.afterFunc(d, func() {
+			defer func() {
+				if r := recover(); r != nil {
+					l.log.Error().Interface("panic", r).Msg("scheduled callback panic")
+				}
+			}()
+			fn()
+		})
 		return
 	}
-	time.AfterFunc(d, wrapped)
+	live.after(d, fn)
 }
 
 func randomCipherKey() ([]byte, error) {

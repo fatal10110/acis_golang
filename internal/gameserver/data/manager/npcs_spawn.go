@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -171,7 +172,11 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	if inst.WalkMode {
 		speed = tmpl.WalkSpeed
 	}
-	hostile, walkerRef, err := newLiveHostileWithActivity(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.effects, n.maxBuffsAmount, n.zones)
+	var queue *sim.Queue
+	if n.queues != nil {
+		queue = n.queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID))
+	}
+	hostile, walkerRef, err := newLiveHostile(inst, speed, n.geo, n.positions, n.log, n.castDefs, n.castEffects, n.walker, n.maxBuffsAmount, n.zones, n.effects, queue)
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: cannot build live npc")
 		return nil

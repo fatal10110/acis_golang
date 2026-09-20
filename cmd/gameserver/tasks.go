@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -57,6 +58,27 @@ func startTicker(lc fx.Lifecycle, log zerolog.Logger, start func(zerolog.Logger)
 
 func provideWorldState() *world.State {
 	return world.New()
+}
+
+// provideSimPool returns the worker pool every live actor's queue drains on,
+// one worker per GOMAXPROCS.
+func provideSimPool(log zerolog.Logger) *sim.Pool {
+	return sim.NewPool(0, log)
+}
+
+// startSimPool starts the actor queues' workers and stops them on shutdown.
+// Its place in the invoke list sets the stop order: fx stops in reverse, so
+// the game listener (every connection's final detach posts to its queue) and
+// the tickers invoked after this one stop first, and the pool drains before
+// startItemInstances' final item save and persistence-worker close.
+func startSimPool(lc fx.Lifecycle, pool *sim.Pool) {
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			pool.Start(context.Background())
+			return nil
+		},
+		OnStop: pool.Stop,
+	})
 }
 
 // provideGroundItems restores dropped items persisted at the previous
@@ -355,8 +377,8 @@ func startInventoryUpdates(lc fx.Lifecycle, updates *task.InventoryUpdates, log 
 // provideItemInstances builds the lazy item persistence task over the real
 // items, augmentations and pets tables, flushed in chunks that each commit
 // atomically (task.ItemInstanceSaveChunkSize).
-func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker) *task.ItemInstances {
-	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items, worker)
+func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker, writes *persist.Order) *task.ItemInstances {
+	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items, worker, writes)
 }
 
 // startItemInstances launches the persistence tick and flushes whatever is

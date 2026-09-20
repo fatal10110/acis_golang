@@ -73,7 +73,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	var live *livePlayer
 	defer func() {
 		if live != nil {
-			_ = l.awaitPersistence(l.detachLivePlayer(live)...)
+			var owners []int32
+			onLive(live, func() { owners = l.detachLivePlayer(live) })
+			_ = l.awaitPersistence(owners...)
 		}
 		if l.clients != nil {
 			l.clients.Release(client.AccountName(), client)
@@ -134,8 +136,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
+		// Once in the world, everything a frame does to the player runs as a
+		// task on its queue (onLive), serialized with its timers and ticks.
+		// The loop waits for each task before reading on, so frames are
+		// still handled one at a time in read order; decoding and the
+		// protection gates above stay on this goroutine.
 		if clearsSpawnProtection(opcode) {
-			l.clearSpawnProtectionOnAction(live)
+			onLive(live, func() { l.clearSpawnProtectionOnAction(live) })
 		}
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
@@ -410,7 +417,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				if live != nil {
-					l.handleAutoSoulShot(live, req)
+					onLive(live, func() { l.handleAutoSoulShot(live, req) })
 				}
 			case clientpackets.OpcodeRequestExEnchantSkillInfo:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkillInfo)
@@ -421,7 +428,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				if live != nil {
-					l.sendEnchantSkillInfo(live, req)
+					onLive(live, func() { l.sendEnchantSkillInfo(live, req) })
 				}
 			case clientpackets.OpcodeRequestExEnchantSkill:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExEnchantSkill)
@@ -432,7 +439,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				if live != nil {
-					l.applyEnchantSkill(ctx, live, req)
+					onLive(live, func() { l.applyEnchantSkill(live, req) })
 				}
 			case clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
@@ -464,7 +471,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 				if live != nil {
-					l.handleMagicSkillUseGround(live, req)
+					onLive(live, func() { l.handleMagicSkillUseGround(live, req) })
 				}
 			case clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
@@ -503,7 +510,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleMagicSkillUse(live, req)
+				onLive(live, func() { l.handleMagicSkillUse(live, req) })
 			}
 
 		case clientpackets.OpcodeAction:
@@ -517,13 +524,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			// A plain click on the already-selected object acts on it
-			// (attack, sit, pick up), exactly like an attack request —
-			// the client sends this second click expecting the action to
-			// resolve, and locks its own input until Attack or
-			// ActionFailed answers it.
-			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-			l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+			onLive(live, func() {
+				// A plain click on the already-selected object acts on it
+				// (attack, sit, pick up), exactly like an attack request —
+				// the client sends this second click expecting the action
+				// to resolve, and locks its own input until Attack or
+				// ActionFailed answers it.
+				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
+				l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+			})
 
 		case clientpackets.OpcodeAttackRequest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAttackRequest)
@@ -536,17 +545,25 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-			l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+			onLive(live, func() {
+				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
+				l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+			})
 
 		case clientpackets.OpcodeLogout:
 			if live != nil {
-				if block := l.exitBlockReason(live); block != exitAllowed {
-					l.refuseExit(session, live, block, false)
+				refused := false
+				onLive(live, func() {
+					if block := l.exitBlockReason(live); block != exitAllowed {
+						l.refuseExit(session, live, block, false)
+						refused = true
+						return
+					}
+					session.SendFrame(serverpackets.FrameLeaveWorld())
+				})
+				if refused {
 					continue
 				}
-				session.SendFrame(serverpackets.FrameLeaveWorld())
-				return
 			}
 			return
 
@@ -565,10 +582,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameActionFailed())
 				continue
 			}
-			l.moveLivePlayer(live,
-				location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
-				location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
-			)
+			onLive(live, func() {
+				l.moveLivePlayer(live,
+					location.Location{X: int(req.TargetX), Y: int(req.TargetY), Z: int(req.TargetZ)},
+					location.Location{X: int(req.OriginX), Y: int(req.OriginY), Z: int(req.OriginZ)},
+				)
+			})
 
 		case clientpackets.OpcodeCannotMoveAnymore:
 			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymore); err != nil {
@@ -580,7 +599,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.stopLivePlayer(live)
+			onLive(live, func() { l.stopLivePlayer(live) })
 
 		case clientpackets.OpcodeValidatePosition:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeValidatePosition)
@@ -591,19 +610,25 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)})
+				onLive(live, func() {
+					l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)})
+				})
 			}
 
 		case clientpackets.OpcodeRequestItemList:
 			if live == nil {
 				continue
 			}
-			// The reference's ItemList constructor recomputes carried weight
-			// on every send, not only at login.
-			if inv := live.Inventory(); inv != nil {
-				inv.UpdateWeight()
-			}
-			frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+			var frame wire.Frame
+			var err error
+			onLive(live, func() {
+				// The reference's ItemList constructor recomputes carried
+				// weight on every send, not only at login.
+				if inv := live.Inventory(); inv != nil {
+					inv.UpdateWeight()
+				}
+				frame, err = serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+			})
 			if err != nil {
 				l.log.Error().Err(err).Msg("build ItemList")
 				return
@@ -621,7 +646,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.useItem(live, req.ObjectID)
+			onLive(live, func() { l.useItem(live, req.ObjectID) })
 
 		case clientpackets.OpcodeRequestUnEquipItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUnequipItem)
@@ -634,7 +659,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.unequipItem(live, req.BodySlot)
+			onLive(live, func() { l.unequipItem(live, req.BodySlot) })
 
 		case clientpackets.OpcodeRequestDropItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestDropItem)
@@ -647,7 +672,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.dropLiveItem(live, req)
+			onLive(live, func() { l.dropLiveItem(live, req) })
 
 		case clientpackets.OpcodeRequestDestroyItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestDestroyItem)
@@ -660,7 +685,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.destroyLiveItem(live, req.ObjectID, int(req.Count))
+			onLive(live, func() { l.destroyLiveItem(live, req.ObjectID, int(req.Count)) })
 
 		case clientpackets.OpcodeRequestCrystallizeItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestCrystallizeItem)
@@ -673,7 +698,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.crystallizeLiveItem(live, req)
+			onLive(live, func() { l.crystallizeLiveItem(live, req) })
 
 		case clientpackets.OpcodeRequestEnchantItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEnchantItem)
@@ -686,7 +711,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.enchantLiveItem(ctx, live, req)
+			onLive(live, func() { l.enchantLiveItem(ctx, live, req) })
 
 		case clientpackets.OpcodeRequestSkillList:
 			// While entering, 0x3f is the quest-list probe the client sends
@@ -700,7 +725,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			session.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+			onLive(live, func() {
+				session.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+			})
 
 		case clientpackets.OpcodeRequestAcquireSkillInfo:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAcquireSkillInfo)
@@ -711,7 +738,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.sendAcquireSkillInfo(live, req)
+				onLive(live, func() { l.sendAcquireSkillInfo(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestAcquireSkill:
@@ -723,7 +750,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.learnAcquireSkill(ctx, live, req)
+				onLive(live, func() { l.learnAcquireSkill(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestActionUse:
@@ -737,22 +764,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			switch req.ActionID {
-			case actionSitStand:
-				l.requestChangeWaitType(live, !live.Standing())
-			case actionWalkRun:
-				l.changeLiveMoveType(live, !live.Running())
-			default:
-				if !l.handleSummonActionUse(ctx, live, req) {
-					// An action-bar command no handler claims must still
-					// answer the client — it locks its input until the
-					// action resolves. The log keeps the gap visible
-					// instead of silently dropped.
-					l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
-						Msg("game client: action-bar command not implemented yet")
-					live.SendFrame(serverpackets.FrameActionFailed())
+			onLive(live, func() {
+				switch req.ActionID {
+				case actionSitStand:
+					l.requestChangeWaitType(live, !live.Standing())
+				case actionWalkRun:
+					l.changeLiveMoveType(live, !live.Running())
+				default:
+					if !l.handleSummonActionUse(ctx, live, req) {
+						// An action-bar command no handler claims must still
+						// answer the client — it locks its input until the
+						// action resolves. The log keeps the gap visible
+						// instead of silently dropped.
+						l.log.Warn().Int32("action_id", req.ActionID).Int32("object_id", live.ObjectID()).
+							Msg("game client: action-bar command not implemented yet")
+						live.SendFrame(serverpackets.FrameActionFailed())
+					}
 				}
-			}
+			})
 
 		case clientpackets.OpcodeRequestRestartPoint:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRestartPoint)
@@ -763,7 +792,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.restartLivePlayer(live, req)
+				onLive(live, func() { l.restartLivePlayer(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestSocialAction:
@@ -775,7 +804,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.broadcastLiveSocialAction(live, req.ActionID)
+				onLive(live, func() { l.broadcastLiveSocialAction(live, req.ActionID) })
 			}
 
 		case clientpackets.OpcodeRequestChangeMoveType:
@@ -787,7 +816,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.changeLiveMoveType(live, req.Run)
+				onLive(live, func() { l.changeLiveMoveType(live, req.Run) })
 			}
 
 		case clientpackets.OpcodeRequestChangeWaitType:
@@ -799,7 +828,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.requestChangeWaitType(live, req.Stand)
+				onLive(live, func() { l.requestChangeWaitType(live, req.Stand) })
 			}
 
 		case clientpackets.OpcodeRequestLinkHtml:
@@ -810,7 +839,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.requestLinkHTML(live, req)
+			onLive(live, func() { l.requestLinkHTML(live, req) })
 
 		case clientpackets.OpcodeRequestBypassToServer:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestBypassToServer)
@@ -826,7 +855,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig.ServerBypassDelay, time.Now()) {
 				continue
 			}
-			l.requestBypassToServer(live, req)
+			onLive(live, func() { l.requestBypassToServer(live, req) })
 
 		case clientpackets.OpcodeRequestTargetCancel:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)
@@ -837,7 +866,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.requestTargetCancel(live, req)
+				onLive(live, func() { l.requestTargetCancel(live, req) })
 			}
 
 		case clientpackets.OpcodeAppearing:
@@ -848,8 +877,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.completeLivePlayerTeleport(live)
-				live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+				onLive(live, func() {
+					l.completeLivePlayerTeleport(live)
+					live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+				})
 			}
 
 		case clientpackets.OpcodeStartRotating:
@@ -863,8 +894,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameStartRotation(live.ObjectID(), int(req.Degree), int(req.Side), 0)
+			onLive(live, func() {
+				l.broadcastLiveFrame(live, func() wire.Frame {
+					return serverpackets.FrameStartRotation(live.ObjectID(), int(req.Degree), int(req.Side), 0)
+				})
 			})
 
 		case clientpackets.OpcodeFinishRotating:
@@ -878,20 +911,33 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			live.SetHeading(int(req.Degree))
-			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameStopRotation(live.ObjectID(), int(req.Degree), 0)
+			onLive(live, func() {
+				live.SetHeading(int(req.Degree))
+				l.broadcastLiveFrame(live, func() wire.Frame {
+					return serverpackets.FrameStopRotation(live.ObjectID(), int(req.Degree), 0)
+				})
 			})
 
 		case clientpackets.OpcodeRequestRestart:
 			if live == nil {
 				continue
 			}
-			if block := l.exitBlockReason(live); block != exitAllowed {
-				l.refuseExit(session, live, block, true)
+			// The exit check and detach run on the player's queue; waiting for
+			// the saves detach queued stays on this goroutine.
+			var owners []int32
+			refused := false
+			onLive(live, func() {
+				if block := l.exitBlockReason(live); block != exitAllowed {
+					l.refuseExit(session, live, block, true)
+					refused = true
+					return
+				}
+				owners = l.detachLivePlayer(live)
+			})
+			if refused {
 				continue
 			}
-			_ = l.awaitPersistence(l.detachLivePlayer(live)...)
+			_ = l.awaitPersistence(owners...)
 			live = nil
 			entering = nil
 			client.SetState(StateAuthed)
@@ -920,7 +966,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.sendPackageSendableItemList(live, req.ObjectID)
+			onLive(live, func() { l.sendPackageSendableItemList(live, req.ObjectID) })
 
 		case clientpackets.OpcodeRequestPetUseItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetUseItem)
@@ -930,7 +976,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.petUseItem(ctx, live, req)
+			onLive(live, func() { l.petUseItem(ctx, live, req) })
 
 		case clientpackets.OpcodeRequestGiveItemToPet:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGiveItemToPet)
@@ -940,7 +986,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.giveItemToPet(ctx, live, req)
+			onLive(live, func() { l.giveItemToPet(ctx, live, req) })
 
 		case clientpackets.OpcodeRequestGetItemFromPet:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetItemFromPet)
@@ -950,7 +996,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.getItemFromPet(ctx, live, req)
+			onLive(live, func() { l.getItemFromPet(ctx, live, req) })
 
 		case clientpackets.OpcodeRequestPetGetItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetGetItem)
@@ -960,7 +1006,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.petGetItem(ctx, live, req)
+			onLive(live, func() { l.petGetItem(ctx, live, req) })
 
 		case clientpackets.OpcodeTradeRequest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeTradeRequest)
@@ -971,7 +1017,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleTradeRequest(live, req)
+				onLive(live, func() { l.handleTradeRequest(live, req) })
 			}
 
 		case clientpackets.OpcodeAnswerTradeRequest:
@@ -983,7 +1029,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleAnswerTradeRequest(live, req)
+				onLive(live, func() { l.handleAnswerTradeRequest(live, req) })
 			}
 
 		case clientpackets.OpcodeAddTradeItem:
@@ -995,7 +1041,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleAddTradeItem(live, req)
+				onLive(live, func() { l.handleAddTradeItem(live, req) })
 			}
 
 		case clientpackets.OpcodeTradeDone:
@@ -1007,7 +1053,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleTradeDone(ctx, live, req)
+				onLive(live, func() { l.handleTradeDone(ctx, live, req) })
 			}
 
 		case clientpackets.OpcodeRequestShortCutReg:
@@ -1019,7 +1065,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.registerShortcut(ctx, live, req)
+				onLive(live, func() { l.registerShortcut(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestShortCutDel:
@@ -1031,7 +1077,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.deleteShortcut(ctx, live, req)
+				onLive(live, func() { l.deleteShortcut(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestChangePetName:
@@ -1043,6 +1089,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
+				// Runs its own queue hops: the pets-table read in the middle
+				// stays here, off the queue (see handleRequestChangePetName).
 				l.handleRequestChangePetName(ctx, live, req)
 			}
 
@@ -1055,7 +1103,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				l.handleDlgAnswer(live, req)
+				onLive(live, func() { l.handleDlgAnswer(live, req) })
 			}
 
 		case clientpackets.OpcodeDummy1A,

@@ -30,15 +30,7 @@ func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 		c.shortBuffTimer.Stop()
 	}
 	c.shortBuffTaskSkillID = skillID
-	log := c.log
-	c.shortBuffTimer = time.AfterFunc(time.Duration(durationSeconds)*time.Second, func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Msg("character: recovered panic in short-buff clear callback")
-			}
-		}()
-		c.clearShortBuff()
-	})
+	c.shortBuffTimer = c.afterLocked(time.Duration(durationSeconds)*time.Second, c.clearShortBuff)
 	c.stateMu.Unlock()
 
 	c.emit(event.ShortBuff{SkillID: skillID, Level: level, DurationSeconds: durationSeconds})

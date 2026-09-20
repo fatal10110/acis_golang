@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -145,3 +146,5 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 }
 
 func (*walkerCtlSelf) OwnsOffensiveFollowTicker() bool { return false }
+
+func (*controllerWalker) Queue() *sim.Queue { return nil }

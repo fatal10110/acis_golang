@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/rs/zerolog"
 )
@@ -121,6 +122,14 @@ type Controller struct {
 	afterFunc      afterFunc
 	sink           event.Sink
 	log            zerolog.Logger
+}
+
+// SetQueue runs the controller's scheduled hit and finish callbacks as tasks
+// on q, the owning actor's queue.
+func (c *Controller) SetQueue(q *sim.Queue) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
 }
 
 // SetLogger records where a panic recovered from a scheduled attack callback

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -14,6 +15,9 @@ import (
 type Live struct {
 	movement move.CreatureMove
 	effects  *effect.List
+	// queue runs this creature's work; set once before the creature is
+	// published into the world.
+	queue *sim.Queue
 
 	// Status flags are independent of each other and settable from any
 	// goroutine; no reader needs two of them to change together.
@@ -33,6 +37,24 @@ func NewLive(origin location.Location, speed float64, geo move.Geo, owner effect
 		return nil, err
 	}
 	return live, nil
+}
+
+// SetQueue makes q the queue this creature's work runs on, movement
+// arrivals included. Call it once, before the creature is published into
+// the world.
+func (l *Live) SetQueue(q *sim.Queue) {
+	l.queue = q
+	l.movement.SetQueue(q)
+	l.effects.SetQueue(q)
+}
+
+// Queue returns the queue this creature's work runs on, or nil when none was
+// set.
+func (l *Live) Queue() *sim.Queue {
+	if l == nil {
+		return nil
+	}
+	return l.queue
 }
 
 // Move returns this live creature's lifetime movement state.

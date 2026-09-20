@@ -105,6 +105,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGameServerLogger,
 			provideGameServerDatabase,
 			providePersist,
+			provideItemWriteOrder,
 			loadHTMLCache,
 			loadCrestCache,
 			loadGameData,
@@ -119,6 +120,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideInventoryUpdates,
 			provideItemInstances,
 			provideWorldState,
+			provideSimPool,
 			provideTaskEffects,
 			provideGroundItemOptions,
 			provideGroundItems,
@@ -147,6 +149,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
+		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
 	}
 }

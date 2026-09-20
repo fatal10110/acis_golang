@@ -64,14 +64,34 @@ type ItemInstances struct {
 	flusher   ItemFlusher
 	templates *item.Table
 	worker    *persist.Worker
+	// writes orders each row's write against the same row's writes from
+	// other lanes — a handler's single-row write, another owner's flush —
+	// so the row keeps whichever was produced last (persist.Order).
+	writes *persist.Order
 
 	mu      sync.RWMutex
-	pending map[int32]*item.Instance
+	pending map[int32]pendingItem
 	// rounds holds every Save whose owner jobs have not all run yet. Each
 	// records the ids RemoveItems dropped while it was outstanding, so its
 	// failed items are not merged back over a container that already tore
 	// down and wrote its own final state (see RemoveItems and Save).
 	rounds map[*saveRound]struct{}
+}
+
+// pendingItem is one changed instance waiting for the next flush, with the
+// owner its row belongs to.
+//
+// ownerID is remembered rather than read from the instance at flush time,
+// because a destroy has already taken the instance through
+// item.Instance.DestroyState, which zeroes OwnerID along with the count. A
+// flush that keyed the lane off that snapshot would send every destroyed
+// item's delete to the lane of owner 0, while the same row's earlier writes
+// sit on its real owner's lane — exactly the split laneKey exists to
+// prevent. The last owner seen for the object wins, so an item that changes
+// hands before the flush is written on the new owner's lane.
+type pendingItem struct {
+	inst    *item.Instance
+	ownerID int32
 }
 
 // saveRound is one Save's outstanding owner jobs. Its fields are guarded by
@@ -85,7 +105,7 @@ type saveRound struct {
 
 // NewItemInstances returns an empty item persistence task whose writes run
 // on worker's lanes. A nil worker writes on the calling goroutine.
-func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker) *ItemInstances {
+func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker, writes *persist.Order) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
@@ -93,7 +113,8 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		flusher:   flusher,
 		templates: templates,
 		worker:    worker,
-		pending:   make(map[int32]*item.Instance),
+		writes:    writes,
+		pending:   make(map[int32]pendingItem),
 		rounds:    make(map[*saveRound]struct{}),
 	}
 }
@@ -118,13 +139,34 @@ func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
 	}, log)
 }
 
-// Add registers inst for the next persistence tick.
+// Add registers inst for the next persistence tick, remembering the owner its
+// row currently belongs to. A destroy reports the instance with its owner
+// already zeroed, so a previously recorded owner is kept (see pendingItem);
+// AddOwned is the form that does not have to guess.
 func (i *ItemInstances) Add(inst *item.Instance) {
 	if inst == nil {
 		return
 	}
+	i.AddOwned(inst.Snapshot().OwnerID, inst)
+}
+
+// AddOwned registers inst for the next persistence tick as ownerID's row.
+// The container holding an item knows that owner even when the item itself no
+// longer does, which is exactly what a destroy reports, so this is the form
+// the per-container persister hook uses: the recorded owner then survives a
+// flush swapping the pending set out, and a restored item whose first
+// mutation is its destruction still names an owner.
+func (i *ItemInstances) AddOwned(ownerID int32, inst *item.Instance) {
+	if inst == nil {
+		return
+	}
 	i.mu.Lock()
-	i.pending[inst.ObjectID] = inst
+	entry := i.pending[inst.ObjectID]
+	entry.inst = inst
+	if ownerID != 0 {
+		entry.ownerID = ownerID
+	}
+	i.pending[inst.ObjectID] = entry
 	i.mu.Unlock()
 }
 
@@ -220,14 +262,14 @@ func (i *ItemInstances) RemoveItems(items []*item.Instance) {
 func (i *ItemInstances) Save(ctx context.Context) error {
 	i.mu.Lock()
 	inflight := i.pending
-	i.pending = make(map[int32]*item.Instance)
+	i.pending = make(map[int32]pendingItem)
 	// Each owner's items are written on that owner's persistence lane, so
 	// they can never interleave with a container flush for the same owner
 	// (network.flushItemPersistence) and land an older snapshot after it.
-	byOwner := make(map[int32][]*item.Instance)
-	for _, inst := range inflight {
-		key := i.laneKey(inst.Snapshot())
-		byOwner[key] = append(byOwner[key], inst)
+	byOwner := make(map[int32][]pendingItem)
+	for _, entry := range inflight {
+		key := i.laneKey(entry.inst.Snapshot(), entry.ownerID)
+		byOwner[key] = append(byOwner[key], entry)
 	}
 	round := &saveRound{removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
 	if round.remaining == 0 {
@@ -238,12 +280,12 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	i.mu.Unlock()
 
 	for _, owner := range slices.Sorted(maps.Keys(byOwner)) {
-		items := byOwner[owner]
+		entries := byOwner[owner]
 		// Fixes chunk boundaries so they don't depend on map iteration
 		// order; see the chunk-boundary note above.
-		slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+		slices.SortFunc(entries, func(a, b pendingItem) int { return cmp.Compare(a.inst.ObjectID, b.inst.ObjectID) })
 		job := func() {
-			failed, err := i.saveChunks(ctx, items)
+			failed, err := i.saveChunks(ctx, entries)
 			i.finishOwner(round, failed, err)
 		}
 		// A closed worker has already run every job it accepted, so writing
@@ -272,15 +314,17 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 // finishOwner merges one owner job's failed items back to pending, skipping
 // any RemoveItems dropped while round was outstanding, and closes round once
 // its last owner job has run.
-func (i *ItemInstances) finishOwner(round *saveRound, failed []*item.Instance, err error) {
+func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	for _, inst := range failed {
-		if _, wasRemoved := round.removed[inst.ObjectID]; wasRemoved {
+	for _, entry := range failed {
+		if _, wasRemoved := round.removed[entry.inst.ObjectID]; wasRemoved {
 			continue
 		}
-		if _, ok := i.pending[inst.ObjectID]; !ok {
-			i.pending[inst.ObjectID] = inst
+		// Keeps the owner this round resolved: a retry of a destroyed item
+		// must not fall back to the zeroed owner on its instance.
+		if _, ok := i.pending[entry.inst.ObjectID]; !ok {
+			i.pending[entry.inst.ObjectID] = entry
 		}
 	}
 	if round.err == nil {
@@ -297,23 +341,26 @@ func (i *ItemInstances) finishOwner(round *saveRound, failed []*item.Instance, e
 // except a destroyed pet collar, whose write also deletes its pets row. That
 // one runs on the collar's own lane, where every pets-row save is queued, so
 // a save still waiting there cannot land after the delete and recreate the
-// row.
-func (i *ItemInstances) laneKey(st item.InstanceState) int32 {
+// row. The same argument is why every other destroyed item's write stays on
+// its owner's lane, which is where that row's earlier writes are: ownerID
+// comes from the pending entry, not from the instance, whose owner a destroy
+// has already zeroed (see pendingItem).
+func (i *ItemInstances) laneKey(st item.InstanceState, ownerID int32) int32 {
 	if st.Count <= 0 {
 		if tmpl, _ := i.templates.Get(st.TemplateID); isPetCollar(tmpl) {
 			return st.ObjectID
 		}
 	}
-	return st.OwnerID
+	return ownerID
 }
 
 // saveChunks writes items in chunks of at most ItemInstanceSaveChunkSize,
 // each under its own ItemInstanceSaveTimeout, and returns the items whose
 // chunk failed or was never attempted because ctx had already ended.
-func (i *ItemInstances) saveChunks(ctx context.Context, items []*item.Instance) ([]*item.Instance, error) {
+func (i *ItemInstances) saveChunks(ctx context.Context, entries []pendingItem) ([]pendingItem, error) {
 	var firstErr error
-	var failed []*item.Instance
-	for chunk := range slices.Chunk(items, ItemInstanceSaveChunkSize) {
+	var failed []pendingItem
+	for chunk := range slices.Chunk(entries, ItemInstanceSaveChunkSize) {
 		if ctx.Err() != nil {
 			failed = append(failed, chunk...)
 			if firstErr == nil {
@@ -321,8 +368,12 @@ func (i *ItemInstances) saveChunks(ctx context.Context, items []*item.Instance) 
 			}
 			continue
 		}
+		items := make([]*item.Instance, 0, len(chunk))
+		for _, entry := range chunk {
+			items = append(items, entry.inst)
+		}
 		chunkCtx, cancel := context.WithTimeout(ctx, ItemInstanceSaveTimeout)
-		err := i.UpdateItems(chunkCtx, chunk)
+		err := i.UpdateItems(chunkCtx, items)
 		cancel()
 		if err != nil {
 			failed = append(failed, chunk...)
@@ -355,19 +406,44 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
-	var batch item.FlushBatch
+	// Each row's state and its place in that row's write order are taken
+	// together, under the instance: the state this flush will land is fixed
+	// here, not when the write finally runs, so a single-row write produced
+	// after it always holds the later place — and one produced before it the
+	// earlier, however long this flush then waits for the rows. Reading the
+	// state later than the place is what let a flush hold an older place
+	// while carrying a newer state, and an older write then landed on top of
+	// its delete.
+	write := i.writes.Begin()
+	states := make([]item.InstanceState, 0, len(items))
 	for _, inst := range items {
-		i.addToBatch(&batch, inst)
+		inst.WithState(func(st item.InstanceState) {
+			write.Add(st.ObjectID)
+			states = append(states, st)
+		})
 	}
-	return i.flusher.Flush(ctx, batch)
+	var err error
+	write.Run(func(keep []int32) {
+		var batch item.FlushBatch
+		for _, st := range states {
+			if _, found := slices.BinarySearch(keep, st.ObjectID); !found {
+				continue
+			}
+			i.addToBatch(&batch, st)
+		}
+		err = i.flusher.Flush(ctx, batch)
+	})
+	return err
 }
 
-// addToBatch resolves inst's persistence effect and appends it to batch,
+// addToBatch resolves st's persistence effect and appends it to batch,
 // matching the per-item semantics updateItem used to apply immediately:
 // delete when count <= 0 or location == VOID, augmentation delete/save
 // only for weapons, pet-row delete only for a pet collar at zero count.
-func (i *ItemInstances) addToBatch(batch *item.FlushBatch, inst *item.Instance) {
-	st := inst.Snapshot()
+//
+// It takes the state rather than the instance because the state is read where
+// the write's place in its row's order is taken (UpdateItems), not here.
+func (i *ItemInstances) addToBatch(batch *item.FlushBatch, st item.InstanceState) {
 	tmpl, _ := i.templates.Get(st.TemplateID)
 	isWeapon := tmpl != nil && tmpl.Kind == item.KindWeapon
 

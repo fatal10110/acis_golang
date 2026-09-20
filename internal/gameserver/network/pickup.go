@@ -116,7 +116,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.world.Despawn(ground)
 	l.lockPickupParalysis(live)
 
-	l.applyPersistActions(ctx, res.Persist)
+	l.applyPersistActions(res.Persist)
 	return true
 }
 
@@ -127,7 +127,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 // lifted with the lock still nominally held, or vice versa.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 	gen := live.enterPickupLock()
-	l.scheduleAfter(pickupParalyzeLock, func() {
+	l.scheduleAfter(live, pickupParalyzeLock, func() {
 		if !live.exitPickupLock(gen) {
 			return
 		}

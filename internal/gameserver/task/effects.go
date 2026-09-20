@@ -78,7 +78,8 @@ func (e *Effects) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(EffectTick, e.Tick, log)
 }
 
-// Tick advances every currently active effect list once.
+// Tick advances every currently active effect list once, on its owner's
+// queue.
 func (e *Effects) Tick() {
 	if !e.beginTick(e.log, "task: Effects.Tick") {
 		return
@@ -87,6 +88,6 @@ func (e *Effects) Tick() {
 	defer e.releaseSnapshot()
 
 	for _, list := range e.snapshot() {
-		list.Tick()
+		post(list.Queue(), list.Tick)
 	}
 }

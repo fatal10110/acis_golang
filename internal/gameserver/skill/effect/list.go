@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // StatOwner is what a List is attached to: the holder its stat modifiers
@@ -117,7 +118,18 @@ type List struct {
 	// reconcile against l's own last-known state instead of a value a
 	// caller captured before releasing mu — see notifyActivityTransition.
 	tracked bool
+
+	// queue is the owner's queue, which periodic effect actions run on; set
+	// once before the owner is published.
+	queue *sim.Queue
 }
+
+// SetQueue makes q, the owner's queue, the queue this list's periodic
+// actions run on.
+func (l *List) SetQueue(q *sim.Queue) { l.queue = q }
+
+// Queue returns the queue SetQueue installed, or nil.
+func (l *List) Queue() *sim.Queue { return l.queue }
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {

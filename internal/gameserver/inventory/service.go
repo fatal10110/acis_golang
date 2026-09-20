@@ -203,7 +203,7 @@ func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instan
 		return Result{}, PickupNoop
 	}
 	if absorbed {
-		return Result{Persist: []Persist{Update(result), Delete(ground.ObjectID)}}, PickupOK
+		return Result{Persist: []Persist{Update(result), Delete(groundState.OwnerID, groundState.ObjectID)}}, PickupOK
 	}
 	return Result{Persist: []Persist{Save(result)}}, PickupOK
 }
@@ -302,7 +302,7 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 		out.Persist = append(out.Persist, Update(remaining))
 	}
 	if freed {
-		out.Persist = append(out.Persist, Delete(freedObjectID))
+		out.Persist = append(out.Persist, Delete(source.OwnerID(), freedObjectID))
 	}
 	if newObjectID != 0 && result.ObjectID == newObjectID {
 		out.Persist = append(out.Persist, Save(result))

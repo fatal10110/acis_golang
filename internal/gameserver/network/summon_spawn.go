@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -19,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -42,55 +44,105 @@ const petRestoreTimeout = 5 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
 // beside the owner, and registers it as the owner's active summon,
-// mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and reports
-// false if the owner already has a pet or servitor tracked — the reference
-// re-checks this at the handler layer even though SummonItems.java already
-// gated it once before the cast started.
+// mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and stops if
+// the owner already has a pet or servitor tracked — the reference re-checks
+// this at the handler layer even though SummonItems.java already gated it
+// once before the cast started.
 //
 // Every other rejection below (missing template, unmapped or non-pet
 // summon item, missing npc template, a restore-state error, ID exhaustion,
-// an unresolvable level) sends no further packet and only reports false.
-// This runs inside the cast's already-committed Hit phase — MagicSkillUse,
-// the SUMMON_A_PET system message and MagicSkillLaunched are already sent
-// by the caller before SpawnPet runs — and Java's own handler is silent
-// for the identical set of conditions (SummonCreature.java:36,40,44,49,54,
-// 59 are all bare `return;`, with no packet beyond what the cast itself
-// already sent).
-func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) bool {
+// an unresolvable level) sends no further packet and simply stops. This runs
+// inside the cast's already-committed Hit phase — MagicSkillUse, the
+// SUMMON_A_PET system message and MagicSkillLaunched are already sent by the
+// caller before SpawnPet runs — and Java's own handler is silent for the
+// identical set of conditions (SummonCreature.java:36,40,44,49,54, 59 are
+// all bare `return;`, with no packet beyond what the cast itself already
+// sent).
+//
+// When the pets row has to be read, the spawn finishes on the owner's queue
+// after the read (see spawnRestoredPet), so it reports nothing to its caller.
+func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) {
 	link, live := s.link, s.live
 	if link == nil || live == nil || controlItem == nil {
-		return false
+		return
 	}
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
-		return false
+		return
 	}
 
 	tmpl, ok := live.Inventory().Templates().Get(controlItem.TemplateID)
 	if !ok {
-		return false
+		return
 	}
 	summonItem, ok := link.summonItems.Item(tmpl.ID)
 	if !ok || summonItem.SummonType != summonItemTypePet {
-		return false
+		return
 	}
 	npcTmpl, ok := link.npcs.Get(int(summonItem.NPCID))
 	if !ok || npcTmpl.Pet == nil {
-		return false
+		return
 	}
 
 	// An unsummon or logout whose pets-row write is still queued restores
-	// from the state it queued; otherwise the row is current.
-	state, hasSaved := link.queuedPets.latest(controlItem.ObjectID)
-	if !hasSaved {
+	// from the state it queued; otherwise the row has to be read.
+	if state, hasSaved := link.queuedPets.latest(controlItem.ObjectID); hasSaved {
+		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true)
+		return
+	}
+	// The read runs on the control item's persistence lane: behind every
+	// pets-row write queued for that item, and off this actor queue, where a
+	// slow database would hold a pool worker and stall unrelated actors. The
+	// spawn continues on the owner's queue with the row, so the packets it
+	// sends keep their own order; a closed queue (the owner logged out while
+	// the read ran) drops it.
+	link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
-		var err error
-		state, hasSaved, err = link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
-			return false
+			return
 		}
+		postLive(live, func() { s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved) })
+	})
+}
+
+// spawnRestoredPet builds and publishes the pet from its resolved pets-row
+// state, on the owner's queue. It re-checks both gates that the caster's own
+// state can have invalidated while the pets-row read was outstanding: the
+// control item still being held, and no other summon having reached the
+// world.
+//
+// The reference re-resolves the control item from the caster's inventory at
+// use time and drops out silently when it is gone or no longer theirs
+// (SummonCreature.java:34-41). Go needs that check on this side of the read:
+// the read runs off the owner's queue, so the owner's own handlers — drop,
+// destroy, a trade transfer — can run between the cast's Hit phase and this
+// task, and a pet built from a collar someone else now holds would answer to
+// two players through one pets row.
+//
+// A logout in that window is the same problem one step further: sim.Queue
+// refuses later posts but still runs every task it has already accepted, so a
+// continuation queued just before detachLivePlayer closed the queue would run
+// after the session left the world — publishing a pet for an offline owner,
+// past the only cleanup that would have removed it. The reference cannot
+// reach that state: Player.cleanup aborts the cast and unsummons the pet
+// (Player.java:6266-6283), and its spawn had no separate continuation to
+// leave behind. The detaching flag is the same one taskeffects.go checks
+// before applying a deferred effect to a departing session.
+func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
+	link, live := s.link, s.live
+	if live.detached() {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
+		return
+	}
+	if _, ok := link.world.Summon(live.ObjectID()); ok {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+		return
 	}
 
 	// Java's unsaved branch commits the seeded row immediately
@@ -113,7 +165,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		// with zero-value combat/feeding stats, matching Pet.restore
 		// returning null on bad data (SummonCreature.java:59's pet==null
 		// check, itself a silent no-op — see this file's own SpawnPet doc).
-		return false
+		return
 	}
 	fed, curHP, curMP := levelStats.MaxMeal, levelStats.MaxHP, levelStats.MaxMP
 	exp := levelStats.MaxExp
@@ -124,7 +176,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	objID, err := link.ids.NextID()
 	if err != nil {
-		return false
+		return
 	}
 
 	name := npcTmpl.Name
@@ -189,7 +241,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		LOS:       link.summonLineOfSight(),
 	})
 	if err != nil {
-		return false
+		return
 	}
 	pet.SetHP(curHP)
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
@@ -227,7 +279,6 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
 
-	return true
 }
 
 // SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its
@@ -305,6 +356,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		runSpeed = speed[0]
 	}
 	sink := &summonSink{link: l, actor: actor}
+	// A summon's work runs on its owner's queue.
+	var queue *sim.Queue
+	if owner, ok := liveSummonOwner(actor); ok {
+		queue = owner.Queue()
+	}
+	if queue != nil {
+		actor.SetQueue(queue)
+	}
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
@@ -323,6 +382,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetLogger(l.log)
+	if queue != nil {
+		attackController.SetQueue(queue)
+	}
 	brain := ai.NewSummon(actor, moveController, attackController)
 	sink.brain = brain
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
@@ -338,6 +400,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// c.SetLogger).
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
 	castController.SetLogger(l.log)
+	if queue != nil {
+		castController.SetQueue(queue)
+	}
 	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
@@ -403,14 +468,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	brain.SetCastController(aiController)
 	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
-	followTicker := brain.StartOffensiveFollowTicker(l.log)
-	sink.despawn = followTicker.Stop
+	stopFollow := brain.StartOffensiveFollowTicker(queue, l.log)
+	sink.despawn = stopFollow
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
 		sink.despawn = func() {
 			l.ai.Remove(runner)
-			followTicker.Stop()
+			stopFollow()
 		}
 	}
 	return aiController

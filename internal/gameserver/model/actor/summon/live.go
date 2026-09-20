@@ -13,6 +13,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -66,6 +67,9 @@ type Actor struct {
 	// zero-value until InitMovement wires real geodata/speed, so Move().Moving()
 	// stays false (not an error) for a summon with no movement controller.
 	movement move.CreatureMove
+	// queue is the owner's queue, which this summon's work runs on; set once
+	// before the summon is published.
+	queue *sim.Queue
 
 	id             int32
 	owner          Owner

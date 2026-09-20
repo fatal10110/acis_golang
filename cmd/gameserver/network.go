@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -85,6 +86,8 @@ func provideGameClientLink(
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	worker *persist.Worker,
+	itemWrites *persist.Order,
+	pool *sim.Pool,
 	log zerolog.Logger,
 ) *network.GameClientLink {
 	formulas.SetMagicFailures(bool(gameplay.MagicFailures))
@@ -146,6 +149,8 @@ func provideGameClientLink(
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          worker,
+		ItemWrites:       itemWrites,
+		Queues:           pool,
 		Restarts:         data.Restarts,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
@@ -160,8 +165,12 @@ func provideGameClientLink(
 	return link
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig) *skillstate.Persistence {
-	return skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(gameplay.StoreSkillCooltime), gamesql.NewCharacterSkillStore(pool))
+func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig, worker *persist.Worker, log zerolog.Logger) *skillstate.Persistence {
+	skills := skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(gameplay.StoreSkillCooltime), gamesql.NewCharacterSkillStore(pool))
+	// A learn, enchant or level refresh runs on the player's queue; its
+	// character_skills write must not block that queue.
+	skills.SetPersistWorker(worker, log)
+	return skills
 }
 
 // onlineAccounts collects the account names of every player currently in

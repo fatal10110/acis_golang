@@ -67,7 +67,7 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 	}
 	actions := []inventory.Persist{inventory.Save(result)}
 	if absorbed {
-		actions = []inventory.Persist{inventory.Update(result), inventory.Delete(ground.ObjectID())}
+		actions = []inventory.Persist{inventory.Update(result), inventory.Delete(ground.Instance.OwnerID, ground.ObjectID())}
 	}
 	return PickupResult{Persist: actions}, PickupOK
 }

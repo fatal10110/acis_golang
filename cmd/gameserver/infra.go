@@ -56,6 +56,14 @@ func providePersist(lc fx.Lifecycle, _ *sql.DB, log zerolog.Logger) *persist.Wor
 	return worker
 }
 
+// provideItemWriteOrder builds the ordering both writers of the items table
+// share: the handlers' single-row writes and the lazy persistence task write
+// the same rows from different lanes, and a row's last write has to be the
+// last one produced for it.
+func provideItemWriteOrder() *persist.Order {
+	return persist.NewOrder()
+}
+
 func provideIDAllocator(ctx bootContext, pool *sql.DB, log zerolog.Logger) (*idfactory.Allocator, error) {
 	return idfactory.New(ctx, pool, log)
 }
