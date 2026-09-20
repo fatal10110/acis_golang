@@ -67,3 +67,39 @@ func TestFlushWaitsForARequeuedItemWrite(t *testing.T) {
 		t.Fatal("flush returned before the item write landed")
 	}
 }
+
+// TestPanickingItemWriteDoesNotWedgeItsLane covers what a write owes when it
+// cannot finish. The worker recovers a panicking job (persist.Worker.runJob),
+// so the write is gone but the lane's books are not: work left owed forever
+// blocks every later flush of that lane — one lane in persist.Lanes, so a
+// quarter of the players, taking the whole awaitPersistence budget on every
+// logout and restart from then on.
+func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
+	order := persist.NewOrder()
+	worker := persist.New(zerolog.Nop())
+	t.Cleanup(func() {
+		if err := worker.Close(context.Background()); err != nil {
+			t.Errorf("close persistence worker: %v", err)
+		}
+	})
+	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
+
+	const ownerID, objectID int32 = 1, 910
+	link.queueItemWrite(ownerID, order.Reserve(objectID), func() { panic("store driver blew up") })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := worker.Flush(ctx, ownerID); err != nil {
+		t.Fatalf("flush of the lane never settled after a panicking write: %v", err)
+	}
+
+	// The row the panicking write held must be free for the next one.
+	landed := false
+	link.queueItemWrite(ownerID, order.Reserve(objectID), func() { landed = true })
+	if err := worker.Flush(ctx, ownerID); err != nil {
+		t.Fatalf("flush after the following write: %v", err)
+	}
+	if !landed {
+		t.Fatal("a later write of the same row never ran")
+	}
+}

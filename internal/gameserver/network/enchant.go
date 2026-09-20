@@ -198,22 +198,37 @@ const itemWriteRowWait = 20 * time.Millisecond
 // including a flush marker pushed after it was first queued, so the write is
 // also booked as work the lane owes: awaitPersistence waits for a lane to
 // report that what it queued has run, and a restart reads the items table
-// straight after. The debt is settled however the write ends — landed,
-// dropped as superseded, or cancelled.
+// straight after. The debt is booked here, before the first Enqueue and on
+// the actor queue — booking it inside attempt instead would let the write
+// run, fail and hand itself forward after a flush had already read what the
+// lane owes, which is the hole the booking exists to close.
+//
+// The debt is settled however the write ends — landed, dropped as superseded,
+// cancelled, or panicking — on every exit but the one that hands it to
+// another attempt. A lane owing work that nothing will ever settle wedges
+// every later flush of it, so this follows the row release in persist.Order:
+// the worker recovers a panicking job, so a write that panics has to leave
+// the bookkeeping as it found it.
 func (l *GameClientLink) queueItemWrite(ownerID int32, reserved *persist.Write, write func()) {
 	owed := l.persist.Owe(ownerID)
 	var attempt func()
 	attempt = func() {
+		settle := true
+		defer func() {
+			if settle {
+				owed.Settle()
+			}
+		}()
 		if reserved.TryRun(itemWriteRowWait, func([]int32) { write() }) {
-			owed.Settle()
 			return
 		}
-		if !l.persist.Enqueue(ownerID, attempt) {
-			// Shutdown: nothing will come back for this, so take the wait
-			// here rather than dropping a write the row is still owed.
-			reserved.Run(func([]int32) { write() })
-			owed.Settle()
+		if l.persist.Enqueue(ownerID, attempt) {
+			settle = false // Still owed: whichever attempt ends it settles.
+			return
 		}
+		// Shutdown: nothing will come back for this, so take the wait here
+		// rather than dropping a write the row is still owed.
+		reserved.Run(func([]int32) { write() })
 	}
 	if !l.persist.Enqueue(ownerID, attempt) {
 		reserved.Cancel()
