@@ -1060,3 +1060,10 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 }
 
 // ---- from summonitem_test.go ----
+
+func TestInstanceReleasePersisterIgnoresUncomparablePersister(t *testing.T) {
+	inst := newPersistTestInstance()
+	p := persistFunc(func(*Instance) {})
+	inst.BindPersister(p)
+	inst.ReleasePersister(p) // must not panic comparing func-typed values
+}

@@ -1,6 +1,7 @@
 package item
 
 import (
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -191,7 +192,9 @@ func (inst *Instance) BindPersister(p Persister) {
 }
 
 // ReleasePersister ends inst's dependency on p, and only p: an item that has
-// since been bound to another owner's persister keeps that one.
+// since been bound to another owner's persister keeps that one. A persister
+// whose dynamic type is not comparable (a func adapter) can never match, so
+// it is never released rather than panicking under the caller's lock.
 func (inst *Instance) ReleasePersister(p Persister) {
 	if inst == nil || p == nil {
 		return
@@ -199,7 +202,7 @@ func (inst *Instance) ReleasePersister(p Persister) {
 	mu := inst.lock()
 	mu.Lock()
 	defer mu.Unlock()
-	if inst.persist == p {
+	if reflect.TypeOf(p).Comparable() && inst.persist == p {
 		inst.persist = nil
 	}
 }
