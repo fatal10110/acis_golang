@@ -74,12 +74,13 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	npc.SetMaxGeoPathFailCount(int(gameplay.MaxGeoPathFailCount))
 	castTargets := skilltarget.NewRegistry(skilltarget.WorldKnown{State: state})
 	castHandlers := handlerskill.NewDefaultRegistryWithSignet(data.Skills, handlerskill.SignetDeps{
+		Activity:  effects,
 		Templates: data.NPCs,
 		IDs:       ids,
 		World:     state,
 		Log:       log,
 	})
-	npcs, err := manager.NewNpcsWithMaxBuffsAmountAndEffects(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
+	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
 		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers, OnHitResult: link.DeliverHitResult}, walker, network.HostileSinks(state), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), effects, pool, data.Zones)
 	if err != nil {
 		return nil, err

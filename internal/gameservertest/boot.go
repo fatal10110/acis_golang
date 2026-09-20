@@ -52,25 +52,6 @@ import (
 // HexID is the fixed server hex id every booted server registers under.
 var HexID = []byte{0x01, 0x02, 0x03, 0x04}
 
-// sharedEffects is the one task.Effects instance every Boot in this test
-// binary reuses. Each list carries its own activity registry, so
-// fresh instance per Boot would make each new server silently steal every
-// later effect.List registration away from servers already running in the
-// same process. Test servers only ever run
-// sequentially in this package, and each Boot's t.Cleanup tears its
-// connections down (triggering the network-layer Despawn/Untrack path)
-// before the next Boot runs, so one shared instance never mixes live
-// registrations from two servers at once.
-var (
-	sharedEffectsOnce sync.Once
-	sharedEffects     *task.Effects
-)
-
-func sharedTaskEffects() *task.Effects {
-	sharedEffectsOnce.Do(func() { sharedEffects = task.NewEffects() })
-	return sharedEffects
-}
-
 // Option customizes Boot.
 type Option func(*options)
 
