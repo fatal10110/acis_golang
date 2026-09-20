@@ -945,7 +945,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
 	queues := startQueues(t, o.log)
-	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker)
+	// Both writers of the items table share one ordering, as production does.
+	itemWrites := persist.NewOrder()
+	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker, itemWrites)
 	petStore := gamesql.NewPetStore(db)
 
 	// Mirror the production boot for the Seven Signs calendar: optional
@@ -1025,6 +1027,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
+		ItemWrites:       itemWrites,
 		PersistWait:      o.persistWait,
 		Queues:           queues,
 		ShadowItems:      shadowItems,

@@ -64,6 +64,10 @@ type ItemInstances struct {
 	flusher   ItemFlusher
 	templates *item.Table
 	worker    *persist.Worker
+	// writes orders each row's write against the same row's writes from
+	// other lanes — a handler's single-row write, another owner's flush —
+	// so the row keeps whichever was produced last (persist.Order).
+	writes *persist.Order
 
 	mu      sync.RWMutex
 	pending map[int32]pendingItem
@@ -101,7 +105,7 @@ type saveRound struct {
 
 // NewItemInstances returns an empty item persistence task whose writes run
 // on worker's lanes. A nil worker writes on the calling goroutine.
-func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker) *ItemInstances {
+func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker, writes *persist.Order) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
@@ -109,6 +113,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		flusher:   flusher,
 		templates: templates,
 		worker:    worker,
+		writes:    writes,
 		pending:   make(map[int32]pendingItem),
 		rounds:    make(map[*saveRound]struct{}),
 	}
@@ -134,14 +139,27 @@ func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
 	}, log)
 }
 
-// Add registers inst for the next persistence tick, remembering the owner
-// its row currently belongs to. A destroy reports the instance with its owner
-// already zeroed, so the previously recorded owner is kept (see pendingItem).
+// Add registers inst for the next persistence tick, remembering the owner its
+// row currently belongs to. A destroy reports the instance with its owner
+// already zeroed, so a previously recorded owner is kept (see pendingItem);
+// AddOwned is the form that does not have to guess.
 func (i *ItemInstances) Add(inst *item.Instance) {
 	if inst == nil {
 		return
 	}
-	ownerID := inst.Snapshot().OwnerID
+	i.AddOwned(inst.Snapshot().OwnerID, inst)
+}
+
+// AddOwned registers inst for the next persistence tick as ownerID's row.
+// The container holding an item knows that owner even when the item itself no
+// longer does, which is exactly what a destroy reports, so this is the form
+// the per-container persister hook uses: the recorded owner then survives a
+// flush swapping the pending set out, and a restored item whose first
+// mutation is its destruction still names an owner.
+func (i *ItemInstances) AddOwned(ownerID int32, inst *item.Instance) {
+	if inst == nil {
+		return
+	}
 	i.mu.Lock()
 	entry := i.pending[inst.ObjectID]
 	entry.inst = inst
@@ -388,11 +406,26 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
-	var batch item.FlushBatch
+	// The state each row is written with is read here, so this is where the
+	// flush takes its place in those rows' write order: it is then newer than
+	// every single-row write produced before it, and a row a newer write has
+	// already landed is left out rather than pushed back to an older state.
+	ids := make([]int32, 0, len(items))
 	for _, inst := range items {
-		i.addToBatch(&batch, inst)
+		ids = append(ids, inst.ObjectID)
 	}
-	return i.flusher.Flush(ctx, batch)
+	var err error
+	i.writes.Reserve(ids...).Run(func(keep []int32) {
+		var batch item.FlushBatch
+		for _, inst := range items {
+			if _, found := slices.BinarySearch(keep, inst.ObjectID); !found {
+				continue
+			}
+			i.addToBatch(&batch, inst)
+		}
+		err = i.flusher.Flush(ctx, batch)
+	})
+	return err
 }
 
 // addToBatch resolves inst's persistence effect and appends it to batch,

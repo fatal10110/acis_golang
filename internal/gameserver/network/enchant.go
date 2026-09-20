@@ -125,20 +125,23 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // worker instead of writing them here: this runs on an actor queue, where a
 // slow database would hold a pool worker and stall unrelated actors.
 //
-// The lane is the row owner's at the moment the action is produced, so one
-// owner's writes of one row keep their production order. The state itself is
-// read when the write runs, not frozen here, because a lane is not enough on
-// its own: an item that changes hands has its next write queued on the new
-// owner's lane, and if the old owner's lane drains later, a frozen snapshot
-// would overwrite the row with the previous owner. Reading at write time
-// means every queued write lands the row's current state, so two lanes
-// writing one row converge instead of fighting. item.Instance.Snapshot is
-// mutex-guarded, so the read is safe from a worker goroutine.
+// Each write carries the state this queue produced it with, and takes its
+// place in that row's write order before it is queued (persist.Order). The
+// lane it runs on is the row owner's at that moment, so one owner's writes of
+// one row also keep their order; the reservation is what covers the rest,
+// because a row does not stay with one owner. An item that changes hands has
+// its next write queued on the new owner's lane, a destroyed item's delete
+// comes from the persistence tick's own lane, and a dropped item is picked up
+// as a new instance carrying the same object id — in each case a second lane
+// writes the row this one is about to, and only the reservation decides which
+// of them the row keeps.
 //
-// An item that has been destroyed or moved out of the world by the time the
-// write runs becomes a delete, the same rule task.ItemInstances.addToBatch
-// applies: an ItemStore save is an upsert, so writing that state as a row
-// would resurrect what another writer has already deleted.
+// Both a new row and a changed one are written as the same upsert, which is
+// what the persistence tick's own batch does for every live item
+// (task.ItemInstances.addToBatch). The distinction cannot survive ordering:
+// the write that creates a row may be the one a later write supersedes, and a
+// plain UPDATE from that later write would then touch nothing and lose the
+// row altogether.
 //
 // A count-zero pet collar is the one row whose pets-row delete needs the
 // collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
@@ -154,34 +157,28 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			if action.Item == nil {
 				continue
 			}
-			insert := action.Action == invops.PersistSave
-			inst := action.Item
-			l.persist.Enqueue(inst.Snapshot().OwnerID, func() {
-				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-				defer cancel()
-				st := inst.Snapshot()
-				if st.Count <= 0 || st.Location == item.LocationVoid {
-					if err := l.items.Delete(ctx, st.ObjectID); err != nil {
-						l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("delete item")
+			st := action.Item.Snapshot()
+			reserved := l.itemWrites.Reserve(st.ObjectID)
+			l.persist.Enqueue(st.OwnerID, func() {
+				reserved.Run(func([]int32) {
+					ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+					defer cancel()
+					if err := l.items.SaveState(ctx, st); err != nil {
+						l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("save item")
 					}
-					return
-				}
-				write, op := l.items.UpdateState, "update item"
-				if insert {
-					write, op = l.items.SaveState, "save item"
-				}
-				if err := write(ctx, st); err != nil {
-					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg(op)
-				}
+				})
 			})
 		case invops.PersistDelete:
 			objectID := action.ObjectID
+			reserved := l.itemWrites.Reserve(objectID)
 			l.persist.Enqueue(action.OwnerID, func() {
-				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-				defer cancel()
-				if err := l.items.Delete(ctx, objectID); err != nil {
-					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
-				}
+				reserved.Run(func([]int32) {
+					ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+					defer cancel()
+					if err := l.items.Delete(ctx, objectID); err != nil {
+						l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
+					}
+				})
 			})
 		}
 	}

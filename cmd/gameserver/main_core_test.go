@@ -975,7 +975,7 @@ func TestItemInstanceSaveTimeoutFitsShutdownBudget(t *testing.T) {
 func TestDrainItemInstancesOutlivesExpiredStopContext(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	flusher := &countingItemFlusher{}
-	items := task.NewItemInstances(flusher, item.NewTable(nil), worker)
+	items := task.NewItemInstances(flusher, item.NewTable(nil), worker, nil)
 	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
 	items.Add(inst)
 

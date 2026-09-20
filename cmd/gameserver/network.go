@@ -85,6 +85,7 @@ func provideGameClientLink(
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	worker *persist.Worker,
+	itemWrites *persist.Order,
 	pool *sim.Pool,
 	log zerolog.Logger,
 ) *network.GameClientLink {
@@ -146,6 +147,7 @@ func provideGameClientLink(
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          worker,
+		ItemWrites:       itemWrites,
 		Queues:           pool,
 		Restarts:         data.Restarts,
 		Levels:           data.Levels,

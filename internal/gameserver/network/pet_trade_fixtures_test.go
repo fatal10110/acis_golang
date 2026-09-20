@@ -16,6 +16,7 @@ import (
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -81,6 +82,7 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 		world:            state,
 		itemTemplates:    testItemTemplates(),
 		items:            store,
+		itemWrites:       persist.NewOrder(),
 		ids:              ids,
 		inventory:        invops.NewService(ids),
 		trades:           tradebook.NewBook(time.Now),

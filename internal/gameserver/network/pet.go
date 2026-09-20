@@ -55,7 +55,9 @@ func (l *GameClientLink) registerPetInventoryUpdates(pet *summon.Actor, live *li
 	// does; its items carry the pet's own object id as owner.
 	if l.itemInstances != nil && pet != nil {
 		if inv := pet.PetInventory(); inv != nil {
-			inv.SetItemPersister(l.itemInstances.Add)
+			// The container supplies the owner, so a destroy — which zeroes
+			// the instance's own — still names the row's lane.
+			inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 		}
 	}
 }

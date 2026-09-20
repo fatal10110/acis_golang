@@ -550,7 +550,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// without a client request still reaches the items table on the task's
 	// own cadence.
 	if inv := c.Inventory(); inv != nil && l.itemInstances != nil {
-		inv.SetItemPersister(l.itemInstances.Add)
+		// The container supplies the owner, so a destroy — which zeroes the
+		// instance's own — still names the row's lane.
+		inv.SetItemPersister(func(inst *item.Instance) { l.itemInstances.AddOwned(inv.OwnerID(), inst) })
 	}
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {
