@@ -26,6 +26,7 @@ const activityReminderMinutes = 720
 // mutates when a day/night boundary crosses.
 type PlayerClockActor interface {
 	ObjectID() int32
+	Queued
 	HasSkill(skillID int) bool
 	SetSkillLevel(skillID, level int)
 }
@@ -159,10 +160,12 @@ func (p *PlayerClock) onDayNight(night bool) {
 		if !ok {
 			continue
 		}
-		if !actor.HasSkill(shadowSenseSkillID) {
-			continue
-		}
-		actor.SetSkillLevel(shadowSenseSkillID, shadowSenseLevel)
-		p.effects.NotifyDayNightSkillTransition(actor.ObjectID(), night, shadowSenseSkillID, shadowSenseLevel)
+		post(actor.Queue(), func() {
+			if !actor.HasSkill(shadowSenseSkillID) {
+				return
+			}
+			actor.SetSkillLevel(shadowSenseSkillID, shadowSenseLevel)
+			p.effects.NotifyDayNightSkillTransition(actor.ObjectID(), night, shadowSenseSkillID, shadowSenseLevel)
+		})
 	}
 }

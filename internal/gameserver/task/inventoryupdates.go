@@ -16,6 +16,7 @@ const InventoryUpdateTick = 333 * time.Millisecond
 // InventoryUpdateOwner is the narrow playable surface the inventory update
 // task needs.
 type InventoryUpdateOwner interface {
+	Queued
 	Visible() bool
 	Teleporting() bool
 	SendInventoryUpdate([]itemcontainer.Update)
@@ -86,7 +87,7 @@ func (u *InventoryUpdates) Contains(inv *itemcontainer.Inventory) bool {
 }
 
 // Tick sends one queued inventory update to every visible or teleporting
-// owner, then refreshes the inventory weight.
+// owner, then refreshes the inventory weight, on the owner's queue.
 func (u *InventoryUpdates) Tick() {
 	entries := u.snapshot()
 	done := make(map[*itemcontainer.Inventory]uint64, len(entries))
@@ -100,13 +101,15 @@ func (u *InventoryUpdates) Tick() {
 			continue
 		}
 
-		updates := entry.inventory.DrainUpdates()
-		if len(updates) == 0 {
-			done[entry.inventory] = entry.epoch
-			continue
-		}
-		entry.owner.SendInventoryUpdate(updates)
-		entry.inventory.UpdateWeight()
+		// Draining on the owner's queue leaves an entry that turns out empty
+		// registered; the next tick finds no updates and drops it then.
+		inv, owner := entry.inventory, entry.owner
+		post(owner.Queue(), func() {
+			if updates := inv.DrainUpdates(); len(updates) > 0 {
+				owner.SendInventoryUpdate(updates)
+				inv.UpdateWeight()
+			}
+		})
 	}
 	if len(done) > 0 {
 		u.removeUnchanged(done)

@@ -25,6 +25,7 @@ const (
 // WalkerActor is the narrow NPC surface route walking needs.
 type WalkerActor interface {
 	world.Tracked
+	Queued
 	Position() location.Location
 	Moving() bool
 	MoveToLocation(location.Location) (event.Move, error)
@@ -87,6 +88,7 @@ type Walker struct {
 	path   WalkerPath
 	now    func() time.Time
 	state  *world.State
+	log    zerolog.Logger // set by Start, before the first tick
 
 	mu      sync.Mutex
 	entries map[int32]*walkerEntry
@@ -123,6 +125,7 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 
 // Start launches the fixed one-second walker task.
 func (w *Walker) Start(log zerolog.Logger) *scheduler.Ticker {
+	w.log = log
 	return scheduler.Start(WalkerTick, func() {
 		for _, err := range w.Tick() {
 			log.Error().Err(err).Msg("walker route tick")
@@ -222,27 +225,52 @@ func (w *Walker) MoveToNextPoint(actor WalkerActor) error {
 }
 
 // Tick releases delayed route walkers whose wait has elapsed and that are no
-// longer moving. It returns per-entry errors so tests and callers can surface
-// bad route state without stopping the recurring task.
+// longer moving, each on its own queue, where a route error is logged. For a
+// walker without a queue the release runs here, and Tick returns its error so
+// tests and callers can surface bad route state without stopping the
+// recurring task.
 func (w *Walker) Tick() []error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	now := w.now()
+	w.mu.Lock()
+	var due []WalkerActor
+	for _, entry := range w.entries {
+		if !entry.wakeTime.IsZero() && !now.Before(entry.wakeTime) {
+			due = append(due, entry.actor)
+		}
+	}
+	w.mu.Unlock()
+
 	var errs []error
-	for id, entry := range w.entries {
-		if entry.wakeTime.IsZero() || now.Before(entry.wakeTime) {
+	for _, actor := range due {
+		if q := actor.Queue(); q != nil {
+			q.Post(func() {
+				if err := w.release(actor, now); err != nil {
+					w.log.Error().Err(err).Msg("walker route tick")
+				}
+			})
 			continue
 		}
-		if entry.actor.Moving() {
-			continue
-		}
-		entry.wakeTime = time.Time{}
-		if err := w.moveToNextPoint(entry); err != nil {
-			errs = append(errs, fmt.Errorf("task: walker %d: %w", id, err))
+		if err := w.release(actor, now); err != nil {
+			errs = append(errs, err)
 		}
 	}
 	return errs
+}
+
+// release requests actor's next route node if its wait, as of now, has
+// elapsed and it is no longer moving.
+func (w *Walker) release(actor WalkerActor, now time.Time) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	entry, ok := w.entries[actor.ObjectID()]
+	if !ok || entry.actor != actor || entry.wakeTime.IsZero() || now.Before(entry.wakeTime) || actor.Moving() {
+		return nil
+	}
+	entry.wakeTime = time.Time{}
+	if err := w.moveToNextPoint(entry); err != nil {
+		return fmt.Errorf("task: walker %d: %w", actor.ObjectID(), err)
+	}
+	return nil
 }
 
 func (w *Walker) moveToNextPoint(entry *walkerEntry) error {

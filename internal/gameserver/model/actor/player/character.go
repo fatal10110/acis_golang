@@ -178,7 +178,7 @@ type Character struct {
 	shortBuffTaskSkillID int32
 	weaponGradePenalty   bool
 	armorGradePenalty    int
-	shortBuffTimer       *time.Timer
+	shortBuffTimer       stopper
 	recentFakeDeathUntil time.Time
 	groundTarget         location.Location
 	castCtrl             bool
@@ -193,7 +193,7 @@ type Character struct {
 	// decreaseCharges/clearCharges), auto-cleared by chargeTimer after
 	// chargeAutoClearDelay of inactivity.
 	charges     int
-	chargeTimer *time.Timer
+	chargeTimer stopper
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.

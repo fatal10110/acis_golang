@@ -26,6 +26,7 @@ const AITick = time.Second
 // AIActor is the narrow actor brain surface the AI task runs.
 type AIActor interface {
 	world.Tracked
+	Queued
 	Tick()
 	TickThink() error
 }
@@ -72,8 +73,9 @@ func (a *AI) Remove(actor AIActor) {
 	a.remove(actor.ObjectID())
 }
 
-// Tick runs one AI cycle for every registered actor in an active region,
-// and for inactive-region actors that explicitly opt out of sleeping. It
+// Tick runs one AI cycle, on each actor's queue, for every registered actor
+// in an active region, and for inactive-region actors that explicitly opt
+// out of sleeping. It
 // logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AI) Tick() error {
@@ -94,10 +96,12 @@ func (a *AI) Tick() error {
 				continue
 			}
 		}
-		actor.Tick()
-		if err := actor.TickThink(); err != nil {
-			a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
-		}
+		post(actor.Queue(), func() {
+			actor.Tick()
+			if err := actor.TickThink(); err != nil {
+				a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")
+			}
+		})
 	}
 	return nil
 }

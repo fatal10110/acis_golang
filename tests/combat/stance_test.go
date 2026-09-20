@@ -10,6 +10,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -226,6 +227,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 type worldActor struct{ id int32 }
 
 func (a worldActor) ObjectID() int32 { return a.id }
+func (worldActor) Queue() *sim.Queue { return nil }
 
 func playerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) bool {
 	t.Helper()

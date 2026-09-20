@@ -340,6 +340,7 @@ type Server struct {
 	autosave         *task.Autosave
 	autosaveClock    *autosaveClock
 	persist          *persist.Worker
+	queues           *queues
 	log              zerolog.Logger
 
 	closeOnce    sync.Once
@@ -700,6 +701,11 @@ func (s *Server) QueueAutosave() {
 	}
 	s.autosaveClock.Advance(task.AutosaveInitialDelay)
 	s.autosave.Tick()
+	// The sweep runs each save on its player's queue; once those tasks
+	// have run, every write is on its persistence lane.
+	if err := s.queues.settle(); err != nil {
+		panic(err)
+	}
 }
 
 // HoldPersistenceLane blocks ownerID's persistence lane until the returned
@@ -734,6 +740,16 @@ func (s *Server) flushPersistence() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 	defer cancel()
 	return s.persist.Flush(ctx)
+}
+
+// Settle waits until every task already posted to an actor queue has run: a
+// packet handler's follow-up, a timer that fired, or the per-actor work a
+// tick fanned out. Work those tasks post in turn may still be pending.
+func (s *Server) Settle(tb testing.TB) {
+	tb.Helper()
+	if err := s.queues.settle(); err != nil {
+		tb.Fatal(err)
+	}
 }
 
 // NewObjectID allocates the next object id from the server's id sequence.
@@ -890,6 +906,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Errorf("close persistence worker: %v", err)
 		}
 	})
+	// Registered after the persistence worker and before the listener, so
+	// it stops once every connection has detached on its queue and before
+	// the worker drains.
+	queues := startQueues(t, o.log)
 	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker)
 	petStore := gamesql.NewPetStore(db)
 
@@ -971,6 +991,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
 		PersistWait:      o.persistWait,
+		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
@@ -1120,6 +1141,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autosave:         autosave,
 		autosaveClock:    autosaveClock,
 		persist:          persistWorker,
+		queues:           queues,
 		log:              o.log,
 		cancel:           cancel,
 		waitHandlers:     waitHandlers,

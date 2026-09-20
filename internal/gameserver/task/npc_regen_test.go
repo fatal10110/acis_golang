@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -96,3 +97,5 @@ func TestNPCRegenTickLogsReentrantCall(t *testing.T) {
 		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
+
+func (*countingRegenActor) Queue() *sim.Queue { return nil }

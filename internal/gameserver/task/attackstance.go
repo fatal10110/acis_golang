@@ -23,6 +23,7 @@ const LifeCubicID = 3
 // AttackStanceActor is the narrow actor surface tracked by combat stance.
 type AttackStanceActor interface {
 	ObjectID() int32
+	Queued
 }
 
 type attackStanceCombatant interface {
@@ -120,7 +121,8 @@ func (a *AttackStance) InAttackStance(actor AttackStanceActor) bool {
 	return a.tracked(actor.ObjectID())
 }
 
-// Tick stops combat stance for actors whose inactivity period has elapsed.
+// Tick stops combat stance, on each actor's queue, for actors whose
+// inactivity period has elapsed.
 // It logs and returns ErrReentrantTick without doing anything else if another Tick call is
 // already in flight.
 func (a *AttackStance) Tick() error {
@@ -129,18 +131,39 @@ func (a *AttackStance) Tick() error {
 	}
 	defer a.endTick()
 
-	a.tickDue(a.now(), func(actor AttackStanceActor) {
-		if combatant, ok := actor.(attackStanceCombatant); ok {
-			combatant.SetInCombat(false)
+	// The entry stays tracked until the queued expiry runs: an attack that
+	// refreshes the deadline ahead of it keeps the stance, instead of the
+	// stale expiry stopping a stance the actor has just renewed.
+	a.sweepDue(a.now(), func(actor AttackStanceActor, deadline time.Time) {
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { a.expire(actor, deadline) })
+			return
 		}
-		a.effects.AutoAttackStop(actor)
-		if s, ok := actor.(attackStanceSummoner); ok {
-			if summon := s.Summon(); summon != nil {
-				a.effects.AutoAttackStop(summon)
-			}
-		}
+		a.expire(actor, deadline)
 	})
 	return nil
+}
+
+// expire ends actor's combat stance unless its deadline was refreshed after
+// the sweep observed it.
+func (a *AttackStance) expire(actor AttackStanceActor, deadline time.Time) {
+	if !a.expireIf(actor.ObjectID(), deadline) {
+		return
+	}
+	a.stop(actor)
+}
+
+// stop ends actor's combat stance and its summon's.
+func (a *AttackStance) stop(actor AttackStanceActor) {
+	if combatant, ok := actor.(attackStanceCombatant); ok {
+		combatant.SetInCombat(false)
+	}
+	a.effects.AutoAttackStop(actor)
+	if s, ok := actor.(attackStanceSummoner); ok {
+		if summon := s.Summon(); summon != nil {
+			a.effects.AutoAttackStop(summon)
+		}
+	}
 }
 
 func stanceOwner(actor AttackStanceActor) AttackStanceActor {

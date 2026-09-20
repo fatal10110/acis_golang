@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -304,6 +305,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		runSpeed = speed[0]
 	}
 	sink := &summonSink{link: l, actor: actor}
+	// A summon's work runs on its owner's queue.
+	var queue *sim.Queue
+	if owner, ok := liveSummonOwner(actor); ok {
+		queue = owner.Queue()
+	}
+	if queue != nil {
+		actor.SetQueue(queue)
+	}
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
@@ -322,6 +331,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetLogger(l.log)
+	if queue != nil {
+		attackController.SetQueue(queue)
+	}
 	brain := ai.NewSummon(actor, moveController, attackController)
 	sink.brain = brain
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
@@ -337,6 +349,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// c.SetLogger).
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
 	castController.SetLogger(l.log)
+	if queue != nil {
+		castController.SetQueue(queue)
+	}
 	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
@@ -402,14 +417,14 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	brain.SetCastController(aiController)
 	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
-	followTicker := brain.StartOffensiveFollowTicker(l.log)
-	sink.despawn = followTicker.Stop
+	stopFollow := brain.StartOffensiveFollowTicker(queue, l.log)
+	sink.despawn = stopFollow
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
 		sink.despawn = func() {
 			l.ai.Remove(runner)
-			followTicker.Stop()
+			stopFollow()
 		}
 	}
 	return aiController

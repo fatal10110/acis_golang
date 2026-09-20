@@ -101,21 +101,22 @@ func (r *deadlineRegistry[K, V]) tickDueConcurrent(now time.Time, fire func(V)) 
 	}
 }
 
-// tickExpiry partitions entries into due (now strictly after deadline,
-// removed and passed to expire) and pending (left tracked, passed with
-// their deadline to update). Matches PvPFlags's blink semantics, where an
-// entry exactly at its deadline is still pending, not yet due. Like
-// tickDueConcurrent, both partitions are allocated fresh on every call,
-// starting nil, so an all-pending or all-due tick costs nothing for the
-// partition that stays empty; this is what makes it safe to call from
-// multiple goroutines at once with no other coordination.
-func (r *deadlineRegistry[K, V]) tickExpiry(now time.Time, expire func(V), update func(V, time.Time)) {
+// tickPending partitions entries into due (now strictly after deadline,
+// passed to expire) and pending (passed to update), each with the deadline
+// the sweep read. Matches PvPFlags's blink semantics, where an entry exactly
+// at its deadline is still pending, not yet due. Entries stay tracked: a due
+// one is removed by expire through expireIf, once it is ready to apply, so a
+// refresh in between wins. Like tickDueConcurrent, both partitions are
+// allocated fresh on every call, starting nil, so an all-pending or all-due
+// tick costs nothing for the partition that stays empty; this is what makes
+// it safe to call from multiple goroutines at once with no other
+// coordination.
+func (r *deadlineRegistry[K, V]) tickPending(now time.Time, expire func(V, time.Time), update func(V, time.Time)) {
 	r.mu.Lock()
 	var due, pending []deadlineEntry[V]
-	for key, entry := range r.entries {
+	for _, entry := range r.entries {
 		if now.After(entry.deadline) {
 			due = append(due, entry)
-			delete(r.entries, key)
 			continue
 		}
 		pending = append(pending, entry)
@@ -123,11 +124,36 @@ func (r *deadlineRegistry[K, V]) tickExpiry(now time.Time, expire func(V), updat
 	r.mu.Unlock()
 
 	for _, entry := range due {
-		expire(entry.actor)
+		expire(entry.actor, entry.deadline)
 	}
 	for _, entry := range pending {
 		update(entry.actor, entry.deadline)
 	}
+}
+
+// expireIf removes key when it is still tracked with exactly deadline, and
+// reports whether it did. A refresh that replaced the entry between the
+// sweep and this call leaves the fresh entry tracked, so the expiry the
+// sweep observed is dropped instead of applied to it.
+func (r *deadlineRegistry[K, V]) expireIf(key K, deadline time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, ok := r.entries[key]
+	if !ok || !entry.deadline.Equal(deadline) {
+		return false
+	}
+	delete(r.entries, key)
+	return true
+}
+
+// hasDeadline reports whether key is tracked with exactly deadline, so a
+// caller can drop a transition it computed from a deadline that has since
+// been refreshed.
+func (r *deadlineRegistry[K, V]) hasDeadline(key K, deadline time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, ok := r.entries[key]
+	return ok && entry.deadline.Equal(deadline)
 }
 
 // serialDeadlineRegistry layers a reused scratch buffer and a
@@ -144,6 +170,30 @@ type serialDeadlineRegistry[K comparable, V any] struct {
 
 func newSerialDeadlineRegistry[K comparable, V any]() *serialDeadlineRegistry[K, V] {
 	return &serialDeadlineRegistry[K, V]{deadlineRegistry: newDeadlineRegistry[K, V]()}
+}
+
+// sweepDue calls fire for every entry whose deadline is not after now,
+// leaving each one tracked: the caller applies the expiry through expireIf,
+// which drops it if the entry was refreshed in the meantime. The due
+// partition is the reused scratch slice, so the caller must hold the
+// beginTick/endTick guard for the duration of the call.
+func (r *serialDeadlineRegistry[K, V]) sweepDue(now time.Time, fire func(actor V, deadline time.Time)) {
+	r.mu.Lock()
+	r.scratch = r.scratch[:0]
+	for _, entry := range r.entries {
+		if now.Before(entry.deadline) {
+			continue
+		}
+		r.scratch = append(r.scratch, entry)
+	}
+	due := r.scratch
+	r.mu.Unlock()
+
+	defer clear(r.scratch)
+
+	for _, entry := range due {
+		fire(entry.actor, entry.deadline)
+	}
 }
 
 // tickDue sweeps entries whose deadline is not after now, removes them, and

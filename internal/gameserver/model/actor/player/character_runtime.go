@@ -2,6 +2,7 @@ package player
 
 import (
 	"math/rand/v2"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -10,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -197,6 +199,16 @@ func (c *Character) Attach(live *creature.Live, sink event.Sink) {
 	defer c.stateMu.Unlock()
 	c.Live = live
 	c.sink = sink
+}
+
+// stopper is an armed one-shot timer.
+type stopper interface{ Stop() bool }
+
+// afterLocked arms fn to run once d has elapsed, as a task on the
+// character's queue once Attach installed one; see sim.AfterOr otherwise.
+// The caller holds stateMu.
+func (c *Character) afterLocked(d time.Duration, fn func()) stopper {
+	return sim.AfterOr(c.Live.Queue(), d, fn, c.log)
 }
 
 // DetachSession marks the owning session gone. Events the session alone

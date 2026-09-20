@@ -7,6 +7,8 @@ package sim
 import (
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // Clock reports the current time. Inline's clock moves only on Advance.
@@ -46,6 +48,7 @@ type Queue struct {
 	mu        sync.Mutex
 	tasks     []func() // pending tasks; Pool only, Inline keeps one global FIFO
 	scheduled bool     // Pool only: q is in the run queue or being drained
+	backlog   bool     // Pool only: pending tasks crossed highWater and have not dropped back below it
 	closed    bool
 	timers    map[*Timer]struct{} // armed timers and tickers, cancelled by Close
 }
@@ -177,6 +180,23 @@ func (t *Timer) run() {
 	}
 	q.mu.Unlock()
 	t.fn()
+}
+
+// AfterOr runs fn once d has elapsed: as a task on q, or, for a nil q (an
+// actor built without a queue), on a timer goroutine that logs a panic to
+// log instead of crashing the process. The result stops the timer.
+func AfterOr(q *Queue, d time.Duration, fn func(), log zerolog.Logger) interface{ Stop() bool } {
+	if q != nil {
+		return q.After(d, fn)
+	}
+	return time.AfterFunc(d, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error().Interface("panic", r).Msg("sim: recovered panic in timer callback")
+			}
+		}()
+		fn()
+	})
 }
 
 // Ticker is a periodic callback armed by Queue.Every.

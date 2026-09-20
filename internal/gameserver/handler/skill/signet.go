@@ -167,6 +167,9 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if err != nil {
 		return nil, false
 	}
+	// The point's own effect list stays off the caster's queue: it outlives
+	// the caster's session, and its OnExit is what despawns the point, so a
+	// queue closed by the caster's logout would strand the point in world.
 	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
 
 	pos, ok := caster.(signetPositioned)
