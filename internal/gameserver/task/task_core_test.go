@@ -23,6 +23,7 @@ import (
 // ---- from attackstance_test.go ----
 type attackStanceFakeActor struct {
 	id       int32
+	queue    *sim.Queue
 	owner    AttackStanceActor
 	summon   AttackStanceActor
 	cubics   []AttackStanceCubic
@@ -1551,6 +1552,7 @@ func augmentationSaveIDs(saves []item.FlushAugmentationSave) []int32 {
 // ---- from pvpflag_test.go ----
 type pvpFlagFakeActor struct {
 	id     int32
+	queue  *sim.Queue
 	flag   PvPFlagState
 	events []PvPFlagState
 }
@@ -2024,8 +2026,9 @@ func TestShadowItems_Remove_StopsTrackingByActor(t *testing.T) {
 
 // ---- from water_test.go ----
 type waterFakeActor struct {
-	id   int32
-	dead bool
+	id    int32
+	queue *sim.Queue
+	dead  bool
 }
 
 func (a *waterFakeActor) ObjectID() int32 { return a.id }
@@ -2307,16 +2310,144 @@ func TestGroundItemOptionsFromPropertiesSpecialItemsOverridesDefault(t *testing.
 
 func (waterFakeActor) Kind() actor.Kind { return actor.KindNPC }
 
-func (*attackStanceFakeActor) Queue() *sim.Queue { return nil }
+func (a *attackStanceFakeActor) Queue() *sim.Queue { return a.queue }
 
 func (*decayFakeActor) Queue() *sim.Queue { return nil }
 
 func (*autosaveFakeActor) Queue() *sim.Queue { return nil }
 
-func (*pvpFlagFakeActor) Queue() *sim.Queue { return nil }
+func (a *pvpFlagFakeActor) Queue() *sim.Queue { return a.queue }
 
 func (*decayFakeSummon) Queue() *sim.Queue { return nil }
 
-func (*waterFakeActor) Queue() *sim.Queue { return nil }
+func (a *waterFakeActor) Queue() *sim.Queue { return a.queue }
 
 func (*inventoryUpdateOwnerStub) Queue() *sim.Queue { return nil }
+
+// TestAttackStanceRefreshBeforeQueuedExpiryKeepsStance covers the ordering a
+// sweep on the ticker goroutine opens up: the expiry runs as a task on the
+// actor's queue, and an attack that refreshes the deadline can reach that
+// queue first. The refreshed stance must survive, and registry membership
+// must agree with the combat flag.
+func TestAttackStanceRefreshBeforeQueuedExpiryKeepsStance(t *testing.T) {
+	inline := sim.NewInline(time.UnixMilli(0))
+	base := time.UnixMilli(0)
+	now := base
+	effects := &attackStanceFakeEffects{}
+	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewAttackStance() error = %v", err)
+	}
+	actor := &attackStanceFakeActor{id: 1, queue: inline.NewQueue("actor-1"), inCombat: true}
+	stance.Add(actor)
+
+	now = base.Add(AttackStancePeriod + time.Second)
+	// The fresh attack lands on the queue ahead of the sweep's expiry.
+	actor.queue.Post(func() { stance.Add(actor) })
+	if err := stance.Tick(); err != nil {
+		t.Fatalf("Tick() = %v", err)
+	}
+	inline.Run()
+
+	if !actor.inCombat {
+		t.Error("refreshed stance: inCombat = false, want true")
+	}
+	if stops := effects.take(); len(stops) != 0 {
+		t.Errorf("refreshed stance: AutoAttackStop calls = %v, want none", stops)
+	}
+	if !stance.InAttackStance(actor) {
+		t.Error("refreshed stance: tracked = false, want true")
+	}
+
+	// With no refresh, the next sweep's queued expiry still stops it.
+	now = now.Add(AttackStancePeriod + time.Second)
+	if err := stance.Tick(); err != nil {
+		t.Fatalf("Tick() = %v", err)
+	}
+	inline.Run()
+	if actor.inCombat {
+		t.Error("expired stance: inCombat = true, want false")
+	}
+	if stance.InAttackStance(actor) {
+		t.Error("expired stance: still tracked")
+	}
+}
+
+// TestPvPFlagsRefreshBeforeQueuedTransitionKeepsFlag covers the same ordering
+// for PvP flags: a refresh that reaches the actor's queue before the sweep's
+// queued transition must not be cleared by it.
+func TestPvPFlagsRefreshBeforeQueuedTransitionKeepsFlag(t *testing.T) {
+	inline := sim.NewInline(time.UnixMilli(0))
+	base := time.UnixMilli(0)
+	now := base
+	flags := NewPvPFlags(DefaultPvPFlagOptions(), func() time.Time { return now })
+	actor := &pvpFlagFakeActor{id: 1, queue: inline.NewQueue("actor-1")}
+	flags.AddNormal(actor)
+
+	now = base.Add(DefaultPvPFlagOptions().Normal + time.Second)
+	actor.queue.Post(func() { flags.AddNormal(actor) })
+	flags.Tick()
+	inline.Run()
+
+	if actor.flag != PvPFlagOn {
+		t.Errorf("refreshed flag = %v, want PvPFlagOn", actor.flag)
+	}
+	if flags.Len() != 1 {
+		t.Errorf("tracked flags = %d, want 1", flags.Len())
+	}
+
+	// Without a refresh the queued expiry clears the flag and drops it.
+	now = now.Add(DefaultPvPFlagOptions().Normal + time.Second)
+	flags.Tick()
+	inline.Run()
+	if actor.flag != PvPFlagNone {
+		t.Errorf("expired flag = %v, want PvPFlagNone", actor.flag)
+	}
+	if flags.Len() != 0 {
+		t.Errorf("tracked flags after expiry = %d, want 0", flags.Len())
+	}
+}
+
+// TestWaterExitBeforeQueuedDrownSkipsDamage covers the same ordering for
+// drowning: leaving the water ahead of the sweep's queued damage must keep
+// that damage from landing on a surfaced player.
+func TestWaterExitBeforeQueuedDrownSkipsDamage(t *testing.T) {
+	inline := sim.NewInline(time.UnixMilli(0))
+	base := time.UnixMilli(0)
+	now := base
+	effects := &waterFakeEffects{}
+	water, err := NewWater(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewWater() error = %v", err)
+	}
+	actor := &waterFakeActor{id: 1, queue: inline.NewQueue("actor-1")}
+	water.Add(actor, time.Second)
+
+	now = base.Add(2 * time.Second)
+	// Surfacing lands on the queue ahead of the sweep's drowning damage.
+	actor.queue.Post(func() { water.Remove(actor) })
+	water.Tick()
+	inline.Run()
+
+	for _, event := range effects.take() {
+		if strings.Contains(event, "drown") {
+			t.Fatal("drowning damage landed after the player left the water")
+		}
+	}
+
+	// A fresh submersion still drowns once its own breath runs out.
+	water.Add(actor, time.Second)
+	now = now.Add(2 * time.Second)
+	water.Tick()
+	inline.Run()
+	events := effects.take()
+	drowns := 0
+	for _, event := range events {
+		if strings.Contains(event, "drown") {
+			drowns++
+		}
+	}
+	if drowns != 1 {
+		t.Fatalf("drowning damage after a fresh breath = %d, want 1: %v", drowns, events)
+	}
+}

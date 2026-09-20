@@ -92,6 +92,18 @@ func (w *Water) Add(actor WaterActor, breath time.Duration) {
 	w.effects.GaugeSet(actor, breath)
 }
 
+// drown applies one drowning tick, unless entry is no longer the tracked
+// submersion it was swept from.
+func (w *Water) drown(entry waterEntry) {
+	w.mu.Lock()
+	current, ok := w.entries[entry.actor.ObjectID()]
+	w.mu.Unlock()
+	if !ok || current.actor != entry.actor || !current.deadline.Equal(entry.deadline) {
+		return
+	}
+	w.effects.Drown(entry.actor)
+}
+
 // Remove stops tracking actor's breath countdown, if it was tracked.
 func (w *Water) Remove(actor WaterActor) {
 	if actor == nil {
@@ -115,17 +127,24 @@ func (w *Water) Remove(actor WaterActor) {
 // drowning every tick) until Remove is called.
 func (w *Water) Tick() {
 	w.mu.Lock()
-	var due []WaterActor
+	var due []waterEntry
 	now := w.now()
 	for _, entry := range w.entries {
 		if now.Before(entry.deadline) {
 			continue
 		}
-		due = append(due, entry.actor)
+		due = append(due, entry)
 	}
 	w.mu.Unlock()
 
-	for _, actor := range due {
-		post(actor.Queue(), func() { w.effects.Drown(actor) })
+	// The queued damage resolves the entry again: an actor that left the
+	// water, or started a fresh breath, before the callback ran is no longer
+	// the submerged actor this sweep saw.
+	for _, entry := range due {
+		if q := entry.actor.Queue(); q != nil {
+			q.Post(func() { w.drown(entry) })
+			continue
+		}
+		w.drown(entry)
 	}
 }

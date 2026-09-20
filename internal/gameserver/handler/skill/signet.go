@@ -4,7 +4,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -168,11 +167,10 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if err != nil {
 		return nil, false
 	}
+	// The point's own effect list stays off the caster's queue: it outlives
+	// the caster's session, and its OnExit is what despawns the point, so a
+	// queue closed by the caster's logout would strand the point in world.
 	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
-	// The point's periodic effect runs on its caster's queue.
-	if queued, ok := caster.(signetQueued); ok {
-		actor.EffectList().SetQueue(queued.Queue())
-	}
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {
@@ -190,11 +188,6 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 	actor.Spawn(x, y, z, heading)
 	return actor, true
-}
-
-// signetQueued is a caster whose work runs on a queue.
-type signetQueued interface {
-	Queue() *sim.Queue
 }
 
 // signetEffectMeta builds the effect metadata a signet-family effect

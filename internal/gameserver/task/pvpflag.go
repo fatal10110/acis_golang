@@ -150,27 +150,46 @@ func (p *PvPFlags) Remove(actor PvPFlagActor, reset bool) {
 // and clearing the flag only after the deadline has passed.
 func (p *PvPFlags) Tick() {
 	now := p.now()
-	p.tickExpiry(now,
-		func(actor PvPFlagActor) {
-			updatePvPFlag(actor, PvPFlagNone)
-		},
+	// Both transitions are resolved again on the actor's queue against the
+	// deadline this sweep saw, so a flag refreshed ahead of a queued
+	// transition keeps its fresh state instead of being cleared or blinked
+	// by the stale one.
+	p.tickPending(now,
 		func(actor PvPFlagActor, expiresAt time.Time) {
-			if now.After(expiresAt.Add(-5 * time.Second)) {
-				updatePvPFlag(actor, PvPFlagBlinking)
+			if q := actor.Queue(); q != nil {
+				q.Post(func() { p.expire(actor, expiresAt) })
 				return
 			}
-			updatePvPFlag(actor, PvPFlagOn)
+			p.expire(actor, expiresAt)
+		},
+		func(actor PvPFlagActor, expiresAt time.Time) {
+			state := PvPFlagOn
+			if now.After(expiresAt.Add(-5 * time.Second)) {
+				state = PvPFlagBlinking
+			}
+			if q := actor.Queue(); q != nil {
+				q.Post(func() { p.update(actor, expiresAt, state) })
+				return
+			}
+			p.update(actor, expiresAt, state)
 		},
 	)
 }
 
-// updatePvPFlag sets actor's flag state on its queue.
-func updatePvPFlag(actor PvPFlagActor, state PvPFlagState) {
-	if q := actor.Queue(); q != nil {
-		q.Post(func() { actor.UpdatePvPFlag(state) })
-		return
+// expire clears actor's flag unless its deadline was refreshed after the
+// sweep read it.
+func (p *PvPFlags) expire(actor PvPFlagActor, expiresAt time.Time) {
+	if p.expireIf(actor.ObjectID(), expiresAt) {
+		actor.UpdatePvPFlag(PvPFlagNone)
 	}
-	actor.UpdatePvPFlag(state)
+}
+
+// update applies a blink or steady transition unless actor's deadline has
+// moved since the sweep computed it.
+func (p *PvPFlags) update(actor PvPFlagActor, expiresAt time.Time, state PvPFlagState) {
+	if p.hasDeadline(actor.ObjectID(), expiresAt) {
+		actor.UpdatePvPFlag(state)
+	}
 }
 
 // Len returns the number of tracked actors.

@@ -131,14 +131,26 @@ func (a *AttackStance) Tick() error {
 	}
 	defer a.endTick()
 
-	a.tickDue(a.now(), func(actor AttackStanceActor) {
+	// The entry stays tracked until the queued expiry runs: an attack that
+	// refreshes the deadline ahead of it keeps the stance, instead of the
+	// stale expiry stopping a stance the actor has just renewed.
+	a.sweepDue(a.now(), func(actor AttackStanceActor, deadline time.Time) {
 		if q := actor.Queue(); q != nil {
-			q.Post(func() { a.stop(actor) })
+			q.Post(func() { a.expire(actor, deadline) })
 			return
 		}
-		a.stop(actor)
+		a.expire(actor, deadline)
 	})
 	return nil
+}
+
+// expire ends actor's combat stance unless its deadline was refreshed after
+// the sweep observed it.
+func (a *AttackStance) expire(actor AttackStanceActor, deadline time.Time) {
+	if !a.expireIf(actor.ObjectID(), deadline) {
+		return
+	}
+	a.stop(actor)
 }
 
 // stop ends actor's combat stance and its summon's.

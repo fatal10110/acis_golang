@@ -9,9 +9,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // tickInterval is one live effect tick (Template.Time: 1 second) plus
@@ -411,3 +413,54 @@ func (noopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 func (noopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (noopStatOwner) UpdateEffectIcons() {}
+
+// queuedSignetCaster is a caster whose own work runs on a queue, like a live
+// player's.
+type queuedSignetCaster struct {
+	*signetFakeCaster
+	queue *sim.Queue
+}
+
+func (c queuedSignetCaster) Queue() *sim.Queue { return c.queue }
+
+// TestSignetOutlivesItsCastersQueue keeps an effect point's driving effect
+// off the caster's queue. The point's OnExit is what despawns it, and it
+// outlives the caster's session: bound to the caster's queue, a logout
+// (detachLivePlayer closes that queue) would strand the point in world with
+// its effect list registered forever.
+func TestSignetOutlivesItsCastersQueue(t *testing.T) {
+	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
+		{ID: 5123, Level: 1}: {
+			ID: 5123, Level: 1, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Count: 1}},
+		},
+	}}
+	h, state, _ := newTestSignetHandler(defs)
+
+	pool := sim.NewPool(1, zerolog.Nop())
+	caster := queuedSignetCaster{signetFakeCaster: newSignetFakeCaster(1, 100, 100, 0, 100), queue: pool.NewQueue("caster-1")}
+	def := modelskill.Definition{
+		ID: 454, Level: 1, SkillType: "SIGNET", EffectID: 5123, EffectNpcID: 13018, Radius: 180,
+		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}
+
+	h.Use(Cast{Caster: caster, Skill: def})
+
+	all := findEffectPointObjects(state)
+	if len(all) != 1 {
+		t.Fatalf("spawned actors = %d, want 1", len(all))
+	}
+	actor := all[0]
+	if q := actor.EffectList().Queue(); q != nil {
+		t.Fatal("effect point's list is bound to a queue; its expiry must not depend on one")
+	}
+
+	// The caster logs out: its queue is closed and drops every later task.
+	caster.queue.Close()
+
+	time.Sleep(tickInterval)
+	actor.EffectList().Tick()
+	if _, ok := state.Object(actor.ObjectID()); ok {
+		t.Fatal("effect point still in world after its driving effect exited")
+	}
+}
