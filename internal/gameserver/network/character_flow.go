@@ -74,6 +74,36 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
+// dropStaleItemRows removes every row whose object id still has an unflushed
+// change queued on the lazy item persistence task, so an inventory is never
+// rebuilt from a row the task is about to rewrite or delete.
+//
+// The lazy task is what makes this necessary. Destroying a whole stack takes
+// the instance out of its container in memory and leaves the row's delete to
+// the next tick, and the detach flush only writes the items the container
+// still holds — so a logout inside the tick window leaves the destroyed
+// item's row in place. Without this check the next login reads that row back
+// and hands the player the stack again.
+//
+// The pending set outranks the table: an entry means the stored state is
+// known stale and the item is no longer part of this container.
+func (l *GameClientLink) dropStaleItemRows(items []*item.Instance) []*item.Instance {
+	if l.itemInstances == nil {
+		return items
+	}
+	kept := items[:0]
+	for _, inst := range items {
+		if inst == nil {
+			continue
+		}
+		if l.itemInstances.ContainsID(inst.ObjectID) {
+			continue
+		}
+		kept = append(kept, inst)
+	}
+	return kept
+}
+
 // enterWorld sends the EnterWorld packet burst for c and registers it in the
 // live world state.
 func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
@@ -87,6 +117,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: list items")
 		return nil, false
 	}
+	items = l.dropStaleItemRows(items)
 	if l.skills != nil {
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore known skills")

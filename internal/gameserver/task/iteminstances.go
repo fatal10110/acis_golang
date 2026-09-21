@@ -184,9 +184,19 @@ func (i *ItemInstances) Contains(inst *item.Instance) bool {
 	if inst == nil {
 		return false
 	}
+	return i.ContainsID(inst.ObjectID)
+}
+
+// ContainsID reports whether objectID has an unflushed change queued for the
+// next persistence tick. A restore path uses it as an overlay on the items
+// table: a pending row is a row whose stored state is known stale, so the
+// item it describes must not be rebuilt from the database. Taking the id
+// rather than an instance lets that check run on a row before it becomes a
+// live instance.
+func (i *ItemInstances) ContainsID(objectID int32) bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	_, ok := i.pending[inst.ObjectID]
+	_, ok := i.pending[objectID]
 	return ok
 }
 
