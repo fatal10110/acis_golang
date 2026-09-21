@@ -30,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -522,6 +523,15 @@ func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	tb.Helper()
 	holder := s.onlineCharacter(tb, objID)
 	holder.Inventory().SlotLimit = limit
+}
+
+// PlayerInventory returns the live player's inventory so suites can stage a
+// mutation from a queue task, where no client packet can reach: the
+// connection goroutine blocks on each request it posts, so work it sends
+// can never land behind a request task that is still running.
+func (s *Server) PlayerInventory(tb testing.TB, objID int32) *itemcontainer.Inventory {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).Inventory()
 }
 
 // PlayerQueue returns the live player's actor queue so suites can park it on

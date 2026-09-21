@@ -453,6 +453,39 @@ func (p *livePlayer) inventoryItems() []*item.Instance {
 	return p.items
 }
 
+// buildItemList builds the full inventory snapshot frame and drops the
+// pending inventory-update queue in the same critical section.
+//
+// The reference's ItemList constructor clears the update list before it
+// reads the item set, so a full snapshot supersedes and discards the deltas
+// it already describes; the batching task then finds nothing to drain and
+// sends no InventoryUpdate behind the snapshot. Taking the snapshot and the
+// clear under one lock also keeps a mutation landing between them from
+// being lost: it is either inside the snapshot and cleared, or queued after
+// it and still delivered by the next tick.
+//
+// A player without a live inventory (no runtime attached yet) falls back to
+// the restored row set, which has no update queue of its own.
+func (p *livePlayer) buildItemList(templates *item.Table, showWindow bool) (wire.Frame, error) {
+	if p == nil {
+		return serverpackets.FrameItemList(nil, templates, showWindow)
+	}
+	inv := p.Inventory()
+	if inv == nil {
+		return serverpackets.FrameItemList(p.items, templates, showWindow)
+	}
+	var frame wire.Frame
+	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+		var buildErr error
+		frame, buildErr = serverpackets.FrameItemList(items, templates, showWindow)
+		return buildErr
+	})
+	if err != nil {
+		return wire.Frame{}, err
+	}
+	return frame, nil
+}
+
 // SendInventoryUpdate delivers one batch of queued inventory changes as an
 // InventoryUpdate packet, implementing task.InventoryUpdateOwner for
 // changes the server makes outside a client request.

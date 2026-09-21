@@ -257,6 +257,52 @@ func assertFrameOpcode(t *testing.T, frame []byte, want byte, what string) {
 	}
 }
 
+// itemListEntry is one row inside ItemList.
+type itemListEntry struct {
+	objID  int32
+	itemID int32
+	count  int32
+}
+
+func readItemListEntries(t *testing.T, frame []byte) []itemListEntry {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeItemList, "ItemList")
+	r := wire.NewReader(frame[1:])
+	r.ReadUint16() // showWindow
+	n := r.ReadUint16()
+	entries := make([]itemListEntry, 0, n)
+	for i := uint16(0); i < n; i++ {
+		var e itemListEntry
+		r.ReadUint16() // item category
+		e.objID = r.ReadInt32()
+		e.itemID = r.ReadInt32()
+		e.count = r.ReadInt32()
+		r.ReadUint16() // subCategory
+		r.ReadUint16() // CustomType1
+		r.ReadUint16() // equipped
+		r.ReadInt32()  // paperdoll slot
+		r.ReadUint16() // enchant level
+		r.ReadUint16() // CustomType2
+		r.ReadInt32()  // augmentation
+		r.ReadInt32()  // mana left
+		entries = append(entries, e)
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read ItemList: %v", err)
+	}
+	return entries
+}
+
+// findItemListEntry returns the ItemList row about objectID, or nil.
+func findItemListEntry(entries []itemListEntry, objectID int32) *itemListEntry {
+	for i := range entries {
+		if entries[i].objID == objectID {
+			return &entries[i]
+		}
+	}
+	return nil
+}
+
 // inventoryEntry is one update row inside InventoryUpdate.
 type inventoryEntry struct {
 	state    uint16 // 1 added, 2 modified, 3 removed (per ItemState ordinal)
