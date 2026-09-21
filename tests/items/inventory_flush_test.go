@@ -197,7 +197,8 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 	// round count is what makes the inversion show up at all. Measured with
 	// the reply reverted to an off-task send, -race, 8 runs per executor
 	// mode: pool 3/8, inline 6/8 (9/16 overall). Do not read a single green
-	// run of a reverted fix as the property holding.
+	// run of a reverted fix as the property holding. Making this gate
+	// deterministic needs an observer at the enqueue site: issue #2422.
 	const rounds = 15
 	count := int32(100)
 	for round := range rounds {
