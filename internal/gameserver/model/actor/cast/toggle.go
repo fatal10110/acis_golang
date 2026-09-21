@@ -64,6 +64,12 @@ func (c *Controller) CanCastToggle(def modelskill.Definition) error {
 // did before. A cast already in flight keeps its own claim; the funnel
 // reports for that one.
 //
+// Deactivating a running toggle deliberately does not claim, though
+// setCastTask is the first statement of doToggleCast and so claims on both
+// branches: that branch only stops the effect, which cannot kill the
+// caster, so there is no abort for the funnel to report and the narrower
+// claim is unobservable.
+//
 // MP is checked and paid before HP is checked at all: a toggle that has
 // enough MP but not enough HP still loses the MP, uncredited, when
 // activation then fails on the HP check. This mirrors the exact order the
