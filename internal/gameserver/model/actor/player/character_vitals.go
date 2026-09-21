@@ -106,6 +106,12 @@ func (c *Character) CurrentCP() int {
 // cost of 10 in full, and lands on 0.4 — dead in the reference, displayed
 // at 0 HP either way. The remainder is then cleared so a repeat call sees
 // an already-dead character.
+//
+// The rule belongs to every creature, but only this site applies it: the
+// damage tails still declare death on a zero crossing, so the same
+// character survives a blow that leaves the identical remainder. Deferred,
+// tracked so it stays linked rather than silently approximated (issue
+// #2389).
 func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
