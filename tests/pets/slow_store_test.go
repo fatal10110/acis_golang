@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -219,6 +220,60 @@ func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
 	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("pet never reached the world")
 	}
+}
+
+// TestAutoSoulShotSeesSummonDuringRestore covers the acquisition side of
+// the summon slot, on the one path that reaches it while the restore is in
+// flight. RequestAutoSoulShot has no casting gate of its own — it rejects
+// only on AlikeDead (network/inventory.go's handleAutoSoulShot) — so
+// hasActiveSummon is what decides it, unlike the wyvern branch where
+// CastingNow() answers first and hides the reservation entirely.
+//
+// The reference decides it with `player.getSummon() != null`
+// (RequestAutoSoulShot.java:42, NO_SERVITOR_CANNOT_AUTOMATE_USE at line
+// 76), and setSummon(pet) has already run by then
+// (SummonCreature.java:63), so a beast soulshot toggled across this window
+// is accepted there. Without the reservation Go answers
+// NO_SERVITOR_CANNOT_AUTOMATE_USE instead.
+func TestAutoSoulShotSeesSummonDuringRestore(t *testing.T) {
+	h := bootOwnerWithCollarOpts(t,
+		[]gameservertest.Option{gameservertest.WithSlowStores(slowStoreDelay)},
+		seedItem{TemplateID: beastSoulshotID, Count: 10},
+	)
+
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
+	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+
+	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
+		t.Fatal("pet already in world: the restore window this test needs was never open")
+	}
+
+	h.client.Send(encodeRequestAutoSoulShot(beastSoulshotID, 1))
+	frames := drainFrames(t, h.client)
+	var enabled bool
+	for _, frame := range frames {
+		if frame[0] == serverpackets.OpcodeSystemMessage {
+			assertNotSystemMessage(t, frame, serverpackets.SystemMessageNoServitorCannotAutomateUse)
+		}
+		if frame[0] == serverpackets.OpcodeExtended {
+			enabled = true
+		}
+	}
+	if !enabled {
+		t.Fatalf("auto soulshot toggle during the restore = opcodes %x, want it accepted: the owner's summon slot is taken from the moment the cast hits", frameOpcodes(frames))
+	}
+	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
+		t.Fatal("pet never reached the world")
+	}
+}
+
+func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)
+	w.WriteInt32(itemID)
+	w.WriteInt32(typ)
+	return w.Bytes()
 }
 
 // petOwnerCastingNow reports whether the owner has a cast in flight.

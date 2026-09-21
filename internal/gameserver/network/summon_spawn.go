@@ -124,12 +124,13 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	//
 	// Both are released once the continuation has run: by then a successful
 	// spawn has registered the real summon, so the gates stay shut, and
-	// Finish is armed behind the spawn's packets. Every failure path
-	// releases too — the read's error branch, and a continuation the queue
-	// refused, which happens only when the session is already gone.
+	// Finish is armed behind the spawn's packets. Every other exit from the
+	// read releases them too — the read's error branch, a continuation the
+	// queue refused, and a lane that refused the job outright, which
+	// Enqueue reports without running it once the worker is closed.
 	live.summonReservation.Store(true)
 	releaseFinish := link.castController(live).HoldFinish()
-	link.persist.Enqueue(controlItem.ObjectID, func() {
+	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
 		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
@@ -147,7 +148,9 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		if !posted {
 			s.endRestore(releaseFinish)
 		}
-	})
+	}) {
+		s.endRestore(releaseFinish)
+	}
 }
 
 // endRestore gives back what SpawnPet held across the pets-row read: the
