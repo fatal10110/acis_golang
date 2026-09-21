@@ -4,8 +4,11 @@ package skilltest
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -20,16 +23,16 @@ type Creature struct {
 func (Creature) Invul() bool                    { return false }
 func (Creature) Paralyzed() bool                { return false }
 func (Creature) BlessedSpiritshotCharged() bool { return false }
-func (Creature) SkillSuccessInput(attackable.Combatant, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (Creature) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
-func (Creature) EffectSuccessInput(attackable.Combatant, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+func (Creature) EffectSuccessInput(creature.FormulaActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
 func (Creature) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
 	return formulas.SkillReflectInput{}
 }
-func (Creature) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (Creature) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
 func (Creature) Attackable() bool                           { return false }
@@ -46,19 +49,19 @@ func (Creature) AttackTarget(world.Tracked)                 {}
 // Damage and resource surface: the neutral creature takes no damage, rolls
 // no formula input and holds no resources.
 func (Creature) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {}
-func (Creature) PhysicalSkillInput(attackable.Combatant, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (Creature) PhysicalSkillInput(creature.FormulaActor, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return formulas.PhysicalSkillInput{}, false
 }
-func (Creature) MagicDamageInput(attackable.Combatant, modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (Creature) MagicDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return formulas.MagicDamageInput{}, false
 }
-func (Creature) BlowInput(attackable.Combatant, modelskill.Definition) (formulas.BlowInput, bool) {
+func (Creature) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
 	return formulas.BlowInput{}, false
 }
-func (Creature) ManaDamageInput(attackable.Combatant, modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (Creature) ManaDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return formulas.ManaDamageInput{}, false
 }
-func (Creature) LethalInput(attackable.Combatant, modelskill.Definition) (formulas.LethalInput, bool) {
+func (Creature) LethalInput(creature.FormulaActor, modelskill.Definition) (formulas.LethalInput, bool) {
 	return formulas.LethalInput{}, false
 }
 func (Creature) ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition) {
@@ -71,3 +74,27 @@ func (Creature) HealAmount(modelskill.Definition) (float64, bool) {
 func (Creature) MaxHPValue() float64 { return 0 }
 func (Creature) MaxMPValue() float64 { return 0 }
 func (Creature) SetHP(float64)       {}
+
+// Formula surface: the neutral creature has no stats, no weapon and no
+// shots, so every formula term is the zero value and its rolls are 0.
+func (Creature) STR() int                                     { return 0 }
+func (Creature) CON() int                                     { return 0 }
+func (Creature) DEX() int                                     { return 0 }
+func (Creature) INT() int                                     { return 0 }
+func (Creature) WIT() int                                     { return 0 }
+func (Creature) MEN() int                                     { return 0 }
+func (Creature) PAtk() float64                                { return 0 }
+func (Creature) PDef() float64                                { return 0 }
+func (Creature) MAtk() float64                                { return 0 }
+func (Creature) MDef() float64                                { return 0 }
+func (Creature) MagicCriticalRate() float64                   { return 0 }
+func (Creature) AttackType() item.WeaponType                  { return item.WeaponNone }
+func (Creature) SoulshotCharged() bool                        { return false }
+func (Creature) SpiritshotCharged() bool                      { return false }
+func (Creature) CalcStat(stat.Stat, float64) float64          { return 0 }
+func (Creature) RandomDamageSpread() int                      { return 0 }
+func (Creature) Roll(int) int                                 { return 0 }
+func (Creature) WeaponGradePenalty() bool                     { return false }
+func (Creature) Evasion() int                                 { return 0 }
+func (Creature) LethalRate() float64                          { return 0 }
+func (Creature) RaceMultiplier(creature.FormulaActor) float64 { return 1 }

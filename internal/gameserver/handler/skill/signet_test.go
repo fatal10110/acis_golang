@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -103,7 +104,7 @@ func (t *signetFakeTarget) BroadcastSelfSkillUse(_, _ int32) error {
 	return nil
 }
 
-func (t *signetFakeTarget) MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *signetFakeTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 

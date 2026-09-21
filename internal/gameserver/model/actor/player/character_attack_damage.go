@@ -18,6 +18,13 @@ func (c *Character) SetRollSource(f func(int) int) {
 // MakeAttackHit resolves one physical attack result.
 func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {
 	hit := attack.Hit{Target: target, TargetID: target.ObjectID()}
+	// Folding this needs the world known-list to hand out formula operands.
+	// CreatureActor.ForEachKnownCombatantInRadius (attack/controller.go:47)
+	// yields attackable.Combatant, narrowed from world.Tracked, and world
+	// cannot name creature.FormulaActor because creature already depends on
+	// world. The pole and split paths draw their extra targets from that
+	// callback, so the narrowing stays here, at the one point where a
+	// combatant becomes a formula operand; see #2362.
 	other, ok := target.(creature.FormulaActor)
 	if !ok {
 		hit.Miss = true

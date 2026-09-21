@@ -6,29 +6,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-// seedState is one seedable target's sow/harvest lifecycle: unseeded, sown
-// (by a given player id, carrying which seed), then harvested at most once.
-type seedState interface {
-	Seeded() bool
-	Sow(sowerID int32, seed manor.Seed)
-	Harvested() bool
-	MarkHarvested()
-	// AllowedToHarvest reports whether playerID (the sower, or a member of
-	// the sower's party) may harvest the crop.
-	AllowedToHarvest(playerID int32) bool
-	// HarvestedCrop returns the reward item id and quantity a successful
-	// harvest grants; computing it (strong-type passive bonus, monster
-	// level vs seed level, the manor drop-rate config) is the target's own
-	// job, not this handler's.
-	HarvestedCrop() (itemID int32, count int)
-}
-
-type seedableTarget interface {
-	Actor
-	Level() int
-	SeedState() seedState
-}
-
+// Inert until manor lands (#240): no item implements seedItem, so SOW never
+// sows and HARVEST therefore never finds a sown target. That issue also owns
+// the parity these handlers still lack — the Player-only caster gate, the
+// Monster-only target gate, the sow/harvest system messages, the party
+// harvest broadcast and the manor production rate — plus party-shared
+// harvesting (#863).
+//
+// The caster gate is what makes HARVEST's ordering safe: it marks the crop
+// consumed before it checks that the caster can be paid, so a caster that
+// clears every gate without being an earner would eat the crop and receive
+// nothing. The reference rejects a non-player caster before it touches the
+// seed state at all, which is why its own reward call needs no such check.
+//
 // seedItem exposes the manor seed data an item carries when used to sow;
 // resolving an item id to its Seed row (a manor.Table lookup) is the item's
 // own job, not this handler's, since Cast carries no reference to global
@@ -60,10 +50,7 @@ func (sowHandler) Use(cast Cast) {
 	if !ok {
 		return
 	}
-	// Inert: npc.Hostile already carries seed state, but its SeedState
-	// returns *npc.SeedState rather than this handler's seedState, and no
-	// item resolves to a manor.Seed for the check above; see #2362.
-	target, ok := cast.Targets[0].(seedableTarget)
+	target, ok := asNPC(cast.Targets[0])
 	if !ok || target.Dead() {
 		return
 	}
@@ -113,9 +100,7 @@ func (harvestHandler) Use(cast Cast) {
 	if len(cast.Targets) == 0 {
 		return
 	}
-	// Inert: *npc.SeedState return-type drift, and no sown target exists
-	// while SOW is inert; see #2362.
-	target, ok := cast.Targets[0].(seedableTarget)
+	target, ok := asNPC(cast.Targets[0])
 	if !ok {
 		return
 	}

@@ -56,7 +56,7 @@ func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelski
 				}
 				continue
 			}
-			in, ok := source.EffectSuccessInput(combatantOf(effector), def, tmpl, bss, shield)
+			in, ok := source.EffectSuccessInput(formulaCasterOf(effector), def, tmpl, bss, shield)
 			if !ok || !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), rnd.Get(100)) {
 				if tmpl.Icon {
 					resisted++
@@ -107,7 +107,7 @@ func offensiveEffectApplyBlocked(effector, effected effect.Actor, def modelskill
 	if c, ok := effected.(Creature); ok && c.Invul() {
 		return true
 	}
-	return !creature.CanDealDamage(combatantOf(effector))
+	return !creature.CanDealDamage(formulaCasterOf(effector))
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the

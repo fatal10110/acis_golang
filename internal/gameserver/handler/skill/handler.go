@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -37,23 +38,19 @@ type Actor interface {
 // not apply to a kind returns the neutral value documented at its
 // implementation.
 type Creature interface {
-	attackable.Combatant
+	creature.FormulaActor
 	effect.Actor
 
-	Invul() bool
 	Paralyzed() bool
 	Undead() bool
-	BlessedSpiritshotCharged() bool
 	// SkillSuccessInput and EffectSuccessInput resolve an effect-landing roll
 	// of caster's skill against this creature; ok is false when it can't be
 	// rolled at all.
-	SkillSuccessInput(caster attackable.Combatant, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
-	EffectSuccessInput(caster attackable.Combatant, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
+	SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (in formulas.SkillSuccessInput, ok bool)
+	EffectSuccessInput(caster creature.FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool)
 	// SkillReflectInput is the state deciding whether this creature reflects
 	// def back onto its caster.
 	SkillReflectInput(def modelskill.Definition) formulas.SkillReflectInput
-	// ShieldDefense resolves this creature's shield block against caster.
-	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 
 	// Attackable reports an NPC combat target; the aggro controls below only
 	// act on one.
@@ -77,16 +74,15 @@ type Creature interface {
 	// *Input methods resolve a formula roll against this creature and
 	// report false when it cannot be rolled.
 	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
-	PhysicalSkillInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
-	MagicDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
-	BlowInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.BlowInput, bool)
-	ManaDamageInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
-	LethalInput(caster attackable.Combatant, skill modelskill.Definition) (formulas.LethalInput, bool)
+	PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
+	BlowInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.BlowInput, bool)
+	ManaDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
+	LethalInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.LethalInput, bool)
 	ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition)
 	CounterSkillPhysical() float64
 	Invulnerable() bool
 	HealAmount(modelskill.Definition) (float64, bool)
-	MaxHPValue() float64
 	MaxMPValue() float64
 	SetHP(float64)
 }
@@ -134,6 +130,8 @@ type NPC interface {
 	Lethalable() bool
 	// SpoilPool is the NPC's sweepable drop pool, nil when it has none.
 	SpoilPool() *item.SpoilPool
+	// SeedState is the NPC life's manor sow/harvest lifecycle.
+	SeedState() *npc.SeedState
 }
 
 // Summon is the summon-only cast participant surface.
@@ -459,11 +457,11 @@ func cursed(a Actor) bool {
 	return ok && p.CursedWeaponEquipped()
 }
 
-// combatantOf returns a as a combatant, or nil for a cast participant that is
-// not a creature (a door or a signet effect point). Formula inputs treat a nil
-// caster as one that cannot roll.
-func combatantOf(a Actor) attackable.Combatant {
-	c, _ := a.(attackable.Combatant)
+// formulaCasterOf returns a as a formula caster, or nil for a cast
+// participant that is not a creature (a door or a signet effect point).
+// Formula inputs treat a nil caster as one that cannot roll.
+func formulaCasterOf(a Actor) creature.FormulaActor {
+	c, _ := a.(creature.FormulaActor)
 	return c
 }
 
