@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // seedKnownSkill persists a known skill level for objID before the client
@@ -802,4 +803,169 @@ func TestToggleCostFailureBroadcastsCastAbort(t *testing.T) {
 
 func skillCase(skillID int32) string {
 	return fmt.Sprintf("skill-%d", skillID)
+}
+
+// TestExactlyLethalHPConsumeKillsCaster drives a real cast whose HP cost
+// ends up exactly equal to the caster's remaining HP when the hit timer
+// fires. The pre-cast gate rejects a cast at HP <= HPConsume, so the state
+// is only reachable by taking damage during the cast — ordinary combat. The
+// hit-timer re-check rejects only HPConsume > HP, so it accepts and pays
+// this cost; paying it must run the full death sequence instead of leaving
+// the caster alive at 0 HP while the hit runs on to completion.
+func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
+	castLethalHPConsume(t, 0)
+}
+
+// TestFractionallyLethalHPConsumeKillsCaster is the same cast against a
+// caster holding a fractional remainder. The affordability gates compare
+// against truncated HP, so a caster on cost+0.4 reports exactly the cost,
+// pays it in full, and lands on 0.4 — under the reference's half-point
+// death threshold (PlayerStatus.java:217-238), which a zero crossing would
+// miss. Fractional HP is ordinary: the shipped hpRegenTable values are
+// half-integers at most level bands and TickRegen writes the scaled result
+// straight into current HP.
+func TestFractionallyLethalHPConsumeKillsCaster(t *testing.T) {
+	castLethalHPConsume(t, 0.4)
+}
+
+// castLethalHPConsume runs one exactly-lethal HP-consume cast, leaving the
+// caster on the skill's cost plus remainder when the hit lands, and asserts
+// the death, its packets, and that the hit still ran to completion.
+//
+// The skill's own buff landing on the now-dead caster is not asserted: the
+// continuous handler skips dead targets, which issue #2384 tracks.
+func castLethalHPConsume(t *testing.T, remainder float64) {
+	t.Helper()
+	const skillID, hpConsume, hitTime = 291, 10, 1500
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: hitTime, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			HPConsume: hpConsume, SkillType: "BUFF", NumCharges: 1, MaxCharges: 3,
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "cast ack")
+
+	// Drain the caster down to the cost while the cast is in flight. The
+	// pre-cast gate has already passed, so only the hit timer sees it.
+	hp := srv.PlayerCurrentHP(t, objID)
+	if hp <= hpConsume {
+		t.Fatalf("caster HP %d is not above the %d HP cost", hp, hpConsume)
+	}
+	srv.DamagePlayerHP(t, objID, hp-hpConsume)
+	if remainder > 0 {
+		// Prove the remainder landed rather than being clamped away: the
+		// packet surface reports truncated HP, so it cannot show the
+		// difference between this setup and the whole-number one.
+		if added := srv.AddPlayerHP(t, objID, remainder); added != remainder {
+			t.Fatalf("remainder added to caster HP = %v, want %v", added, remainder)
+		}
+	}
+	if got := srv.PlayerCurrentHP(t, objID); got != hpConsume {
+		t.Fatalf("caster HP at the hit = %d, want the %d HP cost", got, hpConsume)
+	}
+
+	waitFor(t, "caster death from its own HP cost", func() bool { return srv.PlayerDead(t, objID) })
+
+	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
+		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
+	}
+	// The abort reaches the client before the death does: Die stops the cast
+	// before it broadcasts, so MagicSkillCanceled is always ahead of Die in
+	// the stream. Reading them in sequence pins that order.
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
+		t.Fatal("no MagicSkillCanceled: the death did not abort the in-flight cast")
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
+		t.Fatal("no Die broadcast after the exactly-lethal HP cost")
+	}
+	// The hit runs to completion despite the death it just caused: the
+	// charge grant sits after the cost in the same hit step, and the death
+	// sequence cleared the charges on its way through, so a charge here can
+	// only have come from the hit continuing afterwards. The death broadcast
+	// is queued from inside the death sequence, before the grant runs, so
+	// this waits for the charge rather than reading it straight off the
+	// Die frame's arrival.
+	waitFor(t, "charge granted by the hit that killed the caster", func() bool {
+		return srv.PlayerCharges(t, objID) == 1
+	})
+}
+
+// TestLethalToggleHPConsumeAbortsAndKillsCaster drives the other caller of
+// the HP-cost path. A toggle skips the pre-cast HP gate entirely — the
+// reference reaches doToggleCast without checkDoCastConditions, and
+// CanCastToggle matches it — so a caster sitting at exactly the toggle's
+// HPConsume reaches the lethal cost directly, with no mid-cast damage and
+// no timing window.
+//
+// The reference claims the cast before paying (doToggleCast's setCastTask
+// sets _isCastingNow at PlayerCast.java:125) and acknowledges it at :127,
+// ahead of the consume at :139-165, so the death that cost causes reaches
+// doDie -> abortAll(true) -> stop() with the cast still in flight. The
+// client therefore sees MagicSkillUse, then MagicSkillCanceled, then Die.
+func TestLethalToggleHPConsumeAbortsAndKillsCaster(t *testing.T) {
+	const skillID, hpConsume = 292, 10
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			HPConsume: hpConsume, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	hp := srv.PlayerCurrentHP(t, objID)
+	if hp <= hpConsume {
+		t.Fatalf("caster HP %d is not above the %d HP cost", hp, hpConsume)
+	}
+	srv.DamagePlayerHP(t, objID, hp-hpConsume)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+
+	// Read in sequence, so this pins the order and not merely the presence
+	// of each frame. The acknowledgement comes first because the cost is
+	// paid after it, and the abort before the death because the death
+	// sequence stops the cast before it broadcasts.
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillUse) {
+		t.Fatal("no MagicSkillUse: the toggle was never acknowledged")
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
+		t.Fatal("no MagicSkillCanceled after the acknowledgement: the lethal toggle cost did not abort the cast")
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
+		t.Fatal("no Die broadcast after the lethal toggle cost")
+	}
+
+	waitFor(t, "caster death from its own toggle HP cost", func() bool { return srv.PlayerDead(t, objID) })
+	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
+		t.Fatalf("caster HP after a lethal toggle cost = %d, want 0", got)
+	}
+}
+
+// readsOpcode consumes frames until one carries want, reporting whether it
+// arrived before the client went quiet.
+func readsOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte) bool {
+	t.Helper()
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			return false
+		}
+		if frame[0] == want {
+			return true
+		}
+	}
+	return false
 }

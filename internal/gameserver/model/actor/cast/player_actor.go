@@ -89,11 +89,21 @@ func (a PlayerActor) ReduceMP(amount int) {
 	a.Character.ReduceCurrentMP(amount)
 }
 
+// ReduceHP pays a skill's HP cost. The caster is its own attacker here, so
+// the cost drains no CP and skips the wake/stand-up side effects an
+// incoming hit triggers; it is a plain vitals reduction whose tail runs the
+// death sequence when it empties the caster's HP. The killer is the caster
+// itself, which is what suppresses the death penalty and any kill reward.
+// A cost that kills its caster does not cut the hit short: the controller
+// pays it before granting charges and running the hit hook, so the death
+// sequence aborts the cast from underneath a hit that still completes.
 func (a PlayerActor) ReduceHP(amount int) {
 	if a.Character == nil || amount <= 0 {
 		return
 	}
-	a.Character.ReduceCurrentHP(amount)
+	if a.Character.ReduceCurrentHP(amount) {
+		a.Character.Die(a.Character)
+	}
 }
 
 func (a PlayerActor) SkillDisabled(key int32) bool {

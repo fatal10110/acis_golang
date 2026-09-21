@@ -388,7 +388,10 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // actorcast.ApplyToggle, but effect application/removal is this handler's
 // job, done only after the MagicSkillUse ack goes out — on both branches,
 // matching PlayerCast.doToggleCast broadcasting before either callSkill or
-// effect.exit() (PlayerCast.java:127 vs 135-137).
+// effect.exit() (PlayerCast.java:127 vs 135-137). The ack is handed to
+// ApplyToggle rather than sent on return, because the reference also
+// broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
+// that kills the caster sends its own packets from inside that consume.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
@@ -401,16 +404,15 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			Definitions: l.skills,
 		},
 		l.stopMovementForCast(live),
+		func(accepted modelskill.Definition) {
+			selfObject := skillCastObject(live)
+			l.broadcastLiveFrame(live, func() wire.Frame {
+				return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(accepted.ID), int32(accepted.Level), 0, 0, false)
+			})
+		},
 	)
-	broadcast := func() {
-		selfObject := skillCastObject(live)
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameMagicSkillUse(selfObject, selfObject, int32(def.ID), int32(def.Level), 0, 0, false)
-		})
-	}
 	if err != nil {
 		if errors.Is(err, actorcast.ErrNotEnoughMP) || errors.Is(err, actorcast.ErrNotEnoughHP) {
-			broadcast()
 			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live, false)
 			sendMagicActionFailed(live)
@@ -420,7 +422,6 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 		return
 	}
 
-	broadcast()
 	if activated {
 		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
 		l.sendSkillHandlerResult(live, result)
