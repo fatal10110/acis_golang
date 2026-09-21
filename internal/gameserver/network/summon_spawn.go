@@ -401,6 +401,20 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	// cannot show it yet: past the hold ceiling this cast could otherwise
 	// take the slot and the inbound pet would be dropped at
 	// spawnRestoredPet's re-check.
+	//
+	// This is the servitor path's only restoringSummon gate, and it is
+	// deliberately asymmetric with the two item branches, which each also
+	// reject before their cast starts (summon_item_use.go:69,111). The
+	// reference rejects all three in the same place — PlayableAI.thinkCast
+	// goes idle on isCastingNow() (PlayableAI.java:82-86), so no SUMMON
+	// cast starts while its read is running — and rejecting only here costs
+	// the caster real resources: Controller.Start has already destroyed the
+	// skill's ItemConsumeID stack and Controller.Hit has already taken the
+	// MP by the time this runs. Both are real for SUMMON skills (1225
+	// Summon Mew the Cat: itemConsumeId 1458, mpConsume 31-109). Closing it
+	// needs a pre-cast gate on the generic cast entry plus a decision on
+	// what that rejection answers, which the reference makes silently
+	// through an AI intention rather than a packet — tracked as #2412.
 	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false
