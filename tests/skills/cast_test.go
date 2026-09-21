@@ -899,6 +899,61 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	})
 }
 
+// TestLethalToggleHPConsumeAbortsAndKillsCaster drives the other caller of
+// the HP-cost path. A toggle skips the pre-cast HP gate entirely — the
+// reference reaches doToggleCast without checkDoCastConditions, and
+// CanCastToggle matches it — so a caster sitting at exactly the toggle's
+// HPConsume reaches the lethal cost directly, with no mid-cast damage and
+// no timing window.
+//
+// The reference claims the cast before paying (doToggleCast's setCastTask
+// sets _isCastingNow at PlayerCast.java:125) and acknowledges it at :127,
+// ahead of the consume at :139-165, so the death that cost causes reaches
+// doDie -> abortAll(true) -> stop() with the cast still in flight. The
+// client therefore sees MagicSkillUse, then MagicSkillCanceled, then Die.
+func TestLethalToggleHPConsumeAbortsAndKillsCaster(t *testing.T) {
+	const skillID, hpConsume = 292, 10
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			HPConsume: hpConsume, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	hp := srv.PlayerCurrentHP(t, objID)
+	if hp <= hpConsume {
+		t.Fatalf("caster HP %d is not above the %d HP cost", hp, hpConsume)
+	}
+	srv.DamagePlayerHP(t, objID, hp-hpConsume)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+
+	// Read in sequence, so this pins the order and not merely the presence
+	// of each frame. The acknowledgement comes first because the cost is
+	// paid after it, and the abort before the death because the death
+	// sequence stops the cast before it broadcasts.
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillUse) {
+		t.Fatal("no MagicSkillUse: the toggle was never acknowledged")
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
+		t.Fatal("no MagicSkillCanceled after the acknowledgement: the lethal toggle cost did not abort the cast")
+	}
+	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
+		t.Fatal("no Die broadcast after the lethal toggle cost")
+	}
+
+	waitFor(t, "caster death from its own toggle HP cost", func() bool { return srv.PlayerDead(t, objID) })
+	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
+		t.Fatalf("caster HP after a lethal toggle cost = %d, want 0", got)
+	}
+}
+
 // readsOpcode consumes frames until one carries want, reporting whether it
 // arrived before the client went quiet.
 func readsOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte) bool {

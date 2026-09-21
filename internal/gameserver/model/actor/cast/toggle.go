@@ -45,9 +45,24 @@ func (c *Controller) CanCastToggle(def modelskill.Definition) error {
 // any other successfully started cast.
 //
 // Unlike Start, activating a toggle never installs a reuse delay and has
-// no separate Hit/Finish phase — its whole cost applies immediately, and
-// this method does not touch the Controller's casting state, since a
-// toggle's cast window is effectively instantaneous.
+// no separate Hit/Finish phase — its whole cost applies immediately.
+//
+// It does claim the Controller's casting state across those costs, because
+// the abort funnel keys off that claim. The reference's doToggleCast opens
+// with setCastTask, which sets _isCastingNow (PlayerCast.java:125,
+// CreatureCast.java:636-645), so a cost that kills the caster reaches
+// doDie -> abortAll(true) -> stop() while the cast still counts as in
+// flight, and the client is sent MagicSkillCanceled ahead of its Die.
+// Without the claim the funnel finds no cast and sends only the
+// acknowledgement, leaving a toggle that kills you silent where one you
+// cannot afford cancels cleanly.
+//
+// The claim is released as soon as the costs are paid — a toggle has no
+// hit or cool phase to hold it open, matching onMagicFinalizer being
+// scheduled at zero delay (PlayerCast.java:173) — and released silently,
+// so a toggle that does not kill its caster emits exactly the events it
+// did before. A cast already in flight keeps its own claim; the funnel
+// reports for that one.
 //
 // MP is checked and paid before HP is checked at all: a toggle that has
 // enough MP but not enough HP still loses the MP, uncredited, when
@@ -60,6 +75,11 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 	}
 	if alreadyActive {
 		return false, nil
+	}
+
+	seq, claimed := c.claimToggle(def)
+	if claimed {
+		defer c.releaseToggle(seq)
 	}
 
 	if mp := c.actor.MPCost(def); mp > 0 {
@@ -90,6 +110,13 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 // false and err is nil. The on/off rule CastToggle documents lives
 // entirely inside this package, not in whatever is decoding the request.
 //
+// ack, when non-nil, sends the cast acknowledgment and runs before the
+// costs rather than after them, matching doToggleCast broadcasting
+// MagicSkillUse at PlayerCast.java:127 ahead of the MP/HP consume at
+// :139-165. The order only becomes observable once a cost can kill: the
+// death packets it produces would otherwise reach the client ahead of the
+// acknowledgment for the cast that caused them.
+//
 // stopMovement, when non-nil, runs only after target resolution and
 // CanCastToggle both pass — matching PlayerAI.thinkCast, which reaches its
 // unconditional getMove().stop() (PlayerAI.java:273-276) only after
@@ -100,7 +127,7 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 // stopForCast's `_ = stopMovement()`: movement is already cancelled inside
 // Controller.Stop before the fallible broadcast, and Java's stop cannot
 // fail at all.
-func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func() error) (def modelskill.Definition, target Target, activated bool, err error) {
+func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func() error, ack func(modelskill.Definition)) (def modelskill.Definition, target Target, activated bool, err error) {
 	def, target, err = ResolvePlayerToggle(req)
 	if err != nil {
 		return def, target, false, err
@@ -111,6 +138,10 @@ func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerTogg
 
 	if stopMovement != nil {
 		_ = stopMovement()
+	}
+
+	if ack != nil {
+		ack(def)
 	}
 
 	alreadyActive := handlerskill.ActiveEffect(req.Caster, def.ID)
