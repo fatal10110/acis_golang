@@ -630,7 +630,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if inv := live.Inventory(); inv != nil {
 					inv.UpdateWeight()
 				}
-				frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+				// showWindow is true here and false in the EnterWorld
+				// burst: an on-demand request is the player asking for the
+				// inventory window, while the login snapshot only seeds
+				// item state and must not pop the window open.
+				frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, true)
 				if err != nil {
 					l.log.Error().Err(err).Msg("build ItemList")
 					failed = true
