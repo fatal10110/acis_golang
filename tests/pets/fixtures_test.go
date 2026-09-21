@@ -259,9 +259,20 @@ func (h *petWorld) ownerItemCount(t *testing.T, templateID int32) int {
 	return count
 }
 
+// syncOnSkillList proves the server ran everything already sent, without
+// disturbing the pending inventory updates a following tick must drain. A
+// full ItemList would not do: its snapshot discards the owner's queued
+// deltas, so the update the tick is meant to deliver would never be sent.
+func (h *petWorld) syncOnSkillList(t *testing.T) {
+	t.Helper()
+	testsupport.SyncBarrier(t, h.client, func() {
+		h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	}, serverpackets.OpcodeSkillList)
+}
+
 // giveToPet hands an owner inventory stack (or part of it) to the active
-// pet through the give flow, syncing on a RequestItemList round-trip before
-// the batching tick so the transfer has settled, then consuming both
+// pet through the give flow, syncing on a neutral round-trip before the
+// batching tick so the transfer has settled, then consuming both
 // inventory-update frames in wire order.
 func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	t.Helper()
@@ -273,9 +284,7 @@ func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	h.srv.InventoryUpdates.Tick()
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestGiveItemToPet(objectID, count))
-	testsupport.SyncBarrier(t, h.client, func() {
-		h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	}, serverpackets.OpcodeItemList)
+	h.syncOnSkillList(t)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
 	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "give to pet",

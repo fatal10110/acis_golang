@@ -630,7 +630,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if inv := live.Inventory(); inv != nil {
 					inv.UpdateWeight()
 				}
-				frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+				// Building through the inventory drops the pending update
+				// queue the snapshot supersedes, so no InventoryUpdate for
+				// those same deltas follows the full list.
+				frame, err := live.buildItemList(l.itemTemplates, false)
 				if err != nil {
 					l.log.Error().Err(err).Msg("build ItemList")
 					failed = true

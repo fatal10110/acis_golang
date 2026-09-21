@@ -6,10 +6,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
-	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestGiveItemToPetMovesStackAndPersists drives the give flow end to end:
@@ -73,9 +71,7 @@ func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
 
 	petStackObj := h.petInventoryAdena(t).ObjectID
 	h.client.Send(encodeRequestGetItemFromPet(petStackObj, 15))
-	testsupport.SyncBarrier(t, h.client, func() {
-		h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
-	}, serverpackets.OpcodeItemList)
+	h.syncOnSkillList(t)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
 	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "take from pet",
