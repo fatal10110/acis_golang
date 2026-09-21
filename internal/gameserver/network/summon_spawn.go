@@ -42,6 +42,27 @@ const petSpawnOffset = 40
 // DB read" shape.
 const petRestoreTimeout = 5 * time.Second
 
+// petRestoreHoldCeiling bounds how long a summon cast is held open for its
+// pets-row read, measured from the enqueue rather than from the job's start
+// so it covers the wait for a shared persistence lane as well as the query.
+//
+// It is deliberately well under petRestoreTimeout. Hitting it then degrades
+// to the ordering this hold exists to fix — cast completes, pet arrives
+// afterwards — instead of coinciding with the read giving up, which would
+// turn a slow lane into no pet at all. The caster is blocked from changing
+// target, picking up, unequipping and casting item skills while the hold
+// stands, so the ceiling is sized as the longest stall worth trading for
+// packet order, not as a second read budget.
+//
+// The two are not on the same clock, so the gap between them is not the
+// difference of the constants: this one starts at the enqueue, and
+// petRestoreTimeout at the job's start, separated by however long the lane
+// wait runs. A long wait then a fast query overruns the ceiling and still
+// succeeds; no wait and a query past its own budget trips the ceiling and
+// then fails. The degraded mode is the same either way, but neither
+// constant bounds the other.
+const petRestoreHoldCeiling = 2 * time.Second
+
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
 // beside the owner, and registers it as the owner's active summon,
 // mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and stops if
@@ -60,13 +81,15 @@ const petRestoreTimeout = 5 * time.Second
 // sent).
 //
 // When the pets row has to be read, the spawn finishes on the owner's queue
-// after the read (see spawnRestoredPet), so it reports nothing to its caller.
+// after the read (see spawnRestoredPet), so it reports nothing to its
+// caller. The owner's summon slot is reserved across that read so no other
+// summon or mount can take it meanwhile; see the read below.
 func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) {
 	link, live := s.link, s.live
 	if link == nil || live == nil || controlItem == nil {
 		return
 	}
-	if _, ok := link.world.Summon(live.ObjectID()); ok {
+	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
 	}
@@ -96,16 +119,90 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// spawn continues on the owner's queue with the row, so the packets it
 	// sends keep their own order; a closed queue (the owner logged out while
 	// the read ran) drops it.
-	link.persist.Enqueue(controlItem.ObjectID, func() {
+	//
+	// Moving the read off the queue splits what the reference does in one
+	// synchronous block: it resolves the row, registers the summon and
+	// spawns inside useSkill, and only then schedules the cast's finalizer
+	// (SummonCreature.java:28-77, PlayerCast.java:150-173). Both halves of
+	// that atomicity have to be rebuilt here, because SUMMON_CREATURE
+	// carries no cool time — Plan.FinalDelay stays 0, so the Finish timer
+	// would otherwise be armed the instant the Hit phase returns and no
+	// database round trip could beat it.
+	//
+	// The Finish hold stands in for the finalizer's scheduling: the cast
+	// stays in flight until the spawn has run, so the client sees the pet
+	// before the cast's completion, in the reference's order. This is not
+	// extra waiting invented here — Pet.restore is a synchronous query
+	// inside useSkill, so the reference's caster is in its cast across the
+	// identical read. Unlike the reference, the queue itself keeps running
+	// the owner's other work throughout.
+	//
+	// The summon slot is deliberately *not* claimed here. The reference's
+	// setSummon runs after Pet.restore returns (SummonCreature.java:58,64),
+	// as does its World.addPet, so getSummon() and getPet() are both null
+	// across the read and every gate reading them answers "no summon" —
+	// which is what hasActiveSummon does too. Claiming it early would make
+	// Go reject or accept where the reference does the opposite, and would
+	// leave hasActiveSummon reporting a summon that world.Summon cannot
+	// produce.
+	//
+	// The hold is released once the continuation has run, and on every
+	// other exit from the read: the read's error branch, a continuation the
+	// queue refused, and a lane that refused the job outright, which
+	// Enqueue reports without running it once the worker is closed.
+	//
+	// It also has a ceiling. petRestoreTimeout bounds the query, but the
+	// job first waits its turn on one of persist.Lanes lanes shared by
+	// every owner (worker.go's laneIndex), and nothing bounds that wait —
+	// a burst of logout saves landing on the same lane would otherwise keep
+	// the caster in a cast long after the client's own cast bar ended,
+	// which the reference never does: its read has nothing queued ahead of
+	// it. Past the ceiling the ordering guarantee yields to keeping the
+	// player responsive, and the pet spawns after the cast completed, as it
+	// did before the hold existed. Release is idempotent, so the timer and
+	// the continuation race harmlessly.
+	// petRestoreInFlight outlives the ceiling on purpose. The ceiling ends
+	// the cast to keep the player responsive, but the pet is still on its
+	// way, so the gates the reference closes with isCastingNow() have to
+	// stay closed until it lands — otherwise the ceiling hands back exactly
+	// the window the hold was added to remove, and a wyvern collar used in
+	// it leaves the owner mounted with a pet arriving beside them.
+	live.petRestoreInFlight.Store(true)
+	releaseFinish := link.castController(live).HoldFinish()
+	time.AfterFunc(petRestoreHoldCeiling, releaseFinish)
+	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
 		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
+			if !postLive(live, func() { s.endRestore(releaseFinish) }) {
+				s.endRestore(releaseFinish)
+			}
 			return
 		}
-		postLive(live, func() { s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved) })
-	})
+		posted := postLive(live, func() {
+			defer s.endRestore(releaseFinish)
+			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved)
+		})
+		if !posted {
+			s.endRestore(releaseFinish)
+		}
+	}) {
+		s.endRestore(releaseFinish)
+	}
+}
+
+// endRestore ends the pets-row read: it reopens the owner's summon slot and
+// releases the cast's deferred Finish if the ceiling has not already. It runs
+// on every exit from the read, including the ones that build no pet, so
+// neither a failed restore nor a session that went away mid-read can leave
+// the owner unable to summon or mount.
+func (s *gameSummonSpawner) endRestore(releaseFinish func()) {
+	if s.live != nil {
+		s.live.petRestoreInFlight.Store(false)
+	}
+	releaseFinish()
 }
 
 // spawnRestoredPet builds and publishes the pet from its resolved pets-row
@@ -140,6 +237,12 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
 		return
 	}
+	// This re-check is against the world, not against restoringSummon: the
+	// restore still in flight here is this spawn's own, so consulting it
+	// would reject every restored pet. It catches a summon that reached the
+	// world while the read was outstanding — the owner's own handlers keep
+	// running throughout, and past the hold ceiling the cast no longer
+	// blocks them either.
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
@@ -294,7 +397,25 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
 		return false
 	}
-	if _, ok := link.world.Summon(live.ObjectID()); ok {
+	// A pet restore still in flight owns the slot even though world.Summon
+	// cannot show it yet: past the hold ceiling this cast could otherwise
+	// take the slot and the inbound pet would be dropped at
+	// spawnRestoredPet's re-check.
+	//
+	// This is the servitor path's only restoringSummon gate, and it is
+	// deliberately asymmetric with the two item branches, which each also
+	// reject before their cast starts (summon_item_use.go:69,111). The
+	// reference rejects all three in the same place — PlayableAI.thinkCast
+	// goes idle on isCastingNow() (PlayableAI.java:82-86), so no SUMMON
+	// cast starts while its read is running — and rejecting only here costs
+	// the caster real resources: Controller.Start has already destroyed the
+	// skill's ItemConsumeID stack and Controller.Hit has already taken the
+	// MP by the time this runs. Both are real for SUMMON skills (1225
+	// Summon Mew the Cat: itemConsumeId 1458, mpConsume 31-109). Closing it
+	// needs a pre-cast gate on the generic cast entry plus a decision on
+	// what that rejection answers, which the reference makes silently
+	// through an AI intention rather than a packet — tracked as #2412.
+	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false
 	}

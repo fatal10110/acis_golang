@@ -47,9 +47,40 @@ type livePlayer struct {
 	// useSummonItem creates it on the first pet-collar use, from the
 	// connection goroutine; the cast timer goroutine reads it.
 	summonSpawner atomic.Pointer[gameSummonSpawner]
-	shortcuts     *shortcut.List
-	isGM          bool
-	log           zerolog.Logger
+	// petRestoreInFlight is set while a summon cast that has already hit is
+	// still waiting for its pets-row read, and cleared when that read lands
+	// however it ends.
+	//
+	// The reference needs no equivalent: its read is a synchronous call
+	// inside useSkill, so isCastingNow() stays true across it and
+	// SummonItems.useItem returns on that alone (SummonItems.java:37-38)
+	// before it ever reaches the summon-slot check at :42-46. Go's read
+	// leaves the queue, and the hold that stands in for that casting state
+	// has a ceiling, so past the ceiling the cast is over while the pet is
+	// still inbound. This flag keeps the summon slot closed for the rest of
+	// the read.
+	//
+	// It covers the restore window only, not the whole of what :37-38
+	// gates. Java's check sits above the switch at :64-65 and so applies to
+	// every summon item; Go's equivalents are per-branch, and outside this
+	// window the pet branch still relies on StartItemSkill's already-casting
+	// rejection and the decorative branch has no such check at all. Those
+	// are pre-existing gaps in the pre-cast gating, tracked by #2369 and
+	// #2411 — whichever adds a pre-cast gate has to consult this flag as
+	// well as hasActiveSummon, or it will close the :42-46 half and leave
+	// the :37-38 half open in exactly this window.
+	//
+	// It is deliberately not part of hasActiveSummon: the reference answers
+	// RequestAutoSoulShot with getSummon(), which is null across its own
+	// read (SummonCreature.java:58 vs :64), so that gate must keep seeing an
+	// empty slot.
+	//
+	// Only the owner's queue and its persistence continuation write it;
+	// atomic so a gate reached from any other goroutine stays race-free.
+	petRestoreInFlight atomic.Bool
+	shortcuts          *shortcut.List
+	isGM               bool
+	log                zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
@@ -168,13 +199,15 @@ func onQueue(q *sim.Queue, fn func()) {
 }
 
 // postLive posts fn to live's queue without waiting, or runs it now when
-// live has no queue. A detached player's closed queue drops fn.
-func postLive(live *livePlayer, fn func()) {
+// live has no queue. It reports whether fn will run: a detached player's
+// closed queue drops it, which a caller holding state for fn to release has
+// to clean up itself.
+func postLive(live *livePlayer, fn func()) bool {
 	if q := live.Queue(); q != nil {
-		q.Post(fn)
-		return
+		return q.Post(fn)
 	}
 	fn()
+	return true
 }
 
 // onLive runs fn on live's queue, or on the calling goroutine when live is

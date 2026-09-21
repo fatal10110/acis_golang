@@ -390,3 +390,104 @@ func (s *syncCastBuffer) String() string {
 	defer s.mu.Unlock()
 	return s.buf.String()
 }
+
+// TestHoldFinishDefersFinishUntilReleased covers the grant a Hit effect
+// takes when its own work has to leave the actor's queue and come back: Hit
+// still runs on time, Finish waits for the release, and the release arms it
+// even though the final delay already elapsed while the hold stood.
+func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
+	clock := &fakeCastClock{}
+	ctrl := NewController(scalingActor(), nil)
+	ctrl.afterFunc = clock.AfterFunc
+
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	var order []string
+	var release func()
+	ctrl.Schedule(plan, Hooks{
+		Hit:    func() { order = append(order, "hit"); release = ctrl.HoldFinish() },
+		Finish: func() { order = append(order, "finish") },
+	})
+
+	clock.fire(plan.LaunchDelay)
+	clock.fire(plan.HitDelay)
+	if got := []string{"hit"}; !equalStrings(order, got) {
+		t.Fatalf("order after hit delay = %v, want %v", order, got)
+	}
+
+	clock.fire(plan.FinalDelay)
+	if got := []string{"hit"}; !equalStrings(order, got) {
+		t.Fatalf("order after final delay while held = %v, want Finish still pending (%v)", order, got)
+	}
+	if !ctrl.CastingNow() {
+		t.Fatal("CastingNow() = false while a Finish hold stands, want still casting")
+	}
+
+	release()
+	clock.fire(plan.FinalDelay)
+	if got := []string{"hit", "finish"}; !equalStrings(order, got) {
+		t.Fatalf("order after release = %v, want %v", order, got)
+	}
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after the released Finish ran, want cleared")
+	}
+
+	// Releasing again must not arm a second Finish for a cast that ended.
+	release()
+	clock.fire(plan.FinalDelay)
+	if got := []string{"hit", "finish"}; !equalStrings(order, got) {
+		t.Fatalf("order after a repeated release = %v, want %v", order, got)
+	}
+}
+
+// TestHoldFinishDroppedWhenCastStops covers the abandoned grant: a cast
+// stopped while a hold stands clears it with the rest of its state, and the
+// late release neither revives that cast's Finish nor leaks into the next
+// cast on the same controller.
+func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
+	clock := &fakeCastClock{}
+	ctrl := NewController(scalingActor(), nil)
+	ctrl.afterFunc = clock.AfterFunc
+
+	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
+	if err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	var finishes int
+	var release func()
+	ctrl.Schedule(plan, Hooks{
+		Hit:    func() { release = ctrl.HoldFinish() },
+		Finish: func() { finishes++ },
+	})
+	clock.fire(plan.LaunchDelay)
+	clock.fire(plan.HitDelay)
+
+	ctrl.Stop()
+	if ctrl.CastingNow() {
+		t.Fatal("CastingNow() = true after Stop, want cleared")
+	}
+
+	release()
+	clock.fire(plan.FinalDelay)
+	if finishes != 0 {
+		t.Fatalf("Finish ran %d times for a stopped cast, want 0", finishes)
+	}
+
+	// A fresh cast on the same controller must not inherit the stale hold.
+	var order []string
+	plan2, err := ctrl.Start(time.Unix(2000, 0), testTarget{}, scalingDef)
+	if err != nil {
+		t.Fatalf("second Start() error: %v", err)
+	}
+	ctrl.Schedule(plan2, Hooks{Finish: func() { order = append(order, "finish") }})
+	clock.fire(plan2.LaunchDelay)
+	clock.fire(plan2.HitDelay)
+	clock.fire(plan2.FinalDelay)
+	if got := []string{"finish"}; !equalStrings(order, got) {
+		t.Fatalf("second cast order = %v, want %v", order, got)
+	}
+}
