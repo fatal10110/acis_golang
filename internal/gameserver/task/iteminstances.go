@@ -51,6 +51,12 @@ const (
 	ItemInstanceSaveChunkSize = 100
 )
 
+// errSaveJobPanic is the error a Save owner job reports when it panicked.
+// The lane logs the panic itself (persist.Worker.runJob) and swallows it, so
+// without this the round would close with a nil error and Save would report
+// a flush that never happened as a success.
+var errSaveJobPanic = errors.New("task: item save job panicked")
+
 // ItemFlusher atomically persists one flush batch: either every change in
 // it lands, or, on error, none of it does.
 type ItemFlusher interface {
@@ -334,8 +340,26 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 		// order; see the chunk-boundary note above.
 		slices.SortFunc(entries, func(a, b pendingItem) int { return cmp.Compare(a.inst.ObjectID, b.inst.ObjectID) })
 		job := func() {
-			failed, err := i.saveChunks(ctx, entries)
-			i.finishOwner(round, failed, err)
+			// The bookkeeping runs on the panic path too. A panic anywhere
+			// inside saveChunks is recovered by the lane (persist.Worker.runJob)
+			// so one bad job cannot kill it, which means an unguarded
+			// finishOwner call simply never runs: the round never reaches zero
+			// remaining, so Save blocks until its own ctx expires and the round
+			// stays in i.rounds for the rest of the process, and this owner's
+			// items — already swapped out of pending — end up in no map at all,
+			// neither written nor retried. The row then keeps pre-write state
+			// while memory holds the new one, which a relog turns into a
+			// rollback or, for a trade whose other leg saved on another lane, a
+			// duplicate.
+			//
+			// The pre-set values are what a panic reports: every item back to
+			// pending (saveChunks has no return value to say which chunks got
+			// as far as committing, and a redundant re-save is the safe side of
+			// that) and a non-nil error, so a panicked round surfaces to the
+			// caller as a failed one rather than as a silent success.
+			failed, err := entries, errSaveJobPanic
+			defer func() { i.finishOwner(round, failed, err) }()
+			failed, err = i.saveChunks(ctx, entries)
 		}
 		// A closed worker has already run every job it accepted, so writing
 		// here cannot land ahead of an older queued write.
