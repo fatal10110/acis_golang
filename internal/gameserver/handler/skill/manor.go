@@ -8,9 +8,16 @@ import (
 
 // Inert until manor lands (#240): no item implements seedItem, so SOW never
 // sows and HARVEST therefore never finds a sown target. That issue also owns
-// the parity these handlers still lack — the Monster-only target gate, the
-// sow/harvest system messages, the party harvest broadcast and the manor
-// production rate — plus party-shared harvesting (#863).
+// the parity these handlers still lack — the Player-only caster gate, the
+// Monster-only target gate, the sow/harvest system messages, the party
+// harvest broadcast and the manor production rate — plus party-shared
+// harvesting (#863).
+//
+// The caster gate is what makes HARVEST's ordering safe: it marks the crop
+// consumed before it checks that the caster can be paid, so a caster that
+// clears every gate without being an earner would eat the crop and receive
+// nothing. The reference rejects a non-player caster before it touches the
+// seed state at all, which is why its own reward call needs no such check.
 //
 // seedItem exposes the manor seed data an item carries when used to sow;
 // resolving an item id to its Seed row (a manor.Table lookup) is the item's
