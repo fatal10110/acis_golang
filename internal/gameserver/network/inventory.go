@@ -214,8 +214,19 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
 }
 
+// hasActiveSummon reports whether live's summon slot is taken: by a summon
+// already in the world, or by a summon cast that has hit and is still
+// resolving its pets row (see livePlayer.summonReservation). It is the
+// counterpart of the reference's `player.getSummon() != null`, which is
+// already non-null across the equivalent stretch.
 func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
-	if l.world == nil || live == nil {
+	if live == nil {
+		return false
+	}
+	if live.summonReservation.Load() {
+		return true
+	}
+	if l.world == nil {
 		return false
 	}
 	_, ok := l.world.Summon(live.ObjectID())

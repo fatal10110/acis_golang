@@ -118,7 +118,15 @@ func (c *Controller) runHit(seq uint64, plan Plan, hooks Hooks) {
 		c.mu.Unlock()
 		return
 	}
-	c.scheduleLocked(plan.FinalDelay, func() { c.runFinish(seq, hooks) })
+	arm := func() { c.scheduleLocked(plan.FinalDelay, func() { c.runFinish(seq, hooks) }) }
+	// A Hit effect that took a HoldFinish grant is still completing off this
+	// actor's queue; arming Finish now would let the cast end ahead of it.
+	// releaseFinish runs arm once the last hold is gone.
+	if c.finishHolds > 0 {
+		c.finishArm = arm
+	} else {
+		arm()
+	}
 	c.mu.Unlock()
 }
 

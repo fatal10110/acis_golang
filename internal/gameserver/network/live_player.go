@@ -47,9 +47,29 @@ type livePlayer struct {
 	// useSummonItem creates it on the first pet-collar use, from the
 	// connection goroutine; the cast timer goroutine reads it.
 	summonSpawner atomic.Pointer[gameSummonSpawner]
-	shortcuts     *shortcut.List
-	isGM          bool
-	log           zerolog.Logger
+	// summonReservation holds this owner's summon slot from the instant a
+	// summon cast hits until its pet actually reaches the world. It exists
+	// because the pets-row read runs off this player's queue, so the spawn
+	// lands in a later task and world.Summon would otherwise answer "no
+	// summon" for the whole database round trip — a window in which the
+	// owner is already out of their cast and free to act.
+	//
+	// The reference has no such window: SummonCreature.useSkill calls
+	// player.setSummon(pet) in the same synchronous block that resolves the
+	// row (SummonCreature.java:38-63), so every gate reading getSummon()
+	// closes at hit time. Reserving here closes the Go gates at the same
+	// point. hasActiveSummon is the read side; every gate that asks whether
+	// this owner already has a summon goes through it, while code that
+	// needs the summon object itself keeps reading world.Summon and
+	// correctly finds nothing until the spawn lands.
+	//
+	// Only the owner's queue and its persistence continuation touch it, but
+	// it is atomic so a gate reached from any other goroutine stays
+	// race-free.
+	summonReservation atomic.Bool
+	shortcuts         *shortcut.List
+	isGM              bool
+	log               zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
@@ -168,13 +188,15 @@ func onQueue(q *sim.Queue, fn func()) {
 }
 
 // postLive posts fn to live's queue without waiting, or runs it now when
-// live has no queue. A detached player's closed queue drops fn.
-func postLive(live *livePlayer, fn func()) {
+// live has no queue. It reports whether fn will run: a detached player's
+// closed queue drops it, which a caller holding state for fn to release has
+// to clean up itself.
+func postLive(live *livePlayer, fn func()) bool {
 	if q := live.Queue(); q != nil {
-		q.Post(fn)
-		return
+		return q.Post(fn)
 	}
 	fn()
+	return true
 }
 
 // onLive runs fn on live's queue, or on the calling goroutine when live is

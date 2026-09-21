@@ -60,13 +60,15 @@ const petRestoreTimeout = 5 * time.Second
 // sent).
 //
 // When the pets row has to be read, the spawn finishes on the owner's queue
-// after the read (see spawnRestoredPet), so it reports nothing to its caller.
+// after the read (see spawnRestoredPet), so it reports nothing to its
+// caller. The owner's summon slot is reserved across that read so no other
+// summon or mount can take it meanwhile; see the read below.
 func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.Instance) {
 	link, live := s.link, s.live
 	if link == nil || live == nil || controlItem == nil {
 		return
 	}
-	if _, ok := link.world.Summon(live.ObjectID()); ok {
+	if link.hasActiveSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
 	}
@@ -96,16 +98,68 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// spawn continues on the owner's queue with the row, so the packets it
 	// sends keep their own order; a closed queue (the owner logged out while
 	// the read ran) drops it.
+	//
+	// Moving the read off the queue splits what the reference does in one
+	// synchronous block: it resolves the row, registers the summon and
+	// spawns inside useSkill, and only then schedules the cast's finalizer
+	// (SummonCreature.java:28-77, PlayerCast.java:150-173). Both halves of
+	// that atomicity have to be rebuilt here, because SUMMON_CREATURE
+	// carries no cool time — Plan.FinalDelay stays 0, so the Finish timer
+	// would otherwise be armed the instant the Hit phase returns and no
+	// database round trip could beat it.
+	//
+	// The reservation stands in for setSummon: it closes every gate that
+	// asks whether this owner already has a summon (hasActiveSummon) from
+	// hit time, so a wyvern collar, a second pet collar or a servitor cast
+	// attempted while the row is in flight is rejected exactly where the
+	// reference rejects it.
+	//
+	// The Finish hold stands in for the finalizer's scheduling: the cast
+	// stays in flight until the spawn has run, so the client sees the pet
+	// before the cast's completion, in the reference's order. This is not
+	// extra waiting invented here — Pet.restore is a synchronous query
+	// inside useSkill, so the reference's caster is in its cast across the
+	// identical read. Unlike the reference, the queue itself keeps running
+	// the owner's other work throughout.
+	//
+	// Both are released once the continuation has run: by then a successful
+	// spawn has registered the real summon, so the gates stay shut, and
+	// Finish is armed behind the spawn's packets. Every failure path
+	// releases too — the read's error branch, and a continuation the queue
+	// refused, which happens only when the session is already gone.
+	live.summonReservation.Store(true)
+	releaseFinish := link.castController(live).HoldFinish()
 	link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
 		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
+			if !postLive(live, func() { s.endRestore(releaseFinish) }) {
+				s.endRestore(releaseFinish)
+			}
 			return
 		}
-		postLive(live, func() { s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved) })
+		posted := postLive(live, func() {
+			defer s.endRestore(releaseFinish)
+			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved)
+		})
+		if !posted {
+			s.endRestore(releaseFinish)
+		}
 	})
+}
+
+// endRestore gives back what SpawnPet held across the pets-row read: the
+// owner's summon slot, and the cast's deferred Finish. It runs on every exit
+// from the read, including the ones where no pet was built, so neither a
+// failed restore nor a session that went away mid-read can leave the owner
+// permanently unable to summon or stuck in a cast that never completes.
+func (s *gameSummonSpawner) endRestore(releaseFinish func()) {
+	if s.live != nil {
+		s.live.summonReservation.Store(false)
+	}
+	releaseFinish()
 }
 
 // spawnRestoredPet builds and publishes the pet from its resolved pets-row
@@ -140,6 +194,11 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
 		return
 	}
+	// world.Summon, not hasActiveSummon: the reservation still standing here
+	// is this spawn's own, and consulting it would reject every restored
+	// pet. Another summon cannot have taken the slot while it stood — that
+	// is what reserving it prevents — so this re-check now only catches a
+	// summon that reached the world through a path holding no reservation.
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
@@ -294,7 +353,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
 		return false
 	}
-	if _, ok := link.world.Summon(live.ObjectID()); ok {
+	if link.hasActiveSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false
 	}

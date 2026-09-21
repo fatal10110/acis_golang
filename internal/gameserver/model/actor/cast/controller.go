@@ -156,9 +156,16 @@ type Controller struct {
 	castSeq   uint64
 	timers    []scheduledTimer
 	fusionEnd func()
-	afterFunc afterFunc
-	sink      event.Sink
-	log       zerolog.Logger
+	// finishHolds counts the outstanding HoldFinish grants for the active
+	// cast, and finishArm is the Finish arming Hit deferred because of
+	// them. clearLocked drops both with the rest of the cast state, so a
+	// stopped or superseded cast never arms a Finish on a later one's
+	// behalf.
+	finishHolds int
+	finishArm   func()
+	afterFunc   afterFunc
+	sink        event.Sink
+	log         zerolog.Logger
 }
 
 // NewController returns a cast controller for actor. sink receives, each
@@ -201,6 +208,53 @@ func (c *Controller) SetLogger(log zerolog.Logger) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.log = log
+}
+
+// HoldFinish keeps the active cast's Finish phase from being armed until
+// the returned release is called, and returns a no-op release when no cast
+// is in flight. Hit still runs on time; only the transition out of the cast
+// waits.
+//
+// It exists for a Hit-phase effect whose own work cannot finish inside the
+// Hit task — one that has to leave the actor's queue and come back, such as
+// a summon that must read its saved state. The reference does that work
+// synchronously inside the skill handler and schedules its finalizer only
+// afterwards, so the actor stays in its cast for the duration; a held Finish
+// is how that shape survives the work moving off the queue.
+//
+// Release is idempotent and safe from any goroutine. Releasing after the
+// cast was stopped, interrupted or superseded does nothing: the grant is
+// bound to the cast that was active when it was taken. The caller owns the
+// release and must run it on every path, including its own failures — an
+// unreleased hold leaves the actor casting until something else stops it.
+func (c *Controller) HoldFinish() func() {
+	c.mu.Lock()
+	if !c.casting {
+		c.mu.Unlock()
+		return func() {}
+	}
+	seq := c.castSeq
+	c.finishHolds++
+	c.mu.Unlock()
+	var once sync.Once
+	return func() { once.Do(func() { c.releaseFinish(seq) }) }
+}
+
+// releaseFinish drops one hold taken for the cast identified by seq and arms
+// the Finish that Hit deferred once the last one is gone.
+func (c *Controller) releaseFinish(seq uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.castingLocked(seq) || c.finishHolds == 0 {
+		return
+	}
+	c.finishHolds--
+	if c.finishHolds > 0 || c.finishArm == nil {
+		return
+	}
+	arm := c.finishArm
+	c.finishArm = nil
+	arm()
 }
 
 // CastingNow reports whether the actor currently has an active cast.
@@ -681,6 +735,8 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 
 func (c *Controller) clearLocked() {
 	c.stopTimersLocked()
+	c.finishHolds = 0
+	c.finishArm = nil
 	c.castSeq++
 	c.casting = false
 	c.current = modelskill.Definition{}
