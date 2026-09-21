@@ -53,6 +53,14 @@ const petRestoreTimeout = 5 * time.Second
 // target, picking up, unequipping and casting item skills while the hold
 // stands, so the ceiling is sized as the longest stall worth trading for
 // packet order, not as a second read budget.
+//
+// The two are not on the same clock, so the gap between them is not the
+// difference of the constants: this one starts at the enqueue, and
+// petRestoreTimeout at the job's start, separated by however long the lane
+// wait runs. A long wait then a fast query overruns the ceiling and still
+// succeeds; no wait and a query past its own budget trips the ceiling and
+// then fails. The degraded mode is the same either way, but neither
+// constant bounds the other.
 const petRestoreHoldCeiling = 2 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
@@ -81,7 +89,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	if link == nil || live == nil || controlItem == nil {
 		return
 	}
-	if link.hasActiveSummon(live) {
+	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
 	}
@@ -153,6 +161,13 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// player responsive, and the pet spawns after the cast completed, as it
 	// did before the hold existed. Release is idempotent, so the timer and
 	// the continuation race harmlessly.
+	// petRestoreInFlight outlives the ceiling on purpose. The ceiling ends
+	// the cast to keep the player responsive, but the pet is still on its
+	// way, so the gates the reference closes with isCastingNow() have to
+	// stay closed until it lands — otherwise the ceiling hands back exactly
+	// the window the hold was added to remove, and a wyvern collar used in
+	// it leaves the owner mounted with a pet arriving beside them.
+	live.petRestoreInFlight.Store(true)
 	releaseFinish := link.castController(live).HoldFinish()
 	time.AfterFunc(petRestoreHoldCeiling, releaseFinish)
 	if !link.persist.Enqueue(controlItem.ObjectID, func() {
@@ -161,21 +176,33 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
-			if !postLive(live, func() { releaseFinish() }) {
-				releaseFinish()
+			if !postLive(live, func() { s.endRestore(releaseFinish) }) {
+				s.endRestore(releaseFinish)
 			}
 			return
 		}
 		posted := postLive(live, func() {
-			defer releaseFinish()
+			defer s.endRestore(releaseFinish)
 			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved)
 		})
 		if !posted {
-			releaseFinish()
+			s.endRestore(releaseFinish)
 		}
 	}) {
-		releaseFinish()
+		s.endRestore(releaseFinish)
 	}
+}
+
+// endRestore ends the pets-row read: it reopens the owner's summon slot and
+// releases the cast's deferred Finish if the ceiling has not already. It runs
+// on every exit from the read, including the ones that build no pet, so
+// neither a failed restore nor a session that went away mid-read can leave
+// the owner unable to summon or mount.
+func (s *gameSummonSpawner) endRestore(releaseFinish func()) {
+	if s.live != nil {
+		s.live.petRestoreInFlight.Store(false)
+	}
+	releaseFinish()
 }
 
 // spawnRestoredPet builds and publishes the pet from its resolved pets-row
@@ -210,11 +237,12 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	if inv == nil || inv.ItemByObjectID(controlItem.ObjectID) == nil {
 		return
 	}
-	// world.Summon, not hasActiveSummon: the reservation still standing here
-	// is this spawn's own, and consulting it would reject every restored
-	// pet. Another summon cannot have taken the slot while it stood — that
-	// is what reserving it prevents — so this re-check now only catches a
-	// summon that reached the world through a path holding no reservation.
+	// This re-check is against the world, not against restoringSummon: the
+	// restore still in flight here is this spawn's own, so consulting it
+	// would reject every restored pet. It catches a summon that reached the
+	// world while the read was outstanding — the owner's own handlers keep
+	// running throughout, and past the hold ceiling the cast no longer
+	// blocks them either.
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
@@ -369,7 +397,11 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
 		return false
 	}
-	if link.hasActiveSummon(live) {
+	// A pet restore still in flight owns the slot even though world.Summon
+	// cannot show it yet: past the hold ceiling this cast could otherwise
+	// take the slot and the inbound pet would be dropped at
+	// spawnRestoredPet's re-check.
+	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false
 	}

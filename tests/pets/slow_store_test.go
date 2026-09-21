@@ -365,3 +365,60 @@ func petOwnerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) b
 	}
 	return caster.CastingNow()
 }
+
+// TestWyvernMountRejectedAfterHoldCeiling covers the window the hold's own
+// ceiling opens. Past the ceiling the cast is over while the pets-row read
+// is still outstanding, so the barrier that rejects a wyvern collar during a
+// normal restore — the cast itself, matching SummonItems.java:36-37's
+// isCastingNow() return before the summon-slot check at :41-45 — is gone,
+// and world.Summon is still empty because the pet has not landed.
+//
+// The reference never reaches that state: its read is one synchronous call
+// inside useSkill, with isCastingNow() true throughout. Go has to hold the
+// slot explicitly for as long as the restore is in flight, ceiling or not,
+// or the owner ends up mounted with a pet arriving beside them.
+func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
+	h := bootOwnerWithCollarOpts(t,
+		[]gameservertest.Option{gameservertest.WithSlowStores(ceilingStoreDelay)},
+		seedItem{TemplateID: wyvernCollarID, Count: 1},
+	)
+	wyvernCollar := h.seeded[wyvernCollarID][0]
+
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
+	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+
+	// Wait for the ceiling to end the cast, with the read still running.
+	deadline := time.Now().Add(ceilingStoreDelay)
+	for time.Now().Before(deadline) {
+		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if petOwnerCastingNow(t, h.srv, h.ownerID) {
+		t.Fatal("cast never ended: the ceiling window this test needs was never open")
+	}
+	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
+		t.Fatal("pet already in world: the restore was no longer in flight")
+	}
+
+	h.client.Send(encodeUseItem(wyvernCollar, false))
+	frames := drainFrames(t, h.client)
+	for _, frame := range frames {
+		if frame[0] == serverpackets.OpcodeRide {
+			t.Fatalf("wyvern mounted after the hold ceiling while the pet was still inbound: opcodes %x", frameOpcodes(frames))
+		}
+	}
+
+	// The rejection is silent, so the drain above returns long before the
+	// read lands; wait the rest of it out to prove the pet still arrives.
+	petDeadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
+	for time.Now().Before(petDeadline) {
+		if _, ok := h.srv.State.Summon(h.ownerID); ok {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("pet never reached the world")
+}

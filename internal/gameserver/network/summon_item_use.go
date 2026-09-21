@@ -62,7 +62,11 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 			return true
 		}
-		if live.Character.AllSkillsDisabled() || live.Character.CastingNow() {
+		// restoringSummon extends this gate over the rest of a pets-row
+		// read whose cast the hold ceiling already ended: the reference
+		// is still casting there and returns here silently
+		// (SummonItems.java:36-37), before the summon-slot check below.
+		if live.Character.AllSkillsDisabled() || live.Character.CastingNow() || l.restoringSummon(live) {
 			return true
 		}
 		if live.Character.MountType() != 0 || l.hasActiveSummon(live) {

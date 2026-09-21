@@ -47,9 +47,30 @@ type livePlayer struct {
 	// useSummonItem creates it on the first pet-collar use, from the
 	// connection goroutine; the cast timer goroutine reads it.
 	summonSpawner atomic.Pointer[gameSummonSpawner]
-	shortcuts     *shortcut.List
-	isGM          bool
-	log           zerolog.Logger
+	// petRestoreInFlight is set while a summon cast that has already hit is
+	// still waiting for its pets-row read, and cleared when that read lands
+	// however it ends.
+	//
+	// The reference needs no equivalent: its read is a synchronous call
+	// inside useSkill, so isCastingNow() stays true across it and
+	// SummonItems.useItem returns on that alone (SummonItems.java:36-37)
+	// before it ever reaches the summon-slot check at :41-45. Go's read
+	// leaves the queue, and the hold that stands in for that casting state
+	// has a ceiling, so past the ceiling the cast is over while the pet is
+	// still inbound. This flag keeps exactly the gates the reference closes
+	// with isCastingNow() closed for the rest of the read.
+	//
+	// It is deliberately not part of hasActiveSummon: the reference answers
+	// RequestAutoSoulShot with getSummon(), which is null across its own
+	// read (SummonCreature.java:58 vs :64), so that gate must keep seeing an
+	// empty slot.
+	//
+	// Only the owner's queue and its persistence continuation write it;
+	// atomic so a gate reached from any other goroutine stays race-free.
+	petRestoreInFlight atomic.Bool
+	shortcuts          *shortcut.List
+	isGM               bool
+	log                zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor

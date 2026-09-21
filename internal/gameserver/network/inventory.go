@@ -219,6 +219,15 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 // no for a summon cast still resolving its pets row: the reference's own
 // setSummon runs after Pet.restore returns (SummonCreature.java:58,64), so
 // its slot is empty across that read too.
+// restoringSummon reports whether live has a summon cast that already hit
+// and is still resolving its pets row. It is the Go-side stand-in for the
+// casting state the reference holds across that read, for the gates the
+// reference closes with isCastingNow() — never for hasActiveSummon, which
+// has to keep answering as getSummon() does.
+func (l *GameClientLink) restoringSummon(live *livePlayer) bool {
+	return live != nil && live.petRestoreInFlight.Load()
+}
+
 func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 	if l.world == nil || live == nil {
 		return false
