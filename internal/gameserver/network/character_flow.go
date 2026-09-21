@@ -181,18 +181,19 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
 	}
 
+	// Built before the runtime is attached, so a missing item template aborts
+	// the login without leaving an actor queue and shadow-item tracking
+	// registered behind it. The restore that follows ends with an empty
+	// update queue, so there is nothing here for a full-list send to discard;
+	// routing this snapshot through the inventory as well waits on #2420.
+	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
+	if err != nil {
+		l.log.Error().Err(err).Msg("enter world: build ItemList")
+		return nil, false
+	}
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
-		return nil, false
-	}
-	// Built from the live inventory the rows were just restored into, so the
-	// login snapshot goes through the same constructor as every later full
-	// list and drops the pending update queue with it. Nothing is queued this
-	// early — a restore notifies nobody — so the clear is only consistency.
-	itemListFrame, err := live.buildItemList(l.itemTemplates, false)
-	if err != nil {
-		l.log.Error().Err(err).Msg("enter world: build ItemList")
 		return nil, false
 	}
 	if l.roster != nil {

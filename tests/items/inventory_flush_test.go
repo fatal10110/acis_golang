@@ -186,12 +186,18 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 	startInWorld(t, c)
 	inv := srv.PlayerInventory(t, objID)
 
-	// The off-task regression is a race: the connection goroutine wakes from
-	// the reply task while the queue goroutine runs the two tasks behind it,
-	// and either can reach the socket first. One round only samples that
-	// race, so the round count is what makes the inversion observable —
-	// measured on this change, 15 rounds reproduce a reverted fix in about
-	// two of every three runs, in both executor modes.
+	// This gate is one-directional. With the reply sent on its task the
+	// order is deterministic — reply, mutation and drain are three tasks on
+	// one FIFO queue — so the test never fails spuriously. Detecting the
+	// off-task regression is probabilistic: Conn.SendFrame only appends to
+	// the connection's outbound queue under its own mutex (conn.go:170-193)
+	// and a separate writer goroutine does the socket write, so an off-task
+	// reply differs only in which goroutine appends first, which nothing the
+	// client can observe distinguishes. Each round samples that race; the
+	// round count is what makes the inversion show up at all. Measured with
+	// the reply reverted to an off-task send, -race, 8 runs per executor
+	// mode: pool 3/8, inline 6/8 (9/16 overall). Do not read a single green
+	// run of a reverted fix as the property holding.
 	const rounds = 15
 	count := int32(100)
 	for round := range rounds {
