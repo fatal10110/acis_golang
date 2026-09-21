@@ -223,10 +223,5 @@ func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.Scripted
 func syncOnItemList(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Send(encodeRequestItemList())
-	for range 100 {
-		if frame := c.Read(); len(frame) > 0 && frame[0] == serverpackets.OpcodeItemList {
-			return
-		}
-	}
-	t.Fatal("no ItemList reply within 100 frames")
+	readItemList(t, c)
 }

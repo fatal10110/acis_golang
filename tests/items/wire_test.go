@@ -144,8 +144,10 @@ func encodeMoveBackwardToLocation(targetX, targetY, targetZ, originX, originY, o
 // startInWorld selects slot 0 and enters the world, consuming the fixed
 // EnterWorld reply burst plus every trailing frame (level-grant SkillList,
 // late ActionFailed) so callers read their own flow's frames from a quiet
-// stream.
-func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
+// stream. It returns the burst frames, in wire order, for the rare caller
+// that asserts on their contents; callers that only need to reach the world
+// ignore the result.
+func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	c.Send(encodeRequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
@@ -155,8 +157,21 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
 	c.Send(encodeEnterWorld())
-	readEnterWorldBurst(t, c)
+	frames := readEnterWorldBurst(t, c)
 	drainUntilQuiet(t, c)
+	return frames
+}
+
+// readItemList reads until the next ItemList frame and returns it.
+func readItemList(t *testing.T, c *testsupport.ScriptedClient) []byte {
+	t.Helper()
+	for range 100 {
+		if frame := c.Read(); len(frame) > 0 && frame[0] == serverpackets.OpcodeItemList {
+			return frame
+		}
+	}
+	t.Fatal("no ItemList reply within 100 frames")
+	return nil
 }
 
 // equipNoiseOpcodes are the grade/expertise-penalty packets an equip or
@@ -180,6 +195,12 @@ func readSkippingEquipNoise(t *testing.T, c *testsupport.ScriptedClient, what st
 	t.Fatalf("no %s frame after skipping equip noise", what)
 	return nil
 }
+
+// enterWorldBurstItemList is the index of the ItemList frame in the burst
+// readEnterWorldBurst pins below. Callers that index it assert the opcode
+// too, so reordering the burst fails loudly instead of reading the wrong
+// frame.
+const enterWorldBurstItemList = 10
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
