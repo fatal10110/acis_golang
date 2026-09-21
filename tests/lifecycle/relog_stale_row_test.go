@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -20,6 +21,7 @@ func TestDestroyedStackDoesNotReturnOnRelog(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
+		gameservertest.WithCapturedLog(),
 	)
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -42,6 +44,12 @@ func TestDestroyedStackDoesNotReturnOnRelog(t *testing.T) {
 	entries := readItemListEntries(t, burstFrame(t, frames, serverpackets.OpcodeItemList))
 	if e := findItemListEntry(entries, potions); e != nil {
 		t.Fatalf("destroyed stack returned in the relog ItemList: %+v", *e)
+	}
+	// The drop is the one point in the login path that removes rows a
+	// player may still own, so it has to be greppable: without this line a
+	// detach flush that never landed would empty an inventory in silence.
+	if !strings.Contains(srv.LogText(), "skipped item rows with an unflushed change") {
+		t.Fatalf("no log line for the skipped stale row; login-side diagnostics missing")
 	}
 }
 

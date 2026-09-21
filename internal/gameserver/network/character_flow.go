@@ -87,7 +87,14 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 //
 // The pending set outranks the table: an entry means the stored state is
 // known stale and the item is no longer part of this container.
-func (l *GameClientLink) dropStaleItemRows(items []*item.Instance) []*item.Instance {
+//
+// A drop is logged because this is the one place in the login path that
+// removes rows a player may still legitimately own. The normal case is a
+// small count — one destroyed or traded stack — while a count covering the
+// whole inventory means the previous detach flush never landed and left the
+// container pending, and the error for that was logged minutes earlier on
+// another connection's goroutine. The count is what tells the two apart.
+func (l *GameClientLink) dropStaleItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
 	if l.itemInstances == nil {
 		return items
 	}
@@ -100,6 +107,10 @@ func (l *GameClientLink) dropStaleItemRows(items []*item.Instance) []*item.Insta
 			continue
 		}
 		kept = append(kept, inst)
+	}
+	if dropped := len(items) - len(kept); dropped > 0 {
+		l.log.Warn().Int32("object_id", ownerID).Int("dropped", dropped).Int("restored", len(kept)).
+			Msg("restore inventory: skipped item rows with an unflushed change")
 	}
 	return kept
 }
@@ -117,7 +128,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: list items")
 		return nil, false
 	}
-	items = l.dropStaleItemRows(items)
+	items = l.dropStaleItemRows(c.ID, items)
 	if l.skills != nil {
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore known skills")
