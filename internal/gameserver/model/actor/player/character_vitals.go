@@ -94,8 +94,18 @@ func (c *Character) CurrentCP() int {
 	return int(c.ResourceValues().CurrentCP)
 }
 
-// ReduceCurrentHP subtracts non-negative HP, clamps at zero, and reports
-// whether this call newly reached zero.
+// ReduceCurrentHP subtracts non-negative HP and reports whether this call
+// newly killed the character.
+//
+// Death is a half-point threshold, not a zero crossing: the reference sets
+// HP and then dies on `_hp < 0.5` (PlayerStatus.java:217-238,
+// CreatureStatus.java:249-250), so any remainder under half a point is
+// already a death. A zero crossing would miss it, and the gap is reachable
+// rather than theoretical because the callers that gate on affordability
+// compare against truncated HP: a character on 10.4 HP reports 10, pays a
+// cost of 10 in full, and lands on 0.4 — dead in the reference, displayed
+// at 0 HP either way. The remainder is then cleared so a repeat call sees
+// an already-dead character.
 func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
@@ -106,7 +116,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 		return false
 	}
 	c.curHP -= float64(amount)
-	if c.curHP > 0 {
+	if c.curHP >= 0.5 {
 		return false
 	}
 	c.curHP = 0

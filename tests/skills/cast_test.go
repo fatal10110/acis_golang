@@ -812,10 +812,30 @@ func skillCase(skillID int32) string {
 // hit-timer re-check rejects only HPConsume > HP, so it accepts and pays
 // this cost; paying it must run the full death sequence instead of leaving
 // the caster alive at 0 HP while the hit runs on to completion.
-//
-// The skill's own buff landing on the now-dead caster is not asserted here:
-// the continuous handler skips dead targets, which issue #2384 tracks.
 func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
+	castLethalHPConsume(t, 0)
+}
+
+// TestFractionallyLethalHPConsumeKillsCaster is the same cast against a
+// caster holding a fractional remainder. The affordability gates compare
+// against truncated HP, so a caster on cost+0.4 reports exactly the cost,
+// pays it in full, and lands on 0.4 — under the reference's half-point
+// death threshold (PlayerStatus.java:217-238), which a zero crossing would
+// miss. Fractional HP is ordinary: the shipped hpRegenTable values are
+// half-integers at most level bands and TickRegen writes the scaled result
+// straight into current HP.
+func TestFractionallyLethalHPConsumeKillsCaster(t *testing.T) {
+	castLethalHPConsume(t, 0.4)
+}
+
+// castLethalHPConsume runs one exactly-lethal HP-consume cast, leaving the
+// caster on the skill's cost plus remainder when the hit lands, and asserts
+// the death, its packets, and that the hit still ran to completion.
+//
+// The skill's own buff landing on the now-dead caster is not asserted: the
+// continuous handler skips dead targets, which issue #2384 tracks.
+func castLethalHPConsume(t *testing.T, remainder float64) {
+	t.Helper()
 	const skillID, hpConsume, hitTime = 291, 10, 1500
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Caster", 5, 0),
@@ -834,13 +854,24 @@ func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "cast ack")
 
-	// Drain the caster down to exactly the cost while the cast is in flight.
-	// The pre-cast gate has already passed, so only the hit timer sees it.
+	// Drain the caster down to the cost while the cast is in flight. The
+	// pre-cast gate has already passed, so only the hit timer sees it.
 	hp := srv.PlayerCurrentHP(t, objID)
 	if hp <= hpConsume {
 		t.Fatalf("caster HP %d is not above the %d HP cost", hp, hpConsume)
 	}
 	srv.DamagePlayerHP(t, objID, hp-hpConsume)
+	if remainder > 0 {
+		// Prove the remainder landed rather than being clamped away: the
+		// packet surface reports truncated HP, so it cannot show the
+		// difference between this setup and the whole-number one.
+		if added := srv.AddPlayerHP(t, objID, remainder); added != remainder {
+			t.Fatalf("remainder added to caster HP = %v, want %v", added, remainder)
+		}
+	}
+	if got := srv.PlayerCurrentHP(t, objID); got != hpConsume {
+		t.Fatalf("caster HP at the hit = %d, want the %d HP cost", got, hpConsume)
+	}
 
 	waitFor(t, "caster death from its own HP cost", func() bool { return srv.PlayerDead(t, objID) })
 

@@ -615,6 +615,16 @@ func (s *Server) DamagePlayerHP(tb testing.TB, objID int32, amount int) {
 	reducer.ReduceCurrentHP(amount)
 }
 
+// AddPlayerHP restores HP to the live player and reports the amount that
+// actually landed, so a suite can place HP at a fractional value the
+// integer-reporting packet surface cannot express and still prove the
+// placement was not clamped away.
+func (s *Server) AddPlayerHP(tb testing.TB, objID int32, amount float64) float64 {
+	tb.Helper()
+	healer := s.onlineCharacter(tb, objID)
+	return healer.AddHP(amount)
+}
+
 // PlayerCurrentHP reports the live player's current HP.
 func (s *Server) PlayerCurrentHP(tb testing.TB, objID int32) int {
 	tb.Helper()
