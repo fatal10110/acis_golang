@@ -74,9 +74,12 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
-// dropStaleItemRows removes every row whose object id still has an unflushed
-// change queued on the lazy item persistence task, so an inventory is never
-// rebuilt from a row the task is about to rewrite or delete.
+// dropStaleItemRows filters the rows a login restores an inventory from: it
+// removes every row whose object id still has an unflushed change queued on
+// the lazy item persistence task, so an inventory is never rebuilt from a row
+// the task is about to rewrite or delete, and every row whose item template
+// is not loaded, so a datapack downgrade costs the player that one item
+// rather than the whole login.
 //
 // The lazy task is what makes this necessary. Destroying a whole stack takes
 // the instance out of its container in memory and leaves the row's delete to
@@ -95,22 +98,39 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 // container pending, and the error for that was logged minutes earlier on
 // another connection's goroutine. The count is what tells the two apart.
 func (l *GameClientLink) dropStaleItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
-	if l.itemInstances == nil {
-		return items
-	}
 	kept := items[:0]
+	var stale, unknown int
 	for _, inst := range items {
 		if inst == nil {
 			continue
 		}
-		if l.itemInstances.ContainsID(inst.ObjectID) {
+		if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
+			stale++
 			continue
+		}
+		// A row whose item template is no longer loaded — what a datapack
+		// downgrade leaves behind — is dropped from the restore and the
+		// login carries on. Inventory.restore() does the same: the
+		// ResultSet constructor dereferences the missing template,
+		// restoreFromDb swallows that and returns null, and the restore
+		// loop skips the row (Inventory.java:119-124,
+		// ItemInstance.java:108-124 and 718-735). The row itself is left
+		// alone, so the item returns when its template does.
+		if l.itemTemplates != nil {
+			if _, ok := l.itemTemplates.Get(inst.TemplateID); !ok {
+				unknown++
+				continue
+			}
 		}
 		kept = append(kept, inst)
 	}
-	if dropped := len(items) - len(kept); dropped > 0 {
-		l.log.Warn().Int32("object_id", ownerID).Int("dropped", dropped).Int("restored", len(kept)).
+	if stale > 0 {
+		l.log.Warn().Int32("object_id", ownerID).Int("dropped", stale).Int("restored", len(kept)).
 			Msg("restore inventory: skipped item rows with an unflushed change")
+	}
+	if unknown > 0 {
+		l.log.Error().Int32("object_id", ownerID).Int("dropped", unknown).Int("restored", len(kept)).
+			Msg("restore inventory: skipped item rows with no loaded template")
 	}
 	return kept
 }
