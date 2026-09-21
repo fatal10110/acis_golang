@@ -380,11 +380,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if entering == nil {
 				return
 			}
+			// Assigned before the check: a failure after the player was
+			// attached hands the partial attachment back, and the deferred
+			// detachLivePlayer above is what releases it.
 			entered, ok := l.enterWorld(ctx, client, entering)
+			live = entered
 			if !ok {
 				return
 			}
-			live = entered
 			client.SetState(StateInGame)
 
 		case clientpackets.OpcodeExtended:

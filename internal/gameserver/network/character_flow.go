@@ -181,16 +181,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
 	}
 
-	// Built before the runtime is attached, so a missing item template aborts
-	// the login without leaving an actor queue and shadow-item tracking
-	// registered behind it. The restore that follows ends with an empty
-	// update queue, so there is nothing here for a full-list send to discard;
-	// routing this snapshot through the inventory as well waits on #2420.
-	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
-	if err != nil {
-		l.log.Error().Err(err).Msg("enter world: build ItemList")
-		return nil, false
-	}
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
@@ -207,9 +197,15 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	// From here on the player has a queue: the rest of the login runs on it,
 	// and this goroutine waits, so the burst keeps its order.
 	entered := false
-	onLive(live, func() { entered = l.finishEnterWorld(client, c, live, itemListFrame) })
+	onLive(live, func() { entered = l.finishEnterWorld(client, c, live) })
 	if !entered {
-		return nil, false
+		// Hand the partially attached player back rather than nil: by now it
+		// owns an actor queue, shadow-item tracking and, past world.Spawn,
+		// world/clock/autosave registrations. The caller's deferred
+		// detachLivePlayer is what releases them. Dropping live here would
+		// leave the queue behind and let the shadow-item task keep decaying
+		// — and finally destroy — an offline character's equipment.
+		return live, false
 	}
 	return live, true
 }
@@ -217,7 +213,17 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 // finishEnterWorld publishes the attached player live into the world and
 // sends the rest of the EnterWorld burst, on live's queue. It reports false
 // when the login cannot complete.
-func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer, itemListFrame wire.Frame) bool {
+func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer) bool {
+	// Same constructor RequestItemList uses, so the login snapshot comes from
+	// the live inventory instead of the raw restored rows. Built before the
+	// burst starts and before anything is published into the world, so a
+	// missing item template aborts with nothing sent and nothing spawned;
+	// enterWorld's caller detaches what attachLivePlayer registered.
+	itemListFrame, err := live.buildItemList(l.itemTemplates, false)
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: build ItemList")
+		return false
+	}
 	l.activateSpawnProtection(live)
 	if l.skills != nil {
 		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
