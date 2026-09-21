@@ -619,21 +619,28 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			var frame wire.Frame
-			var err error
+			// Build and send on the player's queue. Handing the frame back
+			// to the connection to send would let an inventory drain queued
+			// behind this task overtake the snapshot it supersedes, leaving
+			// the client on stale counts until that item changes again.
+			var failed bool
 			onLive(live, func() {
 				// The reference's ItemList constructor recomputes carried
 				// weight on every send, not only at login.
 				if inv := live.Inventory(); inv != nil {
 					inv.UpdateWeight()
 				}
-				frame, err = serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+				frame, err := serverpackets.FrameItemList(live.inventoryItems(), l.itemTemplates, false)
+				if err != nil {
+					l.log.Error().Err(err).Msg("build ItemList")
+					failed = true
+					return
+				}
+				session.SendFrame(frame)
 			})
-			if err != nil {
-				l.log.Error().Err(err).Msg("build ItemList")
+			if failed {
 				return
 			}
-			session.SendFrame(frame)
 
 		case clientpackets.OpcodeUseItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUseItem)
