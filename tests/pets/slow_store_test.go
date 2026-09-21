@@ -222,20 +222,27 @@ func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
 	}
 }
 
-// TestAutoSoulShotSeesSummonDuringRestore covers the acquisition side of
-// the summon slot, on the one path that reaches it while the restore is in
-// flight. RequestAutoSoulShot has no casting gate of its own — it rejects
-// only on AlikeDead (network/inventory.go's handleAutoSoulShot) — so
-// hasActiveSummon is what decides it, unlike the wyvern branch where
-// CastingNow() answers first and hides the reservation entirely.
+// TestAutoSoulShotRejectedDuringRestore pins the summon slot's state across
+// the pets-row read: empty, the same answer the reference gives.
 //
-// The reference decides it with `player.getSummon() != null`
-// (RequestAutoSoulShot.java:42, NO_SERVITOR_CANNOT_AUTOMATE_USE at line
-// 76), and setSummon(pet) has already run by then
-// (SummonCreature.java:63), so a beast soulshot toggled across this window
-// is accepted there. Without the reservation Go answers
-// NO_SERVITOR_CANNOT_AUTOMATE_USE instead.
-func TestAutoSoulShotSeesSummonDuringRestore(t *testing.T) {
+// The reference resolves the row first and only then claims the slot —
+// Pet.restore at SummonCreature.java:58, World.addPet at :62,
+// player.setSummon(pet) at :64 — so for the whole duration of that read
+// getSummon() is still null. RequestAutoSoulShot is handled on a packet
+// thread concurrently with the cast task and takes its else branch,
+// answering NO_SERVITOR_CANNOT_AUTOMATE_USE (RequestAutoSoulShot.java:42,76)
+// for a beast soulshot toggled across the window.
+//
+// Go must answer the same, so hasActiveSummon reads world.Summon alone. An
+// early claim would both invert this message and leave hasActiveSummon
+// reporting a summon that world.Summon cannot produce — the reference's own
+// getSummon() != null branch dereferences it immediately (:53, :61, :73).
+//
+// The wyvern collar is rejected in this same window instead by the cast the
+// hold keeps in flight, which is how the reference rejects it too
+// (SummonItems.java:36-45 checks isCastingNow() before the summon slot) —
+// see TestWyvernMountRejectedWhileSummonRestoreInFlight.
+func TestAutoSoulShotRejectedDuringRestore(t *testing.T) {
 	h := bootOwnerWithCollarOpts(t,
 		[]gameservertest.Option{gameservertest.WithSlowStores(slowStoreDelay)},
 		seedItem{TemplateID: beastSoulshotID, Count: 10},
@@ -251,21 +258,45 @@ func TestAutoSoulShotSeesSummonDuringRestore(t *testing.T) {
 
 	h.client.Send(encodeRequestAutoSoulShot(beastSoulshotID, 1))
 	frames := drainFrames(t, h.client)
-	var enabled bool
+	var rejected bool
 	for _, frame := range frames {
 		if frame[0] == serverpackets.OpcodeSystemMessage {
-			assertNotSystemMessage(t, frame, serverpackets.SystemMessageNoServitorCannotAutomateUse)
+			r := wire.NewReader(frame[1:])
+			if r.ReadInt32() == int32(serverpackets.SystemMessageNoServitorCannotAutomateUse) {
+				rejected = true
+			}
+			continue
 		}
-		if frame[0] == serverpackets.OpcodeExtended {
-			enabled = true
+		if isExAutoSoulShot(t, frame) {
+			t.Fatalf("auto soulshot acknowledged during the restore: opcodes %x, want the reference's NO_SERVITOR_CANNOT_AUTOMATE_USE while the summon slot is still empty", frameOpcodes(frames))
 		}
 	}
-	if !enabled {
-		t.Fatalf("auto soulshot toggle during the restore = opcodes %x, want it accepted: the owner's summon slot is taken from the moment the cast hits", frameOpcodes(frames))
+	if !rejected {
+		t.Fatalf("auto soulshot toggle during the restore = opcodes %x, want NO_SERVITOR_CANNOT_AUTOMATE_USE", frameOpcodes(frames))
 	}
 	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("pet never reached the world")
 	}
+}
+
+// isExAutoSoulShot reports whether frame is an ExAutoSoulShot acknowledgement
+// specifically, rather than any extended packet that drifted into the drain.
+// Layout: OpcodeExtended, sub-opcode, item id, enabled flag
+// (serverpackets.FrameExAutoSoulShot).
+func isExAutoSoulShot(t *testing.T, frame []byte) bool {
+	t.Helper()
+	if len(frame) == 0 || frame[0] != serverpackets.OpcodeExtended {
+		return false
+	}
+	r := wire.NewReader(frame[1:])
+	if r.ReadUint16() != serverpackets.OpcodeExAutoSoulShot {
+		return false
+	}
+	itemID, enabled := r.ReadInt32(), r.ReadInt32()
+	if err := r.Err(); err != nil {
+		t.Fatalf("read ExAutoSoulShot: %v", err)
+	}
+	return itemID == beastSoulshotID && enabled == 1
 }
 
 func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
@@ -274,6 +305,51 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	w.WriteInt32(itemID)
 	w.WriteInt32(typ)
 	return w.Bytes()
+}
+
+// ceilingStoreDelay sits between summon_spawn.go's petRestoreHoldCeiling and
+// its petRestoreTimeout, so the hold's deadline fires while the pets-row read
+// is still outstanding and the read itself still succeeds afterwards.
+const ceilingStoreDelay = 3 * time.Second
+
+// TestSummonHoldReleasesAtItsCeiling pins the bound on how long a summon
+// cast is held open for its pets-row read. The hold exists to keep the spawn
+// ahead of the cast's completion, but the job first waits its turn on a
+// persistence lane shared by every owner, and nothing bounds that wait — a
+// burst of logout saves on the same lane would otherwise keep the caster
+// casting long after the client's own cast bar ended, blocking target
+// changes, pickup, unequip and item-skill casts. The reference never waits
+// that way: its read has nothing queued ahead of it (SummonCreature.java:58).
+//
+// Past the ceiling the ordering guarantee yields to keeping the player
+// responsive, so the cast completes first and the pet lands afterwards, as
+// it did before the hold existed.
+func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithSlowStores(ceilingStoreDelay),
+	})
+
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
+	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+
+	deadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
+	var castEnded bool
+	for time.Now().Before(deadline) {
+		if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
+			break
+		}
+		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+			castEnded = true
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, spawned := h.srv.State.Summon(h.ownerID); !spawned {
+		t.Fatal("pet never reached the world")
+	}
+	if !castEnded {
+		t.Fatal("the summon cast was still in flight for the whole read: the hold has no ceiling, so a stalled persistence lane keeps the caster casting for as long as it stalls")
+	}
 }
 
 // petOwnerCastingNow reports whether the owner has a cast in flight.
