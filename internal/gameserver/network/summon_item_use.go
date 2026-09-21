@@ -94,6 +94,23 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 		return true
 	}
+	// A pets-row read still in flight means the previous summon cast has
+	// hit; the reference is still casting at that point and returns here
+	// silently (SummonItems.java:37-38, above the switch at :64-65), so no
+	// second cast starts. Without this, past the hold ceiling the cast is
+	// over and StartItemSkill's already-casting rejection no longer fires,
+	// so the collar would run a whole second cast — broadcasting
+	// MagicSkillUse and MagicSkillLaunched — only to be rejected at
+	// SpawnPet's gate when it hits.
+	//
+	// Only the restore window is gated here. The rest of what :37-38
+	// covers for this branch (an ordinary cast in progress, disabled
+	// skills) still reaches StartItemSkill and answers through
+	// sendMagicCastFailure; that pre-existing divergence belongs to the
+	// pre-cast gate #2369 adds.
+	if l.restoringSummon(live) {
+		return true
+	}
 
 	def, ok := l.skills.Definition(summonCreatureSkillRef)
 	if !ok {

@@ -422,3 +422,61 @@ func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
 	}
 	t.Fatal("pet never reached the world")
 }
+
+// TestSecondCollarSilentAfterHoldCeiling covers the pet branch of item use
+// in the window the hold ceiling opens. Past the ceiling the cast is over
+// while the pets-row read is still in flight, so StartItemSkill's
+// already-casting rejection no longer fires and nothing else stood between a
+// second collar use and a full second cast.
+//
+// The reference returns silently: SummonItems.useItem checks
+// isAllSkillsDisabled() || isCastingNow() at :37-38, above the
+// switch (sitem.getValue()) at :64-65, so the pet case never starts a cast
+// while the first one's read is outstanding. A cast that runs and then
+// rejects broadcasts MagicSkillUse and MagicSkillLaunched to everyone nearby
+// before answering, which the reference never sends here.
+func TestSecondCollarSilentAfterHoldCeiling(t *testing.T) {
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithSlowStores(ceilingStoreDelay),
+	})
+
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
+	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+
+	deadline := time.Now().Add(ceilingStoreDelay)
+	for time.Now().Before(deadline) {
+		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if petOwnerCastingNow(t, h.srv, h.ownerID) {
+		t.Fatal("cast never ended: the ceiling window this test needs was never open")
+	}
+	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
+		t.Fatal("pet already in world: the restore was no longer in flight")
+	}
+
+	// Clear the first cast's own tail (its MagicSkillLaunched broadcast)
+	// so what the drain below collects is the second use's answer alone.
+	drainFrames(t, h.client)
+
+	// The same collar object: the fixture's owner holds exactly one, and a
+	// second seeded stack of the same template is not in the inventory at
+	// enter-world, so useItem would bail before reaching this path.
+	h.client.Send(encodeUseItem(h.collarID, false))
+	frames := drainFrames(t, h.client)
+	if len(frames) != 0 {
+		t.Fatalf("second collar past the hold ceiling = opcodes %x, want silence: the reference returns at SummonItems.java:37-38 without starting a cast", frameOpcodes(frames))
+	}
+
+	petDeadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
+	for time.Now().Before(petDeadline) {
+		if _, ok := h.srv.State.Summon(h.ownerID); ok {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("pet never reached the world")
+}

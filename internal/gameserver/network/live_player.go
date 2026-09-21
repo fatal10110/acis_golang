@@ -53,12 +53,22 @@ type livePlayer struct {
 	//
 	// The reference needs no equivalent: its read is a synchronous call
 	// inside useSkill, so isCastingNow() stays true across it and
-	// SummonItems.useItem returns on that alone (SummonItems.java:36-37)
-	// before it ever reaches the summon-slot check at :41-45. Go's read
+	// SummonItems.useItem returns on that alone (SummonItems.java:37-38)
+	// before it ever reaches the summon-slot check at :42-46. Go's read
 	// leaves the queue, and the hold that stands in for that casting state
 	// has a ceiling, so past the ceiling the cast is over while the pet is
-	// still inbound. This flag keeps exactly the gates the reference closes
-	// with isCastingNow() closed for the rest of the read.
+	// still inbound. This flag keeps the summon slot closed for the rest of
+	// the read.
+	//
+	// It covers the restore window only, not the whole of what :37-38
+	// gates. Java's check sits above the switch at :64-65 and so applies to
+	// every summon item; Go's equivalents are per-branch, and outside this
+	// window the pet branch still relies on StartItemSkill's already-casting
+	// rejection and the decorative branch has no such check at all. Those
+	// are pre-existing gaps in the pre-cast gating, tracked by #2369 and
+	// #2411 — whichever adds a pre-cast gate has to consult this flag as
+	// well as hasActiveSummon, or it will close the :42-46 half and leave
+	// the :37-38 half open in exactly this window.
 	//
 	// It is deliberately not part of hasActiveSummon: the reference answers
 	// RequestAutoSoulShot with getSummon(), which is null across its own
