@@ -733,6 +733,34 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 	return plan
 }
 
+// claimToggle marks an instantaneous toggle cast as in flight so the abort
+// funnel has a cast to report, and returns the sequence the release must
+// match. It reports false when a cast is already in flight, which keeps its
+// own claim and its own abort.
+func (c *Controller) claimToggle(def modelskill.Definition) (uint64, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.casting {
+		return c.castSeq, false
+	}
+	c.casting = true
+	c.current = def
+	return c.castSeq, true
+}
+
+// releaseToggle drops a claim taken by claimToggle without emitting the
+// abort or finish observers, leaving a toggle whose costs were paid
+// uneventfully exactly as silent as it was before the claim existed. A
+// claim already ended — by a lethal cost aborting through Stop — has moved
+// the sequence on and is left alone.
+func (c *Controller) releaseToggle(seq uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.castingLocked(seq) {
+		c.clearLocked()
+	}
+}
+
 func (c *Controller) clearLocked() {
 	c.stopTimersLocked()
 	c.finishHolds = 0

@@ -49,6 +49,10 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 	skillType := skillTypeKey(def.SkillType)
 
 	for _, obj := range cast.Targets {
+		// The dead-target skip diverges from the reference handler, which
+		// has no such gate and applies effects to a target that died
+		// between the cast's launch and its hit. Deferred, tracked so it
+		// stays linked rather than silently approximated (issue #2384).
 		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
