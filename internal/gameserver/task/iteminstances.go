@@ -97,6 +97,12 @@ type pendingItem struct {
 // saveRound is one Save's outstanding owner jobs. Its fields are guarded by
 // ItemInstances.mu.
 type saveRound struct {
+	// inflight is the pending map this round took ownership of. It is kept
+	// so ContainsID can still answer for an item whose write is queued but
+	// has not run: Save empties pending before the first write is enqueued,
+	// and without this the item would look settled while its row still
+	// holds the stale state.
+	inflight  map[int32]pendingItem
 	removed   map[int32]struct{}
 	remaining int
 	err       error
@@ -187,17 +193,41 @@ func (i *ItemInstances) Contains(inst *item.Instance) bool {
 	return i.ContainsID(inst.ObjectID)
 }
 
-// ContainsID reports whether objectID has an unflushed change queued for the
-// next persistence tick. A restore path uses it as an overlay on the items
-// table: a pending row is a row whose stored state is known stale, so the
-// item it describes must not be rebuilt from the database. Taking the id
-// rather than an instance lets that check run on a row before it becomes a
-// live instance.
+// ContainsID reports whether objectID's row still has a change that has not
+// reached the database. A restore path uses it as an overlay on the items
+// table: such a row holds state that is known stale, so the item it
+// describes must not be rebuilt from it. Taking the id rather than an
+// instance lets that check run on a row before it becomes a live instance.
+//
+// An item counts until its write has actually run, not merely until Save has
+// picked it up. Save empties pending before it enqueues anything, and those
+// writes are queued per owner lane, so a login that waits on the character's
+// lane does not wait for an item routed elsewhere by laneKey — a destroyed
+// pet collar runs on the collar's own lane. Answering from pending alone
+// would call such a row settled while its delete is still queued behind
+// other work, and the row would be restored and then re-inserted by the next
+// detach flush. Checking the outstanding rounds as well keeps the answer
+// true for the whole write, the way the reference holds its set until every
+// batch has executed.
+//
+// An id RemoveItems dropped mid-round is excluded, matching the rule
+// finishOwner merges by: its container wrote its own final state, so the
+// inflight copy is the stale one and the row is safe to restore.
 func (i *ItemInstances) ContainsID(objectID int32) bool {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	_, ok := i.pending[objectID]
-	return ok
+	if _, ok := i.pending[objectID]; ok {
+		return true
+	}
+	for round := range i.rounds {
+		if _, ok := round.inflight[objectID]; !ok {
+			continue
+		}
+		if _, dropped := round.removed[objectID]; !dropped {
+			return true
+		}
+	}
+	return false
 }
 
 // RemoveItems removes every provided item from the pending set. If a Save
@@ -290,7 +320,7 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 		key := i.laneKey(entry.inst.Snapshot(), entry.ownerID)
 		byOwner[key] = append(byOwner[key], entry)
 	}
-	round := &saveRound{removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
+	round := &saveRound{inflight: inflight, removed: make(map[int32]struct{}), remaining: len(byOwner), done: make(chan struct{})}
 	if round.remaining == 0 {
 		i.mu.Unlock()
 		return nil
