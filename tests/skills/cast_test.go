@@ -842,10 +842,16 @@ func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
 	}
 	srv.DamagePlayerHP(t, objID, hp-hpConsume)
 
-	waitFor(t, "caster death from its own HP cost", func() bool { return livePlayerDead(t, srv, objID) })
+	waitFor(t, "caster death from its own HP cost", func() bool { return srv.PlayerDead(t, objID) })
 
 	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
 		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
+	}
+	// The abort reaches the client before the death does: Die stops the cast
+	// before it broadcasts, so MagicSkillCanceled is always ahead of Die in
+	// the stream. Reading them in sequence pins that order.
+	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
+		t.Fatal("no MagicSkillCanceled: the death did not abort the in-flight cast")
 	}
 	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
 		t.Fatal("no Die broadcast after the exactly-lethal HP cost")
@@ -853,24 +859,13 @@ func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
 	// The hit runs to completion despite the death it just caused: the
 	// charge grant sits after the cost in the same hit step, and the death
 	// sequence cleared the charges on its way through, so a charge here can
-	// only have come from the hit continuing afterwards.
-	if got := livePlayerCharges(t, srv, objID); got != 1 {
-		t.Fatalf("charges after the lethal hit = %d, want 1 from the hit that killed the caster", got)
-	}
-}
-
-// livePlayerDead reports the live world player's dead state.
-func livePlayerDead(t *testing.T, srv *gameservertest.Server, objID int32) bool {
-	t.Helper()
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	dead, ok := obj.(interface{ Dead() bool })
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T has no Dead()", objID, obj)
-	}
-	return dead.Dead()
+	// only have come from the hit continuing afterwards. The death broadcast
+	// is queued from inside the death sequence, before the grant runs, so
+	// this waits for the charge rather than reading it straight off the
+	// Die frame's arrival.
+	waitFor(t, "charge granted by the hit that killed the caster", func() bool {
+		return srv.PlayerCharges(t, objID) == 1
+	})
 }
 
 // readsOpcode consumes frames until one carries want, reporting whether it
@@ -887,18 +882,4 @@ func readsOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte) bool {
 		}
 	}
 	return false
-}
-
-// livePlayerCharges reports the live world player's force/soul charge count.
-func livePlayerCharges(t *testing.T, srv *gameservertest.Server, objID int32) int {
-	t.Helper()
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	charged, ok := obj.(interface{ Charges() int })
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T has no Charges()", objID, obj)
-	}
-	return charged.Charges()
 }

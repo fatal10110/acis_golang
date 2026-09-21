@@ -452,6 +452,21 @@ func (s *Server) MarkPlayerDead(tb testing.TB, objID int32) {
 	marker.MarkDead()
 }
 
+// PlayerDead reports the live player's dead state, the reader half of
+// MarkPlayerDead.
+func (s *Server) PlayerDead(tb testing.TB, objID int32) bool {
+	tb.Helper()
+	reader := s.onlineCharacter(tb, objID)
+	return reader.Dead()
+}
+
+// PlayerCharges reports the live player's force/soul charge count.
+func (s *Server) PlayerCharges(tb testing.TB, objID int32) int {
+	tb.Helper()
+	reader := s.onlineCharacter(tb, objID)
+	return reader.Charges()
+}
+
 // SetPlayerOperating toggles the live player's store/workshop operation
 // state, the precondition of the use-item storing gate.
 func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) {
