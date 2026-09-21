@@ -3612,7 +3612,7 @@ func TestCharacterHealAmountUsesMagicAttackAndHealProficiency(t *testing.T) {
 
 // ---- from character_stats_shield_test.go ----
 type shieldDefenseResolver interface {
-	ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
+	ShieldDefense(caster creature.FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense
 }
 
 func TestCharacterShieldDefenseUsesLiveShieldStatsFacingAndRoll(t *testing.T) {

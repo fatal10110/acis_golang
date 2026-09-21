@@ -3,6 +3,7 @@ package npc
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -38,7 +39,7 @@ func (h *Hostile) Owner() (attackable.Combatant, bool) { return nil, false }
 func (h *Hostile) EffectRangeInPeaceZone(x, y, z, effectRange int) bool { return false }
 
 // ShieldDefense reports ShieldFailed: NPCs carry no shield.
-func (h *Hostile) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (h *Hostile) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
 

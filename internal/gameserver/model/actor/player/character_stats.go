@@ -229,7 +229,7 @@ func (c *Character) MEN() int { return characterStatActor{c: c}.MEN() }
 func (c *Character) LevelMod() float64 { return characterStatActor{c: c}.LevelMod() }
 
 // ShieldDefense resolves c's shield-block outcome against an incoming skill.
-func (c *Character) ShieldDefense(caster attackable.Combatant, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
 	if def.IgnoreShield || !c.secondaryShieldEquipped() {
 		return formulas.ShieldFailed
 	}
@@ -288,9 +288,8 @@ func (c *Character) facing(caster attackable.Combatant, degrees int) bool {
 	return targetFacing.IsFacing(location.Location{X: x, Y: y, Z: z}, degrees)
 }
 
-func attackerUsesBow(caster attackable.Combatant) bool {
-	attacker, ok := caster.(creature.FormulaActor)
-	return ok && attacker.AttackType() == item.WeaponBow
+func attackerUsesBow(caster creature.FormulaActor) bool {
+	return caster != nil && caster.AttackType() == item.WeaponBow
 }
 
 // MAtk returns the current magic attack value.
@@ -639,19 +638,19 @@ func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
 // cast by caster against c.
-func (c *Character) PhysicalSkillInput(caster attackable.Combatant, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
+func (c *Character) PhysicalSkillInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return creature.ResolvePhysicalSkillInput(caster, c, def, creature.Playable(caster), 1)
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast
 // by caster against c.
-func (c *Character) MagicDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (c *Character) MagicDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
 	return creature.ResolveMagicDamageInput(caster, c, def, creature.Playable(caster))
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by
 // caster against c.
-func (c *Character) BlowInput(caster attackable.Combatant, def modelskill.Definition) (formulas.BlowInput, bool) {
+func (c *Character) BlowInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.BlowInput, bool) {
 	return creature.ResolveBlowInput(caster, c, def, creature.Playable(caster))
 }
 
@@ -684,7 +683,7 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 
 // ManaDamageInput resolves the MP-damage formula input for a magic skill
 // cast by caster against c.
-func (c *Character) ManaDamageInput(caster attackable.Combatant, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
+func (c *Character) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, c, c.MaxMPValue(), def)
 }
 
@@ -694,14 +693,14 @@ func (c *Character) LethalRate() float64 {
 }
 
 // LethalInput resolves a lethal-strike roll against c.
-func (c *Character) LethalInput(caster attackable.Combatant, def modelskill.Definition) (formulas.LethalInput, bool) {
+func (c *Character) LethalInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.LethalInput, bool) {
 	if c.Invul() || !creature.CanDealDamage(caster) {
 		return formulas.LethalInput{}, false
 	}
-	attacker, ok := caster.(creature.FormulaActor)
-	if !ok {
+	if caster == nil {
 		return formulas.LethalInput{}, false
 	}
+	attacker := caster
 	return formulas.LethalInput{
 		Chance1:       def.LethalChance1,
 		Chance2:       def.LethalChance2,

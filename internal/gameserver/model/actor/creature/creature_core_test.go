@@ -610,7 +610,7 @@ type shieldedPhysicalAttackActor struct {
 	shield formulas.ShieldDefense
 }
 
-func (a *shieldedPhysicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (a *shieldedPhysicalAttackActor) ShieldDefense(FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return a.shield
 }
 
@@ -749,7 +749,7 @@ func (randomDamageTestActor) MaxHPValue() float64 { return 0 }
 
 func (randomDamageTestActor) RaceMultiplier(FormulaActor) float64 { return 1 }
 
-func (randomDamageTestActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (randomDamageTestActor) ShieldDefense(FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
 
@@ -759,6 +759,6 @@ func (physicalAttackActor) Invul() bool { return false }
 
 func (physicalAttackActor) MaxHPValue() float64 { return 0 }
 
-func (physicalAttackActor) ShieldDefense(attackable.Combatant, modelskill.Definition, bool) formulas.ShieldDefense {
+func (physicalAttackActor) ShieldDefense(FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
