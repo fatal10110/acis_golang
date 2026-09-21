@@ -2,6 +2,7 @@ package items
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -157,11 +158,11 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 		c.Send(encodeRequestItemList())
 		time.Sleep(gateSettle)
 		replyRunning, releaseReply := postGate(t, queue, round)
-		close(releaseProtection)
+		releaseProtection()
 		<-replyRunning
 		time.Sleep(gateSettle)
 		srv.InventoryUpdates.Tick()
-		close(releaseReply)
+		releaseReply()
 
 		assertItemListPrecedesInventoryUpdate(t, c, round, potion, count)
 	}
@@ -171,16 +172,25 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 // packet it has already been sent produces, while the queue is parked.
 const gateSettle = 200 * time.Millisecond
 
-// postGate posts a gate task to queue without waiting for it: the first
-// channel closes once the gate is running, and closing the second releases
-// it. Work posted while a gate runs stays pending, in post order, until then.
-func postGate(t *testing.T, queue *sim.Queue, round int) (running, release chan struct{}) {
+// postGate posts a gate task to queue without waiting for it: the returned
+// channel closes once the gate is running, and release lets it finish. Work
+// posted while a gate runs stays pending, in post order, until then.
+//
+// release is idempotent and also registered with t.Cleanup, so a gate is
+// never left held by a later t.Fatalf on a path that has not reached its own
+// release yet. A gate held past the end of a test would block the executor's
+// own cleanup: under inline that cleanup waits on a pump goroutine parked
+// inside the gate, which hangs the whole package rather than failing a test.
+func postGate(t *testing.T, queue *sim.Queue, round int) (running <-chan struct{}, release func()) {
 	t.Helper()
-	running, release = make(chan struct{}), make(chan struct{})
-	if !queue.Post(func() { close(running); <-release }) {
+	started, gate := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	release = func() { once.Do(func() { close(gate) }) }
+	t.Cleanup(release)
+	if !queue.Post(func() { close(started); <-gate }) {
 		t.Fatalf("round %d: post gate task", round)
 	}
-	return running, release
+	return started, release
 }
 
 // assertItemListPrecedesInventoryUpdate reads until the drain's
