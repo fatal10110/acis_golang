@@ -1054,9 +1054,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	var ai *task.AI
 	if o.productionTickers {
 		ai = task.NewAI(state, o.log)
-		if o.attackStance != nil && o.attackStanceTracker != nil {
-			t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
-		}
 		if o.attackStance == nil && o.attackStanceNow == nil {
 			o.attackStanceNow = time.Now
 		}
@@ -1121,6 +1118,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		if err != nil {
 			t.Fatalf("attack stance: %v", err)
 		}
+	}
+	// Checked here rather than with the other option validation: the wiring
+	// below is unconditional, so a guard inside any narrower block would be
+	// dead for the suites that can actually trip it.
+	if o.attackStance != nil && o.attackStanceTracker != nil {
+		t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
 	}
 	if o.attackStanceTracker != nil {
 		gclConfig.AttackStance = o.attackStanceTracker

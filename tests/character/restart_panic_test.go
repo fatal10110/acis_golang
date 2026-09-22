@@ -28,12 +28,10 @@ func (p *panicOnStanceCheck) InAttackStance(task.AttackStanceActor) bool {
 	return false
 }
 
-// panicOnStanceRemove fails the stance removal detachLivePlayer reaches
-// through live.Stop(), so the teardown dies part-way instead of before it
-// starts. It fires at most once by construction, and counts its calls to
-// prove that: stopLiveAutoAttack only reaches Remove when SetInCombat(false)
-// reports a change, so the re-entrant detach behind the panic short-circuits
-// ahead of it.
+// panicOnStanceRemove fails the first stance removal detachLivePlayer
+// reaches, so the teardown dies part-way instead of before it starts. Later
+// removals succeed, so the detach that resumes behind the panic runs to the
+// end; the call count is what proves it reached the tracker again.
 type panicOnStanceRemove struct{ calls atomic.Int32 }
 
 func (p *panicOnStanceRemove) Add(task.AttackStanceActor) {}
@@ -41,8 +39,10 @@ func (p *panicOnStanceRemove) Add(task.AttackStanceActor) {}
 func (p *panicOnStanceRemove) InAttackStance(task.AttackStanceActor) bool { return false }
 
 func (p *panicOnStanceRemove) Remove(task.AttackStanceActor) bool {
-	p.calls.Add(1)
-	panic("attack-stance remove panic")
+	if p.calls.Add(1) == 1 {
+		panic("attack-stance remove panic")
+	}
+	return true
 }
 
 // TestPanicInQueuedRestartHandlerDropsSession covers the one dispatch site
@@ -116,8 +116,14 @@ func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
 		t.Fatal("session stayed open after detachLivePlayer panicked part-way")
 	}
 	srv.FlushPersistence(t)
-	if got := stance.calls.Load(); got != 1 {
-		t.Fatalf("stance Remove calls = %d, want 1: the re-entrant detach must short-circuit ahead of it", got)
+	// Two, not one. The first is live.Stop's stopLiveAutoAttack, which
+	// panics; the second is detachLivePlayer's own unconditional removal.
+	// stopLiveAutoAttack clears the in-combat flag before it reaches the
+	// tracker, so the resumed pass returns early there — without the
+	// unconditional removal the entry would survive the detach and, past
+	// q.Close, could never be swept.
+	if got := stance.calls.Load(); got != 2 {
+		t.Fatalf("stance Remove calls = %d, want 2: the resumed detach must still drop the stance entry", got)
 	}
 	if _, ok := srv.State.Player(objID); ok {
 		t.Fatalf("character %d left registered in the world after a panic inside detach", objID)
