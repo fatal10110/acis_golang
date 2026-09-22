@@ -772,9 +772,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}
-	if err := h.BroadcastDie(); err != nil {
-		h.log.Warn().Err(err).Msg("npc: die broadcast")
-	}
+	h.BroadcastDie()
 	return true
 }
 

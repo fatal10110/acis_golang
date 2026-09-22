@@ -1075,14 +1075,12 @@ type fakeBroadcastingCaster struct {
 	skillLaunchedCalls []skillLaunchedCall
 }
 
-func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
+func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
 	f.skillUseCalls = append(f.skillUseCalls, skillUseCall{targetID, targetX, targetY, targetZ, skillID, level, hitTime, reuseDelay})
-	return nil
 }
 
-func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
+func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
 	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
-	return nil
 }
 
 // ---- from cubic_fire_test.go ----
@@ -3081,11 +3079,9 @@ func (testActor) GroundTargetUnset() bool { return false }
 
 func (testActor) IncreaseCharges(int, int) bool { return false }
 
-func (*fakeCastCreature) BroadcastSkillLaunched(int32, int32, []int32) error { return nil }
+func (*fakeCastCreature) BroadcastSkillLaunched(int32, int32, []int32) {}
 
-func (*fakeCastCreature) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) error {
-	return nil
-}
+func (*fakeCastCreature) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) {}
 
 var (
 	_ SkillCaster  = (*fakeCastCreature)(nil)

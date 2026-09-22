@@ -28,7 +28,7 @@ type SummonActor interface {
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	SetHeadingTo(attackable.Combatant)
-	BroadcastMoveToPawn(attackable.Combatant) error
+	BroadcastMoveToPawn(attackable.Combatant)
 }
 
 // SummonMoveController controls movement requests emitted by a summon AI.
@@ -320,11 +320,10 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 
 	if !s.cast.CanCast(target, ref) {
 		s.current = intention{kind: IntentionIdle}
-		var pawnErr error
 		if target.ObjectID() != s.actor.ObjectID() {
-			pawnErr = s.actor.BroadcastMoveToPawn(target)
+			s.actor.BroadcastMoveToPawn(target)
 		}
-		return false, errors.Join(stopErr, pawnErr)
+		return false, stopErr
 	}
 
 	s.cast.Cast(target, ref)

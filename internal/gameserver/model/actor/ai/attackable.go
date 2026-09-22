@@ -45,7 +45,7 @@ type AttackableActor interface {
 	// BroadcastMoveToPawn sends a rotation-only MoveToPawn notice toward
 	// target, used when a final cast attempt is rejected after movement so
 	// observers still see the actor face its target.
-	BroadcastMoveToPawn(target attackable.Combatant) error
+	BroadcastMoveToPawn(target attackable.Combatant)
 
 	// IdleFollowTarget is the master an escorting NPC follows when idle; nil
 	// when it escorts no one.
@@ -896,11 +896,10 @@ func (a *Attackable) thinkCast() (bool, error) {
 	}
 
 	if !a.cast.CanCast(target, ref) {
-		var pawnErr error
 		if target.ObjectID() != a.actor.ObjectID() {
-			pawnErr = a.actor.BroadcastMoveToPawn(target)
+			a.actor.BroadcastMoveToPawn(target)
 		}
-		return false, errors.Join(stopErr, pawnErr)
+		return false, stopErr
 	}
 
 	a.cast.Cast(target, ref)

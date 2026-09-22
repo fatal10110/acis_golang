@@ -38,7 +38,5 @@ func (h *Hostile) TickRegen() {
 	if !changed {
 		return
 	}
-	if err := h.BroadcastStatus(); err != nil {
-		h.log.Warn().Err(err).Msg("npc: regen status broadcast")
-	}
+	h.BroadcastStatus()
 }

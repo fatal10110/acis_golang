@@ -59,7 +59,7 @@ type signetUnsummonable interface {
 	Actor
 	Unsummon()
 	Position() (x, y, z int)
-	BroadcastSelfSkillUse(skillID, level int32) error
+	BroadcastSelfSkillUse(skillID, level int32)
 }
 
 type signetHandler struct {

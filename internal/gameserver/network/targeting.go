@@ -291,9 +291,7 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		if !l.playerCanDoInteract(live, pet) {
 			return false
 		}
-		if err := live.BroadcastStop(); err != nil {
-			l.log.Warn().Err(err).Msg("move: blocked interact stop")
-		}
+		live.BroadcastStop()
 		// onInteract has no world-presence check: PetStatusShow uses the
 		// snapshot summon even if it has already left the world.
 		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))

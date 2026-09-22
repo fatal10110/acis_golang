@@ -53,13 +53,13 @@ func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
 // summons is not wired yet.
 func (a *Actor) TakeDamage(int, attackable.Combatant) bool { return false }
 
-// BroadcastSkillUse reports nil without broadcasting: summon AI casts do not
-// announce themselves to observers yet.
-func (a *Actor) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) error { return nil }
+// BroadcastSkillUse does nothing: summon AI casts do not announce themselves
+// to observers yet.
+func (a *Actor) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) {}
 
-// BroadcastSkillLaunched reports nil without broadcasting: summon AI casts do
-// not announce themselves to observers yet.
-func (a *Actor) BroadcastSkillLaunched(int32, int32, []int32) error { return nil }
+// BroadcastSkillLaunched does nothing: summon AI casts do not announce
+// themselves to observers yet.
+func (a *Actor) BroadcastSkillLaunched(int32, int32, []int32) {}
 
 // NotePvPSkillTargets does nothing: PvP flagging tracks the owning player.
 func (a *Actor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}

@@ -467,11 +467,10 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	return Hit{Target: t, Damage: 1}
 }
 func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
-func (a *timingActor) BroadcastAttack(snapshot event.Attack) error {
+func (a *timingActor) BroadcastAttack(snapshot event.Attack) {
 	a.snapshot = snapshot
 	a.broadcasts++
 	a.events = append(a.events, "broadcast")
-	return nil
 }
 
 type timingTarget struct {

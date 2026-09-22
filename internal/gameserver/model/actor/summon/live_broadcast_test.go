@@ -39,18 +39,10 @@ func TestSummonBroadcastEmitsTypedEvents(t *testing.T) {
 	actor, rec := newBroadcastFixture(t)
 
 	move := event.Move{Origin: location.Location{X: 1}, Destination: location.Location{X: 2}}
-	if err := actor.BroadcastMove(move); err != nil {
-		t.Fatalf("BroadcastMove() error = %v", err)
-	}
-	if err := actor.BroadcastStop(); err != nil {
-		t.Fatalf("BroadcastStop() error = %v", err)
-	}
-	if err := actor.BroadcastSelfSkillUse(1422, 1); err != nil {
-		t.Fatalf("BroadcastSelfSkillUse() error = %v", err)
-	}
-	if err := actor.BroadcastAttack(event.Attack{AttackerID: 7}); err != nil {
-		t.Fatalf("BroadcastAttack() error = %v", err)
-	}
+	actor.BroadcastMove(move)
+	actor.BroadcastStop()
+	actor.BroadcastSelfSkillUse(1422, 1)
+	actor.BroadcastAttack(event.Attack{AttackerID: 7})
 
 	x, y, z := actor.Position()
 	at := location.Location{X: x, Y: y, Z: z}
@@ -70,12 +62,9 @@ func TestSummonBroadcastWithoutSinkIsSilentNoOp(t *testing.T) {
 	actor := mustServitor(t, ServitorConfig{ObjectID: 7})
 	SpawnBesideOwner(state, actor, &fakeSummonOwner{id: 1}, location.Location{})
 
-	if err := actor.BroadcastStop(); err != nil {
-		t.Fatalf("BroadcastStop() with no sink error = %v, want nil", err)
-	}
-	if err := actor.BroadcastSelfSkillUse(1422, 1); err != nil {
-		t.Fatalf("BroadcastSelfSkillUse() with no sink error = %v, want nil", err)
-	}
+	// No sink attached: these must not panic and must reach nobody.
+	actor.BroadcastStop()
+	actor.BroadcastSelfSkillUse(1422, 1)
 }
 
 func TestSummonBroadcastMoveToPawnEmitsDistanceFromOrigin(t *testing.T) {
@@ -84,9 +73,7 @@ func TestSummonBroadcastMoveToPawnEmitsDistanceFromOrigin(t *testing.T) {
 	target := mustServitor(t, ServitorConfig{ObjectID: 9})
 	actor.world.Spawn(target, 1020, 1000, 0, 0)
 
-	if err := actor.BroadcastMoveToPawn(target); err != nil {
-		t.Fatalf("BroadcastMoveToPawn() error = %v", err)
-	}
+	actor.BroadcastMoveToPawn(target)
 	x, y, z := actor.Position()
 	origin := location.Location{X: x, Y: y, Z: z}
 	want := event.MoveToPawn{TargetID: 9, Distance: int(origin.Distance3D(location.Location{X: 1020, Y: 1000})), Origin: origin}

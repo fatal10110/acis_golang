@@ -55,7 +55,7 @@ type CreatureActor interface {
 	Dead() bool
 	SetHeadingTo(attackable.Combatant)
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
-	BroadcastAttack(event.Attack) error
+	BroadcastAttack(event.Attack)
 	ConsumeBowMP()
 }
 
@@ -252,11 +252,10 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	return true
 }
 
-// DoAttack starts one physical attack animation against target. The attack
-// itself is never aborted by a broadcast failure — c.start has already
-// scheduled the hit landings by the time BroadcastAttack runs — but a
-// non-nil return still reports that the animation packet didn't reach
-// observers.
+// DoAttack starts one physical attack animation against target. It always
+// reports nil: c.start has already scheduled the hit landings by the time
+// BroadcastAttack runs, and the broadcast itself cannot fail. The error
+// return stays for the AttackController interface its callers hold.
 func (c *Controller) DoAttack(target attackable.Combatant) error {
 	if target == nil || c.actor == nil {
 		return nil
@@ -327,12 +326,12 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	if attackType == item.WeaponBow && c.player != nil {
 		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(bowReuse/time.Millisecond))
 	}
-	err := c.actor.BroadcastAttack(c.snapshot(hits))
+	c.actor.BroadcastAttack(c.snapshot(hits))
 
 	if c.player != nil {
 		c.player.ClearRecentFakeDeath()
 	}
-	return err
+	return nil
 }
 
 // Stop aborts the current attack and clears any pending bow cooldown.

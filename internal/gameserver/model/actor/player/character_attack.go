@@ -444,16 +444,14 @@ func (c *Character) SetHeadingTo(target attackable.Combatant) {
 
 // MakeAttackHit resolves one physical attack result.
 
-// BroadcastAttack reports one resolved attack swing. It always reports nil.
-func (c *Character) BroadcastAttack(snapshot event.Attack) error {
+// BroadcastAttack reports one resolved attack swing.
+func (c *Character) BroadcastAttack(snapshot event.Attack) {
 	c.emit(snapshot)
-	return nil
 }
 
 // BroadcastMove reports a server-driven movement start.
-func (c *Character) BroadcastMove(ev event.Move) error {
+func (c *Character) BroadcastMove(ev event.Move) {
 	c.emit(ev)
-	return nil
 }
 
 // OffensiveFollowIsPawnMove reports that a player's attack approach uses the
@@ -461,9 +459,8 @@ func (c *Character) BroadcastMove(ev event.Move) error {
 func (c *Character) OffensiveFollowIsPawnMove() bool { return true }
 
 // BroadcastStop reports server-driven movement cancelled mid-flight.
-func (c *Character) BroadcastStop() error {
+func (c *Character) BroadcastStop() {
 	c.emit(event.Stopped{})
-	return nil
 }
 
 // BroadcastAutoAttackStop reports that combat stance expired from inactivity.

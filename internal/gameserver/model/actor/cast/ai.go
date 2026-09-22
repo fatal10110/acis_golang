@@ -147,8 +147,8 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 // observers to notify report nil.
 type AICaster interface {
 	LaunchCaster
-	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error
-	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error
+	BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int)
+	BroadcastSkillLaunched(skillID, level int32, targetIDs []int32)
 }
 
 // Cast starts the cast against target and schedules its Launch, Hit and
@@ -173,10 +173,8 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// CreatureCast.doCast's broadcastPacket call before the launch
 	// timer is even scheduled (CreatureCast.java:148,165).
 	tx, ty, tz := castTarget.Position()
-	if err := a.Caster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
-		int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond)); err != nil {
-		a.Controller.log.Warn().Err(err).Msg("cast: skill-use broadcast")
-	}
+	a.Caster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
+		int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond))
 
 	// launchTargets is resolved once, in the Launch hook, and reused
 	// unchanged by Hit — mirroring CreatureCast.java's `_targets` field,
@@ -207,9 +205,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			for i, t := range launchTargets {
 				targetIDs[i] = t.ObjectID()
 			}
-			if err := a.Caster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs); err != nil {
-				a.Controller.log.Warn().Err(err).Msg("cast: skill-launched broadcast")
-			}
+			a.Caster.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), targetIDs)
 			return true
 		},
 		Hit: func() {

@@ -60,8 +60,8 @@ func (s *walkerCtlSelf) Position() (int, int, int)          { return s.x, s.y, s
 func (s *walkerCtlSelf) CollisionRadius() float64           { return 0 }
 func (s *walkerCtlSelf) SetHeading(int)                     {}
 func (s *walkerCtlSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
-func (s *walkerCtlSelf) BroadcastMove(event.Move) error     { return nil }
-func (s *walkerCtlSelf) BroadcastStop() error               { return nil }
+func (s *walkerCtlSelf) BroadcastMove(event.Move)           {}
+func (s *walkerCtlSelf) BroadcastStop()                     {}
 func (s *walkerCtlSelf) GeoPathFailCount() int {
 	return s.failCount
 }

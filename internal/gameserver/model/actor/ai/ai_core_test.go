@@ -412,17 +412,15 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	}
 }
 
-// TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors is the
-// regression test for the review finding that thinkCast's early
-// `if pawnErr != nil { return pawnErr }` masked stopErr whenever both
-// move.Stop's and BroadcastMoveToPawn's broadcasts failed in the same tick.
-func TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors(t *testing.T) {
+// TestAttackableThinkCastReportsStopErrorAndStillFacesTarget keeps the
+// rejected-cast path honest: the move controller's stop failure is still
+// reported to the caller, and the rotation-only notice observers need still
+// goes out on the same tick.
+func TestAttackableThinkCastReportsStopErrorAndStillFacesTarget(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	stopErr := errors.New("stop broadcast failed")
-	pawnErr := errors.New("move-to-pawn broadcast failed")
-	owner.moveToPawnErr = pawnErr
 	move := &recordingMove{stopErr: stopErr}
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
@@ -435,8 +433,8 @@ func TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors(t *testing.T) 
 	if !errors.Is(err, stopErr) {
 		t.Fatalf("Think() error = %v, want it to wrap stopErr (%v)", err, stopErr)
 	}
-	if !errors.Is(err, pawnErr) {
-		t.Fatalf("Think() error = %v, want it to wrap pawnErr (%v)", err, pawnErr)
+	if owner.moveToPawnCalls != 1 || owner.moveToPawnTo != target {
+		t.Fatalf("BroadcastMoveToPawn calls = (%d, %v), want (1, target)", owner.moveToPawnCalls, owner.moveToPawnTo)
 	}
 }
 
@@ -539,7 +537,6 @@ type fakeActor struct {
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
-	moveToPawnErr   error
 }
 
 func actor(id int32) *fakeActor {
@@ -568,10 +565,9 @@ func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
-func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
+func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
-	return a.moveToPawnErr
 }
 func (a *fakeActor) ShouldIdleWander() bool       { return a.idleWander }
 func (a *fakeActor) ForceWalkStance()             { a.walkStanceCalls++ }
