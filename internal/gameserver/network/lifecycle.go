@@ -79,6 +79,22 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.shadowItems != nil {
 		l.shadowItems.Remove(live.ObjectID())
 	}
+	if l.attackStance != nil {
+		// Unconditional, alongside the other registry removals: the
+		// reference drops the stance entry here too (Player.java:6292,
+		// between the water and pvp-flag removals), and live.Stop's
+		// stopLiveAutoAttack cannot stand in for it. That helper clears the
+		// in-combat flag before it reaches the tracker, so a detach that
+		// resumes after an aborted first pass finds the flag already down,
+		// returns early, and would leave the entry behind for good: the
+		// sweep re-posts its expiry to the owner's queue, which q.Close
+		// below has shut, so nothing ever removes it.
+		//
+		// No AutoAttackStop broadcast here: on the ordinary path
+		// stopLiveAutoAttack already sent it and this call reports no
+		// change, and on the aborted path the session is going away.
+		l.attackStance.Remove(live)
+	}
 	if l.pvpFlags != nil {
 		// reset=false, matching Player.java:6293's deleteMe cleanup: a
 		// disconnecting character's flag isn't persisted, so there's
