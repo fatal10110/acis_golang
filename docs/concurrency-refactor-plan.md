@@ -232,6 +232,13 @@ pool (Phase 2), so no queued task can block on the DB.
   resolves pre-world auth only. The harness picks the executor with
   `ACIS_SIM_EXECUTOR=pool|inline` (`gameservertest.SimExecutorEnv`); `Server.Settle` waits
   for posted work. Synchronous DB calls still reachable from queue tasks are #2364.
+  *Panic policy (#2394):* a task a connection **waits** on (`onLive`/`onQueue`) that panics ends
+  that session — the pool still recovers and logs the panic, and `onLive` reports the failure so
+  the dispatch loop returns and its deferred detach saves and detaches the character, exactly as a
+  fatal decode error does. A half-applied mutation the client was never told about must not be
+  replayable against a live session. Fire-and-forget work (`postLive`) and timer/tick expiries keep
+  the pool's own recovery alone: nothing waits on them, and dropping a session because a tick
+  panicked would be a regression in the other direction.
 
 ### Phase 3 — cross-actor boundary (synchronous subset + inventory container) — #2271
 - Introduce `vitalsMu` on `Character`/`Hostile`/`summon.Actor` guarding HP/MP/CP, dead, hate,

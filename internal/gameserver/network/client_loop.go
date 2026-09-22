@@ -84,6 +84,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	}()
 
 	for {
+		// A task this goroutine waited on panicked. sim recovered it, but the
+		// handler stopped part-way through its mutation and the client was
+		// told nothing, so the session ends exactly as a fatal decode error
+		// ends it: the deferred detach above saves and detaches the
+		// character. Timers and ticks keep the pool's own recovery — nothing
+		// waits on them, and dropping a session over a tick would be a
+		// regression in the other direction.
+		if live != nil && live.handlerPanicked {
+			l.log.Warn().Str("account", client.AccountName()).Msg("game client disconnected: panic in queued packet handler")
+			return
+		}
 		payload, err := session.ReadFrame()
 		if err != nil {
 			if normalReadFrameError(err) {
@@ -142,7 +153,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// still handled one at a time in read order; decoding and the
 		// protection gates above stay on this goroutine.
 		if clearsSpawnProtection(opcode) {
-			onLive(live, func() { l.clearSpawnProtectionOnAction(live) })
+			// A panic here must not let this frame's own handler run behind
+			// it; the check at the top of the loop ends the session.
+			if !onLive(live, func() { l.clearSpawnProtectionOnAction(live) }) {
+				continue
+			}
 		}
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
