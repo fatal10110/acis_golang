@@ -72,7 +72,7 @@ type options struct {
 	restarts               *restart.Table
 	zones                  *zone.Index
 	attackStance           *task.AttackStance
-	attackStanceTracker    AttackStanceTracker
+	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
@@ -157,20 +157,13 @@ func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
 }
 
-// AttackStanceTracker is the combat-stance seam the game link consults,
-// including from the exit guard that runs inside the task a restart or
-// logout request posts to the player's queue. Boot wires the production
-// tracker unless a suite substitutes one.
-type AttackStanceTracker interface {
-	Add(task.AttackStanceActor)
-	Remove(task.AttackStanceActor) bool
-	InAttackStance(task.AttackStanceActor) bool
-}
-
-// WithAttackStanceTracker substitutes the tracker the link consults, so a
-// suite can drive a failure from inside a queued handler. It replaces only
-// the link's collaborator; Server.AttackStance stays the production one.
-func WithAttackStanceTracker(tracker AttackStanceTracker) Option {
+// WithAttackStanceTracker substitutes the combat-stance tracker the link
+// consults, including from the exit guard that runs inside the task a
+// restart or logout request posts to the player's queue, so a suite can
+// drive a failure from inside a queued handler. It replaces only the link's
+// collaborator; Server.AttackStance stays the production one. It cannot be
+// combined with WithAttackStance, which sets the same collaborator.
+func WithAttackStanceTracker(tracker network.AttackStanceTracker) Option {
 	return func(o *options) { o.attackStanceTracker = tracker }
 }
 
@@ -501,6 +494,14 @@ func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) 
 	tb.Helper()
 	setter := s.onlineCharacter(tb, objID)
 	setter.SetOperating(operating)
+}
+
+// SetPlayerInCombat toggles the live player's combat flag, the precondition
+// the auto-attack stop path checks before it touches the stance tracker.
+func (s *Server) SetPlayerInCombat(tb testing.TB, objID int32, inCombat bool) {
+	tb.Helper()
+	setter := s.onlineCharacter(tb, objID)
+	setter.SetInCombat(inCombat)
 }
 
 // SeedGroundItem places an item instance directly on the ground at the given
@@ -1053,6 +1054,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	var ai *task.AI
 	if o.productionTickers {
 		ai = task.NewAI(state, o.log)
+		if o.attackStance != nil && o.attackStanceTracker != nil {
+			t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
+		}
 		if o.attackStance == nil && o.attackStanceNow == nil {
 			o.attackStanceNow = time.Now
 		}

@@ -68,7 +68,9 @@ type petStore interface {
 	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
 }
 
-type attackStanceTracker interface {
+// AttackStanceTracker owns combat-stance membership. It is exported so the
+// behavior harness can substitute one without redeclaring the contract.
+type AttackStanceTracker interface {
 	Add(task.AttackStanceActor)
 	Remove(task.AttackStanceActor) bool
 	InAttackStance(task.AttackStanceActor) bool
@@ -167,7 +169,7 @@ type GameClientLink struct {
 	zones         *zone.Index
 	ids           idAllocator
 	groundItems   groundItemDropper
-	attackStance  attackStanceTracker
+	attackStance  AttackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
 	effects       effect.ActivityRegistry
@@ -279,7 +281,7 @@ type GameClientLinkConfig struct {
 	Zones         *zone.Index
 	IDs           idAllocator
 	GroundItems   groundItemDropper
-	AttackStance  attackStanceTracker
+	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
 	Effects       effect.ActivityRegistry
