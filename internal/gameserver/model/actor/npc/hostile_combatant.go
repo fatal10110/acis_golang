@@ -8,6 +8,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
+// Hostile satisfies the identity surface SkillSuccessInput/EffectSuccessInput/
+// ShieldDefense/DecreaseFusion take their caster/effected parameter as.
+var _ attackable.Combatant = (*Hostile)(nil)
+
+// Hostile satisfies the live formula-caster surface. Every combatant kind
+// must keep satisfying it: the skill handler narrows a cast participant to
+// creature.FormulaActor and treats a failed narrowing as "no creature
+// source", which lifts the CanDealDamage gate instead of tightening it.
+var _ creature.FormulaActor = (*Hostile)(nil)
+
 // Karma reports 0: NPCs carry no PK karma.
 func (h *Hostile) Karma() int { return 0 }
 
