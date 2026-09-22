@@ -1240,21 +1240,43 @@ func TestFreight_VisibleItems_OrderedByEntryTimeThenObjectID(t *testing.T) {
 	}
 }
 
-func TestFreight_Add_MergesLowestObjectIDVisibleStack(t *testing.T) {
+// TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup pins the one
+// answer the freight container gives to "which stack of this template?".
+//
+// Two visible stacks of a template only coexist across town tags, which is
+// what this fixture builds. The reference resolves the deposit's merge target
+// through getItemByItemId, and PcFreight overrides exactly that method to
+// walk _items in container order and return the first visible one
+// (PcFreight.java:69-78) — so the newest visible stack grows, and the same
+// method answers a plain lookup. Asserting both here is the point: a merge
+// target and a lookup that disagreed would hand a future freight handler one
+// stack from Add and a different one from VisibleItemByTemplateID.
+func TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
-	low := f.AddNew(freightTestStackableID, 10, 0x20000001)
+	older := f.AddNew(freightTestStackableID, 10, 0x20000001)
 	f.ActiveLocation = 2
-	high := f.AddNew(freightTestStackableID, 5, 0x20000002)
+	newer := f.AddNew(freightTestStackableID, 5, 0x20000002)
 	f.ActiveLocation = 0
 
-	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
-	if merged != low {
-		t.Fatalf("AddNew() with multiple visible stacks returned object %d, want lowest visible object %d", merged.ObjectID, low.ObjectID)
+	// Pin the entry times instead of relying on the two AddNew calls landing
+	// in different milliseconds. The newer stack also carries the higher
+	// object id, so the times are what decide it: swapping them would flip
+	// the expected target.
+	older.SetTime(1000)
+	newer.SetTime(2000)
+
+	if got := f.VisibleItemByTemplateID(freightTestStackableID); got != newer {
+		t.Fatalf("VisibleItemByTemplateID() = object %d, want the newest visible stack %d", got.ObjectID, newer.ObjectID)
 	}
-	if low.Count != 13 || high.Count != 5 {
-		t.Errorf("stack counts after merge = low %d high %d, want low 13 high 5", low.Count, high.Count)
+
+	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
+	if merged != newer {
+		t.Fatalf("AddNew() with multiple visible stacks merged into object %d, want the newest visible stack %d — the same one the lookup names", merged.ObjectID, newer.ObjectID)
+	}
+	if newer.Count != 8 || older.Count != 10 {
+		t.Errorf("stack counts after merge = newer %d older %d, want newer 8 older 10", newer.Count, older.Count)
 	}
 }
 

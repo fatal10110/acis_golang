@@ -159,6 +159,21 @@ func (c *Container) Items() []*item.Instance {
 	return c.itemsLocked()
 }
 
+// ItemsUnordered returns the container's contents in no particular order,
+// for callers that index them rather than list them. InventoryUpdate builds
+// a lookup map from the result and never reads the sequence, so paying for
+// byContainerOrder there would sort a slice purely to iterate it once — on a
+// path that runs per item mutation.
+func (c *Container) ItemsUnordered() []*item.Instance {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]*item.Instance, 0, len(c.items))
+	for _, inst := range c.items {
+		out = append(out, inst)
+	}
+	return out
+}
+
 func (c *Container) itemsLocked() []*item.Instance {
 	out := make([]*item.Instance, 0, len(c.items))
 	for _, inst := range c.items {
