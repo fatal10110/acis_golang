@@ -74,9 +74,12 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
-// dropStaleItemRows removes every row whose object id still has an unflushed
-// change queued on the lazy item persistence task, so an inventory is never
-// rebuilt from a row the task is about to rewrite or delete.
+// dropStaleItemRows filters the rows a login restores an inventory from: it
+// removes every row whose object id still has an unflushed change queued on
+// the lazy item persistence task, so an inventory is never rebuilt from a row
+// the task is about to rewrite or delete, and every row whose item template
+// is not loaded, so a datapack downgrade costs the player that one item
+// rather than the whole login.
 //
 // The lazy task is what makes this necessary. Destroying a whole stack takes
 // the instance out of its container in memory and leaves the row's delete to
@@ -95,22 +98,39 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 // container pending, and the error for that was logged minutes earlier on
 // another connection's goroutine. The count is what tells the two apart.
 func (l *GameClientLink) dropStaleItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
-	if l.itemInstances == nil {
-		return items
-	}
 	kept := items[:0]
+	var stale, unknown int
 	for _, inst := range items {
 		if inst == nil {
 			continue
 		}
-		if l.itemInstances.ContainsID(inst.ObjectID) {
+		if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
+			stale++
 			continue
+		}
+		// A row whose item template is no longer loaded — what a datapack
+		// downgrade leaves behind — is dropped from the restore and the
+		// login carries on. Inventory.restore() does the same: the
+		// ResultSet constructor dereferences the missing template,
+		// restoreFromDb swallows that and returns null, and the restore
+		// loop skips the row (Inventory.java:119-124,
+		// ItemInstance.java:108-124 and 718-735). The row itself is left
+		// alone, so the item returns when its template does.
+		if l.itemTemplates != nil {
+			if _, ok := l.itemTemplates.Get(inst.TemplateID); !ok {
+				unknown++
+				continue
+			}
 		}
 		kept = append(kept, inst)
 	}
-	if dropped := len(items) - len(kept); dropped > 0 {
-		l.log.Warn().Int32("object_id", ownerID).Int("dropped", dropped).Int("restored", len(kept)).
+	if stale > 0 {
+		l.log.Warn().Int32("object_id", ownerID).Int("dropped", stale).Int("restored", len(kept)).
 			Msg("restore inventory: skipped item rows with an unflushed change")
+	}
+	if unknown > 0 {
+		l.log.Error().Int32("object_id", ownerID).Int("dropped", unknown).Int("restored", len(kept)).
+			Msg("restore inventory: skipped item rows with no loaded template")
 	}
 	return kept
 }
@@ -181,16 +201,6 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
 	}
 
-	// Built before the runtime is attached, so a missing item template aborts
-	// the login without leaving an actor queue and shadow-item tracking
-	// registered behind it. The restore that follows ends with an empty
-	// update queue, so there is nothing here for a full-list send to discard;
-	// routing this snapshot through the inventory as well waits on #2420.
-	itemListFrame, err := serverpackets.FrameItemList(items, l.itemTemplates, false)
-	if err != nil {
-		l.log.Error().Err(err).Msg("enter world: build ItemList")
-		return nil, false
-	}
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
@@ -207,9 +217,15 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	// From here on the player has a queue: the rest of the login runs on it,
 	// and this goroutine waits, so the burst keeps its order.
 	entered := false
-	onLive(live, func() { entered = l.finishEnterWorld(client, c, live, itemListFrame) })
+	onLive(live, func() { entered = l.finishEnterWorld(client, c, live) })
 	if !entered {
-		return nil, false
+		// Hand the partially attached player back rather than nil: by now it
+		// owns an actor queue, shadow-item tracking and, past world.Spawn,
+		// world/clock/autosave registrations. The caller's deferred
+		// detachLivePlayer is what releases them. Dropping live here would
+		// leave the queue behind and let the shadow-item task keep decaying
+		// — and finally destroy — an offline character's equipment.
+		return live, false
 	}
 	return live, true
 }
@@ -217,7 +233,17 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 // finishEnterWorld publishes the attached player live into the world and
 // sends the rest of the EnterWorld burst, on live's queue. It reports false
 // when the login cannot complete.
-func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer, itemListFrame wire.Frame) bool {
+func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer) bool {
+	// Same constructor RequestItemList uses, so the login snapshot comes from
+	// the live inventory instead of the raw restored rows. Built before the
+	// burst starts and before anything is published into the world, so a
+	// missing item template aborts with nothing sent and nothing spawned;
+	// enterWorld's caller detaches what attachLivePlayer registered.
+	itemListFrame, err := live.buildItemList(l.itemTemplates, false)
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: build ItemList")
+		return false
+	}
 	l.activateSpawnProtection(live)
 	if l.skills != nil {
 		if err := l.skills.RestoreEquippedItemStats(c, c.Inventory()); err != nil {
