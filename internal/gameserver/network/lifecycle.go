@@ -290,6 +290,15 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // a deadline expiring partway through leaves none of it written; keeping
 // the container pending hands all of it to the next tick, or to the
 // shutdown flush, instead of dropping it on the floor.
+//
+// So a pending entry here means "this item's write has not landed yet", not
+// "this item left its container" — the entry carries the container's final
+// state and the item is still the owner's. The login side reads it that way:
+// restoreItemRows (character_flow.go) does not drop a row just for being
+// pending, it asks the entry's own state whether the item is still owned and
+// restores it from that state when it is. The two sites have to keep
+// agreeing about what an entry means; changing the rule here without
+// changing it there turns a failed logout write into a missing inventory.
 func (l *GameClientLink) flushItemPersistence(inv *itemcontainer.Inventory) {
 	inv.ReleasePersistence()
 	if l.itemInstances == nil {
