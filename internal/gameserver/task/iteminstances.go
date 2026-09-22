@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -52,9 +53,10 @@ const (
 )
 
 // errSaveJobPanic is the error a Save owner job reports when it panicked.
-// The lane logs the panic itself (persist.Worker.runJob) and swallows it, so
-// without this the round would close with a nil error and Save would report
-// a flush that never happened as a success.
+// The job recovers its own panic (see Save), so without this the round would
+// close with a nil error and Save would report a flush that never happened as
+// a success. Wrapped with the recovered value, it is also what carries the
+// panic's reason out to the caller's log.
 var errSaveJobPanic = errors.New("task: item save job panicked")
 
 // ItemFlusher atomically persists one flush batch: either every change in
@@ -359,6 +361,33 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 			// caller as a failed one rather than as a silent success.
 			failed, err := entries, errSaveJobPanic
 			defer func() { i.finishOwner(round, failed, err) }()
+			// Stopping the panic here rather than letting the lane's recover
+			// take it is what makes the guard cover both dispatch paths. The
+			// lane recovers a queued job, but the loop below runs the job on
+			// this goroutine whenever Enqueue refuses it — a closed worker, or
+			// a nil one — and there a panic unwinds out of the dispatch loop
+			// and out of Save. Every owner sorted after the panicking one is
+			// then never dispatched at all, with its entries already swapped
+			// out of pending and nothing left to merge them back, and the round
+			// stays in i.rounds forever, where its inflight copy keeps
+			// ContainsID answering true for ids no Save will ever write again.
+			//
+			// That inline path is the shutdown drain's post-Close save
+			// (cmd/gameserver/tasks.go, drainItemInstances), the last chance
+			// these rows get, and an escaping panic there would leave the fx
+			// OnStop hook — no fx.RecoverFromPanics is configured — skipping
+			// every stop hook after it. The reference cannot fail that way:
+			// ItemInstanceTaskManager.updateItems catches Exception around the
+			// whole batch and never throws out of the shutdown-triggered call.
+			//
+			// Recovering here instead of at the two call sites also keeps the
+			// panic's reason, which reaches the caller through round.err and
+			// so through the ticker's and the drain's own error logs.
+			defer func() {
+				if r := recover(); r != nil {
+					err = fmt.Errorf("%w: %v", errSaveJobPanic, r)
+				}
+			}()
 			failed, err = i.saveChunks(ctx, entries)
 		}
 		// A closed worker has already run every job it accepted, so writing

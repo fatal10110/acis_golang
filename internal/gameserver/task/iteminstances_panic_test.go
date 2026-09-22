@@ -2,6 +2,9 @@ package task
 
 import (
 	"context"
+	"errors"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,13 +16,57 @@ import (
 
 // panickingItemFlusher panics on every Flush, standing in for any panic
 // raised inside a Save owner job — a nil template lookup in addToBatch, a
-// driver fault in the real store. persist.Worker.runJob recovers such a
-// panic on purpose so one bad job cannot kill a lane, which is exactly what
+// driver fault in the real store. Such a panic is survivable by policy (the
+// lane recovers a queued job, persist.Worker.runJob), which is exactly what
 // makes the job's own bookkeeping (finishOwner) its responsibility to run.
 type panickingItemFlusher struct{}
 
 func (panickingItemFlusher) Flush(context.Context, item.FlushBatch) error {
 	panic("flush blew up")
+}
+
+// poisonItemFlusher panics only for poisonID and records the ids every other
+// flush wrote, so a multi-owner Save can be checked for whether the owners
+// dispatched after the panicking one still reached the database.
+type poisonItemFlusher struct {
+	poisonID int32
+
+	mu    sync.Mutex
+	saved []int32
+}
+
+func (p *poisonItemFlusher) Flush(_ context.Context, batch item.FlushBatch) error {
+	for _, st := range batch.Saves {
+		if st.ObjectID == p.poisonID {
+			panic("flush blew up")
+		}
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, st := range batch.Saves {
+		p.saved = append(p.saved, st.ObjectID)
+	}
+	return nil
+}
+
+func (p *poisonItemFlusher) savedIDs() []int32 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return slices.Clone(p.saved)
+}
+
+// closedWorker returns a persist.Worker that refuses every job, which is what
+// makes Save take its inline dispatch path — the one drainItemInstances uses
+// for the shutdown drain's post-Close, last-chance save.
+func closedWorker(t *testing.T) *persist.Worker {
+	t.Helper()
+	worker := persist.New(zerolog.Nop())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := worker.Close(ctx); err != nil {
+		t.Fatalf("worker.Close() error = %v", err)
+	}
+	return worker
 }
 
 // TestItemInstancesSaveSurvivesPanickingFlush pins #2403: a panicking owner
@@ -68,5 +115,89 @@ func TestItemInstancesSaveSurvivesPanickingFlush(t *testing.T) {
 	instances.mu.RUnlock()
 	if leaked != 0 {
 		t.Fatalf("leaked rounds = %d, want 0", leaked)
+	}
+}
+
+// TestItemInstancesSaveInlinePanicKeepsDispatchingOwners covers the other
+// dispatch path: when Enqueue refuses the job (a closed worker, as on the
+// shutdown drain's post-Close save, or a nil one) Save runs it on its own
+// goroutine, where no lane recover stands behind it. A panic escaping there
+// unwound out of the dispatch loop, so every owner sorted after the
+// panicking one was never dispatched at all — its entries already swapped
+// out of pending, with nothing left to merge them back — and the round stayed
+// in i.rounds, where its inflight copy keeps ContainsID answering true for
+// ids no later Save will ever write.
+func TestItemInstancesSaveInlinePanicKeepsDispatchingOwners(t *testing.T) {
+	flusher := &poisonItemFlusher{poisonID: 1}
+	templates := item.NewTable([]*item.Template{{ID: 10}})
+	instances := NewItemInstances(flusher, templates, closedWorker(t), nil)
+	// Lane keys are the owner ids and Save dispatches them sorted, so owner
+	// 100 panics while owner 200 is still undispatched behind it.
+	poisoned := &item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory}
+	behind := &item.Instance{ObjectID: 2, TemplateID: 10, OwnerID: 200, Count: 5, Location: item.LocationInventory}
+	instances.Add(poisoned)
+	instances.Add(behind)
+
+	var err error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Save() panicked out to its caller (%v); an inline panic must not unwind the dispatch loop or the fx stop hook", r)
+			}
+		}()
+		err = instances.Save(context.Background())
+	}()
+
+	if !errors.Is(err, errSaveJobPanic) {
+		t.Fatalf("Save() error = %v, want one wrapping errSaveJobPanic", err)
+	}
+	if got := flusher.savedIDs(); !slices.Contains(got, behind.ObjectID) {
+		t.Fatalf("saved ids = %v, want the owner behind the panicking one (%d) written", got, behind.ObjectID)
+	}
+	instances.mu.RLock()
+	_, poisonedPending := instances.pending[poisoned.ObjectID]
+	leaked := len(instances.rounds)
+	instances.mu.RUnlock()
+	if !poisonedPending {
+		t.Fatalf("panicked owner's item in pending = false, want true so a later Save retries it")
+	}
+	if leaked != 0 {
+		t.Fatalf("leaked rounds = %d, want 0", leaked)
+	}
+}
+
+// TestItemInstancesShutdownDrainSurvivesPanickingFlush pins the drain
+// sequence drainItemInstances runs (cmd/gameserver/tasks.go): save, close the
+// worker, save again. Merging a panicked flush's items back to pending is what
+// gives that post-Close save something to re-attempt, and it re-attempts it
+// inline — so without the job's own recover the panic leaves Save, leaves
+// drainItemInstances, and leaves the fx OnStop hook, which no
+// fx.RecoverFromPanics converts, skipping every stop hook ordered after it.
+// The reference cannot fail this way: ItemInstanceTaskManager.updateItems
+// catches Exception around the whole batch and clears unconditionally, so its
+// shutdown-triggered call never throws out.
+func TestItemInstancesShutdownDrainSurvivesPanickingFlush(t *testing.T) {
+	worker := persist.New(zerolog.Nop())
+	templates := item.NewTable([]*item.Template{{ID: 10}})
+	instances := NewItemInstances(panickingItemFlusher{}, templates, worker, nil)
+	instances.Add(&item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := instances.Save(ctx); !errors.Is(err, errSaveJobPanic) {
+		t.Fatalf("first Save() error = %v, want one wrapping errSaveJobPanic", err)
+	}
+	if err := worker.Close(ctx); err != nil {
+		t.Fatalf("worker.Close() error = %v", err)
+	}
+
+	// The post-Close save dispatches inline; nothing recovers above it.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("post-Close Save() panicked out (%v); that panic would leave the fx stop hook and skip every later one", r)
+		}
+	}()
+	if err := instances.Save(ctx); !errors.Is(err, errSaveJobPanic) {
+		t.Fatalf("post-Close Save() error = %v, want one wrapping errSaveJobPanic", err)
 	}
 }
