@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -71,6 +72,32 @@ func TestFailedDetachFlushKeepsInventoryOnRelog(t *testing.T) {
 	}
 	if got := findItemListEntry(entries, adena); got == nil || got.count != 100 {
 		t.Fatalf("untouched stack %d missing or wrong in the relog ItemList: %+v", adena, entries)
+	}
+
+	// The restore takes the row's write over; it does not cancel it. A second
+	// logout whose flush fails just as the first did must therefore retain the
+	// same state again, rather than leaving the stale row as the only record
+	// and handing the destroyed potions back on the login after it.
+	fault.Arm()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
+	fault.Disarm()
+
+	if rows := persistedItemCounts(t, srv, objID); rows[potions] != 5 {
+		t.Fatalf("precondition failed: row %d holds count %d, so the second flush did land and this run never entered the repeated-failure window", potions, rows[potions])
+	}
+	entries = readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))
+	if e := findItemListEntry(entries, potions); e == nil || e.count != 3 {
+		t.Fatalf("stack %d after a second failed detach flush = %+v, want count 3 (the destroyed potions must not come back)", potions, e)
+	}
+
+	// With the fault cleared the retained state finally reaches the table, so
+	// the row converges on the count the session actually left behind.
+	if err := srv.ItemInstances.Save(context.Background()); err != nil {
+		t.Fatalf("flush retained item state: %v", err)
+	}
+	if rows := persistedItemCounts(t, srv, objID); rows[potions] != 3 {
+		t.Fatalf("row %d count = %d after the flush succeeds, want 3", potions, rows[potions])
 	}
 }
 

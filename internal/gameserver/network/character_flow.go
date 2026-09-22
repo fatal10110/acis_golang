@@ -94,8 +94,14 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 // once the write lands, so the task resolves them and hands back the ones
 // still owned (ItemInstances.ClaimRestoredItems): those are restored from that
 // state rather than from the row, which is both the freshest description of
-// the item and the one the failed write was carrying. Claiming them also
-// makes the rebuilt instance the row's only writer from here on.
+// the item and the one the failed write was carrying.
+//
+// Claiming hands the row's write over without cancelling it: the entry stays
+// pending, retargeted at the instance restored here, so the state is still
+// scheduled if this login goes no further and the row still has exactly one
+// writer. Only rows this restore actually keeps are offered for claiming
+// (restoredItemLocation), so a row the inventory would discard is never handed
+// a writer that discards it.
 //
 // A row whose item template is no longer loaded is dropped so that a datapack
 // downgrade costs the player that one item rather than the whole login.
@@ -107,11 +113,11 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 // the same items, which is a bug here rather than a detach flush that never
 // landed: those items are claimed and restored, not dropped.
 func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
-	var claimed map[int32]item.InstanceState
+	var claimed map[int32]*item.Instance
 	if l.itemInstances != nil {
 		ids := make([]int32, 0, len(items))
 		for _, inst := range items {
-			if inst != nil {
+			if inst != nil && restoredItemLocation(inst.Location) {
 				ids = append(ids, inst.ObjectID)
 			}
 		}
@@ -124,8 +130,8 @@ func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) 
 		if inst == nil {
 			continue
 		}
-		if st, ok := claimed[inst.ObjectID]; ok {
-			inst = st.Instance()
+		if restored, ok := claimed[inst.ObjectID]; ok {
+			inst = restored
 		} else if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
 			stale++
 			continue
@@ -159,6 +165,18 @@ func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) 
 			Msg("restore inventory: skipped item rows with no loaded template")
 	}
 	return kept
+}
+
+// restoredItemLocation reports whether a row at loc is one the player
+// inventory rebuilds itself from — its base and equip locations, the only two
+// Inventory.Restore keeps. The row query is not location-filtered, so a
+// warehouse or freight row reaches here too; claiming one would hand its write
+// to an instance the inventory then discards, leaving the row with no writer
+// at all. The reference draws the same line one step earlier, by binding
+// getBaseLocation() and getEquipLocation() into the restore query itself
+// (Inventory.java:110-114), so its guard never sees those rows either.
+func restoredItemLocation(loc item.Location) bool {
+	return loc == item.LocationInventory || loc == item.LocationPaperdoll
 }
 
 // enterWorld sends the EnterWorld packet burst for c and registers it in the
