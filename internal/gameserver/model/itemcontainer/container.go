@@ -1,12 +1,39 @@
 package itemcontainer
 
 import (
-	"cmp"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
+
+// nowMillis stamps an item as it enters a container. Containers order their
+// contents newest-first, so this is the ordering key, not just bookkeeping.
+func nowMillis() int64 { return time.Now().UnixMilli() }
+
+// byContainerOrder is the total order every container lists its contents in:
+// descending entry time, then descending object id. That puts the most
+// recently acquired item first, which is the order the client expects an
+// item list in. Callers hold the container lock, which is also what every
+// write of an item's time is taken under, so the key is stable across a sort.
+func byContainerOrder(a, b *item.Instance) int {
+	if d := cmpDesc(a.TimeValue(), b.TimeValue()); d != 0 {
+		return d
+	}
+	return cmpDesc(int64(a.ObjectID), int64(b.ObjectID))
+}
+
+func cmpDesc(a, b int64) int {
+	switch {
+	case a > b:
+		return -1
+	case a < b:
+		return 1
+	default:
+		return 0
+	}
+}
 
 // Container is one owned collection of item instances sitting at a single
 // item.Location: a private warehouse, a clan warehouse, or freight. An
@@ -94,10 +121,10 @@ func (c *Container) Size() int {
 	return len(c.items)
 }
 
-// Items returns every item instance the container holds, ordered by object
-// id for determinism (the Java reference orders by most-recently-touched;
-// nothing in this package's scope depends on that order, so object id is
-// used instead as a simpler, stable substitute).
+// Items returns every item instance the container holds in
+// byContainerOrder: newest entry first, object id descending within a tie.
+// Packets built straight from this slice (ItemList, TradeStart,
+// PackageSendableList) inherit that order, which is the whole point of it.
 func (c *Container) Items() []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -109,7 +136,7 @@ func (c *Container) itemsLocked() []*item.Instance {
 	for _, inst := range c.items {
 		out = append(out, inst)
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	slices.SortFunc(out, byContainerOrder)
 	return out
 }
 
@@ -149,7 +176,7 @@ func (c *Container) HasAnyItem(templateIDs ...int32) bool {
 }
 
 // ItemsByTemplateID returns every instance of templateID the container
-// holds, ordered by object id.
+// holds, in byContainerOrder.
 func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -159,7 +186,7 @@ func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	slices.SortFunc(out, byContainerOrder)
 	return out
 }
 
@@ -171,13 +198,22 @@ func (c *Container) ItemByTemplateID(templateID int32) *item.Instance {
 	return c.itemByTemplateIDLocked(templateID)
 }
 
+// itemByTemplateIDLocked returns the first matching instance in
+// byContainerOrder. "First" has to mean the same thing it does in Items(),
+// or destroying "the" instance of a template would pick an arbitrary one of
+// several — a different enchant level than the player watched disappear.
+// It scans instead of sorting: this is on HasItem/ItemCount/Adena.
 func (c *Container) itemByTemplateIDLocked(templateID int32) *item.Instance {
+	var best *item.Instance
 	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			return inst
+		if inst.TemplateID != templateID {
+			continue
+		}
+		if best == nil || byContainerOrder(inst, best) < 0 {
+			best = inst
 		}
 	}
-	return nil
+	return best
 }
 
 // ItemByObjectID returns the instance identified by objectID, or nil if the
@@ -257,7 +293,7 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 	// the one the item already carries in place: moving between containers
 	// never unregisters an item.
 	inst.BindPersister(c.persist)
-	inst.SetOwnerLocation(c.ownerID, c.location, 0)
+	inst.EnterContainer(c.ownerID, c.location, 0, nowMillis())
 	c.items[inst.ObjectID] = inst
 	return inst, false
 }

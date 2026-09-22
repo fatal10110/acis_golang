@@ -1,7 +1,6 @@
 package itemcontainer
 
 import (
-	"cmp"
 	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -72,7 +71,7 @@ func (f *Freight) VisibleItems() []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	slices.SortFunc(out, byContainerOrder)
 	return out
 }
 
@@ -127,7 +126,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 		locData = f.ActiveLocation
 	}
 	inst.BindPersister(f.persist)
-	inst.SetOwnerLocation(f.ownerID, f.location, locData)
+	inst.EnterContainer(f.ownerID, f.location, locData, nowMillis())
 	f.items[inst.ObjectID] = inst
 	return inst, false
 }

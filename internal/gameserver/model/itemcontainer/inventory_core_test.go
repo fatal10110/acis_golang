@@ -2,6 +2,7 @@ package itemcontainer
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -253,8 +254,10 @@ func TestInventory_PackageSendableItems(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("PackageSendableItems() returned %d items, want 2", len(items))
 	}
-	if items[0].ObjectID != 500 || items[1].ObjectID != 501 {
-		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 500,501", items[0].ObjectID, items[1].ObjectID)
+	// Container order is newest entry first, and both were added in the same
+	// millisecond, so the tie-break puts the higher object id first.
+	if items[0].ObjectID != 501 || items[1].ObjectID != 500 {
+		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 501,500", items[0].ObjectID, items[1].ObjectID)
 	}
 }
 
@@ -1195,19 +1198,32 @@ func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T
 	}
 }
 
-func TestFreight_VisibleItems_OrderedByObjectID(t *testing.T) {
+func TestFreight_VisibleItems_OrderedByEntryTimeThenObjectID(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1
 
 	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000004, 0x20000002} {
 		f.AddNew(freightTestItemID, 1, objectID)
 	}
+	// Pin the entry times rather than relying on four AddNew calls landing in
+	// the same millisecond: 0x20000001 is the newest, the other three tie and
+	// fall through to descending object id.
+	for _, inst := range f.VisibleItems() {
+		if inst.ObjectID == 0x20000001 {
+			inst.SetTime(2000)
+		} else {
+			inst.SetTime(1000)
+		}
+	}
 
 	visible := f.VisibleItems()
-	for i := 1; i < len(visible); i++ {
-		if visible[i-1].ObjectID > visible[i].ObjectID {
-			t.Fatalf("VisibleItems() object ids are not ordered: %d before %d", visible[i-1].ObjectID, visible[i].ObjectID)
-		}
+	got := make([]int32, len(visible))
+	for i, inst := range visible {
+		got[i] = inst.ObjectID
+	}
+	want := []int32{0x20000001, 0x20000004, 0x20000003, 0x20000002}
+	if !slices.Equal(got, want) {
+		t.Fatalf("VisibleItems() object ids = %v, want %v", got, want)
 	}
 }
 
@@ -1527,5 +1543,81 @@ func TestInventoryRestoreMergeDoesNotPersist(t *testing.T) {
 	held.AddCount(1)
 	if len(rec.ids) != 1 {
 		t.Errorf("persist calls after mutating the merged stack = %d, want 1", len(rec.ids))
+	}
+}
+
+// TestContainerItemsOrderedByEntryTimeThenObjectID pins byContainerOrder on
+// both of its keys at once, with the two disagreeing: entry time descending
+// decides first, and only a tie falls through to object id descending. Object
+// ids and times are interleaved so an implementation that used either key
+// alone would produce a different order than the one asserted.
+func TestContainerItemsOrderedByEntryTimeThenObjectID(t *testing.T) {
+	c := NewWarehouse(1, testTemplates())
+	for _, objectID := range []int32{601, 602, 603, 604} {
+		if c.AddNew(daggerTemplateID, 1, objectID) == nil {
+			t.Fatalf("AddNew(%d) returned nil", objectID)
+		}
+	}
+	times := map[int32]int64{601: 300, 602: 100, 603: 300, 604: 200}
+	for _, inst := range c.Items() {
+		inst.SetTime(times[inst.ObjectID])
+	}
+
+	got := make([]int32, 0, 4)
+	for _, inst := range c.Items() {
+		got = append(got, inst.ObjectID)
+	}
+	want := []int32{603, 601, 604, 602}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Items() object ids = %v, want %v", got, want)
+	}
+
+	// "First instance of this template" has to mean the same thing the list
+	// does, or destroying one of several picks an arbitrary instance.
+	if got := c.ItemByTemplateID(daggerTemplateID); got == nil || got.ObjectID != want[0] {
+		t.Fatalf("ItemByTemplateID() = %v, want the first listed instance %d", got, want[0])
+	}
+	byTemplate := make([]int32, 0, 4)
+	for _, inst := range c.ItemsByTemplateID(daggerTemplateID) {
+		byTemplate = append(byTemplate, inst.ObjectID)
+	}
+	if !slices.Equal(byTemplate, want) {
+		t.Fatalf("ItemsByTemplateID() object ids = %v, want %v", byTemplate, want)
+	}
+}
+
+// TestContainerAddStampsEntryTimeWithoutRestampingMergedStack pins which adds
+// move an item to the front of the list. Taking a new instance in stamps it as
+// the newest; merging units into a stack that is already held leaves that
+// stack's place in the list alone.
+func TestContainerAddStampsEntryTimeWithoutRestampingMergedStack(t *testing.T) {
+	c := NewWarehouse(1, testTemplates())
+
+	stack := c.AddNew(adenaTemplateID, 100, 700)
+	if stack == nil {
+		t.Fatal("AddNew(adena) returned nil")
+	}
+	if stack.TimeValue() == 0 {
+		t.Fatal("Add left the item's entry time unstamped")
+	}
+	stack.SetTime(1000)
+
+	dagger := c.AddNew(daggerTemplateID, 1, 701)
+	if dagger == nil {
+		t.Fatal("AddNew(dagger) returned nil")
+	}
+	if dagger.TimeValue() <= 1000 {
+		t.Fatalf("second Add stamped entry time %d, want it newer than the first item's 1000", dagger.TimeValue())
+	}
+
+	merged, absorbed := c.Add(&item.Instance{ObjectID: 702, TemplateID: adenaTemplateID, Count: 50})
+	if !absorbed || merged != stack {
+		t.Fatalf("Add(adena) = %v absorbed=%v, want it merged into the held stack", merged, absorbed)
+	}
+	if stack.TimeValue() != 1000 {
+		t.Fatalf("merging units restamped the held stack's entry time to %d, want it left at 1000", stack.TimeValue())
+	}
+	if first := c.Items()[0]; first != dagger {
+		t.Fatalf("Items()[0] = object %d, want the dagger %d: a merge must not move the stack to the front", first.ObjectID, dagger.ObjectID)
 	}
 }
