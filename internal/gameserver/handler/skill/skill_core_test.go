@@ -123,6 +123,18 @@ type damagePermissionFake struct {
 func (f *damagePermissionFake) CanGiveDamage() bool { return f.allow }
 func (*damagePermissionFake) Heading() int          { return 0 }
 
+// combatantOnlyCaster is a combatant that is not a formula caster: the shape
+// a new combatant kind has before it grows the formula surface.
+type combatantOnlyCaster struct {
+	world.Presence
+	fakeActor
+	allow bool
+}
+
+var _ attackable.Combatant = (*combatantOnlyCaster)(nil)
+
+func (f *combatantOnlyCaster) CanGiveDamage() bool { return f.allow }
+
 type positionedFakeActor struct {
 	neutralCreature
 	world.Presence
@@ -213,6 +225,9 @@ func TestApplyEffectsRejectsPerfectShieldBeforeTemplates(t *testing.T) {
 }
 
 func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T) {
+	if _, ok := effect.Actor(&combatantOnlyCaster{}).(creature.FormulaActor); ok {
+		t.Fatal("combatantOnlyCaster must not satisfy creature.FormulaActor")
+	}
 	landing := []modelskill.EffectTemplate{{Name: "Buff", Time: 60}}
 	tests := []struct {
 		name   string
@@ -261,6 +276,19 @@ func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T
 			name:   "buff when caster cannot give damage still lands",
 			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
 			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			want:   1,
+		},
+		{
+			name:   "offensive when a non-formula combatant cannot give damage",
+			caster: &combatantOnlyCaster{fakeActor: fakeActor{objectID: 1}, allow: false},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			def:    modelskill.Definition{Offensive: true},
+		},
+		{
+			name:   "offensive when a non-formula combatant may give damage",
+			caster: &combatantOnlyCaster{fakeActor: fakeActor{objectID: 1}, allow: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			def:    modelskill.Definition{Offensive: true},
 			want:   1,
 		},
 		{

@@ -22,12 +22,6 @@ var _ target.Actor = (*Character)(nil)
 // ShieldDefense/DecreaseFusion take their caster/effected parameter as.
 var _ attackable.Combatant = (*Character)(nil)
 
-// Character satisfies the live formula-caster surface. Every combatant kind
-// must keep satisfying it: the skill handler narrows a cast participant to
-// creature.FormulaActor and treats a failed narrowing as "no creature
-// source", which lifts the CanDealDamage gate instead of tightening it.
-var _ creature.FormulaActor = (*Character)(nil)
-
 // MaxBuffCount is the number of non-toggle, non-seven-signs buffs c can
 // hold at once: the configured base plus the known Divine Inspiration
 // skill level (0 when unknown).

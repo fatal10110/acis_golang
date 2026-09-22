@@ -653,12 +653,6 @@ func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attack
 // DecreaseFusion take their caster/effected parameter as.
 var _ attackable.Combatant = (*Actor)(nil)
 
-// Actor satisfies the live formula-caster surface. Every combatant kind must
-// keep satisfying it: the skill handler narrows a cast participant to
-// creature.FormulaActor and treats a failed narrowing as "no creature
-// source", which lifts the CanDealDamage gate instead of tightening it.
-var _ creature.FormulaActor = (*Actor)(nil)
-
 // SkillSuccessInput returns the effect-landing roll input for def cast against a.
 func (a *Actor) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return creature.ResolveSkillSuccessInput(caster, a, def, bss, shield)

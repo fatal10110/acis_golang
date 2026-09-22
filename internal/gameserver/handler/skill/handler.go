@@ -461,12 +461,11 @@ func cursed(a Actor) bool {
 // participant that is not a creature (a door or a signet effect point).
 // Formula inputs treat a nil caster as one that cannot roll.
 //
-// Nil is permissive, not restrictive: creature.CanDealDamage(nil) reports
-// true, because sourceless damage is legitimate. So a combatant that stopped
-// satisfying creature.FormulaActor would not be rejected here — it would be
-// read as "no creature source" and land offensive effects while flagged
-// unable to deal damage. The creature.FormulaActor guards in the player, npc
-// and summon packages keep that from compiling.
+// Do not read a damage permission through this narrowing: a combatant that
+// is not a formula caster also comes back nil, and creature.CanDealDamage(nil)
+// reports true because sourceless damage is legitimate. Such a gate would
+// lift for that combatant instead of consulting it. Narrow to
+// attackable.Combatant for permission checks instead.
 func formulaCasterOf(a Actor) creature.FormulaActor {
 	c, _ := a.(creature.FormulaActor)
 	return c
@@ -477,6 +476,5 @@ var (
 	_ NPC      = (*npc.Hostile)(nil)
 	_ Creature = (*player.Character)(nil)
 	_ Creature = (*npc.Hostile)(nil)
-	_ Creature = (*summon.Actor)(nil)
 	_ Summon   = (*summon.Actor)(nil)
 )
