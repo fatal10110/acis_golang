@@ -12,16 +12,44 @@ import (
 // contents newest-first, so this is the ordering key, not just bookkeeping.
 func nowMillis() int64 { return time.Now().UnixMilli() }
 
+// orderedItem is an instance paired with its ordering key, copied out once
+// so the comparison never re-reads live state.
+type orderedItem struct {
+	inst *item.Instance
+	time int64
+}
+
+func keyed(inst *item.Instance) orderedItem {
+	return orderedItem{inst: inst, time: inst.TimeValue()}
+}
+
 // byContainerOrder is the total order every container lists its contents in:
 // descending entry time, then descending object id. That puts the most
 // recently acquired item first, which is the order the client expects an
-// item list in. Callers hold the container lock, which is also what every
-// write of an item's time is taken under, so the key is stable across a sort.
-func byContainerOrder(a, b *item.Instance) int {
-	if d := cmpDesc(a.TimeValue(), b.TimeValue()); d != 0 {
+// item list in.
+func byContainerOrder(a, b orderedItem) int {
+	if d := cmpDesc(a.time, b.time); d != 0 {
 		return d
 	}
-	return cmpDesc(int64(a.ObjectID), int64(b.ObjectID))
+	return cmpDesc(int64(a.inst.ObjectID), int64(b.inst.ObjectID))
+}
+
+// sortContainerOrder puts items in byContainerOrder, reading each entry time
+// exactly once and sorting the copies. Comparing against live state instead
+// would make the sort depend on no writer touching Time until it finished:
+// slices.SortFunc does not fault on a key that moves mid-sort, it just
+// returns a wrong order, which leaves as a silently wrong ItemList. Copying
+// the key also keeps Items() to one instance RLock per item rather than one
+// per comparison, on a path FrameInventoryUpdate walks per item mutation.
+func sortContainerOrder(items []*item.Instance) {
+	order := make([]orderedItem, len(items))
+	for i, inst := range items {
+		order[i] = keyed(inst)
+	}
+	slices.SortFunc(order, byContainerOrder)
+	for i, o := range order {
+		items[i] = o.inst
+	}
 }
 
 func cmpDesc(a, b int64) int {
@@ -136,7 +164,7 @@ func (c *Container) itemsLocked() []*item.Instance {
 	for _, inst := range c.items {
 		out = append(out, inst)
 	}
-	slices.SortFunc(out, byContainerOrder)
+	sortContainerOrder(out)
 	return out
 }
 
@@ -149,8 +177,18 @@ func (c *Container) forEach(fn func(*item.Instance)) {
 }
 
 // HasItem reports whether the container holds any instance of templateID.
+// It answers from the first match rather than through ItemByTemplateID:
+// existence doesn't depend on which instance is found, and HasItems /
+// HasAnyItem / quest conditions call it per template id.
 func (c *Container) HasItem(templateID int32) bool {
-	return c.ItemByTemplateID(templateID) != nil
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, inst := range c.items {
+		if inst.TemplateID == templateID {
+			return true
+		}
+	}
+	return false
 }
 
 // HasItems reports whether the container holds at least one instance of
@@ -186,7 +224,7 @@ func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, byContainerOrder)
+	sortContainerOrder(out)
 	return out
 }
 
@@ -202,18 +240,19 @@ func (c *Container) ItemByTemplateID(templateID int32) *item.Instance {
 // byContainerOrder. "First" has to mean the same thing it does in Items(),
 // or destroying "the" instance of a template would pick an arbitrary one of
 // several — a different enchant level than the player watched disappear.
-// It scans instead of sorting: this is on HasItem/ItemCount/Adena.
+// It scans for the ordering-best candidate rather than sorting, so callers
+// that only want one instance don't pay for a slice and a sort.
 func (c *Container) itemByTemplateIDLocked(templateID int32) *item.Instance {
-	var best *item.Instance
+	var best orderedItem
 	for _, inst := range c.items {
 		if inst.TemplateID != templateID {
 			continue
 		}
-		if best == nil || byContainerOrder(inst, best) < 0 {
-			best = inst
+		if cand := keyed(inst); best.inst == nil || byContainerOrder(cand, best) < 0 {
+			best = cand
 		}
 	}
-	return best
+	return best.inst
 }
 
 // ItemByObjectID returns the instance identified by objectID, or nil if the

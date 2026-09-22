@@ -231,9 +231,13 @@ func (inst *Instance) TimeValue() int64 {
 }
 
 // SetTime stamps inst as having entered a container at ms (Unix
-// milliseconds). Containers call it as part of taking an item in, under
-// their own lock, so the ordering key can never change while a container
-// read is sorting on it.
+// milliseconds). Production code reaches this through EnterContainer; this
+// setter exists for callers that need to place an item in a container's
+// order without moving it, and for tests that pin that order.
+//
+// A container orders its contents by this value, but reads it into a copy
+// before comparing, so a write racing a container read reorders nothing
+// worse than it would have by arriving a moment later.
 func (inst *Instance) SetTime(ms int64) {
 	mu := inst.lock()
 	mu.Lock()

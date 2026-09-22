@@ -724,14 +724,27 @@ func newWeightedInventory(size int) *Inventory {
 	return inv
 }
 
-func TestFreight_VisibleItemsAllocatesOnlyResultSlice(t *testing.T) {
-	f := newFullFreight(64)
+// TestFreight_VisibleItemsAllocationsDoNotScaleWithSize guards what the
+// allocation budget is actually for: VisibleItems must not allocate per item.
+// It allocates twice — the result slice, and the ordering-key slice
+// sortContainerOrder copies entry times into so the comparison never reads
+// live state — and both are one allocation each however many items are held.
+// Comparing two sizes pins that, where a bare count would quietly admit a
+// per-item allocation the next time the budget is raised.
+func TestFreight_VisibleItemsAllocationsDoNotScaleWithSize(t *testing.T) {
+	measure := func(size int) float64 {
+		f := newFullFreight(size)
+		return testing.AllocsPerRun(100, func() {
+			_ = f.VisibleItems()
+		})
+	}
 
-	allocs := testing.AllocsPerRun(100, func() {
-		_ = f.VisibleItems()
-	})
-	if allocs > 1 {
-		t.Fatalf("VisibleItems() allocs/run = %.0f, want at most 1 result-slice allocation", allocs)
+	small, large := measure(8), measure(64)
+	if small != large {
+		t.Fatalf("VisibleItems() allocs/run = %.0f at 8 items, %.0f at 64; allocations must not scale with size", small, large)
+	}
+	if large > 2 {
+		t.Fatalf("VisibleItems() allocs/run = %.0f, want at most the result slice plus the ordering-key slice", large)
 	}
 }
 
@@ -1619,5 +1632,47 @@ func TestContainerAddStampsEntryTimeWithoutRestampingMergedStack(t *testing.T) {
 	}
 	if first := c.Items()[0]; first != dagger {
 		t.Fatalf("Items()[0] = object %d, want the dagger %d: a merge must not move the stack to the front", first.ObjectID, dagger.ObjectID)
+	}
+}
+
+// TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored pins which of two
+// duplicate stackable rows survives a restore: the one the row loop reaches
+// first, whatever its object id.
+//
+// The merge target is never ambiguous, which is why the unordered scan that
+// picks it is not a source of nondeterminism. A stackable template can only
+// ever have one stack in the container — the first row is inserted, and every
+// later duplicate collapses into it — so by the time a merge is resolved
+// there is exactly one candidate to find. The reference behaves the same way
+// for the same reason: its restore loop resolves the target through
+// getItemByItemId against the partially built set, which likewise holds a
+// single stack of that template.
+func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
+	for _, restoreOrder := range [][]int32{{801, 802}, {802, 801}} {
+		rows := make([]*item.Instance, 0, 2)
+		for _, objectID := range restoreOrder {
+			rows = append(rows, &item.Instance{
+				ObjectID:   objectID,
+				TemplateID: adenaTemplateID,
+				Count:      100,
+				Location:   item.LocationInventory,
+			})
+		}
+
+		inv := RestorePlayerInventory(1, testTemplates(), rows)
+
+		items := inv.Items()
+		if len(items) != 1 {
+			t.Fatalf("restore order %v: Items() = %d entries, want the two rows merged into one", restoreOrder, len(items))
+		}
+		if want := restoreOrder[0]; items[0].ObjectID != want {
+			t.Fatalf("restore order %v: surviving object id = %d, want the first row restored %d", restoreOrder, items[0].ObjectID, want)
+		}
+		if got := items[0].CountValue(); got != 200 {
+			t.Fatalf("restore order %v: merged count = %d, want 200", restoreOrder, got)
+		}
+		if got := inv.ItemByObjectID(restoreOrder[1]); got != nil {
+			t.Fatalf("restore order %v: merged-away instance %d still held", restoreOrder, restoreOrder[1])
+		}
 	}
 }

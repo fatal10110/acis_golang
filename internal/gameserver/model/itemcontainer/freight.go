@@ -1,8 +1,6 @@
 package itemcontainer
 
 import (
-	"slices"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -71,7 +69,7 @@ func (f *Freight) VisibleItems() []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, byContainerOrder)
+	sortContainerOrder(out)
 	return out
 }
 
