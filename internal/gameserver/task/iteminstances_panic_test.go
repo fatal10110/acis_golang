@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -88,7 +89,7 @@ func TestItemInstancesSaveSurvivesPanickingFlush(t *testing.T) {
 	})
 
 	templates := item.NewTable([]*item.Template{{ID: 10}})
-	instances := NewItemInstances(panickingItemFlusher{}, templates, worker, nil)
+	instances := NewItemInstances(panickingItemFlusher{}, templates, worker, nil, zerolog.Nop())
 	inst := &item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory}
 	instances.Add(inst)
 
@@ -130,7 +131,7 @@ func TestItemInstancesSaveSurvivesPanickingFlush(t *testing.T) {
 func TestItemInstancesSaveInlinePanicKeepsDispatchingOwners(t *testing.T) {
 	flusher := &poisonItemFlusher{poisonID: 1}
 	templates := item.NewTable([]*item.Template{{ID: 10}})
-	instances := NewItemInstances(flusher, templates, closedWorker(t), nil)
+	instances := NewItemInstances(flusher, templates, closedWorker(t), nil, zerolog.Nop())
 	// Lane keys are the owner ids and Save dispatches them sorted, so owner
 	// 100 panics while owner 200 is still undispatched behind it.
 	poisoned := &item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory}
@@ -179,7 +180,7 @@ func TestItemInstancesSaveInlinePanicKeepsDispatchingOwners(t *testing.T) {
 func TestItemInstancesShutdownDrainSurvivesPanickingFlush(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	templates := item.NewTable([]*item.Template{{ID: 10}})
-	instances := NewItemInstances(panickingItemFlusher{}, templates, worker, nil)
+	instances := NewItemInstances(panickingItemFlusher{}, templates, worker, nil, zerolog.Nop())
 	instances.Add(&item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -199,5 +200,90 @@ func TestItemInstancesShutdownDrainSurvivesPanickingFlush(t *testing.T) {
 	}()
 	if err := instances.Save(ctx); !errors.Is(err, errSaveJobPanic) {
 		t.Fatalf("post-Close Save() error = %v, want one wrapping errSaveJobPanic", err)
+	}
+}
+
+// failThenPanicFlusher fails the flush for failID and panics for panicID, so a
+// multi-owner round can be driven into the state where the panicking owner is
+// not the one that wins round.err.
+type failThenPanicFlusher struct {
+	failID  int32
+	panicID int32
+}
+
+var errFlushDown = errors.New("db is down")
+
+func (f failThenPanicFlusher) Flush(_ context.Context, batch item.FlushBatch) error {
+	for _, st := range batch.Saves {
+		if st.ObjectID == f.panicID {
+			panic("poison: flush blew up")
+		}
+	}
+	for _, st := range batch.Saves {
+		if st.ObjectID == f.failID {
+			return errFlushDown
+		}
+	}
+	return nil
+}
+
+// syncBuffer collects log output; a round's jobs can run on several lanes, so
+// the writer has to be safe for concurrent use even though this test's closed
+// worker keeps them on one goroutine.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf = append(b.buf, p...)
+	return len(p), nil
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return string(b.buf)
+}
+
+// TestItemInstancesSavePanicIsLoggedEvenWhenAnotherOwnerWinsTheError pins the
+// panic's one unconditional record. Recovering inside the job took the panic
+// away from the lane, whose own "persist: recovered panic in job" line fired
+// no matter what, and round.err is not a replacement for it: finishOwner keeps
+// only the round's first non-nil error, and a round holds one job per owner, so
+// any other owner's DB error claims that slot instead. (Save returning on
+// ctx.Done is the second way, and that branch never reads round.err at all.)
+// Without the log at the recover, a panicking flush would be completely silent.
+// #2403 asks for the panic to be a failed round *and* a log line.
+func TestItemInstancesSavePanicIsLoggedEvenWhenAnotherOwnerWinsTheError(t *testing.T) {
+	var logged syncBuffer
+	templates := item.NewTable([]*item.Template{{ID: 10}})
+	// A closed worker dispatches inline in sorted lane-key order, which fixes
+	// which owner reports first without depending on lane scheduling: owner
+	// 100 takes round.err with its DB error, owner 200 panics behind it.
+	instances := NewItemInstances(
+		failThenPanicFlusher{failID: 1, panicID: 2},
+		templates,
+		closedWorker(t),
+		nil,
+		zerolog.New(&logged),
+	)
+	instances.Add(&item.Instance{ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory})
+	instances.Add(&item.Instance{ObjectID: 2, TemplateID: 10, OwnerID: 200, Count: 5, Location: item.LocationInventory})
+
+	err := instances.Save(context.Background())
+
+	// Documents the limit rather than wishing it away: the caller's error is
+	// the round's first one, so it does not carry the panic.
+	if !errors.Is(err, errFlushDown) {
+		t.Fatalf("Save() error = %v, want the first owner's flush error", err)
+	}
+	if errors.Is(err, errSaveJobPanic) {
+		t.Fatalf("Save() error = %v; round.err is first-wins, so this test no longer covers the case it was written for", err)
+	}
+	if got := logged.String(); !strings.Contains(got, "poison: flush blew up") {
+		t.Fatalf("panic reason absent from the log; a panicking flush must never be silent.\nlog = %s", got)
 	}
 }

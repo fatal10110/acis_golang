@@ -64,7 +64,7 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 	if !ok {
 		t.Fatal("missing summon item fixture")
 	}
-	instances := task.NewItemInstances(nil, testItemTemplates(), nil, nil)
+	instances := task.NewItemInstances(nil, testItemTemplates(), nil, nil, zerolog.Nop())
 	link := &GameClientLink{
 		itemInstances: instances,
 		world:         state,

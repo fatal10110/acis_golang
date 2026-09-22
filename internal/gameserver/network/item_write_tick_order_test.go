@@ -111,7 +111,7 @@ func TestTickWriteCannotBeOvertakenByAnEarlierHandlerWrite(t *testing.T) {
 
 	const objectID int32 = 5300
 	flusher := &recordingFlusher{inner: gamesql.NewItemFlushStore(sqltest.SharedDB(t)), watch: objectID}
-	instances := task.NewItemInstances(flusher, link.itemTemplates, worker, order)
+	instances := task.NewItemInstances(flusher, link.itemTemplates, worker, order, zerolog.Nop())
 	link.itemInstances = instances
 	link.items = recordingItemStore{itemStore: link.items, log: flusher, watch: objectID}
 

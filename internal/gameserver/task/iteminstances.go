@@ -55,8 +55,9 @@ const (
 // errSaveJobPanic is the error a Save owner job reports when it panicked.
 // The job recovers its own panic (see Save), so without this the round would
 // close with a nil error and Save would report a flush that never happened as
-// a success. Wrapped with the recovered value, it is also what carries the
-// panic's reason out to the caller's log.
+// a success. It is wrapped with the recovered value, but the job logs that
+// value itself: round.err keeps only the round's first error, so a caller
+// cannot count on seeing this one.
 var errSaveJobPanic = errors.New("task: item save job panicked")
 
 // ItemFlusher atomically persists one flush batch: either every change in
@@ -69,6 +70,7 @@ type ItemFlusher interface {
 //
 // mu guards pending. Mutable item fields are guarded by item.Instance.
 type ItemInstances struct {
+	log       zerolog.Logger
 	flusher   ItemFlusher
 	templates *item.Table
 	worker    *persist.Worker
@@ -119,11 +121,19 @@ type saveRound struct {
 
 // NewItemInstances returns an empty item persistence task whose writes run
 // on worker's lanes. A nil worker writes on the calling goroutine.
-func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker, writes *persist.Order) *ItemInstances {
+//
+// log is taken here rather than in Start, the way Effects and PositionUpdates
+// take theirs, because those only ever read their logger on the ticker's one
+// goroutine. This one is read by whichever goroutine runs an owner job — a
+// persistence lane, or Save's own caller on the inline path — and Save runs
+// without Start on both the shutdown drain and in tests, so assigning it in
+// Start would be a write racing those reads.
+func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persist.Worker, writes *persist.Order, log zerolog.Logger) *ItemInstances {
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
 	return &ItemInstances{
+		log:       log,
 		flusher:   flusher,
 		templates: templates,
 		worker:    worker,
@@ -380,12 +390,23 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 			// ItemInstanceTaskManager.updateItems catches Exception around the
 			// whole batch and never throws out of the shutdown-triggered call.
 			//
-			// Recovering here instead of at the two call sites also keeps the
-			// panic's reason, which reaches the caller through round.err and
-			// so through the ticker's and the drain's own error logs.
+			// The reason is logged here rather than left to round.err, which
+			// is best-effort and cannot be relied on: finishOwner keeps only
+			// the first non-nil error of the round, and a round holds one job
+			// per owner — a whole tick's worth of players — so any other
+			// owner's DB error or DeadlineExceeded takes that slot first.
+			// Save can also return on ctx.Done before the round finishes, and
+			// that branch returns ctx.Err() without ever reading round.err.
+			// Recovering ahead of the lane took away its own unconditional
+			// "persist: recovered panic in job" line, so without this a
+			// panicking flush could be completely silent. #2403 asks for the
+			// panic to be a failed round *and* a log line, not one instead of
+			// the other.
 			defer func() {
 				if r := recover(); r != nil {
 					err = fmt.Errorf("%w: %v", errSaveJobPanic, r)
+					i.log.Error().Interface("panic", r).Int32("owner_id", owner).
+						Msg("task: recovered panic in item save job")
 				}
 			}()
 			failed, err = i.saveChunks(ctx, entries)

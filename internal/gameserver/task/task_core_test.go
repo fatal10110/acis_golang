@@ -1243,7 +1243,7 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 		{ID: 30, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{Type: item.EtcItemPetCollar}},
 	})
 	flusher := &itemFlusherStub{}
-	instances := NewItemInstances(flusher, templates, nil, nil)
+	instances := NewItemInstances(flusher, templates, nil, nil, zerolog.Nop())
 
 	kept := &item.Instance{
 		ObjectID: 1, TemplateID: 10, OwnerID: 100, Count: 5, Location: item.LocationInventory,
@@ -1301,7 +1301,7 @@ func TestItemInstancesSaveFlushesAndClearsPendingItems(t *testing.T) {
 func TestItemInstancesSaveDeletesVoidItemsWithoutDeletingAugmentation(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 10, Kind: item.KindWeapon, Weapon: &item.WeaponDetail{}}})
 	flusher := &itemFlusherStub{}
-	instances := NewItemInstances(flusher, templates, nil, nil)
+	instances := NewItemInstances(flusher, templates, nil, nil, zerolog.Nop())
 
 	instances.Add(&item.Instance{
 		ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationVoid,
@@ -1324,7 +1324,7 @@ func TestItemInstancesSaveDeletesVoidItemsWithoutDeletingAugmentation(t *testing
 func TestItemInstancesSaveKeepsConcurrentAddDuringFlush(t *testing.T) {
 	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
 	flusher := newBlockingItemFlusher(nil)
-	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil)
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil, zerolog.Nop())
 	instances.Add(inst)
 
 	done := make(chan error, 1)
@@ -1364,7 +1364,7 @@ func assertSaveKeepsPendingOnFlushResult(t *testing.T, flushErr error, waitForCt
 	t.Helper()
 	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
 	flusher := newBlockingItemFlusher(flushErr)
-	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil)
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil, zerolog.Nop())
 	instances.Add(inst)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1412,7 +1412,7 @@ func assertSaveKeepsPendingOnFlushResult(t *testing.T, flushErr error, waitForCt
 func TestItemInstancesSaveDoesNotResurrectRemovedItemsOnFlushError(t *testing.T) {
 	inst := &item.Instance{ObjectID: 1, TemplateID: 10, Count: 1, Location: item.LocationInventory}
 	flusher := newBlockingItemFlusher(errors.New("flush failed"))
-	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil)
+	instances := NewItemInstances(flusher, item.NewTable([]*item.Template{{ID: 10}}), nil, nil, zerolog.Nop())
 	instances.Add(inst)
 
 	done := make(chan error, 1)
@@ -1453,7 +1453,7 @@ func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 	}
 	shadowItems.Track(100, inst, tmpl)
 
-	instances := NewItemInstances(&itemFlusherStub{}, templates, nil, nil)
+	instances := NewItemInstances(&itemFlusherStub{}, templates, nil, nil, zerolog.Nop())
 
 	const iterations = 1000
 	var wg sync.WaitGroup

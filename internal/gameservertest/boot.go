@@ -989,7 +989,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	queues := startQueues(t, o.log)
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
-	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker, itemWrites)
+	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker, itemWrites, zerolog.Nop())
 	petStore := gamesql.NewPetStore(db)
 
 	// Mirror the production boot for the Seven Signs calendar: optional

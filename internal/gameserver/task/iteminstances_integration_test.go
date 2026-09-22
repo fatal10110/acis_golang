@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -28,7 +30,7 @@ func TestItemInstancesSaveChunksIndependently(t *testing.T) {
 	db := sqltest.NewDB(t)
 	flusher := gamesql.NewItemFlushStore(db)
 	templates := item.NewTable([]*item.Template{{ID: 10, Kind: item.KindWeapon, Weapon: &item.WeaponDetail{}}})
-	instances := task.NewItemInstances(flusher, templates, nil, nil)
+	instances := task.NewItemInstances(flusher, templates, nil, nil, zerolog.Nop())
 
 	const total = task.ItemInstanceSaveChunkSize + 50
 	items := make([]*item.Instance, 0, total)
