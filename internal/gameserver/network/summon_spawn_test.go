@@ -1,13 +1,19 @@
 package network
 
 import (
+	"context"
+	"slices"
 	"testing"
 
 	"github.com/rs/zerolog"
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 
@@ -160,4 +166,228 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 		t.Fatalf("owner frame count = %d, want 1 (only the unconditional Resisted entry forwards)", len(ownerGot))
 	}
 	assertSystemMessageStringSkillNameFrame(t, ownerGot[0], serverpackets.SystemMessageS1ResistedYourS2, "Orc", 1, 1)
+}
+
+// recordingAIRegistry records the AI-task registrations wireSummonAI makes.
+// onAdd, when set, runs inside Add, which is where the shared AI task first
+// becomes able to reach a summon and drive it all the way to despawn.
+type recordingAIRegistry struct {
+	onAdd   func()
+	added   []task.AIActor
+	removed []task.AIActor
+}
+
+func (r *recordingAIRegistry) Add(actor task.AIActor) {
+	r.added = append(r.added, actor)
+	if r.onAdd != nil {
+		r.onAdd()
+	}
+}
+
+func (r *recordingAIRegistry) Remove(actor task.AIActor) {
+	r.removed = append(r.removed, actor)
+}
+
+// newTestServitor builds an unspawned servitor. Callers place it with
+// SpawnBesideOwner themselves, so each test controls where the publish sits
+// relative to wireSummonAI.
+func newTestServitor(t *testing.T, owner *livePlayer) *summon.Actor {
+	t.Helper()
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
+		ObjectID:       300,
+		Owner:          owner,
+		NPCID:          1,
+		Name:           "Servitor",
+		OwnerInventory: owner.Inventory(),
+		Stats:          summon.CombatStats{MaxHP: 100, MaxMP: 100},
+	})
+	if err != nil {
+		t.Fatalf("NewServitor() error: %v", err)
+	}
+	return servitor
+}
+
+// TestWireSummonAIRemovesAIRunnerOnDespawn pins issue #2396's acceptance
+// criterion on the production wiring order: both callers run wireSummonAI
+// first and SpawnBesideOwner second (summon_spawn.go:382-386, :468-469), so
+// this does the same. The AI-task registration is handed back exactly once
+// when the summon later despawns, and a repeated Despawned does not release
+// it twice.
+func TestWireSummonAIRemovesAIRunnerOnDespawn(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+
+	registry := &recordingAIRegistry{}
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+
+	if len(registry.added) != 1 {
+		t.Fatalf("AI registrations = %d, want 1", len(registry.added))
+	}
+	servitor.Unsummon()
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after despawn = %d, want 1", len(registry.removed))
+	}
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after despawn")
+	}
+	// Despawned can reach the sink more than once; cleanup still runs once.
+	servitor.Unsummon()
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after second despawn = %d, want 1", len(registry.removed))
+	}
+}
+
+// TestWireSummonAIDespawnDuringRegistrationIsUnreachableInProduction records
+// why the guard in the test below is defensive rather than a live hazard.
+// Production wires before it publishes, and SpawnBesideOwner is the only
+// writer of actor.world (live_helpers.go:59-68), so for the whole of
+// wireSummonAI the summon has no world: Unsummon takes despawn(nil) ->
+// state == nil -> return (live_lifecycle.go:163-168) and never reaches the
+// Despawned arm. The shared AI task, which l.ai.Add does publish early, only
+// posts Tick/TickThink onto the actor's queue (task/ai.go:78-105) and never
+// despawns, and regionActivity skips an unplaced actor anyway. If a later
+// change moves SpawnBesideOwner above wireSummonAI, this test starts failing
+// and the window below becomes real.
+func TestWireSummonAIDespawnDuringRegistrationIsUnreachableInProduction(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+
+	registry := &recordingAIRegistry{}
+	registry.onAdd = func() { servitor.Unsummon() }
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+
+	if len(registry.removed) != 0 {
+		t.Fatalf("AI removals during wiring = %d, want 0 (unspawned summon cannot despawn)", len(registry.removed))
+	}
+	// The registration is still live, so the real despawn after the publish
+	// must hand it back.
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+	servitor.Unsummon()
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after despawn = %d, want 1", len(registry.removed))
+	}
+}
+
+// TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration pins the
+// guard issue #2396 asked for, on a fixture that deliberately publishes
+// before wiring so the reentrant despawn actually reaches the Despawned arm.
+// That ordering is the inverse of production (see the test above), so this is
+// a defensive test, not proof of a reachable live window: it pins that a
+// cleanup registered after the summon has already despawned still runs,
+// which is what keeps the AI task from ticking a dead actor if any future
+// caller publishes earlier.
+func TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+
+	registry := &recordingAIRegistry{}
+	registry.onAdd = func() { servitor.Unsummon() }
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals when despawn reenters registration = %d, want 1", len(registry.removed))
+	}
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after despawn")
+	}
+}
+
+// TestSummonSinkRunDespawnIsolatesAPanickingCleanup pins that one failing
+// cleanup cannot strand the ones registered after it. runDespawn marks the
+// sink despawned and empties the list before running anything, so a panic
+// escaping the loop would drop the rest permanently: a later
+// event.Despawned returns at the despawned guard, and the queue worker
+// recovers and keeps going, so nothing would surface the loss. With
+// wireSummonAI's registration order that lost cleanup is l.ai.Remove --
+// exactly the leak this type exists to prevent.
+func TestSummonSinkRunDespawnIsolatesAPanickingCleanup(t *testing.T) {
+	sink := &summonSink{link: &GameClientLink{log: zerolog.Nop()}}
+
+	var ran []string
+	sink.onDespawn(func() { ran = append(ran, "first"); panic("cleanup exploded") })
+	sink.onDespawn(func() { ran = append(ran, "second") })
+
+	sink.Emit(event.Despawned{})
+
+	if want := []string{"first", "second"}; !slices.Equal(ran, want) {
+		t.Fatalf("cleanups run = %v, want %v", ran, want)
+	}
+	// The sink is still despawned, so a cleanup registered afterwards runs
+	// immediately rather than waiting for an event that cannot come again.
+	late := false
+	sink.onDespawn(func() { late = true })
+	if !late {
+		t.Fatal("cleanup registered after a panicking despawn did not run")
+	}
+}
+
+// TestWireSummonAIRemovesAIRunnerWithOwnerQueue runs the wiring production
+// actually uses. The other tests leave the fixture player without a queue,
+// so wireSummonAI takes its nil-queue branches and StartOffensiveFollowTicker
+// returns scheduler.Start(...).Stop instead of the q.Every(...) queue timer
+// (ai/summon.go:175-180). Production always has a queue
+// (character_flow.go:618), which makes the registered cleanup
+// (*sim.Ticker).Stop -- a call that takes the owner's q.mu. Despawn is driven
+// from a goroutine that is not the owner's, mirroring Unsummon reached from
+// another player's queue (handler/skill/signet.go:317,
+// handler/skill/disablers.go:141), so -race covers that cross-queue cleanup
+// instead of leaving it to review-by-reading.
+func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
+	pool := sim.NewPool(2, zerolog.Nop())
+	pool.Start(context.Background())
+	t.Cleanup(func() {
+		if err := pool.Stop(context.Background()); err != nil {
+			t.Errorf("pool.Stop() error: %v", err)
+		}
+	})
+
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	owner.Character.Live.SetQueue(pool.NewQueue("player-100"))
+	if owner.Queue() == nil {
+		t.Fatal("fixture owner has no queue; the queue branch is not under test")
+	}
+
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+
+	registry := &recordingAIRegistry{}
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+
+	if len(registry.added) != 1 {
+		t.Fatalf("AI registrations = %d, want 1", len(registry.added))
+	}
+	// wireSummonAI only calls actor.SetQueue on its non-nil-queue branch
+	// (summon_spawn.go:490-492), so this proves the test took the wiring
+	// production takes rather than the nil-queue fallback.
+	if servitor.Queue() == nil {
+		t.Fatal("wireSummonAI took its nil-queue branch; the queue wiring is not under test")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		servitor.Unsummon()
+	}()
+	<-done
+
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after cross-goroutine despawn = %d, want 1", len(registry.removed))
+	}
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after despawn")
+	}
 }

@@ -594,15 +594,20 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	brain.SetCastController(aiController)
 	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
-	stopFollow := brain.StartOffensiveFollowTicker(queue, l.log)
-	sink.despawn = stopFollow
+	// Each cleanup is registered directly after the thing it releases
+	// starts, never before and never batched into a single field written
+	// after both. Both starts publish this summon to another goroutine --
+	// the follow ticker, and the shared AI task -- and either can drive it
+	// to Despawned before this function returns. Registering afterwards
+	// means the losing side still releases its resource through
+	// onDespawn's already-despawned path, so a summon that leaves the
+	// world inside this window cannot leave the AI task ticking a dead
+	// actor.
+	sink.onDespawn(brain.StartOffensiveFollowTicker(queue, l.log))
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)
-		sink.despawn = func() {
-			l.ai.Remove(runner)
-			stopFollow()
-		}
+		sink.onDespawn(func() { l.ai.Remove(runner) })
 	}
 	return aiController
 }

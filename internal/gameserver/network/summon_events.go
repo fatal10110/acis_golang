@@ -1,6 +1,8 @@
 package network
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -19,9 +21,80 @@ type summonSink struct {
 	// attack and arrival events re-evaluate; move is nil without geodata.
 	brain *ai.Summon
 	move  *move.Controller
-	// despawn is the runtime cleanup that runs exactly when the summon
-	// leaves the world.
-	despawn func()
+	// cleanupMu guards cleanup and despawned. Registration runs on the
+	// spawning goroutine while the AI task and the offensive-follow ticker
+	// can already reach this sink and drive it to Despawned, so the two
+	// sides must not race: onDespawn runs fn immediately when the summon
+	// has already left the world, which is what keeps a registration that
+	// lost that race from leaking.
+	cleanupMu sync.Mutex
+	cleanup   []func()
+	despawned bool
+}
+
+// onDespawn registers fn as runtime cleanup that runs exactly once when the
+// summon leaves the world, or immediately when it already has. Register a
+// cleanup only after the resource it releases exists, so that the immediate
+// path cannot run before the thing it undoes.
+func (s *summonSink) onDespawn(fn func()) {
+	if fn == nil {
+		return
+	}
+	s.cleanupMu.Lock()
+	if s.despawned {
+		s.cleanupMu.Unlock()
+		fn()
+		return
+	}
+	s.cleanup = append(s.cleanup, fn)
+	s.cleanupMu.Unlock()
+}
+
+// runDespawn releases every registered cleanup, in registration order, and
+// marks the summon despawned so later registrations release themselves.
+//
+// Each cleanup runs under its own recover. The sink is already marked
+// despawned by the time any of them runs, so a panic escaping one would
+// strand every cleanup after it with no way to ask again: a later
+// event.Despawned returns at the guard above, and only newly registered
+// cleanups would still fire. The queue worker recovers and keeps going
+// (sim/pool.go), so that would surface as nothing at all -- the AI-task
+// registration this type exists to hand back would simply never come back.
+// Isolating each one keeps a failing cleanup from taking the rest with it,
+// and logs the failure rather than dropping it silently.
+func (s *summonSink) runDespawn() {
+	s.cleanupMu.Lock()
+	if s.despawned {
+		s.cleanupMu.Unlock()
+		return
+	}
+	s.despawned = true
+	pending := s.cleanup
+	s.cleanup = nil
+	s.cleanupMu.Unlock()
+	for _, fn := range pending {
+		s.runCleanup(fn)
+	}
+}
+
+// runCleanup runs one cleanup, recovering and logging a panic so the
+// cleanups after it still run.
+func (s *summonSink) runCleanup(fn func()) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		if s.link == nil {
+			return
+		}
+		event := s.link.log.Error().Interface("panic", r)
+		if s.actor != nil {
+			event = event.Int32("summon_id", s.actor.ObjectID())
+		}
+		event.Msg("summon: recovered panic in despawn cleanup")
+	}()
+	fn()
 }
 
 // Emit maps ev to its packets. Each arm keeps the send order its packets
@@ -77,9 +150,7 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
 	case event.Despawned:
-		if s.despawn != nil {
-			s.despawn()
-		}
+		s.runDespawn()
 	}
 }
 
