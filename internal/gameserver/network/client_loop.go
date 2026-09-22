@@ -959,14 +959,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// the saves detach queued stays on this goroutine.
 			var owners []int32
 			refused := false
-			onLive(live, func() {
+			// This is the one dispatch site that clears live, so a panic
+			// here must be acted on before that happens: past `live = nil`
+			// the guard at the top of the loop can never fire again, the
+			// session would stay open with a half-detached character still
+			// registered in the world, and Handle's deferred detach would
+			// be skipped too. Leaving live in place and taking the guard
+			// instead ends the session and finishes the teardown the
+			// panicking task abandoned.
+			if !onLive(live, func() {
 				if block := l.exitBlockReason(live); block != exitAllowed {
 					l.refuseExit(session, live, block, true)
 					refused = true
 					return
 				}
 				owners = l.detachLivePlayer(live)
-			})
+			}) {
+				continue
+			}
 			if refused {
 				continue
 			}

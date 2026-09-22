@@ -187,11 +187,12 @@ func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
 // stopping), fn runs on the calling goroutine. A task must never call it for
 // its own queue: it would wait on itself.
 //
-// It reports whether fn returned normally. False means fn panicked and the
-// pool's per-task recovery swallowed it, so whatever fn had mutated before
-// the panic is half-applied and the caller must not carry on as if the work
-// had succeeded. Running fn on the calling goroutine reports true: there the
-// panic keeps unwinding, to the connection handler's own recover.
+// It reports whether fn returned normally. False means fn panicked or called
+// runtime.Goexit and the pool's per-task recovery contained it, so whatever
+// fn had mutated before it stopped is half-applied and the caller must not
+// carry on as if the work had succeeded. Running fn on the calling goroutine
+// reports true: there the panic keeps unwinding, to the connection handler's
+// own recover.
 func onQueue(q *sim.Queue, fn func()) (ok bool) {
 	if q == nil {
 		fn()
@@ -226,8 +227,9 @@ func postLive(live *livePlayer, fn func()) bool {
 
 // onLive runs fn on live's queue, or on the calling goroutine when live is
 // nil; see onQueue. It reports whether fn returned normally and records a
-// panic on live, so the dispatch loop drops the session even at the call
-// sites that ignore the result.
+// failure on live, so the dispatch loop drops the session even at the call
+// sites that ignore the result. The one site that clears live must consult
+// the result instead: see OpcodeRequestRestart.
 func onLive(live *livePlayer, fn func()) bool {
 	if live == nil {
 		fn()

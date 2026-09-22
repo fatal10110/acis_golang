@@ -72,6 +72,7 @@ type options struct {
 	restarts               *restart.Table
 	zones                  *zone.Index
 	attackStance           *task.AttackStance
+	attackStanceTracker    AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
@@ -154,6 +155,23 @@ func WithZones(index *zone.Index) Option {
 // (default: nil, so stance is neither tracked nor consulted).
 func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
+}
+
+// AttackStanceTracker is the combat-stance seam the game link consults,
+// including from the exit guard that runs inside the task a restart or
+// logout request posts to the player's queue. Boot wires the production
+// tracker unless a suite substitutes one.
+type AttackStanceTracker interface {
+	Add(task.AttackStanceActor)
+	Remove(task.AttackStanceActor) bool
+	InAttackStance(task.AttackStanceActor) bool
+}
+
+// WithAttackStanceTracker substitutes the tracker the link consults, so a
+// suite can drive a failure from inside a queued handler. It replaces only
+// the link's collaborator; Server.AttackStance stays the production one.
+func WithAttackStanceTracker(tracker AttackStanceTracker) Option {
+	return func(o *options) { o.attackStanceTracker = tracker }
 }
 
 // WithAttackStanceClock builds the production combat-stance timeout
@@ -1100,7 +1118,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("attack stance: %v", err)
 		}
 	}
-	if attackStance != nil {
+	if o.attackStanceTracker != nil {
+		gclConfig.AttackStance = o.attackStanceTracker
+	} else if attackStance != nil {
 		gclConfig.AttackStance = attackStance
 	}
 	if ai != nil {
