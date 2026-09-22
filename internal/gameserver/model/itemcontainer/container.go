@@ -1,12 +1,67 @@
 package itemcontainer
 
 import (
-	"cmp"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
+
+// nowMillis stamps an item as it enters a container. Containers order their
+// contents newest-first, so this is the ordering key, not just bookkeeping.
+func nowMillis() int64 { return time.Now().UnixMilli() }
+
+// orderedItem is an instance paired with its ordering key, copied out once
+// so the comparison never re-reads live state.
+type orderedItem struct {
+	inst *item.Instance
+	time int64
+}
+
+func keyed(inst *item.Instance) orderedItem {
+	return orderedItem{inst: inst, time: inst.TimeValue()}
+}
+
+// byContainerOrder is the total order every container lists its contents in:
+// descending entry time, then descending object id. That puts the most
+// recently acquired item first, which is the order the client expects an
+// item list in.
+func byContainerOrder(a, b orderedItem) int {
+	if d := cmpDesc(a.time, b.time); d != 0 {
+		return d
+	}
+	return cmpDesc(int64(a.inst.ObjectID), int64(b.inst.ObjectID))
+}
+
+// sortContainerOrder puts items in byContainerOrder, reading each entry time
+// exactly once and sorting the copies. Comparing against live state instead
+// would make the sort depend on no writer touching Time until it finished:
+// slices.SortFunc does not fault on a key that moves mid-sort, it just
+// returns a wrong order, which leaves as a silently wrong ItemList. Copying
+// the key also keeps Items() to one instance RLock per item rather than one
+// per comparison, on a path FrameInventoryUpdate walks per item mutation.
+func sortContainerOrder(items []*item.Instance) {
+	order := make([]orderedItem, len(items))
+	for i, inst := range items {
+		order[i] = keyed(inst)
+	}
+	slices.SortFunc(order, byContainerOrder)
+	for i, o := range order {
+		items[i] = o.inst
+	}
+}
+
+func cmpDesc(a, b int64) int {
+	switch {
+	case a > b:
+		return -1
+	case a < b:
+		return 1
+	default:
+		return 0
+	}
+}
 
 // Container is one owned collection of item instances sitting at a single
 // item.Location: a private warehouse, a clan warehouse, or freight. An
@@ -94,14 +149,29 @@ func (c *Container) Size() int {
 	return len(c.items)
 }
 
-// Items returns every item instance the container holds, ordered by object
-// id for determinism (the Java reference orders by most-recently-touched;
-// nothing in this package's scope depends on that order, so object id is
-// used instead as a simpler, stable substitute).
+// Items returns every item instance the container holds in
+// byContainerOrder: newest entry first, object id descending within a tie.
+// Packets built straight from this slice (ItemList, TradeStart,
+// PackageSendableList) inherit that order, which is the whole point of it.
 func (c *Container) Items() []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.itemsLocked()
+}
+
+// ItemsUnordered returns the container's contents in no particular order,
+// for callers that index them rather than list them. InventoryUpdate builds
+// a lookup map from the result and never reads the sequence, so paying for
+// byContainerOrder there would sort a slice purely to iterate it once — on a
+// path that runs per item mutation.
+func (c *Container) ItemsUnordered() []*item.Instance {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]*item.Instance, 0, len(c.items))
+	for _, inst := range c.items {
+		out = append(out, inst)
+	}
+	return out
 }
 
 func (c *Container) itemsLocked() []*item.Instance {
@@ -109,7 +179,7 @@ func (c *Container) itemsLocked() []*item.Instance {
 	for _, inst := range c.items {
 		out = append(out, inst)
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	sortContainerOrder(out)
 	return out
 }
 
@@ -122,8 +192,18 @@ func (c *Container) forEach(fn func(*item.Instance)) {
 }
 
 // HasItem reports whether the container holds any instance of templateID.
+// It answers from the first match rather than through ItemByTemplateID:
+// existence doesn't depend on which instance is found, and HasItems /
+// HasAnyItem / quest conditions call it per template id.
 func (c *Container) HasItem(templateID int32) bool {
-	return c.ItemByTemplateID(templateID) != nil
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for _, inst := range c.items {
+		if inst.TemplateID == templateID {
+			return true
+		}
+	}
+	return false
 }
 
 // HasItems reports whether the container holds at least one instance of
@@ -149,7 +229,7 @@ func (c *Container) HasAnyItem(templateIDs ...int32) bool {
 }
 
 // ItemsByTemplateID returns every instance of templateID the container
-// holds, ordered by object id.
+// holds, in byContainerOrder.
 func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -159,7 +239,7 @@ func (c *Container) ItemsByTemplateID(templateID int32) []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	sortContainerOrder(out)
 	return out
 }
 
@@ -171,13 +251,23 @@ func (c *Container) ItemByTemplateID(templateID int32) *item.Instance {
 	return c.itemByTemplateIDLocked(templateID)
 }
 
+// itemByTemplateIDLocked returns the first matching instance in
+// byContainerOrder. "First" has to mean the same thing it does in Items(),
+// or destroying "the" instance of a template would pick an arbitrary one of
+// several — a different enchant level than the player watched disappear.
+// It scans for the ordering-best candidate rather than sorting, so callers
+// that only want one instance don't pay for a slice and a sort.
 func (c *Container) itemByTemplateIDLocked(templateID int32) *item.Instance {
+	var best orderedItem
 	for _, inst := range c.items {
-		if inst.TemplateID == templateID {
-			return inst
+		if inst.TemplateID != templateID {
+			continue
+		}
+		if cand := keyed(inst); best.inst == nil || byContainerOrder(cand, best) < 0 {
+			best = cand
 		}
 	}
-	return nil
+	return best.inst
 }
 
 // ItemByObjectID returns the instance identified by objectID, or nil if the
@@ -257,7 +347,7 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 	// the one the item already carries in place: moving between containers
 	// never unregisters an item.
 	inst.BindPersister(c.persist)
-	inst.SetOwnerLocation(c.ownerID, c.location, 0)
+	inst.EnterContainer(c.ownerID, c.location, 0, nowMillis())
 	c.items[inst.ObjectID] = inst
 	return inst, false
 }

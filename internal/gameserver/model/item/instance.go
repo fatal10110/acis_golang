@@ -220,6 +220,36 @@ func (inst *Instance) persisted() {
 	}
 }
 
+// TimeValue returns the instant inst last entered an item container,
+// in Unix milliseconds. It is the primary key containers order their
+// contents by, newest first.
+func (inst *Instance) TimeValue() int64 {
+	mu := inst.lock()
+	mu.RLock()
+	defer mu.RUnlock()
+	return inst.Time
+}
+
+// SetTime stamps inst as having entered a container at ms (Unix
+// milliseconds). Production code reaches this through EnterContainer; this
+// setter exists for callers that need to place an item in a container's
+// order without moving it, and for tests that pin that order.
+//
+// A container orders its contents by this value, but reads it into a copy
+// before comparing, so a write racing a container read reorders nothing
+// worse than it would have by arriving a moment later.
+func (inst *Instance) SetTime(ms int64) {
+	mu := inst.lock()
+	mu.Lock()
+	changed := inst.Time != ms
+	inst.Time = ms
+	mu.Unlock()
+
+	if changed {
+		inst.persisted()
+	}
+}
+
 // CountValue returns inst's current count.
 func (inst *Instance) CountValue() int {
 	mu := inst.lock()
@@ -306,6 +336,24 @@ func (inst *Instance) SetOwnerLocation(ownerID int32, loc Location, locData int)
 	inst.OwnerID = ownerID
 	inst.Location = loc
 	inst.LocationData = locData
+	mu.Unlock()
+
+	if changed {
+		inst.persisted()
+	}
+}
+
+// EnterContainer records inst as taken in by a container: its new owner,
+// location and entry time in one step, so the single write the move
+// schedules already carries all of them.
+func (inst *Instance) EnterContainer(ownerID int32, loc Location, locData int, ms int64) {
+	mu := inst.lock()
+	mu.Lock()
+	changed := inst.OwnerID != ownerID || inst.Location != loc || inst.LocationData != locData || inst.Time != ms
+	inst.OwnerID = ownerID
+	inst.Location = loc
+	inst.LocationData = locData
+	inst.Time = ms
 	mu.Unlock()
 
 	if changed {

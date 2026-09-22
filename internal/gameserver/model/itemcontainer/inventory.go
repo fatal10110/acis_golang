@@ -181,6 +181,12 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 	inv.totalWeight = 0
 	inv.updates = nil
 
+	// Every restored row enters the inventory at the same instant, so the
+	// stored time never outlives the session that wrote it and the whole
+	// restored set ties on it — leaving object id, descending, to order the
+	// list the player sees on login.
+	restoredAt := nowMillis()
+
 	for _, inst := range items {
 		if inst == nil {
 			continue
@@ -196,7 +202,7 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		// bound only once every row is in place, so neither the owner
 		// fix-up, nor a stack merge, nor an equip displacement schedules
 		// a redundant write of what was just read.
-		inst.SetOwnerLocation(inv.OwnerID(), st.Location, st.LocationData)
+		inst.EnterContainer(inv.OwnerID(), st.Location, st.LocationData, restoredAt)
 		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
