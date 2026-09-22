@@ -1,14 +1,18 @@
 package network
 
 import (
+	"context"
+	"slices"
 	"testing"
 
 	"github.com/rs/zerolog"
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -293,6 +297,95 @@ func TestWireSummonAIRemovesAIRunnerWhenDespawnReentersRegistration(t *testing.T
 
 	if len(registry.removed) != 1 {
 		t.Fatalf("AI removals when despawn reenters registration = %d, want 1", len(registry.removed))
+	}
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after despawn")
+	}
+}
+
+// TestSummonSinkRunDespawnIsolatesAPanickingCleanup pins that one failing
+// cleanup cannot strand the ones registered after it. runDespawn marks the
+// sink despawned and empties the list before running anything, so a panic
+// escaping the loop would drop the rest permanently: a later
+// event.Despawned returns at the despawned guard, and the queue worker
+// recovers and keeps going, so nothing would surface the loss. With
+// wireSummonAI's registration order that lost cleanup is l.ai.Remove --
+// exactly the leak this type exists to prevent.
+func TestSummonSinkRunDespawnIsolatesAPanickingCleanup(t *testing.T) {
+	sink := &summonSink{link: &GameClientLink{log: zerolog.Nop()}}
+
+	var ran []string
+	sink.onDespawn(func() { ran = append(ran, "first"); panic("cleanup exploded") })
+	sink.onDespawn(func() { ran = append(ran, "second") })
+
+	sink.Emit(event.Despawned{})
+
+	if want := []string{"first", "second"}; !slices.Equal(ran, want) {
+		t.Fatalf("cleanups run = %v, want %v", ran, want)
+	}
+	// The sink is still despawned, so a cleanup registered afterwards runs
+	// immediately rather than waiting for an event that cannot come again.
+	late := false
+	sink.onDespawn(func() { late = true })
+	if !late {
+		t.Fatal("cleanup registered after a panicking despawn did not run")
+	}
+}
+
+// TestWireSummonAIRemovesAIRunnerWithOwnerQueue runs the wiring production
+// actually uses. The other tests leave the fixture player without a queue,
+// so wireSummonAI takes its nil-queue branches and StartOffensiveFollowTicker
+// returns scheduler.Start(...).Stop instead of the q.Every(...) queue timer
+// (ai/summon.go:175-180). Production always has a queue
+// (character_flow.go:618), which makes the registered cleanup
+// (*sim.Ticker).Stop -- a call that takes the owner's q.mu. Despawn is driven
+// from a goroutine that is not the owner's, mirroring Unsummon reached from
+// another player's queue (handler/skill/signet.go:317,
+// handler/skill/disablers.go:141), so -race covers that cross-queue cleanup
+// instead of leaving it to review-by-reading.
+func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
+	pool := sim.NewPool(2, zerolog.Nop())
+	pool.Start(context.Background())
+	t.Cleanup(func() {
+		if err := pool.Stop(context.Background()); err != nil {
+			t.Errorf("pool.Stop() error: %v", err)
+		}
+	})
+
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	owner.Character.Live.SetQueue(pool.NewQueue("player-100"))
+	if owner.Queue() == nil {
+		t.Fatal("fixture owner has no queue; the queue branch is not under test")
+	}
+
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+
+	registry := &recordingAIRegistry{}
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+
+	if len(registry.added) != 1 {
+		t.Fatalf("AI registrations = %d, want 1", len(registry.added))
+	}
+	// wireSummonAI only calls actor.SetQueue on its non-nil-queue branch
+	// (summon_spawn.go:490-492), so this proves the test took the wiring
+	// production takes rather than the nil-queue fallback.
+	if servitor.Queue() == nil {
+		t.Fatal("wireSummonAI took its nil-queue branch; the queue wiring is not under test")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		servitor.Unsummon()
+	}()
+	<-done
+
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after cross-goroutine despawn = %d, want 1", len(registry.removed))
 	}
 	if _, ok := state.Summon(owner.ObjectID()); ok {
 		t.Fatal("summon still active in world after despawn")

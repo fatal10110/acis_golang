@@ -52,6 +52,16 @@ func (s *summonSink) onDespawn(fn func()) {
 
 // runDespawn releases every registered cleanup, in registration order, and
 // marks the summon despawned so later registrations release themselves.
+//
+// Each cleanup runs under its own recover. The sink is already marked
+// despawned by the time any of them runs, so a panic escaping one would
+// strand every cleanup after it with no way to ask again: a later
+// event.Despawned returns at the guard above, and only newly registered
+// cleanups would still fire. The queue worker recovers and keeps going
+// (sim/pool.go), so that would surface as nothing at all -- the AI-task
+// registration this type exists to hand back would simply never come back.
+// Isolating each one keeps a failing cleanup from taking the rest with it,
+// and logs the failure rather than dropping it silently.
 func (s *summonSink) runDespawn() {
 	s.cleanupMu.Lock()
 	if s.despawned {
@@ -63,8 +73,28 @@ func (s *summonSink) runDespawn() {
 	s.cleanup = nil
 	s.cleanupMu.Unlock()
 	for _, fn := range pending {
-		fn()
+		s.runCleanup(fn)
 	}
+}
+
+// runCleanup runs one cleanup, recovering and logging a panic so the
+// cleanups after it still run.
+func (s *summonSink) runCleanup(fn func()) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		if s.link == nil {
+			return
+		}
+		event := s.link.log.Error().Interface("panic", r)
+		if s.actor != nil {
+			event = event.Int32("summon_id", s.actor.ObjectID())
+		}
+		event.Msg("summon: recovered panic in despawn cleanup")
+	}()
+	fn()
 }
 
 // Emit maps ev to its packets. Each arm keeps the send order its packets
