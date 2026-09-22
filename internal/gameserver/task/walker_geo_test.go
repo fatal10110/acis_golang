@@ -112,7 +112,7 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ctl.Stop() })
+	t.Cleanup(ctl.Stop)
 	actor := &controllerWalker{self: self, ctl: ctl}
 
 	routes := route.WalkerRoutes{

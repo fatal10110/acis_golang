@@ -485,7 +485,7 @@ func (h *Hostile) AddAttackDesireHold(attacker attackable.Combatant, hate float6
 // desire, and aborts movement.
 func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 	h.brain.StopAggroHate(target)
-	_ = h.move.Stop()
+	h.move.Stop()
 }
 
 // AddCombatDamageHate records attacker's combat damage against this NPC,

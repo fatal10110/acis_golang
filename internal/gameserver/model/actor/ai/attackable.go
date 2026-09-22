@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -68,7 +67,7 @@ type MoveController interface {
 	MoveToLocation(location.Location) (bool, error)
 	// CanMoveTo reports whether a path to the destination exists.
 	CanMoveTo(location.Location) bool
-	Stop() error
+	Stop()
 }
 
 // AttackController controls attack requests emitted by the AI loop.
@@ -76,7 +75,7 @@ type AttackController interface {
 	BowCoolingDown() bool
 	AttackingNow() bool
 	CanAttack(attackable.Combatant) bool
-	DoAttack(attackable.Combatant) error
+	DoAttack(attackable.Combatant)
 	// Stop aborts an in-flight attack, including a pending hit task.
 	Stop()
 }
@@ -390,7 +389,7 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 }
 
 func (a *Attackable) thinkIdle() {
-	_ = a.move.Stop()
+	a.move.Stop()
 	a.attack.Stop()
 	if a.cast != nil {
 		a.cast.Stop()
@@ -853,9 +852,9 @@ func (a *Attackable) thinkAttack() (bool, error) {
 		return false, nil
 	}
 
-	stopErr := a.move.Stop()
-	attackErr := a.attack.DoAttack(target)
-	return false, errors.Join(stopErr, attackErr)
+	a.move.Stop()
+	a.attack.DoAttack(target)
+	return false, nil
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
@@ -887,9 +886,8 @@ func (a *Attackable) thinkCast() (bool, error) {
 		return false, err
 	}
 
-	var stopErr error
 	if a.cast.StopsMovement(ref) {
-		stopErr = a.move.Stop()
+		a.move.Stop()
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.SetHeadingTo(target)
 		}
@@ -899,11 +897,11 @@ func (a *Attackable) thinkCast() (bool, error) {
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.BroadcastMoveToPawn(target)
 		}
-		return false, stopErr
+		return false, nil
 	}
 
 	a.cast.Cast(target, ref)
-	return false, stopErr
+	return false, nil
 }
 
 func (a *Attackable) thinkMoveTo() {

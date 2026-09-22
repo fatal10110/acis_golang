@@ -94,7 +94,7 @@ type moveOwner interface {
 	// next queued waypoint, with the newly active segment. It does not run
 	// for the first segment (MoveToLocation already returns it) or for the
 	// final segment's completion (arrived does).
-	segmentAdvanced(event.Move) error
+	segmentAdvanced(event.Move)
 }
 
 type scheduledTimer interface {
@@ -442,12 +442,7 @@ func (m *CreatureMove) finishLocked() func() {
 		if owner == nil {
 			return nil
 		}
-		log := m.log
-		return func() {
-			if err := owner.segmentAdvanced(ev); err != nil {
-				log.Warn().Err(err).Msg("move: segment-advance broadcast")
-			}
-		}
+		return func() { owner.segmentAdvanced(ev) }
 	}
 
 	m.moving = false
@@ -596,12 +591,7 @@ func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
 	if owner == nil {
 		return true, nil
 	}
-	log := m.log
-	return true, func() {
-		if err := owner.segmentAdvanced(ev); err != nil {
-			log.Warn().Err(err).Msg("move: segment-advance broadcast")
-		}
-	}
+	return true, func() { owner.segmentAdvanced(ev) }
 }
 
 func (m *CreatureMove) currentEventLocked() event.Move {

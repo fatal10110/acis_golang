@@ -167,9 +167,7 @@ func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
 		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
 	}
-	if err := controller.Stop(); err != nil {
-		t.Fatal(err)
-	}
+	controller.Stop()
 
 	target.x = 200
 	for range 5 {
@@ -1205,10 +1203,9 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	blocked := 0
 	advanced := 0
 	var advancedEvent event.Move
-	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }, onAdvanced: func(ev event.Move) error {
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }, onAdvanced: func(ev event.Move) {
 		advanced++
 		advancedEvent = ev
-		return nil
 	}})
 	if _, err := mover.MoveToLocation(location.Location{X: 100, Y: 100, Z: 30}); err != nil {
 		t.Fatal(err)
@@ -1695,7 +1692,7 @@ func TestRandomNearbyLocationNilGeoReturnsTargetUnchanged(t *testing.T) {
 // hookOwner adapts test callbacks to the moveOwner milestones.
 type hookOwner struct {
 	onArrived, onBlocked func()
-	onAdvanced           func(event.Move) error
+	onAdvanced           func(event.Move)
 }
 
 func (o *hookOwner) arrived() {
@@ -1710,11 +1707,10 @@ func (o *hookOwner) blocked() {
 	}
 }
 
-func (o *hookOwner) segmentAdvanced(ev event.Move) error {
+func (o *hookOwner) segmentAdvanced(ev event.Move) {
 	if o.onAdvanced != nil {
-		return o.onAdvanced(ev)
+		o.onAdvanced(ev)
 	}
-	return nil
 }
 
 func (followTarget) Kind() actor.Kind { return actor.KindNPC }

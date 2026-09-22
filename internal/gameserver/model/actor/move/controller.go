@@ -115,7 +115,7 @@ func NewController(move *CreatureMove, self Actor, sink event.Sink) (*Controller
 // every segment advance, not just the first: without it, clients keep
 // predicting the original straight-line walk and visibly cut through
 // obstacles the server itself routed around.
-func (c *Controller) segmentAdvanced(ev event.Move) error {
+func (c *Controller) segmentAdvanced(ev event.Move) {
 	// Continuations describe the next route leg, so they must carry its
 	// waypoint rather than a follow target.
 	ev.FollowTarget = 0
@@ -125,7 +125,6 @@ func (c *Controller) segmentAdvanced(ev event.Move) error {
 	// setHeadingTo(destination) directly above the MoveToLocation send).
 	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
 	c.self.BroadcastMove(ev)
-	return nil
 }
 
 // blocked reports an in-flight move stopped by a newly blocked geodata path.
@@ -347,7 +346,7 @@ func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
 // broadcasting a stop-in-place packet when there was movement to cancel —
 // otherwise a client that already received the move request keeps walking
 // toward the stale destination until it separately resyncs.
-func (c *Controller) Stop() error {
+func (c *Controller) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	wasMoving := c.move.Moving() || c.move.Following()
@@ -357,7 +356,6 @@ func (c *Controller) Stop() error {
 	if wasMoving {
 		c.self.BroadcastStop()
 	}
-	return nil
 }
 
 // CanMoveTo reports whether a straight-line geodata walk from the actor's

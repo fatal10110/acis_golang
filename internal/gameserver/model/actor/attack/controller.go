@@ -252,13 +252,12 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	return true
 }
 
-// DoAttack starts one physical attack animation against target. It always
-// reports nil: c.start has already scheduled the hit landings by the time
-// BroadcastAttack runs, and the broadcast itself cannot fail. The error
-// return stays for the AttackController interface its callers hold.
-func (c *Controller) DoAttack(target attackable.Combatant) error {
+// DoAttack starts one physical attack animation against target. The hit
+// landings are scheduled by c.start before the animation is broadcast, so
+// there is nothing left that can fail once the swing is accepted.
+func (c *Controller) DoAttack(target attackable.Combatant) {
 	if target == nil || c.actor == nil {
-		return nil
+		return
 	}
 
 	c.emit(event.AttackStarted{})
@@ -331,7 +330,6 @@ func (c *Controller) DoAttack(target attackable.Combatant) error {
 	if c.player != nil {
 		c.player.ClearRecentFakeDeath()
 	}
-	return nil
 }
 
 // Stop aborts the current attack and clears any pending bow cooldown.

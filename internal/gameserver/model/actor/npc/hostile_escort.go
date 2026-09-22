@@ -44,7 +44,7 @@ func (h *Hostile) ThinkFollow(target attackable.Combatant, lastWasFollow bool) (
 		return true
 	}
 	if h.GeoPathFailCount() >= escortGeoFailLimit {
-		_ = h.move.Stop()
+		h.move.Stop()
 		h.teleportNear(target, escortTeleportOffset)
 		h.ResetGeoPathFailCount()
 		return false

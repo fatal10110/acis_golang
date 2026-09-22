@@ -54,9 +54,7 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	ctrl.sink = rec
 	finished := func() int { return event.Count[event.AttackFinished](rec) }
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	if got := clock.activeCount(500 * time.Millisecond); got != 1 {
 		t.Fatalf("first-hit timers at attackTime/2 = %d, want 1", got)
 	}
@@ -104,9 +102,7 @@ func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
 		}
 	}
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	clock.fire(500 * time.Millisecond)
 	if target.hits != 1 || finished() != 0 {
 		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished())
@@ -128,9 +124,7 @@ func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	target.dead = true
 	clock.fire(500 * time.Millisecond)
 
@@ -162,9 +156,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 	ctrl := NewPlayer(actor, nil)
 	ctrl.afterFunc = (&timingClock{}).AfterFunc
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	if got, want := actor.events, []string{"consume", "mp", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
 		t.Fatalf("bow fire events = %v, want %v", got, want)
 	}
@@ -179,9 +171,7 @@ func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
 	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = (&timingClock{}).AfterFunc
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	if got, want := actor.events, []string{"mp", "hit", "broadcast"}; !slices.Equal(got, want) {
 		t.Fatalf("creature bow events = %v, want %v", got, want)
 	}
@@ -201,9 +191,7 @@ func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
 	ctrl := NewPlayer(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
-	if err := ctrl.DoAttack(target); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(target)
 	if actor.drawMs != 2035 {
 		t.Fatalf("NotifyBowDraw ms = %d, want 2035", actor.drawMs)
 	}
@@ -251,9 +239,7 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 		ctrl.Stop()
 	}
 
-	if err := ctrl.DoAttack(primary); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(primary)
 
 	if actor.queryRadius != 100 {
 		t.Fatalf("known-combatant radius = %d, want 100", actor.queryRadius)
@@ -300,9 +286,7 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 	ctrl := NewCreature(actor, nil)
 	ctrl.afterFunc = clock.AfterFunc
 
-	if err := ctrl.DoAttack(primary); err != nil {
-		t.Fatalf("DoAttack() error: %v", err)
-	}
+	ctrl.DoAttack(primary)
 
 	if got, want := snapshotTargetIDs(actor.snapshot), []int32{2}; !slices.Equal(got, want) {
 		t.Fatalf("snapshot target IDs = %v, want %v", got, want)

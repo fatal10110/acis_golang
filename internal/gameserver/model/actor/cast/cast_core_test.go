@@ -1694,14 +1694,14 @@ func (castHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (boo
 	return false, nil
 }
 func (castHostileMove) MoveHome(location.Location) error { return nil }
-func (castHostileMove) Stop() error                      { return nil }
+func (castHostileMove) Stop()                            {}
 
 type castHostileAttack struct{}
 
 func (castHostileAttack) BowCoolingDown() bool                { return false }
 func (castHostileAttack) AttackingNow() bool                  { return false }
 func (castHostileAttack) CanAttack(attackable.Combatant) bool { return false }
-func (castHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (castHostileAttack) DoAttack(attackable.Combatant)       {}
 func (castHostileAttack) Stop()                               {}
 
 func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {

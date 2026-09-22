@@ -1159,7 +1159,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			}
 			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
-			_ = ep.BroadcastSkillLaunched(1, 1, []int32{1})
+			ep.BroadcastSkillLaunched(1, 1, []int32{1})
 		}},
 		{"door", func(t *testing.T, state *world.State) {
 			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
