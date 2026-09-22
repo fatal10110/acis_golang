@@ -7,7 +7,9 @@ import (
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 
@@ -160,4 +162,94 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 		t.Fatalf("owner frame count = %d, want 1 (only the unconditional Resisted entry forwards)", len(ownerGot))
 	}
 	assertSystemMessageStringSkillNameFrame(t, ownerGot[0], serverpackets.SystemMessageS1ResistedYourS2, "Orc", 1, 1)
+}
+
+// recordingAIRegistry records the AI-task registrations wireSummonAI makes.
+// onAdd, when set, runs inside Add, which is where the shared AI task first
+// becomes able to reach a summon and drive it all the way to despawn.
+type recordingAIRegistry struct {
+	onAdd   func()
+	added   []task.AIActor
+	removed []task.AIActor
+}
+
+func (r *recordingAIRegistry) Add(actor task.AIActor) {
+	r.added = append(r.added, actor)
+	if r.onAdd != nil {
+		r.onAdd()
+	}
+}
+
+func (r *recordingAIRegistry) Remove(actor task.AIActor) {
+	r.removed = append(r.removed, actor)
+}
+
+// newWiredTestServitor builds a servitor already spawned in state beside
+// owner, so Unsummon reaches the despawn path.
+func newWiredTestServitor(t *testing.T, state *world.State, owner *livePlayer) *summon.Actor {
+	t.Helper()
+	servitor, err := summon.NewServitor(summon.ServitorConfig{
+		ObjectID:       300,
+		Owner:          owner,
+		NPCID:          1,
+		Name:           "Servitor",
+		OwnerInventory: owner.Inventory(),
+		Stats:          summon.CombatStats{MaxHP: 100, MaxMP: 100},
+	})
+	if err != nil {
+		t.Fatalf("NewServitor() error: %v", err)
+	}
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+	return servitor
+}
+
+// TestWireSummonAIRemovesAIRunnerOnDespawn pins the ordinary case: a summon
+// that despawns after wireSummonAI returns gives its AI-task registration
+// back exactly once.
+func TestWireSummonAIRemovesAIRunnerOnDespawn(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newWiredTestServitor(t, state, owner)
+
+	registry := &recordingAIRegistry{}
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+
+	if len(registry.added) != 1 {
+		t.Fatalf("AI registrations = %d, want 1", len(registry.added))
+	}
+	servitor.Unsummon()
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after despawn = %d, want 1", len(registry.removed))
+	}
+	// Despawned can reach the sink more than once; cleanup still runs once.
+	servitor.Unsummon()
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals after second despawn = %d, want 1", len(registry.removed))
+	}
+}
+
+// TestWireSummonAIRemovesAIRunnerWhenDespawnRacesRegistration pins issue
+// #2396: the AI task can reach a summon the instant Add publishes it and
+// drive it to Despawned before wireSummonAI has finished installing the
+// cleanup. The registration must still be given back -- otherwise the AI
+// task keeps ticking an actor that has already left the world.
+func TestWireSummonAIRemovesAIRunnerWhenDespawnRacesRegistration(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newWiredTestServitor(t, state, owner)
+
+	registry := &recordingAIRegistry{}
+	registry.onAdd = func() { servitor.Unsummon() }
+	l := &GameClientLink{world: state, log: zerolog.Nop(), ai: registry}
+	l.wireSummonAI(servitor)
+
+	if len(registry.removed) != 1 {
+		t.Fatalf("AI removals when despawn races registration = %d, want 1", len(registry.removed))
+	}
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after despawn")
+	}
 }

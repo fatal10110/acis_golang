@@ -1,6 +1,8 @@
 package network
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -19,9 +21,50 @@ type summonSink struct {
 	// attack and arrival events re-evaluate; move is nil without geodata.
 	brain *ai.Summon
 	move  *move.Controller
-	// despawn is the runtime cleanup that runs exactly when the summon
-	// leaves the world.
-	despawn func()
+	// cleanupMu guards cleanup and despawned. Registration runs on the
+	// spawning goroutine while the AI task and the offensive-follow ticker
+	// can already reach this sink and drive it to Despawned, so the two
+	// sides must not race: onDespawn runs fn immediately when the summon
+	// has already left the world, which is what keeps a registration that
+	// lost that race from leaking.
+	cleanupMu sync.Mutex
+	cleanup   []func()
+	despawned bool
+}
+
+// onDespawn registers fn as runtime cleanup that runs exactly once when the
+// summon leaves the world, or immediately when it already has. Register a
+// cleanup only after the resource it releases exists, so that the immediate
+// path cannot run before the thing it undoes.
+func (s *summonSink) onDespawn(fn func()) {
+	if fn == nil {
+		return
+	}
+	s.cleanupMu.Lock()
+	if s.despawned {
+		s.cleanupMu.Unlock()
+		fn()
+		return
+	}
+	s.cleanup = append(s.cleanup, fn)
+	s.cleanupMu.Unlock()
+}
+
+// runDespawn releases every registered cleanup, in registration order, and
+// marks the summon despawned so later registrations release themselves.
+func (s *summonSink) runDespawn() {
+	s.cleanupMu.Lock()
+	if s.despawned {
+		s.cleanupMu.Unlock()
+		return
+	}
+	s.despawned = true
+	pending := s.cleanup
+	s.cleanup = nil
+	s.cleanupMu.Unlock()
+	for _, fn := range pending {
+		fn()
+	}
 }
 
 // Emit maps ev to its packets. Each arm keeps the send order its packets
@@ -77,9 +120,7 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
 	case event.Despawned:
-		if s.despawn != nil {
-			s.despawn()
-		}
+		s.runDespawn()
 	}
 }
 
