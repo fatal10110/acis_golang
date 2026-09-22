@@ -72,6 +72,7 @@ type options struct {
 	restarts               *restart.Table
 	zones                  *zone.Index
 	attackStance           *task.AttackStance
+	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
@@ -154,6 +155,16 @@ func WithZones(index *zone.Index) Option {
 // (default: nil, so stance is neither tracked nor consulted).
 func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
+}
+
+// WithAttackStanceTracker substitutes the combat-stance tracker the link
+// consults, including from the exit guard that runs inside the task a
+// restart or logout request posts to the player's queue, so a suite can
+// drive a failure from inside a queued handler. It replaces only the link's
+// collaborator; Server.AttackStance stays the production one. It cannot be
+// combined with WithAttackStance, which sets the same collaborator.
+func WithAttackStanceTracker(tracker network.AttackStanceTracker) Option {
+	return func(o *options) { o.attackStanceTracker = tracker }
 }
 
 // WithAttackStanceClock builds the production combat-stance timeout
@@ -483,6 +494,14 @@ func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) 
 	tb.Helper()
 	setter := s.onlineCharacter(tb, objID)
 	setter.SetOperating(operating)
+}
+
+// SetPlayerInCombat toggles the live player's combat flag, the precondition
+// the auto-attack stop path checks before it touches the stance tracker.
+func (s *Server) SetPlayerInCombat(tb testing.TB, objID int32, inCombat bool) {
+	tb.Helper()
+	setter := s.onlineCharacter(tb, objID)
+	setter.SetInCombat(inCombat)
 }
 
 // SeedGroundItem places an item instance directly on the ground at the given
@@ -1100,7 +1119,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("attack stance: %v", err)
 		}
 	}
-	if attackStance != nil {
+	// Checked here rather than with the other option validation: the wiring
+	// below is unconditional, so a guard inside any narrower block would be
+	// dead for the suites that can actually trip it.
+	if o.attackStance != nil && o.attackStanceTracker != nil {
+		t.Fatalf("WithAttackStance and WithAttackStanceTracker both set: they wire the same link collaborator")
+	}
+	if o.attackStanceTracker != nil {
+		gclConfig.AttackStance = o.attackStanceTracker
+	} else if attackStance != nil {
 		gclConfig.AttackStance = attackStance
 	}
 	if ai != nil {

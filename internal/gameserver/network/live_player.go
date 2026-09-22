@@ -80,7 +80,11 @@ type livePlayer struct {
 	petRestoreInFlight atomic.Bool
 	shortcuts          *shortcut.List
 	isGM               bool
-	log                zerolog.Logger
+	// handlerPanicked records that a task this player's connection waited on
+	// panicked. Written by onLive and read by the dispatch loop, both on the
+	// owning connection goroutine and nowhere else.
+	handlerPanicked bool
+	log             zerolog.Logger
 
 	known          world.KnownBuffer
 	zoneActor      *liveZoneActor
@@ -182,20 +186,31 @@ func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
 // that no longer accepts tasks (the player detached, or the pool is
 // stopping), fn runs on the calling goroutine. A task must never call it for
 // its own queue: it would wait on itself.
-func onQueue(q *sim.Queue, fn func()) {
+//
+// It reports whether fn returned normally. False means fn panicked or called
+// runtime.Goexit and the pool's per-task recovery contained it, so whatever
+// fn had mutated before it stopped is half-applied and the caller must not
+// carry on as if the work had succeeded. Running fn on the calling goroutine
+// reports true: there the panic keeps unwinding, to the connection handler's
+// own recover.
+func onQueue(q *sim.Queue, fn func()) (ok bool) {
 	if q == nil {
 		fn()
-		return
+		return true
 	}
 	done := make(chan struct{})
+	// ok is written before the deferred close and read after <-done, so the
+	// waiting goroutine sees the task goroutine's write.
 	if !q.Post(func() {
 		defer close(done)
 		fn()
+		ok = true
 	}) {
 		fn()
-		return
+		return true
 	}
 	<-done
+	return ok
 }
 
 // postLive posts fn to live's queue without waiting, or runs it now when
@@ -211,13 +226,20 @@ func postLive(live *livePlayer, fn func()) bool {
 }
 
 // onLive runs fn on live's queue, or on the calling goroutine when live is
-// nil; see onQueue.
-func onLive(live *livePlayer, fn func()) {
+// nil; see onQueue. It reports whether fn returned normally and records a
+// failure on live, so the dispatch loop drops the session even at the call
+// sites that ignore the result. The one site that clears live must consult
+// the result instead: see OpcodeRequestRestart.
+func onLive(live *livePlayer, fn func()) bool {
 	if live == nil {
 		fn()
-		return
+		return true
 	}
-	onQueue(live.Queue(), fn)
+	if onQueue(live.Queue(), fn) {
+		return true
+	}
+	live.handlerPanicked = true
+	return false
 }
 
 func (p *livePlayer) Stop() {
