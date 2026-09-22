@@ -110,3 +110,20 @@ func startQueues(tb testing.TB, log zerolog.Logger) *queues {
 		return nil
 	}
 }
+
+// OpenActorQueues counts the actor queues created so far that still accept a
+// task. Every queue belongs to an actor that owns it until it detaches, so a
+// queue left open with nobody behind it is a leak; posting a no-op is the
+// only way to ask a queue whether it is still open.
+func (s *Server) OpenActorQueues() int {
+	s.queues.mu.Lock()
+	all := append([]*sim.Queue(nil), s.queues.all...)
+	s.queues.mu.Unlock()
+	open := 0
+	for _, queue := range all {
+		if queue.Post(func() {}) {
+			open++
+		}
+	}
+	return open
+}

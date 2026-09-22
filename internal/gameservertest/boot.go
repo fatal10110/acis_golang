@@ -94,6 +94,7 @@ type options struct {
 	levels                 *player.LevelTable
 	log                    zerolog.Logger
 	geo                    move.Geo
+	itemTemplates          *item.Table
 	productionTickers      bool
 }
 
@@ -298,6 +299,13 @@ func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
 // hand. Effects is the process-wide shared registry, so a suite using this
 // must not tick it by hand in parallel.
 func WithProductionTickers() Option { return func(o *options) { o.productionTickers = true } }
+
+// WithItemTemplates boots against tbl instead of the shared catalog, so a
+// suite can hand the server a catalog it also holds a reference to and edit
+// a template mid-test — what a datapack edit looks like from the inside.
+func WithItemTemplates(tbl *item.Table) Option {
+	return func(o *options) { o.itemTemplates = tbl }
+}
 
 func bootGeo(geo move.Geo) move.Geo {
 	if geo != nil {
@@ -945,7 +953,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("new shadow items: %v", err)
 	}
 	templates := Templates(t)
-	itemTemplates := ItemTemplates()
+	itemTemplates := o.itemTemplates
+	if itemTemplates == nil {
+		itemTemplates = ItemTemplates()
+	}
 	ids := &sequentialIDs{next: 100}
 	levels := o.levels
 	if levels == nil {
