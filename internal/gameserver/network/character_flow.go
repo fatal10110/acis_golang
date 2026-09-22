@@ -74,37 +74,65 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	return chars, nil
 }
 
-// dropStaleItemRows filters the rows a login restores an inventory from: it
-// removes every row whose object id still has an unflushed change queued on
-// the lazy item persistence task, so an inventory is never rebuilt from a row
-// the task is about to rewrite or delete, and every row whose item template
-// is not loaded, so a datapack downgrade costs the player that one item
-// rather than the whole login.
+// restoreItemRows resolves the rows a login restores an inventory from
+// against the changes the lazy item persistence task has not written yet, and
+// returns the items the inventory is actually rebuilt from.
 //
 // The lazy task is what makes this necessary. Destroying a whole stack takes
 // the instance out of its container in memory and leaves the row's delete to
 // the next tick, and the detach flush only writes the items the container
 // still holds — so a logout inside the tick window leaves the destroyed
-// item's row in place. Without this check the next login reads that row back
-// and hands the player the stack again.
+// item's row in place. Without a check here the next login reads that row
+// back and hands the player the stack again.
 //
-// The pending set outranks the table: an entry means the stored state is
-// known stale and the item is no longer part of this container.
+// The pending set outranks the table either way: an entry means the row is
+// stale. What an entry does not say on its own is whether the item left the
+// container or whether its write simply has not landed — the detach flush
+// keeps a container pending when its write fails or times out, exactly so the
+// next tick still has it — and those two need opposite answers here. The
+// write's own state settles it, because that state is what the row will hold
+// once the write lands, so the task resolves them and hands back the ones
+// still owned (ItemInstances.ClaimRestoredItems): those are restored from that
+// state rather than from the row, which is both the freshest description of
+// the item and the one the failed write was carrying.
 //
-// A drop is logged because this is the one place in the login path that
-// removes rows a player may still legitimately own. The normal case is a
-// small count — one destroyed or traded stack — while a count covering the
-// whole inventory means the previous detach flush never landed and left the
-// container pending, and the error for that was logged minutes earlier on
-// another connection's goroutine. The count is what tells the two apart.
-func (l *GameClientLink) dropStaleItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
+// Claiming hands the row's write over without cancelling it: the entry stays
+// pending, retargeted at the instance restored here, so the state is still
+// scheduled if this login goes no further and the row still has exactly one
+// writer. Only rows this restore actually keeps are offered for claiming
+// (restoredItemLocation), so a row the inventory would discard is never handed
+// a writer that discards it.
+//
+// A row whose item template is no longer loaded is dropped so that a datapack
+// downgrade costs the player that one item rather than the whole login.
+//
+// A departed row is logged because this is the one place in the login path
+// that removes rows a player may still legitimately own. The normal case is a
+// small count — one destroyed or traded stack — and a count covering the whole
+// inventory would mean the pending set and the state it holds disagree about
+// the same items, which is a bug here rather than a detach flush that never
+// landed: those items are claimed and restored, not dropped.
+func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
+	var claimed map[int32]*item.Instance
+	if l.itemInstances != nil {
+		ids := make([]int32, 0, len(items))
+		for _, inst := range items {
+			if inst != nil && restoredItemLocation(inst.Location) {
+				ids = append(ids, inst.ObjectID)
+			}
+		}
+		claimed = l.itemInstances.ClaimRestoredItems(ownerID, ids)
+	}
+
 	kept := items[:0]
 	var stale, unknown int
 	for _, inst := range items {
 		if inst == nil {
 			continue
 		}
-		if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
+		if restored, ok := claimed[inst.ObjectID]; ok {
+			inst = restored
+		} else if l.itemInstances != nil && l.itemInstances.ContainsID(inst.ObjectID) {
 			stale++
 			continue
 		}
@@ -128,11 +156,27 @@ func (l *GameClientLink) dropStaleItemRows(ownerID int32, items []*item.Instance
 		l.log.Warn().Int32("object_id", ownerID).Int("dropped", stale).Int("restored", len(kept)).
 			Msg("restore inventory: skipped item rows with an unflushed change")
 	}
+	if len(claimed) > 0 {
+		l.log.Warn().Int32("object_id", ownerID).Int("claimed", len(claimed)).Int("restored", len(kept)).
+			Msg("restore inventory: restored item rows from an unflushed change")
+	}
 	if unknown > 0 {
 		l.log.Error().Int32("object_id", ownerID).Int("dropped", unknown).Int("restored", len(kept)).
 			Msg("restore inventory: skipped item rows with no loaded template")
 	}
 	return kept
+}
+
+// restoredItemLocation reports whether a row at loc is one the player
+// inventory rebuilds itself from — its base and equip locations, the only two
+// Inventory.Restore keeps. The row query is not location-filtered, so a
+// warehouse or freight row reaches here too; claiming one would hand its write
+// to an instance the inventory then discards, leaving the row with no writer
+// at all. The reference draws the same line one step earlier, by binding
+// getBaseLocation() and getEquipLocation() into the restore query itself
+// (Inventory.java:110-114), so its guard never sees those rows either.
+func restoredItemLocation(loc item.Location) bool {
+	return loc == item.LocationInventory || loc == item.LocationPaperdoll
 }
 
 // enterWorld sends the EnterWorld packet burst for c and registers it in the
@@ -148,7 +192,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		l.log.Error().Err(err).Msg("enter world: list items")
 		return nil, false
 	}
-	items = l.dropStaleItemRows(c.ID, items)
+	items = l.restoreItemRows(c.ID, items)
 	if l.skills != nil {
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore known skills")

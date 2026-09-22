@@ -60,6 +60,7 @@ type Option func(*options)
 type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
+	itemFlushFault         *ItemFlushFault
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -1008,7 +1009,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	queues := startQueues(t, o.log)
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
-	itemInstances := task.NewItemInstances(gamesql.NewItemFlushStore(db), itemTemplates, persistWorker, itemWrites, zerolog.Nop())
+	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)
+	if o.itemFlushFault != nil {
+		itemFlusher = faultyItemFlusher{inner: itemFlusher, fault: o.itemFlushFault}
+	}
+	itemInstances := task.NewItemInstances(itemFlusher, itemTemplates, persistWorker, itemWrites, zerolog.Nop())
 	petStore := gamesql.NewPetStore(db)
 
 	// Mirror the production boot for the Seven Signs calendar: optional
