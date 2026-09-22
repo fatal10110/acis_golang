@@ -1,9 +1,6 @@
 package itemcontainer
 
 import (
-	"cmp"
-	"slices"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -72,7 +69,7 @@ func (f *Freight) VisibleItems() []*item.Instance {
 			out = append(out, inst)
 		}
 	}
-	slices.SortFunc(out, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+	sortContainerOrder(out)
 	return out
 }
 
@@ -89,13 +86,23 @@ func (f *Freight) ItemByTemplateID(templateID int32) *item.Instance {
 	return f.itemByTemplateIDLocked(templateID)
 }
 
+// itemByTemplateIDLocked returns the visible instance of templateID that
+// comes first in byContainerOrder. Every "which stack of this template?"
+// question the freight container answers goes through here — the lookup and
+// the deposit merge target alike — so a deposit can't grow one stack while a
+// lookup names another. It scans for the best candidate rather than sorting
+// the whole container, matching Container.itemByTemplateIDLocked.
 func (f *Freight) itemByTemplateIDLocked(templateID int32) *item.Instance {
-	for _, inst := range f.itemsLocked() {
-		if inst.TemplateID == templateID && f.visible(inst) {
-			return inst
+	var best orderedItem
+	for _, inst := range f.items {
+		if inst.TemplateID != templateID || !f.visible(inst) {
+			continue
+		}
+		if cand := keyed(inst); best.inst == nil || byContainerOrder(cand, best) < 0 {
+			best = cand
 		}
 	}
-	return nil
+	return best.inst
 }
 
 // Add adds inst to the currently active town's visible freight contents,
@@ -107,15 +114,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 
 	tmpl, _ := f.templates.Get(inst.TemplateID)
 	if tmpl != nil && tmpl.Stackable {
-		var old *item.Instance
-		for _, candidate := range f.items {
-			if candidate.TemplateID == inst.TemplateID && f.visible(candidate) {
-				if old == nil || candidate.ObjectID < old.ObjectID {
-					old = candidate
-				}
-			}
-		}
-		if old != nil {
+		if old := f.itemByTemplateIDLocked(inst.TemplateID); old != nil {
 			old.AddCount(inst.Snapshot().Count)
 			inst.DestroyState()
 			return old, true
@@ -127,7 +126,7 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 		locData = f.ActiveLocation
 	}
 	inst.BindPersister(f.persist)
-	inst.SetOwnerLocation(f.ownerID, f.location, locData)
+	inst.EnterContainer(f.ownerID, f.location, locData, nowMillis())
 	f.items[inst.ObjectID] = inst
 	return inst, false
 }

@@ -2,6 +2,7 @@ package itemcontainer
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -253,8 +254,10 @@ func TestInventory_PackageSendableItems(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("PackageSendableItems() returned %d items, want 2", len(items))
 	}
-	if items[0].ObjectID != 500 || items[1].ObjectID != 501 {
-		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 500,501", items[0].ObjectID, items[1].ObjectID)
+	// Container order is newest entry first, and both were added in the same
+	// millisecond, so the tie-break puts the higher object id first.
+	if items[0].ObjectID != 501 || items[1].ObjectID != 500 {
+		t.Fatalf("PackageSendableItems() object ids = %d,%d; want 501,500", items[0].ObjectID, items[1].ObjectID)
 	}
 }
 
@@ -721,14 +724,27 @@ func newWeightedInventory(size int) *Inventory {
 	return inv
 }
 
-func TestFreight_VisibleItemsAllocatesOnlyResultSlice(t *testing.T) {
-	f := newFullFreight(64)
+// TestFreight_VisibleItemsAllocationsDoNotScaleWithSize guards what the
+// allocation budget is actually for: VisibleItems must not allocate per item.
+// It allocates twice — the result slice, and the ordering-key slice
+// sortContainerOrder copies entry times into so the comparison never reads
+// live state — and both are one allocation each however many items are held.
+// Comparing two sizes pins that, where a bare count would quietly admit a
+// per-item allocation the next time the budget is raised.
+func TestFreight_VisibleItemsAllocationsDoNotScaleWithSize(t *testing.T) {
+	measure := func(size int) float64 {
+		f := newFullFreight(size)
+		return testing.AllocsPerRun(100, func() {
+			_ = f.VisibleItems()
+		})
+	}
 
-	allocs := testing.AllocsPerRun(100, func() {
-		_ = f.VisibleItems()
-	})
-	if allocs > 1 {
-		t.Fatalf("VisibleItems() allocs/run = %.0f, want at most 1 result-slice allocation", allocs)
+	small, large := measure(8), measure(64)
+	if small != large {
+		t.Fatalf("VisibleItems() allocs/run = %.0f at 8 items, %.0f at 64; allocations must not scale with size", small, large)
+	}
+	if large > 2 {
+		t.Fatalf("VisibleItems() allocs/run = %.0f, want at most the result slice plus the ordering-key slice", large)
 	}
 }
 
@@ -1195,37 +1211,72 @@ func TestFreight_VisibleItems_ZeroActiveLocationReturnsOnlyUntagged(t *testing.T
 	}
 }
 
-func TestFreight_VisibleItems_OrderedByObjectID(t *testing.T) {
+func TestFreight_VisibleItems_OrderedByEntryTimeThenObjectID(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 	f.ActiveLocation = 1
 
 	for _, objectID := range []int32{0x20000003, 0x20000001, 0x20000004, 0x20000002} {
 		f.AddNew(freightTestItemID, 1, objectID)
 	}
+	// Pin the entry times rather than relying on four AddNew calls landing in
+	// the same millisecond: 0x20000001 is the newest, the other three tie and
+	// fall through to descending object id.
+	for _, inst := range f.VisibleItems() {
+		if inst.ObjectID == 0x20000001 {
+			inst.SetTime(2000)
+		} else {
+			inst.SetTime(1000)
+		}
+	}
 
 	visible := f.VisibleItems()
-	for i := 1; i < len(visible); i++ {
-		if visible[i-1].ObjectID > visible[i].ObjectID {
-			t.Fatalf("VisibleItems() object ids are not ordered: %d before %d", visible[i-1].ObjectID, visible[i].ObjectID)
-		}
+	got := make([]int32, len(visible))
+	for i, inst := range visible {
+		got[i] = inst.ObjectID
+	}
+	want := []int32{0x20000001, 0x20000004, 0x20000003, 0x20000002}
+	if !slices.Equal(got, want) {
+		t.Fatalf("VisibleItems() object ids = %v, want %v", got, want)
 	}
 }
 
-func TestFreight_Add_MergesLowestObjectIDVisibleStack(t *testing.T) {
+// TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup pins the one
+// answer the freight container gives to "which stack of this template?".
+//
+// Two visible stacks of a template only coexist across town tags, which is
+// what this fixture builds. The reference resolves the deposit's merge target
+// through getItemByItemId, and PcFreight overrides exactly that method to
+// walk _items in container order and return the first visible one
+// (PcFreight.java:69-78) — so the newest visible stack grows, and the same
+// method answers a plain lookup. Asserting both here is the point: a merge
+// target and a lookup that disagreed would hand a future freight handler one
+// stack from Add and a different one from VisibleItemByTemplateID.
+func TestFreight_Add_MergesNewestVisibleStackAndAgreesWithLookup(t *testing.T) {
 	f := NewFreight(0x10000001, freightTestTemplates())
 
 	f.ActiveLocation = 1
-	low := f.AddNew(freightTestStackableID, 10, 0x20000001)
+	older := f.AddNew(freightTestStackableID, 10, 0x20000001)
 	f.ActiveLocation = 2
-	high := f.AddNew(freightTestStackableID, 5, 0x20000002)
+	newer := f.AddNew(freightTestStackableID, 5, 0x20000002)
 	f.ActiveLocation = 0
 
-	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
-	if merged != low {
-		t.Fatalf("AddNew() with multiple visible stacks returned object %d, want lowest visible object %d", merged.ObjectID, low.ObjectID)
+	// Pin the entry times instead of relying on the two AddNew calls landing
+	// in different milliseconds. The newer stack also carries the higher
+	// object id, so the times are what decide it: swapping them would flip
+	// the expected target.
+	older.SetTime(1000)
+	newer.SetTime(2000)
+
+	if got := f.VisibleItemByTemplateID(freightTestStackableID); got != newer {
+		t.Fatalf("VisibleItemByTemplateID() = object %d, want the newest visible stack %d", got.ObjectID, newer.ObjectID)
 	}
-	if low.Count != 13 || high.Count != 5 {
-		t.Errorf("stack counts after merge = low %d high %d, want low 13 high 5", low.Count, high.Count)
+
+	merged := f.AddNew(freightTestStackableID, 3, 0x20000003)
+	if merged != newer {
+		t.Fatalf("AddNew() with multiple visible stacks merged into object %d, want the newest visible stack %d — the same one the lookup names", merged.ObjectID, newer.ObjectID)
+	}
+	if newer.Count != 8 || older.Count != 10 {
+		t.Errorf("stack counts after merge = newer %d older %d, want newer 8 older 10", newer.Count, older.Count)
 	}
 }
 
@@ -1527,5 +1578,123 @@ func TestInventoryRestoreMergeDoesNotPersist(t *testing.T) {
 	held.AddCount(1)
 	if len(rec.ids) != 1 {
 		t.Errorf("persist calls after mutating the merged stack = %d, want 1", len(rec.ids))
+	}
+}
+
+// TestContainerItemsOrderedByEntryTimeThenObjectID pins byContainerOrder on
+// both of its keys at once, with the two disagreeing: entry time descending
+// decides first, and only a tie falls through to object id descending. Object
+// ids and times are interleaved so an implementation that used either key
+// alone would produce a different order than the one asserted.
+func TestContainerItemsOrderedByEntryTimeThenObjectID(t *testing.T) {
+	c := NewWarehouse(1, testTemplates())
+	for _, objectID := range []int32{601, 602, 603, 604} {
+		if c.AddNew(daggerTemplateID, 1, objectID) == nil {
+			t.Fatalf("AddNew(%d) returned nil", objectID)
+		}
+	}
+	times := map[int32]int64{601: 300, 602: 100, 603: 300, 604: 200}
+	for _, inst := range c.Items() {
+		inst.SetTime(times[inst.ObjectID])
+	}
+
+	got := make([]int32, 0, 4)
+	for _, inst := range c.Items() {
+		got = append(got, inst.ObjectID)
+	}
+	want := []int32{603, 601, 604, 602}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Items() object ids = %v, want %v", got, want)
+	}
+
+	// "First instance of this template" has to mean the same thing the list
+	// does, or destroying one of several picks an arbitrary instance.
+	if got := c.ItemByTemplateID(daggerTemplateID); got == nil || got.ObjectID != want[0] {
+		t.Fatalf("ItemByTemplateID() = %v, want the first listed instance %d", got, want[0])
+	}
+	byTemplate := make([]int32, 0, 4)
+	for _, inst := range c.ItemsByTemplateID(daggerTemplateID) {
+		byTemplate = append(byTemplate, inst.ObjectID)
+	}
+	if !slices.Equal(byTemplate, want) {
+		t.Fatalf("ItemsByTemplateID() object ids = %v, want %v", byTemplate, want)
+	}
+}
+
+// TestContainerAddStampsEntryTimeWithoutRestampingMergedStack pins which adds
+// move an item to the front of the list. Taking a new instance in stamps it as
+// the newest; merging units into a stack that is already held leaves that
+// stack's place in the list alone.
+func TestContainerAddStampsEntryTimeWithoutRestampingMergedStack(t *testing.T) {
+	c := NewWarehouse(1, testTemplates())
+
+	stack := c.AddNew(adenaTemplateID, 100, 700)
+	if stack == nil {
+		t.Fatal("AddNew(adena) returned nil")
+	}
+	if stack.TimeValue() == 0 {
+		t.Fatal("Add left the item's entry time unstamped")
+	}
+	stack.SetTime(1000)
+
+	dagger := c.AddNew(daggerTemplateID, 1, 701)
+	if dagger == nil {
+		t.Fatal("AddNew(dagger) returned nil")
+	}
+	if dagger.TimeValue() <= 1000 {
+		t.Fatalf("second Add stamped entry time %d, want it newer than the first item's 1000", dagger.TimeValue())
+	}
+
+	merged, absorbed := c.Add(&item.Instance{ObjectID: 702, TemplateID: adenaTemplateID, Count: 50})
+	if !absorbed || merged != stack {
+		t.Fatalf("Add(adena) = %v absorbed=%v, want it merged into the held stack", merged, absorbed)
+	}
+	if stack.TimeValue() != 1000 {
+		t.Fatalf("merging units restamped the held stack's entry time to %d, want it left at 1000", stack.TimeValue())
+	}
+	if first := c.Items()[0]; first != dagger {
+		t.Fatalf("Items()[0] = object %d, want the dagger %d: a merge must not move the stack to the front", first.ObjectID, dagger.ObjectID)
+	}
+}
+
+// TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored pins which of two
+// duplicate stackable rows survives a restore: the one the row loop reaches
+// first, whatever its object id.
+//
+// The merge target is never ambiguous, which is why the unordered scan that
+// picks it is not a source of nondeterminism. A stackable template can only
+// ever have one stack in the container — the first row is inserted, and every
+// later duplicate collapses into it — so by the time a merge is resolved
+// there is exactly one candidate to find. The reference behaves the same way
+// for the same reason: its restore loop resolves the target through
+// getItemByItemId against the partially built set, which likewise holds a
+// single stack of that template.
+func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
+	for _, restoreOrder := range [][]int32{{801, 802}, {802, 801}} {
+		rows := make([]*item.Instance, 0, 2)
+		for _, objectID := range restoreOrder {
+			rows = append(rows, &item.Instance{
+				ObjectID:   objectID,
+				TemplateID: adenaTemplateID,
+				Count:      100,
+				Location:   item.LocationInventory,
+			})
+		}
+
+		inv := RestorePlayerInventory(1, testTemplates(), rows)
+
+		items := inv.Items()
+		if len(items) != 1 {
+			t.Fatalf("restore order %v: Items() = %d entries, want the two rows merged into one", restoreOrder, len(items))
+		}
+		if want := restoreOrder[0]; items[0].ObjectID != want {
+			t.Fatalf("restore order %v: surviving object id = %d, want the first row restored %d", restoreOrder, items[0].ObjectID, want)
+		}
+		if got := items[0].CountValue(); got != 200 {
+			t.Fatalf("restore order %v: merged count = %d, want 200", restoreOrder, got)
+		}
+		if got := inv.ItemByObjectID(restoreOrder[1]); got != nil {
+			t.Fatalf("restore order %v: merged-away instance %d still held", restoreOrder, restoreOrder[1])
+		}
 	}
 }

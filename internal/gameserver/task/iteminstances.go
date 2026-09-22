@@ -254,17 +254,142 @@ func (i *ItemInstances) ContainsID(objectID int32) bool {
 // down and wrote its own final state (network.flushItemPersistence), and
 // that write must not be undone by a stale inflight copy.
 func (i *ItemInstances) RemoveItems(items []*item.Instance) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+	ids := make([]int32, 0, len(items))
 	for _, inst := range items {
 		if inst == nil {
 			continue
 		}
-		delete(i.pending, inst.ObjectID)
+		ids = append(ids, inst.ObjectID)
+	}
+	i.RemoveIDs(ids...)
+}
+
+// RemoveIDs is RemoveItems addressed by object id, for a caller holding the
+// ids rather than the instances.
+func (i *ItemInstances) RemoveIDs(objectIDs ...int32) {
+	if len(objectIDs) == 0 {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	for _, objectID := range objectIDs {
+		delete(i.pending, objectID)
 		for r := range i.rounds {
-			r.removed[inst.ObjectID] = struct{}{}
+			r.removed[objectID] = struct{}{}
 		}
 	}
+}
+
+// ClaimRestoredItems resolves the outstanding writes against the rows a login
+// is restoring for ownerID, named by objectIDs, and returns a fresh instance
+// carrying each still-owned item's unflushed state, keyed by object id, for
+// the caller to restore in place of the row.
+//
+// An outstanding write means the row is stale; it does not say why, and the
+// restore has to tell two cases apart that need opposite answers. Only the
+// write's own state can, because that state is what the row will hold once the
+// write lands. A write that still places the item in ownerID's hands is one
+// that has not landed yet — the container held the item to the end and its
+// final state is here rather than in the row — so the item is the player's and
+// its freshest description is this state. A write that places it elsewhere, or
+// deletes it, is the record of the item leaving the container, and nothing of
+// it may come back. The second kind stays pending — its delete, or its new
+// owner's row, still has to be written — and ContainsID keeps reporting it,
+// which is how the caller knows to skip the row it left behind.
+//
+// Claiming the first kind hands the row's write over; it does not cancel it.
+// The pending entry stays, retargeted at the returned instance, because that
+// instance is the one the caller restores and mutates from here on. Both
+// halves matter:
+//
+//   - The entry stays, so the state is still scheduled. Dropping it would
+//     leave the unflushed state in memory alone until something else happened
+//     to write it, and a second failed logout flush — the same degraded
+//     database that caused the first — would then lose it and let the stale
+//     row win, which is the destroyed stack coming back. A login that aborts
+//     after claiming costs nothing for the same reason.
+//   - It is retargeted rather than left pointing at the torn-down container's
+//     copy, so the row still has exactly one writer. Two copies of one item in
+//     the write path is a rollback waiting for the later write to carry the
+//     older state.
+//
+// An id the caller does not pass is not touched at all, so a row this login
+// does not restore keeps its own pending write.
+//
+// Callers must already have waited for ownerID's persistence lane, so the
+// container flush that produced these entries has finished and nothing is
+// mutating the instances behind this read.
+func (i *ItemInstances) ClaimRestoredItems(ownerID int32, objectIDs []int32) map[int32]*item.Instance {
+	if ownerID == 0 || len(objectIDs) == 0 {
+		return nil
+	}
+	// The instances are snapshotted after the lock is dropped: a live mutation
+	// takes the instance first and the pending set second (AddOwned), so
+	// reading them in the other order here would invert that pair.
+	candidates := i.pendingInstances(objectIDs)
+	claimed := make(map[int32]*item.Instance, len(candidates))
+	for _, inst := range candidates {
+		st := inst.Snapshot()
+		// The same test addToBatch applies, read forwards: these are exactly
+		// the states whose write leaves a row that a restore of ownerID's
+		// items would select.
+		if st.OwnerID != ownerID || st.Count <= 0 || st.Location == item.LocationVoid {
+			continue
+		}
+		claimed[st.ObjectID] = st.Instance()
+	}
+	i.retarget(ownerID, claimed)
+	return claimed
+}
+
+// retarget points ownerID's pending entries at the instances a restore just
+// built for them, and records the ids as removed in every outstanding round so
+// a failed flush cannot merge the superseded copy back over them.
+//
+// It overwrites whatever entry the id has, which is safe only because the
+// owner is offline and its persistence lane already drained: the sole
+// concurrent writer left is a Save, and a Save only ever takes entries out.
+func (i *ItemInstances) retarget(ownerID int32, claimed map[int32]*item.Instance) {
+	if len(claimed) == 0 {
+		return
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	for objectID, inst := range claimed {
+		i.pending[objectID] = pendingItem{inst: inst, ownerID: ownerID}
+		for r := range i.rounds {
+			r.removed[objectID] = struct{}{}
+		}
+	}
+}
+
+// pendingInstances returns the instance behind each of objectIDs that has an
+// outstanding write, looking in the same places ContainsID answers from.
+func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+
+	out := make([]*item.Instance, 0, len(objectIDs))
+	for _, objectID := range objectIDs {
+		if entry, ok := i.pending[objectID]; ok {
+			if entry.inst != nil {
+				out = append(out, entry.inst)
+			}
+			continue
+		}
+		for round := range i.rounds {
+			entry, ok := round.inflight[objectID]
+			if !ok || entry.inst == nil {
+				continue
+			}
+			if _, dropped := round.removed[objectID]; dropped {
+				continue
+			}
+			out = append(out, entry.inst)
+			break
+		}
+	}
+	return out
 }
 
 // Save flushes every pending item in chunks of at most
