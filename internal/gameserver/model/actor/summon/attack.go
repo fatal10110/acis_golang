@@ -114,7 +114,6 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 	return hit
 }
 
-func (a *Actor) BroadcastAttack(snapshot event.Attack) error {
+func (a *Actor) BroadcastAttack(snapshot event.Attack) {
 	a.emit(snapshot)
-	return nil
 }

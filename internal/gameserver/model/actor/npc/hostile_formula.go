@@ -179,9 +179,7 @@ func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ mode
 	}
 	h.applyNonConsumptionDamageEffects(false)
 	newlyDead := h.health.DamageValue(amount)
-	if err := h.BroadcastStatus(); err != nil {
-		h.log.Warn().Err(err).Msg("npc: status broadcast")
-	}
+	h.BroadcastStatus()
 	if !newlyDead {
 		return
 	}
@@ -207,9 +205,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
 	newlyDead := h.health.DamageValue(amount)
-	if err := h.BroadcastStatus(); err != nil {
-		h.log.Warn().Err(err).Msg("npc: status broadcast")
-	}
+	h.BroadcastStatus()
 	if !newlyDead {
 		return
 	}

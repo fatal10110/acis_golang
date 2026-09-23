@@ -59,7 +59,7 @@ type signetUnsummonable interface {
 	Actor
 	Unsummon()
 	Position() (x, y, z int)
-	BroadcastSelfSkillUse(skillID, level int32) error
+	BroadcastSelfSkillUse(skillID, level int32)
 }
 
 type signetHandler struct {
@@ -234,16 +234,12 @@ func (h signetHandler) newSignetBuffEffect(def modelskill.Definition, meta effec
 		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
 			applyEffects(actor, target, sub, sub.Effects)
 			if ct := target; ct != nil {
-				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
-					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
-				}
+				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			if err := actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids); err != nil {
-				h.log.Warn().Err(err).Msg("signet: skill-launched broadcast")
-			}
+			actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
 		}
 		return true
 	}
@@ -276,16 +272,12 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 				}
 			}
 			if ct := target; ct != nil {
-				if err := actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level)); err != nil {
-					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
-				}
+				actor.BroadcastSkillUse(ct, int32(sub.ID), int32(sub.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			if err := actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids); err != nil {
-				h.log.Warn().Err(err).Msg("signet: skill-launched broadcast")
-			}
+			actor.BroadcastSkillLaunched(int32(sub.ID), int32(sub.Level), ids)
 		}
 		return true
 	}
@@ -317,9 +309,7 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 			summon.Unsummon()
 		})
 		if len(ids) > 0 {
-			if err := actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids); err != nil {
-				h.log.Warn().Err(err).Msg("signet: skill-launched broadcast")
-			}
+			actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 		}
 		return true
 	}
@@ -377,16 +367,12 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 				dmgTarget.ReduceHP(float64(damage), caster, def)
 			}
 			if ct := target; ct != nil {
-				if err := actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level)); err != nil {
-					h.log.Warn().Err(err).Msg("signet: skill-use broadcast")
-				}
+				actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			if err := actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids); err != nil {
-				h.log.Warn().Err(err).Msg("signet: skill-launched broadcast")
-			}
+			actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 		}
 		return true
 	}

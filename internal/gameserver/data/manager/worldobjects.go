@@ -48,6 +48,13 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 	if doorTimers == nil {
 		return nil, fmt.Errorf("world objects: nil door timers")
 	}
+	if newSink == nil {
+		// Doors built without a sink factory never reach a client: no
+		// open/close state change is broadcast and nothing errors. Domain
+		// tests boot this way on purpose, so this warns rather than fails,
+		// but a production composition root reaching it is a wiring bug.
+		log.Warn().Msg("data/manager: no door event sink factory; doors will not broadcast state changes")
+	}
 
 	w := &WorldObjects{
 		geo:        geo,

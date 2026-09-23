@@ -1269,14 +1269,14 @@ func (disablerHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) 
 	return false, nil
 }
 func (disablerHostileMove) MoveHome(location.Location) error { return nil }
-func (disablerHostileMove) Stop() error                      { return nil }
+func (disablerHostileMove) Stop()                            {}
 
 type disablerHostileAttack struct{}
 
 func (disablerHostileAttack) BowCoolingDown() bool                { return false }
 func (disablerHostileAttack) AttackingNow() bool                  { return false }
 func (disablerHostileAttack) CanAttack(attackable.Combatant) bool { return false }
-func (disablerHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (disablerHostileAttack) DoAttack(attackable.Combatant)       {}
 func (disablerHostileAttack) Stop()                               {}
 
 func TestCheckSkillSuccessFailsOnPerfectShieldBlockDespiteGuaranteedRate(t *testing.T) {

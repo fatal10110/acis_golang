@@ -129,11 +129,9 @@ func (c *Controller) CastToggle(alreadyActive bool, def modelskill.Definition) (
 // denyAiAction()/isCastingNow() (PlayableAI.java:299-303, PlayerAI.java:219-241)
 // and the reuse-delay gate in canAttemptCast. A rejected toggle — blanket
 // lock, on cooldown, dead, unknown skill — must never stop a walk that
-// Java leaves running. Any error it returns is discarded, matching
-// stopForCast's `_ = stopMovement()`: movement is already cancelled inside
-// Controller.Stop before the fallible broadcast, and Java's stop cannot
-// fail at all.
-func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func() error, ack func(modelskill.Definition)) (def modelskill.Definition, target Target, activated bool, err error) {
+// Java leaves running. It reports nothing, matching Java's stop, which
+// cannot fail at all.
+func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerToggleRequest, stopMovement func(), ack func(modelskill.Definition)) (def modelskill.Definition, target Target, activated bool, err error) {
 	def, target, err = ResolvePlayerToggle(req)
 	if err != nil {
 		return def, target, false, err
@@ -143,7 +141,7 @@ func ApplyToggle(handlers EffectHandlers, controller *Controller, req PlayerTogg
 	}
 
 	if stopMovement != nil {
-		_ = stopMovement()
+		stopMovement()
 	}
 
 	if ack != nil {

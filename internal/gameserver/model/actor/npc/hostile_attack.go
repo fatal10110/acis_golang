@@ -274,72 +274,63 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 }
 
 // BroadcastAttack reports one resolved attack swing.
-func (h *Hostile) BroadcastAttack(snapshot event.Attack) error {
+func (h *Hostile) BroadcastAttack(snapshot event.Attack) {
 	h.emit(snapshot)
-	return nil
 }
 
 // BroadcastSkillUse reports a cast-start animation from this actor to the
 // target at (targetX, targetY, targetZ).
-func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) error {
+func (h *Hostile) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
 	sx, sy, sz := h.Position()
 	h.emit(event.MagicSkillUse{
 		CasterID: h.ObjectID(), CasterAt: location.Location{X: sx, Y: sy, Z: sz},
 		TargetID: targetID, TargetAt: location.Location{X: targetX, Y: targetY, Z: targetZ},
 		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
 	})
-	return nil
 }
 
 // BroadcastSkillLaunched reports the cast launch of skillID at level onto
 // targetIDs.
-func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
+func (h *Hostile) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
 	h.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
-	return nil
 }
 
 // BroadcastSkillCanceled reports the cast-cancel animation for objectID.
-func (h *Hostile) BroadcastSkillCanceled(objectID int32) error {
+func (h *Hostile) BroadcastSkillCanceled(objectID int32) {
 	h.emit(event.SkillCanceled{ObjectID: objectID})
-	return nil
 }
 
 // BroadcastDie reports this NPC's death, so clients play the corpse-fall
 // animation instead of leaving it standing until its corpse decays.
-func (h *Hostile) BroadcastDie() error {
+func (h *Hostile) BroadcastDie() {
 	h.emit(event.Died{})
-	return nil
 }
 
 // BroadcastMove reports a server-driven movement start.
-func (h *Hostile) BroadcastMove(ev event.Move) error {
+func (h *Hostile) BroadcastMove(ev event.Move) {
 	h.emit(ev)
-	return nil
 }
 
 // BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
 // target, matching the reference's fallback when an AI-initiated cast is
 // rejected after movement has already turned the actor toward target.
-func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) error {
+func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 	sx, sy, sz := h.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	tx, ty, tz := target.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	h.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
-	return nil
 }
 
 // BroadcastStop reports a stop in place.
-func (h *Hostile) BroadcastStop() error {
+func (h *Hostile) BroadcastStop() {
 	h.emit(event.Stopped{})
-	return nil
 }
 
 // BroadcastStatus reports this NPC's current/max HP, so a target's health
 // bar reflects damage as it lands rather than only the moment it dies.
-func (h *Hostile) BroadcastStatus() error {
+func (h *Hostile) BroadcastStatus() {
 	h.emit(event.Status{Attrs: []event.StatusAttr{{Kind: event.StatusMaxHP, Value: h.MaxHP()}, {Kind: event.StatusCurrentHP, Value: h.CurrentHP()}}})
-	return nil
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.

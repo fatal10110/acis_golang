@@ -124,9 +124,7 @@ func (c attackFinishedSignal) Emit(ev event.Event) {
 // timeout.
 func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant, timeout time.Duration) {
 	t.Helper()
-	if err := h.ctl.DoAttack(target); err != nil {
-		t.Fatalf("npc attack: %v", err)
-	}
+	h.ctl.DoAttack(target)
 	select {
 	case <-h.finished:
 	case <-time.After(timeout):
@@ -337,7 +335,7 @@ func (parkedMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, er
 func (parkedMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
 func (parkedMove) CanMoveTo(location.Location) bool               { return true }
 func (parkedMove) MoveHome(location.Location) error               { return nil }
-func (parkedMove) Stop() error                                    { return nil }
+func (parkedMove) Stop()                                          {}
 
 // parkedAttack is an AttackController that never attacks.
 type parkedAttack struct{}
@@ -345,5 +343,5 @@ type parkedAttack struct{}
 func (parkedAttack) BowCoolingDown() bool                { return false }
 func (parkedAttack) AttackingNow() bool                  { return false }
 func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
-func (parkedAttack) DoAttack(attackable.Combatant) error { return nil }
+func (parkedAttack) DoAttack(attackable.Combatant)       {}
 func (parkedAttack) Stop()                               {}

@@ -440,14 +440,14 @@ func (testHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (boo
 	return false, nil
 }
 func (testHostileMove) MoveHome(location.Location) error { return nil }
-func (testHostileMove) Stop() error                      { return nil }
+func (testHostileMove) Stop()                            {}
 
 type testHostileAttack struct{}
 
 func (testHostileAttack) BowCoolingDown() bool                { return false }
 func (testHostileAttack) AttackingNow() bool                  { return false }
 func (testHostileAttack) CanAttack(attackable.Combatant) bool { return false }
-func (testHostileAttack) DoAttack(attackable.Combatant) error { return nil }
+func (testHostileAttack) DoAttack(attackable.Combatant)       {}
 func (testHostileAttack) Stop()                               {}
 
 func (testHostileMove) CanMoveTo(location.Location) bool { return true }

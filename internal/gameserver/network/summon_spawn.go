@@ -666,7 +666,7 @@ func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant,
 func (inertSummonMoveController) MoveToLocation(location.Location) (bool, error) { return false, nil }
 func (inertSummonMoveController) CanMoveTo(location.Location) bool               { return true }
 func (inertSummonMoveController) MoveHome(location.Location) error               { return nil }
-func (inertSummonMoveController) Stop() error                                    { return nil }
+func (inertSummonMoveController) Stop()                                          {}
 func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }

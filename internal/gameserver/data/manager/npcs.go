@@ -148,6 +148,14 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	if state == nil {
 		return nil, fmt.Errorf("npcs: nil world state")
 	}
+	if newSink == nil {
+		// NPCs spawned without a sink factory never reach a client: no
+		// attack, status, or death broadcast leaves them and nothing
+		// errors. Domain tests boot this way on purpose, so this warns
+		// rather than fails, but a production composition root reaching it
+		// is a wiring bug.
+		log.Warn().Msg("npcs: no NPC event sink factory; spawned NPCs will not broadcast to clients")
+	}
 	if ids == nil {
 		return nil, fmt.Errorf("npcs: nil id allocator")
 	}

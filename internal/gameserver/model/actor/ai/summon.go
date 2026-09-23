@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"errors"
 	"sync"
 	"time"
 
@@ -28,7 +27,7 @@ type SummonActor interface {
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	SetHeadingTo(attackable.Combatant)
-	BroadcastMoveToPawn(attackable.Combatant) error
+	BroadcastMoveToPawn(attackable.Combatant)
 }
 
 // SummonMoveController controls movement requests emitted by a summon AI.
@@ -164,9 +163,7 @@ func (s *Summon) TryToIdle() {
 	defer s.mu.Unlock()
 	s.current = intention{kind: IntentionIdle}
 	s.next = intention{}
-	if err := s.move.Stop(); err != nil {
-		s.log.Warn().Err(err).Msg("ai: summon broadcast")
-	}
+	s.move.Stop()
 }
 
 // StartOffensiveFollowTicker launches the 500 ms offensive-follow recheck
@@ -275,14 +272,14 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 		return false, nil
 	}
 
-	stopErr := s.move.Stop()
+	s.move.Stop()
 	if !s.attack.CanAttack(target) {
 		s.current = intention{kind: IntentionIdle}
-		return false, stopErr
+		return false, nil
 	}
 
-	attackErr := s.attack.DoAttack(target)
-	return true, errors.Join(stopErr, attackErr)
+	s.attack.DoAttack(target)
+	return true, nil
 }
 
 func (s *Summon) thinkCastLocked() (bool, error) {
@@ -310,9 +307,8 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 		return true, err
 	}
 
-	var stopErr error
 	if s.cast.StopsMovement(ref) {
-		stopErr = s.move.Stop()
+		s.move.Stop()
 		if target.ObjectID() != s.actor.ObjectID() {
 			s.actor.SetHeadingTo(target)
 		}
@@ -320,16 +316,15 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 
 	if !s.cast.CanCast(target, ref) {
 		s.current = intention{kind: IntentionIdle}
-		var pawnErr error
 		if target.ObjectID() != s.actor.ObjectID() {
-			pawnErr = s.actor.BroadcastMoveToPawn(target)
+			s.actor.BroadcastMoveToPawn(target)
 		}
-		return false, errors.Join(stopErr, pawnErr)
+		return false, nil
 	}
 
 	s.cast.Cast(target, ref)
 	s.current = intention{kind: IntentionIdle}
-	return true, stopErr
+	return true, nil
 }
 
 func (s *Summon) thinkFollowLocked() (bool, error) {
@@ -370,7 +365,8 @@ func (s *Summon) targetLostLocked(target attackable.Combatant) (bool, error) {
 		if sameCombatant(s.next.target, target) {
 			s.next = intention{}
 		}
-		return true, s.move.Stop()
+		s.move.Stop()
+		return true, nil
 	}
 	return false, nil
 }

@@ -265,9 +265,7 @@ func (c *hostileControl) Emit(ev event.Event) {
 		// a cast was actually in flight — matching CreatureCast.stop()
 		// broadcasting MagicSkillCanceled behind the same isCastingNow()
 		// guard (CreatureCast.java:416-419), inherited unmodified by NpcCast.
-		if err := c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID()); err != nil {
-			c.log.Warn().Err(err).Msg("cast: skill-canceled broadcast")
-		}
+		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
 	}
 }
 
