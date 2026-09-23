@@ -190,12 +190,8 @@ func (a *Actor) despawn(state *world.State) {
 	// would flush the owner's inventory while the pet's items were still
 	// moving into it.
 	a.despawnOnce.Do(func() {
-		// Abort first, while observers still know this summon: a stop
-		// broadcast must reach them, and a cast or attack in flight must not
-		// land from a summon that is leaving.
-		if a.brain != nil {
-			a.brain.AbortAll()
-		}
+		// Unsummoning aborts in-flight actions and settles a pet, while
+		// observers still know this summon.
 		a.emit(event.Unsummoning{})
 		// RemoveSummon runs before Despawn: Despawn's relocate step
 		// synchronously fires the owner's Forget callback, which sends the
