@@ -114,8 +114,6 @@ type Actor struct {
 
 	followActive       bool
 	belowUnsummonLimit bool
-	intent             Intent
-	target             world.Tracked
 
 	ownerInventory   *itemcontainer.Inventory
 	timeLostIdle     int
@@ -148,14 +146,18 @@ type Actor struct {
 	unsummonLimit float64
 	roll          func(int) int
 
-	stats                               CombatStats
-	statCalc                            summonStatCalcs
-	vitals                              summonVitals
-	effects                             *effect.List
-	skillDefs                           skillLookup
-	raidCursesDisabled                  bool
+	stats              CombatStats
+	statCalc           summonStatCalcs
+	vitals             summonVitals
+	effects            *effect.List
+	skillDefs          skillLookup
+	raidCursesDisabled bool
+	// stateMu also guards intent and target: another actor's skill landing
+	// on this summon retargets or idles it from that actor's queue.
 	stateMu                             sync.RWMutex
 	paralyzed, teleporting, immobilized bool
+	intent                              Intent
+	target                              world.Tracked
 
 	abnormalEffect  atomic.Int32
 	ownerDiscovered atomic.Bool

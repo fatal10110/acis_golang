@@ -58,8 +58,10 @@ State splits into three kinds:
   fire-and-forget today (no caller reads a result; the three `Think()` results are discarded with
   `_ =`), so each becomes `target.Queue().Post(func() { … })` with an on-arrival re-check (still
   alive, still the same live object). This is not the rejected async-mutation design: nothing a
-  caller reads back is deferred, only commands nobody reads back, and by one hop — the reference
-  already defers AI intentions the same way via `ThreadPool.execute`. Status flags set by effects
+  caller reads back is deferred, only commands nobody reads back, and by one hop. *Superseded
+  (#2271 slice 3):* these commands stay synchronous under their existing leaf locks; see Phase 3.
+  The reference does not defer them (`AbstractAI.doIntention` is `synchronized`, `notifyEvent`
+  runs inline, nothing in `ai/type` uses `ThreadPool.execute`). Status flags set by effects
   and read by formulas (`invul`, `paralyzed`, `immobilized`, `teleporting`, sitting) are atomics
   (#2262 item 9), settable from any goroutine. New multi-actor state ported later (party, clan,
   duel, olympiad, siege) is a container with its own short mutex, never a field on one actor that
@@ -260,6 +262,18 @@ pool (Phase 2), so no queued task can block on the DB.
   classified into `vitalsMu` subset / atomic flag / container / command post) to
   `target.Queue().Post(...)` with an on-arrival re-check. A site whose result turns out to be read
   by the caller joins the `vitalsMu` subset instead; note each such case on #2271.
+  *Landed as:* no command is posted; each one stays synchronous on the caller's goroutine under
+  the target's existing leaf lock. Posting changes what clients see. The reference runs an
+  effect's `abortAll` → `tryToIdle` → `updateAbnormalEffect` in the caster's call stack, so
+  `StopMove`/`MagicSkillCanceled` reach observers before the effect icon. A post also lands
+  behind a hit expiry the target's queue already holds, so under backlog a stunned target's cast
+  still lands, while a synchronous `sim.Timer.Stop` cancels that expiry the way
+  `ScheduledFuture.cancel` does. Every wired command either sends packets (stop/abort/interrupt,
+  retarget, stance, charges, death penalty, teleport, flight) or is read back by the next
+  aggressor (a summon's target), so none qualifies. The audit found one unguarded pair,
+  `summon.Actor` `target`/`intent`, now under `stateMu`. Commands still stubbed on live actors
+  (`AbortAll`, `StopMove`, `StopAttack`, `ClearTarget`, `TryToIdle`, `FleeFrom` on player/NPC)
+  follow the same rule when they are wired: they run synchronously under the controller's lock.
 - Trade commit and ground pickup as described above.
 - Gate: `tests/combat`, `tests/skills`, `tests/trade`, `tests/items` green under `-race` and
   `-tags simdebug` in both `sim.Inline` and real-pool modes; a scenario per converted flow asserting
@@ -270,10 +284,13 @@ pool (Phase 2), so no queued task can block on the DB.
 1. `model/actor/player` + `network/live_player.go` (18 locks → `vitalsMu`; closes #2258 —
    progression is queue-owned, level-up hooks run on the queue with nothing held).
 2. `model/actor/npc` + `ai` + `summon` (16 → `vitalsMu`; summon state is owner-queue-owned).
-3. `move`/`attack`/`cast`/`cubic` (6 → 0). `cast.Controller.mu` is deleted; `Start` and `Hit` run
-   on the caster's queue and their `ConsumeItem`/`ReduceMP`/`ReduceHP` are the **caster's own**
-   skill cost under the caster's own `vitalsMu` — #2259 itself is fixed in Phase 0, this sweep removes
-   the lock it was about.
+3. `move`/`attack`/`cast`/`cubic`. The move/attack/cast controller locks stay as leaf container
+   locks, because other actors stop, abort and interrupt them synchronously (Phase 3, landed).
+   The same goes for the AI brains' locks (`ai.Attackable`, `ai.PlayerAttack`, `ai.Summon`) and
+   the `stateMu` sections guarding target, stance, charges and summon intent. The sweep still
+   moves `Start` and `Hit` onto the caster's queue, where their `ConsumeItem`/`ReduceMP`/`ReduceHP`
+   are the **caster's own** skill cost under its own `vitalsMu` (#2259 was fixed in Phase 0). The
+   `cubic` locks are still deleted where no other actor reaches them.
 4. `skill/effect`: `List`'s own mutex goes (guarded by its owner's `vitalsMu`); `Calculator` and
    the effect schedule become queue-owned (timers via `queue.After`).
 5. `model/itemcontainer` + `model/item`: `Inventory` keeps `inv.mu` as a container; per-item
@@ -319,7 +336,8 @@ pool (Phase 2), so no queued task can block on the DB.
   scenario where one party drops an offered item between offer and confirm.
 - Phase 4: shutdown with online players saves every one before exit; relog mid-fight.
 - End state check: `rg -n "sync\.(RW)?Mutex" internal/gameserver/model internal/gameserver/skill`
-  reports only `vitalsMu` (one per actor type) and `Inventory`/container locks; nothing else.
+  reports only `vitalsMu` (one per actor type), `Inventory`/container locks, and the leaf locks
+  cross-actor commands take synchronously (controllers, AI brains, target/stance state).
 - Manual: run two clients in one region, trade, fight an NPC, relog mid-fight (autosave/detach
   ordering) per `docs/run-servers.md`.
 
