@@ -674,10 +674,24 @@ func (h *Hostile) TickThink() error {
 	return h.brain.TickThink()
 }
 
-// OnInactiveRegion applies the hostile-NPC reset that aCis runs when the
-// owning world region deactivates.
+// OnInactiveRegion applies the hostile-NPC reset when the owning world region
+// deactivates. The player whose departure deactivated the region calls it on
+// that player's queue, so the reset is posted to this NPC's queue and applies
+// only if the NPC is still placed in an inactive region when it runs.
 func (h *Hostile) OnInactiveRegion() {
-	h.enterInactiveRegion()
+	reset := func() {
+		if h.world != nil {
+			if placed, active := h.world.RegionActivity(h); !placed || active {
+				return
+			}
+		}
+		h.enterInactiveRegion()
+	}
+	if q := h.Queue(); q != nil {
+		q.Post(reset)
+		return
+	}
+	reset()
 }
 
 // OnActiveRegion clears the deactivation latch once players wake the region.

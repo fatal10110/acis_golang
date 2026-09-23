@@ -20,7 +20,10 @@ type Tracked interface {
 // around their own. Callbacks run after the subject has entered its destination
 // region or left the grid, with the world lock released. Discover and Forget run
 // on whichever goroutine drives the region transition, so implementations must
-// be safe to call concurrently and return promptly without blocking. They must
+// be safe to call concurrently and return promptly without blocking. They send
+// before returning rather than posting to the observer's queue: the subject's
+// next updates go out from the goroutine that moved it, and a deferred info
+// packet would reach the observer's client after them. They must
 // not call State's transition methods (Spawn, Move, Despawn, or DespawnAll)
 // from a callback: the subject's placement is still being delivered, and two
 // callbacks repositioning each other's subjects would wait on each other.

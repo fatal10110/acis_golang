@@ -36,6 +36,9 @@ type activeRegionActor interface {
 	OnActiveRegion()
 }
 
+// inactiveRegionActor is told its region deactivated. The call runs on the
+// goroutine of the player whose departure deactivated it, so an
+// implementation that resets its own state posts that work to its own queue.
 type inactiveRegionActor interface {
 	OnInactiveRegion()
 }

@@ -246,9 +246,15 @@ pool (Phase 2), so no queued task can block on the DB.
   every hook they fire today moves to a post on the owner's queue after unlock.
 - Atomics for HP/MP/CP, position, dead, target id; `atomic.Pointer` stat snapshot republished on
   recalculation (reuse `player.Vitals`, `npcinfo.Snapshot`, `attack.Snapshot`).
-- Observers: `world.Observer.Discover/Forget` implementations post to the observer's queue
-  (contract at [world/visibility.go:18](internal/gameserver/world/visibility.go#L18) already
-  forbids blocking); zone enter/exit watchers and region `OnActive/OnInactiveRegion` likewise.
+- Observers: region `OnInactiveRegion` posts the NPC reset (effects stopped, AI back to peace) to
+  the NPC's queue with an on-arrival re-check that the region is still inactive; `OnActiveRegion`
+  only clears an atomic latch and stays inline. *Landed as:* `world.Observer.Discover/Forget`
+  stay synchronous on the goroutine that drives the transition — the reference sends object info
+  inline from the moving thread, and the subject's next updates (move, status) go out from that
+  same goroutine, so posting info to the observer's queue would let them overtake it. What those
+  callbacks read of the other actor is covered by the atomics/stat-snapshot item below. Zone
+  enter/exit watchers have no production registration yet; a script that adds one posts its own
+  work.
 - Cross-actor commands: convert the 53 sites (list them in the PR with
   `rg -oh 'target\.[A-Z][A-Za-z]+\(' internal/gameserver/skill internal/gameserver/handler | sort | uniq -c`,
   classified into `vitalsMu` subset / atomic flag / container / command post) to
