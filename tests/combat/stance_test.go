@@ -201,7 +201,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	assertFrameOpcode(t, mustRead(t, c, "cast message"), serverpackets.OpcodeSystemMessage, "cast message")
 	assertFrameOpcode(t, mustRead(t, c, "SetupGauge"), serverpackets.OpcodeSetupGauge, "SetupGauge")
 
-	if !playerCastingNow(t, srv, objID) {
+	if !srv.PlayerCastingNow(t, objID) {
 		t.Fatal("cast was not in flight before stance timeout")
 	}
 
@@ -214,7 +214,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	if got := wireReader(stop[1:]).ReadInt32(); got != objID {
 		t.Fatalf("AutoAttackStop object id = %d, want %d", got, objID)
 	}
-	if !playerCastingNow(t, srv, objID) {
+	if !srv.PlayerCastingNow(t, objID) {
 		t.Fatal("stance timeout stopped the in-flight cast")
 	}
 	if srv.AttackStance.InAttackStance(worldActor{id: objID}) {
@@ -228,19 +228,6 @@ type worldActor struct{ id int32 }
 
 func (a worldActor) ObjectID() int32 { return a.id }
 func (worldActor) Queue() *sim.Queue { return nil }
-
-func playerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) bool {
-	t.Helper()
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	caster, ok := obj.(interface{ CastingNow() bool })
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T does not expose CastingNow", objID, obj)
-	}
-	return caster.CastingNow()
-}
 
 // readSkippingCombat reads until opcode want, skipping in-flight Attack
 // and StatusUpdate frames. MagicSkillCanceled is a failure: the timeout

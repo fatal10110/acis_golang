@@ -71,6 +71,9 @@ func killPrimaryClient(t *testing.T, srv *gameservertest.Server, killer *scripte
 		t.Fatalf("world victim %T does not expose Dead()", obj)
 	}
 	waitFor(t, "victim death", dead.Dead)
+	// The dead flag flips at the start of the death sequence; the rest of
+	// it (effect cleanup, penalties) finishes on an actor queue.
+	srv.Settle(t)
 }
 
 // readExpLossMessage scans the victim's frames until the experience-loss
