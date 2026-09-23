@@ -39,9 +39,11 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 		t.Fatalf("merged rows pending = %v/%v, want both scheduled",
 			srv.ItemInstances.ContainsID(first), srv.ItemInstances.ContainsID(second))
 	}
-	absorbed := first
-	if findItemListEntry(entries, first) != nil {
-		absorbed = second
+	// The rows are read back in no particular order, so either one may be
+	// the survivor.
+	survivor, absorbed, absorbedCount := first, second, 50
+	if findItemListEntry(entries, first) == nil {
+		survivor, absorbed, absorbedCount = second, first, 100
 	}
 
 	// A player can relog before the lazy task runs. The detach flush then
@@ -51,8 +53,8 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 	for login := 2; login <= 4; login++ {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
-		if rows := persistedItemCounts(t, srv, objID); rows[absorbed] != 50 {
-			t.Fatalf("login %d: precondition failed: absorbed row %d holds %v, so its delete already landed and this run never entered the relog-before-flush window", login, absorbed, rows)
+		if rows := persistedItemCounts(t, srv, objID); rows[absorbed] != absorbedCount || rows[survivor] != 150 {
+			t.Fatalf("login %d: precondition failed: rows %v, want survivor %d at 150 and absorbed %d still at %d, so this run never entered the relog-before-flush window", login, rows, survivor, absorbed, absorbedCount)
 		}
 		entries = readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))
 		assertSingleAdena(t, entries, 150)
