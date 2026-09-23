@@ -168,7 +168,9 @@ func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.
 }
 
 // Restore replaces inv's current contents with persisted item rows without
-// changing their locations and without queuing inventory updates.
+// changing their locations and without queuing inventory updates. The only
+// writes it schedules are those of a stackable row merged into an earlier
+// stack of the same template.
 func (inv *Inventory) Restore(items []*item.Instance) {
 	inv.Container.mu.Lock()
 	defer inv.Container.mu.Unlock()
@@ -200,14 +202,20 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 
 		// Restoring a row is not a change to persist: the persister is
 		// bound only once every row is in place, so neither the owner
-		// fix-up, nor a stack merge, nor an equip displacement schedules
-		// a redundant write of what was just read.
+		// fix-up nor an equip displacement schedules a redundant write of
+		// what was just read.
 		inst.EnterContainer(inv.OwnerID(), st.Location, st.LocationData, restoredAt)
 		merged := false
 		tmpl, _ := inv.Templates().Get(inst.TemplateID)
 		if tmpl != nil && tmpl.Stackable {
 			for _, held := range inv.Container.items {
 				if held.TemplateID == inst.TemplateID {
+					// A stack merge is the exception: it changes two rows.
+					// Unwritten, the absorbed row survives to be merged in
+					// again on every later restore, so both the grown stack
+					// and the absorbed row's delete are scheduled here.
+					held.BindPersister(inv.Container.persist)
+					inst.BindPersister(inv.Container.persist)
 					held.AddCount(st.Count)
 					inst.DestroyState()
 					merged = true
