@@ -7,6 +7,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -389,5 +391,33 @@ func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
 	}
 	if _, ok := state.Summon(owner.ObjectID()); ok {
 		t.Fatal("summon still active in world after despawn")
+	}
+}
+
+// panickingSummonMove is a summon movement controller whose Stop panics,
+// standing in for any failure inside the despawn abort.
+type panickingSummonMove struct{ inertSummonMoveController }
+
+func (panickingSummonMove) Stop() { panic("move stop exploded") }
+
+// TestSummonDespawnSurvivesAPanickingAbort pins that the abort at the start
+// of a despawn cannot strand the summon. Despawn runs once, and a panic
+// escaping it would count as done: the summon would stay in the world
+// holding its owner's summon slot, with no later despawn able to remove it.
+func TestSummonDespawnSurvivesAPanickingAbort(t *testing.T) {
+	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
+	state := world.New()
+	state.AddPlayer(owner)
+	servitor := newTestServitor(t, owner)
+
+	sink := &summonSink{link: &GameClientLink{world: state, log: zerolog.Nop()}, actor: servitor}
+	sink.brain = ai.NewSummon(servitor, panickingSummonMove{}, attack.NewPlayable(servitor, sink))
+	servitor.Attach(summon.Runtime{AI: sink.brain, Sink: sink})
+	summon.SpawnBesideOwner(state, servitor, owner, location.Location{})
+
+	servitor.Unsummon()
+
+	if _, ok := state.Summon(owner.ObjectID()); ok {
+		t.Fatal("summon still active in world after a despawn whose abort panicked")
 	}
 }

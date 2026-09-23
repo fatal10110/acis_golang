@@ -153,7 +153,12 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.Unsummoning:
 		// Recovered like a despawn cleanup: this runs inside the summon's
 		// one-time despawn, so a panic escaping it would leave the summon in
-		// the world with no second despawn to take it out.
+		// the world with no second despawn to take it out. The abort comes
+		// first, so a stop broadcast still reaches observers and a cast or
+		// attack in flight cannot land from a summon that is leaving.
+		if s.brain != nil {
+			s.runCleanup(s.brain.AbortAll)
+		}
 		s.runCleanup(func() { l.releasePet(actor) })
 	case event.Despawned:
 		s.runDespawn()

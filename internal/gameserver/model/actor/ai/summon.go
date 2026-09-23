@@ -166,6 +166,19 @@ func (s *Summon) TryToIdle() {
 	s.move.Stop()
 }
 
+// AbortAll stops movement, the attack cycle and any in-flight cast, in that
+// order. Intentions are left as they are.
+func (s *Summon) AbortAll() {
+	s.mu.Lock()
+	cast := s.cast
+	s.mu.Unlock()
+	s.move.Stop()
+	s.attack.Stop()
+	if cast != nil {
+		cast.Stop()
+	}
+}
+
 // StartOffensiveFollowTicker launches the 500 ms offensive-follow recheck
 // loop on q, the owner's queue, and returns the func the caller stops it
 // with on despawn. A nil q runs the loop on its own ticker goroutine.
