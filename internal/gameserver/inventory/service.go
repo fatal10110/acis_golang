@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -312,6 +313,8 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	return out, true, nil
 }
 
+var errNoIDAllocator = errors.New("inventory exchange: no object id allocator")
+
 // Move is one item row an exchange hands from one inventory to the other.
 type Move struct {
 	ObjectID int32
@@ -329,18 +332,23 @@ func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, che
 	if a == nil || b == nil || a == b {
 		return Result{}, false, nil
 	}
-	// Ids come from outside the inventory locks, so every row gets one up
-	// front; a row that needs none hands it back below.
+	// Ids come from outside the inventory locks, and whether a row splits is
+	// only known under them, so every row gets one up front. A move that
+	// could not get its id would fail after earlier rows had landed, so no
+	// allocator means no exchange at all.
+	// ponytail: a row that needs no id burns its id; the allocator never
+	// reuses an id behind its cursor, so handing it back would buy nothing.
 	ids := make([]int32, len(aOut)+len(bOut))
 	for i := range ids {
-		id, _, err := s.nextID()
+		id, ok, err := s.nextID()
 		if err != nil {
-			s.releaseIDs(ids)
 			return Result{}, false, err
+		}
+		if !ok {
+			return Result{}, false, errNoIDAllocator
 		}
 		ids[i] = id
 	}
-	defer s.releaseIDs(ids)
 
 	var res Result
 	ok := false
@@ -354,8 +362,8 @@ func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, che
 	return res, ok, nil
 }
 
-// moveAll transfers every row from source to receiver, taking ids[i] for row
-// i and zeroing it once the move keeps it.
+// moveAll transfers every row from source to receiver, row i splitting off
+// under ids[i] when it has to.
 func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids []int32) bool {
 	for i, row := range rows {
 		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids[i])
@@ -369,29 +377,12 @@ func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int
 			res.Persist = append(res.Persist, Delete(sourceOwnerID, m.FreedObjectID))
 		}
 		if m.Created {
-			ids[i] = 0
 			res.Persist = append(res.Persist, Save(m.Item))
 		} else {
 			res.Persist = append(res.Persist, Update(m.Item))
 		}
 	}
 	return true
-}
-
-// releaseIDs hands unused ids back when the allocator takes them back.
-func (s *Service) releaseIDs(ids []int32) {
-	if s == nil {
-		return
-	}
-	releaser, ok := s.ids.(interface{ ReleaseID(int32) })
-	if !ok {
-		return
-	}
-	for _, id := range ids {
-		if id != 0 {
-			releaser.ReleaseID(id)
-		}
-	}
 }
 
 // CrystallizeItem destroys up to count units of objectID and adds the crystal reward.

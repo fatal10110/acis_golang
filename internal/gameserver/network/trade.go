@@ -212,13 +212,23 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 // leave the trade half done. Both inventories' updates and weight reach their
 // owners through the inventory-update tick, on each owner's own queue.
 func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirmerID int32) {
+	// Confirm already took the ready session out of the book, so a failed
+	// re-check cancels straight to the participants: a book cancel would
+	// reach no one.
 	first, second, ok := l.tradeParticipants(session)
 	if !ok {
-		l.cancelTradeByID(confirmerID)
+		// A participant left the world after Confirm. The reference answers
+		// a partner gone offline with the confirmer's own cancel, which
+		// names the confirmer; the one who left gets nothing.
+		for _, live := range []*livePlayer{first, second} {
+			if live != nil && live.ObjectID() == confirmerID {
+				sendTradeCancel(live, live.Name)
+			}
+		}
 		return
 	}
 	if !l.validTradeParticipants(first, second) {
-		l.cancelSettlingTrade(confirmerID, first, second)
+		sendTradeCanceled(first, second)
 		return
 	}
 
@@ -240,7 +250,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		l.applyPersistActions(res.Persist)
 	}
 	if status == tradebook.SettlementInvalidItems {
-		l.cancelSettlingTrade(confirmerID, first, second)
+		sendTradeCanceled(first, second)
 		return
 	}
 	failMessage := tradeSettlementMessage(status)
@@ -278,20 +288,14 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 	sendTradeCanceled(first, second)
 }
 
-// cancelSettlingTrade cancels a ready trade whose settle-time re-check
-// failed, with the same packets as every other cancel. Confirm already took
-// the ready session out of the book, so the cancel goes straight to both
-// participants; the book cancel only matters when the session is still open.
-func (l *GameClientLink) cancelSettlingTrade(confirmerID int32, first, second *livePlayer) {
-	l.tradeBook().Cancel(confirmerID)
-	sendTradeCanceled(first, second)
+func sendTradeCanceled(first, second *livePlayer) {
+	sendTradeCancel(first, second.Name)
+	sendTradeCancel(second, first.Name)
 }
 
-func sendTradeCanceled(first, second *livePlayer) {
-	first.SendFrame(serverpackets.FrameSendTradeDone(false))
-	first.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, second.Name))
-	second.SendFrame(serverpackets.FrameSendTradeDone(false))
-	second.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, first.Name))
+func sendTradeCancel(live *livePlayer, cancellerName string) {
+	live.SendFrame(serverpackets.FrameSendTradeDone(false))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, cancellerName))
 }
 
 func (l *GameClientLink) finishTrade(first, second *livePlayer, success bool) {

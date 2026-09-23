@@ -330,3 +330,29 @@ func TestCrystallizeItemReportsGradeTooHighWithoutMutation(t *testing.T) {
 		t.Fatal("source item was removed")
 	}
 }
+
+// TestExchangeWithoutAllocatorMovesNothing pins the fail-closed exchange: a
+// service that cannot hand out object ids refuses before locking, instead of
+// moving a whole row and then failing on a later row that has to split.
+func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	sword := a.AddNew(30, 1, 500)
+	adena := b.AddNew(item.AdenaID, 100, 600)
+
+	checked := false
+	_, ok, err := NewService(nil).Exchange(a, b,
+		[]Move{{ObjectID: sword.ObjectID, Count: 1}},
+		[]Move{{ObjectID: adena.ObjectID, Count: 40}},
+		func(itemcontainer.Held, itemcontainer.Held) bool { checked = true; return true })
+	if err == nil || ok {
+		t.Fatalf("Exchange() = ok %v, err %v; want a refusal", ok, err)
+	}
+	if checked {
+		t.Fatal("Exchange locked and checked without ids for its rows")
+	}
+	if a.ItemByObjectID(sword.ObjectID) == nil || b.ItemCount(item.AdenaID, -1, true) != 100 {
+		t.Fatal("a refused exchange moved items")
+	}
+}
