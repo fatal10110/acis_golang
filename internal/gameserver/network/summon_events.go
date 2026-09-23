@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -149,8 +150,40 @@ func (s *summonSink) Emit(ev event.Event) {
 		s.brain.Think()
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
+	case event.Unsummoning:
+		// Recovered like a despawn cleanup: this runs inside the summon's
+		// one-time despawn, so a panic escaping it would leave the summon in
+		// the world with no second despawn to take it out.
+		s.runCleanup(func() { l.releasePet(actor) })
 	case event.Despawned:
 		s.runDespawn()
+	}
+}
+
+// releasePet settles a pet on its way out of the world, whatever took it out:
+// its items go back to its owner, its row and collar are saved, and its
+// container is then flushed and unregistered, since nothing else will ever
+// write it. It runs while the pet and its owner are both still in the world,
+// before PetDelete is sent.
+//
+// A dead pet is settled the same way. The routes that must leave a corpse
+// alone refuse before reaching here (Actor.Unsummon), so a dead pet only
+// arrives with its owner's logout or after dying mid-despawn. Its container
+// is keyed by an object id no later summon reuses, so items left in it would
+// be lost for good, and skipping the row would restore it alive from an
+// older save.
+func (l *GameClientLink) releasePet(actor *summon.Actor) {
+	if !actor.IsPet() {
+		return
+	}
+	var ownerInv *itemcontainer.Inventory
+	if owner, ok := liveSummonOwner(actor); ok {
+		ownerInv = owner.Inventory()
+	}
+	l.transferPetInventory(actor, ownerInv)
+	l.savePet(actor, ownerInv)
+	if inv := actor.PetInventory(); inv != nil {
+		l.flushItemPersistence(inv)
 	}
 }
 

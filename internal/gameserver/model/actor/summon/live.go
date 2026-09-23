@@ -99,7 +99,10 @@ type Actor struct {
 	lifetime LifetimeState
 	dead     bool
 	disabled bool
-	brain    AI
+	// despawnOnce runs the one despawn that takes this summon out of the
+	// world; see despawn. Nothing it runs may despawn this summon again.
+	despawnOnce sync.Once
+	brain       AI
 	// sink receives this summon's events. Attach installs it before
 	// SpawnBesideOwner publishes this summon into world.State; that publish
 	// takes a registry mutex, giving every other goroutine's read a
