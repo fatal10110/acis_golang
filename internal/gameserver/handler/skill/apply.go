@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -107,7 +108,10 @@ func offensiveEffectApplyBlocked(effector, effected effect.Actor, def modelskill
 	if c, ok := effected.(Creature); ok && c.Invul() {
 		return true
 	}
-	return !creature.CanDealDamage(formulaCasterOf(effector))
+	// Every combatant is consulted, formula caster or not; only a
+	// non-combatant effector is treated as sourceless and never blocked.
+	cb, _ := effector.(attackable.Combatant)
+	return !creature.CanDealDamage(cb)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the
