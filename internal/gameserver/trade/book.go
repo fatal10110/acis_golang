@@ -168,6 +168,9 @@ func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, objectID in
 		return AddResult{Status: AddPartnerConfirmed, PartnerID: partnerID}
 	}
 
+	if inv == nil {
+		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
+	}
 	inst, ok := itemForOffer(inv, playerID, objectID, count)
 	if !ok {
 		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
@@ -258,13 +261,35 @@ func (s Session) Empty() bool {
 	return s.FirstOffer.Empty() && s.SecondOffer.Empty()
 }
 
-// ValidItems reports whether all offered items are still tradeable in their source inventories.
-func (s Session) ValidItems(firstInv, secondInv *itemcontainer.Inventory) bool {
-	return ValidOfferItems(firstInv, s.FirstID, s.FirstOffer) && ValidOfferItems(secondInv, s.SecondID, s.SecondOffer)
+// Holdings is what settling a trade reads from one participant's inventory:
+// an *itemcontainer.Inventory, or the itemcontainer.Held view of one the
+// settling exchange has locked.
+type Holdings interface {
+	ItemByObjectID(objectID int32) *item.Instance
+	ItemByTemplateID(templateID int32) *item.Instance
+	Templates() *item.Table
+	ValidateCapacity(slotCount int) bool
+	ValidateWeight(weight int) bool
+}
+
+// Check re-validates a ready session against both participants' inventories
+// as they stand when it settles: every offered item still tradeable, then
+// the partner's offer within each receiver's weight and slots.
+func (s Session) Check(first, second Holdings) SettlementStatus {
+	if !ValidOfferItems(first, s.FirstID, s.FirstOffer) || !ValidOfferItems(second, s.SecondID, s.SecondOffer) {
+		return SettlementInvalidItems
+	}
+	switch s.ReceiverStatus(first, second) {
+	case ReceiverWeightExceeded:
+		return SettlementWeightExceeded
+	case ReceiverSlotsFull:
+		return SettlementSlotsFull
+	}
+	return SettlementOK
 }
 
 // ReceiverStatus reports whether both participants can receive their partner's offer.
-func (s Session) ReceiverStatus(firstInv, secondInv *itemcontainer.Inventory) ReceiverStatus {
+func (s Session) ReceiverStatus(firstInv, secondInv Holdings) ReceiverStatus {
 	if !ReceiverWeightFits(firstInv, s.SecondOffer) || !ReceiverWeightFits(secondInv, s.FirstOffer) {
 		return ReceiverWeightExceeded
 	}
@@ -295,7 +320,7 @@ func (o Offer) Entries(inv *itemcontainer.Inventory) []ItemUpdateEntry {
 }
 
 // ValidOfferItems reports whether every item in offer is still tradeable in inv.
-func ValidOfferItems(inv *itemcontainer.Inventory, ownerID int32, offer Offer) bool {
+func ValidOfferItems(inv Holdings, ownerID int32, offer Offer) bool {
 	for _, row := range offer.Items {
 		if _, ok := itemForOffer(inv, ownerID, row.Snapshot.ObjectID, row.Count); !ok {
 			return false
@@ -305,10 +330,7 @@ func ValidOfferItems(inv *itemcontainer.Inventory, ownerID int32, offer Offer) b
 }
 
 // ReceiverFits reports whether receiver has enough slots for offer.
-func ReceiverFits(receiver *itemcontainer.Inventory, offer Offer) bool {
-	if receiver == nil {
-		return false
-	}
+func ReceiverFits(receiver Holdings, offer Offer) bool {
 	slots := 0
 	seenStack := make(map[int32]bool)
 	for _, row := range offer.Items {
@@ -328,10 +350,7 @@ func ReceiverFits(receiver *itemcontainer.Inventory, offer Offer) bool {
 }
 
 // ReceiverWeightFits reports whether receiver can carry offer's weight.
-func ReceiverWeightFits(receiver *itemcontainer.Inventory, offer Offer) bool {
-	if receiver == nil {
-		return false
-	}
+func ReceiverWeightFits(receiver Holdings, offer Offer) bool {
 	weight := 0
 	for _, row := range offer.Items {
 		tmpl, ok := receiver.Templates().Get(row.Snapshot.TemplateID)
@@ -443,8 +462,8 @@ func (b *Book) processingTransactionLocked(objectID int32) bool {
 	return ok
 }
 
-func itemForOffer(inv *itemcontainer.Inventory, ownerID, objectID int32, count int) (*item.Instance, bool) {
-	if inv == nil || count <= 0 {
+func itemForOffer(inv Holdings, ownerID, objectID int32, count int) (*item.Instance, bool) {
+	if count <= 0 {
 		return nil, false
 	}
 	inst := inv.ItemByObjectID(objectID)

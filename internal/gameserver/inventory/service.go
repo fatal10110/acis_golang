@@ -312,6 +312,88 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	return out, true, nil
 }
 
+// Move is one item row an exchange hands from one inventory to the other.
+type Move struct {
+	ObjectID int32
+	Count    int
+}
+
+// Exchange moves aOut from a to b and bOut from b to a as one step (see
+// itemcontainer.Exchange): check sees both inventories exactly as the moves
+// will find them and can veto the whole exchange, and nothing either owner
+// does can land between the check and the last move. It reports false,
+// having changed nothing, when check vetoes. A move failing after the check
+// approved is a broken check; it reports false with the persistence of the
+// moves already made, so the caller still writes what did happen.
+func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, check func(a, b itemcontainer.Held) bool) (Result, bool, error) {
+	if a == nil || b == nil || a == b {
+		return Result{}, false, nil
+	}
+	// Ids come from outside the inventory locks, so every row gets one up
+	// front; a row that needs none hands it back below.
+	ids := make([]int32, len(aOut)+len(bOut))
+	for i := range ids {
+		id, _, err := s.nextID()
+		if err != nil {
+			s.releaseIDs(ids)
+			return Result{}, false, err
+		}
+		ids[i] = id
+	}
+	defer s.releaseIDs(ids)
+
+	var res Result
+	ok := false
+	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
+		if check != nil && !check(heldA, heldB) {
+			return
+		}
+		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, ids) &&
+			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, ids[len(aOut):])
+	})
+	return res, ok, nil
+}
+
+// moveAll transfers every row from source to receiver, taking ids[i] for row
+// i and zeroing it once the move keeps it.
+func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids []int32) bool {
+	for i, row := range rows {
+		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids[i])
+		if !ok {
+			return false
+		}
+		if m.Remaining != nil {
+			res.Persist = append(res.Persist, Update(m.Remaining))
+		}
+		if m.FreedObjectID != 0 {
+			res.Persist = append(res.Persist, Delete(sourceOwnerID, m.FreedObjectID))
+		}
+		if m.Created {
+			ids[i] = 0
+			res.Persist = append(res.Persist, Save(m.Item))
+		} else {
+			res.Persist = append(res.Persist, Update(m.Item))
+		}
+	}
+	return true
+}
+
+// releaseIDs hands unused ids back when the allocator takes them back.
+func (s *Service) releaseIDs(ids []int32) {
+	if s == nil {
+		return
+	}
+	releaser, ok := s.ids.(interface{ ReleaseID(int32) })
+	if !ok {
+		return
+	}
+	for _, id := range ids {
+		if id != 0 {
+			releaser.ReleaseID(id)
+		}
+	}
+}
+
 // CrystallizeItem destroys up to count units of objectID and adds the crystal reward.
 func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, count, skillLevel int) (CrystallizeResult, CrystallizeFailure, error) {
 	if count <= 0 {

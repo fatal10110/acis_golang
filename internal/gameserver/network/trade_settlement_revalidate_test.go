@@ -31,7 +31,7 @@ func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 	}
 	testsupport.ResetCapture(firstCap, secondCap)
 
-	link.settleConfirmedTrade(ctx, session, second.ObjectID())
+	link.settleConfirmedTrade(session, second.ObjectID())
 
 	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)

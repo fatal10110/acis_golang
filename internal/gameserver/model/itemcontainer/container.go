@@ -341,6 +341,12 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 		return nil, false
 	}
 
+	c.insertLocked(inst)
+	return inst, false
+}
+
+// insertLocked makes inst one of c's items. The caller holds c.mu.
+func (c *Container) insertLocked(inst *item.Instance) {
 	// Hand the item this container's persister before the move itself
 	// mutates it, so the ownership/location change that brings it in is the
 	// first thing reported. A container with no persister of its own leaves
@@ -349,7 +355,6 @@ func (c *Container) Add(inst *item.Instance) (result *item.Instance, absorbed bo
 	inst.BindPersister(c.persist)
 	inst.EnterContainer(c.ownerID, c.location, 0, nowMillis())
 	c.items[inst.ObjectID] = inst
-	return inst, false
 }
 
 // AddNew creates a new instance of templateID, using objectID as its
