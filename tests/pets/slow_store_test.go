@@ -148,7 +148,7 @@ func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
 	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 		t.Fatal("pet already in world: the restore window this test needs was never open")
 	}
-	if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+	if !h.srv.PlayerCastingNow(t, h.ownerID) {
 		t.Fatal("summon cast already finished while the pets-row read was still in flight: the client can see the cast complete before the pet it summoned")
 	}
 
@@ -157,7 +157,7 @@ func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
 		if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 			return true
 		}
-		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+		if !h.srv.PlayerCastingNow(t, h.ownerID) {
 			endedEarly = true
 		}
 		return false
@@ -339,7 +339,7 @@ func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
 		if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 			break
 		}
-		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+		if !h.srv.PlayerCastingNow(t, h.ownerID) {
 			castEnded = true
 		}
 		time.Sleep(50 * time.Millisecond)
@@ -350,20 +350,6 @@ func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
 	if !castEnded {
 		t.Fatal("the summon cast was still in flight for the whole read: the hold has no ceiling, so a stalled persistence lane keeps the caster casting for as long as it stalls")
 	}
-}
-
-// petOwnerCastingNow reports whether the owner has a cast in flight.
-func petOwnerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) bool {
-	t.Helper()
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	caster, ok := obj.(interface{ CastingNow() bool })
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T does not expose CastingNow", objID, obj)
-	}
-	return caster.CastingNow()
 }
 
 // TestWyvernMountRejectedAfterHoldCeiling covers the window the hold's own
@@ -391,12 +377,12 @@ func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
 	// Wait for the ceiling to end the cast, with the read still running.
 	deadline := time.Now().Add(ceilingStoreDelay)
 	for time.Now().Before(deadline) {
-		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+		if !h.srv.PlayerCastingNow(t, h.ownerID) {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if petOwnerCastingNow(t, h.srv, h.ownerID) {
+	if h.srv.PlayerCastingNow(t, h.ownerID) {
 		t.Fatal("cast never ended: the ceiling window this test needs was never open")
 	}
 	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
@@ -446,12 +432,12 @@ func TestSecondCollarSilentAfterHoldCeiling(t *testing.T) {
 
 	deadline := time.Now().Add(ceilingStoreDelay)
 	for time.Now().Before(deadline) {
-		if !petOwnerCastingNow(t, h.srv, h.ownerID) {
+		if !h.srv.PlayerCastingNow(t, h.ownerID) {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if petOwnerCastingNow(t, h.srv, h.ownerID) {
+	if h.srv.PlayerCastingNow(t, h.ownerID) {
 		t.Fatal("cast never ended: the ceiling window this test needs was never open")
 	}
 	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
