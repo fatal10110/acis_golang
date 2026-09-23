@@ -219,6 +219,12 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			if def.SkillType == "FUSION" || !launchResolved {
 				return
 			}
+			// A caster that left the world after launch lands nothing,
+			// whichever path removed it. Off the grid, an object knows
+			// nothing, itself included.
+			if !a.Caster.Knows(a.Caster) {
+				return
+			}
 			result := ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)
 			if a.OnHitResult != nil {
 				a.OnHitResult(result)

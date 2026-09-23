@@ -169,6 +169,12 @@ func (a *Actor) despawn(state *world.State) {
 	if state == nil {
 		return
 	}
+	// Abort first, while observers still know this summon: a stop broadcast
+	// must reach them, and a cast or attack in flight must not land from a
+	// summon that has already left.
+	if a.brain != nil {
+		a.brain.AbortAll()
+	}
 	// RemoveSummon runs before Despawn: Despawn's relocate step synchronously
 	// fires the owner's Forget callback, which sends the client-visible
 	// PetDelete frame. A caller (or a test synchronizing on that frame, as
