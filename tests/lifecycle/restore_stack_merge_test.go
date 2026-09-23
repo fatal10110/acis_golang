@@ -101,3 +101,56 @@ func assertPersistedAdena(t *testing.T, srv *gameservertest.Server, ownerID int3
 		t.Fatalf("persisted adena rows = %v, want [%d]", got, want)
 	}
 }
+
+// TestRestoreMergedStackKeepsInventoryRowOverEquippedRow covers a merge whose
+// two rows sit at different locations: one equipped in the arrow slot, one in
+// the inventory. Rows are restored in slot order, so the inventory row (slot
+// 0) is read first and survives; the equipped row is absorbed into it and the
+// merged stack comes back unequipped. The equipped row is inserted first so
+// that a restore reading rows in insertion order would keep it instead.
+func TestRestoreMergedStackKeepsInventoryRowOverEquippedRow(t *testing.T) {
+	const woodenArrow = 17
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithReuseDelays(0, 0),
+	)
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	arrowSlot, ok := item.SlotLHand.PaperdollIndex()
+	if !ok {
+		t.Fatal("no paperdoll index for the left hand")
+	}
+	equipped := srv.NewObjectID()
+	if err := srv.Items.Create(context.Background(), objID, item.Instance{
+		ObjectID: equipped, TemplateID: woodenArrow, OwnerID: objID, Count: 10,
+		Location: item.LocationPaperdoll, LocationData: arrowSlot,
+	}); err != nil {
+		t.Fatalf("seed equipped arrows: %v", err)
+	}
+	inventory := srv.GiveItem(t, objID, woodenArrow, 5)
+
+	entries := readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))
+	var arrows []itemListEntry
+	for _, e := range entries {
+		if e.itemID == woodenArrow {
+			arrows = append(arrows, e)
+		}
+	}
+	if len(arrows) != 1 || arrows[0].objID != inventory || arrows[0].count != 15 || arrows[0].equipped != 0 {
+		t.Fatalf("ItemList arrows = %+v, want one unequipped stack of 15 under object %d", arrows, inventory)
+	}
+
+	if err := srv.ItemInstances.Save(context.Background()); err != nil {
+		t.Fatalf("flush merged stack: %v", err)
+	}
+	var rows []*item.Instance
+	for _, inst := range persistedItems(t, srv, objID) {
+		if inst.TemplateID == woodenArrow {
+			rows = append(rows, inst)
+		}
+	}
+	if len(rows) != 1 || rows[0].ObjectID != inventory || rows[0].Count != 15 || rows[0].Location != item.LocationInventory {
+		t.Fatalf("persisted arrow rows = %+v, want only object %d at 15 in INVENTORY", rows, inventory)
+	}
+}
