@@ -50,6 +50,19 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
+	// The claim is this click's hold on the drop. Another player's pickup,
+	// a pet's loot or the cleanup task that got there first leaves nothing
+	// to take; every rejection below puts the item back for the next picker.
+	if !ground.Claim() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+	taken := false
+	defer func() {
+		if !taken {
+			ground.Release()
+		}
+	}()
 	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
@@ -78,6 +91,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 			return true
 		}
+		taken = true
 		live.SendFrame(serverpackets.FrameActionFailed())
 		l.broadcastGroundPickup(ground, live.ObjectID())
 		l.groundItems.Remove(ground)
@@ -102,6 +116,8 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}
+
+	taken = true
 
 	// A successful pickup still has to release the pending action the client
 	// registered when it accepted the click. GetItem, DeleteObject and

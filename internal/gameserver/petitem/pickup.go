@@ -24,6 +24,9 @@ const (
 	PickupPetCannotCarryMore
 	// PickupLootLocked means ground is owned by someone other than pet's owner.
 	PickupLootLocked
+	// PickupTaken means another pickup or the ground cleanup claimed ground
+	// first, so there is nothing left to take.
+	PickupTaken
 )
 
 // PickupResult carries item-store operations for a pet ground-item pickup.
@@ -37,7 +40,9 @@ func PickupAvailable(pet *summon.Actor) bool {
 	return pet != nil && !pet.Dead() && !pet.OutOfControl()
 }
 
-// PickupGround validates and moves a ground item into a pet inventory.
+// PickupGround validates and moves a ground item into a pet inventory. It
+// claims ground first (see grounditem.Item.Claim) and keeps the claim only on
+// PickupOK, so the caller despawns an item no one else can take any more.
 func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item) (PickupResult, PickupFailure) {
 	if pet == nil || petInv == nil || ground == nil || ground.Template == nil || ground.Count() <= 0 {
 		return PickupResult{}, PickupNoop
@@ -51,10 +56,16 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 	if !herb && ForbiddenForPet(picked, ground.Template) {
 		return PickupResult{}, PickupItemNotForPets
 	}
+	// Every rejection from here on puts the claimed item back on the ground.
+	if !ground.Claim() {
+		return PickupResult{}, PickupTaken
+	}
 	if !petInv.ValidateCapacity(petInv.SlotsNeededFor(picked, ground.Template)) {
+		ground.Release()
 		return PickupResult{}, PickupPetCannotCarryMore
 	}
 	if inventory.LootLocked(ground.Instance.OwnerID, pet.OwnerID()) {
+		ground.Release()
 		return PickupResult{}, PickupLootLocked
 	}
 	if herb {
@@ -63,6 +74,7 @@ func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *gr
 
 	result, absorbed := petInv.Add(picked)
 	if result == nil {
+		ground.Release()
 		return PickupResult{}, PickupNoop
 	}
 	actions := []inventory.Persist{inventory.Save(result)}

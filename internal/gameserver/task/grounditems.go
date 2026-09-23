@@ -205,6 +205,11 @@ func (g *GroundItems) Tick() {
 		if entry.expiresAt.IsZero() || now.Before(entry.expiresAt) {
 			continue
 		}
+		// A pickup in flight owns the item; a failed one puts it back and a
+		// later tick expires it.
+		if !entry.item.Claim() {
+			continue
+		}
 		delete(g.items, id)
 		expired = append(expired, entry.item)
 	}
