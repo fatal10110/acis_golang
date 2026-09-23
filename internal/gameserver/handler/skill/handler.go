@@ -460,6 +460,12 @@ func cursed(a Actor) bool {
 // formulaCasterOf returns a as a formula caster, or nil for a cast
 // participant that is not a creature (a door or a signet effect point).
 // Formula inputs treat a nil caster as one that cannot roll.
+//
+// Do not read a damage permission through this narrowing: a combatant that
+// is not a formula caster also comes back nil, and creature.CanDealDamage(nil)
+// reports true because sourceless damage is legitimate. Such a gate would
+// lift for that combatant instead of consulting it. Narrow to
+// attackable.Combatant for permission checks instead.
 func formulaCasterOf(a Actor) creature.FormulaActor {
 	c, _ := a.(creature.FormulaActor)
 	return c
