@@ -511,10 +511,18 @@ func (a *Actor) IsAttackingNow() bool {
 }
 
 // CurrentTarget returns the summon target selected by its current command.
-func (a *Actor) CurrentTarget() world.Tracked { return a.target }
+func (a *Actor) CurrentTarget() world.Tracked {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.target
+}
 
 // SetTarget updates the summon target without issuing an owner-visible packet.
-func (a *Actor) SetTarget(target world.Tracked) { a.target = target }
+func (a *Actor) SetTarget(target world.Tracked) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	a.target = target
+}
 
 // AttackTarget forwards an aggression-triggered attack to the summon AI.
 func (a *Actor) AttackTarget(target world.Tracked) { a.TryToAttack(target) }
@@ -541,7 +549,7 @@ func (a *Actor) TryToFollow(target world.Tracked) {
 
 // TryToIdle cancels the attached AI's current intention.
 func (a *Actor) TryToIdle() {
-	a.intent = IntentIdle
+	a.setIntent(IntentIdle)
 	if a.brain != nil {
 		a.brain.TryToIdle()
 	}
@@ -598,6 +606,16 @@ func (a *Actor) Lifetime() LifetimeState {
 func (a *Actor) FollowActive() bool { return a.followActive }
 
 // Intent returns the live action this actor is currently pursuing.
-func (a *Actor) Intent() Intent { return a.intent }
+func (a *Actor) Intent() Intent {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.intent
+}
+
+func (a *Actor) setIntent(intent Intent) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	a.intent = intent
+}
 
 // ApplyCommand resolves and applies an owner-issued control command.

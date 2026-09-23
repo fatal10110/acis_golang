@@ -12,7 +12,7 @@ import (
 
 func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 	outcome := Resolve(a.resolveRequest(ctx))
-	result := CommandResult{Outcome: outcome, Feedback: feedbackFor(outcome), Intent: a.intent}
+	result := CommandResult{Outcome: outcome, Feedback: feedbackFor(outcome), Intent: a.Intent()}
 	if outcome != OutcomeApplied {
 		return result
 	}
@@ -21,21 +21,21 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 	case CommandToggleFollow:
 		a.followActive = !a.followActive
 		if a.followActive {
-			a.intent = IntentFollowOwner
+			a.setIntent(IntentFollowOwner)
 			a.TryToFollow(a.owner)
 		} else {
 			a.TryToIdle()
 		}
 	case CommandAttack:
-		a.target = ctx.Target
+		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature && ctx.TargetAttackable {
-			a.intent = IntentAttackTarget
+			a.setIntent(IntentAttackTarget)
 			a.TryToAttack(ctx.Target)
 		} else if ctx.TargetIsCreature {
-			a.intent = IntentFollowTarget
+			a.setIntent(IntentFollowTarget)
 			a.TryToFollow(ctx.Target)
 		} else {
-			a.intent = IntentInteractTarget
+			a.setIntent(IntentInteractTarget)
 		}
 	case CommandStop:
 		a.TryToIdle()
@@ -44,15 +44,15 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.despawn(ctx.World)
 	case CommandMoveToTarget:
 		a.followActive = false
-		a.target = ctx.Target
+		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature {
-			a.intent = IntentFollowTarget
+			a.setIntent(IntentFollowTarget)
 			a.TryToFollow(ctx.Target)
 		} else {
-			a.intent = IntentInteractTarget
+			a.setIntent(IntentInteractTarget)
 		}
 	}
-	result.Intent = a.intent
+	result.Intent = a.Intent()
 	return result
 }
 
