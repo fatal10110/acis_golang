@@ -89,17 +89,16 @@ func (c *Character) RestoreExp(restorePercent float64) {
 	table := c.levelTable
 	c.stateMu.RUnlock()
 
-	var hooks progressionHooks
-	defer func() { hooks.run() }()
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
 	if c.ExpBeforeDeath <= 0 || table == nil {
+		c.progressionMu.Unlock()
 		return
 	}
-
 	restored := int64(math.Round(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100))
 	c.ExpBeforeDeath = 0
-	c.addExpAndSp(table, c.runtimeTemplate, restored, -1, &hooks)
+	c.progressionMu.Unlock()
+
+	c.addExpAndSp(table, c.runtimeTemplate, restored, -1)
 }
 
 // updateKarmaLoss reduces this character's karma for a death that cost

@@ -5242,8 +5242,8 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10)+1000, 1000)
 		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, 10, 25)
-		if lost := event.Of[event.ExpSPLost](rec); len(lost) != 1 || lost[0] != (event.ExpSPLost{Exp: 10, SP: 25}) {
-			t.Errorf("loss notifications = %v, want [[10 25]]", lost)
+		if lost := event.Of[event.ExpSPLost](rec); len(lost) != 1 || lost[0] != (event.ExpSPLost{Exp: 10, SP: 25, SPLeft: 975}) {
+			t.Errorf("loss notifications = %v, want [[10 25 975]]", lost)
 		}
 		if broadcasts := countVitals(rec, false); broadcasts != 0 {
 			t.Errorf("status broadcasts = %d, want 0", broadcasts)
@@ -6029,5 +6029,35 @@ func TestCharacterCombatantHeadingIsCurrentHeading(t *testing.T) {
 	var combatant attackable.Combatant = c
 	if got, want := combatant.Heading(), c.CurrentHeading(); got != want || got != 16384 {
 		t.Fatalf("Combatant.Heading() = %d, CurrentHeading() = %d, want both 16384", got, want)
+	}
+}
+
+// userInfoSPSink records the SP a UserInfo built at each UserInfoChanged
+// would carry.
+type userInfoSPSink struct {
+	c  *Character
+	sp []int
+}
+
+func (s *userInfoSPSink) Emit(e event.Event) {
+	if _, ok := e.(event.UserInfoChanged); ok {
+		s.sp = append(s.sp, s.c.ProgressionValues().SP)
+	}
+}
+
+// TestLevelUpUserInfoPrecedesSPGain pins the SP a level-up UserInfo carries:
+// the level change is sent while the experience lands, before the SP add
+// (PlayerStatus.addExp, then PlayableStatus.addSp), so it still shows the old
+// SP; only the closing UserInfo shows the gain.
+func TestLevelUpUserInfoPrecedesSPGain(t *testing.T) {
+	table := realLevelTable(t)
+	c := newProgressionCharacter()
+	sink := &userInfoSPSink{c: c}
+	c.sink = sink
+
+	c.AddExpAndSp(table, levelStepTemplate(81), table.RequiredExpForLevel(2), 40)
+
+	if len(sink.sp) != 2 || sink.sp[0] != 0 || sink.sp[1] != 40 {
+		t.Fatalf("UserInfo SP values = %v, want [0 40]", sink.sp)
 	}
 }

@@ -306,6 +306,9 @@ pool (Phase 2), so no queued task can block on the DB.
    cross-actor (death exp/karma loss and PK/PvP credit run on another actor's queue, see Phase 3),
    so it stays a leaf lock or folds into `vitalsMu`; #2258 closed with Phase 3 slice 4.
 2. `model/actor/npc` + `ai` + `summon` (16 → `vitalsMu`; summon state is owner-queue-owned).
+   `npc.SeedState.mu` and `item.SpoilPool.mu` (Phase 3 slice 4) guard per-life NPC state that
+   sowers, harvesters, spoilers and the killer change from their own queues; fold them into the
+   NPC's `vitalsMu` or keep them as leaf locks, but they stay cross-actor.
 3. `move`/`attack`/`cast`/`cubic`. The move/attack/cast controller locks stay as leaf container
    locks, because other actors stop, abort and interrupt them synchronously (Phase 3, landed).
    The same goes for the AI brains' locks (`ai.Attackable`, `ai.PlayerAttack`, `ai.Summon`) and
@@ -359,7 +362,8 @@ pool (Phase 2), so no queued task can block on the DB.
 - Phase 4: shutdown with online players saves every one before exit; relog mid-fight.
 - End state check: `rg -n "sync\.(RW)?Mutex" internal/gameserver/model internal/gameserver/skill`
   reports only `vitalsMu` (one per actor type), `Inventory`/container locks, and the leaf locks
-  cross-actor commands take synchronously (controllers, AI brains, target/stance state).
+  cross-actor commands take synchronously (controllers, AI brains, target/stance state), plus
+  `progressionMu`, `SeedState.mu` and `SpoilPool.mu` unless sweeps 1–2 fold them into `vitalsMu`.
 - Manual: run two clients in one region, trade, fight an NPC, relog mid-fight (autosave/detach
   ordering) per `docs/run-servers.md`.
 

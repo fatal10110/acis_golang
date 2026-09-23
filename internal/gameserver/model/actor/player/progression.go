@@ -60,29 +60,38 @@ func (c *Character) ProgressionValues() Progression {
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
-	var hooks progressionHooks
-	c.progressionMu.Lock()
-	leveledUp := c.addExpAndSp(table, tmpl, exp, sp, &hooks)
-	c.progressionMu.Unlock()
-	hooks.run()
-	return leveledUp
+	return c.addExpAndSp(table, tmpl, exp, sp)
 }
 
-func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int, hooks *progressionHooks) bool {
-	beforeExp, beforeSP := c.Exp, c.SP
+// addExpAndSp applies the experience, runs what a level change triggers,
+// then applies the SP: a level change's UserInfo carries the SP from before
+// this add, as it does when experience and SP land one after the other.
+func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+	var hooks progressionHooks
+	c.progressionMu.Lock()
+	beforeExp := c.Exp
 	leveledUp := false
 	// The reward message follows the attempt, not the result: an experience
 	// add always counts, and an SP add counts unless SP already sits at the
 	// ceiling. Only an attempt where neither amount applied stays silent.
 	attempted := false
 	if exp >= 0 {
-		leveledUp = c.addExp(table, tmpl, exp, hooks)
+		leveledUp = c.addExp(table, tmpl, exp, &hooks)
 		attempted = true
 	}
+	changed := c.Exp != beforeExp
+	c.progressionMu.Unlock()
+	hooks.run()
+
+	c.progressionMu.Lock()
 	if sp >= 0 {
+		beforeSP := c.SP
 		attempted = attempted || c.SP < maxSP
 		c.addSp(sp)
+		changed = changed || c.SP != beforeSP
 	}
+	c.progressionMu.Unlock()
+
 	// Only an add that actually landed pushes UserInfo. Deliberate divergence
 	// under review in issue #1060: the reference sends it for any non-negative
 	// add, because its dropped-addition branch still reports success to the
@@ -90,11 +99,11 @@ func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	// level-difference penalty) pushes a UserInfo describing nothing that
 	// changed. Both adds here can be no-ops, and the packet is self-only and
 	// purely descriptive, so the redundant one is suppressed.
-	if c.Exp != beforeExp || c.SP != beforeSP {
-		hooks.add(c.UpdateUserInfo)
+	if changed {
+		c.UpdateUserInfo()
 	}
 	if attempted {
-		hooks.add(func() { c.sendExpSpGain(exp, sp) })
+		c.sendExpSpGain(exp, sp)
 	}
 	return leveledUp
 }
@@ -102,24 +111,24 @@ func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 // RewardExpAndSp applies a kill reward using this live character's runtime
 // template for level-up stat refills.
 func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
-	var hooks progressionHooks
-	defer func() { hooks.run() }()
-	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	if table == nil {
-		beforeSP := c.SP
-		if sp >= 0 {
-			c.addSp(sp)
-			// Same deliberate divergence as AddExpAndSp: no packet when the
-			// add changed nothing.
-			if c.SP != beforeSP {
-				hooks.add(c.UpdateUserInfo)
-			}
-			hooks.add(func() { c.sendExpSpGain(0, sp) })
-		}
+	if table != nil {
+		return c.addExpAndSp(table, c.runtimeTemplate, exp, sp)
+	}
+	if sp < 0 {
 		return false
 	}
-	return c.addExpAndSp(table, c.runtimeTemplate, exp, sp, &hooks)
+	c.progressionMu.Lock()
+	beforeSP := c.SP
+	c.addSp(sp)
+	changed := c.SP != beforeSP
+	c.progressionMu.Unlock()
+	// Same deliberate divergence as AddExpAndSp: no packet when the add
+	// changed nothing.
+	if changed {
+		c.UpdateUserInfo()
+	}
+	c.sendExpSpGain(0, sp)
+	return false
 }
 
 // AddExp adds delta experience to c. An addition that would overflow
@@ -177,25 +186,45 @@ func (c *Character) addSp(delta int) {
 // is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSp
 // does. A level drop never refills HP/MP/CP, matching AddLevel.
 func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
+	// The experience comes off first and a level change's hooks run before
+	// the SP does, so their UserInfo carries the SP from before this removal.
 	var hooks progressionHooks
 	c.progressionMu.Lock()
-	c.removeExpAndSp(table, tmpl, exp, sp, &hooks)
+	beforeLevel := c.CharLevel
+	if exp > 0 {
+		c.removeExp(table, tmpl, exp, &hooks)
+	}
+	c.progressionMu.Unlock()
+	hooks.run()
+
+	hooks = nil
+	c.progressionMu.Lock()
+	c.finishExpSpLoss(beforeLevel, exp, sp, &hooks)
 	c.progressionMu.Unlock()
 	hooks.run()
 }
 
+// removeExpAndSp is RemoveExpAndSp for a caller already holding
+// progressionMu.
 func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int, hooks *progressionHooks) {
 	beforeLevel := c.CharLevel
 	if exp > 0 {
 		c.removeExp(table, tmpl, exp, hooks)
 	}
+	c.finishExpSpLoss(beforeLevel, exp, sp, hooks)
+}
+
+// finishExpSpLoss removes sp and queues the loss notification. The caller
+// holds progressionMu.
+func (c *Character) finishExpSpLoss(beforeLevel int, exp int64, sp int, hooks *progressionHooks) {
 	if sp > 0 {
 		c.removeSp(sp)
 	}
 	if exp <= 0 && sp <= 0 {
 		return
 	}
-	hooks.add(func() { c.sendExpSpLoss(exp, sp) })
+	spLeft := c.SP
+	hooks.add(func() { c.sendExpSpLoss(exp, sp, spLeft) })
 	// A removal deep enough to drop a level changes max HP and MP, so the
 	// observers' health bars need the new values, not only this client.
 	if c.CharLevel < beforeLevel {
@@ -293,8 +322,8 @@ func (c *Character) sendExpSpGain(exp int64, sp int) {
 	c.emit(event.ExpSPGained{Exp: exp, SP: sp})
 }
 
-func (c *Character) sendExpSpLoss(exp int64, sp int) {
-	c.emit(event.ExpSPLost{Exp: exp, SP: sp})
+func (c *Character) sendExpSpLoss(exp int64, sp, spLeft int) {
+	c.emit(event.ExpSPLost{Exp: exp, SP: sp, SPLeft: spLeft})
 }
 
 func (c *Character) refreshForLevel() {

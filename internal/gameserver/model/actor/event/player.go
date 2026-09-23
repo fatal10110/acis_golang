@@ -62,10 +62,12 @@ type ExpSPGained struct {
 	SP  int
 }
 
-// ExpSPLost reports one experience/SP removal.
+// ExpSPLost reports one experience/SP removal. SPLeft is the SP the
+// removal left, read under the progression lock.
 type ExpSPLost struct {
-	Exp int64
-	SP  int
+	Exp    int64
+	SP     int
+	SPLeft int
 }
 
 // KarmaChanged reports the character's new karma total.
