@@ -161,10 +161,17 @@ func (s *summonSink) Emit(ev event.Event) {
 }
 
 // releasePet settles a pet on its way out of the world, whatever took it out:
-// its items go back to its owner and its row and collar are saved, unless it
-// died, and its container is then flushed and unregistered, since nothing
-// else will ever write it. It runs while the pet and its owner are both
-// still in the world, before PetDelete is sent.
+// its items go back to its owner, its row and collar are saved, and its
+// container is then flushed and unregistered, since nothing else will ever
+// write it. It runs while the pet and its owner are both still in the world,
+// before PetDelete is sent.
+//
+// A dead pet is settled the same way. The routes that must leave a corpse
+// alone refuse before reaching here (Actor.Unsummon), so a dead pet only
+// arrives with its owner's logout or after dying mid-despawn. Its container
+// is keyed by an object id no later summon reuses, so items left in it would
+// be lost for good, and skipping the row would restore it alive from an
+// older save.
 func (l *GameClientLink) releasePet(actor *summon.Actor) {
 	if !actor.IsPet() {
 		return
@@ -173,10 +180,8 @@ func (l *GameClientLink) releasePet(actor *summon.Actor) {
 	if owner, ok := liveSummonOwner(actor); ok {
 		ownerInv = owner.Inventory()
 	}
-	if !actor.Dead() {
-		l.transferPetInventory(actor, ownerInv)
-		l.savePet(actor, ownerInv)
-	}
+	l.transferPetInventory(actor, ownerInv)
+	l.savePet(actor, ownerInv)
 	if inv := actor.PetInventory(); inv != nil {
 		l.flushItemPersistence(inv)
 	}

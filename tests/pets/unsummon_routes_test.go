@@ -72,6 +72,12 @@ func TestHostileUnsummonRoutesSettleThePet(t *testing.T) {
 			pet, _ := h.spawnWolf(t)
 			h.giveToPet(t, h.seededItem(t, item.AdenaID), 40)
 			pet.SetHP(37)
+			pet.AddExpAndSp(1, 0)
+			pet.TickPet(h.srv.State)
+			exp, fed := pet.Exp(), pet.Fed()
+			if fed == wolfMaxMeal {
+				t.Fatal("precondition: the feed tick left the gauge full")
+			}
 			setCollarEnchant(t, h, 0)
 
 			tc.do(pet)
@@ -80,8 +86,9 @@ func TestHostileUnsummonRoutesSettleThePet(t *testing.T) {
 			if _, ok := h.srv.State.Summon(h.ownerID); ok {
 				t.Fatal("world still tracks the summon")
 			}
-			if got := h.savedPetState(t).CurHP; got != 37 {
-				t.Fatalf("saved pet HP = %v, want 37", got)
+			saved := h.savedPetState(t)
+			if saved.CurHP != 37 || saved.Exp != exp || saved.Fed != fed {
+				t.Fatalf("saved pet = hp %v exp %d fed %d, want hp 37 exp %d fed %d", saved.CurHP, saved.Exp, saved.Fed, exp, fed)
 			}
 			if got := h.liveCollarEnchant(t); got != wolfLevel {
 				t.Fatalf("live collar enchant = %d, want pet level %d", got, wolfLevel)
@@ -101,12 +108,7 @@ func TestHostileUnsummonRoutesSettleThePet(t *testing.T) {
 func TestHostileUnsummonLeavesDeadPetAlone(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
-	obj, ok := h.srv.State.Player(h.ownerID)
-	if !ok {
-		t.Fatal("owner not in world")
-	}
-	pet.ReduceHP(pet.HP()+1, obj.(attackable.Combatant), modelskill.Definition{})
-	waitFor(t, "pet dead", pet.Dead)
+	killPet(t, h, pet)
 
 	pet.UnSummon(pet.SummonOwner())
 	pet.Unsummon()
@@ -114,6 +116,46 @@ func TestHostileUnsummonLeavesDeadPetAlone(t *testing.T) {
 	if got, ok := h.srv.State.Summon(h.ownerID); !ok || got.ObjectID() != pet.ObjectID() {
 		t.Fatal("hostile unsummon took a dead pet out of the world")
 	}
+}
+
+// TestRestartWithDeadPetReturnsItemsAndKeepsItDead covers a dead pet leaving
+// with its owner: its container is keyed by an object id no later summon
+// reuses, so its items must come back to the owner, and its row must record
+// the death rather than leave an older, living save to restore from.
+func TestRestartWithDeadPetReturnsItemsAndKeepsItDead(t *testing.T) {
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)},
+		seedItem{TemplateID: item.AdenaID, Count: 40})
+	pet, _ := h.spawnWolf(t)
+	h.giveToPet(t, h.seededItem(t, item.AdenaID), 40)
+	killPet(t, h, pet)
+
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
+
+	if got := h.ownerItemCount(t, item.AdenaID); got != 40 {
+		t.Fatalf("owner adena after restart = %d, want the dead pet's 40 back", got)
+	}
+	if got := h.savedPetState(t).CurHP; got != 0 {
+		t.Fatalf("saved dead pet HP = %v, want 0", got)
+	}
+
+	startInWorld(t, h.client)
+	again, _ := h.spawnWolf(t)
+	if got := again.HP(); got != 0 {
+		t.Fatalf("resummoned pet HP = %v, want the dead pet's 0", got)
+	}
+}
+
+// killPet lands lethal damage on pet from its owner and waits for the death.
+func killPet(t *testing.T, h *petWorld, pet *summon.Actor) {
+	t.Helper()
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner not in world")
+	}
+	pet.ReduceHP(pet.HP()+1, obj.(attackable.Combatant), modelskill.Definition{})
+	waitFor(t, "pet dead", pet.Dead)
+	drainUntilQuiet(t, h.client)
 }
 
 func sawDeleteObject(frames [][]byte, objectID int32) bool {
