@@ -35,22 +35,6 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 	if id, ok := systemMessageForSummonFeedback(result.Feedback); ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(id))
 	}
-	if result.Outcome == summon.OutcomeApplied && (command == summon.CommandReturnPet || command == summon.CommandUnsummonServitor) {
-		l.savePet(actor, live.Inventory())
-		l.transferPetInventory(actor, live.Inventory())
-		// ApplyCommand's despawn (inside CommandReturnPet/CommandUnsummonServitor)
-		// synchronously triggers world visibility's Forget callback, which
-		// sends the owner PetDelete (network/visibility.go) — no explicit
-		// send needed here.
-		//
-		// The pet's container goes away here, so its
-		// items are flushed and unregistered on the same path logout uses —
-		// otherwise they'd sit in the persistence task's pending set
-		// referencing a despawned pet.
-		if inv := actor.PetInventory(); inv != nil {
-			l.flushItemPersistence(inv)
-		}
-	}
 	return true
 }
 
