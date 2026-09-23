@@ -106,18 +106,17 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
 	}
 	if l.world != nil {
-		// A still-active pet's inventory notifier closure holds live too;
-		// detach it before live itself is despawned and its client-frame
-		// hooks are cleared below, so it can't run against an already
-		// detached player.
+		// The summon leaves with its owner. Its despawn settles a pet -- items back to
+		// live, row and collar saved -- so that must happen before live's
+		// own inventory is flushed below, and before live is despawned and
+		// the pet inventory's notifier, which holds live, can no longer
+		// reach it.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
-			if pet, ok := obj.(*summon.Actor); ok {
-				l.savePet(pet, live.Inventory())
-				l.transferPetInventory(pet, live.Inventory())
-				if inv := pet.PetInventory(); inv != nil {
-					l.flushItemPersistence(inv)
+			if s, ok := obj.(*summon.Actor); ok {
+				if inv := s.PetInventory(); inv != nil {
 					owners = append(owners, inv.OwnerID())
 				}
+				s.LeaveWithOwner()
 			}
 		}
 	}

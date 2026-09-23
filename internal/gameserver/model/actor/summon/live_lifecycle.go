@@ -157,8 +157,21 @@ func (a *Actor) StartPetFeed(period time.Duration, state *world.State, log zerol
 	}, log)
 }
 
-// Unsummon despawns this summon and detaches it from its owner.
+// Unsummon despawns this summon and detaches it from its owner. A dead
+// summon stays where it is: its corpse is not the owner's to recall.
 func (a *Actor) Unsummon() {
+	if a.Dead() {
+		return
+	}
+	a.despawn(nil)
+}
+
+// LeaveWithOwner despawns this summon, dead or alive, because its owner is
+// leaving the world. Summons are tracked under the owner's persistent object
+// id, so a corpse left behind would still hold that owner's summon slot on
+// the next login; nothing else would ever take it out until summon corpses
+// decay (#2439).
+func (a *Actor) LeaveWithOwner() {
 	a.despawn(nil)
 }
 
@@ -169,18 +182,28 @@ func (a *Actor) despawn(state *world.State) {
 	if state == nil {
 		return
 	}
-	// RemoveSummon runs before Despawn: Despawn's relocate step synchronously
-	// fires the owner's Forget callback, which sends the client-visible
-	// PetDelete frame. A caller (or a test synchronizing on that frame, as
-	// TestGameClientLinkRoutesSummonActionUseToLiveSummon does) must never
-	// observe world.State.Summon still reporting this actor active once the
-	// client has been told it's gone.
-	state.RemoveSummon(a.OwnerID())
-	state.Despawn(a)
-	// Stop the periodic effect sweep from reaching this summon's list once
-	// it leaves the world for good, even if it still holds a buff.
-	a.EffectList().Untrack()
-	a.emit(event.Despawned{})
+	// Only the first caller despawns, and a concurrent one returns only once
+	// it has finished. An owner's command, a hostile Erase, a signet and the
+	// owner's logout can each reach here on their own goroutines: a second
+	// pass would settle the pet twice, its RemoveSummon could clear a newer
+	// summon the owner has called since, and a logout that returned early
+	// would flush the owner's inventory while the pet's items were still
+	// moving into it.
+	a.despawnOnce.Do(func() {
+		a.emit(event.Unsummoning{})
+		// RemoveSummon runs before Despawn: Despawn's relocate step
+		// synchronously fires the owner's Forget callback, which sends the
+		// client-visible PetDelete frame. A caller (or a test synchronizing on
+		// that frame, as TestGameClientLinkRoutesSummonActionUseToLiveSummon
+		// does) must never observe world.State.Summon still reporting this
+		// actor active once the client has been told it's gone.
+		state.RemoveSummon(a.OwnerID())
+		state.Despawn(a)
+		// Stop the periodic effect sweep from reaching this summon's list
+		// once it leaves the world for good, even if it still holds a buff.
+		a.EffectList().Untrack()
+		a.emit(event.Despawned{})
+	})
 }
 
 func (a *Actor) resolveRequest(ctx CommandContext) Request {
