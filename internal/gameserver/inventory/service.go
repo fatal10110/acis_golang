@@ -1,6 +1,7 @@
 package inventory
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -310,6 +311,78 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 		out.Persist = append(out.Persist, Update(result))
 	}
 	return out, true, nil
+}
+
+var errNoIDAllocator = errors.New("inventory exchange: no object id allocator")
+
+// Move is one item row an exchange hands from one inventory to the other.
+type Move struct {
+	ObjectID int32
+	Count    int
+}
+
+// Exchange moves aOut from a to b and bOut from b to a as one step (see
+// itemcontainer.Exchange): check sees both inventories exactly as the moves
+// will find them and can veto the whole exchange, and nothing either owner
+// does can land between the check and the last move. It reports false,
+// having changed nothing, when check vetoes. A move failing after the check
+// approved is a broken check; it reports false with the persistence of the
+// moves already made, so the caller still writes what did happen.
+func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, check func(a, b itemcontainer.Held) bool) (Result, bool, error) {
+	if a == nil || b == nil || a == b {
+		return Result{}, false, nil
+	}
+	// Ids come from outside the inventory locks, and whether a row splits is
+	// only known under them, so every row gets one up front. A move that
+	// could not get its id would fail after earlier rows had landed, so no
+	// allocator means no exchange at all.
+	// ponytail: a row that needs no id burns its id; the allocator never
+	// reuses an id behind its cursor, so handing it back would buy nothing.
+	ids := make([]int32, len(aOut)+len(bOut))
+	for i := range ids {
+		id, ok, err := s.nextID()
+		if err != nil {
+			return Result{}, false, err
+		}
+		if !ok {
+			return Result{}, false, errNoIDAllocator
+		}
+		ids[i] = id
+	}
+
+	var res Result
+	ok := false
+	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
+		if check != nil && !check(heldA, heldB) {
+			return
+		}
+		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, ids) &&
+			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, ids[len(aOut):])
+	})
+	return res, ok, nil
+}
+
+// moveAll transfers every row from source to receiver, row i splitting off
+// under ids[i] when it has to.
+func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids []int32) bool {
+	for i, row := range rows {
+		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids[i])
+		if !ok {
+			return false
+		}
+		if m.Remaining != nil {
+			res.Persist = append(res.Persist, Update(m.Remaining))
+		}
+		if m.FreedObjectID != 0 {
+			res.Persist = append(res.Persist, Delete(sourceOwnerID, m.FreedObjectID))
+		}
+		if m.Created {
+			res.Persist = append(res.Persist, Save(m.Item))
+		} else {
+			res.Persist = append(res.Persist, Update(m.Item))
+		}
+	}
+	return true
 }
 
 // CrystallizeItem destroys up to count units of objectID and adds the crystal reward.

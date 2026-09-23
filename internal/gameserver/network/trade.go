@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -196,7 +197,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 
-	l.settleConfirmedTrade(ctx, result.Session, live.ObjectID())
+	l.settleConfirmedTrade(result.Session, live.ObjectID())
 }
 
 // settleConfirmedTrade exchanges the offers of a session both sides have
@@ -204,22 +205,68 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 // both-sides-confirmed branch) and answers a failed re-check by cancelling
 // the whole trade for both players — the same cancel broadcast as everywhere
 // else — not with the exchange-ended finish of a failed transfer.
-func (l *GameClientLink) settleConfirmedTrade(ctx context.Context, session tradebook.Session, confirmerID int32) {
+//
+// The partner's own queue keeps running while this settles on the
+// confirmer's, so the check and every move happen inside one exchange that
+// holds both inventories: nothing the partner does can slip between them and
+// leave the trade half done. Both inventories' updates and weight reach their
+// owners through the inventory-update tick, on each owner's own queue.
+func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirmerID int32) {
+	// Confirm already took the ready session out of the book, so a failed
+	// re-check cancels straight to the participants: a book cancel would
+	// reach no one.
 	first, second, ok := l.tradeParticipants(session)
-	if !ok || !l.validTradeParticipants(first, second) {
-		l.cancelTradeByID(confirmerID)
+	if !ok {
+		// A participant left the world after Confirm. The reference answers
+		// a partner gone offline with the confirmer's own cancel, which
+		// names the confirmer; the one who left gets nothing.
+		for _, live := range []*livePlayer{first, second} {
+			if live != nil && live.ObjectID() == confirmerID {
+				sendTradeCancel(live, live.Name)
+			}
+		}
+		return
+	}
+	if !l.validTradeParticipants(first, second) {
+		sendTradeCanceled(first, second)
 		return
 	}
 
-	settlement := tradebook.Settle(session, first.Inventory(), second.Inventory(), func(source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
-		return l.transferTradeInventoryItem(ctx, source, receiver, objectID, count)
-	})
-	failMessage := tradeSettlementMessage(settlement.Status)
+	status := tradebook.SettlementEmpty
+	if !session.Empty() {
+		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
+			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
+			func(first, second itemcontainer.Held) bool {
+				status = session.Check(first, second)
+				return status == tradebook.SettlementOK
+			})
+		switch {
+		case err != nil:
+			l.log.Error().Err(err).Msg("allocate trade item id")
+			status = tradebook.SettlementTransferFailed
+		case !moved && status == tradebook.SettlementOK:
+			status = tradebook.SettlementTransferFailed
+		}
+		l.applyPersistActions(res.Persist)
+	}
+	if status == tradebook.SettlementInvalidItems {
+		sendTradeCanceled(first, second)
+		return
+	}
+	failMessage := tradeSettlementMessage(status)
 	if failMessage != 0 {
 		first.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 		second.SendFrame(serverpackets.FrameSystemMessage(failMessage))
 	}
-	l.finishTrade(first, second, settlement.Status == tradebook.SettlementOK)
+	l.finishTrade(first, second, status == tradebook.SettlementOK)
+}
+
+func tradeMoves(offer tradebook.Offer) []invops.Move {
+	moves := make([]invops.Move, 0, len(offer.Items))
+	for _, row := range offer.Items {
+		moves = append(moves, invops.Move{ObjectID: row.Snapshot.ObjectID, Count: row.Count})
+	}
+	return moves
 }
 
 func (l *GameClientLink) cancelActiveTrade(live *livePlayer) {
@@ -238,10 +285,17 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 	if !ok {
 		return
 	}
-	first.SendFrame(serverpackets.FrameSendTradeDone(false))
-	first.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, second.Name))
-	second.SendFrame(serverpackets.FrameSendTradeDone(false))
-	second.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, first.Name))
+	sendTradeCanceled(first, second)
+}
+
+func sendTradeCanceled(first, second *livePlayer) {
+	sendTradeCancel(first, second.Name)
+	sendTradeCancel(second, first.Name)
+}
+
+func sendTradeCancel(live *livePlayer, cancellerName string) {
+	live.SendFrame(serverpackets.FrameSendTradeDone(false))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CanceledTrade, cancellerName))
 }
 
 func (l *GameClientLink) finishTrade(first, second *livePlayer, success bool) {
@@ -320,18 +374,6 @@ func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlay
 	first, firstOK := l.livePlayerByID(session.FirstID)
 	second, secondOK := l.livePlayerByID(session.SecondID)
 	return first, second, firstOK && secondOK
-}
-
-func (l *GameClientLink) transferTradeInventoryItem(ctx context.Context, source, receiver *itemcontainer.Inventory, objectID int32, count int) bool {
-	res, ok, err := l.inventory.TransferItem(source, receiver, objectID, count)
-	if err != nil {
-		l.log.Error().Err(err).Msg("allocate trade item id")
-		return false
-	}
-	if ok {
-		l.applyPersistActions(res.Persist)
-	}
-	return ok
 }
 
 func tradeSettlementMessage(status tradebook.SettlementStatus) int {

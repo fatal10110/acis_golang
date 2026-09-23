@@ -20,6 +20,7 @@ type Item struct {
 
 	destroyProtected bool
 	dropperID        atomic.Int32
+	claimed          atomic.Bool
 }
 
 // New creates a visible-world item from a persisted instance and its loaded
@@ -78,6 +79,19 @@ func (i *Item) DestroyProtected() bool {
 // this item is being spawned.
 func (i *Item) SetDropperID(id int32) {
 	i.dropperID.Store(id)
+}
+
+// Claim takes the item for one pickup or for ground cleanup. Only the first
+// claim on a drop succeeds; every later one fails until Release, and a
+// claimer that loses must leave the item alone. A pickup keeps its claim for
+// good, so a click still holding this drop can never take it a second time.
+func (i *Item) Claim() bool {
+	return i.claimed.CompareAndSwap(false, true)
+}
+
+// Release puts a claimed item back on the ground after its pickup failed.
+func (i *Item) Release() {
+	i.claimed.Store(false)
 }
 
 // DropperID returns the temporary dropper object id used by DropItem.

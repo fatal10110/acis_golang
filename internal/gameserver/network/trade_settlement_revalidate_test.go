@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -18,20 +19,14 @@ func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	ctx := context.Background()
 
-	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
-	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
-	session, ok := link.trades.Session(first.ObjectID())
-	if !ok {
-		t.Fatal("trade session missing after handshake")
-	}
-	link.handleTradeDone(ctx, first, clientpackets.TradeDone{Response: 1})
+	session := readyTradeSession(t, ctx, link, first, second)
 
 	if err := link.world.Move(second, 1000, 0, 0); err != nil {
 		t.Fatalf("Move: %v", err)
 	}
 	testsupport.ResetCapture(firstCap, secondCap)
 
-	link.settleConfirmedTrade(ctx, session, second.ObjectID())
+	link.settleConfirmedTrade(session, second.ObjectID())
 
 	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
 		serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
@@ -45,4 +40,42 @@ func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 	if link.trades.HasActive(first.ObjectID()) || link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not cleared after failed settlement re-validation")
 	}
+}
+
+// TestSettleConfirmedTradePartnerGoneCancelsConfirmer pins the settle-time
+// cancel when the partner left the world after Confirm took the ready
+// session out of the book (its own detach cancel then found nothing to
+// cancel): the confirmer still gets the reference's cancelActiveTrade pair,
+// naming itself, instead of a trade window left open.
+func TestSettleConfirmedTradePartnerGoneCancelsConfirmer(t *testing.T) {
+	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
+	session := readyTradeSession(t, context.Background(), link, first, second)
+
+	link.world.RemovePlayer(second.ObjectID())
+	testsupport.ResetCapture(firstCap, secondCap)
+
+	link.settleConfirmedTrade(session, first.ObjectID())
+
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
+		serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
+	assertTradeDoneFrame(t, firstCap.Frames()[0], false)
+	assertSystemMessageStringFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, "TraderOne")
+	if n := len(secondCap.Frames()); n != 0 {
+		t.Fatalf("departed partner received %d frames, want none", n)
+	}
+}
+
+// readyTradeSession opens a trade between first and second and confirms it
+// on both sides the way handleTradeDone does, returning the ready session
+// Confirm has already taken out of the book.
+func readyTradeSession(t *testing.T, ctx context.Context, link *GameClientLink, first, second *livePlayer) tradebook.Session {
+	t.Helper()
+	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
+	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
+	link.handleTradeDone(ctx, second, clientpackets.TradeDone{Response: 1})
+	ready := link.trades.Confirm(first.ObjectID())
+	if ready.Status != tradebook.DoneReady {
+		t.Fatalf("Confirm status = %v, want ready", ready.Status)
+	}
+	return ready.Session
 }

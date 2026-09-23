@@ -427,6 +427,7 @@ func ItemTemplates() *item.Table {
 			Duration:    -1,
 			Stackable:   true,
 			Destroyable: true,
+			Tradable:    true,
 			EtcItem:     &item.EtcItemDetail{},
 			Weight:      10,
 		},
