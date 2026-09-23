@@ -39,6 +39,27 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 		t.Fatalf("merged rows pending = %v/%v, want both scheduled",
 			srv.ItemInstances.ContainsID(first), srv.ItemInstances.ContainsID(second))
 	}
+	absorbed := first
+	if findItemListEntry(entries, first) != nil {
+		absorbed = second
+	}
+
+	// A player can relog before the lazy task runs. The detach flush then
+	// writes the grown stack while the absorbed row's delete is still only
+	// pending, so the next restore reads both rows back and must not merge
+	// the absorbed one in again.
+	for login := 2; login <= 4; login++ {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
+		if rows := persistedItemCounts(t, srv, objID); rows[absorbed] != 50 {
+			t.Fatalf("login %d: precondition failed: absorbed row %d holds %v, so its delete already landed and this run never entered the relog-before-flush window", login, absorbed, rows)
+		}
+		entries = readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))
+		assertSingleAdena(t, entries, 150)
+		if !srv.ItemInstances.ContainsID(absorbed) {
+			t.Fatalf("login %d: absorbed row's delete is no longer pending", login)
+		}
+	}
 
 	if err := srv.ItemInstances.Save(context.Background()); err != nil {
 		t.Fatalf("flush merged stack: %v", err)
@@ -47,7 +68,7 @@ func TestRestoreMergedStackWritesBothRows(t *testing.T) {
 
 	// The count must hold across relogs rather than grow by the absorbed
 	// row each time.
-	for login := 2; login <= 4; login++ {
+	for login := 5; login <= 7; login++ {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 		readUntilOpcode(t, c, serverpackets.OpcodeCharSelectInfo)
 		entries = readItemListEntries(t, burstFrame(t, startInWorld(t, c), serverpackets.OpcodeItemList))

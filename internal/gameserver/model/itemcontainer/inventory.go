@@ -213,7 +213,9 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 					// A stack merge is the exception: it changes two rows.
 					// Unwritten, the absorbed row survives to be merged in
 					// again on every later restore, so both the grown stack
-					// and the absorbed row's delete are scheduled here.
+					// and the absorbed row's delete are scheduled here. The
+					// grown stack stays bound from here on, so a later row
+					// displacing it from its equip slot is written too.
 					held.BindPersister(inv.Container.persist)
 					inst.BindPersister(inv.Container.persist)
 					held.AddCount(st.Count)
