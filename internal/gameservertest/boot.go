@@ -489,6 +489,13 @@ func (s *Server) PlayerCharges(tb testing.TB, objID int32) int {
 	return reader.Charges()
 }
 
+// PlayerCastingNow reports whether the live player has a cast in flight.
+func (s *Server) PlayerCastingNow(tb testing.TB, objID int32) bool {
+	tb.Helper()
+	reader := s.onlineCharacter(tb, objID)
+	return reader.CastingNow()
+}
+
 // SetPlayerOperating toggles the live player's store/workshop operation
 // state, the precondition of the use-item storing gate.
 func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) {

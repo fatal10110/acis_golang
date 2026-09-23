@@ -289,7 +289,7 @@ func TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst(t *testing.T) {
 	}
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
 	drainUntilQuiet(t, c)
-	if playerCastingNow(t, srv, objID) {
+	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("CastingNow() = true after first skill finished, want first cast still scheduled to completion")
 	}
 }
@@ -346,19 +346,6 @@ func disablePlayerSkill(t *testing.T, srv *gameservertest.Server, objID int32, d
 		t.Fatalf("world.Player(%d) = %T does not expose DisableSkill", objID, obj)
 	}
 	disabler.DisableSkill(actorcast.ReuseKey(def), delay)
-}
-
-func playerCastingNow(t *testing.T, srv *gameservertest.Server, objID int32) bool {
-	t.Helper()
-	obj, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", objID)
-	}
-	caster, ok := obj.(interface{ CastingNow() bool })
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T does not expose CastingNow", objID, obj)
-	}
-	return caster.CastingNow()
 }
 
 func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window time.Duration) []int32 {
