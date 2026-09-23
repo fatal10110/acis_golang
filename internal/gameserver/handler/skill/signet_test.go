@@ -99,9 +99,8 @@ func (t *signetFakeTarget) Dead() bool               { return t.dead }
 func (t *signetFakeTarget) InPeaceZone() bool        { return t.peace }
 func (t *signetFakeTarget) EffectList() *effect.List { return t.list }
 func (t *signetFakeTarget) Unsummon()                { t.unsummoned = true }
-func (t *signetFakeTarget) BroadcastSelfSkillUse(_, _ int32) error {
+func (t *signetFakeTarget) BroadcastSelfSkillUse(_, _ int32) {
 	t.selfSkillUses++
-	return nil
 }
 
 func (t *signetFakeTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {

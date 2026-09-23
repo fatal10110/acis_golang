@@ -1141,7 +1141,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			h := newTestHostileNPC(t, 7)
 			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
 			state.Spawn(h, 0, 0, 0, 0)
-			_ = h.BroadcastStop()
+			h.BroadcastStop()
 		}},
 		{"summon", func(t *testing.T, state *world.State) {
 			actor, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 7})
@@ -1150,7 +1150,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			}
 			actor.Attach(summon.Runtime{Sink: &summonSink{link: &GameClientLink{world: state}, actor: actor}})
 			state.Spawn(actor, 0, 0, 0, 0)
-			_ = actor.BroadcastSelfSkillUse(1422, 1)
+			actor.BroadcastSelfSkillUse(1422, 1)
 		}},
 		{"effect point", func(t *testing.T, state *world.State) {
 			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1)
@@ -1159,7 +1159,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			}
 			ep.Attach(npc.Runtime{World: state, Sink: EffectPointSinks(state)(ep)})
 			ep.Spawn(0, 0, 0, 0)
-			_ = ep.BroadcastSkillLaunched(1, 1, []int32{1})
+			ep.BroadcastSkillLaunched(1, 1, []int32{1})
 		}},
 		{"door", func(t *testing.T, state *world.State) {
 			d, err := door.NewObject(7, &door.Template{ID: 1}, sinkTestDoorShape{})
@@ -1207,7 +1207,7 @@ func TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines(t *testing.T) {
 	go func() {
 		defer close(done)
 		if obj, ok := state.Object(7); ok {
-			_ = obj.(*npc.Hostile).BroadcastStop()
+			obj.(*npc.Hostile).BroadcastStop()
 		}
 	}()
 	<-done

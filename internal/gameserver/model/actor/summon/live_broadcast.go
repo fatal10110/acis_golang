@@ -35,9 +35,8 @@ func (a *Actor) BroadcastAutoAttackStop() {
 	a.emit(event.AutoAttackStopped{})
 }
 
-func (a *Actor) BroadcastMove(ev event.Move) error {
+func (a *Actor) BroadcastMove(ev event.Move) {
 	a.emit(ev)
-	return nil
 }
 
 func (a *Actor) SyncPosition(position location.Location) {
@@ -46,9 +45,8 @@ func (a *Actor) SyncPosition(position location.Location) {
 	}
 }
 
-func (a *Actor) BroadcastStop() error {
+func (a *Actor) BroadcastStop() {
 	a.emit(event.Stopped{})
-	return nil
 }
 
 func (a *Actor) SetHeadingTo(target attackable.Combatant) {
@@ -57,24 +55,22 @@ func (a *Actor) SetHeadingTo(target attackable.Combatant) {
 	a.Presence.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
 }
 
-func (a *Actor) BroadcastMoveToPawn(target attackable.Combatant) error {
+func (a *Actor) BroadcastMoveToPawn(target attackable.Combatant) {
 	sx, sy, sz := a.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}
 	tx, ty, tz := target.Position()
 	distance := int(origin.Distance3D(location.Location{X: tx, Y: ty, Z: tz}))
 	a.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: distance, Origin: origin})
-	return nil
 }
 
 // BroadcastSelfSkillUse reports the cast-start animation of skillID at level
 // with this summon as both caster and target, matching the reference's
 // summon.broadcastPacket(new MagicSkillUse(summon, summon, ...)) self-cast
 // shape.
-func (a *Actor) BroadcastSelfSkillUse(skillID, level int32) error {
+func (a *Actor) BroadcastSelfSkillUse(skillID, level int32) {
 	x, y, z := a.Position()
 	at := location.Location{X: x, Y: y, Z: z}
 	a.emit(event.MagicSkillUse{CasterID: a.ObjectID(), CasterAt: at, TargetID: a.ObjectID(), TargetAt: at, SkillID: skillID, Level: level})
-	return nil
 }
 
 // MarkDiscoveredByOwner records that the owner's client now knows this

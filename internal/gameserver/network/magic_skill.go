@@ -193,16 +193,12 @@ func magicCastFailureMovesToPawn(err error) bool {
 		errors.Is(err, actorcast.ErrNotEnoughItems)
 }
 
-func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() error {
-	return func() error {
+func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() {
+	return func() {
 		if live == nil || live.move == nil {
-			return nil
+			return
 		}
-		if err := live.move.Stop(); err != nil {
-			l.log.Warn().Err(err).Msg("move: stop before cast")
-			return err
-		}
-		return nil
+		live.move.Stop()
 	}
 }
 

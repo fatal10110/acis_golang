@@ -118,13 +118,10 @@ type skillCastTarget interface {
 }
 
 // BroadcastSkillUse reports a cast-start animation from this actor to target.
-// It is a no-op until Attach has installed a world.
-func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) error {
-	if ep.world == nil {
-		return ErrNoWorld
-	}
-	if ep.sink == nil {
-		return nil
+// It is a no-op until Attach has installed a world and a sink.
+func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level int32) {
+	if ep.world == nil || ep.sink == nil {
+		return
 	}
 	ax, ay, az := ep.Position()
 	tx, ty, tz := target.Position()
@@ -133,17 +130,13 @@ func (ep *EffectPoint) BroadcastSkillUse(target skillCastTarget, skillID, level 
 		TargetID: target.ObjectID(), TargetAt: location.Location{X: tx, Y: ty, Z: tz},
 		SkillID: skillID, Level: level,
 	})
-	return nil
 }
 
 // BroadcastSkillLaunched reports the cast launch of skillID at level onto
-// targetIDs. It is a no-op until Attach has installed a world.
-func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) error {
-	if ep.world == nil {
-		return ErrNoWorld
+// targetIDs. It is a no-op until Attach has installed a world and a sink.
+func (ep *EffectPoint) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	if ep.world == nil || ep.sink == nil {
+		return
 	}
-	if ep.sink != nil {
-		ep.sink.Emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
-	}
-	return nil
+	ep.sink.Emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
 }

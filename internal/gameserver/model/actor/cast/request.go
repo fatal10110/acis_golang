@@ -22,7 +22,7 @@ type StartHooks struct {
 	ResolveTarget func(Target, world.Tracked, modelskill.Definition, bool) (Target, skilltarget.CastRejection)
 	// StopMovement cancels an in-flight walk before final cast validation
 	// when the skill's template hit time is long enough to freeze the caster.
-	StopMovement func() error
+	StopMovement func()
 	// AfterCanCast runs after cost/reuse validation succeeds and before the
 	// caster faces a non-self target. Ground skills use it for signet LOS,
 	// peace-zone, heading, and ValidateLocation.
@@ -179,11 +179,11 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 // stopForCast cancels an in-flight walk when the skill's template hit time
 // is long enough that the caster must stand still. Callers must already
 // have passed the pre-movement reuse and disable gates.
-func stopForCast(def modelskill.Definition, stopMovement func() error) {
+func stopForCast(def modelskill.Definition, stopMovement func()) {
 	if def.HitTime <= 50 || stopMovement == nil {
 		return
 	}
-	_ = stopMovement()
+	stopMovement()
 }
 
 // faceCastTarget orients the caster toward a non-self target after the

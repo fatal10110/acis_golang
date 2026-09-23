@@ -27,8 +27,8 @@ type Actor interface {
 	ObjectID() int32
 	SyncPosition(location.Location)
 	SetHeading(int)
-	BroadcastMove(event.Move) error
-	BroadcastStop() error
+	BroadcastMove(event.Move)
+	BroadcastStop()
 	// OwnsOffensiveFollowTicker reports that the actor's own AI already
 	// rechecks an offensive follow, so the controller must not track it.
 	OwnsOffensiveFollowTicker() bool
@@ -115,7 +115,7 @@ func NewController(move *CreatureMove, self Actor, sink event.Sink) (*Controller
 // every segment advance, not just the first: without it, clients keep
 // predicting the original straight-line walk and visibly cut through
 // obstacles the server itself routed around.
-func (c *Controller) segmentAdvanced(ev event.Move) error {
+func (c *Controller) segmentAdvanced(ev event.Move) {
 	// Continuations describe the next route leg, so they must carry its
 	// waypoint rather than a follow target.
 	ev.FollowTarget = 0
@@ -124,7 +124,7 @@ func (c *Controller) segmentAdvanced(ev event.Move) error {
 	// broadcasting it (CreatureMove.java moveToNextRoutePoint,
 	// setHeadingTo(destination) directly above the MoveToLocation send).
 	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
-	return c.self.BroadcastMove(ev)
+	c.self.BroadcastMove(ev)
 }
 
 // blocked reports an in-flight move stopped by a newly blocked geodata path.
@@ -267,9 +267,9 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 				ev.FollowOffset = offset
 			}
 		}
-		broadcastErr := c.self.BroadcastMove(ev)
+		c.self.BroadcastMove(ev)
 		c.addPositionUpdate()
-		return true, broadcastErr
+		return true, nil
 	}
 	return true, nil
 }
@@ -295,9 +295,9 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(ev)
+	c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
-	return broadcastErr
+	return nil
 }
 
 // MoveToLocation starts a pathfinding movement request and reports whether
@@ -310,9 +310,9 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 		return false, nil
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(ev)
+	c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
-	return true, broadcastErr
+	return true, nil
 }
 
 // MoveToLocationEvent behaves like MoveToLocation but also returns the
@@ -324,9 +324,9 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, 
 		return event.Move{}, err
 	}
 	c.applyPathFindOutcome(outcome)
-	broadcastErr := c.self.BroadcastMove(ev)
+	c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
-	return ev, broadcastErr
+	return ev, nil
 }
 
 func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
@@ -346,7 +346,7 @@ func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
 // broadcasting a stop-in-place packet when there was movement to cancel —
 // otherwise a client that already received the move request keeps walking
 // toward the stale destination until it separately resyncs.
-func (c *Controller) Stop() error {
+func (c *Controller) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	wasMoving := c.move.Moving() || c.move.Following()
@@ -354,9 +354,8 @@ func (c *Controller) Stop() error {
 	c.move.CancelMove()
 	c.removePositionUpdate()
 	if wasMoving {
-		return c.self.BroadcastStop()
+		c.self.BroadcastStop()
 	}
-	return nil
 }
 
 // CanMoveTo reports whether a straight-line geodata walk from the actor's
@@ -370,7 +369,7 @@ func (c *Controller) CanMoveTo(target location.Location) bool {
 // would freeze client prediction at the stale destination.
 func (c *Controller) BroadcastBlockedCorrection() {
 	pos := c.move.Position()
-	_ = c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
+	c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
 }
 
 // Queue returns the queue the moving actor's work runs on, or nil.

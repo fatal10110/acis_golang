@@ -2,9 +2,7 @@ package ai
 
 import (
 	"bytes"
-	"errors"
 	"math"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -144,29 +142,27 @@ func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	}
 }
 
-// TestAttackableThinkJoinsStopAndAttackBroadcastErrors is the regression
-// test for the review finding that thinkAttack's `if stopErr != nil {
-// return stopErr }` masked attackErr whenever both move.Stop's and
-// attack.DoAttack's broadcasts failed in the same tick: only one of the two
-// failures ever reached the log. Both errors must now surface.
-func TestAttackableThinkJoinsStopAndAttackBroadcastErrors(t *testing.T) {
+// TestAttackableThinkStopsMovementAndAttacksOnTheSameTick pins thinkAttack's
+// two-call shape: an accepted swing cancels the walk and starts the attack in
+// the same tick, and reports no error for either.
+func TestAttackableThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
-	stopErr := errors.New("stop broadcast failed")
-	attackErr := errors.New("attack broadcast failed")
-	move := &recordingMove{stopErr: stopErr}
-	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
+	move := &recordingMove{}
+	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, move, strike)
 
 	addAttackHate(ai, target, 0, 10)
-	err := ai.Think()
-
-	if !errors.Is(err, stopErr) {
-		t.Fatalf("Think() error = %v, want it to wrap stopErr (%v)", err, stopErr)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error = %v, want nil", err)
 	}
-	if !errors.Is(err, attackErr) {
-		t.Fatalf("Think() error = %v, want it to wrap attackErr (%v)", err, attackErr)
+
+	if move.stopCount != 1 {
+		t.Fatalf("move.Stop calls = %d, want 1", move.stopCount)
+	}
+	if strike.doAttackCalls != 1 || strike.target != target {
+		t.Fatalf("DoAttack calls = (%d, %v), want (1, target)", strike.doAttackCalls, strike.target)
 	}
 }
 
@@ -412,31 +408,30 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	}
 }
 
-// TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors is the
-// regression test for the review finding that thinkCast's early
-// `if pawnErr != nil { return pawnErr }` masked stopErr whenever both
-// move.Stop's and BroadcastMoveToPawn's broadcasts failed in the same tick.
-func TestAttackableThinkCastJoinsStopAndMoveToPawnBroadcastErrors(t *testing.T) {
+// TestAttackableThinkCastStopsMovementAndStillFacesTarget covers the
+// rejected-cast path: a cast whose skill freezes the caster cancels the walk,
+// and the rotation-only notice observers need still goes out on the same tick
+// even though the cast itself was rejected.
+func TestAttackableThinkCastStopsMovementAndStillFacesTarget(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
-	stopErr := errors.New("stop broadcast failed")
-	pawnErr := errors.New("move-to-pawn broadcast failed")
-	owner.moveToPawnErr = pawnErr
-	move := &recordingMove{stopErr: stopErr}
+	move := &recordingMove{}
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	err := ai.Think()
-
-	if !errors.Is(err, stopErr) {
-		t.Fatalf("Think() error = %v, want it to wrap stopErr (%v)", err, stopErr)
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error = %v, want nil", err)
 	}
-	if !errors.Is(err, pawnErr) {
-		t.Fatalf("Think() error = %v, want it to wrap pawnErr (%v)", err, pawnErr)
+
+	if move.stopCount != 1 {
+		t.Fatalf("move.Stop calls = %d, want 1", move.stopCount)
+	}
+	if owner.moveToPawnCalls != 1 || owner.moveToPawnTo != target {
+		t.Fatalf("BroadcastMoveToPawn calls = (%d, %v), want (1, target)", owner.moveToPawnCalls, owner.moveToPawnTo)
 	}
 }
 
@@ -539,7 +534,6 @@ type fakeActor struct {
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
-	moveToPawnErr   error
 }
 
 func actor(id int32) *fakeActor {
@@ -568,10 +562,9 @@ func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
-func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) error {
+func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
-	return a.moveToPawnErr
 }
 func (a *fakeActor) ShouldIdleWander() bool       { return a.idleWander }
 func (a *fakeActor) ForceWalkStance()             { a.walkStanceCalls++ }
@@ -598,7 +591,6 @@ type recordingMove struct {
 	followRange   int
 	followCalls   int
 	stopCount     int
-	stopErr       error
 	home          location.Location
 	denyMove      bool
 }
@@ -617,10 +609,7 @@ func (m *recordingMove) MoveHome(home location.Location) error {
 
 func (m *recordingMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
-func (m *recordingMove) Stop() error {
-	m.stopCount++
-	return m.stopErr
-}
+func (m *recordingMove) Stop() { m.stopCount++ }
 
 type recordingAttack struct {
 	canAttack       bool
@@ -629,7 +618,6 @@ type recordingAttack struct {
 	bowCooling      bool
 	target          attackable.Combatant
 	doAttackCalls   int
-	doAttackErr     error
 	stopCalls       int
 }
 
@@ -641,10 +629,9 @@ func (a *recordingAttack) CanAttack(target attackable.Combatant) bool {
 	}
 	return a.canAttack
 }
-func (a *recordingAttack) DoAttack(target attackable.Combatant) error {
+func (a *recordingAttack) DoAttack(target attackable.Combatant) {
 	a.doAttackCalls++
 	a.target = target
-	return a.doAttackErr
 }
 func (a *recordingAttack) Stop() {
 	a.stopCalls++
@@ -2400,19 +2387,15 @@ func TestSummonAIThinkPreservesQueuedRetargetWhileCurrentAttackIsBusy(t *testing
 	}
 }
 
-// TestSummonThinkLogsBothStopAndAttackBroadcastErrors is the regression
-// test for the review finding that thinkAttackLocked's masking pattern
-// (mirroring Attackable.thinkAttack) dropped attackErr from the log
-// whenever both move.Stop's and attack.DoAttack's broadcasts failed in the
-// same tick.
-func TestSummonThinkLogsBothStopAndAttackBroadcastErrors(t *testing.T) {
+// TestSummonThinkStopsMovementAndAttacksOnTheSameTick pins
+// thinkAttackLocked's two-call shape (mirroring Attackable.thinkAttack): an
+// accepted swing cancels the walk and starts the attack in the same tick,
+// and logs nothing for either.
+func TestSummonThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 	owner := actor(100)
 	target := actor(200)
-	stopErr := errors.New("stop broadcast failed")
-	attackErr := errors.New("attack broadcast failed")
 	move := &summonMove{}
-	move.stopErr = stopErr
-	strike := &recordingAttack{canAttack: true, doAttackErr: attackErr}
+	strike := &recordingAttack{canAttack: true}
 	brain := NewSummon(owner, move, strike)
 	var buf bytes.Buffer
 	brain.SetLogger(zerolog.New(&buf))
@@ -2421,12 +2404,14 @@ func TestSummonThinkLogsBothStopAndAttackBroadcastErrors(t *testing.T) {
 		t.Fatal("TryToAttack() = false, want accepted attack")
 	}
 
-	logged := buf.String()
-	if !strings.Contains(logged, stopErr.Error()) {
-		t.Fatalf("logged error = %q, want it to contain stopErr (%v)", logged, stopErr)
+	if move.stopCount != 1 {
+		t.Fatalf("move.Stop calls = %d, want 1", move.stopCount)
 	}
-	if !strings.Contains(logged, attackErr.Error()) {
-		t.Fatalf("logged error = %q, want it to contain attackErr (%v)", logged, attackErr)
+	if strike.doAttackCalls != 1 || strike.target != target {
+		t.Fatalf("DoAttack calls = (%d, %v), want (1, target)", strike.doAttackCalls, strike.target)
+	}
+	if logged := buf.String(); logged != "" {
+		t.Fatalf("logged = %q, want nothing logged on the accepted path", logged)
 	}
 }
 

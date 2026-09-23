@@ -126,7 +126,7 @@ func (m *hostileMove) MoveToLocation(target location.Location) (bool, error) {
 	return true, nil
 }
 
-func (m *hostileMove) Stop() error { m.stopCount++; return nil }
+func (m *hostileMove) Stop() { m.stopCount++ }
 
 type hostileAttack struct {
 	canAttack bool
@@ -138,9 +138,8 @@ func (a *hostileAttack) AttackingNow() bool   { return false }
 func (a *hostileAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
-func (a *hostileAttack) DoAttack(target attackable.Combatant) error {
+func (a *hostileAttack) DoAttack(target attackable.Combatant) {
 	a.target = target
-	return nil
 }
 func (a *hostileAttack) Stop() {}
 
