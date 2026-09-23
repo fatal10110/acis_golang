@@ -60,11 +60,15 @@ func (s *ItemStore) SaveState(ctx context.Context, st item.InstanceState) error 
 	return nil
 }
 
-// ListByOwner returns every item ownerID owns, in no particular order.
+// ListByOwner returns every item ownerID owns, ordered by loc_data. A login
+// restore depends on that order: when two rows of one stackable template
+// merge, the row read first survives, so an inventory row (loc_data 0) keeps
+// its object id over an equipped one. Rows tied on loc_data come back in no
+// particular order.
 func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time
-		 FROM items WHERE owner_id = ?`, ownerID)
+		 FROM items WHERE owner_id = ? ORDER BY loc_data`, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
 	}
