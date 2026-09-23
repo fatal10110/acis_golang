@@ -32,6 +32,11 @@ type AIController struct {
 	// Creature.sendPacket is a no-op in the reference for caster-addressed
 	// ones (issue #2350).
 	OnHitResult func(EffectResult)
+	// HitNeedsPresence drops the hit when the caster has left the world
+	// since launch. Set it only for casters whose every removal aborts the
+	// cast first, so the drop never fires where a removed caster would
+	// still land its skill.
+	HitNeedsPresence bool
 }
 
 // Disabled reports whether the actor cannot attempt a new cast right now:
@@ -219,10 +224,8 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			if def.SkillType == "FUSION" || !launchResolved {
 				return
 			}
-			// A caster that left the world after launch lands nothing,
-			// whichever path removed it. Off the grid, an object knows
-			// nothing, itself included.
-			if !a.Caster.Knows(a.Caster) {
+			// Off the grid, an object knows nothing, itself included.
+			if a.HitNeedsPresence && !a.Caster.Knows(a.Caster) {
 				return
 			}
 			result := ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)

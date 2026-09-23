@@ -17,7 +17,9 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 	return a.owner, true
 }
 
-// AbortAll does nothing yet: aborting every in-progress action is not wired.
+// AbortAll does nothing yet: effect-driven aborts are not wired. Despawn
+// already aborts through the AI's AbortAll; wiring this means delegating to
+// it.
 func (a *Actor) AbortAll(bool) {}
 
 // StopMove does nothing yet: effect-driven movement stops are not wired.

@@ -534,6 +534,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		Definitions: l.skills,
 		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
 		Caster:      actor,
+		// Every summon removal aborts first, so a hit reaching a summon
+		// that has left the world lost a race with that abort.
+		HitNeedsPresence: true,
 	}
 	// Summon.sendPacket forwards every packet to the owner (base
 	// Creature.sendPacket is a no-op), but Java only calls sendPacket
