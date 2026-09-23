@@ -172,7 +172,9 @@ func carriedCount(t *testing.T, srv *gameservertest.Server, ownerID, templateID 
 	if !ok {
 		t.Fatalf("player %d not online", ownerID)
 	}
-	holder, ok := obj.(interface{ Inventory() *itemcontainer.Inventory })
+	holder, ok := obj.(interface {
+		Inventory() *itemcontainer.Inventory
+	})
 	if !ok {
 		t.Fatalf("player %d = %T has no inventory", ownerID, obj)
 	}
