@@ -10,12 +10,29 @@ import (
 // signed integer ceiling the persisted column was sized for.
 const maxSP = math.MaxInt32
 
-// Progression snapshots the persisted level, experience and SP values.
+// Progression snapshots the persisted level, experience, SP and karma
+// counters.
 type Progression struct {
 	CharLevel      int
 	Exp            int64
 	SP             int
 	ExpBeforeDeath int64
+	Karma          int
+	PvPKills       int
+	PKKills        int
+}
+
+// progressionHooks collects what a progression change triggers — events and
+// level-derived refreshes that read progression back — so it runs in order
+// after progressionMu is released.
+type progressionHooks []func()
+
+func (h *progressionHooks) add(fn func()) { *h = append(*h, fn) }
+
+func (h progressionHooks) run() {
+	for _, fn := range h {
+		fn()
+	}
 }
 
 // ProgressionValues returns a synchronized snapshot of c's persisted
@@ -30,6 +47,9 @@ func (c *Character) ProgressionValues() Progression {
 		Exp:            c.Exp,
 		SP:             c.SP,
 		ExpBeforeDeath: c.ExpBeforeDeath,
+		Karma:          c.KarmaPoints,
+		PvPKills:       c.PvPKills,
+		PKKills:        c.PKKills,
 	}
 }
 
@@ -40,12 +60,15 @@ func (c *Character) ProgressionValues() Progression {
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
 func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+	var hooks progressionHooks
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	return c.addExpAndSp(table, tmpl, exp, sp)
+	leveledUp := c.addExpAndSp(table, tmpl, exp, sp, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
+	return leveledUp
 }
 
-func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int, hooks *progressionHooks) bool {
 	beforeExp, beforeSP := c.Exp, c.SP
 	leveledUp := false
 	// The reward message follows the attempt, not the result: an experience
@@ -53,7 +76,7 @@ func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	// ceiling. Only an attempt where neither amount applied stays silent.
 	attempted := false
 	if exp >= 0 {
-		leveledUp = c.addExp(table, tmpl, exp)
+		leveledUp = c.addExp(table, tmpl, exp, hooks)
 		attempted = true
 	}
 	if sp >= 0 {
@@ -68,10 +91,10 @@ func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 	// changed. Both adds here can be no-ops, and the packet is self-only and
 	// purely descriptive, so the redundant one is suppressed.
 	if c.Exp != beforeExp || c.SP != beforeSP {
-		c.UpdateUserInfo()
+		hooks.add(c.UpdateUserInfo)
 	}
 	if attempted {
-		c.sendExpSpGain(exp, sp)
+		hooks.add(func() { c.sendExpSpGain(exp, sp) })
 	}
 	return leveledUp
 }
@@ -79,6 +102,8 @@ func (c *Character) addExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp
 // RewardExpAndSp applies a kill reward using this live character's runtime
 // template for level-up stat refills.
 func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
+	var hooks progressionHooks
+	defer func() { hooks.run() }()
 	c.progressionMu.Lock()
 	defer c.progressionMu.Unlock()
 	if table == nil {
@@ -88,13 +113,13 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 			// Same deliberate divergence as AddExpAndSp: no packet when the
 			// add changed nothing.
 			if c.SP != beforeSP {
-				c.UpdateUserInfo()
+				hooks.add(c.UpdateUserInfo)
 			}
-			c.sendExpSpGain(0, sp)
+			hooks.add(func() { c.sendExpSpGain(0, sp) })
 		}
 		return false
 	}
-	return c.addExpAndSp(table, c.runtimeTemplate, exp, sp)
+	return c.addExpAndSp(table, c.runtimeTemplate, exp, sp, &hooks)
 }
 
 // AddExp adds delta experience to c. An addition that would overflow
@@ -104,12 +129,15 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 // HP/MP/CP refill as AddLevel on an increase. It reports whether the level
 // increased.
 func (c *Character) AddExp(table *LevelTable, tmpl *Template, delta int64) bool {
+	var hooks progressionHooks
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	return c.addExp(table, tmpl, delta)
+	leveledUp := c.addExp(table, tmpl, delta, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
+	return leveledUp
 }
 
-func (c *Character) addExp(table *LevelTable, tmpl *Template, delta int64) bool {
+func (c *Character) addExp(table *LevelTable, tmpl *Template, delta int64, hooks *progressionHooks) bool {
 	if c.Exp+delta < 0 {
 		return false
 	}
@@ -124,7 +152,7 @@ func (c *Character) addExp(table *LevelTable, tmpl *Template, delta int64) bool 
 	if level == c.CharLevel {
 		return false
 	}
-	return c.addLevel(table, tmpl, level-c.CharLevel)
+	return c.addLevel(table, tmpl, level-c.CharLevel, hooks)
 }
 
 // AddSp adds delta sp to c.SP, saturating at the 32-bit signed integer
@@ -149,15 +177,17 @@ func (c *Character) addSp(delta int) {
 // is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSp
 // does. A level drop never refills HP/MP/CP, matching AddLevel.
 func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
+	var hooks progressionHooks
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	c.removeExpAndSp(table, tmpl, exp, sp)
+	c.removeExpAndSp(table, tmpl, exp, sp, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
 }
 
-func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
+func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int, hooks *progressionHooks) {
 	beforeLevel := c.CharLevel
 	if exp > 0 {
-		c.removeExp(table, tmpl, exp)
+		c.removeExp(table, tmpl, exp, hooks)
 	}
 	if sp > 0 {
 		c.removeSp(sp)
@@ -165,11 +195,11 @@ func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64,
 	if exp <= 0 && sp <= 0 {
 		return
 	}
-	c.sendExpSpLoss(exp, sp)
+	hooks.add(func() { c.sendExpSpLoss(exp, sp) })
 	// A removal deep enough to drop a level changes max HP and MP, so the
 	// observers' health bars need the new values, not only this client.
 	if c.CharLevel < beforeLevel {
-		c.BroadcastStatus()
+		hooks.add(c.BroadcastStatus)
 	}
 }
 
@@ -177,19 +207,21 @@ func (c *Character) removeExpAndSp(table *LevelTable, tmpl *Template, exp int64,
 // (never 0) rather than going negative, and resyncs c.CharLevel from the
 // result via table.
 func (c *Character) RemoveExp(table *LevelTable, tmpl *Template, delta int64) {
+	var hooks progressionHooks
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	c.removeExp(table, tmpl, delta)
+	c.removeExp(table, tmpl, delta, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
 }
 
-func (c *Character) removeExp(table *LevelTable, tmpl *Template, delta int64) {
+func (c *Character) removeExp(table *LevelTable, tmpl *Template, delta int64, hooks *progressionHooks) {
 	if c.Exp-delta < 0 {
 		delta = c.Exp - 1
 	}
 	c.Exp -= delta
 
 	if level := table.levelForExp(c.Exp); level != c.CharLevel {
-		c.addLevel(table, tmpl, level-c.CharLevel)
+		c.addLevel(table, tmpl, level-c.CharLevel, hooks)
 	}
 }
 
@@ -217,12 +249,15 @@ func (c *Character) removeSp(delta int) {
 // from the new level, never remembered, so a drop has to revoke exactly what
 // a gain would have granted.
 func (c *Character) AddLevel(table *LevelTable, tmpl *Template, delta int) bool {
+	var hooks progressionHooks
 	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	return c.addLevel(table, tmpl, delta)
+	increased := c.addLevel(table, tmpl, delta, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
+	return increased
 }
 
-func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int) bool {
+func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks *progressionHooks) bool {
 	if c.CharLevel+delta > table.RealMaxLevel() {
 		return false
 	}
@@ -238,18 +273,19 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int) bool 
 
 	if increased {
 		if idx := c.CharLevel - 1; tmpl != nil && idx >= 0 && idx < len(tmpl.HPTable) && idx < len(tmpl.MPTable) && idx < len(tmpl.CPTable) {
-			c.refillResources(tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx])
+			hp, mp, cp := tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx]
+			hooks.add(func() { c.refillResources(hp, mp, cp) })
 		}
-		c.announceLevelUp()
+		hooks.add(c.announceLevelUp)
 	}
 
-	c.refreshForLevel()
+	hooks.add(c.refreshForLevel)
 	// PlayerStatus.addLevel calls _actor.refreshWeightPenalty() directly
 	// on every level change (PlayerStatus.java:644), before the UserInfo
 	// send below (:648) — the weight limit is CON-derived and therefore
 	// level-dependent.
-	c.RefreshWeightPenalty()
-	c.UpdateUserInfo()
+	hooks.add(c.RefreshWeightPenalty)
+	hooks.add(c.UpdateUserInfo)
 	return increased
 }
 

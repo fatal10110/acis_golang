@@ -558,7 +558,7 @@ func (c *Character) PDef() float64 {
 func (c *Character) Evasion() int {
 	tmpl := c.template()
 	if tmpl == nil {
-		return c.CharLevel
+		return c.Level()
 	}
 	val := c.calcStat(stat.EvasionRate, 0)
 	if agp := c.ArmorGradePenalty(); agp > 0 {

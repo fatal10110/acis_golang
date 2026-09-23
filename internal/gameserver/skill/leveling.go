@@ -34,7 +34,7 @@ func (p *Persistence) GiveSkills(c *player.Character, tmpl *player.Template) err
 	if p == nil || c == nil || tmpl == nil {
 		return nil
 	}
-	level := c.CharLevel
+	level := c.Level()
 	for _, grant := range tmpl.AutoGetSkillGrants(level, c.SkillLevels()) {
 		if err := p.setKnownSkill(c, grant.SkillID, grant.Level, false); err != nil {
 			return err
@@ -55,7 +55,7 @@ func (p *Persistence) RewardSkills(c *player.Character, tmpl *player.Template) e
 	if p == nil || c == nil || tmpl == nil {
 		return nil
 	}
-	level := c.CharLevel
+	level := c.Level()
 	for _, grant := range tmpl.AllAvailableSkillGrants(level, c.SkillLevels()) {
 		if err := p.setKnownSkill(c, grant.SkillID, grant.Level, grant.Cost != 0); err != nil {
 			return err

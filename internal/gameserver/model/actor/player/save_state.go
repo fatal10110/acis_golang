@@ -24,13 +24,14 @@ type SaveState struct {
 
 // SaveState copies c's persisted character-row values.
 func (c *Character) SaveState() SaveState {
+	progression := c.ProgressionValues()
 	return SaveState{
 		ID:                c.ID,
-		Progression:       c.ProgressionValues(),
+		Progression:       progression,
 		Resources:         c.ResourceValues(),
-		Karma:             c.KarmaPoints,
-		PvPKills:          c.PvPKills,
-		PKKills:           c.PKKills,
+		Karma:             progression.Karma,
+		PvPKills:          progression.PvPKills,
+		PKKills:           progression.PKKills,
 		DeathPenaltyLevel: c.DeathPenaltyLevel(),
 		OnlineTime:        c.TotalOnlineTime(time.Now()),
 		Location:          c.CurrentLocation(),

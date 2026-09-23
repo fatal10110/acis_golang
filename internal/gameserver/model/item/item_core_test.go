@@ -1025,6 +1025,12 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 	if pool.IsSpoiler(7) {
 		t.Fatal("IsSpoiler(7) = true, want false")
 	}
+	if pool.Mark(7) {
+		t.Fatal("second Mark(7) = true, want false: the first spoiler keeps the pool")
+	}
+	if !pool.IsSpoiler(42) {
+		t.Fatal("IsSpoiler(42) = false after a losing Mark, want true")
+	}
 
 	pool.Add(100, 3)
 	pool.Add(100, 2)

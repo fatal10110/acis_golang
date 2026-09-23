@@ -55,10 +55,13 @@ type Character struct {
 	// resurrection effect restores a percentage of the exp lost since then
 	// via RestoreExp, which also clears this back to 0.
 	ExpBeforeDeath int64
-	// progressionMu guards CharLevel, Exp, SP and ExpBeforeDeath. Kill
-	// rewards and death exp loss mutate them from task/timer goroutines
-	// while disconnect/autosave snapshots them through ProgressionValues
-	// (#1890).
+	// progressionMu guards CharLevel, Exp, SP, ExpBeforeDeath, KarmaPoints,
+	// PvPKills and PKKills once the character is live. Another actor's
+	// queue writes them: a killer's applies the victim's death exp and
+	// karma loss and its own PK/PvP counters, a resurrecting caster
+	// restores exp. Read them through Level, Karma or ProgressionValues.
+	// Nothing that can call back into those runs while it is held; see
+	// progressionHooks.
 	progressionMu sync.RWMutex
 
 	maxHP, curHP float64

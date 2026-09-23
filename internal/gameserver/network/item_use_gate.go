@@ -49,7 +49,7 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 		switch strings.ToLower(name) {
 		case "level":
 			level, ok := parseConditionInt(raw)
-			if !ok || live.CharLevel < level {
+			if !ok || live.Level() < level {
 				return false
 			}
 		case "sex":
@@ -64,7 +64,7 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 			}
 		case "pkcount":
 			limit, ok := parseConditionInt(raw)
-			if !ok || live.PKKills > limit {
+			if !ok || live.ProgressionValues().PKKills > limit {
 				return false
 			}
 		case "flying":

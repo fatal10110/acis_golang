@@ -100,6 +100,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	c, t := s.Character, s.Template
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
+	progression := c.ProgressionValues()
 	paperdoll := item.Paperdoll(s.Items)
 	rhand := paperdoll[rhandPaperdollIndex]
 
@@ -132,8 +133,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex))
 	w.WriteInt32(int32(c.ClassID))
-	w.WriteInt32(int32(c.CharLevel))
-	w.WriteInt64(c.Exp)
+	w.WriteInt32(int32(progression.CharLevel))
+	w.WriteInt64(progression.Exp)
 	w.WriteInt32(int32(t.STR))
 	w.WriteInt32(int32(t.DEX))
 	w.WriteInt32(int32(t.CON))
@@ -144,7 +145,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(resources.CurrentHP))
 	w.WriteInt32(int32(resources.MaxMP))
 	w.WriteInt32(int32(resources.CurrentMP))
-	w.WriteInt32(int32(c.SP))
+	w.WriteInt32(int32(progression.SP))
 	w.WriteInt32(clampInt32(c.CurrentWeight()))
 	w.WriteInt32(clampInt32(c.WeightLimit()))
 	w.WriteInt32(bonusSlots)
@@ -182,7 +183,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0) // P.Atk speed (repeated field): combat-formula stats are not modeled
 	w.WriteInt32(int32(t.MDef))
 	w.WriteInt32(int32(c.PvPFlagState()))
-	w.WriteInt32(int32(c.Karma()))
+	w.WriteInt32(int32(progression.Karma))
 
 	runSpd := int32(t.RunSpeed)
 	walkSpd := int32(t.WalkSpeed)
@@ -222,8 +223,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteUint8(0) // operate type: shops/crafting are not modeled
 	w.WriteUint8(0) // crystallize flag: not modeled
 
-	w.WriteInt32(int32(c.PKKills))
-	w.WriteInt32(int32(c.PvPKills))
+	w.WriteInt32(int32(progression.PKKills))
+	w.WriteInt32(int32(progression.PvPKills))
 
 	cubicIDs := c.CubicIDs()
 	count, err := wire.Uint16Count(len(cubicIDs))

@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -60,8 +61,11 @@ func (h *Hostile) CorpseTime() time.Duration {
 	return time.Duration(h.Instance.Template.CorpseTime) * time.Second
 }
 
-// SeedState is one hostile life's manor seed lifecycle.
+// SeedState is one hostile life's manor seed lifecycle. Sowers and
+// harvesters act from their own queues while the killer's queue reads it for
+// rewards, so every method takes mu.
 type SeedState struct {
+	mu        sync.Mutex
 	sowerID   int32
 	seed      manor.Seed
 	harvested bool
@@ -69,36 +73,70 @@ type SeedState struct {
 
 // Seeded reports whether this hostile was sown during its current life.
 func (s *SeedState) Seeded() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.sowerID != 0
 }
 
-// Sow records the sower and seed carried by this hostile.
-func (s *SeedState) Sow(sowerID int32, seed manor.Seed) {
+// Sow records the sower and seed carried by this hostile unless this life
+// was already sown. It reports whether sowerID's seed took.
+func (s *SeedState) Sow(sowerID int32, seed manor.Seed) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sowerID != 0 {
+		return false
+	}
 	s.sowerID = sowerID
 	s.seed = seed
 	s.harvested = false
+	return true
 }
 
 // Harvested reports whether this seeded hostile was already harvested.
 func (s *SeedState) Harvested() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.harvested
 }
 
 // MarkHarvested marks this seeded hostile's crop as consumed.
 func (s *SeedState) MarkHarvested() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.harvested = true
+}
+
+// ClaimHarvest marks the crop consumed for playerID when this life is sown,
+// not yet harvested, and playerID may harvest it. It reports whether
+// playerID took the crop; at most one caller per life does.
+func (s *SeedState) ClaimHarvest(playerID int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sowerID == 0 || s.harvested || !s.allowedToHarvest(playerID) {
+		return false
+	}
+	s.harvested = true
+	return true
 }
 
 // AllowedToHarvest currently permits only the original sower. Party sharing
 // is deferred until live party membership is available.
 func (s *SeedState) AllowedToHarvest(playerID int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.allowedToHarvest(playerID)
+}
+
+func (s *SeedState) allowedToHarvest(playerID int32) bool {
 	return s.sowerID != 0 && s.sowerID == playerID
 }
 
 // HarvestedCrop returns the mature crop id and one crop for now. Manor
 // production-rate configuration is outside the current live reward path.
 func (s *SeedState) HarvestedCrop() (int32, int) {
-	if !s.Seeded() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sowerID == 0 {
 		return 0, 0
 	}
 	return int32(s.seed.MatureID), 1

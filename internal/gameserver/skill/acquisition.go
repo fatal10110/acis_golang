@@ -67,7 +67,7 @@ func GeneralOfferFor(c *player.Character, tmpl *player.Template, skills *Persist
 	if c == nil {
 		return GeneralOffer{}, false
 	}
-	grant, ok := LearnableGeneral(tmpl, c.CharLevel, c.SkillLevels(), skillID, level)
+	grant, ok := LearnableGeneral(tmpl, c.Level(), c.SkillLevels(), skillID, level)
 	if !ok || !definitionLoaded(skills, skillID, level) {
 		return GeneralOffer{}, false
 	}
@@ -98,7 +98,7 @@ func FishingOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 	if c == nil {
 		return FishingOffer{}, false
 	}
-	node, ok := LearnableFishing(trees, c.CharLevel, c.HasDwarvenCraft(), c.SkillLevels(), func(skillID, level int) bool {
+	node, ok := LearnableFishing(trees, c.Level(), c.HasDwarvenCraft(), c.SkillLevels(), func(skillID, level int) bool {
 		return definitionLoaded(skills, skillID, level)
 	}, skillID, level)
 	if !ok {
@@ -112,7 +112,8 @@ func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistenc
 	if c == nil {
 		return LearnResult{}, LearnUnavailable, nil
 	}
-	grant, status := tmpl.CheckSkillLearn(c.CharLevel, c.SP, c.SkillLevels(), skillID, level)
+	progression := c.ProgressionValues()
+	grant, status := tmpl.CheckSkillLearn(progression.CharLevel, progression.SP, c.SkillLevels(), skillID, level)
 	result := LearnResult{SkillID: grant.SkillID, Level: grant.Level, Cost: grant.CorrectedCost()}
 	switch status {
 	case player.LearnAllowed:

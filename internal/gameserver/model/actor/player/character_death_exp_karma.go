@@ -45,7 +45,14 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if table == nil || !allow {
 		return
 	}
-	if c.HasSkill(int(skill.LuckySkillID)) && c.CharLevel <= 9 {
+	lucky := c.HasSkill(int(skill.LuckySkillID))
+	reducedLoss := c.FestivalParticipant() || c.InSiegeZone()
+
+	var hooks progressionHooks
+	defer func() { hooks.run() }()
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	if lucky && c.CharLevel <= 9 {
 		return
 	}
 
@@ -58,7 +65,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if c.KarmaPoints > 0 {
 		percentLost *= rate
 	}
-	if c.FestivalParticipant() || c.InSiegeZone() {
+	if reducedLoss {
 		percentLost /= 4.0
 	}
 
@@ -67,12 +74,10 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 
 	// Snapshot the pre-loss exp for a later resurrection to restore from
 	// (Player.java:2919, `setExpBeforeDeath(getStatus().getExp())`).
-	c.progressionMu.Lock()
 	c.ExpBeforeDeath = c.Exp
-	c.progressionMu.Unlock()
 
-	c.updateKarmaLoss(lostExp)
-	c.RemoveExpAndSp(table, c.runtimeTemplate, lostExp, 0)
+	c.updateKarmaLoss(table, lostExp, &hooks)
+	c.removeExpAndSp(table, c.runtimeTemplate, lostExp, 0, &hooks)
 }
 
 // RestoreExp restores restorePercent (0-100) of the experience lost in this
@@ -80,21 +85,21 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 // It is a no-op unless a death has left ExpBeforeDeath set, and always
 // clears ExpBeforeDeath afterward.
 func (c *Character) RestoreExp(restorePercent float64) {
-	c.progressionMu.Lock()
-	defer c.progressionMu.Unlock()
-	if c.ExpBeforeDeath <= 0 {
-		return
-	}
 	c.stateMu.RLock()
 	table := c.levelTable
 	c.stateMu.RUnlock()
-	if table == nil {
+
+	var hooks progressionHooks
+	defer func() { hooks.run() }()
+	c.progressionMu.Lock()
+	defer c.progressionMu.Unlock()
+	if c.ExpBeforeDeath <= 0 || table == nil {
 		return
 	}
 
 	restored := int64(math.Round(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100))
 	c.ExpBeforeDeath = 0
-	c.addExpAndSp(table, c.runtimeTemplate, restored, -1)
+	c.addExpAndSp(table, c.runtimeTemplate, restored, -1, &hooks)
 }
 
 // updateKarmaLoss reduces this character's karma for a death that cost
@@ -103,14 +108,10 @@ func (c *Character) RestoreExp(restorePercent float64) {
 // cursed-weapon exemption is deferred (see applyDeathExpKarmaLoss); until
 // #225 lands this always evaluates as not-equipped, which is the common
 // case Java itself reproduces for every non-cursed-weapon death.
-func (c *Character) updateKarmaLoss(lostExp int64) {
+//
+// The caller holds progressionMu; the karma announcement runs from hooks.
+func (c *Character) updateKarmaLoss(table *LevelTable, lostExp int64, hooks *progressionHooks) {
 	if c.KarmaPoints <= 0 {
-		return
-	}
-	c.stateMu.RLock()
-	table := c.levelTable
-	c.stateMu.RUnlock()
-	if table == nil {
 		return
 	}
 	level, ok := table.Level(c.CharLevel)
@@ -128,6 +129,6 @@ func (c *Character) updateKarmaLoss(lostExp int64) {
 		return
 	}
 	c.KarmaPoints = newKarma
-	c.notifyKarmaChanged()
-	c.UpdateUserInfo()
+	hooks.add(func() { c.notifyKarmaChanged(newKarma) })
+	hooks.add(c.UpdateUserInfo)
 }

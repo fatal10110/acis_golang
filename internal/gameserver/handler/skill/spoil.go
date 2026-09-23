@@ -48,9 +48,15 @@ func (spoilHandler) Use(cast Cast) {
 
 		rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), cast.Skill.MagicLevel, cast.Skill.LevelDepend, penalty)
 		if formulas.MagicSucceeds(rate, rnd.Get(10000)) {
-			pool.Mark(caster.ObjectID())
+			// Another spoiler can mark the pool between the check above
+			// and here; losing that race reads as the pool already spoiled.
+			marked := pool.Mark(caster.ObjectID())
 			if notify, ok := asPlayer(cast.Caster); ok {
-				notify.NotifySpoilSuccess()
+				if marked {
+					notify.NotifySpoilSuccess()
+				} else {
+					notify.NotifySpoilAlready()
+				}
 			}
 		}
 	}
@@ -83,7 +89,6 @@ func (sweepHandler) Use(cast Cast) {
 		}
 
 		items := pool.Sweep()
-		pool.Reset()
 
 		for itemID, count := range items {
 			rewardSweep(cast.Caster, itemID, count)

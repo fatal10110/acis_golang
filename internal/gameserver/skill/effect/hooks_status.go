@@ -28,7 +28,14 @@ func spoilStart(e *Effect) bool {
 	penalty := casterIsPlayer && player.WeaponGradePenalty()
 	rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), e.Skill.MagicLevel, e.Skill.LevelDepend, penalty)
 	if formulas.MagicSucceeds(rate, rnd.Get(spoilRoll)) {
-		pool.Mark(caster.ObjectID())
+		// Another spoiler can mark the pool between the check above and
+		// here; losing that race is the already-spoiled branch.
+		if !pool.Mark(caster.ObjectID()) {
+			if casterIsPlayer {
+				player.NotifySpoilAlready()
+			}
+			return false
+		}
 		if casterIsPlayer {
 			player.NotifySpoilSuccess()
 		}
