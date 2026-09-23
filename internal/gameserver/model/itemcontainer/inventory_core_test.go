@@ -1558,26 +1558,34 @@ func TestContainerReleasePersistenceKeepsItemsThatLeft(t *testing.T) {
 	}
 }
 
-// TestInventoryRestoreMergeDoesNotPersist proves a restore that merges
-// stacks schedules no write, though the persister is injected at
-// construction.
-func TestInventoryRestoreMergeDoesNotPersist(t *testing.T) {
+// TestInventoryRestoreMergePersistsBothRows proves a restore that merges
+// stacks schedules exactly the merge — the grown stack, then the absorbed
+// row's delete — and nothing for a row restored unchanged. Without the
+// delete the absorbed row is merged in again on every later restore.
+func TestInventoryRestoreMergePersistsBothRows(t *testing.T) {
 	rows := []*item.Instance{
 		{ObjectID: 0x20000001, TemplateID: adenaTemplateID, Count: 100, Location: item.LocationInventory, ManaLeft: -1},
 		{ObjectID: 0x20000002, TemplateID: adenaTemplateID, Count: 50, Location: item.LocationInventory, ManaLeft: -1},
+		{ObjectID: 0x20000003, TemplateID: daggerTemplateID, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
 	}
 	rec := &recordingPersister{}
 	inv := RestorePlayerInventoryWithDelivery(0x10000001, testTemplates(), rows, nil, rec)
-	if len(rec.ids) != 0 {
-		t.Fatalf("restore persisted %d times, want 0", len(rec.ids))
+	if len(rec.states) != 2 {
+		t.Fatalf("restore persisted %v, want exactly the survivor and the absorbed row", rec.ids)
+	}
+	if st := rec.states[0]; st.ObjectID != 0x20000001 || st.Count != 150 {
+		t.Errorf("first write = id %#x count %d, want the survivor at 150", st.ObjectID, st.Count)
+	}
+	if st := rec.states[1]; st.ObjectID != 0x20000002 || st.Count != 0 || st.Location != item.LocationVoid {
+		t.Errorf("second write = id %#x count %d loc %v, want the absorbed row destroyed", st.ObjectID, st.Count, st.Location)
 	}
 	held := inv.ItemByObjectID(0x20000001)
 	if held == nil {
 		t.Fatal("merged stack missing")
 	}
 	held.AddCount(1)
-	if len(rec.ids) != 1 {
-		t.Errorf("persist calls after mutating the merged stack = %d, want 1", len(rec.ids))
+	if len(rec.ids) != 3 {
+		t.Errorf("persist calls after mutating the merged stack = %d, want 3", len(rec.ids))
 	}
 }
 
