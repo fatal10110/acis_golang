@@ -169,7 +169,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// it leaves the owner mounted with a pet arriving beside them.
 	live.petRestoreInFlight.Store(true)
 	releaseFinish := link.castController(live).HoldFinish()
-	sim.AfterOr(live.Queue(), petRestoreHoldCeiling, releaseFinish, link.log)
+	live.Queue().After(petRestoreHoldCeiling, releaseFinish)
 	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
@@ -507,7 +507,6 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		}
 	}
 	attackController := attack.NewPlayable(actor, sink)
-	attackController.SetLogger(l.log)
 	if queue != nil {
 		attackController.SetQueue(queue)
 	}
@@ -518,14 +517,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
 	brain.SetLogger(l.log)
-	// SetLogger records where a panic recovered from a scheduled
-	// Launch/Hit/Finish callback (Controller.scheduleLocked's recover
-	// wrapper, unconditional for every Controller) is logged; left unset,
-	// it's silently discarded through the zero-value zerolog.Logger.
-	// Player-owned controllers get the same wiring (live.cast.SetLogger /
-	// c.SetLogger).
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
-	castController.SetLogger(l.log)
 	if queue != nil {
 		castController.SetQueue(queue)
 	}

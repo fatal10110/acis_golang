@@ -107,6 +107,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		InventoryUpdates: inventoryUpdates,
 		PlayerConfig:     PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, MaxBuffsAmount: 20},
 		PetConfig:        petmodel.DefaultConfig(),
+		Queues:           testQueues(t),
 		Log:              zerolog.Nop(),
 	})
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

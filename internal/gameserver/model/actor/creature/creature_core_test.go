@@ -3,6 +3,7 @@ package creature
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -10,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -263,6 +265,7 @@ func TestLiveOwnsOneMovementState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 
 	first := live.Move()
 	if first != &live.movement {
@@ -297,10 +300,12 @@ func TestLiveMovementStateIsPerCreature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	first.SetQueue(idleQueue())
 	second, err := NewLive(location.Location{X: 100, Y: 0, Z: 30}, 100, geo, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	second.SetQueue(idleQueue())
 
 	if first.Move() == second.Move() {
 		t.Fatal("two live creatures share movement state")
@@ -326,6 +331,7 @@ func newTestLive(t *testing.T) *Live {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	return live
 }
 
@@ -762,3 +768,7 @@ func (physicalAttackActor) MaxHPValue() float64 { return 0 }
 func (physicalAttackActor) ShieldDefense(FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
+
+// idleQueue is a queue on a virtual clock no test advances: timers armed on
+// it never fire.
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }

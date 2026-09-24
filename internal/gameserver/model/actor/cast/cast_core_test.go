@@ -167,9 +167,9 @@ func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 }
 
 func TestStopCancelsPendingPhaseTimers(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	ctrl, _, aborts := newAbortController()
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
 	if err != nil {
@@ -184,9 +184,9 @@ func TestStopCancelsPendingPhaseTimers(t *testing.T) {
 	})
 
 	ctrl.Stop()
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
+	clock.advance(plan.FinalDelay)
 
 	if len(fired) != 0 {
 		t.Fatalf("phase hooks ran after Stop: %v", fired)
@@ -197,9 +197,9 @@ func TestStopCancelsPendingPhaseTimers(t *testing.T) {
 }
 
 func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	ctrl, actor, aborts := newAbortController()
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	actor.hitCost = 20
 
@@ -226,8 +226,8 @@ func TestUnaffordableHitReportsBeforeTheAbortFunnel(t *testing.T) {
 		},
 	})
 
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
 
 	if len(order) != 1 || order[0] != "failed" {
 		t.Fatalf("hook order = %v, want only the failure hook", order)
@@ -576,10 +576,10 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 // apply the skill's effects through the exact same ApplyEffects/
 // EffectHandlers plumbing the live player cast pipeline drives.
 func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -609,8 +609,8 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 	// scalingActor/scalingDef (schedule_test.go) is the same
 	// oracle-verified fixture as TestStartScalesTimingAndInstallsReuse:
 	// LaunchDelay 125ms, HitDelay 400ms.
-	clock.fire(125 * time.Millisecond)
-	clock.fire(400 * time.Millisecond)
+	clock.advance(125 * time.Millisecond)
+	clock.advance(400 * time.Millisecond)
 
 	if len(rec.calls) != 1 {
 		t.Fatalf("handler calls after Hit phase = %d, want 1", len(rec.calls))
@@ -631,10 +631,10 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 // network/magic_skill.go (MagicSkillUse at cast start, MagicSkillLaunched
 // in the Launch hook) is the same sequence this asserts for AI casters.
 func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -668,7 +668,7 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 		t.Fatal("BroadcastSkillLaunched called before the Launch phase")
 	}
 
-	clock.fire(125 * time.Millisecond) // Launch
+	clock.advance(125 * time.Millisecond) // Launch
 
 	if len(caster.skillUseCalls) != 1 {
 		t.Fatalf("BroadcastSkillUse calls after Launch = %d, want still 1 (no re-broadcast)", len(caster.skillUseCalls))
@@ -684,7 +684,7 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want [2]", launched.targetIDs)
 	}
 
-	clock.fire(400 * time.Millisecond) // Hit
+	clock.advance(400 * time.Millisecond) // Hit
 
 	if len(caster.skillLaunchedCalls) != 1 {
 		t.Fatalf("BroadcastSkillLaunched calls after Hit = %d, want still 1 (no re-broadcast)", len(caster.skillLaunchedCalls))
@@ -698,10 +698,10 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 // _target)` recompute and `broadcastPacket(new MagicSkillLaunched(_actor,
 // _skill, _targets))` broadcast of the full array.
 func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -723,7 +723,7 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 	}
 
 	ai.Cast(selected, ref)
-	clock.fire(125 * time.Millisecond) // Launch
+	clock.advance(125 * time.Millisecond) // Launch
 
 	if len(caster.skillLaunchedCalls) != 1 {
 		t.Fatalf("BroadcastSkillLaunched calls after Launch = %d, want 1", len(caster.skillLaunchedCalls))
@@ -765,10 +765,10 @@ func (k *mutableKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ 
 // bystander that leaves the known set between Launch and Hit must still be
 // affected, because the set was already frozen at Launch.
 func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -791,7 +791,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	}
 
 	ai.Cast(selected, ref)
-	clock.fire(125 * time.Millisecond) // Launch — resolves & broadcasts [selected, bystander]
+	clock.advance(125 * time.Millisecond) // Launch — resolves & broadcasts [selected, bystander]
 
 	if len(caster.skillLaunchedCalls) != 1 || len(caster.skillLaunchedCalls[0].targetIDs) != 2 {
 		t.Fatalf("BroadcastSkillLaunched calls = %+v, want 1 call with 2 targets", caster.skillLaunchedCalls)
@@ -801,7 +801,7 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	// resolution at Hit would miss it.
 	known.creatures = []skilltarget.Actor{caster, selected}
 
-	clock.fire(400 * time.Millisecond) // Hit
+	clock.advance(400 * time.Millisecond) // Hit
 
 	if len(rec.calls) != 1 {
 		t.Fatalf("skill handler calls = %d, want 1", len(rec.calls))
@@ -818,10 +818,10 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 // CreatureCast.java:232-234's unconditional broadcast of whatever
 // getTargetList returned, empty included, with no fallback.
 func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -839,7 +839,7 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 	}
 
 	ai.Cast(target, ref)
-	clock.fire(125 * time.Millisecond) // Launch
+	clock.advance(125 * time.Millisecond) // Launch
 
 	if len(caster.skillLaunchedCalls) != 1 {
 		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1", len(caster.skillLaunchedCalls))
@@ -857,10 +857,10 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 // revalidation failure here; also insufficient MP/HP at Hit and a
 // damage-break interrupt) routes through.
 func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	rec := &event.Recorder{}
 	ctrl := NewController(scalingActor(), rec)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -876,7 +876,7 @@ func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 	}
 
 	ai.Cast(&fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}, ref)
-	clock.fire(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
+	clock.advance(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
 
 	if got := event.Count[event.CastAborted](rec); got != 1 {
 		t.Fatalf("CastAborted events = %d, want 1", got)
@@ -887,9 +887,9 @@ func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 }
 
 func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	ctrl := NewController(scalingActor(), nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -908,7 +908,7 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	}
 
 	ai.Cast(&fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}, ref)
-	clock.fire(125 * time.Millisecond)
+	clock.advance(125 * time.Millisecond)
 
 	if got != LaunchAbortTooFar {
 		t.Fatalf("launch abort = %v, want LaunchAbortTooFar", got)
@@ -922,10 +922,10 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 // this hook to forward the result to the summon's owner, mirroring
 // Summon.sendPacket's owner-forward; NPC casters simply leave it unset.
 func TestAIControllerCastReportsHitResult(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -950,8 +950,8 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 	}
 
 	ai.Cast(target, ref)
-	clock.fire(125 * time.Millisecond) // Launch
-	clock.fire(400 * time.Millisecond) // Hit
+	clock.advance(125 * time.Millisecond) // Launch
+	clock.advance(400 * time.Millisecond) // Hit
 
 	if calls != 1 {
 		t.Fatalf("OnHitResult calls = %d, want 1", calls)
@@ -968,10 +968,10 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 // a FUSION-skillType Hit must never reach the effect handlers, unlike a
 // same-shaped non-FUSION skill.
 func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
 	def := scalingDef
@@ -996,8 +996,8 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	// the atkSpd-scaled 125/400 choreography in the non-FUSION Hit test,
 	// scalingDef's raw 1500ms HitTime yields LaunchDelay 1100ms, HitDelay
 	// 400ms (controller.go:564-566).
-	clock.fire(1100 * time.Millisecond)
-	clock.fire(400 * time.Millisecond)
+	clock.advance(1100 * time.Millisecond)
+	clock.advance(400 * time.Millisecond)
 
 	if len(caster.skillLaunchedCalls) != 1 {
 		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1 (Hit phase must actually run for this test to prove anything)", len(caster.skillLaunchedCalls))

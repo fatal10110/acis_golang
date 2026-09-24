@@ -166,8 +166,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	actorRef := &creatureActorRef{}
 	attackCtl := attack.NewAttackable(actorRef, control)
-	live.Move().SetLogger(log)
-	attackCtl.SetLogger(log)
 	if queue != nil {
 		attackCtl.SetQueue(queue)
 	}
@@ -190,7 +188,6 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	// SummonActor's caller relies on before l.skills is ready.
 	if castDefs != nil {
 		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
-		castController.SetLogger(log)
 		if queue != nil {
 			castController.SetQueue(queue)
 		}

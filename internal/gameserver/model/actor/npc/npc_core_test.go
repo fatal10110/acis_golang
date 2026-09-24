@@ -542,8 +542,10 @@ func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testin
 func TestHostileInactiveRegionStopsAllEffects(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
 	hostile.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Template: modelskill.EffectTemplate{Name: "test"}})
+	clock := driveHostile(hostile)
 
 	hostile.OnInactiveRegion()
+	clock.Run()
 
 	if got := hostile.EffectList().All(); len(got) != 0 {
 		t.Fatalf("effects after region deactivation = %d, want 0", len(got))
@@ -1356,6 +1358,7 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.Instance.Template.CollisionRadius = 30
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
+	clock := driveHostile(hostile)
 	hostile.SetHeading(0)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
 	if err := hostile.Think(); err != nil {
@@ -1365,12 +1368,13 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
 	}
 
+	clock.Advance(1500 * time.Millisecond) // (1500+roll)*100/WalkSpeed ms
 	select {
 	case got := <-movement.moved:
 		if want := (location.Location{X: 50, Y: 500, Z: 0}); got != want {
 			t.Fatalf("wander recheck target = %#v, want %#v", got, want)
 		}
-	case <-time.After(2 * time.Second):
+	default:
 		t.Fatal("wander recheck did not move behind the actor")
 	}
 }
@@ -1387,6 +1391,7 @@ func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
+	clock := driveHostile(hostile)
 
 	if hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = true, want false for GrandBoss")
@@ -1394,10 +1399,11 @@ func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	if movement.home != (location.Location{}) {
 		t.Fatalf("MoveHome destination = %#v, want no walk-back", movement.home)
 	}
+	clock.Advance(2 * time.Second)
 	select {
 	case <-movement.moved:
 		t.Fatal("GrandBoss wander recheck moved behind the actor")
-	case <-time.After(2 * time.Second):
+	default:
 	}
 }
 
@@ -1410,14 +1416,16 @@ func TestSiegeGuardReturnHomeDoesNotRecheckWander(t *testing.T) {
 	hostile.Instance.Template.RunSpeed = 100
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
+	clock := driveHostile(hostile)
 
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside drift range")
 	}
+	clock.Advance(2 * time.Second)
 	select {
 	case <-movement.moved:
 		t.Fatal("SiegeGuard wander recheck moved behind the actor")
-	case <-time.After(2 * time.Second):
+	default:
 	}
 }
 
@@ -1429,19 +1437,23 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.Instance.Template.WalkSpeed = 200
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
+	clock := driveHostile(hostile)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
 	if err := hostile.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
 
+	// (1500+roll)*100/WalkSpeed = 750 ms at WalkSpeed 200.
+	clock.Advance(749 * time.Millisecond)
 	select {
 	case <-movement.moved:
 		t.Fatal("wander recheck fired before the scaled delay")
-	case <-time.After(100 * time.Millisecond):
+	default:
 	}
+	clock.Advance(time.Millisecond)
 	select {
 	case <-movement.moved:
-	case <-time.After(time.Second):
+	default:
 		t.Fatal("wander recheck did not fire after the scaled delay")
 	}
 }

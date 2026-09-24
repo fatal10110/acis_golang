@@ -18,10 +18,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// tickInterval is one live effect tick (Template.Time: 1 second) plus
-// slack, matching this codebase's own convention for exercising the real
-// effect scheduler (see task/effects_test.go) rather than mocking time.
-const tickInterval = 1100 * time.Millisecond
+// tickInterval is one live effect tick (Template.Time: 1 second).
+const tickInterval = time.Second
 
 // signetFakeCaster is a minimal player-shaped caster for signet handler
 // tests: it can be positioned and identified, owns its own live effect
@@ -36,13 +34,20 @@ type signetFakeCaster struct {
 	dead       bool
 	mp         float64
 	list       *effect.List
+	// clock drives queue, the caster's own queue, whose clock the caster's
+	// list and every effect point it spawns measure effect periods on.
+	clock *sim.Inline
+	queue *sim.Queue
 }
 
 func newSignetFakeCaster(id int32, x, y, z int, mp float64) *signetFakeCaster {
-	c := &signetFakeCaster{id: id, x: x, y: y, z: z, mp: mp}
-	c.list = effect.NewList(noopStatOwner{})
+	c := &signetFakeCaster{id: id, x: x, y: y, z: z, mp: mp, clock: sim.NewInline(time.Unix(1000, 0))}
+	c.queue = c.clock.NewQueue("caster")
+	c.list = effect.NewList(noopStatOwner{}, effect.WithClock(c.queue))
 	return c
 }
+
+func (c *signetFakeCaster) Queue() *sim.Queue { return c.queue }
 
 func (c *signetFakeCaster) AlikeDead() bool           { return c.dead }
 func (c *signetFakeCaster) ObjectID() int32           { return c.id }
@@ -270,7 +275,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 	actor := all[0]
 
 	// First tick: the sub-skill's buff lands on the nearby target.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 
 	if len(target.list.All()) != 1 {
@@ -279,7 +284,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 
 	// Second (final, Count: 2) tick exhausts the driving effect, which must
 	// despawn the actor on exit.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 
 	if _, ok := state.Object(actor.ObjectID()); ok {
@@ -332,9 +337,9 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 
 	// Ticks 1 and 2 are the effect's documented warmup: no MP paid, no
 	// damage dealt.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick()
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick()
 	if caster.mp != 100 {
 		t.Fatalf("caster mp after warmup ticks = %v, want 100 (unpaid)", caster.mp)
@@ -345,7 +350,7 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 
 	// Tick 3 is live (and, at Count: 3, also the effect's last): it pays
 	// MP, deals damage, and despawns the actor on exit.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick()
 
 	if caster.mp != 90 {
@@ -395,11 +400,11 @@ func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
 	}
 	h.Use(Cast{Caster: caster, Skill: def})
 
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick()
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick()
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	caster.EffectList().Tick() // the live tick: insufficient MP
 
 	if caster.mp != 5 {
@@ -430,14 +435,14 @@ func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
 	actor := findEffectPointObjects(state)[0]
 
 	// First tick is a documented skip: the dance effect must survive it.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 	if len(target.list.All()) != 1 {
 		t.Fatalf("target effects after skipped first tick = %d, want 1", len(target.list.All()))
 	}
 
 	// Second (final) tick strips it.
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 	if len(target.list.All()) != 0 {
 		t.Fatalf("target effects after second tick = %d, want 0 (dance stripped)", len(target.list.All()))
@@ -459,7 +464,7 @@ func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
 
 	actor := findEffectPointObjects(state)[0]
 
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 	if target.unsummoned {
 		t.Fatal("target unsummoned on the skipped first tick")
@@ -468,7 +473,7 @@ func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
 		t.Fatalf("target self skill-use broadcasts on the skipped first tick = %d, want 0", target.selfSkillUses)
 	}
 
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 	if !target.unsummoned {
 		t.Fatal("target not unsummoned after the second tick")
@@ -499,15 +504,6 @@ func (noopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (noopStatOwner) UpdateEffectIcons() {}
 
-// queuedSignetCaster is a caster whose own work runs on a queue, like a live
-// player's.
-type queuedSignetCaster struct {
-	*signetFakeCaster
-	queue *sim.Queue
-}
-
-func (c queuedSignetCaster) Queue() *sim.Queue { return c.queue }
-
 // TestSignetOutlivesItsCastersQueue keeps an effect point's driving effect
 // off the caster's queue. The point's OnExit is what despawns it, and it
 // outlives the caster's session: bound to the caster's queue, a logout
@@ -522,8 +518,7 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	}}
 	h, state, _ := newTestSignetHandler(defs)
 
-	pool := sim.NewPool(1, zerolog.Nop())
-	caster := queuedSignetCaster{signetFakeCaster: newSignetFakeCaster(1, 100, 100, 0, 100), queue: pool.NewQueue("caster-1")}
+	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	def := modelskill.Definition{
 		ID: 454, Level: 1, SkillType: "SIGNET", EffectID: 5123, EffectNpcID: 13018, Radius: 180,
 		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
@@ -543,7 +538,7 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	// The caster logs out: its queue is closed and drops every later task.
 	caster.queue.Close()
 
-	time.Sleep(tickInterval)
+	caster.clock.Advance(tickInterval)
 	actor.EffectList().Tick()
 	if _, ok := state.Object(actor.ObjectID()); ok {
 		t.Fatal("effect point still in world after its driving effect exited")

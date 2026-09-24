@@ -119,8 +119,8 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.ActivityRegistry, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, 20, 30, effects, nil, zoneIndexes...)
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.ActivityRegistry, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, 20, 30, effects, queues, zoneIndexes...)
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.

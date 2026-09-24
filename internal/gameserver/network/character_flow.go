@@ -628,8 +628,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(c, live)
-	c.Move().SetLogger(l.log)
-	attackCtl.SetLogger(l.log)
 	if q := creatureLive.Queue(); q != nil {
 		attackCtl.SetQueue(q)
 	}

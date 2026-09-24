@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -111,8 +112,9 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
 
+	clock := npcQueues()
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, clock)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -136,10 +138,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	// spawn — so this always lands before the reset.
 	hostile.SetHeading(999)
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && hostile.Heading() != walkerTestSpawnHeading {
-		time.Sleep(10 * time.Millisecond)
-	}
+	advanceUntil(clock, func() bool { return hostile.Heading() == walkerTestSpawnHeading })
 	if got := hostile.Heading(); got != walkerTestSpawnHeading {
 		t.Fatalf("Heading() after route arrival = %d, want spawn heading %d", got, walkerTestSpawnHeading)
 	}
@@ -170,7 +169,7 @@ func TestNpcMovementCapsAtWaterSurface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, zones)
+	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, npcQueues(), zones)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -224,7 +223,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, npcQueues())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -317,8 +316,9 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
 
+	clock := npcQueues()
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, clock); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 
@@ -331,11 +331,8 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
 
-	// Wait for the route's initial move to settle the NPC at routeNode.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && (hostile.Move().Moving() || hostile.Move().Position() != routeNode) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	// Let the route's initial move settle the NPC at routeNode.
+	advanceUntil(clock, func() bool { return !hostile.Move().Moving() && hostile.Move().Position() == routeNode })
 	if got := hostile.Move().Position(); got != routeNode {
 		t.Fatalf("precondition: Position() = %+v, want routeNode %+v", got, routeNode)
 	}
@@ -352,14 +349,9 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		t.Fatal("ReturnHome() = false, want true (strayPoint is outside the maker polygon)")
 	}
 
-	deadline = time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) && hostile.Move().Moving() {
-		time.Sleep(10 * time.Millisecond)
-	}
-	// Give a hijacked route re-move (the bug) time to actually start and be
-	// observed, rather than racing a check against the exact instant the
-	// leash arrival's callback runs.
-	time.Sleep(50 * time.Millisecond)
+	advanceUntil(clock, func() bool { return !hostile.Move().Moving() })
+	// Give a hijacked route re-move (the bug) time to start.
+	clock.Advance(50 * time.Millisecond)
 
 	if got := hostile.Move().Position(); got != home {
 		t.Fatalf("Position() after leash return = %+v, want home %+v (walker route hijacked the leash move)", got, home)
@@ -422,7 +414,7 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 	}
 
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, npcQueues()); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 
@@ -441,5 +433,16 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 	}
 	if got, want := ev.Speed, 50.0; got != want {
 		t.Fatalf("MoveToLocation() Speed = %v, want WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
+	}
+}
+
+// advanceUntil moves clock 10 ms at a time until cond holds, for at most
+// 2 s of virtual time.
+func advanceUntil(clock *sim.Inline, cond func() bool) {
+	for range 200 {
+		if cond() {
+			return
+		}
+		clock.Advance(10 * time.Millisecond)
 	}
 }

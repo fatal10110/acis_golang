@@ -194,7 +194,7 @@ type GameClientLink struct {
 	// applyPersistActions).
 	itemWrites       *persist.Order
 	persistWait      time.Duration
-	queues           Queues // nil runs player work on the goroutine that triggers it
+	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
 	levels           *player.LevelTable
@@ -297,8 +297,7 @@ type GameClientLinkConfig struct {
 	// reading rows back; zero means livePlayerPersistWait.
 	PersistWait time.Duration
 	// Queues creates each live player's queue, which its in-world packet
-	// handlers, timers and periodic ticks run on; nil runs that work on
-	// the goroutine that triggers it.
+	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
 	Restarts     *restart.Table
 	Levels       *player.LevelTable

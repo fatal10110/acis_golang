@@ -174,18 +174,17 @@ func (p *livePlayer) kickClient() {
 	}
 }
 
-// after arms fn to run once d has elapsed, as a task on p's queue; see
-// sim.AfterOr for a player built without one.
-func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
-	return sim.AfterOr(p.Queue(), d, fn, p.log)
+// after arms fn to run once d has elapsed, as a task on p's queue.
+func (p *livePlayer) after(d time.Duration, fn func()) *sim.Timer {
+	return p.Queue().After(d, fn)
 }
 
 // onQueue runs fn as a task on q and returns once it has run, so work a
 // connection reads for an in-world player keeps its read order and runs
-// serialized with that player's timers and ticks. With no queue, or one
-// that no longer accepts tasks (the player detached, or the pool is
-// stopping), fn runs on the calling goroutine. A task must never call it for
-// its own queue: it would wait on itself.
+// serialized with that player's timers and ticks. When q no longer accepts
+// tasks (the player detached, or the pool is stopping), fn runs on the
+// calling goroutine. A task must never call it for its own queue: it would
+// wait on itself.
 //
 // It reports whether fn returned normally. False means fn panicked or called
 // runtime.Goexit and the pool's per-task recovery contained it, so whatever
@@ -194,10 +193,6 @@ func (p *livePlayer) after(d time.Duration, fn func()) cubic.Timer {
 // reports true: there the panic keeps unwinding, to the connection handler's
 // own recover.
 func onQueue(q *sim.Queue, fn func()) (ok bool) {
-	if q == nil {
-		fn()
-		return true
-	}
 	done := make(chan struct{})
 	// ok is written before the deferred close and read after <-done, so the
 	// waiting goroutine sees the task goroutine's write.
@@ -213,16 +208,11 @@ func onQueue(q *sim.Queue, fn func()) (ok bool) {
 	return ok
 }
 
-// postLive posts fn to live's queue without waiting, or runs it now when
-// live has no queue. It reports whether fn will run: a detached player's
-// closed queue drops it, which a caller holding state for fn to release has
-// to clean up itself.
+// postLive posts fn to live's queue without waiting. It reports whether fn
+// will run: a detached player's closed queue drops it, which a caller
+// holding state for fn to release has to clean up itself.
 func postLive(live *livePlayer, fn func()) bool {
-	if q := live.Queue(); q != nil {
-		return q.Post(fn)
-	}
-	fn()
-	return true
+	return live.Queue().Post(fn)
 }
 
 // onLive runs fn on live's queue, or on the calling goroutine when live is
@@ -484,7 +474,6 @@ func (p *livePlayer) attackController() *attack.Controller {
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
-		live.cast.SetLogger(live.log)
 		if q := live.Queue(); q != nil {
 			live.cast.SetQueue(q)
 		}

@@ -2,6 +2,7 @@ package npc
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -10,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -52,6 +54,7 @@ func newHostileLive(t testing.TB) *creature.Live {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	return live
 }
 
@@ -182,3 +185,14 @@ func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
 }
 
 func (f *frameReceiver) BroadcastFrame(frame wire.Frame) bool { return f.SendFrame(frame) }
+
+// idleQueue is a queue on a virtual clock no test advances: timers armed on
+// it never fire.
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// driveHostile moves h onto a queue whose virtual clock the test advances.
+func driveHostile(h *Hostile) *sim.Inline {
+	in := sim.NewInline(time.Unix(0, 0))
+	h.SetQueue(in.NewQueue("npc"))
+	return in
+}
