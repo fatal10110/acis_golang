@@ -62,6 +62,11 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	conn := newConn(server, zerolog.Nop())
 	t.Cleanup(func() { _ = client.Close() })
 	t.Cleanup(func() { _ = conn.Close() })
+	// Nothing closes this pipe on a missing reply, so a regression must fail
+	// the read instead of hanging the package.
+	if err := client.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
 
 	gameLink := &GameClientLink{
 		log:       zerolog.Nop(),
