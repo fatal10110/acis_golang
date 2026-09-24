@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -28,14 +29,14 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := &livePlayer{Character: &player.Character{ID: 42}, log: zerolog.Nop()}
+	live := autosaveLive(t, 42)
 	live.markDetaching()
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
-	effects.Save(live)
+	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
 	if got := chars.saves(42); got != 0 {
 		t.Fatalf("roster.Save calls for a detaching session = %d, want 0", got)
@@ -49,13 +50,13 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := &livePlayer{Character: &player.Character{ID: 43}, log: zerolog.Nop()}
+	live := autosaveLive(t, 43)
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
-	effects.Save(live)
+	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
 	if got := chars.saves(43); got != 1 {
 		t.Fatalf("roster.Save calls for an attached session = %d, want 1", got)
@@ -72,14 +73,14 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := &livePlayer{Character: &player.Character{ID: 44}, log: zerolog.Nop()}
+	live := autosaveLive(t, 44)
 	live.Character.SetLastKnownPosition(location.Location{X: 100, Y: 200, Z: 300}, 12345)
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 
-	effects.Save(live)
+	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
 	pos := chars.savedPosition(t, 44)
 	if pos.location != (location.Location{X: 100, Y: 200, Z: 300}) || pos.heading != 12345 {
@@ -105,14 +106,7 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	defer worker.Close(context.Background())
 
-	ch := &player.Character{ID: 45}
-	creatureLive, err := creature.NewLive(location.Location{}, 0, testGeo{}, ch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	creatureLive.SetQueue(idleQueue())
-	ch.Live = creatureLive
-	live := &livePlayer{Character: ch, log: zerolog.Nop()}
+	live := autosaveLive(t, 45)
 	state.AddPlayer(live)
 
 	entered := make(chan struct{})
@@ -127,11 +121,11 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, nil, nil, worker, zerolog.Nop())
-	effects.Save(live)
+	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 	<-entered // the autosave write is in flight on the lane
 
 	link := &GameClientLink{roster: roster, log: zerolog.Nop(), persist: worker}
-	link.detachLivePlayer(live)
+	sim.RunOwned(live.Queue(), func() { link.detachLivePlayer(live) })
 	if seq := chars.onlineSequence(45); len(seq) != 0 {
 		t.Fatalf("online-status writes recorded while the autosave write was blocked = %v, want none", seq)
 	}
@@ -144,4 +138,18 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	if len(seq) != 3 || seq[0] != "online" || seq[1] != "online" || seq[2] != "offline" {
 		t.Fatalf("online-status write sequence = %v, want [online online offline]", seq)
 	}
+}
+
+// autosaveLive builds an attached player on its own queue; the autosave tick
+// runs Save there.
+func autosaveLive(t *testing.T, id int32) *livePlayer {
+	t.Helper()
+	ch := &player.Character{ID: id}
+	creatureLive, err := creature.NewLive(location.Location{}, 0, testGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creatureLive.SetQueue(idleQueue())
+	ch.Live = creatureLive
+	return &livePlayer{Character: ch, log: zerolog.Nop()}
 }

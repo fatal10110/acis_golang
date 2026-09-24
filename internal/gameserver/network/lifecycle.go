@@ -34,7 +34,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// below — otherwise a timer goroutine can still fire after detach.
 	live.Stop()
 	l.cancelActiveTrade(live)
-	// Excludes TaskEffects.Save's check-and-enqueue: every autosave job is
+	// TaskEffects.Save runs on this queue too, so every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
 	live.markDetaching()
 

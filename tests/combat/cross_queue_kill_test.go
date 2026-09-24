@@ -68,8 +68,7 @@ func TestPKCountersSurviveKillsOnTwoQueues(t *testing.T) {
 	}
 	srv.Settle(t)
 
-	state := killer.SaveState()
-	if want := 2 * rounds; state.PKKills != want {
-		t.Fatalf("killer PK kills = %d, want %d: a kill credited on one queue was lost to the other", state.PKKills, want)
+	if got, want := killer.ProgressionValues().PKKills, 2*rounds; got != want {
+		t.Fatalf("killer PK kills = %d, want %d: a kill credited on one queue was lost to the other", got, want)
 	}
 }

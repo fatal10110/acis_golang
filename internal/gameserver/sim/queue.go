@@ -197,6 +197,13 @@ func AssertOwner(q *Queue) {
 	assertDrainer(q)
 }
 
+// RunOwned runs fn on the calling goroutine as q's owner, once the task q is
+// running, if any, has returned. It is for work that must still run after
+// Post refused it: the queue is closed or its pool is stopping, but tasks it
+// accepted earlier may still be draining. A task must not call it for its
+// own queue.
+func RunOwned(q *Queue, fn func()) { drainAs(q, fn) }
+
 // drainAs runs fn as q's owner: q.draining is held and, under simdebug, the
 // calling goroutine is recorded as q's drainer.
 func drainAs(q *Queue, fn func()) {

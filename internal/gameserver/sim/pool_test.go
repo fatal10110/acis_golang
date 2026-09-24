@@ -396,6 +396,34 @@ func TestAssertOwner(t *testing.T) {
 	}
 }
 
+func TestRunOwnedWaitsForTheRunningTaskOfAClosedQueue(t *testing.T) {
+	p := startPool(t, 2, zerolog.Nop())
+	q := p.NewQueue("q")
+	started, release := make(chan struct{}), make(chan struct{})
+	var taskDone atomic.Bool
+	q.Post(func() {
+		close(started)
+		<-release
+		taskDone.Store(true)
+	})
+	<-started
+	q.Close()
+
+	ran := make(chan bool)
+	go RunOwned(q, func() {
+		ran <- taskDone.Load() && !panics(func() { AssertOwner(q) })
+	})
+	select {
+	case <-ran:
+		t.Fatal("RunOwned ran while the queue's task was still running")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	if !<-ran {
+		t.Fatal("RunOwned ran before the queue's task returned, or not as its owner")
+	}
+}
+
 func panics(fn func()) (panicked bool) {
 	defer func() { panicked = recover() != nil }()
 	fn()

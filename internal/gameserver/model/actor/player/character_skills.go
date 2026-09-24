@@ -9,6 +9,9 @@ import (
 )
 
 type skillState struct {
+	// mu is taken from other actors' queues: a killer's applies c's death
+	// exp loss, which reads the Lucky skill, and a caster's target
+	// conditions check c's skills.
 	mu       sync.Mutex
 	known    SkillLevels
 	effects  []effect.ActiveEffect
