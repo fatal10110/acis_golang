@@ -13,7 +13,6 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -228,18 +227,6 @@ type GameClientLink struct {
 	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
-
-	// afterFunc schedules fn to run once after d; nil defaults to
-	// time.AfterFunc. Overridden in tests for deterministic timing.
-	afterFunc func(d time.Duration, fn func())
-
-	// cubicAfterFunc schedules a live cubic's recurring action tick and
-	// one-shot disappear timer; nil runs them on the owner's queue (see
-	// livePlayer.after). Overridden in tests for deterministic cubic-runtime
-	// timing, distinct from afterFunc since a cubic timer must be
-	// individually cancelable (StopAction/RefreshDisappear/Stop) rather than
-	// fire-and-forget.
-	cubicAfterFunc cubic.AfterFunc
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -438,22 +425,6 @@ func (l *GameClientLink) rollEnchantSkill() int {
 		return l.skillEnchantRoll()
 	}
 	return rnd.Get(100)
-}
-
-// scheduleAfter runs fn once, after d elapses, as a task on live's queue.
-func (l *GameClientLink) scheduleAfter(live *livePlayer, d time.Duration, fn func()) {
-	if l.afterFunc != nil {
-		l.afterFunc(d, func() {
-			defer func() {
-				if r := recover(); r != nil {
-					l.log.Error().Interface("panic", r).Msg("scheduled callback panic")
-				}
-			}()
-			fn()
-		})
-		return
-	}
-	live.after(d, fn)
 }
 
 func randomCipherKey() ([]byte, error) {

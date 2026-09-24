@@ -143,7 +143,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 // lifted with the lock still nominally held, or vice versa.
 func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 	gen := live.enterPickupLock()
-	l.scheduleAfter(live, pickupParalyzeLock, func() {
+	live.after(pickupParalyzeLock, func() {
 		if !live.exitPickupLock(gen) {
 			return
 		}

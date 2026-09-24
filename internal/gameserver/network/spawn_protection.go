@@ -21,7 +21,7 @@ func (l *GameClientLink) activateSpawnProtection(live *livePlayer) {
 	live.SetSpawnProtection(true)
 	live.spawnProtectionMu.Unlock()
 	live.UpdateUserInfo()
-	l.scheduleAfter(live, l.playerConfig.SpawnProtection, func() {
+	live.after(l.playerConfig.SpawnProtection, func() {
 		live.spawnProtectionMu.Lock()
 		if gen != live.spawnProtectionGen || !live.SpawnProtected() {
 			live.spawnProtectionMu.Unlock()

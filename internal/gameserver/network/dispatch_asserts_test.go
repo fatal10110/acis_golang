@@ -1,11 +1,7 @@
 package network
 
 import (
-	"bytes"
-	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -33,36 +29,6 @@ func skipPackageSendableRemainder(r *wire.Reader) {
 	r.ReadInt32()
 }
 
-type safeLogBuffer struct {
-	mu sync.Mutex
-	bytes.Buffer
-}
-
-func (b *safeLogBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.Buffer.Write(p)
-}
-
-func (b *safeLogBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.Buffer.String()
-}
-
-func waitForLog(t *testing.T, logs *safeLogBuffer, needle string) string {
-	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		got := logs.String()
-		if strings.Contains(got, needle) {
-			return got
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("timed out waiting for log containing %q; logs=%s", needle, logs.String())
-	return ""
-}
 func assertTargetHPStatus(t *testing.T, frame []byte, objectID int32, maxHP, curHP int) {
 	t.Helper()
 	if frame[0] != serverpackets.OpcodeStatusUpdate {

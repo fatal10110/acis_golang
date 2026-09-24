@@ -784,18 +784,8 @@ func (c *Controller) stopTimersLocked() {
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
 	source := c.afterFunc
-	if source == nil {
-		log := c.log
-		source = func(d time.Duration, fn func()) scheduledTimer {
-			return time.AfterFunc(d, func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Error().Interface("panic", r).Msg("cast: recovered panic in scheduled callback")
-					}
-				}()
-				fn()
-			})
-		}
+	if source == nil { // no queue: only unit tests build one this way
+		source = func(d time.Duration, fn func()) scheduledTimer { return sim.AfterOr(nil, d, fn, c.log) }
 	}
 	c.timers = append(c.timers, source(delay, f))
 }

@@ -369,6 +369,14 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   hold ceiling moved onto `queue.After`. CI keeps these suites' real-pool run as a
   `ACIS_SIM_EXECUTOR=pool` step. Other wall-clock reads (reuse, disabled items, cast interrupt)
   still use `time.Now` (#2482).
+  *Slice 2 (`internal/gameserver/network`) landed as:* production always hands the attack, cast
+  and move controllers a queue, so their three private `time.AfterFunc` fallbacks collapse onto
+  `sim.AfterOr(nil, …)`, reached only by unit tests that build an actor with no queue. The never-set
+  `GameClientLink.afterFunc`/`cubicAfterFunc` seams are gone. The package's other waits are not on
+  a timer: three 2 s waits were false passes, where `ScriptedClient.ExpectClosed` treated a read
+  timeout as a close. They now pin the exact threshold, and a read timeout fails the test. The
+  remaining polls (login link, session validator, the item-flush order) wait on a socket or a
+  goroutine the test starts, not on a queue timer. Close-path frames are tracked in #2484.
 
 ## Performance notes (why this does not regress the hot spot)
 - Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor
