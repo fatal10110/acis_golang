@@ -37,7 +37,9 @@ State splits into three kinds:
   inventory, effect timers. Touched only on the owner queue; enforced by `sim.AssertOwner`.
   Replaces ~80% of today's lock sites.
 - **Cross-mutable subset** (one small mutex per actor, `vitalsMu`): HP/MP/CP, dead flag, hate list,
-  effect list. Other actors mutate these **synchronously** — `target.ReduceHP` still returns, the
+  effect list. *Landed (Phase 3) as several per-actor leaf locks — vitals, progression, state,
+  stat slots, controllers, AI brains, hate, the effect list — not one `vitalsMu`; see Phase 3's
+  Landed as notes and #2273 for the list.* Other actors mutate these **synchronously** — `target.ReduceHP` still returns, the
   caller still reads `died`, reflect/counter still land in the same call stack, exactly as the
   reference. `vitalsMu` is never held across a call-out; side effects (Die sequence, stat
   recalculation, effect-icon broadcast, StatusUpdate) are posted to the owner's queue after
@@ -146,9 +148,14 @@ independent of this plan.
 
 ## Phases (one sub-issue and one PR per phase; every PR keeps behavior and `go test -race ./...` green)
 
-Numbering matches issues #2269–#2274. **Execution order is 0 ∥ 1 → 4 → 2 → 3 → 5 → 6**: Phase 0
+Numbering matches issues #2269–#2274. **Execution order is 0 ∥ 1 → 4 → 2 → 3 → 6 → 5**: Phase 0
 and Phase 1 in parallel; the persist worker (Phase 4) lands before handlers move onto a cores-sized
-pool (Phase 2), so no queued task can block on the DB.
+pool (Phase 2), so no queued task can block on the DB; the test cleanup (Phase 6) runs before the
+lock sweeps (Phase 5) so the sweeps' dual-executor gate is deterministic.
+
+*Status (2026-09-24):* Phases 0–4 landed (#2323–#2325, #2322, #2344, #2365/#2366, #2446–#2449).
+Phase 3 landed with cross-actor **leaf locks** instead of command posts and a single `vitalsMu`
+per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
 
 ### Phase 1 — `internal/gameserver/sim` (new package, no wiring) — #2269
 - `Pool` (worker goroutines, `Start(ctx)`/`Stop(ctx)`: stop accepting posts, drain in-flight
@@ -301,23 +308,38 @@ pool (Phase 2), so no queued task can block on the DB.
   per-client packet order (attack → target StatusUpdate → kill reward) under `sim.Inline` and
   re-run on the pool; perf baseline re-run.
 
-### Phase 5 — mutex deletion sweeps (one PR per group; each site becomes `sim.AssertOwner`) — #2273
-1. `model/actor/player` + `network/live_player.go` (18 locks → `vitalsMu`). `progressionMu` is
-   cross-actor (death exp/karma loss and PK/PvP credit run on another actor's queue, see Phase 3),
-   so it stays a leaf lock or folds into `vitalsMu`; #2258 closed with Phase 3 slice 4.
-2. `model/actor/npc` + `ai` + `summon` (16 → `vitalsMu`; summon state is owner-queue-owned).
-   `npc.SeedState.mu` and `item.SpoilPool.mu` (Phase 3 slice 4) guard per-life NPC state that
-   sowers, harvesters, spoilers and the killer change from their own queues; fold them into the
-   NPC's `vitalsMu` or keep them as leaf locks, but they stay cross-actor.
-3. `move`/`attack`/`cast`/`cubic`. The move/attack/cast controller locks stay as leaf container
+### Phase 5 — mutex deletion sweeps (one PR per group; deleted locks' writers get `sim.AssertOwner`) — #2273
+*Rescoped 2026-09-24.* Phase 3 kept the cross-actor state under per-actor leaf locks, so this
+phase deletes only the locks whose every site runs on the owner's queue (handlers via `onLive`,
+timers via `queue.After`, ticks via `Post`), and puts `sim.AssertOwner(q)` at each former lock
+site so the `simdebug` pool run catches an off-queue writer. It does not fold leaf locks into one
+`vitalsMu`: that widens critical sections for no correctness gain. The deletable candidates and
+the locks that stay are listed on #2273; `AssertOwner` has no production caller until this phase.
+1. `model/actor/player` + `network/live_player.go`: `livePlayer`'s per-connection locks and the
+   `Character` locks not named in Phase 3's *Landed as*. `vitalsMu`, `stateMu` and `progressionMu`
+   stay: progression is cross-actor (death exp/karma loss and PK/PvP credit run on another actor's
+   queue, see Phase 3); #2258 closed with Phase 3 slice 4.
+2. `model/actor/npc` + `summon` + `cubic`: shot, disabled-skill and overhit locks where no other
+   actor reaches them. `Hostile`'s health/`mpMu`/`deathMu`/`minionsMu`, `summon.Actor`'s
+   `statusMu`/`stateMu` (target and intent are read by the next aggressor, Phase 3 slice 3) and the
+   `ai` brain locks stay. `npc.SeedState.mu` and `item.SpoilPool.mu` (Phase 3 slice 4) guard
+   per-life NPC state that sowers, harvesters, spoilers and the killer change from their own queues
+   and stay cross-actor. `Hostile.claimFollowSlot` holds `minionsMu` across the world lock while it
+   resolves occupants (breaks rule 2): snapshot ids under the lock, resolve after unlock, re-check
+   on claim.
+3. `move`/`attack`/`cast`. The move/attack/cast controller locks stay as leaf container
    locks, because other actors stop, abort and interrupt them synchronously (Phase 3, landed).
    The same goes for the AI brains' locks (`ai.Attackable`, `ai.PlayerAttack`, `ai.Summon`) and
    the `stateMu` sections guarding target, stance, charges and summon intent. The sweep still
    moves `Start` and `Hit` onto the caster's queue, where their `ConsumeItem`/`ReduceMP`/`ReduceHP`
    are the **caster's own** skill cost under its own `vitalsMu` (#2259 was fixed in Phase 0). The
-   `cubic` locks are still deleted where no other actor reaches them.
-4. `skill/effect`: `List`'s own mutex goes (guarded by its owner's `vitalsMu`); `Calculator` and
-   the effect schedule become queue-owned (timers via `queue.After`).
+   `cubic` locks are sweep 2's.
+4. `skill/effect` and stat slots: the `List` lock, `scheduleMu`, the `Calculator` locks and the
+   `statMu` that guards each actor's calculator slots (`Character.statMu`, `Hostile.statMu`)
+   **stay** — other actors apply and remove effects synchronously (Phase 3 *Landed as*: "the
+   effect list's own lock" is one of the cross-actor leaf locks), and every `Stat()` read from an
+   attacker's formula goes through `statCalc` under `statMu`. Nothing to delete here beyond
+   confirming no lock is held across a call-out.
 5. `model/itemcontainer` + `model/item`: `Inventory` keeps `inv.mu` as a container; per-item
    `item.Instance` locks deleted (mutated only under the owning inventory's mutex). Closes #2261:
    `BuildAndDrainUpdates` returns the batch under `inv.mu` and the caller runs its callback after
@@ -328,13 +350,19 @@ pool (Phase 2), so no queued task can block on the DB.
 7. `task`: registries stay as containers; delete per-task locks that only guarded actor calls.
 8. Remaining single-field guards from #2262 that survive to this point → atomics or deletion.
 
-### Phase 6 — test cleanup — #2274
-- Replace the 34 `afterFunc` test seams and the 73 `time.Sleep`/`Eventually` waits in
-  `tests/` and `internal/gameservertest` with `sim.Inline` + `Clock.Advance`.
+### Phase 6 — test cleanup — #2274 (runs before Phase 5)
+- Replace the `afterFunc` test seams and the `time.Sleep`/`Eventually`/`waitFor` waits in
+  `tests/`, `internal/gameservertest` and the remaining `internal/**/*_test.go` with `sim.Inline` +
+  `Clock.Advance` (counts on `main` at ef80df83: 52 `afterFunc` lines, 95 + 41 waits; re-count per
+  PR). Retire the `ACIS_SIM_EXECUTOR=inline` pump once a suite drives the clock itself, and move
+  the raw `time.AfterFunc` left in `network/summon_spawn.go` (pet-restore hold ceiling) and the
+  controllers' nil-`afterFunc` fallbacks onto `queue.After` so `Inline` can advance them. Only
+  needs `queue.After` in production (Phase 2), so it does not wait for Phase 5.
 
 ## Performance notes (why this does not regress the hot spot)
-- Pool size = cores; per-actor queues are independent, so contention is bounded by `vitalsMu`
-  (a few instructions per hit, no call-outs) and the container mutexes, each now a map op with no
+- Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor
+  leaf locks (`vitalsMu` and its siblings, a few instructions per hit, no call-outs) and the
+  container mutexes, each now a map op with no
   callbacks — strictly less than today's world/region RWMutex sections that run observer hooks inside.
 - Per-message cost is a closure allocation (~100 ns–1 µs), below packet encode cost. Stat
   snapshots allocate only on recalculation; per-hit reads/writes are atomics.
@@ -361,9 +389,10 @@ pool (Phase 2), so no queued task can block on the DB.
   scenario where one party drops an offered item between offer and confirm.
 - Phase 4: shutdown with online players saves every one before exit; relog mid-fight.
 - End state check: `rg -n "sync\.(RW)?Mutex" internal/gameserver/model internal/gameserver/skill`
-  reports only `vitalsMu` (one per actor type), `Inventory`/container locks, and the leaf locks
-  cross-actor commands take synchronously (controllers, AI brains, target/stance state), plus
-  `progressionMu`, `SeedState.mu` and `SpoilPool.mu` unless sweeps 1–2 fold them into `vitalsMu`.
+  reports only the container locks and the cross-actor leaf locks listed on #2273 (per-actor
+  vitals/progression/state, stat slots (`statMu`), controllers, AI brains, hate/threat, the effect
+  list and calculators, `SeedState.mu`, `SpoilPool.mu`), each commented with the caller or container it serves, and
+  every queue-owned field has `sim.AssertOwner` at its writers.
 - Manual: run two clients in one region, trade, fight an NPC, relog mid-fight (autosave/detach
   ordering) per `docs/run-servers.md`.
 
