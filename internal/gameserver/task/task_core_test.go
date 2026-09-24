@@ -1020,13 +1020,11 @@ func TestGameClockTickDayNightTransitions(t *testing.T) {
 			})
 
 			c.Tick()
-			testLoop.Run()
 			if len(fired) != 1 || fired[0] != tc.wantNight {
 				t.Fatalf("after boundary tick fired = %v, want [%v]", fired, tc.wantNight)
 			}
 
 			c.Tick()
-			testLoop.Run()
 			if len(fired) != 1 {
 				t.Fatalf("non-boundary tick fired listeners: %v", fired)
 			}
@@ -1044,7 +1042,6 @@ func TestGameClockTickTransitionSequence(t *testing.T) {
 	// midnight: day at 06:00, night at the next midnight, day again.
 	for i := 0; i < 1800; i++ {
 		c.Tick()
-		testLoop.Run()
 	}
 	want := []bool{false, true, false}
 	if len(fired) != len(want) {
@@ -1079,7 +1076,6 @@ func TestGameClockConcurrentAccess(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 500; i++ {
 			c.Tick()
-			testLoop.Run()
 		}
 	}()
 	go func() {
@@ -1484,7 +1480,6 @@ func TestItemInstanceBackgroundAndInventoryMutationIsRaceFree(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < iterations; i++ {
 			shadowItems.Tick()
-			testLoop.Run()
 		}
 	}()
 	go func() {
@@ -1830,14 +1825,12 @@ func TestRespawnAddThenTickFiresAfterDeadline(t *testing.T) {
 
 	now = now.Add(6 * time.Second)
 	r.Tick()
-	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before deadline = %v, want none", got)
 	}
 
 	now = now.Add(time.Second)
 	r.Tick()
-	testLoop.Run()
 	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at deadline = %v, want %v", got, want)
 	}
@@ -1853,7 +1846,6 @@ func TestRespawnAddWithPastDeadlineFiresOnNextTick(t *testing.T) {
 
 	r.Add("slot-1", now.Add(-time.Minute))
 	r.Tick()
-	testLoop.Run()
 	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick with past deadline = %v, want %v", got, want)
 	}
@@ -1875,7 +1867,6 @@ func TestRespawnCancelStopsPendingRespawn(t *testing.T) {
 
 	now = now.Add(time.Hour)
 	r.Tick()
-	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick after cancel = %v, want none", got)
 	}
@@ -1891,14 +1882,12 @@ func TestRespawnAddReplacesExistingDeadline(t *testing.T) {
 
 	now = now.Add(time.Second)
 	r.Tick()
-	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before replaced deadline = %v, want none", got)
 	}
 
 	now = now.Add(9 * time.Second)
 	r.Tick()
-	testLoop.Run()
 	if got, want := effects.take(), []string{"slot-1"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at replaced deadline = %v, want %v", got, want)
 	}
@@ -1916,7 +1905,6 @@ func TestRespawnConcurrentAddAndTick(t *testing.T) {
 			key := "slot"
 			r.Add(key, time.Now())
 			r.Tick()
-			testLoop.Run()
 			r.Cancel(key)
 		}(i)
 	}
@@ -1970,7 +1958,6 @@ func TestShadowItems_TrackDecaysManaEachTick(t *testing.T) {
 	}
 
 	s.Tick()
-	testLoop.Run()
 	if inst.ManaLeft != 299 {
 		t.Errorf("ManaLeft after one tick = %d, want 299", inst.ManaLeft)
 	}
@@ -2041,14 +2028,12 @@ func TestShadowItems_Tick_FiresThresholdsAndExpiry(t *testing.T) {
 	inst.ManaLeft = 61
 
 	s.Tick()
-	testLoop.Run()
 	if got := effects.take(); len(got) != 1 || got[0] != "10 threshold 1 60" {
 		t.Fatalf("Tick() at the 1-minute mark = %v, want [10 threshold 1 60]", got)
 	}
 
 	for i := 0; i < 60; i++ {
 		s.Tick()
-		testLoop.Run()
 	}
 	got := effects.take()
 	if len(got) == 0 || got[len(got)-1] != "10 expire 1" {
@@ -2279,14 +2264,12 @@ func TestGroundItemsDropLootProtectionLocksThenExpires(t *testing.T) {
 
 	now = now.Add(10 * time.Second)
 	g.Tick()
-	testLoop.Run()
 	if got := ground.Instance.Snapshot().OwnerID; got != 42 {
 		t.Fatalf("OwnerID before protection deadline = %d, want still 42", got)
 	}
 
 	now = now.Add(6 * time.Second) // total 16s > 15s protection window
 	g.Tick()
-	testLoop.Run()
 	if got := ground.Instance.Snapshot().OwnerID; got != 0 {
 		t.Fatalf("OwnerID after protection deadline = %d, want 0 (unlocked)", got)
 	}

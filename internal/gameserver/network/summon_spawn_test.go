@@ -334,17 +334,12 @@ func TestSummonSinkRunDespawnIsolatesAPanickingCleanup(t *testing.T) {
 	}
 }
 
-// TestWireSummonAIRemovesAIRunnerWithOwnerQueue runs the wiring production
-// actually uses. The other tests leave the fixture player without a queue,
-// so wireSummonAI takes its nil-queue branches and StartOffensiveFollowTicker
-// returns scheduler.Start(...).Stop instead of the q.Every(...) queue timer
-// (ai/summon.go:175-180). Production always has a queue
-// (character_flow.go:618), which makes the registered cleanup
-// (*sim.Ticker).Stop -- a call that takes the owner's q.mu. Despawn is driven
-// from a goroutine that is not the owner's, mirroring Unsummon reached from
-// another player's queue (handler/skill/signet.go:317,
-// handler/skill/disablers.go:141), so -race covers that cross-queue cleanup
-// instead of leaving it to review-by-reading.
+// TestWireSummonAIRemovesAIRunnerWithOwnerQueue runs the summon on a real
+// pool queue, so the registered cleanup is (*sim.Ticker).Stop -- a call that
+// takes the owner's q.mu. Despawn is driven from a goroutine that is not the
+// owner's, mirroring Unsummon reached from another player's queue
+// (handler/skill/signet.go, handler/skill/disablers.go), so -race covers
+// that cross-queue cleanup instead of leaving it to review-by-reading.
 func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
 	pool := sim.NewPool(2, zerolog.Nop())
 	pool.Start(context.Background())
@@ -356,9 +351,6 @@ func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
 
 	owner := newTestLivePlayer(t, 100, &testsupport.FrameCapture{})
 	owner.Character.Live.SetQueue(pool.NewQueue("player-100"))
-	if owner.Queue() == nil {
-		t.Fatal("fixture owner has no queue; the queue branch is not under test")
-	}
 
 	state := world.New()
 	state.AddPlayer(owner)
@@ -372,11 +364,9 @@ func TestWireSummonAIRemovesAIRunnerWithOwnerQueue(t *testing.T) {
 	if len(registry.added) != 1 {
 		t.Fatalf("AI registrations = %d, want 1", len(registry.added))
 	}
-	// wireSummonAI only calls actor.SetQueue on its non-nil-queue branch
-	// (summon_spawn.go:490-492), so this proves the test took the wiring
-	// production takes rather than the nil-queue fallback.
-	if servitor.Queue() == nil {
-		t.Fatal("wireSummonAI took its nil-queue branch; the queue wiring is not under test")
+	// A summon's work runs on its owner's queue.
+	if servitor.Queue() != owner.Queue() {
+		t.Fatal("wireSummonAI did not put the summon on its owner's queue")
 	}
 
 	done := make(chan struct{})

@@ -149,7 +149,7 @@ func (m *CreatureMove) SetQueue(q *sim.Queue) {
 	m.queue = q
 }
 
-// Queue returns the queue SetQueue installed, or nil.
+// Queue returns the queue SetQueue installed.
 func (m *CreatureMove) Queue() *sim.Queue {
 	m.mu.Lock()
 	defer m.mu.Unlock()

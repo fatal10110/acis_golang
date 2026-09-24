@@ -371,7 +371,7 @@ func (c *Controller) BroadcastBlockedCorrection() {
 	c.self.BroadcastMove(event.Move{Origin: pos, Destination: pos})
 }
 
-// Queue returns the queue the moving actor's work runs on, or nil.
+// Queue returns the queue the moving actor's work runs on.
 func (c *Controller) Queue() *sim.Queue {
 	return c.move.Queue()
 }

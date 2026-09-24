@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -520,7 +521,9 @@ func (noopStatOwner) UpdateEffectIcons() {}
 // off the caster's queue. The point's OnExit is what despawns it, and it
 // outlives the caster's session: bound to the caster's queue, a logout
 // (detachLivePlayer closes that queue) would strand the point in world with
-// its effect list registered forever.
+// its effect list registered forever. The tick takes the production path:
+// the effect task posts the list's Tick to the point's own queue, and the
+// despawn closes that queue.
 func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
 		{ID: 5123, Level: 1}: {
@@ -529,6 +532,8 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 		},
 	}}
 	h, state, _ := newTestSignetHandler(defs)
+	effects := task.NewEffects()
+	h.activity = effects
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock
@@ -552,8 +557,15 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	caster.queue.Close()
 
 	caster.clock.Advance(tickInterval)
-	actor.EffectList().Tick()
+	effects.Tick()
+	if _, ok := state.Object(actor.ObjectID()); !ok {
+		t.Fatal("effect point left the world before its queue ran the tick; the list ticked off its queue")
+	}
+	caster.clock.Run()
 	if _, ok := state.Object(actor.ObjectID()); ok {
 		t.Fatal("effect point still in world after its driving effect exited")
+	}
+	if actor.Queue().Post(func() {}) {
+		t.Fatal("effect point's queue still accepts work after despawn")
 	}
 }
