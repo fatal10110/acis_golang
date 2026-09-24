@@ -4,6 +4,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -583,15 +584,19 @@ func TestInventory_DrainUpdates_CoalescesStackableCounts(t *testing.T) {
 // silently losing queued deltas when the frame build fails (e.g. an item
 // whose template isn't loaded): draining before build succeeds would throw
 // the pending updates away with nothing sent and no way to retry them.
+// The requeue must also re-register the inventory with its delivery: the
+// batching task may have seen the drained, empty queue and dropped it.
 func TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
-	inv := NewPetInventory(1, templates)
+	delivery := &inventoryDeliveryRecorder{}
+	inv := NewPetInventoryWithDelivery(1, templates, delivery, nil)
 	inv.AddNew(1, 1, 1)
 	if !inv.HasUpdates() {
 		t.Fatal("expected AddNew to queue an update")
 	}
+	delivery.updates = 0
 
 	buildErr := errors.New("boom")
 	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
@@ -602,6 +607,58 @@ func TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError(t *testing.T) {
 	}
 	if !inv.HasUpdates() {
 		t.Fatal("BuildAndDrainUpdates() drained the queue despite a failed build")
+	}
+	if delivery.updates != 1 {
+		t.Fatalf("update deliveries after a failed build = %d, want 1", delivery.updates)
+	}
+}
+
+// TestInventory_BuildAndDrainUpdates_BuildRunsUnlocked pins that build runs
+// with no inventory lock held: a build that changes inv must not block, and
+// the update it queues lands after the drain, so the next tick delivers it.
+// A failed build then puts the drained update back ahead of it.
+func TestInventory_BuildAndDrainUpdates_BuildRunsUnlocked(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+	})
+	inv := NewPetInventory(1, templates)
+	inv.AddNew(1, 1, 1)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+			if len(items) != 1 {
+				t.Errorf("build got %d items, want 1", len(items))
+			}
+			inv.AddNew(2, 1, 2)
+			return nil
+		})
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("BuildAndDrainUpdates() error = %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("BuildAndDrainUpdates() blocked while build changed the inventory")
+	}
+	if got := inv.DrainUpdates(); len(got) != 1 || got[0].ObjectID != 2 {
+		t.Fatalf("queue after build = %+v, want only the update build queued", got)
+	}
+
+	inv.AddNew(1, 5, 1) // stacks onto object 1
+	buildErr := errors.New("boom")
+	err := inv.BuildAndDrainUpdates(func([]*item.Instance) error {
+		inv.AddNew(2, 1, 2)
+		return buildErr
+	})
+	if !errors.Is(err, buildErr) {
+		t.Fatalf("BuildAndDrainUpdates() error = %v, want %v", err, buildErr)
+	}
+	got := inv.DrainUpdates()
+	if len(got) != 2 || got[0].ObjectID != 1 || got[1].ObjectID != 2 {
+		t.Fatalf("queue after failed build = %+v, want object 1 then object 2", got)
 	}
 }
 

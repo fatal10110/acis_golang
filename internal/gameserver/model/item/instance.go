@@ -15,6 +15,11 @@ import (
 // decay, and lazy persistence; access that state through the methods below
 // once an instance is visible outside construction/restore code.
 type Instance struct {
+	// mu (a lazily allocated *sync.RWMutex) is not owner-queue state: the
+	// item-persistence flush reads instances on a persistence lane
+	// (UpdateItems pairs each state with its write order under it), and a
+	// relogging session claims pending rows (ClaimRestoredItems) from its
+	// connection goroutine while the old owner's writes may still land.
 	mu unsafe.Pointer
 
 	ObjectID   int32
