@@ -69,3 +69,29 @@ func TestAwaitCloseSpendsOneBudgetOnTheAwaitClock(t *testing.T) {
 		t.Fatalf("AwaitClose drained %d frames in a 3s budget of 1s frames, want at most 3", frames)
 	}
 }
+
+// TestReadFinishesAFrameWhoseDeadlinePassesMidFrame pins that a read never
+// splits a frame: once a frame's header has arrived, its payload is read to
+// the end even when the caller's wait runs out first. Reporting a timeout
+// there would leave the header consumed and every later read misaligned.
+func TestReadFinishesAFrameWhoseDeadlinePassesMidFrame(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() { clientConn.Close() })
+	t.Cleanup(func() { serverConn.Close() })
+	c := &ScriptedClient{t: t, conn: clientConn, handshaken: true}
+
+	frame, err := wire.FrameBytes([]byte{0x0d, 0x01, 0x02})
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		serverConn.Write(frame[:wire.FrameHeaderSize])
+		time.Sleep(100 * time.Millisecond)
+		serverConn.Write(frame[wire.FrameHeaderSize:])
+	}()
+
+	got := c.ReadWithTimeout(20 * time.Millisecond)
+	if string(got) != string(frame[wire.FrameHeaderSize:]) {
+		t.Fatalf("read = %x, want the whole payload %x", got, frame[wire.FrameHeaderSize:])
+	}
+}
