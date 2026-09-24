@@ -37,7 +37,9 @@ State splits into three kinds:
   inventory, effect timers. Touched only on the owner queue; enforced by `sim.AssertOwner`.
   Replaces ~80% of today's lock sites.
 - **Cross-mutable subset** (one small mutex per actor, `vitalsMu`): HP/MP/CP, dead flag, hate list,
-  effect list. Other actors mutate these **synchronously** — `target.ReduceHP` still returns, the
+  effect list. *Landed (Phase 3) as several per-actor leaf locks — vitals, progression, state,
+  stat slots, controllers, AI brains, hate, the effect list — not one `vitalsMu`; see Phase 3's
+  Landed as notes and #2273 for the list.* Other actors mutate these **synchronously** — `target.ReduceHP` still returns, the
   caller still reads `died`, reflect/counter still land in the same call stack, exactly as the
   reference. `vitalsMu` is never held across a call-out; side effects (Die sequence, stat
   recalculation, effect-icon broadcast, StatusUpdate) are posted to the owner's queue after
@@ -325,17 +327,19 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
    and stay cross-actor. `Hostile.claimFollowSlot` holds `minionsMu` across the world lock while it
    resolves occupants (breaks rule 2): snapshot ids under the lock, resolve after unlock, re-check
    on claim.
-3. `move`/`attack`/`cast`/`cubic`. The move/attack/cast controller locks stay as leaf container
+3. `move`/`attack`/`cast`. The move/attack/cast controller locks stay as leaf container
    locks, because other actors stop, abort and interrupt them synchronously (Phase 3, landed).
    The same goes for the AI brains' locks (`ai.Attackable`, `ai.PlayerAttack`, `ai.Summon`) and
    the `stateMu` sections guarding target, stance, charges and summon intent. The sweep still
    moves `Start` and `Hit` onto the caster's queue, where their `ConsumeItem`/`ReduceMP`/`ReduceHP`
    are the **caster's own** skill cost under its own `vitalsMu` (#2259 was fixed in Phase 0). The
-   `cubic` locks are still deleted where no other actor reaches them.
-4. `skill/effect`: the `List` lock, `scheduleMu` and the `Calculator` locks **stay** — other
-   actors apply and remove effects synchronously (Phase 3 *Landed as*: "the effect list's own
-   lock" is one of the cross-actor leaf locks). Nothing to delete here beyond confirming no lock is
-   held across a call-out.
+   `cubic` locks are sweep 2's.
+4. `skill/effect` and stat slots: the `List` lock, `scheduleMu`, the `Calculator` locks and the
+   `statMu` that guards each actor's calculator slots (`Character.statMu`, `Hostile.statMu`)
+   **stay** — other actors apply and remove effects synchronously (Phase 3 *Landed as*: "the
+   effect list's own lock" is one of the cross-actor leaf locks), and every `Stat()` read from an
+   attacker's formula goes through `statCalc` under `statMu`. Nothing to delete here beyond
+   confirming no lock is held across a call-out.
 5. `model/itemcontainer` + `model/item`: `Inventory` keeps `inv.mu` as a container; per-item
    `item.Instance` locks deleted (mutated only under the owning inventory's mutex). Closes #2261:
    `BuildAndDrainUpdates` returns the batch under `inv.mu` and the caller runs its callback after
@@ -356,8 +360,9 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   needs `queue.After` in production (Phase 2), so it does not wait for Phase 5.
 
 ## Performance notes (why this does not regress the hot spot)
-- Pool size = cores; per-actor queues are independent, so contention is bounded by `vitalsMu`
-  (a few instructions per hit, no call-outs) and the container mutexes, each now a map op with no
+- Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor
+  leaf locks (`vitalsMu` and its siblings, a few instructions per hit, no call-outs) and the
+  container mutexes, each now a map op with no
   callbacks — strictly less than today's world/region RWMutex sections that run observer hooks inside.
 - Per-message cost is a closure allocation (~100 ns–1 µs), below packet encode cost. Stat
   snapshots allocate only on recalculation; per-hit reads/writes are atomics.
@@ -385,8 +390,8 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
 - Phase 4: shutdown with online players saves every one before exit; relog mid-fight.
 - End state check: `rg -n "sync\.(RW)?Mutex" internal/gameserver/model internal/gameserver/skill`
   reports only the container locks and the cross-actor leaf locks listed on #2273 (per-actor
-  vitals/progression/state, controllers, AI brains, hate/threat, the effect list and calculators,
-  `SeedState.mu`, `SpoilPool.mu`), each commented with the caller or container it serves, and
+  vitals/progression/state, stat slots (`statMu`), controllers, AI brains, hate/threat, the effect
+  list and calculators, `SeedState.mu`, `SpoilPool.mu`), each commented with the caller or container it serves, and
   every queue-owned field has `sim.AssertOwner` at its writers.
 - Manual: run two clients in one region, trade, fight an NPC, relog mid-fight (autosave/detach
   ordering) per `docs/run-servers.md`.
