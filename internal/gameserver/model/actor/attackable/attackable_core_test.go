@@ -3,6 +3,7 @@ package attackable
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 )
@@ -261,7 +262,7 @@ func TestHateTable_ConcurrentAccess(t *testing.T) {
 // ---- from threat_race_test.go ----
 func TestThreatTable_ConcurrentAccess(t *testing.T) {
 	owner := combatant(1)
-	table := NewThreatTable(owner)
+	table := NewThreatTable(owner, time.Now)
 
 	var wg sync.WaitGroup
 	for i := int32(0); i < 100; i++ {

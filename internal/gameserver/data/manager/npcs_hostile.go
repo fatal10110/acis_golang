@@ -137,10 +137,10 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 // controller (over the Hostile's lifetime movement state) and a real attack
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
-func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount int, zones *zone.Index, activity effect.ActivityRegistry, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
+func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
 	control := &hostileControl{walker: walker, log: log}
 	statRef := &statOwnerRef{}
-	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithActivityRegistry(activity))
+	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithEnv(effects))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -176,6 +176,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 		return nil, nil, err
 	}
 	hostile.SetMaxBuffsAmount(maxBuffsAmount)
+	hostile.SetMaxGeoPathFailCount(maxGeoPathFailCount)
 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile

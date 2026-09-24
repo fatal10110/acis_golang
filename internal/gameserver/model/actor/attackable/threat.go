@@ -28,14 +28,17 @@ type Threat struct {
 // mu guards entries.
 type ThreatTable struct {
 	owner Combatant
+	// now stamps Threat.Timestamp.
+	now func() time.Time
 
 	mu      sync.RWMutex
 	entries map[int32]*Threat
 }
 
-// NewThreatTable returns an empty ThreatTable for owner.
-func NewThreatTable(owner Combatant) *ThreatTable {
-	return &ThreatTable{owner: owner, entries: make(map[int32]*Threat)}
+// NewThreatTable returns an empty ThreatTable for owner whose timestamps
+// read now.
+func NewThreatTable(owner Combatant, now func() time.Time) *ThreatTable {
+	return &ThreatTable{owner: owner, now: now, entries: make(map[int32]*Threat)}
 }
 
 // AddDamage records damage dealt and hate raised by attacker. Both are
@@ -62,7 +65,7 @@ func (t *ThreatTable) AddDamage(attacker Combatant, damage, hate float64) {
 	}
 	e.Damage = min(e.Damage+damage, maxThreatValue)
 	e.Hate = min(e.Hate+hate, maxThreatValue)
-	e.Timestamp = time.Now()
+	e.Timestamp = t.now()
 }
 
 // MostHated returns the attacker with the highest positive hate, or ok
@@ -142,7 +145,7 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 
 	chosen := candidates[pick(len(candidates))]
 	chosen.Hate = min(chosen.Hate+(mostHated.Hate-chosen.Hate)+200, maxThreatValue)
-	chosen.Timestamp = time.Now()
+	chosen.Timestamp = t.now()
 	return true
 }
 
@@ -207,7 +210,7 @@ func (t *ThreatTable) ReconsiderTarget(inRange func(Combatant) bool, valid func(
 		return int(a.Attacker.ObjectID() - b.Attacker.ObjectID())
 	})
 	picked := candidates[0]
-	picked.Timestamp = time.Now()
+	picked.Timestamp = t.now()
 
 	if mostHated == nil {
 		picked.Hate = min(picked.Hate+2000, maxThreatValue)

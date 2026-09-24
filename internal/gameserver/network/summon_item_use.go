@@ -1,8 +1,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -132,7 +130,6 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
-		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
 		Selected:    live.Character,

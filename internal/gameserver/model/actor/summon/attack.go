@@ -102,7 +102,7 @@ func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hi
 	_, _, z := a.Position()
 	_, _, targetZ := other.Position()
 	behind, inFront := creature.AttackFacing(other, a)
-	if formulas.Missed(formulas.HitRate(int(a.Accuracy()), other.Evasion(), z-targetZ, creature.Night(), behind, inFront), a.Roll(1000)) {
+	if formulas.Missed(formulas.HitRate(int(a.Accuracy()), other.Evasion(), z-targetZ, a.EffectList().IsNight(), behind, inFront), a.Roll(1000)) {
 		hit.Miss = true
 		return hit
 	}

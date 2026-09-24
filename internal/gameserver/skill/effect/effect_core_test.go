@@ -30,6 +30,7 @@ import (
 type fakeConditionActor struct {
 	level       int
 	moving      bool
+	night       bool
 	wearingMask int
 }
 
@@ -55,6 +56,7 @@ func (a fakeConditionActor) IsBehind(other conditions.Actor) bool    { return fa
 func (a fakeConditionActor) IsInFrontOf(other conditions.Actor) bool { return false }
 func (a fakeConditionActor) ActiveSkillLevel(id int) (int, bool)     { return 0, false }
 func (a fakeConditionActor) ActiveEffectLevel(id int) (int, bool)    { return 0, false }
+func (a fakeConditionActor) IsNight() bool                           { return a.night }
 func (a fakeConditionActor) IsSitting() bool                         { return false }
 func (a fakeConditionActor) IsInOlympiadMode() bool                  { return false }
 func (a fakeConditionActor) IsHero() bool                            { return false }
@@ -116,6 +118,21 @@ func TestFuncConditionPlayerAndComposition(t *testing.T) {
 	}
 	if cond.Test(still) {
 		t.Error("and{player moving=true} should fail while not moving")
+	}
+}
+
+// TestFuncConditionGameNightReadsEffectorServer pins that <game night=.../>
+// asks the effector for the time of day, not a process-wide clock.
+func TestFuncConditionGameNightReadsEffectorServer(t *testing.T) {
+	cond, err := funcCondition(&modelskill.Condition{Kind: "game", Attrs: map[string]string{"night": "true"}}, nil)
+	if err != nil {
+		t.Fatalf("funcCondition: %v", err)
+	}
+	if !cond.Test(fakeConditionActor{night: true}) {
+		t.Error("game night=true should pass at night")
+	}
+	if cond.Test(fakeConditionActor{night: false}) {
+		t.Error("game night=true should fail by day")
 	}
 }
 
@@ -1328,7 +1345,7 @@ func TestListReplacesLowerOrderStackedEffect(t *testing.T) {
 
 func TestListReactivatesNextStackedEffectWhenCancellationDisabled(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithCancelLesser(false))
+	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	strong := namedEffect("strong", 2, "speed", 2, false, &events)
@@ -1928,7 +1945,7 @@ func TestIconDurationRepeatCountDecrementsEverySecond(t *testing.T) {
 // restarting from the template.
 func TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRestartOnPromotion(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithCancelLesser(false))
+	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	weak.Template.Count, weak.Template.Time = 5, 2
@@ -1973,7 +1990,7 @@ func TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRest
 // 291-313).
 func TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActivating(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithCancelLesser(false))
+	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	weak.Template.Count, weak.Template.Time = 2, 2
@@ -2090,7 +2107,7 @@ func TestListRemoveStackedEffectWithoutQueueLeavesVisible(t *testing.T) {
 }
 
 func TestListRemoveStackedEffectAbsentFromQueueRemovesVisible(t *testing.T) {
-	list := NewList(nil, WithCancelLesser(false))
+	list := NewList(nil, WithEnv(Env{KeepLesser: true}))
 	removed := newEffect("removed", 1, "speed", 1, false)
 	remaining := newEffect("remaining", 2, "speed", 2, false)
 	list.Add(removed)

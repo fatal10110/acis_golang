@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -828,7 +829,7 @@ type disablerFake struct {
 
 func newDisablerFake(id int32) *disablerFake {
 	d := &disablerFake{id: id, list: effect.NewList(nil), successOK: true}
-	d.aggro = attackable.NewThreatTable(d)
+	d.aggro = attackable.NewThreatTable(d, time.Now)
 	d.hate = attackable.NewHateTable(d)
 	return d
 }
@@ -1667,10 +1668,12 @@ type skillTarget struct {
 	healEffectiveness float64
 	healOK            bool
 
-	physicalInput  formulas.PhysicalSkillInput
-	physicalOK     bool
-	magicInput     formulas.MagicDamageInput
-	magicOK        bool
+	physicalInput formulas.PhysicalSkillInput
+	physicalOK    bool
+	magicInput    formulas.MagicDamageInput
+	magicOK       bool
+	// magicFailures records the switch the last MagicDamageInput call saw.
+	magicFailures  *bool
 	skillSuccessOK bool
 	// skillSuccessChance overrides SkillSuccessInput's BaseChance; nil keeps
 	// the default guaranteed-success 100, a pointer to 0 forces a
@@ -1834,7 +1837,8 @@ func (t *skillTarget) PhysicalSkillInput(caster creature.FormulaActor, skill mod
 	return t.physicalInput, t.physicalOK
 }
 
-func (t *skillTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *skillTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition, magicFailures bool) (formulas.MagicDamageInput, bool) {
+	t.magicFailures = &magicFailures
 	return t.magicInput, t.magicOK
 }
 
@@ -2258,6 +2262,29 @@ func TestManaDamageHandlerReportsSystemMessages(t *testing.T) {
 			t.Fatalf("OpponentMPReduced = %v, want none (non-player caster)", result.OpponentMPReduced)
 		}
 	})
+}
+
+// TestRegistryPassesMagicFailuresToMdam pins that the server's MagicFailures
+// switch reaches the MDAM resist roll through the registry, with the shipped
+// default on and a per-registry override off.
+func TestRegistryPassesMagicFailuresToMdam(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		registry *Registry
+		want     bool
+	}{
+		{"default", NewDefaultRegistry(), true},
+		{"signet registry off", NewDefaultRegistryWithSignet(nil, false, SignetDeps{}), false},
+		{"signet registry on", NewDefaultRegistryWithSignet(nil, true, SignetDeps{}), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			target := &skillTarget{hp: 2000}
+			tc.registry.Use(Cast{Skill: modelskill.Definition{SkillType: "MDAM"}, Targets: []Actor{target}})
+			if target.magicFailures == nil || *target.magicFailures != tc.want {
+				t.Fatalf("MagicDamageInput magicFailures = %v, want %v", target.magicFailures, tc.want)
+			}
+		})
+	}
 }
 
 func TestMdamHalfFailureHalvesDamageAndReportsAttackFailed(t *testing.T) {

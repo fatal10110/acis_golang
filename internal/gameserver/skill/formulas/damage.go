@@ -223,16 +223,6 @@ const (
 	MagicFailureFull
 )
 
-// magicFailures is the players.properties MagicFailures switch (default true).
-var magicFailures = true
-
-// SetMagicFailures records the process-wide MagicFailures switch. The
-// composition root sets this once at boot from players.properties.
-func SetMagicFailures(enabled bool) { magicFailures = enabled }
-
-// MagicFailuresEnabled reports whether magic-damage casts roll resist.
-func MagicFailuresEnabled() bool { return magicFailures }
-
 // MagicFailureLevelGap is the maximum target-minus-caster level difference
 // that can still produce a half-damage resist instead of a full resist.
 const MagicFailureLevelGap = 9

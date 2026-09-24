@@ -416,7 +416,7 @@ func TestStackedStrongerBuffCancelsLesserByDefault(t *testing.T) {
 // the weaker same-stack buff stays queued, so when the stronger expires the
 // weaker icon returns.
 func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
-	// Not parallel: WithCancelLesserEffect(false) flips a process-wide switch.
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

@@ -26,7 +26,7 @@ func newThreatFixture(t *testing.T) *threatFixture {
 	first := srv.SpawnHostileNPCAt(t, firstThreatSpot)
 	second := srv.SpawnHostileNPCAt(t, secondThreatSpot)
 	return &threatFixture{
-		owner:    attackable.NewThreatTable(first),
+		owner:    attackable.NewThreatTable(first, first.Now),
 		first:    first,
 		second:   second,
 		attacker: second,

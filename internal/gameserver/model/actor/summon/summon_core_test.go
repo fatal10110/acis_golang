@@ -718,7 +718,7 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		SkillType: "MDAM",
 		Magic:     true,
 		Element:   modelskill.ElementFire,
-	})
+	}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -1238,19 +1238,17 @@ type hitNight bool
 func (n hitNight) IsNight() bool { return bool(n) }
 
 func TestSummonMakeAttackHitAppliesFacingAndNight(t *testing.T) {
-	t.Cleanup(func() { creature.SetNightSource(nil) })
-
-	place := func(t *testing.T, ax, ay int) (*Actor, *Actor) {
+	place := func(t *testing.T, ax, ay int, night bool) (*Actor, *Actor) {
 		t.Helper()
 		target := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 1, Stats: CombatStats{DEX: 40, PDef: 50, MaxHP: 100}})
-		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100}})
+		attacker := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 1, Stats: CombatStats{DEX: 20, PDef: 50, MaxHP: 100}, Effects: effect.Env{Night: hitNight(night)}})
 		state := world.New()
 		state.Spawn(target, 0, 0, 0, 0)
 		state.Spawn(attacker, ax, ay, 0, 0)
 		return attacker, target
 	}
 
-	attacker, target := place(t, 100, 0)
+	attacker, target := place(t, 100, 0, false)
 	acc := int(attacker.Accuracy())
 	eva := target.Evasion()
 	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
@@ -1280,8 +1278,7 @@ func TestSummonMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creature.SetNightSource(hitNight(tt.night))
-			attacker, target := place(t, tt.ax, tt.ay)
+			attacker, target := place(t, tt.ax, tt.ay, tt.night)
 			attacker.roll = func(int) int { return tt.roll }
 			hit := attacker.MakeAttackHit(target, false)
 			if hit.Miss != tt.wantMiss {

@@ -90,9 +90,8 @@ one-value providers.
 
 9. **Five mutable package globals set from the root.** `formulas.SetMagicFailures`,
    `effect.SetCancelLesser`, `effect.SetGameClock`, `creature.SetNightSource`,
-   `npc.SetMaxGeoPathFailCount`. Hidden coupling, test-order sensitivity. Defer: the actor-model
-   plan Phase B rewires domain hooks anyway; fold these in then rather than touching domain
-   packages twice.
+   `npc.SetMaxGeoPathFailCount`. Hidden coupling, test-order sensitivity. Resolved in #2481: the
+   values ride on `effect.Env`, the skill handler registry, and each `npc.Hostile`.
 
 10. **Two packages log through the global zerolog logger.** `config/properties.go:198,370-388`
     (missing key, malformed pair, non-numeric value) and `geo/reader/l2off.go:59` (trailing-bytes

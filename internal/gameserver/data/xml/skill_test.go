@@ -45,6 +45,7 @@ func (fakeWearingActor) IsBehind(conditions.Actor) bool    { return false }
 func (fakeWearingActor) IsInFrontOf(conditions.Actor) bool { return false }
 func (fakeWearingActor) ActiveSkillLevel(int) (int, bool)  { return 0, false }
 func (fakeWearingActor) ActiveEffectLevel(int) (int, bool) { return 0, false }
+func (fakeWearingActor) IsNight() bool                     { return false }
 func (fakeWearingActor) IsSitting() bool                   { return false }
 func (fakeWearingActor) IsInOlympiadMode() bool            { return false }
 func (fakeWearingActor) IsHero() bool                      { return false }

@@ -64,13 +64,14 @@ type signetUnsummonable interface {
 }
 
 type signetHandler struct {
-	defs      Definitions
-	templates signetTemplates
-	ids       signetIDAllocator
-	world     *world.State
-	newSink   func(*npc.EffectPoint) event.Sink
-	activity  effect.ActivityRegistry
-	log       zerolog.Logger
+	defs          Definitions
+	magicFailures bool
+	templates     signetTemplates
+	ids           signetIDAllocator
+	world         *world.State
+	newSink       func(*npc.EffectPoint) event.Sink
+	effects       effect.Env
+	log           zerolog.Logger
 }
 
 func (signetHandler) Types() []string { return []string{"SIGNET", "SIGNET_CASTTIME"} }
@@ -165,7 +166,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 
 	ownerID := caster.ObjectID()
-	opts := []effect.Option{effect.WithActivityRegistry(h.activity)}
+	opts := []effect.Option{effect.WithEnv(h.effects)}
 	if queued, ok := caster.(interface{ Queue() *sim.Queue }); ok {
 		opts = append(opts, effect.WithClock(queued.Queue()))
 	}
@@ -362,7 +363,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			if !ok {
 				return
 			}
-			in, ok := dmgTarget.MagicDamageInput(caster, def)
+			in, ok := dmgTarget.MagicDamageInput(caster, def, h.magicFailures)
 			if !ok {
 				return
 			}

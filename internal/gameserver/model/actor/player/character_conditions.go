@@ -112,6 +112,9 @@ func (a characterStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 	return a.c.EffectList().ActiveBySkillID(effectID)
 }
 
+// IsNight satisfies conditions.Actor.
+func (a characterStatActor) IsNight() bool { return a.c.EffectList().IsNight() }
+
 // IsSitting satisfies conditions.PlayerActor.
 func (a characterStatActor) IsSitting() bool { return !a.c.Standing() }
 

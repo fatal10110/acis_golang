@@ -40,6 +40,9 @@ type Actor interface {
 	// ActiveEffectLevel looks up the level of the skill backing an active
 	// effect of id on this actor, returning it and whether one is active.
 	ActiveEffectLevel(effectID int) (level int, ok bool)
+
+	// IsNight reports whether it is currently night on this actor's server.
+	IsNight() bool
 }
 
 // PlayerActor narrows Actor to the extra identity/state data only a
