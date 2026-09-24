@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"sync/atomic"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 )
@@ -13,10 +11,6 @@ const (
 	minMaxGeoPathFailCount     = 15
 )
 
-// maxGeoPathFailCount is the process-wide overflow threshold from
-// geoengine.properties. Zero means "use DefaultMaxGeoPathFailCount".
-var maxGeoPathFailCount atomic.Int32
-
 // ClampMaxGeoPathFailCount applies the configured floor of 15.
 func ClampMaxGeoPathFailCount(n int) int {
 	if n < minMaxGeoPathFailCount {
@@ -25,19 +19,15 @@ func ClampMaxGeoPathFailCount(n int) int {
 	return n
 }
 
-// SetMaxGeoPathFailCount records the process-wide overflow threshold.
-// Tests may stub a value below the config floor.
-func SetMaxGeoPathFailCount(n int) {
-	maxGeoPathFailCount.Store(int32(n))
+// SetMaxGeoPathFailCount sets h's pathfinding-fail overflow threshold from
+// geoengine.properties; zero keeps DefaultMaxGeoPathFailCount. Tests may
+// stub a value below the config floor.
+func (h *Hostile) SetMaxGeoPathFailCount(n int) {
+	h.maxGeoPathFailCount.Store(int32(n))
 }
 
-// MaxGeoPathFailCount reports the overflow threshold currently in force.
-func MaxGeoPathFailCount() int {
-	return int(currentMaxGeoPathFailCount())
-}
-
-func currentMaxGeoPathFailCount() int32 {
-	if n := maxGeoPathFailCount.Load(); n > 0 {
+func (h *Hostile) currentMaxGeoPathFailCount() int32 {
+	if n := h.maxGeoPathFailCount.Load(); n > 0 {
 		return n
 	}
 	return DefaultMaxGeoPathFailCount
@@ -59,7 +49,7 @@ func (h *Hostile) ResetGeoPathFailCount() {
 // Sequence at the cap: MAX, then MAX+1, then the next fail zeros without
 // incrementing so script AI thresholds can drop for a cycle.
 func (h *Hostile) AddGeoPathFailCount() {
-	max := currentMaxGeoPathFailCount()
+	max := h.currentMaxGeoPathFailCount()
 	for {
 		cur := h.geoPathFailCount.Load()
 		if cur > max {

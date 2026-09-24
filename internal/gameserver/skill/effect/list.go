@@ -6,6 +6,7 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // StatOwner is what a List is attached to: the holder its stat modifiers
@@ -34,35 +35,37 @@ type StatOwner interface {
 // Option changes List behavior.
 type Option func(*List)
 
-// cancelLesserEnabled is the process-wide CancelLesserEffect switch
-// (default true). The composition root sets this once at boot from
-// players.properties.
-var cancelLesserEnabled = true
-
-// SetCancelLesser records the process-wide CancelLesserEffect switch.
-func SetCancelLesser(enabled bool) { cancelLesserEnabled = enabled }
-
-// CancelLesser reports whether a newly stacked non-herb effect removes the
-// lower-priority effect it displaces.
-func CancelLesser() bool { return cancelLesserEnabled }
-
-// WithCancelLesser overrides the process-wide CancelLesserEffect switch for
-// one list. Tests use this to pin a list independent of boot config.
-func WithCancelLesser(cancel bool) Option {
-	return func(l *List) {
-		l.cancelLesser = cancel
-		l.cancelLesserSet = true
-	}
-}
-
 // ActivityRegistry records whether a list has effects to tick.
 type ActivityRegistry interface {
 	SetActive(*List, bool)
 }
 
-// WithActivityRegistry associates a list with one server's effect ticker.
-func WithActivityRegistry(registry ActivityRegistry) Option {
-	return func(l *List) { l.activity = registry }
+// Env is one server's context for its effect lists: the ticker that drives
+// them and the gameplay settings they read. The composition root builds it
+// once from config. The zero value is the shipped default: no ticker,
+// CancelLesserEffect on, always day.
+type Env struct {
+	Activity ActivityRegistry
+	// KeepLesser is CancelLesserEffect=false: a newly stacked non-herb
+	// effect leaves the lower-priority effect it displaces queued instead
+	// of removing it.
+	KeepLesser bool
+	// Night reports the in-game time of day; nil is always day.
+	Night conditions.NightSource
+}
+
+// WithEnv attaches a list to one server's Env.
+func WithEnv(env Env) Option {
+	return func(l *List) {
+		l.activity = env.Activity
+		l.cancelLesser = !env.KeepLesser
+		l.night = env.Night
+	}
+}
+
+// IsNight reports whether it is night on the server that owns l.
+func (l *List) IsNight() bool {
+	return l != nil && l.night != nil && l.night.IsNight()
 }
 
 // Untrack unconditionally deregisters l from the process-wide activity
@@ -105,10 +108,10 @@ func (l *List) emptyLocked() bool {
 type List struct {
 	mu sync.Mutex
 
-	owner           StatOwner
-	activity        ActivityRegistry
-	cancelLesser    bool
-	cancelLesserSet bool
+	owner        StatOwner
+	activity     ActivityRegistry
+	cancelLesser bool
+	night        conditions.NightSource
 
 	buffs   []*Effect
 	debuffs []*Effect
@@ -138,7 +141,7 @@ func (l *List) Queue() *sim.Queue { return l.queue }
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {
-	l := &List{owner: owner}
+	l := &List{owner: owner, cancelLesser: true}
 	for _, opt := range opts {
 		opt(l)
 	}
@@ -211,13 +214,6 @@ func (l *List) StartedAffected(flag Flag) bool {
 		}
 	}
 	return false
-}
-
-func (l *List) shouldCancelLesser() bool {
-	if l.cancelLesserSet {
-		return l.cancelLesser
-	}
-	return cancelLesserEnabled
 }
 
 // All returns a snapshot of effects ordered as buffs followed by debuffs.

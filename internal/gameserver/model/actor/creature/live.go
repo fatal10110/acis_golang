@@ -2,6 +2,7 @@ package creature
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -55,6 +56,10 @@ func (l *Live) Queue() *sim.Queue {
 	}
 	return l.queue
 }
+
+// Now reads the clock this creature's queue runs on. Reuse windows and other
+// deadlines compared against its timers are stamped and checked with it.
+func (l *Live) Now() time.Time { return l.Queue().Now() }
 
 // Move returns this live creature's lifetime movement state.
 func (l *Live) Move() *move.CreatureMove {

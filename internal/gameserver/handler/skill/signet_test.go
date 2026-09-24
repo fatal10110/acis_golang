@@ -111,7 +111,7 @@ func (t *signetFakeTarget) BroadcastSelfSkillUse(_, _ int32) {
 	t.selfSkillUses++
 }
 
-func (t *signetFakeTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (t *signetFakeTarget) MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition, _ bool) (formulas.MagicDamageInput, bool) {
 	return t.magicInput, t.magicOK
 }
 
@@ -162,7 +162,7 @@ func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *event
 		13018: {ID: 13018, Type: "EffectPoint"},
 	}}
 	rec := &event.Recorder{}
-	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }, activity: newSignetActivity()}
+	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }, effects: effect.Env{Activity: newSignetActivity()}}
 	return h, state, rec
 }
 
@@ -198,7 +198,7 @@ func (a *signetActivity) isActive(list *effect.List) bool {
 // despawns.
 func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
-	activity := h.activity.(*signetActivity)
+	activity := h.effects.Activity.(*signetActivity)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock
@@ -223,13 +223,13 @@ func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
 }
 
 // TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints covers the
-// SignetDeps.Activity hop, not just the handler literal above.
+// SignetDeps.Effects hop, not just the handler literal above.
 func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T) {
 	state := world.New()
 	activity := newSignetActivity()
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
-	r := NewDefaultRegistryWithSignet(nil, SignetDeps{
-		Activity:  activity,
+	r := NewDefaultRegistryWithSignet(nil, true, SignetDeps{
+		Effects:   effect.Env{Activity: activity},
 		Templates: fakeSignetTemplates{byID: map[int]*npc.Template{13018: {ID: 13018, Type: "EffectPoint"}}},
 		IDs:       &fakeSignetIDs{},
 		World:     state,
@@ -250,7 +250,7 @@ func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T)
 		t.Fatalf("spawned actors = %d, want 1", len(actors))
 	}
 	if !activity.isActive(actors[0].EffectList()) {
-		t.Fatal("SignetDeps.Activity did not reach the spawned point's effect list")
+		t.Fatal("SignetDeps.Effects did not reach the spawned point's effect list")
 	}
 }
 
@@ -533,7 +533,7 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	}}
 	h, state, _ := newTestSignetHandler(defs)
 	effects := task.NewEffects()
-	h.activity = effects
+	h.effects = effect.Env{Activity: effects}
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock

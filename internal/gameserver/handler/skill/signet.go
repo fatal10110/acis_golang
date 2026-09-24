@@ -72,14 +72,15 @@ type signetUnsummonable interface {
 }
 
 type signetHandler struct {
-	defs      Definitions
-	templates signetTemplates
-	ids       signetIDAllocator
-	world     *world.State
-	newSink   func(*npc.EffectPoint) event.Sink
-	activity  effect.ActivityRegistry
-	queues    signetQueues
-	log       zerolog.Logger
+	defs          Definitions
+	magicFailures bool
+	templates     signetTemplates
+	ids           signetIDAllocator
+	world         *world.State
+	newSink       func(*npc.EffectPoint) event.Sink
+	effects       effect.Env
+	queues        signetQueues
+	log           zerolog.Logger
 }
 
 func (signetHandler) Types() []string { return []string{"SIGNET", "SIGNET_CASTTIME"} }
@@ -178,7 +179,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	// caster's session, and its list's OnExit is what despawns it, so a
 	// queue closed by the caster's logout would strand the point in world.
 	queue := h.queues.NewQueue(fmt.Sprintf("effectpoint-%d", id))
-	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithActivityRegistry(h.activity))
+	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithEnv(h.effects))
 	if err != nil {
 		queue.Close()
 		return nil, false
@@ -369,7 +370,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			if !ok {
 				return
 			}
-			in, ok := dmgTarget.MagicDamageInput(caster, def)
+			in, ok := dmgTarget.MagicDamageInput(caster, def, h.magicFailures)
 			if !ok {
 				return
 			}

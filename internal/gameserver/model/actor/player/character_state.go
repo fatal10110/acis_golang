@@ -209,6 +209,7 @@ func (c *Character) DisableItem(objectID int32, delay time.Duration) {
 	if objectID <= 0 {
 		return
 	}
+	until := c.Now().Add(delay)
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	if delay <= 0 {
@@ -218,7 +219,7 @@ func (c *Character) DisableItem(objectID int32, delay time.Duration) {
 	if c.disabledItems == nil {
 		c.disabledItems = make(map[int32]time.Time)
 	}
-	c.disabledItems[objectID] = time.Now().Add(delay)
+	c.disabledItems[objectID] = until
 }
 
 // ItemDisabled reports whether an inventory object id is still disabled.
@@ -242,13 +243,14 @@ func (c *Character) ItemDisabled(objectID int32) bool {
 		return true
 	}
 
+	now := c.Now()
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	until, ok := c.disabledItems[objectID]
 	if !ok {
 		return false
 	}
-	if time.Now().Before(until) {
+	if now.Before(until) {
 		return true
 	}
 	delete(c.disabledItems, objectID)
@@ -268,6 +270,17 @@ func (c *Character) AllSkillsDisabled() bool {
 	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Afraid()
 }
 
+// Now reads the clock this character's queue runs on once Attach has
+// installed Live. A character that was never attached has no queue and reads
+// the wall clock, which is what a Pool queue reads too.
+func (c *Character) Now() time.Time {
+	if live := c.liveLocked(); live != nil {
+		return live.Now()
+	}
+	// ponytail: wall-clock default serves only never-attached fixtures; #2488 drops it.
+	return time.Now()
+}
+
 // liveLocked reads the Live pointer under stateMu, for call sites that
 // cannot rely on Live having been set before any other goroutine can see
 // this Character.
@@ -284,16 +297,18 @@ const recentFakeDeathGrace = 5 * time.Second
 
 // MarkRecentFakeDeath starts this player's post-fake-death grace period.
 func (c *Character) MarkRecentFakeDeath() {
+	until := c.Now().Add(recentFakeDeathGrace)
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
-	c.recentFakeDeathUntil = time.Now().Add(recentFakeDeathGrace)
+	c.recentFakeDeathUntil = until
 }
 
 // RecentFakeDeath reports whether this player is still within its
 // post-fake-death grace period, during which hostile NPC AI won't
 // retarget it.
 func (c *Character) RecentFakeDeath() bool {
+	now := c.Now()
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
-	return time.Now().Before(c.recentFakeDeathUntil)
+	return now.Before(c.recentFakeDeathUntil)
 }

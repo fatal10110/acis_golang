@@ -1,8 +1,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -131,7 +129,7 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 		}
 		if timersChanged {
-			now := time.Now()
+			now := live.Now()
 			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 		}
 	}

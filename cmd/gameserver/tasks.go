@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -166,14 +165,6 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State) {
 			return nil
 		},
 	})
-}
-
-// wireGameClock installs clock as the source <game night=.../> stat-func
-// conditions and melee auto-attack hit-chance read, before any character can
-// log in and reach one.
-func wireGameClock(clock *task.GameClock) {
-	effect.SetGameClock(clock)
-	creature.SetNightSource(clock)
 }
 
 func startGameClock(lc fx.Lifecycle, clock *task.GameClock, log zerolog.Logger) {
@@ -438,6 +429,13 @@ func startPositionUpdates(lc fx.Lifecycle, positions *task.PositionUpdates, log 
 
 func provideEffects() *task.Effects {
 	return task.NewEffects()
+}
+
+// provideEffectEnv builds the context every effect list on this server
+// shares: the effect ticker, the CancelLesserEffect switch, and the in-game
+// clock <game night=.../> stat conditions and melee hit chance read.
+func provideEffectEnv(effects *task.Effects, clock *task.GameClock, gameplay gameplayConfig) effect.Env {
+	return effect.Env{Activity: effects, KeepLesser: !bool(gameplay.CancelLesserEffect), Night: clock}
 }
 
 func startEffects(lc fx.Lifecycle, effects *task.Effects, log zerolog.Logger) {

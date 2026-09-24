@@ -115,7 +115,7 @@ func (c *Character) RestoreSkillEffect(plan effect.EffectPlan, reuseGroup int32)
 // AddSkillReuse records a newly-started reuse timer and disables its reuse
 // key until the delay elapses.
 func (c *Character) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Duration) {
-	expiresAt := time.Now().Add(delay)
+	expiresAt := c.Now().Add(delay)
 	c.SetSkillReuse(ref, key, delay, expiresAt)
 	c.disableSkillUntil(key, expiresAt)
 }
@@ -181,6 +181,7 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 // disabled (Creature.java:1586-1590) — with no skill on cooldown at all, the
 // lock has no effect here.
 func (c *Character) SkillDisabled(key int32) bool {
+	now := c.Now()
 	c.skills.mu.Lock()
 	defer c.skills.mu.Unlock()
 	if len(c.skills.disabled) == 0 {
@@ -193,7 +194,7 @@ func (c *Character) SkillDisabled(key int32) bool {
 	if !ok {
 		return false
 	}
-	if time.Now().Before(expiresAt) {
+	if now.Before(expiresAt) {
 		return true
 	}
 	delete(c.skills.disabled, key)
@@ -205,7 +206,7 @@ func (c *Character) DisableSkill(key int32, delay time.Duration) {
 	if delay <= 0 {
 		return
 	}
-	c.disableSkillUntil(key, time.Now().Add(delay))
+	c.disableSkillUntil(key, c.Now().Add(delay))
 }
 
 func (c *Character) disableSkillUntil(key int32, expiresAt time.Time) {

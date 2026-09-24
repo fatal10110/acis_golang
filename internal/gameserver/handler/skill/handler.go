@@ -75,7 +75,7 @@ type Creature interface {
 	// report false when it cannot be rolled.
 	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
 	PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
-	MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.MagicDamageInput, bool)
+	MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition, magicFailures bool) (formulas.MagicDamageInput, bool)
 	BlowInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.BlowInput, bool)
 	ManaDamageInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.ManaDamageInput, bool)
 	LethalInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.LethalInput, bool)
@@ -307,13 +307,18 @@ func NewDefaultRegistry() *Registry {
 	return NewDefaultRegistryWithDefinitions(nil)
 }
 
-// NewDefaultRegistryWithDefinitions returns the default handlers, providing
-// loaded skill definitions to handlers that need cross-skill effect lookup.
+// NewDefaultRegistryWithDefinitions returns the default handlers with the
+// shipped MagicFailures=true, providing loaded skill definitions to handlers
+// that need cross-skill effect lookup.
 func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
+	return newDefaultRegistry(defs, true)
+}
+
+func newDefaultRegistry(defs Definitions, magicFailures bool) *Registry {
 	return NewRegistry(
 		pdamHandler{},
 		chargeDamHandler{},
-		mdamHandler{},
+		mdamHandler{magicFailures: magicFailures},
 		blowHandler{},
 		manaDamageHandler{},
 		healHandler{},
@@ -348,7 +353,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 // SignetDeps carries the world-spawning collaborators the signet cast
 // shape needs beyond skill definitions.
 type SignetDeps struct {
-	Activity  effect.ActivityRegistry
+	Effects   effect.Env
 	Templates signetTemplates
 	IDs       signetIDAllocator
 	World     *world.State
@@ -361,12 +366,12 @@ type SignetDeps struct {
 	Log    zerolog.Logger
 }
 
-// NewDefaultRegistryWithSignet returns the same handlers as
-// NewDefaultRegistryWithDefinitions, plus the signet cast shape wired with
+// NewDefaultRegistryWithSignet returns the default handlers under the
+// server's MagicFailures switch, plus the signet cast shape wired with
 // signet's own world-spawning collaborators.
-func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
-	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, activity: signet.Activity, queues: signet.Queues, log: signet.Log})
+func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, signet SignetDeps) *Registry {
+	r := newDefaultRegistry(defs, magicFailures)
+	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }
 

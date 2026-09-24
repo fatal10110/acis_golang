@@ -150,7 +150,7 @@ func buildPlayerCondition(attrs map[string]string) (conditions.Condition, error)
 // buildGameCondition resolves one <game .../> element's single attribute.
 func buildGameCondition(attrs map[string]string) (conditions.Condition, error) {
 	if v, ok := attrs["night"]; ok {
-		return conditions.GameTime{Clock: gameClockRef{}, Night: parseBool(v)}, nil
+		return conditions.GameTime{Night: parseBool(v)}, nil
 	}
 	if v, ok := attrs["chance"]; ok {
 		pct, err := strconv.Atoi(v)
@@ -184,25 +184,4 @@ func (c bothCond) Test(effector stat.Actor) bool {
 
 func parseBool(v string) bool {
 	return strings.EqualFold(v, "true") || v == "1"
-}
-
-// gameClock is the boot-wired day/night source <game night=.../> reads;
-// SetGameClock installs it once at server startup (see cmd/gameserver),
-// before any character can log in and reach a conditional stat func.
-var gameClock conditions.NightSource
-
-// SetGameClock installs clock as the source GameTime conditions read.
-func SetGameClock(clock conditions.NightSource) { gameClock = clock }
-
-// gameClockRef defers to the package-level gameClock at Test time rather
-// than at condition-build time, since skill definitions build once at data
-// load — before SetGameClock necessarily runs — while conditions are tested
-// per stat recalculation, long after boot wiring completes.
-type gameClockRef struct{}
-
-func (gameClockRef) IsNight() bool {
-	if gameClock == nil {
-		return false
-	}
-	return gameClock.IsNight()
 }

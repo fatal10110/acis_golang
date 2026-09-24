@@ -96,9 +96,9 @@ calls with the same `tb` return the same database.
 
 - **Subtests:** a `t.Run` subtest is a different `tb`, so it gets a different database from its
   parent. Seed rows and call `gameservertest.Boot` on the same `t`.
-- **Process-wide switches:** behavior suites may call `t.Parallel()`, but a test that overrides a
-  process-wide switch (for example `gameservertest.WithCancelLesserEffect`, see #2481) must stay
-  sequential.
+- **Gameplay settings:** each `Boot` carries its own (`WithCancelLesserEffect`,
+  `WithMagicFailures`, ...), so a test that overrides one may still call `t.Parallel()`. A new
+  setting reaches its consumer through a constructor or option, never a package global.
 
 The pooled databases outlive individual tests, so a package using `SharedDB` must add a
 `TestMain` that drops them once, after every test in the package has run:

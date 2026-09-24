@@ -32,7 +32,7 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	e := NewEffects()
 	lists := make([]*effect.List, total)
 	for i := 0; i < total; i++ {
-		list := newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
+		list := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 		lists[i] = list
 		if i%activeFraction == 0 {
 			eff, err := effect.New(effect.Skill{ID: modelskill.ID(i + 1)}, modelskill.EffectTemplate{Name: "Buff"})

@@ -153,7 +153,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	faceCastTarget(caster, target, def)
 
 	if now.IsZero() {
-		now = time.Now()
+		now = controller.Now()
 	}
 	plan, err := controller.Start(now, target, def)
 	if err != nil {

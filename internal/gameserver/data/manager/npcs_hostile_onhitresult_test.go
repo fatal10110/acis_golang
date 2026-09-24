@@ -7,6 +7,7 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -51,7 +52,7 @@ func TestNewLiveHostileWiresOnHitResultFromEffects(t *testing.T) {
 		},
 	}
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), fakeHostileCastDefs{}, effects, nil, 20, nil, nil, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), fakeHostileCastDefs{}, effects, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}
@@ -92,7 +93,7 @@ func TestNewLiveHostileLeavesOnHitResultUnsetWithoutCastDefs(t *testing.T) {
 	state := world.New()
 	positions := task.NewPositionUpdates(state)
 
-	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, nil, nil, npcQueues().NewQueue("npc"))
+	hostile, _, err := newLiveHostile(inst, 100, blockedHomeGeo{}, positions, zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, nil, effect.Env{}, npcQueues().NewQueue("npc"))
 	if err != nil {
 		t.Fatalf("newLiveHostile() error: %v", err)
 	}

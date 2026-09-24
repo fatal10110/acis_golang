@@ -71,7 +71,7 @@ func mustNewEffect(t *testing.T, skill Skill, name string) *Effect {
 
 func TestListActivityRegistersOnFirstEffect(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := newTestList(activityTestOwner{}, WithActivityRegistry(rec))
+	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 
 	if rec.isActive(list) {
 		t.Fatal("empty list reported active before any Add")
@@ -86,7 +86,7 @@ func TestListActivityRegistersOnFirstEffect(t *testing.T) {
 
 func TestListActivityDeregistersOnLastRemove(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := newTestList(activityTestOwner{}, WithActivityRegistry(rec))
+	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 
 	e := mustNewEffect(t, Skill{ID: 1}, "Buff")
 	list.Add(e)
@@ -105,7 +105,7 @@ func TestListActivityDeregistersOnLastRemove(t *testing.T) {
 // to empty.
 func TestListActivityStaysRegisteredWithEffectsRemaining(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := newTestList(activityTestOwner{}, WithActivityRegistry(rec))
+	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 
 	e1 := mustNewEffect(t, Skill{ID: 1}, "Buff")
 	e2 := mustNewEffect(t, Skill{ID: 2}, "Buff")
@@ -128,7 +128,7 @@ func TestListActivityStaysRegisteredWithEffectsRemaining(t *testing.T) {
 // registration that Effects.Tick then scans forever.
 func TestListActivityRejectedOnStartNeverRegisters(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := newTestList(activityTestOwner{}, WithActivityRegistry(rec))
+	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 
 	e := mustNewEffect(t, Skill{ID: 1}, "AbortCast")
 	// e.Effected is left nil: abortCastStart rejects unconditionally.
@@ -144,7 +144,7 @@ func TestListActivityRejectedOnStartNeverRegisters(t *testing.T) {
 // ticking once its owner leaves the world for good.
 func TestListUntrackDeregistersRegardlessOfContents(t *testing.T) {
 	rec := withActivityRecorder(t)
-	list := newTestList(activityTestOwner{}, WithActivityRegistry(rec))
+	list := newTestList(activityTestOwner{}, WithEnv(Env{Activity: rec}))
 	list.Add(mustNewEffect(t, Skill{ID: 1}, "Buff"))
 
 	if !rec.isActive(list) {
@@ -165,3 +165,19 @@ func (activityTestOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 func (activityTestOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (activityTestOwner) UpdateEffectIcons() {}
+
+type nightStub bool
+
+func (n nightStub) IsNight() bool { return bool(n) }
+
+func TestListIsNightReadsEnvSource(t *testing.T) {
+	if NewList(nil).IsNight() {
+		t.Fatal("IsNight() = true with no source, want day")
+	}
+	if !NewList(nil, WithEnv(Env{Night: nightStub(true)})).IsNight() {
+		t.Fatal("IsNight() = false with a night source")
+	}
+	if NewList(nil, WithEnv(Env{Night: nightStub(false)})).IsNight() {
+		t.Fatal("IsNight() = true with a day source")
+	}
+}

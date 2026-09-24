@@ -250,11 +250,12 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 	groundID := r.ReadInt32()
 
 	// Walk out of pickup range before clicking; wait until the server
-	// reports the player at the destination.
+	// reports the player at the destination. Arrival snaps to it exactly, so
+	// a position short of it is a walk still in flight.
 	c.Send(encodeMoveBackwardToLocation(spawnX+200, spawnY, spawnZ, spawnX, spawnY, spawnZ))
 	srv.AdvanceUntil(t, "walk away completed", func() bool {
 		x, _, _ := srv.PlayerPosition(t, objID)
-		return x >= spawnX+195
+		return x == spawnX+200
 	})
 	drainUntilQuiet(t, c)
 

@@ -94,6 +94,9 @@ type Hostile struct {
 	// not resolve a route, for walker teleport-to-start and SiegeGuard
 	// return-home recovery (see GeoPathFailCount).
 	geoPathFailCount atomic.Int32
+	// maxGeoPathFailCount is the geoengine.properties overflow threshold
+	// geoPathFailCount wraps at; zero means DefaultMaxGeoPathFailCount.
+	maxGeoPathFailCount atomic.Int32
 
 	// raidRelated marks this NPC as tied to a raid encounter (a raid boss
 	// or one of its minions), set per-instance rather than derived from

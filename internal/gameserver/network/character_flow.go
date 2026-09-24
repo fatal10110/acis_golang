@@ -62,7 +62,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	}
 
 	slots := make([]serverpackets.CharacterSlot, len(chars))
-	now := time.Now()
+	now := time.Now() // character select runs on the connection goroutine, off any actor queue
 	for i, c := range chars {
 		items, err := l.items.ListByOwner(ctx, c.ID)
 		if err != nil {
@@ -299,7 +299,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
 	// timer, armed by that restore, is included in the login SkillCoolTime
 	// snapshot rather than missed.
-	now := time.Now()
+	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
@@ -611,7 +611,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.RefreshExpertisePenalty()
 
 	x, y, z := c.Position()
-	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c, effect.WithActivityRegistry(l.effects))
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c, effect.WithEnv(l.effects))
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
