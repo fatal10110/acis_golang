@@ -43,7 +43,9 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 
 	gs := dialGameServer(t, addr)
 	gs.handshake()
-	gs.sendGameServerAuth(1, false, false, "gs.example.com", 7777, 300, testHexID)
+	// An IP literal resolves without a DNS query, so the AuthResponse wait
+	// never depends on the host resolver's retry timeout.
+	gs.sendGameServerAuth(1, false, false, "127.0.0.1", 7777, 300, testHexID)
 
 	ok, id, name, _ := gs.readAuthResult()
 	if !ok || id != 1 || name != "Bartz" {
@@ -86,13 +88,12 @@ func TestGameServerLinkChangeAccessLevelUpdatesDB(t *testing.T) {
 	}
 
 	gs.sendChangeAccessLevel(-1, "player1")
-	time.Sleep(100 * time.Millisecond)
 
-	got, err := accounts.Account(ctx, "player1")
-	if err != nil {
-		t.Fatalf("Account: %v", err)
-	}
-	if got.AccessLevel != -1 {
-		t.Fatalf("AccessLevel = %d, want -1", got.AccessLevel)
-	}
+	waitUntil(t, "AccessLevel = -1", func() bool {
+		got, err := accounts.Account(ctx, "player1")
+		if err != nil {
+			t.Fatalf("Account: %v", err)
+		}
+		return got.AccessLevel == -1
+	})
 }
