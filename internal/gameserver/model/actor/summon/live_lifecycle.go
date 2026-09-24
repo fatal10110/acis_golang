@@ -19,12 +19,13 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 
 	switch ctx.Command {
 	case CommandToggleFollow:
-		a.followActive = !a.followActive
-		if a.followActive {
+		if a.followOff.Load() {
+			a.followOff.Store(false)
 			a.setIntent(IntentFollowOwner)
 			a.TryToFollow(a.owner)
 		} else {
-			a.TryToIdle()
+			a.followOff.Store(true)
+			a.idle()
 		}
 	case CommandAttack:
 		a.SetTarget(ctx.Target)
@@ -38,12 +39,12 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 			a.setIntent(IntentInteractTarget)
 		}
 	case CommandStop:
-		a.TryToIdle()
+		a.idle()
 	case CommandReturnPet, CommandUnsummonServitor:
-		a.TryToIdle()
+		a.idle()
 		a.despawn(ctx.World)
 	case CommandMoveToTarget:
-		a.followActive = false
+		a.followOff.Store(true)
 		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature {
 			a.setIntent(IntentFollowTarget)
@@ -230,7 +231,7 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 		TargetIsOwner:          sameObject(ctx.Target, a.owner),
 		TargetIsDeadCreature:   ctx.TargetIsDeadCreature,
 		IsPassiveSummon:        a.passive,
-		FollowActive:           a.followActive,
+		FollowActive:           !a.followOff.Load(),
 		OwnerWithinFollowRange: a.ownerWithinFollowRange(),
 		SummonLevel:            level,
 		OwnerLevel:             ownerLevel,

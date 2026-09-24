@@ -443,6 +443,12 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 	if live.combat != nil {
 		live.combat.Stop()
 	}
+	l.announceTargetCleared(live, old)
+}
+
+// announceTargetCleared answers a cleared selection: ActionFailed to live,
+// then TargetUnselected to observers when old was selected.
+func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Tracked) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if old != nil {
 		l.broadcastTargetUnselected(live)

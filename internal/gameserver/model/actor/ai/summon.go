@@ -166,6 +166,25 @@ func (s *Summon) TryToIdle() {
 	s.move.Stop()
 }
 
+// FollowInstead makes following target the current intention, dropping any
+// queued one, and acts on it once: the summon walks toward target only when
+// it is able to move, and otherwise resumes on a later think.
+func (s *Summon) FollowInstead(target attackable.Combatant) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.current = intention{kind: IntentionFollow, target: target}
+	s.next = intention{}
+	if _, err := s.thinkFollowLocked(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+}
+
+// StopMove stops movement; intentions are left as they are.
+func (s *Summon) StopMove() { s.move.Stop() }
+
+// StopAttack stops the attack cycle; intentions are left as they are.
+func (s *Summon) StopAttack() { s.attack.Stop() }
+
 // AbortAll stops movement, the attack cycle and any in-flight cast, in that
 // order. Intentions are left as they are.
 func (s *Summon) AbortAll() {

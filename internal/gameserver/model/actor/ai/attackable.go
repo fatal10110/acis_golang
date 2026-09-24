@@ -235,6 +235,21 @@ func (a *Attackable) SetCastController(controller CastController) {
 	a.cast = controller
 }
 
+// AbortAll stops movement, the attack cycle and any in-flight cast, in that
+// order. Intentions and desires are left as they are: the crowd-control
+// state that asked for the abort keeps the think loop from acting on them.
+func (a *Attackable) AbortAll() {
+	cast := a.CastController()
+	a.move.Stop()
+	a.attack.Stop()
+	if cast != nil {
+		cast.Stop()
+	}
+}
+
+// StopAttack stops the attack cycle; intentions are left as they are.
+func (a *Attackable) StopAttack() { a.attack.Stop() }
+
 // CastController returns the currently wired skill-cast handler, or nil if
 // none was set. Exposed alongside Threats/Hates/Desires so tests can drive
 // or inspect the cast wiring directly instead of through full aggro

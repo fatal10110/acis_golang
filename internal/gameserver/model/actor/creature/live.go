@@ -212,6 +212,16 @@ func (l *Live) Teleporting() bool {
 	return l.teleporting.Load()
 }
 
+// AIDeniedBeforeEffect reports whether this creature could not take AI
+// actions before the effect whose on-start hook is running landed; see
+// effect.List.StartedAffected.
+func (l *Live) AIDeniedBeforeEffect() bool {
+	if l == nil {
+		return false
+	}
+	return l.paralyzed.Load() || l.teleporting.Load() || l.effects.StartedAffected(effect.AIDenyFlags)
+}
+
 // SetTeleporting sets or clears this creature's teleport transition flag
 // and reports whether it changed.
 func (l *Live) SetTeleporting(v bool) bool {

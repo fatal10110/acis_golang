@@ -27,6 +27,12 @@ type AI interface {
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
 	TryToCast(target attackable.Combatant, ref modelskill.Ref) bool
+	// AbortAll stops movement, the attack cycle and any in-flight cast.
+	AbortAll()
+	// FollowInstead makes following target the current intention.
+	FollowInstead(attackable.Combatant)
+	StopMove()
+	StopAttack()
 	// AttackingNow reports whether this summon's own attack cycle is
 	// currently in flight, matching CreatureAttack.isAttackingNow
 	// (CreatureAttack.java:56-59): a plain start/stop flag on the summon's
@@ -112,7 +118,10 @@ type Actor struct {
 	skills map[int]int
 	zones  PeaceZoneQuery
 
-	followActive       bool
+	// followOff is set while the owner has told the summon to stop following
+	// it; the zero value follows. Atomic because an effect landing on the
+	// summon reads it from the queue of whoever applied the effect.
+	followOff          atomic.Bool
 	belowUnsummonLimit bool
 
 	ownerInventory   *itemcontainer.Inventory
@@ -339,7 +348,6 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		height:           cfg.CollisionHeight,
 		name:             cfg.Name,
 		passive:          cfg.Passive,
-		followActive:     true,
 		intent:           IntentFollowOwner,
 		ownerInventory:   cfg.OwnerInventory,
 		lifetime:         cfg.Lifetime,
@@ -382,7 +390,6 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		name:           cfg.Name,
 		named:          cfg.Named,
 		passive:        cfg.Passive,
-		followActive:   true,
 		intent:         IntentFollowOwner,
 		petInventory:   cfg.Inventory,
 		petConfig:      petCfg,

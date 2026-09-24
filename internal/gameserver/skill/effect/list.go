@@ -185,6 +185,29 @@ func (l *List) IsAffected(flag Flag) bool {
 	return l.Flags()&flag != 0
 }
 
+// AIDenyFlags are the effect flags that keep an actor from taking AI actions.
+const AIDenyFlags = FlagStunned | FlagMeditating | FlagSleep | FlagParalyzed | FlagFear
+
+// StartedAffected is IsAffected limited to effects whose on-start hook has
+// completed. Called from inside an on-start hook, it answers for the state
+// the actor was in before that effect landed: a hook must not see its own
+// flag when deciding how an actor that was already disabled reacts.
+func (l *List) StartedAffected(flag Flag) bool {
+	if l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, group := range [][]*Effect{l.buffs, l.debuffs} {
+		for _, e := range group {
+			if e != nil && e.inUse && e.Flag&flag != 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (l *List) shouldCancelLesser() bool {
 	if l.cancelLesserSet {
 		return l.cancelLesser
