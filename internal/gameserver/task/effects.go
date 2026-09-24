@@ -41,20 +41,15 @@ func (e *Effects) SetActive(list *effect.List, active bool) {
 }
 
 // Reset deregisters every currently registered list, so Tick visits
-// nothing until something registers again. It is test cleanup for a list
-// left registered without a clean despawn, logout, or Untrack.
+// nothing until something registers again. It is server-teardown cleanup
+// for a list left registered without a clean despawn, logout, or Untrack;
+// each reset list is untracked for good, like its owner leaving the world.
 //
 // It goes through each list's own Untrack rather than clearing e.entries
-// directly: a list tracks its own registration state (List.tracked) so
-// notifyActivityTransition can decide+apply atomically, and a bare
-// clear(e.entries) would leave that state out of sync for any list that
-// survives the reset — the list would believe itself still registered and
-// silently refuse to re-register on its next Add. Untrack keeps the two in
-// sync by clearing List.tracked itself. The snapshot is taken and released
-// before calling Untrack, not held across the calls: Untrack ends in
-// List.Untrack -> List.activity.SetActive -> Effects.SetActive -> e.remove,
-// which needs e.mu itself,
-// so calling it while still holding e.mu here would deadlock.
+// directly, so List.tracked stays in sync with the registry. The snapshot
+// is taken and released before calling Untrack, not held across the calls:
+// Untrack ends in List.activity.SetActive -> Effects.SetActive -> e.remove,
+// which needs e.mu itself, so holding e.mu here would deadlock.
 func (e *Effects) Reset() {
 	e.mu.Lock()
 	lists := make([]*effect.List, 0, len(e.entries))
