@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -221,6 +223,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
 		Queues:           testQueues(t),
+		Effects:          effect.Env{Activity: task.NewEffects()},
 		Log:              log,
 		Now:              testLinkNow,
 	})
@@ -478,3 +481,12 @@ func testQueues(t *testing.T) *sim.Pool {
 }
 
 func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// Without an effect activity registry no player or summon effect would ever
+// expire.
+func TestNewGameClientLinkRejectsMissingEffectRegistry(t *testing.T) {
+	_, err := NewGameClientLink(GameClientLinkConfig{Queues: testQueues(t)})
+	if err == nil || !strings.Contains(err.Error(), "Effects.Activity") {
+		t.Fatalf("NewGameClientLink() error = %v, want missing Effects.Activity", err)
+	}
+}
