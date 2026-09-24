@@ -408,10 +408,13 @@ func TestPoolLogsABacklogOncePerHighWaterCrossing(t *testing.T) {
 	q := p.NewQueue("player-7")
 	// burst holds the worker inside q's first task while more than
 	// highWater tasks pile up behind it, then waits for all of them to run.
+	// It waits for the worker to enter that task first: a drain that starts
+	// mid-burst would reset the backlog flag and log a second crossing.
 	burst := func() {
-		release, done := make(chan struct{}), make(chan struct{})
-		q.Post(func() { <-release })
-		for range highWater + drainSlice + 1 { // a drain may already hold drainSlice of them
+		started, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+		q.Post(func() { close(started); <-release })
+		<-started
+		for range highWater + 1 {
 			q.Post(func() {})
 		}
 		q.Post(func() { close(done) })
