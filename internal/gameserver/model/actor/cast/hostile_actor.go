@@ -64,7 +64,7 @@ func (a HostileActor) ReduceMP(n int) {
 }
 func (a HostileActor) ReduceHP(n int) {
 	if a.Hostile != nil {
-		a.Hostile.ReduceHP(float64(n), nil, modelskill.Definition{})
+		a.Hostile.ConsumeHP(float64(n))
 	}
 }
 func (a HostileActor) SkillDisabled(k int32) bool {

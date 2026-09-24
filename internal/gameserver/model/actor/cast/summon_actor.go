@@ -41,7 +41,7 @@ func (a SummonActor) ReduceMP(n int) {
 }
 func (a SummonActor) ReduceHP(n int) {
 	if a.Summon != nil {
-		a.Summon.ReduceHP(float64(n), nil, modelskill.Definition{})
+		a.Summon.ConsumeHP(float64(n))
 	}
 }
 func (a SummonActor) SkillDisabled(k int32) bool { return a.Summon != nil && a.Summon.SkillDisabled(k) }

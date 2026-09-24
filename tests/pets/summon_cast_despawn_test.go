@@ -24,9 +24,25 @@ const (
 	wolfStrikeLaunch = (wolfStrikeHitTime - 400) * time.Millisecond
 )
 
-// bootWolfStriker brings the owner in with a wolf that knows a lethal
-// single-target strike, summons it, and targets the fixture monster.
+// wolfStrike is the lethal single-target strike bootWolfStriker teaches.
+func wolfStrike() modelskill.Definition {
+	return modelskill.Definition{
+		ID: wolfStrikeSkill, Level: 1, Activation: modelskill.ActivationActive,
+		Target: modelskill.TargetOne, Offensive: true, SkillType: "PDAM",
+		CastRange: 900, HitTime: wolfStrikeHitTime, ReuseDelay: 60_000,
+		StaticHitTime: true, StaticReuse: true, Power: 1_000_000,
+	}
+}
+
+// bootWolfStriker brings the owner in with a wolf that knows wolfStrike,
+// summons it, and targets the fixture monster.
 func bootWolfStriker(t *testing.T) (*petWorld, *summon.Actor, *npc.Hostile) {
+	t.Helper()
+	return bootWolfStrikerWith(t, wolfStrike())
+}
+
+// bootWolfStrikerWith is bootWolfStriker with a caller-tuned strike.
+func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition) (*petWorld, *summon.Actor, *npc.Hostile) {
 	t.Helper()
 	wolf := wolfTemplate()
 	wolf.Skills = map[int]int{wolfStrikeSkill: 1}
@@ -36,12 +52,7 @@ func bootWolfStriker(t *testing.T) (*petWorld, *summon.Actor, *npc.Hostile) {
 			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
-		{
-			ID: wolfStrikeSkill, Level: 1, Activation: modelskill.ActivationActive,
-			Target: modelskill.TargetOne, Offensive: true, SkillType: "PDAM",
-			CastRange: 900, HitTime: wolfStrikeHitTime, ReuseDelay: 60_000,
-			StaticHitTime: true, StaticReuse: true, Power: 1_000_000,
-		},
+		strike,
 	}), gamesql.NewCharacterSkillStore(db))
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf, treeTemplate()})),

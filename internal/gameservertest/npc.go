@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -91,6 +92,31 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
+}
+
+// SpawnCastingHostileNPC seeds the parked fixture monster from tmpl with the
+// production AI-cast seam installed: the cast controller runs over the
+// HostileActor adapter on the monster's own queue, and the AIController the
+// AI loop drives resolves skills through defs. Suites start a cast with
+// AIController.Cast on the monster's queue, exactly as the AI loop does.
+func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs actorcast.Definitions) (*npc.Hostile, *actorcast.AIController) {
+	t.Helper()
+	hostile := s.spawnHostile(t, tmpl, hostileNPCSpawn, parkedAttack{})
+	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
+	ctl.SetQueue(hostile.Queue())
+	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Caster: hostile}
+	hostile.AI().SetCastController(aiCtl)
+	return hostile, aiCtl
+}
+
+// castCanceledBroadcast closes an aborted fixture AI cast with its cancel
+// animation, as production's hostile controller sink does.
+type castCanceledBroadcast struct{ hostile *npc.Hostile }
+
+func (c castCanceledBroadcast) Emit(ev event.Event) {
+	if _, ok := ev.(event.CastAborted); ok {
+		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
+	}
 }
 
 // AttackingHostile is a stationary hostile NPC wired with a real

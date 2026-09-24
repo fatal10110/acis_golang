@@ -498,21 +498,26 @@ func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ models
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
-	a.vitals.mu.Lock()
-	if a.dead || a.vitals.hp <= 0 {
-		a.vitals.mu.Unlock()
+	if !a.drainHP(amount) {
 		return
 	}
-	a.vitals.hp -= amount
-	if a.vitals.hp <= 0 {
-		a.vitals.hp = 0
-		a.dead = true
-	}
-	a.vitals.mu.Unlock()
-	a.UpdateStatus()
 	if attacker != nil {
 		a.notifyDamage(attacker, amount)
 	}
+}
+
+// ConsumeHP pays one of a's own skill HP costs. The summon is its own
+// attacker here: an invulnerable summon still pays the cost, while an owner
+// barred from dealing damage does not. The owner is told of the damage
+// either way, with the summon named as its source.
+func (a *Actor) ConsumeHP(amount float64) {
+	if amount <= 0 || a.Dead() {
+		return
+	}
+	if creature.CanDealDamage(a) {
+		a.drainHP(amount)
+	}
+	a.notifyDamage(a, amount)
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
@@ -521,10 +526,16 @@ func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
+	a.drainHP(amount)
+}
+
+// drainHP takes amount off a live summon's HP, marks it dead at zero, and
+// refreshes its status. It reports false when the summon was already dead.
+func (a *Actor) drainHP(amount float64) bool {
 	a.vitals.mu.Lock()
 	if a.dead || a.vitals.hp <= 0 {
 		a.vitals.mu.Unlock()
-		return
+		return false
 	}
 	a.vitals.hp -= amount
 	if a.vitals.hp <= 0 {
@@ -533,6 +544,7 @@ func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	}
 	a.vitals.mu.Unlock()
 	a.UpdateStatus()
+	return true
 }
 
 // CanBeHealed reports whether a may receive HP/MP restoration.
