@@ -39,7 +39,7 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: partyAI},
 		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
 	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, npcQueues())
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
