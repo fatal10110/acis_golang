@@ -70,7 +70,7 @@ func killPrimaryClient(t *testing.T, srv *gameservertest.Server, killer *scripte
 	if !ok {
 		t.Fatalf("world victim %T does not expose Dead()", obj)
 	}
-	waitFor(t, "victim death", dead.Dead)
+	srv.AdvanceUntil(t, "victim death", dead.Dead)
 	// The dead flag flips at the start of the death sequence; the rest of
 	// it (effect cleanup, penalties) finishes on an actor queue.
 	srv.Settle(t)
@@ -135,11 +135,10 @@ func TestDeathCostsConfiguredExperience(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	// Logout persists the character; the reduced total must survive.
-	c.Send(encodeLogout())
-	waitFor(t, "persisted exp loss", func() bool {
-		ch, err := srv.Chars.Get(context.Background(), victimID)
-		return err == nil && ch.Exp == 1300 && ch.CharLevel == 5
-	})
+	logoutPersisted(t, srv, c)
+	if ch, err := srv.Chars.Get(context.Background(), victimID); err != nil || ch.Exp != 1300 || ch.CharLevel != 5 {
+		t.Fatalf("persisted victim = %+v, %v; want exp 1300 at level 5", ch, err)
+	}
 }
 
 // TestKarmaDeathLosesKarma pins the karma half of the same flow: a
@@ -173,9 +172,8 @@ func TestKarmaDeathLosesKarma(t *testing.T) {
 	readExpLossMessage(t, c, 400)
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeLogout())
-	waitFor(t, "persisted karma loss", func() bool {
-		ch, err := srv.Chars.Get(context.Background(), victimID)
-		return err == nil && ch.Exp == 1100 && ch.KarmaPoints == 227
-	})
+	logoutPersisted(t, srv, c)
+	if ch, err := srv.Chars.Get(context.Background(), victimID); err != nil || ch.Exp != 1100 || ch.KarmaPoints != 227 {
+		t.Fatalf("persisted victim = %+v, %v; want exp 1100 and karma 227", ch, err)
+	}
 }

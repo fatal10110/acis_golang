@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -183,17 +184,16 @@ func readUntil(t *testing.T, c *testsupport.ScriptedClient, want byte, what stri
 	return nil
 }
 
-// waitFor polls cond until it holds or the deadline passes.
-func waitFor(t *testing.T, what string, cond func() bool) {
+// logoutPersisted logs c out and waits until its character's save has
+// landed: the server closes the connection after the detach has queued the
+// save, and the flush drains it.
+func logoutPersisted(t *testing.T, srv *gameservertest.Server, c *scriptedClient) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
+	c.Send(encodeLogout())
+	if !c.AwaitClose(5 * time.Second) {
+		t.Fatal("server kept the connection open after Logout")
 	}
-	t.Fatalf("%s not observed within 5s", what)
+	srv.FlushPersistence(t)
 }
 
 func assertFrameOpcode(t *testing.T, frame []byte, want byte, what string) {

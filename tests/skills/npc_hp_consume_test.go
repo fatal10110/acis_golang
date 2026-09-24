@@ -59,7 +59,7 @@ func onNPCQueue(t *testing.T, hostile *npc.Hostile, fn func()) {
 // survives the payment, and the monster does not enter its own threat
 // table.
 func TestNPCHPCostDoesNotWakeOrAggroCaster(t *testing.T) {
-	_, hostile, cast := bootNPCCostCaster(t)
+	srv, hostile, cast := bootNPCCostCaster(t)
 	onNPCQueue(t, hostile, func() {
 		hostile.EffectList().Add(&effect.Effect{
 			Skill:    effect.Skill{ID: 1},
@@ -70,7 +70,7 @@ func TestNPCHPCostDoesNotWakeOrAggroCaster(t *testing.T) {
 
 	cast()
 	full := float64(hostile.MaxHP())
-	waitFor(t, "the monster paying its HP cost", func() bool { return hostile.HP() == full-npcHPCost })
+	srv.AdvanceUntil(t, "the monster paying its HP cost", func() bool { return hostile.HP() == full-npcHPCost })
 
 	var asleep bool
 	onNPCQueue(t, hostile, func() {
@@ -101,7 +101,7 @@ func TestInvulNPCPaysLethalHPCostAndDies(t *testing.T) {
 		hostile.SetHP(npcHPCost)
 		hostile.Live.SetInvul(true)
 	})
-	waitFor(t, "the invulnerable monster dying from its own HP cost", hostile.Dead)
+	srv.AdvanceUntil(t, "the invulnerable monster dying from its own HP cost", hostile.Dead)
 	if hp := hostile.HP(); hp != 0 {
 		t.Fatalf("monster HP after an exactly-lethal cost = %v, want 0", hp)
 	}
@@ -140,7 +140,7 @@ func TestNPCLethalHPCostReplacesPlayerOverhit(t *testing.T) {
 		t.Fatal("setup: the player's overhit strike was not recorded")
 	}
 
-	waitFor(t, "the monster dying from its own HP cost", hostile.Dead)
+	srv.AdvanceUntil(t, "the monster dying from its own HP cost", hostile.Dead)
 	if hostile.OverhitValid(player) {
 		t.Fatal("player still holds the overhit after the monster's own lethal cost replaced it")
 	}

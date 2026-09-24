@@ -47,7 +47,7 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 
-	time.Sleep(2200 * time.Millisecond)
+	srv.Advance(t, 2200*time.Millisecond)
 	srv.TickEffects()
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 4, 1)
 	if entries := readAbnormalStatusUpdateEntries(t, c); len(entries) != 0 {
@@ -431,7 +431,7 @@ func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
 		t.Fatalf("held effects with cancel-lesser off = %v, want queued lesser [201 202]", ids)
 	}
 
-	time.Sleep(2200 * time.Millisecond)
+	srv.Advance(t, 2200*time.Millisecond)
 	srv.TickEffects()
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 202, 1)
 	if entries := readAbnormalStatusUpdateEntries(t, c); !slices.Equal(buffSlotIDs(entries), []int32{201}) {
@@ -474,7 +474,7 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 		t.Fatalf("held effects after same-stack debuff = %v, want buff victim still held [201 301]", ids)
 	}
 
-	time.Sleep(2200 * time.Millisecond)
+	srv.Advance(t, 2200*time.Millisecond)
 	srv.TickEffects()
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 201, 1)
 	drainUntilQuiet(t, c)
@@ -518,7 +518,7 @@ func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 		t.Fatalf("held effects after same-stack debuff = %v, want buff victim still held [203 302]", ids)
 	}
 
-	time.Sleep(2200 * time.Millisecond)
+	srv.Advance(t, 2200*time.Millisecond)
 	srv.TickEffects()
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1HasWornOff, 302, 1)
 	drainUntilQuiet(t, c)

@@ -45,6 +45,16 @@ func (in *Inline) Now() time.Time {
 	return in.at
 }
 
+// NextTimer returns the deadline of the earliest armed timer or ticker.
+func (in *Inline) NextTimer() (time.Time, bool) {
+	in.mu.Lock()
+	defer in.mu.Unlock()
+	if len(in.timers) == 0 {
+		return time.Time{}, false
+	}
+	return in.timers[0].at, true
+}
+
 // Run runs posted tasks in post order, including the ones they post, until
 // none remain.
 func (in *Inline) Run() {

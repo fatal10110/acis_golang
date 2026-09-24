@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -52,6 +53,13 @@ func WithCancelLesser(cancel bool) Option {
 		l.cancelLesser = cancel
 		l.cancelLesserSet = true
 	}
+}
+
+// WithClock makes a list that runs on no queue of its own read the time
+// from q's clock, so its effect periods follow the same clock as the timers
+// of q's owner.
+func WithClock(q *sim.Queue) Option {
+	return func(l *List) { l.clock = q }
 }
 
 // ActivityRegistry records whether a list has effects to tick.
@@ -122,6 +130,17 @@ type List struct {
 	// queue is the owner's queue, which periodic effect actions run on; set
 	// once before the owner is published.
 	queue *sim.Queue
+	// clock is WithClock's queue, read only when queue is nil.
+	clock *sim.Queue
+}
+
+// now reads the clock effect periods run on: the list's queue, else the
+// WithClock queue, else the wall clock.
+func (l *List) now() time.Time {
+	if l.queue != nil {
+		return l.queue.Now()
+	}
+	return sim.Now(l.clock)
 }
 
 // SetQueue makes q, the owner's queue, the queue this list's periodic

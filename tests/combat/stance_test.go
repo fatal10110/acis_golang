@@ -31,13 +31,13 @@ func TestWalkAwayStopsAutoAttack(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
-	waitFor(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 
 	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
 	drainUntilQuiet(t, c)
 
 	afterMove := hostile.CurrentHP()
-	time.Sleep(1500 * time.Millisecond)
+	srv.Advance(t, 1500*time.Millisecond)
 	if got := hostile.CurrentHP(); got != afterMove {
 		t.Fatalf("hostile HP = %d after walking away, want frozen at %d (attack not stopped)", got, afterMove)
 	}
@@ -60,7 +60,7 @@ func TestAttackWalksIntoRangeThenLandsSwing(t *testing.T) {
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertFrameOpcode(t, mustRead(t, c, "MoveToPawn"), serverpackets.OpcodeMoveToPawn, "approach")
 
-	waitFor(t, "post-arrival swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "post-arrival swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 	drainUntilQuiet(t, c)
 }
 
@@ -79,7 +79,7 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
-	waitFor(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 
 	c.Send(encodeRequestTargetCancel(1))
 	// The swing loop may broadcast one more in-flight Attack before the
@@ -95,7 +95,7 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 	afterCancel := hostile.CurrentHP()
-	time.Sleep(1200 * time.Millisecond)
+	srv.Advance(t, 1200*time.Millisecond)
 	if got := hostile.CurrentHP(); got != afterCancel {
 		t.Fatalf("hostile HP = %d after cancel, want frozen at %d", got, afterCancel)
 	}
@@ -130,7 +130,7 @@ func TestAttackStanceBlocksRestartAndLogout(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
-	waitFor(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 
 	// Disengage: the walk stops the swing loop but the combat stance stays
 	// registered until its inactivity period expires.
@@ -183,7 +183,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertAutoAttackStart(t, c, objID)
-	waitFor(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 
 	// Walk away: the swing loop stops but the combat-stance tracker stays
 	// registered until inactivity expiry, matching the restart/logout test.
@@ -192,7 +192,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	// The last swing's AttackingNow flag can outlive the walk; casting
 	// during that window is deferred with ActionFailed and may never start
 	// if the swing is cancelled instead of finishing.
-	time.Sleep(2 * time.Second)
+	srv.Advance(t, 2*time.Second)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(stanceTimeoutDummySkill, false, false))

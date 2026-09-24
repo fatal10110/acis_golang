@@ -154,7 +154,7 @@ func killPet(t *testing.T, h *petWorld, pet *summon.Actor) {
 		t.Fatal("owner not in world")
 	}
 	pet.ReduceHP(pet.HP()+1, obj.(attackable.Combatant), modelskill.Definition{})
-	waitFor(t, "pet dead", pet.Dead)
+	h.srv.AdvanceUntil(t, "pet dead", pet.Dead)
 	drainUntilQuiet(t, h.client)
 }
 

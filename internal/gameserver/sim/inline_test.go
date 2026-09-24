@@ -76,6 +76,35 @@ func TestInlineAdvanceFiresExactlyTheDueTimers(t *testing.T) {
 	assertFires(t, fired, nil)
 }
 
+func TestInlineNextTimerIsTheEarliestArmedDeadline(t *testing.T) {
+	in := NewInline(epoch)
+	q := in.NewQueue("q")
+	if _, ok := in.NextTimer(); ok {
+		t.Fatal("NextTimer reported a deadline with no timer armed")
+	}
+	q.After(30*time.Millisecond, func() {})
+	early := q.After(10*time.Millisecond, func() {})
+	if at, ok := in.NextTimer(); !ok || !at.Equal(epoch.Add(10*time.Millisecond)) {
+		t.Fatalf("NextTimer = %v, %v; want epoch+10ms", at, ok)
+	}
+	early.Stop()
+	if at, ok := in.NextTimer(); !ok || !at.Equal(epoch.Add(30*time.Millisecond)) {
+		t.Fatalf("NextTimer after Stop = %v, %v; want epoch+30ms", at, ok)
+	}
+}
+
+func TestQueueNowReadsItsExecutorClock(t *testing.T) {
+	in := NewInline(epoch)
+	q := in.NewQueue("q")
+	in.Advance(time.Minute)
+	if got := Now(q); !got.Equal(epoch.Add(time.Minute)) {
+		t.Fatalf("Now(q) = %v, want the Inline clock %v", got, epoch.Add(time.Minute))
+	}
+	if got := Now(nil); got.Before(time.Now().Add(-time.Minute)) {
+		t.Fatalf("Now(nil) = %v, want the wall clock", got)
+	}
+}
+
 func TestInlineTimerStopCancelsBeforeFire(t *testing.T) {
 	in := NewInline(epoch)
 	q := in.NewQueue("q")

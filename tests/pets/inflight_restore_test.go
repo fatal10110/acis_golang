@@ -24,12 +24,12 @@ func TestDestroyedCollarIsNotRestoredWhileItsDeleteIsQueued(t *testing.T) {
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)})
 	// Holding the collar's lane must not also hold the owner's, or it would
 	// stall the logout instead of the delete the test is about.
-	if uint32(h.collarID)%persist.Lanes == uint32(h.ownerID)%persist.Lanes {
+	if persist.LaneIndex(h.collarID) == persist.LaneIndex(h.ownerID) {
 		t.Fatalf("collar %d and owner %d share a persistence lane; this test needs them apart", h.collarID, h.ownerID)
 	}
 
 	h.client.Send(encodeRequestDestroyItem(h.collarID, 1))
-	waitFor(t, "collar destroyed", func() bool {
+	h.srv.AdvanceUntil(t, "collar destroyed", func() bool {
 		return liveInventory(t, h).ItemByObjectID(h.collarID) == nil
 	})
 	drainUntilQuiet(t, h.client)

@@ -30,7 +30,7 @@ func TestStunnedPetStrikeLandsNothing(t *testing.T) {
 	}
 	<-done
 
-	time.Sleep(wolfStrikeHitTime*time.Millisecond + 600*time.Millisecond)
+	h.srv.Advance(t, wolfStrikeHitTime*time.Millisecond+600*time.Millisecond)
 	drainUntilQuiet(t, h.client)
 	if hp, full := hostile.HP(), float64(hostile.MaxHP()); hp != full {
 		t.Fatalf("monster HP = %v after the pet was stunned mid-cast, want untouched %v", hp, full)

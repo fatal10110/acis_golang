@@ -25,10 +25,13 @@ jobs:
         shard:
           - name: skills-pets
             pkgs: ./tests/skills ./tests/pets
+            pool: ./tests/skills ./tests/pets
           - name: combat-items
             pkgs: ./tests/combat ./tests/items
+            pool: ./tests/combat
           - name: rest
             pkgs: ""
+            pool: ""
     services:
       mariadb:
         image: mariadb:11
@@ -87,6 +90,17 @@ jobs:
           if [ -z "$PKGS" ]; then
             PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
           fi
+          # shellcheck disable=SC2086 # PKGS is a space-separated package list
+          go test -race $PKGS
+
+      # Suites that drive their own clock run on sim.Inline by default; this
+      # keeps their run on the real pool, with real interleavings.
+      - name: Test (real pool)
+        if: matrix.shard.pool != ''
+        env:
+          ACIS_SIM_EXECUTOR: pool
+          PKGS: ${{ matrix.shard.pool }}
+        run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
           go test -race $PKGS
 

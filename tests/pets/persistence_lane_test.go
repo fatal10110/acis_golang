@@ -67,7 +67,7 @@ func TestRenameLandsAfterQueuedPetSave(t *testing.T) {
 func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	buyerID := h.srv.SeedCharacterFor(t, "player2", "Buyer", 1, 0).ID
-	if buyerID%persist.Lanes == h.ownerID%persist.Lanes {
+	if persist.LaneIndex(buyerID) == persist.LaneIndex(h.ownerID) {
 		t.Fatalf("owner %d and buyer %d share a persistence lane; the scenario needs distinct lanes", h.ownerID, buyerID)
 	}
 	buyer := h.srv.DialClient(t, "player2", 1)
@@ -94,7 +94,7 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 	h.client.Send(encodeTradeDone(1))
 	drainUntilQuiet(t, buyer)
 	buyer.Send(encodeTradeDone(1))
-	waitFor(t, "collar in the buyer's inventory", func() bool {
+	h.srv.AdvanceUntil(t, "collar in the buyer's inventory", func() bool {
 		obj, ok := h.srv.State.Player(buyerID)
 		if !ok {
 			return false
@@ -108,7 +108,7 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 
 	buyer.Send(encodeUseItem(h.collarID, false))
 	var buyerPet *summon.Actor
-	waitFor(t, "buyer's pet in world state", func() bool {
+	h.srv.AdvanceUntil(t, "buyer's pet in world state", func() bool {
 		obj, ok := h.srv.State.Summon(buyerID)
 		if ok {
 			buyerPet, ok = obj.(*summon.Actor)
