@@ -186,6 +186,28 @@ func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ mode
 	h.Die(attacker, h.rewards)
 }
 
+// ConsumeHP pays one of h's own skill HP costs. The NPC is its own attacker
+// here, and the cost is a consumption rather than a hit: it adds no hate,
+// calls no party, and never wakes or stun-breaks the caster. An
+// invulnerable NPC still pays it and still dies from it, with itself as the
+// killer. The overhit check still runs against the NPC itself, so a lethal
+// cost replaces an overhit a player armed and that player loses the bonus.
+func (h *Hostile) ConsumeHP(amount float64) {
+	if h.AlikeDead() {
+		return
+	}
+	h.testOverhit(h, amount)
+	if amount <= 0 {
+		return
+	}
+	newlyDead := h.health.DamageValue(amount)
+	h.BroadcastStatus()
+	if !newlyDead {
+		return
+	}
+	h.Die(h, h.rewards)
+}
+
 // ReduceHPByDOT applies periodic damage and records it in the threat table
 // at zero hate weight, matching Npc.reduceCurrentHp's unconditional
 // addDamageHate(attacker, damage, 0) — every HP reduction feeds the
@@ -219,8 +241,9 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 // check on the attacker and otherwise delegates unchanged, including the
 // isDOT gate on the whole block — unlike PlayerStatus, which overrides the
 // gate to !isHPConsumption alone and stun-breaks separately on !isDOT
-// (PlayerStatus.java:118-134). There is no isHPConsumption concept for NPCs
-// and no sit/stand-up clause (Player-only, PlayerStatus.java:124). Callers
+// (PlayerStatus.java:118-134). HP consumption never reaches this block: it
+// goes through ConsumeHP instead. There is no sit/stand-up clause
+// (Player-only, PlayerStatus.java:124). Callers
 // must run this after AddDamageHate, matching Npc.reduceCurrentHp
 // (Npc.java:395, 468): the hate lands before super.reduceCurrentHp reaches
 // this block, so a sleep-stop's synchronous wake-think (EffectSleep.java:37-44
