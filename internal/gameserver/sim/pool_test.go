@@ -198,17 +198,37 @@ func TestTickerDropsTicksWhileOneIsQueued(t *testing.T) {
 	p := startPool(t, 1, zerolog.Nop())
 	q := p.NewQueue("q")
 	release := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(unblock) // runs before startPool's stop, so a failure does not stall it
 	q.Post(func() { <-release })
 
 	var ticks int // queue-owned
 	ticker := q.Every(2*time.Millisecond, func() { ticks++ })
-	time.Sleep(30 * time.Millisecond) // ~15 periods while the queue is blocked
+	// Poll the ticker instead of sleeping a fixed time: under load the
+	// runtime may fire it late.
+	tm := (*Timer)(ticker)
+	var queuedNext time.Time
+	waitFor := func(what string, cond func() bool) {
+		for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(time.Millisecond) {
+			q.mu.Lock()
+			ok := cond()
+			q.mu.Unlock()
+			if ok {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("ticker never %s while the queue was blocked", what)
+			}
+		}
+	}
+	waitFor("queued a tick", func() bool { queuedNext = tm.next; return tm.queued })
+	waitFor("fired again", func() bool { return !tm.next.Equal(queuedNext) })
 	got := make(chan int)
 	q.Post(func() { got <- ticks }) // behind the one tick queued during the block
-	close(release)
+	unblock()
 
 	if n := <-got; n != 1 {
-		t.Fatalf("%d ticks ran for ~15 periods blocked behind one task, want 1", n)
+		t.Fatalf("%d ticks ran for several periods blocked behind one task, want 1", n)
 	}
 	ticker.Stop()
 }
