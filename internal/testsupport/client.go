@@ -304,11 +304,13 @@ func (f *ScriptedClient) Conn() net.Conn { return f.conn }
 // Close closes the underlying connection.
 func (f *ScriptedClient) Close() error { return f.conn.Close() }
 
-// ExpectClosed fails unless the server closes the connection within 2s. A
-// timeout fails too: a connection still open is not closed.
+// ExpectClosed fails unless the server closes the connection within 5s, the
+// same generous bound Read gives a frame: the close trails the detach path's
+// persistence, which other packages' CPU load can stretch past a couple of
+// seconds. A timeout fails too: a connection still open is not closed.
 func (f *ScriptedClient) ExpectClosed() {
 	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	buf := make([]byte, 1)
 	n, err := f.conn.Read(buf)
 	if ne, ok := err.(net.Error); n != 0 || err == nil || ok && ne.Timeout() {
