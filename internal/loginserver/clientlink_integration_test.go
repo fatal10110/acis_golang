@@ -104,11 +104,12 @@ func (s *fakeAccountStore) getLastActive(login string) (time.Time, bool) {
 
 func mustHashPassword(t *testing.T, password string) string {
 	t.Helper()
-	hashed, err := model.HashPassword(password)
+	// MinCost keeps fixtures cheap; verification reads the cost from the hash.
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
-		t.Fatalf("HashPassword: %v", err)
+		t.Fatalf("hash password: %v", err)
 	}
-	return hashed
+	return string(hashed)
 }
 
 // --- fake login client, driving the wire protocol from the other side ---
