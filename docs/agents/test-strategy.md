@@ -53,6 +53,14 @@ Rules:
   before driving a task tick.
 - Suites need the shared MariaDB service (`make test-db-up`); each suite package calls
   `sqltest.Main(m)` from `TestMain` to release its uniquely named database.
+- Never wait on the wall clock (`time.Sleep`, polling loops). A suite whose `TestMain` calls
+  `gameservertest.DriveClock()` (`combat`, `skills`, `pets`) runs actor queues on `sim.Inline`
+  with a clock that moves only when the test lets time pass: `srv.Advance(t, d)` for a known
+  delay, `srv.AdvanceUntil(t, what, cond)` for "until this happens", and client reads, which
+  advance to the next timer while no frame is on its way. Before the clock moves, the server has
+  handled every client frame and the persistence lanes have run their jobs, so hold a lane
+  (`HoldPersistenceLane`) to keep a database round trip outstanding — a slow store does not.
+  `ACIS_SIM_EXECUTOR=pool` runs the same suite on the real pool, where those calls wait for real.
 
 ### Tier 2 — pure-function core tests (`<pkg>_core_test.go`)
 

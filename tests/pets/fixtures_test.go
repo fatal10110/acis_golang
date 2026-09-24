@@ -195,7 +195,7 @@ func (h *petWorld) returnPet(t *testing.T) {
 	t.Helper()
 	h.client.Send(encodeRequestActionUse(19, false))
 	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete")
-	waitFor(t, "pets row saved", func() bool {
+	h.srv.AdvanceUntil(t, "pets row saved", func() bool {
 		_, ok, err := h.srv.Pets.Get(context.Background(), h.collarID)
 		return err == nil && ok
 	})
@@ -218,7 +218,7 @@ func (h *petWorld) spawnWolf(t *testing.T) (*summon.Actor, [][]byte) {
 		t.Fatalf("collar cast = caster %d skill %d level %d, want %d/%d/1", caster, skill, level, h.ownerID, summonCreatureID)
 	}
 	var actor *summon.Actor
-	waitFor(t, "pet in world state", func() bool {
+	h.srv.AdvanceUntil(t, "pet in world state", func() bool {
 		obj, ok := h.srv.State.Summon(h.ownerID)
 		if !ok {
 			return false
@@ -506,18 +506,6 @@ func readUntilOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte, wha
 	}
 	t.Fatalf("%s not found within 100 frames", what)
 	return nil
-}
-
-func waitFor(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("%s not observed within 5s", what)
 }
 
 func assertFrameOpcode(t *testing.T, frame []byte, want byte, what string) {

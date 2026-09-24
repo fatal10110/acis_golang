@@ -358,6 +358,17 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   the raw `time.AfterFunc` left in `network/summon_spawn.go` (pet-restore hold ceiling) and the
   controllers' nil-`afterFunc` fallbacks onto `queue.After` so `Inline` can advance them. Only
   needs `queue.After` in production (Phase 2), so it does not wait for Phase 5.
+  *Slice 1 (`tests/combat`, `tests/skills`, `tests/pets`) landed as:* `gameservertest.DriveClock()`
+  in a suite's `TestMain` runs its queues on `sim.Inline` whose clock moves only through
+  `Server.Advance`/`AdvanceUntil` and through client reads, which step to the next timer while no
+  frame is on its way. Before the clock moves the harness waits until the server has handled every
+  client frame (`network.Conn.ObserveReads`, frame counts on both ends) and flushes the persistence
+  lanes a test does not hold, so a database round trip takes no virtual time; restore-window tests
+  hold the lane instead of slowing the store. Effect periods read the owner queue's clock
+  (`sim.Queue.Now`; a signet point's off-queue list via `effect.WithClock`), and the pet-restore
+  hold ceiling moved onto `queue.After`. CI keeps these suites' real-pool run as a
+  `ACIS_SIM_EXECUTOR=pool` step. Other wall-clock reads (reuse, disabled items, cast interrupt)
+  still use `time.Now` (#2482).
 
 ## Performance notes (why this does not regress the hot spot)
 - Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor

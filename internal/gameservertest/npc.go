@@ -3,7 +3,6 @@ package gameservertest
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -145,6 +144,7 @@ type AttackingHostile struct {
 	*npc.Hostile
 	ctl      *attack.Controller
 	finished chan struct{}
+	srv      *Server
 }
 
 // attackFinishedSignal is the attack controller sink of an AttackingHostile:
@@ -163,16 +163,19 @@ func (c attackFinishedSignal) Emit(ev event.Event) {
 // DoAttack starts one swing against target and blocks until it lands (the
 // hit is already delivered by the time the animation's finish callback
 // fires), so the caller can assert HP/CP state right after without a
-// wall-clock sleep. It fails the test if the swing does not finish within
-// timeout.
-func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant, timeout time.Duration) {
+// wall-clock sleep. It lets time pass (Server.AdvanceUntil) until the swing
+// finishes.
+func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant) {
 	t.Helper()
 	h.ctl.DoAttack(target)
-	select {
-	case <-h.finished:
-	case <-time.After(timeout):
-		t.Fatal("npc attack did not finish within timeout")
-	}
+	h.srv.AdvanceUntil(t, "npc attack finish", func() bool {
+		select {
+		case <-h.finished:
+			return true
+		default:
+			return false
+		}
+	})
 }
 
 // AttackingHostileTemplate returns a fresh copy of the template
@@ -230,7 +233,7 @@ func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Templa
 	// non-zero CritRate will see every landed hit crit, not the
 	// configured percentage.
 	hostile.SetRollSource(func(int) int { return 0 })
-	return &AttackingHostile{Hostile: hostile, ctl: attackCtl, finished: finished}
+	return &AttackingHostile{Hostile: hostile, ctl: attackCtl, finished: finished, srv: s}
 }
 
 type movingHostileStatRef struct{ effect.StatOwner }

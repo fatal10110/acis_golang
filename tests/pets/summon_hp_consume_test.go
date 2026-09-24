@@ -19,7 +19,7 @@ func TestInvulPetPaysStrikeHPCostAndTellsOwner(t *testing.T) {
 	before := petActor.HP()
 
 	startWolfStrike(t, h)
-	waitFor(t, "the pet paying its strike's HP cost", func() bool { return petActor.HP() == before-hpCost })
+	h.srv.AdvanceUntil(t, "the pet paying its strike's HP cost", func() bool { return petActor.HP() == before-hpCost })
 
 	frame := findSystemMessage(t, drainFrames(t, h.client), serverpackets.SystemMessagePetReceivedS2DamageByS1)
 	if frame == nil {

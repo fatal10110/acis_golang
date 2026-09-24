@@ -30,6 +30,7 @@ func TestSlowKnownSkillStoreKeepsQueuesFree(t *testing.T) {
 		gameservertest.WithCharacter("Newbie", 5, 50),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCapturedLog(),
+		gameservertest.WithRealPool(), // the slow-task watchdog runs only on the pool
 		gameservertest.WithSkills(slowLearnerTable(t)),
 	)
 	bindSkillShortcut(t, srv, objID, 3, 3, -1)

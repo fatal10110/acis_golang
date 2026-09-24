@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -164,7 +165,11 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 
 	ownerID := caster.ObjectID()
-	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, effect.WithActivityRegistry(h.activity))
+	opts := []effect.Option{effect.WithActivityRegistry(h.activity)}
+	if queued, ok := caster.(interface{ Queue() *sim.Queue }); ok {
+		opts = append(opts, effect.WithClock(queued.Queue()))
+	}
+	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, opts...)
 	if err != nil {
 		return nil, false
 	}

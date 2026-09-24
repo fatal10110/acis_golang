@@ -99,6 +99,7 @@ type options struct {
 	geo                    move.Geo
 	itemTemplates          *item.Table
 	productionTickers      bool
+	realPool               bool
 }
 
 type characterSpec struct {
@@ -300,6 +301,11 @@ func WithSlowStores(d time.Duration) Option { return func(o *options) { o.slowSt
 // suite reads back with Server.LogText or Server.SlowTaskLogs.
 func WithCapturedLog() Option { return func(o *options) { o.captureLog = true } }
 
+// WithRealPool runs this Boot's actor queues on the production sim.Pool even
+// in a suite that drives its clock, for a test that needs the pool itself:
+// its slow-task watchdog (Server.SlowTaskLogs) exists only there.
+func WithRealPool() Option { return func(o *options) { o.realPool = true } }
+
 // WithGeo supplies the movement geodata collaborator wired into live
 // players. The default is the always-passable Geo double.
 func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
@@ -360,6 +366,8 @@ type Server struct {
 	persist          *persist.Worker
 	logs             *lockedBuffer
 	queues           *queues
+	traffic          *traffic
+	heldLanes        [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
 	log              zerolog.Logger
 	sendObserver     *atomic.Pointer[func(payload []byte)]
 
@@ -430,6 +438,7 @@ func (s *Server) SeedCharacterFor(tb testing.TB, account, name string, level, sp
 func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsupport.ScriptedClient {
 	t.Helper()
 	c := testsupport.Dial(t, s.addr.String())
+	s.addClient(c)
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
@@ -804,13 +813,20 @@ func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func
 	tb.Helper()
 	held := make(chan struct{})
 	started := make(chan struct{})
+	lane := &s.heldLanes[persist.LaneIndex(ownerID)]
+	lane.Add(1)
 	s.persist.Enqueue(ownerID, func() {
 		close(started)
 		<-held
 	})
 	<-started
 	var once sync.Once
-	release = func() { once.Do(func() { close(held) }) }
+	release = func() {
+		once.Do(func() {
+			lane.Add(-1)
+			close(held)
+		})
+	}
 	tb.Cleanup(release)
 	return release
 }
@@ -1015,7 +1031,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered after the persistence worker and before the listener, so
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
-	queues := startQueues(t, o.log)
+	queues := startQueues(t, o.log, o.realPool)
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
 	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)
@@ -1186,8 +1202,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		waitHandlers()
 	})
 	sendObserver := new(atomic.Pointer[func(payload []byte)])
+	frames := new(traffic)
 	go network.Serve(ctx, ln, func(ctx context.Context, conn *network.Conn) {
+		sent, closed := frames.track(conn)
+		defer closed()
 		conn.ObserveSends(func(payload []byte) {
+			sent()
 			if observe := sendObserver.Load(); observe != nil {
 				(*observe)(payload)
 			}
@@ -1244,7 +1264,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("initial char count = %d, want %d", count, o.wantChars)
 	}
 
-	return &Server{
+	srv := &Server{
 		Client:           c,
 		State:            state,
 		itemTable:        itemTemplates,
@@ -1275,12 +1295,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autosaveClock:    autosaveClock,
 		persist:          persistWorker,
 		queues:           queues,
+		traffic:          frames,
 		log:              o.log,
 		logs:             logs,
 		cancel:           cancel,
 		waitHandlers:     waitHandlers,
 		sendObserver:     sendObserver,
 	}
+	srv.addClient(c)
+	return srv
 }
 
 // ObserveSends has fn see the cleartext payload of every frame any of this

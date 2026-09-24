@@ -62,6 +62,20 @@ func (q *Queue) Post(fn func()) bool {
 	return !q.closed && q.exec.enqueue(q, fn)
 }
 
+// Now reads the clock q's timers run on: the wall clock on a Pool, the
+// virtual clock on an Inline loop. Deadlines compared against q's timers
+// must be taken from it.
+func (q *Queue) Now() time.Time { return q.exec.Now() }
+
+// Now is q.Now, or the wall clock for a nil q (an actor built without a
+// queue).
+func Now(q *Queue) time.Time {
+	if q == nil {
+		return time.Now()
+	}
+	return q.Now()
+}
+
 // Close cancels every armed timer and ticker and refuses later posts. Tasks
 // already accepted still run. Safe to call more than once.
 func (q *Queue) Close() {

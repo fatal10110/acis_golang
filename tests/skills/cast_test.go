@@ -214,17 +214,10 @@ func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
 
 func waitForPlayerPosition(t *testing.T, srv *gameservertest.Server, objID int32, want location.Location) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	srv.AdvanceUntil(t, "player arrival", func() bool {
 		x, y, z := srv.PlayerPosition(t, objID)
-		if x == want.X && y == want.Y && z == want.Z {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("player position after walk = (%d,%d,%d), want %+v", x, y, z, want)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return x == want.X && y == want.Y && z == want.Z
+	})
 }
 
 func playerHeading(t *testing.T, srv *gameservertest.Server, objID int32) int {
@@ -878,7 +871,7 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 		t.Fatalf("caster HP at the hit = %d, want the %d HP cost", got, hpConsume)
 	}
 
-	waitFor(t, "caster death from its own HP cost", func() bool { return srv.PlayerDead(t, objID) })
+	srv.AdvanceUntil(t, "caster death from its own HP cost", func() bool { return srv.PlayerDead(t, objID) })
 
 	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
 		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
@@ -899,7 +892,7 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	// is queued from inside the death sequence, before the grant runs, so
 	// this waits for the charge rather than reading it straight off the
 	// Die frame's arrival.
-	waitFor(t, "charge granted by the hit that killed the caster", func() bool {
+	srv.AdvanceUntil(t, "charge granted by the hit that killed the caster", func() bool {
 		return srv.PlayerCharges(t, objID) == 1
 	})
 
@@ -913,7 +906,7 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	if !ok {
 		t.Fatalf("world.Player(%d) = %T has no EffectList", objID, obj)
 	}
-	waitFor(t, "self effect on the dead caster", func() bool { return len(holder.EffectList().All()) > 0 })
+	srv.AdvanceUntil(t, "self effect on the dead caster", func() bool { return len(holder.EffectList().All()) > 0 })
 	if held := holder.EffectList().All(); len(held) != 1 || !held[0].Template.Self {
 		t.Fatalf("dead caster holds %+v, want only the skill's self effect", held)
 	}
@@ -968,7 +961,7 @@ func TestLethalToggleHPConsumeAbortsAndKillsCaster(t *testing.T) {
 		t.Fatal("no Die broadcast after the lethal toggle cost")
 	}
 
-	waitFor(t, "caster death from its own toggle HP cost", func() bool { return srv.PlayerDead(t, objID) })
+	srv.AdvanceUntil(t, "caster death from its own toggle HP cost", func() bool { return srv.PlayerDead(t, objID) })
 	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
 		t.Fatalf("caster HP after a lethal toggle cost = %d, want 0", got)
 	}
