@@ -137,8 +137,6 @@ func TestRequestGameStartUnknownSlotKeepsConnectionOpen(t *testing.T) {
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
 	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
-	}
 }
 
 // TestRequestGameStartBannedCharacterRefusedSilently pins that a character
@@ -166,8 +164,6 @@ func TestRequestGameStartBannedCharacterRefusedSilently(t *testing.T) {
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
-	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 
@@ -205,8 +201,6 @@ func TestDuplicateCharacterLoginClosesPreviousClientAndAbortsNewSelection(t *tes
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-abort opcode = %#x, want a CharCreate reply", frame[0])
-	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 

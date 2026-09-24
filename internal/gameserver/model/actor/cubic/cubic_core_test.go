@@ -252,9 +252,9 @@ func TestRuntime_StopActionCancelsAndTickDoesNothingAfter(t *testing.T) {
 // fire() doesn't leave running stuck true: without the reset, Action()'s
 // no-op-if-already-active guard would permanently block every future
 // stance re-entry, silently stalling the cubic for the rest of its grant.
-// The panic must still reach the caller (recovered/logged by the
-// production afterFunc, e.g. GameClientLink's cubicAfterFunc) rather than
-// being swallowed here.
+// The panic must still reach the caller (in production, livePlayer.after
+// runs the tick as a task on the owner's queue, and the pool's per-task
+// recovery logs it) rather than being swallowed here.
 func TestRuntime_TickRecoversPanicAndAllowsActionToRestart(t *testing.T) {
 	clock := &fakeClock{}
 	fireCount := 0
