@@ -214,21 +214,11 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirmerID int32) {
 	// Confirm already took the ready session out of the book, so a failed
 	// re-check cancels straight to the participants: a book cancel would
-	// reach no one.
-	first, second, ok := l.tradeParticipants(session)
-	if !ok {
-		// A participant left the world after Confirm. The reference answers
-		// a partner gone offline with the confirmer's own cancel, which
-		// names the confirmer; the one who left gets nothing.
-		for _, live := range []*livePlayer{first, second} {
-			if live != nil && live.ObjectID() == confirmerID {
-				sendTradeCancel(live, live.Name)
-			}
-		}
-		return
-	}
+	// reach no one. The confirmer is the canceller, and a participant who
+	// left the world after Confirm gets nothing.
+	first, second, _ := l.tradeParticipants(session)
 	if !l.validTradeParticipants(first, second) {
-		sendTradeCanceled(first, second)
+		l.sendTradeCanceled(session, confirmerID)
 		return
 	}
 
@@ -250,7 +240,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		l.applyPersistActions(res.Persist)
 	}
 	if status == tradebook.SettlementInvalidItems {
-		sendTradeCanceled(first, second)
+		l.sendTradeCanceled(session, confirmerID)
 		return
 	}
 	failMessage := tradeSettlementMessage(status)
@@ -281,16 +271,24 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 	if result.Status != tradebook.CancelDone {
 		return
 	}
-	first, second, ok := l.tradeParticipants(result.Session)
+	l.sendTradeCanceled(result.Session, playerID)
+}
+
+// sendTradeCanceled closes the trade window on both clients, partner first,
+// naming the canceller to each: the canceller reads its own name. A
+// participant no longer in the world gets nothing, so a canceller whose
+// partner is gone still hears its own cancel.
+func (l *GameClientLink) sendTradeCanceled(session tradebook.Session, cancellerID int32) {
+	canceller, ok := l.livePlayerByID(cancellerID)
 	if !ok {
 		return
 	}
-	sendTradeCanceled(first, second)
-}
-
-func sendTradeCanceled(first, second *livePlayer) {
-	sendTradeCancel(first, second.Name)
-	sendTradeCancel(second, first.Name)
+	if partnerID, ok := session.PartnerID(cancellerID); ok {
+		if partner, ok := l.livePlayerByID(partnerID); ok {
+			sendTradeCancel(partner, canceller.Name)
+		}
+	}
+	sendTradeCancel(canceller, canceller.Name)
 }
 
 func sendTradeCancel(live *livePlayer, cancellerName string) {

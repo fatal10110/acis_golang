@@ -43,6 +43,21 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		sendMagicActionFailed(live)
 		return
 	}
+	// A pets-row read still in flight stands in for a cast the caster is
+	// still in, whether or not its hold already ended. A servitor cast started
+	// there would pay its item and MP, only to lose the slot to the inbound
+	// pet at hit, so it is refused the way an already-casting caster is: an
+	// ActionFailed with no reason. The pre-attempt checks (reuse, disabled
+	// skills) still answer first, with their own reason, as they would for
+	// any caster.
+	if known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
+		if err := l.castController(live).CanAttemptCast(live.Character, def); err != nil {
+			sendMagicCastFailure(live, def, err)
+			return
+		}
+		sendMagicActionFailed(live)
+		return
+	}
 
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	controller := l.castController(live)
@@ -535,6 +550,14 @@ func sendMagicActionFailed(live *livePlayer) {
 // through — a hostile NPC's AIController.OnHitResult (issue #2350).
 func (l *GameClientLink) DeliverHitResult(result actorcast.EffectResult) {
 	l.sendSkillHandlerResult(nil, result)
+}
+
+// HostileCastEffects returns the effect handlers a hostile NPC's AI cast
+// dispatches through: the link's own target and skill registries (both
+// read-only after construction, so NPC and player queues share them) and
+// DeliverHitResult for target-addressed messages.
+func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
+	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, OnHitResult: l.DeliverHitResult}
 }
 
 // sendSkillHandlerResult delivers both caster-addressed messages (sent to

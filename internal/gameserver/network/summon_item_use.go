@@ -52,25 +52,41 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	if !ok {
 		return false
 	}
-	if summonItem.SummonType == summonItemTypeDecorative {
-		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
+	if summonItem.SummonType != summonItemTypeDecorative &&
+		summonItem.SummonType != summonItemTypePet &&
+		summonItem.SummonType != summonItemTypeWyvern {
+		return false
 	}
-	if summonItem.SummonType == summonItemTypeWyvern {
-		if !live.Character.Standing() {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
-			return true
-		}
-		// restoringSummon extends this gate over the rest of a pets-row
-		// read whose cast the hold ceiling already ended: the reference
-		// is still casting there and returns here silently
-		// (SummonItems.java:36-37), before the summon-slot check below.
-		if live.Character.AllSkillsDisabled() || live.Character.CastingNow() || l.restoringSummon(live) {
-			return true
-		}
-		if live.Character.MountType() != 0 || l.hasActiveSummon(live) {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
-			return true
-		}
+
+	// The gates below are shared by every summon kind, in the reference's
+	// order, ahead of the per-kind branches.
+	if !live.Character.Standing() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
+		return true
+	}
+	// The reference answers the observer, skills-disabled and casting
+	// rejections with no packet, and a use-item request leaves no client
+	// action pending, so silence is the matching answer.
+	if live.Character.ObserverMode() {
+		return true
+	}
+	// restoringSummon extends the casting gate over a pets-row read whose
+	// cast was already ended — by the hold ceiling, crowd control or death:
+	// the reference is still in that cast until its pet lands. It is not part
+	// of the summon-slot check below, which would answer SUMMON_ONLY_ONE
+	// where the reference is silent.
+	if live.Character.AllSkillsDisabled() || live.Character.CastingNow() || l.restoringSummon(live) {
+		return true
+	}
+	if summonItem.SummonType != summonItemTypeDecorative && (live.Character.MountType() != 0 || l.hasActiveSummon(live)) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+		return true
+	}
+
+	switch summonItem.SummonType {
+	case summonItemTypeDecorative:
+		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
+	case summonItemTypeWyvern:
 		if live.Character.InCombat() {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
 			return true
@@ -83,30 +99,6 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			return serverpackets.FrameRide(live.ObjectID(), summonItem.NPCID)
 		})
 		live.Character.UpdateUserInfo()
-		return true
-	}
-	if summonItem.SummonType != summonItemTypePet {
-		return false
-	}
-	if !live.Character.Standing() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
-		return true
-	}
-	// A pets-row read still in flight means the previous summon cast has
-	// hit; the reference is still casting at that point and returns here
-	// silently (SummonItems.java:37-38, above the switch at :64-65), so no
-	// second cast starts. Without this, past the hold ceiling the cast is
-	// over and StartItemSkill's already-casting rejection no longer fires,
-	// so the collar would run a whole second cast — broadcasting
-	// MagicSkillUse and MagicSkillLaunched — only to be rejected at
-	// SpawnPet's gate when it hits.
-	//
-	// Only the restore window is gated here. The rest of what :37-38
-	// covers for this branch (an ordinary cast in progress, disabled
-	// skills) still reaches StartItemSkill and answers through
-	// sendMagicCastFailure; that pre-existing divergence belongs to the
-	// pre-cast gate #2369 adds.
-	if l.restoringSummon(live) {
 		return true
 	}
 
@@ -177,10 +169,6 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 }
 
 func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, summonItem item.SummonItem) bool {
-	if !live.Character.Standing() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
-		return true
-	}
 	if l.world == nil || l.ids == nil || l.npcs == nil {
 		return false
 	}

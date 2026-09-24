@@ -216,6 +216,10 @@ func (c *Character) DetachSession() { c.sessionDetached.Store(true) }
 // SessionDetached reports whether DetachSession has run.
 func (c *Character) SessionDetached() bool { return c.sessionDetached.Load() }
 
+// PlayerCharacter returns c. A wrapper embedding *Character inherits it, so
+// a combatant reached through a summon's owner resolves to its model.
+func (c *Character) PlayerCharacter() *Character { return c }
+
 func (c *Character) emit(e event.Event) {
 	if c.sink != nil {
 		c.sink.Emit(e)

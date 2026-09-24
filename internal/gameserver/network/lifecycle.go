@@ -149,8 +149,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 // The player's lane also carries the single-row writes its handlers queued
 // (item rows, shortcut rows, character_skills rows), so a degraded database
 // can put more than those four jobs in front of this wait. The wait is a
-// bound, not a guarantee: awaitPersistence logs a wait it gave up on and the
-// caller continues, exactly as it does when the saves themselves fail.
+// bound, not a guarantee: awaitPersistence logs a wait it gave up on. The
+// restart and disconnect callers then continue, exactly as they do when the
+// saves themselves fail; character selection refuses instead of loading rows
+// the saves have not written.
 const livePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceSaveTimeout
 
 // awaitPersistence waits until every save already enqueued for owners has
