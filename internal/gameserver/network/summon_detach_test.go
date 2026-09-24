@@ -9,6 +9,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -83,7 +84,7 @@ func TestSpawnRestoredPetStopsOnceOwnerDetached(t *testing.T) {
 		collar := live.Inventory().AddNew(detachTestCollarID, 1, collarObjectID)
 		live.Inventory().DrainUpdates()
 		if detach {
-			link.detachLivePlayer(live)
+			sim.RunOwned(live.Queue(), func() { link.detachLivePlayer(live) })
 		}
 		(&gameSummonSpawner{link: link, live: live}).spawnRestoredPet(collar, summonItem, npcTmpl, petmodel.State{}, false)
 		_, spawned := state.Summon(live.ObjectID())

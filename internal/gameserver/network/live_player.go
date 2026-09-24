@@ -95,31 +95,36 @@ type livePlayer struct {
 	// previous session.
 	kick       func()
 	stopAttack func(*livePlayer)
-	// shadowExpiryMu guards detaching. deliveryStopped is its unlocked mirror
-	// for delivery invoked while this lock is already held; markDetaching sets
-	// it first, so detached never lags a pending write lock. Autosave enqueues
-	// its save while holding the read lock and detach then writes its own, so
-	// every autosave job sits ahead of detach's offline persistence write.
-	shadowExpiryMu     sync.RWMutex
-	spawnProtectionMu  sync.Mutex
+	// spawnProtectionGen is owned by p's queue.
 	spawnProtectionGen uint64
-	detaching          bool
-	deliveryStopped    atomic.Bool
-	pickupMu           sync.Mutex // guards deferred player intentions and pickup state
-	pickup             *pickupIntention
-	deferredPickup     *pickupIntention
-	deferredMagic      *clientpackets.RequestMagicSkillUse
-	deferredItem       *itemAICastIntention
-	pickupLocked       bool
-	pickupLockGen      uint64
+	// deliveryStopped is set on p's queue when detach begins. Autosave and
+	// shadow-item expiry check it on the same queue, so an autosave job either
+	// sits ahead of detach's offline persistence write or is never enqueued.
+	// Atomic for the readers on other goroutines.
+	deliveryStopped atomic.Bool
+	// pickupMu guards deferred player intentions and pickup state. Another
+	// actor's queue reaches them: an effect it applies stops p's actions and
+	// drops them (stopLiveActions → tryToIdle).
+	pickupMu       sync.Mutex
+	pickup         *pickupIntention
+	deferredPickup *pickupIntention
+	deferredMagic  *clientpackets.RequestMagicSkillUse
+	deferredItem   *itemAICastIntention
+	pickupLocked   bool
+	pickupLockGen  uint64
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.
 	fusionTargetID atomic.Int32
 
+	// petInteractMu is taken from another actor's queue for the same reason
+	// as pickupMu.
 	petInteractMu sync.Mutex
 	petInteract   *summon.Actor
 
+	// cubicsMu is taken from another actor's queue: another player's cubic
+	// skill grants p a cubic (syncCubicTargets), and a summon-friend cast
+	// teleports p, which stops them (TeleportRequested → Stop).
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
 }
@@ -183,8 +188,8 @@ func (p *livePlayer) after(d time.Duration, fn func()) *sim.Timer {
 // connection reads for an in-world player keeps its read order and runs
 // serialized with that player's timers and ticks. When q no longer accepts
 // tasks (the player detached, or the pool is stopping), fn runs on the
-// calling goroutine. A task must never call it for its own queue: it would
-// wait on itself.
+// calling goroutine as q's owner, after the task q is still running, if any.
+// A task must never call it for its own queue: it would wait on itself.
 //
 // It reports whether fn returned normally. False means fn panicked or called
 // runtime.Goexit and the pool's per-task recovery contained it, so whatever
@@ -201,7 +206,7 @@ func onQueue(q *sim.Queue, fn func()) (ok bool) {
 		fn()
 		ok = true
 	}) {
-		fn()
+		sim.RunOwned(q, fn)
 		return true
 	}
 	<-done
@@ -258,17 +263,16 @@ func (p *livePlayer) Stop() {
 	p.stopCubics()
 }
 
-// detached reports whether p's session has begun detaching (logout) without
-// taking shadowExpiryMu: expiry delivery may already hold that lock.
+// detached reports whether p's session has begun detaching (logout).
 func (p *livePlayer) detached() bool {
 	return p.deliveryStopped.Load()
 }
 
+// markDetaching runs on p's queue, where autosave and shadow-item expiry
+// check detached, so neither enqueues after detach's own writes (#1948).
 func (p *livePlayer) markDetaching() {
+	sim.AssertOwner(p.Queue())
 	p.deliveryStopped.Store(true)
-	p.shadowExpiryMu.Lock()
-	p.detaching = true
-	p.shadowExpiryMu.Unlock()
 }
 
 // stopCubics cancels every live cubic runtime's timers on detach, so a

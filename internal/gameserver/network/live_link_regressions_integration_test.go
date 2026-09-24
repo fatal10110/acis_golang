@@ -227,7 +227,9 @@ func TestGameClientLinkEnterWorldRebasesRestoredVitalBases(t *testing.T) {
 
 	// The next save→load cycle must be a fixed point: same maxima, currents
 	// untouched.
-	if err := chars.Save(context.Background(), character.SaveState()); err != nil {
+	var saved player.SaveState
+	onLive(live.(*livePlayer), func() { saved = character.SaveState() })
+	if err := chars.Save(context.Background(), saved); err != nil {
 		t.Fatalf("save live character: %v", err)
 	}
 	reloaded, err := chars.Get(context.Background(), character.ID)

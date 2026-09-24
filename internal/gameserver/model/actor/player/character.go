@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -75,10 +76,9 @@ type Character struct {
 	// Location and LastHeading are the character's last known world
 	// location. The field is named LastHeading, not Heading, so it doesn't
 	// shadow the Heading() method promoted from the embedded world.Presence.
-	// locMu guards both fields once the character is live: the
-	// position-update ticker (SyncPosition, during an attack chase) and the
-	// owning connection's network goroutine (SetLastKnownPosition, during
-	// client-reported movement) write them from different goroutines.
+	// locMu guards both fields once the character is live. Another actor's
+	// queue writes them (a summon-friend cast teleports c: TeleportTo →
+	// SyncPosition) and reads them (Position while c is not visible).
 	Location    location.Location
 	LastHeading int
 	locMu       sync.RWMutex
@@ -99,10 +99,8 @@ type Character struct {
 	DeleteAt   int64
 	LastAccess int64
 
-	// onlineMu guards the session playtime clock below. The clock starts
-	// when the row is restored and every save persists the accumulated
-	// total, so both run from goroutines that never otherwise meet.
-	onlineMu       sync.Mutex
+	// The session playtime clock is set when the row is restored, before
+	// the character has a queue, and read by saves on its queue.
 	onlineTimeBase int64
 	onlineBegin    time.Time
 
@@ -145,7 +143,8 @@ type Character struct {
 	sessionDetached atomic.Bool
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
-	// teleport-confirm request state,
+	// teleport-confirm request state, which the caster's queue records
+	// (TeleportRequest),
 	// matching Player._summonTargetRequest/_summonSkillRequest
 	// (Player.java:452-453).
 	summonFriendMu    sync.Mutex
@@ -298,12 +297,20 @@ func (c *Character) CurrentHeading() int {
 	return c.LastHeading
 }
 
+// assertOwner panics unless the caller is one of c's queue tasks. A
+// character not yet attached has no queue: it is still confined to the
+// goroutine restoring or seeding it.
+func (c *Character) assertOwner() {
+	if q := c.Queue(); q != nil {
+		sim.AssertOwner(q)
+	}
+}
+
 // SetOnlineTime seeds the session playtime clock with seconds already
 // accumulated by earlier sessions; the in-session elapsed time is measured
 // from now, so the first save after this call persists base plus elapsed.
 func (c *Character) SetOnlineTime(seconds int64, now time.Time) {
-	c.onlineMu.Lock()
-	defer c.onlineMu.Unlock()
+	c.assertOwner()
 	c.onlineTimeBase = seconds
 	c.onlineBegin = now
 }
@@ -312,8 +319,7 @@ func (c *Character) SetOnlineTime(seconds int64, now time.Time) {
 // the base restored from the characters row plus everything accrued since
 // the clock started.
 func (c *Character) TotalOnlineTime(now time.Time) int64 {
-	c.onlineMu.Lock()
-	defer c.onlineMu.Unlock()
+	c.assertOwner()
 	total := c.onlineTimeBase
 	if !c.onlineBegin.IsZero() && now.After(c.onlineBegin) {
 		total += int64(now.Sub(c.onlineBegin) / time.Second)

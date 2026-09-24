@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -188,11 +189,10 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // on the owner's persistence lane.
 //
 // A session mid-detach is skipped: detachLivePlayer writes the same columns
-// and then marks the row offline, and Roster.Save marks it online. The
-// detaching check and the enqueue both run under shadowExpiryMu's read lock,
-// which detachLivePlayer's write lock excludes, so an autosave job either
-// sits ahead of detach's jobs on the lane or is never enqueued. Its online
-// write therefore cannot land after detach's offline write (#1948).
+// and then marks the row offline, and Roster.Save marks it online. Save runs
+// on the player's queue, as detach does, so an autosave job either sits ahead
+// of detach's jobs on the lane or is never enqueued. Its online write
+// therefore cannot land after detach's offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
 	e.mu.RLock()
 	roster, skills, pets, worker, log := e.roster, e.skills, e.pets, e.persist, e.log
@@ -205,9 +205,11 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		return
 	}
 	live, ok := obj.(*livePlayer)
-	if !ok || live.detached() {
+	// A relogged character's newer live is not this queue's to touch.
+	if !ok || live.Queue() != actor.Queue() || live.detached() {
 		return
 	}
+	sim.AssertOwner(live.Queue())
 	charState := live.Character.SaveState()
 	skillState := skills.SaveState(live.Character)
 	var petItemID int32
@@ -218,11 +220,6 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		}
 	}
 
-	live.shadowExpiryMu.RLock()
-	defer live.shadowExpiryMu.RUnlock()
-	if live.detaching {
-		return
-	}
 	worker.Enqueue(live.ObjectID(), func() {
 		ctx, cancel := context.WithTimeout(context.Background(), autosaveSaveTimeout)
 		defer cancel()
@@ -277,9 +274,8 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 		return
 	}
 	postLive(live, func() {
-		live.shadowExpiryMu.RLock()
-		defer live.shadowExpiryMu.RUnlock()
-		if live.detaching {
+		sim.AssertOwner(live.Queue())
+		if live.detached() {
 			return
 		}
 		if current, ok := e.state.Player(actorID); !ok || current != live {
