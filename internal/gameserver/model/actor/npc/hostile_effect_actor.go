@@ -7,20 +7,26 @@ import (
 
 var _ effect.NPCActor = (*Hostile)(nil)
 
-// AbortAll does nothing yet: aborting every in-progress action is not wired.
-func (h *Hostile) AbortAll(bool) {}
+// AbortAll stops the NPC's movement, attack and cast without sending it
+// idle: while the effect that asked for the abort holds, the think loop
+// declines to act on its intentions. An NPC keeps no selected target apart from its
+// intentions, so resetTarget has nothing to clear.
+func (h *Hostile) AbortAll(bool) {
+	h.brain.AbortAll()
+}
 
-// StopMove does nothing yet: effect-driven movement stops are not wired.
-func (h *Hostile) StopMove() {}
+// StopMove stops the NPC's movement.
+func (h *Hostile) StopMove() { h.move.Stop() }
 
-// TryToIdle does nothing yet: effect-driven NPC idling is not wired.
+// TryToIdle does nothing: only a player or summon is sent idle by an effect.
 func (h *Hostile) TryToIdle() {}
 
-// ClearTarget does nothing yet: effect-driven target clearing is not wired.
+// ClearTarget does nothing: an NPC keeps no selected target apart from its
+// intentions, and clearing one is silent.
 func (h *Hostile) ClearTarget() {}
 
-// StopAttack does nothing yet: effect-driven attack stops are not wired.
-func (h *Hostile) StopAttack() {}
+// StopAttack stops the NPC's attack cycle; its intentions stay.
+func (h *Hostile) StopAttack() { h.brain.StopAttack() }
 
 // FearImmune reports false: fear immunity is not modeled yet.
 func (h *Hostile) FearImmune() bool { return false }
