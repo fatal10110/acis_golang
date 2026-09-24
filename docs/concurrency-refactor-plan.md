@@ -227,9 +227,20 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
 - **Operator knobs** and how they add up (constants, not config today):
   - `persist.Lanes` = 4: lanes shared by every owner; one slow job holds the owners hashed to its
     lane.
-  - `livePlayerDetachSaveTimeout` = 2 s (`network/lifecycle.go`): budget per queued job
-    (character save, pet row, item row). `livePlayerPersistWait` = 3 × that +
-    `task.ItemInstanceSaveTimeout` = 16 s bounds the character-select barrier.
+  - Per-job budgets on the same lanes (each started when the job runs, not when it was queued):
+    - `livePlayerDetachSaveTimeout` = 2 s (`network/lifecycle.go`): detach save, container
+      flush, pets row on unsummon/logout/rename, shortcut rows, and single-item writes
+      (enchant, pickup, pet, trade).
+    - `autosaveSaveTimeout` = 5 s (`network/taskeffects.go`): the autosave's characters row,
+      position and skill state on the player's lane, and the pets row on the collar's lane — the
+      largest budget on a player's lane.
+    - `knownSkillWriteTimeout` = 2 s (`skill/persistence.go`): character_skills rows.
+    - `petRestoreTimeout` = 5 s (`network/summon_spawn.go`): the pets-row read a summon cast
+      queues on the collar's lane.
+  - `livePlayerPersistWait` = 3 × `livePlayerDetachSaveTimeout` + `task.ItemInstanceSaveTimeout`
+    = 16 s bounds the character-select barrier. An autosave or other job queued ahead of the
+    detach counts against it; a wait that gives up is logged and refuses the selection
+    (`network/client_loop.go`) rather than load unwritten rows.
   - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-tick save and per shutdown step.
   - `gameServerStopTimeout` = 30 s (`cmd/gameserver/main.go`): fx's whole stop budget. The
     listener stop waits for connection handlers (each detach enqueues, it does not wait for the
