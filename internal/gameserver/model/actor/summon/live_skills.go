@@ -14,7 +14,7 @@ func (a *Actor) SkillDisabled(key int32) bool {
 	if !ok {
 		return false
 	}
-	if time.Now().Before(expiresAt) {
+	if a.Now().Before(expiresAt) {
 		return true
 	}
 	delete(a.disabledSkills, key)
@@ -31,7 +31,7 @@ func (a *Actor) DisableSkill(key int32, delay time.Duration) {
 	if a.disabledSkills == nil {
 		a.disabledSkills = make(map[int32]time.Time)
 	}
-	a.disabledSkills[key] = time.Now().Add(delay)
+	a.disabledSkills[key] = a.Now().Add(delay)
 }
 
 // AddSkillReuse installs a summon-local item-skill reuse delay. Summons do

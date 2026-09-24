@@ -576,6 +576,8 @@ func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {
 	a.wanderOffset = offset
 }
 
+func (*fakeActor) Now() time.Time { return time.Now() }
+
 // recordingMove/recordingAttack/recordingCast (below) stand in for
 // MoveController/AttackController/CastController. move.Controller,
 // attack.Controller and cast.AIController each satisfy the respective

@@ -1,8 +1,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -291,7 +289,7 @@ func (l *GameClientLink) refreshLiveItemStats(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	}
 	if timersChanged {
-		now := time.Now()
+		now := live.Now()
 		live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 	}
 }

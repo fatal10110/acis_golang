@@ -62,7 +62,7 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 	}
 
 	slots := make([]serverpackets.CharacterSlot, len(chars))
-	now := time.Now()
+	now := time.Now() // character select runs on the connection goroutine, off any actor queue
 	for i, c := range chars {
 		items, err := l.items.ListByOwner(ctx, c.ID)
 		if err != nil {
@@ -299,7 +299,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// Computed after RestoreEquippedItemStats so an item's equip-delay reuse
 	// timer, armed by that restore, is included in the login SkillCoolTime
 	// snapshot rather than missed.
-	now := time.Now()
+	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)

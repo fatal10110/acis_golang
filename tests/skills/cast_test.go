@@ -117,6 +117,50 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestRecastSucceedsOnceReuseElapses casts, is refused while the skill is
+// disabled, lets the reuse delay pass on the actor queues' clock and recasts:
+// the second cast starts and charges MP again. Reuse is stamped and checked on
+// the caster's queue clock, so a driven clock opens the window exactly as the
+// wall clock does on the pool.
+func TestRecastSucceedsOnceReuseElapses(t *testing.T) {
+	t.Parallel()
+	const reuse = 2_000
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 3, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+					HitTime: 500, ReuseDelay: reuse, StaticHitTime: true, StaticReuse: true,
+					MPInitialConsume: 2, MPConsume: 3, SkillType: "DUMMY",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 3, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	readCastStartFrames(t, c, objID, 3, 1, 500, reuse, objID)
+	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1PreparedForReuse, 3, 1)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "recast rejection")
+	drainUntilQuiet(t, c)
+
+	srv.Advance(t, reuse*time.Millisecond)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	readCastStartFrames(t, c, objID, 3, 1, 500, reuse, objID)
+	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 20}})
+	drainUntilQuiet(t, c)
+}
+
 // TestWalkingReuseRejectionDoesNotStopMovement recasts a long-hit-time
 // skill while the caster is still walking. Reuse is a pre-movement gate, so
 // the recast must answer with the prepared-for-reuse message and leave the

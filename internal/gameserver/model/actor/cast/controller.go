@@ -190,6 +190,15 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 	c.queue = q
 }
 
+// Now reads the clock the controller's queue runs on, the one its cast
+// phases are scheduled on.
+func (c *Controller) Now() time.Time {
+	c.mu.RLock()
+	q := c.queue
+	c.mu.RUnlock()
+	return q.Now()
+}
+
 // HoldFinish keeps the active cast's Finish phase from being armed until
 // the returned release is called, and returns a no-op release when no cast
 // is in flight. Hit still runs on time; only the transition out of the cast
@@ -567,7 +576,7 @@ func (c *Controller) Interrupt(now time.Time) bool {
 // window, for callers that don't already hold `now` — the effect-driven
 // abort-cast surface (castInterrupter) uses this.
 func (c *Controller) InterruptCast() {
-	c.Interrupt(time.Now())
+	c.Interrupt(c.Now())
 }
 
 // StopCast aborts the current cast unconditionally, matching the
@@ -583,7 +592,7 @@ func (c *Controller) StopCast() {
 // AiEventType.CANCEL when canAbortCast() is true) uses this to decide
 // whether onEvtCancel's unconditional stop() applies at all.
 func (c *Controller) CanAbortCast() bool {
-	return c.CanAbort(time.Now())
+	return c.CanAbort(c.Now())
 }
 
 // CurrentSkillIsMagic reports whether the active cast's skill is a magic
@@ -595,7 +604,7 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 }
 
 // InterruptCastOnDamage applies the damage-based cast-break rule
-// (Formulas.calcCastBreak) to the active cast using time.Now(), for callers
+// (Formulas.calcCastBreak) to the active cast at c.Now(), for callers
 // outside this package that don't hold a DamageInterrupt value already.
 // Fusion reflects whether the active cast is a FUSION skill
 // (target.getFusionSkill() != null in Formulas.calcCastBreak, Formulas.java:732),
@@ -608,7 +617,7 @@ func (c *Controller) InterruptCastOnDamage(damage float64, men int, attackCancel
 	c.mu.RLock()
 	fusion := c.casting && c.current.SkillType == "FUSION"
 	c.mu.RUnlock()
-	return c.InterruptOnDamage(time.Now(), DamageInterrupt{
+	return c.InterruptOnDamage(c.Now(), DamageInterrupt{
 		Damage:       damage,
 		MEN:          men,
 		AttackCancel: attackCancel,
