@@ -54,6 +54,10 @@ type Conn struct {
 	stopOnce sync.Once
 	stopped  chan struct{}
 	closeErr error
+
+	// observeSend, when set, sees each outbound payload on the goroutine
+	// that queues it; see ObserveSends.
+	observeSend func(payload []byte)
 }
 
 func newConn(c net.Conn, log zerolog.Logger) *Conn {
@@ -190,6 +194,16 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 	c.mu.Unlock()
 	c.signal()
 	return true
+}
+
+// ObserveSends installs fn to see every frame a Session queues on c: its
+// cleartext payload, length header stripped, on the sending goroutine, before
+// the frame is encrypted and queued. It is a test seam for which goroutine
+// queued a reply — the writer goroutine owns the socket write, so nothing on
+// the wire tells. fn must not retain payload or send on c. Call it before c
+// reaches its handler; unset, a send pays only a nil check.
+func (c *Conn) ObserveSends(fn func(payload []byte)) {
+	c.observeSend = fn
 }
 
 func (c *Conn) signal() {

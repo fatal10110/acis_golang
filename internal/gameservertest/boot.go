@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -360,6 +361,7 @@ type Server struct {
 	logs             *lockedBuffer
 	queues           *queues
 	log              zerolog.Logger
+	sendObserver     *atomic.Pointer[func(payload []byte)]
 
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
@@ -1183,7 +1185,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ln.Close()
 		waitHandlers()
 	})
+	sendObserver := new(atomic.Pointer[func(payload []byte)])
 	go network.Serve(ctx, ln, func(ctx context.Context, conn *network.Conn) {
+		conn.ObserveSends(func(payload []byte) {
+			if observe := sendObserver.Load(); observe != nil {
+				(*observe)(payload)
+			}
+		})
 		handlers.Lock()
 		handlers.count++
 		handlers.Unlock()
@@ -1271,7 +1279,18 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		logs:             logs,
 		cancel:           cancel,
 		waitHandlers:     waitHandlers,
+		sendObserver:     sendObserver,
 	}
+}
+
+// ObserveSends has fn see the cleartext payload of every frame any of this
+// server's connections queues, on the goroutine that queues it, so a suite
+// can pin which task sent a reply; see network.Conn.ObserveSends. fn must
+// not retain payload. It stays installed until the test ends.
+func (s *Server) ObserveSends(tb testing.TB, fn func(payload []byte)) {
+	tb.Helper()
+	s.sendObserver.Store(&fn)
+	tb.Cleanup(func() { s.sendObserver.Store(nil) })
 }
 
 // startLoginServerAcceptor mirrors the login-side GS-LS acceptor the network

@@ -1,8 +1,9 @@
 package items
 
 import (
+	"bytes"
 	"context"
-	"sync"
+	"runtime"
 	"testing"
 	"time"
 
@@ -166,18 +167,18 @@ func TestItemListDiscardsPendingInventoryUpdates(t *testing.T) {
 }
 
 // TestItemListReplyPrecedesDrainQueuedBehindIt pins that the RequestItemList
-// reply is sent by the same queue task that builds it. The player's queue is
-// parked on a gate and the reply task is queued behind that gate, then a
-// mutation and the drain it feeds are queued behind the reply, so the
-// InventoryUpdate for a change the snapshot never saw must still reach the
-// client after that snapshot. Handing the frame back to the connection to
-// send lets the drain overtake it, and the client applies the older full
-// list last, keeping pre-drain counts until those items change again.
+// reply is queued for the client by the same player-queue task that builds
+// it, so an inventory drain queued behind that task cannot overtake the
+// snapshot it supersedes. Handing the frame back to the connection to send
+// would let the drain win, and the client would apply the older full list
+// last, keeping pre-drain counts until those items change again.
 //
-// The mutation is posted as a queue task rather than sent as a packet: the
-// connection goroutine blocks on each request it posts, so a packet sent
-// while the reply task is parked cannot be read, let alone queued, until
-// that task has already run.
+// Nothing on the wire tells the two apart — the connection's writer
+// goroutine does every socket write either way — so the send observer checks
+// the enqueuing goroutine itself, which makes the gate deterministic. The
+// observer then posts a mutation and the drain it feeds from inside the reply
+// task, placing them right behind it on the queue with no gate or sleep, and
+// the client must see the snapshot before that drain's InventoryUpdate.
 func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
@@ -185,82 +186,62 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 	potion := srv.GiveItem(t, objID, 20, 100)
 	startInWorld(t, c)
 	inv := srv.PlayerInventory(t, objID)
+	queue := srv.PlayerQueue(t, objID)
 
-	// This gate is one-directional. With the reply sent on its task the
-	// order is deterministic — reply, mutation and drain are three tasks on
-	// one FIFO queue — so the test never fails spuriously. Detecting the
-	// off-task regression is probabilistic: Conn.SendFrame only appends to
-	// the connection's outbound queue under its own mutex (conn.go:170-193)
-	// and a separate writer goroutine does the socket write, so an off-task
-	// reply differs only in which goroutine appends first, which nothing the
-	// client can observe distinguishes. Each round samples that race; the
-	// round count is what makes the inversion show up at all. Measured with
-	// the reply reverted to an off-task send, -race, 8 runs per executor
-	// mode: pool 3/8, inline 6/8 (9/16 overall). Do not read a single green
-	// run of a reverted fix as the property holding. Making this gate
-	// deterministic needs an observer at the enqueue site: issue #2422.
-	const rounds = 15
-	count := int32(100)
-	for round := range rounds {
-		// Every in-world opcode but a handful clears spawn protection on the
-		// queue first, so the request lands as two tasks: park the queue
-		// once to place that first task, then again to place the reply task
-		// itself, with the mutation and its drain queued behind it.
-		queue := srv.PlayerQueue(t, objID)
-		protectionRunning, releaseProtection := postGate(t, queue, round)
-		<-protectionRunning
-		c.Send(encodeRequestItemList())
-		time.Sleep(gateSettle)
-		replyRunning, releaseReply := postGate(t, queue, round)
-		releaseProtection()
-		<-replyRunning
-		time.Sleep(gateSettle)
-		count--
-		// Registered after the snapshot task builds, so the snapshot cannot
-		// have covered it and the drain owes the client this delta. Ticking
-		// from the same task keeps the drain on the queue right behind it,
-		// with no test-goroutine sync to let the reply win by waiting.
-		if !queue.Post(func() {
+	onTask := make(chan [2]bool, 1)
+	srv.ObserveSends(t, func(payload []byte) {
+		if len(payload) == 0 || payload[0] != serverpackets.OpcodeItemList {
+			return
+		}
+		sent := onQueueTask(queue)
+		// Posted while the reply task still runs, after its snapshot was
+		// built, so the snapshot cannot cover this change and the drain owes
+		// the client its delta.
+		posted := sent && queue.Post(func() {
 			inv.DestroyByObjectID(potion, 1)
 			srv.InventoryUpdates.Tick()
-		}) {
-			t.Fatalf("round %d: post destroy task", round)
+		})
+		select {
+		case onTask <- [2]bool{sent, posted}:
+		default: // only the first ItemList is under test
 		}
-		releaseReply()
+	})
 
-		assertItemListPrecedesInventoryUpdate(t, c, round, potion, count)
+	c.Send(encodeRequestItemList())
+	select {
+	case got := <-onTask:
+		if !got[0] {
+			t.Fatal("ItemList reply was queued off the player-queue task that built it")
+		}
+		if !got[1] {
+			t.Fatal("post destroy task behind the ItemList reply")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("no ItemList reply was queued")
 	}
+	assertItemListPrecedesInventoryUpdate(t, c, potion, 99)
 }
 
-// gateSettle is how long a round waits for the connection to post the task a
-// packet it has already been sent produces, while the queue is parked.
-const gateSettle = 200 * time.Millisecond
-
-// postGate posts a gate task to queue without waiting for it: the returned
-// channel closes once the gate is running, and release lets it finish. Work
-// posted while a gate runs stays pending, in post order, until then.
-//
-// release is idempotent and also registered with t.Cleanup, so a gate is
-// never left held by a later t.Fatalf on a path that has not reached its own
-// release yet. A gate held past the end of a test would block the executor's
-// own cleanup: under inline that cleanup waits on a pump goroutine parked
-// inside the gate, which hangs the whole package rather than failing a test.
-func postGate(t *testing.T, queue *sim.Queue, round int) (running <-chan struct{}, release func()) {
-	t.Helper()
-	started, gate := make(chan struct{}), make(chan struct{})
-	var once sync.Once
-	release = func() { once.Do(func() { close(gate) }) }
-	t.Cleanup(release)
-	if !queue.Post(func() { close(started); <-gate }) {
-		t.Fatalf("round %d: post gate task", round)
-	}
-	return started, release
+// onQueueTask reports whether the calling goroutine is running one of q's
+// tasks. sim.AssertOwner alone only proves someone drains q outside simdebug,
+// and q may already be on its next task when an off-task send happens, so the
+// caller's own stack must also be inside a queue drain (sim.drainAs; renaming
+// it fails this check loudly rather than passing it).
+func onQueueTask(q *sim.Queue) (ok bool) {
+	defer func() {
+		if recover() != nil {
+			ok = false
+		}
+	}()
+	sim.AssertOwner(q)
+	buf := make([]byte, 64<<10)
+	return bytes.Contains(buf[:runtime.Stack(buf, false)], []byte("/sim.drainAs("))
 }
 
 // assertItemListPrecedesInventoryUpdate reads until the drain's
 // InventoryUpdate for objectID, requiring the ItemList snapshot to have
 // arrived first and the drain to carry wantCount.
-func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, round int, objectID, wantCount int32) {
+func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectID, wantCount int32) {
 	t.Helper()
 	sawItemList := false
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
@@ -271,15 +252,15 @@ func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.Scripted
 			sawItemList = true
 		case frame[0] == serverpackets.OpcodeInventoryUpdate:
 			if !sawItemList {
-				t.Fatalf("round %d: InventoryUpdate arrived before the ItemList snapshot it supersedes", round)
+				t.Fatal("InventoryUpdate arrived before the ItemList snapshot it supersedes")
 			}
 			if e := findInventoryUpdate(t, [][]byte{frame}, objectID); e.count != wantCount {
-				t.Fatalf("round %d: InventoryUpdate count = %d, want %d", round, e.count, wantCount)
+				t.Fatalf("InventoryUpdate count = %d, want %d", e.count, wantCount)
 			}
 			return
 		}
 	}
-	t.Fatalf("round %d: no InventoryUpdate for the destroyed stack", round)
+	t.Fatal("no InventoryUpdate for the destroyed stack")
 }
 
 // readUntilOpcode collects frames until one carries opcode, returning every
