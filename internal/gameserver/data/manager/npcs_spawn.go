@@ -267,10 +267,11 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 // NewHostileRewarder builds the production kill-reward hook for a hostile
 // spawned outside the spawn table — the behavior-test boot uses it so kills
 // pay real experience/SP through the same death chain. Drop categories come
-// from the template and corpse-decay scheduling from its CorpseTime, so a
-// caller whose templates declare neither never reaches the decay, drop-id,
-// or ground-placement hooks this simplified signature leaves out.
-func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table) creature.Rewarder {
+// from the template, placed through ids and ground, and corpse-decay
+// scheduling from its CorpseTime, so a caller whose templates declare no
+// CorpseTime never reaches the decay hook this simplified signature leaves
+// out.
+func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) creature.Rewarder {
 	return &deathRewards{
 		hostile:    hostile,
 		state:      state,
@@ -279,6 +280,8 @@ func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.S
 		config:     config,
 		raid:       tmpl.Type == "RaidBoss",
 		items:      items,
+		ids:        ids,
+		ground:     ground,
 	}
 }
 

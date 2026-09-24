@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -62,6 +63,22 @@ func (s *Server) SpawnHostileNPCKindAt(t *testing.T, kind string, at location.Lo
 	return s.spawnHostile(t, tmpl, at, parkedAttack{})
 }
 
+// SpawnHostileNPCTemplateAt seeds a parked hostile NPC built from tmpl, for
+// suites that need template data read at spawn time, such as drop categories.
+func (s *Server) SpawnHostileNPCTemplateAt(t *testing.T, tmpl *npc.Template, at location.Location) *npc.Hostile {
+	t.Helper()
+	return s.spawnHostile(t, tmpl, at, parkedAttack{})
+}
+
+// killRewards is the fixture kill-reward config: the suite's level table and
+// stock x1 drop rates.
+func (s *Server) killRewards() gamemanager.KillRewardConfig {
+	return gamemanager.KillRewardConfig{
+		PlayerLevels: s.levelTable,
+		Rates:        item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
+	}
+}
+
 // spawnHostile builds and world-spawns a stationary hostile NPC from tmpl at
 // at, wired with attackCtl. It is the parked-stub and real-attack fixtures'
 // shared construction path (SpawnHostileNPCKindAt, SpawnAttackingHostileNPCTemplate).
@@ -87,7 +104,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		World: s.State,
 		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-			gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable),
+			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
 		Sink: network.HostileSinks(s.State)(hostile),
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
@@ -303,7 +320,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	hostile.Attach(npc.Runtime{
 		World: s.State,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-			gamemanager.KillRewardConfig{PlayerLevels: s.levelTable}, s.itemTable),
+			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
 		Sink: network.HostileSinks(s.State)(hostile),
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
