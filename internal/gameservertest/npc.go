@@ -114,14 +114,15 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 // SpawnCastingHostileNPC seeds the parked fixture monster from tmpl with the
 // production AI-cast seam installed: the cast controller runs over the
 // HostileActor adapter on the monster's own queue, and the AIController the
-// AI loop drives resolves skills through defs. Suites start a cast with
+// AI loop drives resolves skills through defs and dispatches their effects
+// through the link's HostileCastEffects, as boot wires every live monster. Suites start a cast with
 // AIController.Cast on the monster's queue, exactly as the AI loop does.
 func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs actorcast.Definitions) (*npc.Hostile, *actorcast.AIController) {
 	t.Helper()
 	hostile := s.spawnHostile(t, tmpl, hostileNPCSpawn, parkedAttack{})
 	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
 	ctl.SetQueue(hostile.Queue())
-	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Caster: hostile}
+	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
 	return hostile, aiCtl
 }
