@@ -798,29 +798,48 @@ func (inv *Inventory) DrainUpdates() []Update {
 	return out
 }
 
-// BuildAndDrainUpdates atomically snapshots inv's items, passes them to
-// build, and clears the pending-update queue only if build succeeds. Doing
-// the snapshot, build, and drain in one critical section closes two gaps at
-// once: a separate Items() call followed by DrainUpdates() would let a
-// concurrent change (the auto-feed ticker, a give/pickup on another
-// goroutine) land between the two locks and be lost, captured by neither
-// the snapshot nor a later drain; and draining before build succeeds would
-// throw away real queued deltas on a failed build (e.g. a persisted item
-// whose template never loaded), with no way to retry them later. Used
-// where a full-list snapshot must double as the update checkpoint, e.g.
-// sending PetItemList on discover.
+// BuildAndDrainUpdates snapshots inv's items and drains the pending-update
+// queue in one critical section, then passes the snapshot to build with no
+// lock held. Used where a full-list snapshot must double as the update
+// checkpoint, e.g. sending PetItemList on discover.
+//
+// Taking the snapshot and the drain together keeps a concurrent change (the
+// auto-feed ticker, a trade partner's give) from landing between them and
+// being lost: it is either inside the snapshot and drained, or queued after
+// it and delivered by the next tick. build runs unlocked, so it may call back
+// into inv. If build fails (e.g. a persisted item whose template never
+// loaded), the drained updates go back ahead of any queued since, so nothing
+// is thrown away unsent.
 func (inv *Inventory) BuildAndDrainUpdates(build func(items []*item.Instance) error) error {
 	inv.Container.mu.RLock()
-	defer inv.Container.mu.RUnlock()
 	inv.mu.Lock()
-	defer inv.mu.Unlock()
-
 	items := inv.itemsLocked()
+	drained := inv.updates
+	inv.updates = nil
+	inv.mu.Unlock()
+	inv.Container.mu.RUnlock()
+
 	if err := build(items); err != nil {
+		inv.requeueUpdates(drained)
 		return err
 	}
-	inv.updates = nil
 	return nil
+}
+
+// requeueUpdates puts drained back at the head of the queue and folds the
+// updates queued since into it with the usual coalescing.
+func (inv *Inventory) requeueUpdates(drained []Update) {
+	if len(drained) == 0 {
+		return
+	}
+	inv.mu.Lock()
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	newer := inv.updates
+	inv.updates = drained
+	for _, u := range newer {
+		inv.queueUpdateRecordLocked(u.ObjectID, u.TemplateID, u.Count, u.State)
+	}
 }
 
 // HasUpdates reports whether any inventory-change notifications are queued.
