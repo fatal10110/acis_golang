@@ -246,17 +246,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.CastFinished:
 		l.finishLiveCast(live, e.Skill)
 	case event.PetSummonRequested:
-		spawner := p.summonSpawner.Load()
-		if spawner == nil {
-			return
-		}
 		if controlItem, ok := e.ControlItem.(*item.Instance); ok {
-			spawner.SpawnPet(live.Character, controlItem)
+			(&gameSummonSpawner{link: l, live: live}).SpawnPet(live.Character, controlItem)
 		}
 	case event.ServitorSummonRequested:
-		if spawner := p.summonSpawner.Load(); spawner != nil {
-			spawner.SpawnServitor(live.Character, e.Skill)
-		}
+		(&gameSummonSpawner{link: l, live: live}).SpawnServitor(live.Character, e.Skill)
 	}
 }
 
