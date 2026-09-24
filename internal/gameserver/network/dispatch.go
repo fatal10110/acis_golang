@@ -274,7 +274,7 @@ type GameClientLinkConfig struct {
 	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
-	Effects       effect.Env
+	Effects       effect.Env // Activity required: without it no effect expires
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
@@ -330,6 +330,9 @@ type GameClientLinkConfig struct {
 func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	if cfg.Queues == nil {
 		return nil, errors.New("network: GameClientLinkConfig.Queues is required")
+	}
+	if cfg.Effects.Activity == nil {
+		return nil, errors.New("network: GameClientLinkConfig.Effects.Activity is required")
 	}
 	link := &GameClientLink{
 		validator:     cfg.Validator,

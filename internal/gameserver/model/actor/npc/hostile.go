@@ -80,9 +80,10 @@ type Hostile struct {
 	minions   map[int32]*Hostile
 	// followSlots are the eight escort points around this NPC, occupied by
 	// minion object ids (0 is empty). Only a master uses them.
-	followSlots [8]int32
-	// lastFollowingLoc is the master's position recorded after this minion's
-	// last escort step; hasLastFollow reports whether that snapshot is set.
+	followSlots [escortSlotCount]int32
+	// lastFollowingLoc is the master position this minion's last escort step
+	// laid the slots out around, taken before the move; hasLastFollow reports
+	// whether it is set.
 	lastFollowingLoc location.Location
 	hasLastFollow    bool
 
@@ -131,7 +132,11 @@ type Hostile struct {
 
 	los LineOfSight
 
-	// shotsMu guards the per-spawn NPC shot counters and charge mask.
+	// shotsMu guards the per-spawn NPC shot counters and charge mask. It is
+	// taken from other actors' queues: a hit's shot-recharge roll
+	// (registerHit) runs on the attacker's queue, and so does the Think an
+	// attacker's first hit runs (thinkIfNoMostHated), which launches this
+	// NPC's attacks and casts.
 	shotsMu            sync.RWMutex
 	currentSoulshots   int
 	currentSpiritshots int
@@ -155,7 +160,10 @@ type Hostile struct {
 	// effect (e.g. Grow) installs; nil means "use the template value".
 	collisionRadiusOverride atomic.Pointer[float64]
 
-	// skillMu guards disabledSkills, this NPC's cast reuse-delay state.
+	// skillMu guards disabledSkills, this NPC's cast reuse-delay state. The
+	// Think an attacker's first hit runs on the attacker's queue
+	// (thinkIfNoMostHated) checks and sets reuse delays through the cast
+	// controller.
 	skillMu        sync.Mutex
 	disabledSkills map[int32]time.Time
 	maxBuffsAmount atomic.Int32

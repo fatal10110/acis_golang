@@ -114,17 +114,11 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 		t.Fatal("Reset on one registry removed a list from another registry")
 	}
 
-	// leftover's owner is still alive in this scenario (Reset only fires
-	// because a *different* server tore down; this list's actor keeps
-	// playing) and lands another effect. Since leftover was already
-	// active going into Reset, this Add doesn't cross an empty->active
-	// transition on its own — the regression this guards against is
-	// Reset clearing the registry without also clearing List.tracked,
-	// which leaves a survivor believing it's still registered and makes
-	// every later Add on it a permanent no-op.
+	// Reset is teardown: a straggling Add on a reset list must not bring it
+	// back into the registry.
 	leftover.Add(newEffect(3))
-	if !e.contains(leftover) {
-		t.Fatal("a list that survived Reset never re-registered on its next Add")
+	if e.contains(leftover) {
+		t.Fatal("a list reset at teardown re-registered on a later Add")
 	}
 
 	// A fresh owner (the next test server's own NPC) must still be able to
@@ -140,4 +134,42 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// leftover — it should simply not be visited.
 	e.Tick()
 	testLoop.Run()
+}
+
+// TestEffectsUntrackedListStaysOutAfterStragglerTask covers a despawned
+// actor whose queue still runs work accepted before Close: removing one of
+// two held effects, or landing a new one, must not re-register its list.
+func TestEffectsUntrackedListStaysOutAfterStragglerTask(t *testing.T) {
+	e := NewEffects()
+	newEffect := func(id int) *effect.Effect {
+		eff, err := effect.New(effect.Skill{ID: modelskill.ID(id)}, modelskill.EffectTemplate{Name: "Buff"})
+		if err != nil {
+			t.Fatalf("effect.New: %v", err)
+		}
+		return eff
+	}
+
+	q := testLoop.NewQueue("despawned")
+	list := effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
+	list.SetQueue(q)
+	first := newEffect(1)
+	list.Add(first)
+	list.Add(newEffect(2))
+	if !e.contains(list) {
+		t.Fatal("list not registered after Add")
+	}
+
+	if !q.Post(func() { list.Remove(first) }) || !q.Post(func() { list.Add(newEffect(3)) }) {
+		t.Fatal("open queue refused a post")
+	}
+	list.Untrack()
+	q.Close()
+	testLoop.Run()
+
+	if got := len(list.All()); got != 2 {
+		t.Fatalf("straggler tasks did not run: list holds %d effects, want 2", got)
+	}
+	if e.contains(list) {
+		t.Fatal("untracked list re-registered from a task accepted before its queue closed")
+	}
 }

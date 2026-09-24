@@ -115,7 +115,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 
 	clock := npcQueues()
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, clock)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, clock)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestNpcMovementCapsAtWaterSurface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, npcQueues(), zones)
+	_, err = NewNpcs(NewSpawns(table, nil), walkerTestTemplate(), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), zones)
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, npcQueues())
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 
 	clock := npcQueues()
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, clock); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, clock); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 
@@ -415,7 +415,7 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 	}
 
 	if _, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, npcQueues()); err != nil {
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues()); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 

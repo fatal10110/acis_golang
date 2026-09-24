@@ -10,7 +10,9 @@ import (
 
 // overhitState records one lethal overhit strike against a hostile NPC.
 // A playable caster's overhit skill arms it; the next HP reduction then
-// either stores the excess damage or clears the flag.
+// either stores the excess damage or clears the flag. mu is taken from
+// other actors' queues: the caster arms it (EnableOverhit), the attacker's
+// HP reduction tests it, and the killer's reward reads it.
 type overhitState struct {
 	mu       sync.Mutex
 	enabled  bool

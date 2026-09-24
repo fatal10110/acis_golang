@@ -42,9 +42,14 @@ type ActivityRegistry interface {
 
 // Env is one server's context for its effect lists: the ticker that drives
 // them and the gameplay settings they read. The composition root builds it
-// once from config. The zero value is the shipped default: no ticker,
-// CancelLesserEffect on, always day.
+// once from config. Apart from Activity, the zero value is the shipped
+// default: CancelLesserEffect on, always day.
 type Env struct {
+	// Activity is the ticker that runs periodic actions and expiry. A list
+	// built without one is never ticked, so its effects never expire, never
+	// send their removal packets, and never recalculate stats; only tests
+	// that drive List.Tick themselves may leave it nil. Production
+	// constructors reject a nil Activity.
 	Activity ActivityRegistry
 	// KeepLesser is CancelLesserEffect=false: a newly stacked non-herb
 	// effect leaves the lower-priority effect it displaces queued instead
@@ -77,6 +82,11 @@ func (l *List) IsNight() bool {
 // does not run any effect's exit hook or otherwise touch buffs/debuffs,
 // only stops future Tick calls from reaching this list.
 //
+// Untrack is terminal: a later Add or Remove never registers l again. A
+// tick or skill task accepted onto the owner's queue before it closed still
+// runs after Untrack, and without this a straggler that leaves l holding an
+// effect would re-register a departed actor's list for the rest of uptime.
+//
 // Like notifyActivityTransition, it decides and applies under one hold of
 // l.mu so it can't race a concurrent Add/Remove on the same list into
 // re-registering it right after Untrack deregisters it, or vice versa.
@@ -87,6 +97,7 @@ func (l *List) Untrack() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
+	l.untracked = true
 	if !l.tracked {
 		return
 	}
@@ -103,7 +114,7 @@ func (l *List) emptyLocked() bool {
 }
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, tracked, and callbacks
+// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, and callbacks
 // into owner.
 type List struct {
 	mu sync.Mutex
@@ -122,6 +133,8 @@ type List struct {
 	// reconcile against l's own last-known state instead of a value a
 	// caller captured before releasing mu — see notifyActivityTransition.
 	tracked bool
+	// untracked records that Untrack ran; l never registers again.
+	untracked bool
 
 	// queue is the owner's queue: periodic effect actions run on it and
 	// effect periods are measured on its clock. Set once before the owner is

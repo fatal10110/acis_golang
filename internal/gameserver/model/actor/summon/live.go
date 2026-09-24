@@ -171,9 +171,13 @@ type Actor struct {
 	abnormalEffect  atomic.Int32
 	ownerDiscovered atomic.Bool
 
-	shotsMu        sync.Mutex
-	shotsMask      int32
-	skillMu        sync.Mutex // guards disabledSkills
+	// shotsMu is taken from another actor's queue: Betray, applied by its
+	// caster, makes the summon attack its owner there (TryToAttack), and
+	// the attack launch reads the shot mask.
+	shotsMu   sync.Mutex
+	shotsMask int32
+	// disabledSkills is queue-owned: only this summon's casts, started by
+	// the owner's commands or its own AI on the owner's queue, touch it.
 	disabledSkills map[int32]time.Time
 }
 
