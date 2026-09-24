@@ -315,16 +315,16 @@ func newTestLink(t *testing.T, allowNewServers bool) (addr string, l *GameServer
 	return newTestLinkCommon(t, allowNewServers, nil, nil)
 }
 
-func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations *sql.GameServerStore) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+func newTestLinkCommon(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations *sql.GameServerStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 	var store registrationStore
 	if registrations != nil {
 		store = registrations
 	}
-	return newTestLinkWithRegistrationStore(t, allowNewServers, accounts, store)
+	return newTestLinkWithRegistrationStore(t, allowNewServers, accounts, store, configure...)
 }
 
-func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations registrationStore) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
+func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accounts *sql.AccountStore, registrations registrationStore, configure ...func(*GameServerLink)) (addr string, l *GameServerLink, servers *manager.ServerRegistry, sessions *manager.SessionStore, bans *manager.IPBanList) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -350,6 +350,9 @@ func newTestLinkWithRegistrationStore(t *testing.T, allowNewServers bool, accoun
 	bans = manager.NewIPBanList(zerolog.Nop())
 
 	l = NewGameServerLink(servers, names, keys, sessions, bans, accounts, registrations, allowNewServers, nil, NewLinkRoster(), zerolog.Nop())
+	for _, fn := range configure {
+		fn(l)
+	}
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

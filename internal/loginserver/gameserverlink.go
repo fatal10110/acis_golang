@@ -35,6 +35,9 @@ type GameServerLink struct {
 	flood           *netutil.FloodGuard
 	roster          *LinkRoster
 	log             zerolog.Logger
+
+	// lookupHost resolves a registering server's advertised host name.
+	lookupHost func(string) ([]string, error)
 }
 
 type registrationStore interface {
@@ -71,6 +74,7 @@ func NewGameServerLink(
 		flood:           flood,
 		roster:          roster,
 		log:             log,
+		lookupHost:      net.LookupHost,
 	}
 }
 
@@ -285,9 +289,10 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 	persist := false
 	host := auth.HostName
 	if host != "*" {
-		if resolved, err := net.LookupHost(host); err == nil && len(resolved) > 0 {
+		if resolved, err := l.lookupHost(host); err == nil && len(resolved) > 0 {
 			host = resolved[0]
 		} else {
+			l.log.Error().Str("host", host).Err(err).Msg("gameserver link: couldn't resolve hostname")
 			host = c.remoteIP.String()
 		}
 	} else {
