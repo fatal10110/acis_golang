@@ -196,10 +196,11 @@ func (a *Actor) despawn(state *world.State) {
 		a.emit(event.Unsummoning{})
 		// RemoveSummon runs before Despawn: Despawn's relocate step
 		// synchronously fires the owner's Forget callback, which sends the
-		// client-visible PetDelete frame. A caller (or a test synchronizing on
-		// that frame, as TestGameClientLinkRoutesSummonActionUseToLiveSummon
-		// does) must never observe world.State.Summon still reporting this
-		// actor active once the client has been told it's gone.
+		// client-visible PetDelete frame. A caller synchronizing on that frame
+		// must never observe world.State.Summon still reporting this actor
+		// active once the client has been told it's gone. The object registry
+		// is different: Despawn drops it only after the Forget callbacks, so
+		// State.Object can still report the summon until Despawn returns.
 		state.RemoveSummon(a.OwnerID())
 		state.Despawn(a)
 		// Stop the periodic effect sweep from reaching this summon's list

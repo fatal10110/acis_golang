@@ -119,15 +119,6 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return false
 	}
 
-	// The spawner is created here rather than at world-enter time
-	// (mirroring castController's own lazy-build-on-first-use), since no
-	// other production path needs one before a pet-collar item is actually
-	// used — but only on the first use, not every one: link/live never
-	// change for the life of the connection.
-	if live.summonSpawner.Load() == nil {
-		live.summonSpawner.Store(&gameSummonSpawner{link: l, live: live})
-	}
-
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,

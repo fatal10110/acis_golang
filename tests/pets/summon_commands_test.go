@@ -1,10 +1,19 @@
 package pets
 
 import (
+	"context"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // TestPetAttackCommandSendsPetAgainstTarget targets a monster and presses
@@ -127,4 +136,68 @@ func TestWyvernCollarMountsPlayer(t *testing.T) {
 	if _, ok := h.srv.State.Summon(h.ownerID); ok {
 		t.Fatal("mounting registered a summon, want none")
 	}
+}
+
+// TestUnsummonShortcutDismissesServitor casts a servitor SUMMON skill on a
+// fresh session (no pet collar used first) and presses the unsummon
+// shortcut: the owner gets PetDelete, and both the owner's summon slot and
+// the object registry drop the servitor.
+func TestUnsummonShortcutDismissesServitor(t *testing.T) {
+	t.Parallel()
+	const (
+		summonCatSkill = 1111
+		catNPCID       = 12600
+	)
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
+		ID: summonCatSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "SUMMON", NpcID: catNPCID, SummonTotalLifeTime: 1_200_000,
+		StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
+	}}), gamesql.NewCharacterSkillStore(db))
+	cat := &npc.Template{
+		ID: catNPCID, TemplateID: catNPCID, Type: "Servitor", Name: "Kat the Cat", Level: 20,
+		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
+		CollisionRadius: 8, CollisionHeight: 20,
+	}
+	srv := bootPets(t,
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{cat})),
+		gameservertest.WithSkills(skills))
+	c, ownerID := srv.Client, srv.SoleObjectID(t)
+	if err := srv.KnownSkills.SetKnownSkill(context.Background(), ownerID, 0, summonCatSkill, 1); err != nil {
+		t.Fatalf("seed known skill: %v", err)
+	}
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(summonCatSkill))
+	var servitor *summon.Actor
+	srv.AdvanceUntil(t, "servitor in world state", func() bool {
+		obj, ok := srv.State.Summon(ownerID)
+		if ok {
+			servitor, ok = obj.(*summon.Actor)
+		}
+		return ok
+	})
+	drainUntilQuiet(t, c)
+
+	// Despawn sends PetDelete before it clears the object registry; the
+	// harness read returns only once the server has finished the request.
+	c.Send(encodeRequestActionUse(petUnsummonAction, false))
+	frames := readUntilOpcode(t, c, serverpackets.OpcodePetDelete, "PetDelete")
+	if got := wire.NewReader(frames[len(frames)-1][1:]).ReadInt32(); got != 1 {
+		t.Fatalf("PetDelete summon type = %d, want 1 (servitor)", got)
+	}
+	if _, ok := srv.State.Summon(ownerID); ok {
+		t.Fatal("owner still has an active summon after unsummon")
+	}
+	if _, ok := srv.State.Object(servitor.ObjectID()); ok {
+		t.Fatalf("servitor %d still in the object registry after unsummon", servitor.ObjectID())
+	}
+}
+
+func encodeRequestMagicSkillUse(skillID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
+	w.WriteInt32(skillID)
+	w.WriteInt32(0) // ctrl
+	w.WriteUint8(0) // shift
+	return w.Bytes()
 }

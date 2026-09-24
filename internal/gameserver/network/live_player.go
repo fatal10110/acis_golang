@@ -43,10 +43,6 @@ type livePlayer struct {
 	move     *move.Controller
 	combat   *ai.PlayerAttack
 	cast     *actorcast.Controller
-	// summonSpawner is the pet/servitor spawner summon-request events reach.
-	// useSummonItem creates it on the first pet-collar use, from the
-	// connection goroutine; the cast timer goroutine reads it.
-	summonSpawner atomic.Pointer[gameSummonSpawner]
 	// petRestoreInFlight is set while a summon cast that has already hit is
 	// still waiting for its pets-row read, and cleared when that read lands
 	// however it ends.
