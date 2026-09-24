@@ -91,6 +91,10 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithPersistWait(200*time.Millisecond),
+		// The wait budget is a wall-clock deadline on the connection
+		// goroutine; on a driven clock the read below would let virtual time
+		// pass while the budget has not.
+		gameservertest.WithRealPool(),
 	)
 	startInWorld(t, srv.Client)
 	objID := srv.SoleObjectID(t)
@@ -112,6 +116,10 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 
 	release()
 	srv.FlushPersistence(t)
+	// A selection that kept waiting instead of giving up answers now.
+	if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
+		t.Fatalf("refused selection answered %#x once the lane drained: it waited past its budget", frame[0])
+	}
 	c.Send(encodeRequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
