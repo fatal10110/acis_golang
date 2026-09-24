@@ -407,6 +407,11 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
    `item.Instance` locks deleted (mutated only under the owning inventory's mutex). Closes #2261:
    `BuildAndDrainUpdates` returns the batch under `inv.mu` and the caller runs its callback after
    unlock, on the owner queue.
+   *Landed as:* `BuildAndDrainUpdates` snapshots the items and drains the queue under both
+   container locks, runs the build unlocked, and puts the drained updates back on a failed build.
+   The `item.Instance` lock stays: the item-persistence flush reads instances on a persistence
+   lane, and a relogging session claims pending rows from its connection goroutine, so it is not
+   owner-queue state. `Container.mu` and `Inventory.mu` stay as containers.
 6. `zone` actor/flags (2) — `network.liveZoneActor.mu` may be dead weight, `zone.Flags` keeps its
    paired-read reason from #776 unless the single-goroutine caller removes it. (The `world` collapse
    moved to Phase 0.)

@@ -488,8 +488,9 @@ func (p *livePlayer) inventoryItems() []*item.Instance {
 	return p.items
 }
 
-// buildItemList builds the full inventory snapshot frame and drops the
-// pending inventory-update queue in the same critical section.
+// buildItemList snapshots the inventory and drops the pending
+// inventory-update queue in one critical section, then builds the full
+// snapshot frame unlocked.
 //
 // The reference's ItemList constructor clears the update list before it
 // reads the item set, so a full snapshot supersedes and discards the deltas

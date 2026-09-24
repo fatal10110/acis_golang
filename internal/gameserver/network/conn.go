@@ -42,11 +42,12 @@ type Conn struct {
 	net.Conn
 	log zerolog.Logger
 
-	// mu guards queue, pending and closed. It is held only to append to or
-	// swap out the queue, never across I/O.
+	// mu guards queue, pending, sealed and closed. It is held only to append
+	// to or swap out the queue, never across I/O.
 	mu      sync.Mutex
 	queue   []wire.Frame
-	pending int // frameCost of every frame queued or being written
+	pending int  // frameCost of every frame queued or being written
+	sealed  bool // sendLast queued the final frame; later sends are dropped
 	closed  bool
 
 	wake     chan struct{} // capacity 1: queue gained frames or closed was set
@@ -184,7 +185,7 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 	}
 	cost := frameCost(frame)
 	c.mu.Lock()
-	if c.closed {
+	if c.closed || c.sealed {
 		c.mu.Unlock()
 		frame.Release()
 		return false
@@ -197,6 +198,29 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 	}
 	c.queue = append(c.queue, frame)
 	c.pending += cost
+	c.mu.Unlock()
+	c.signal()
+	return true
+}
+
+// sendLast queues frame as the last one the peer receives: every later
+// SendFrame and sendLast is dropped. Frames queued ahead of it are still
+// written, and Close still flushes it before closing the socket. It reports
+// false, releasing frame, when the connection is already sealed or closed.
+func (c *Conn) sendLast(frame wire.Frame) bool {
+	if frame.Err() != nil {
+		frame.Release()
+		return false
+	}
+	c.mu.Lock()
+	if c.closed || c.sealed {
+		c.mu.Unlock()
+		frame.Release()
+		return false
+	}
+	c.queue = append(c.queue, frame)
+	c.pending += frameCost(frame)
+	c.sealed = true
 	c.mu.Unlock()
 	c.signal()
 	return true
