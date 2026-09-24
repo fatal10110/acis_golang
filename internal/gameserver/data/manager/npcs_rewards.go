@@ -102,7 +102,10 @@ func (d *deathRewards) rewardEntries(threats []attackable.Threat) ([]playerRewar
 	var maxDealer *player.Character
 
 	for _, threat := range threats {
-		if threat.Damage <= 1 || !d.inPartyRange(threat.Attacker) {
+		// An attacker the victim no longer knows (logged out, unsummoned,
+		// gone out of sight) has left the fight; its entry only lingers
+		// until the next AI refresh.
+		if threat.Damage <= 1 || !d.hostile.Knows(threat.Attacker) || !d.inPartyRange(threat.Attacker) {
 			continue
 		}
 		attacker, ok := actingCharacter(threat.Attacker)

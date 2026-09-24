@@ -194,28 +194,115 @@ func TestPetDamageMakesOwnerTopDealer(t *testing.T) {
 	assertDropOwner(t, h.srv, h.ownerID)
 }
 
-// TestLoggedOutTopDealerForfeitsDrops hands the drop to the killer's owner
-// when the top dealer logged out before the kill.
-func TestLoggedOutTopDealerForfeitsDrops(t *testing.T) {
+// TestDepartedAttackerLeavesTheFight drops an attacker that left before the
+// kill from the reward: the one who stayed earns the whole 5000/25 and the
+// drop, however much the departed attacker dealt.
+func TestDepartedAttackerLeavesTheFight(t *testing.T) {
 	t.Parallel()
-	h, pet := bootRewardPet(t, -1)
-	second, secondID := joinSecondPlayer(t, h.srv)
-	monster := h.spawnRewardMonster(t)
+	t.Run("top dealer logged out", func(t *testing.T) {
+		t.Parallel()
+		h, _ := bootRewardPet(t, -1)
+		second, secondID := joinSecondPlayer(t, h.srv)
+		monster := h.spawnRewardMonster(t)
 
-	monster.TakeDamage(600, onlinePlayer(t, h.srv, secondID))
-	second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
-	if !second.AwaitClose(2 * time.Second) {
-		t.Fatal("logout did not close the connection")
-	}
-	h.srv.AdvanceUntil(t, "second player left world", func() bool {
-		_, ok := h.srv.State.Player(secondID)
-		return !ok
+		monster.TakeDamage(600, onlinePlayer(t, h.srv, secondID))
+		second.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+		if !second.AwaitClose(2 * time.Second) {
+			t.Fatal("logout did not close the connection")
+		}
+		h.srv.AdvanceUntil(t, "second player left world", func() bool {
+			_, ok := h.srv.State.Player(secondID)
+			return !ok
+		})
+		if !monster.TakeDamage(400, onlinePlayer(t, h.srv, h.ownerID)) {
+			t.Fatal("owner's hit did not kill the monster")
+		}
+
+		assertDropOwner(t, h.srv, h.ownerID)
+		if exp, sp := earnedExpSp(t, drainFrames(t, h.client)); exp != rewardMonsterExp || sp != rewardMonsterSp {
+			t.Fatalf("owner earned %d exp %d SP, want %d/%d", exp, sp, rewardMonsterExp, rewardMonsterSp)
+		}
 	})
-	if !monster.TakeDamage(int(monster.CurrentHP()), pet) {
-		t.Fatal("pet's hit did not kill the monster")
-	}
+	t.Run("top dealer's pet unsummoned", func(t *testing.T) {
+		t.Parallel()
+		h, pet := bootRewardPet(t, -1)
+		second, secondID := joinSecondPlayer(t, h.srv)
+		monster := h.spawnRewardMonster(t)
+		drainUntilQuiet(t, second)
 
-	assertDropOwner(t, h.srv, h.ownerID)
+		monster.TakeDamage(600, pet)
+		h.returnPet(t)
+		if !monster.TakeDamage(400, onlinePlayer(t, h.srv, secondID)) {
+			t.Fatal("second player's hit did not kill the monster")
+		}
+
+		assertDropOwner(t, h.srv, secondID)
+		if exp, sp := earnedExpSp(t, drainFrames(t, second)); exp != rewardMonsterExp || sp != rewardMonsterSp {
+			t.Fatalf("second player earned %d exp %d SP, want %d/%d", exp, sp, rewardMonsterExp, rewardMonsterSp)
+		}
+	})
+}
+
+// TestRewardRangeMeasuresTheAttackersBody counts an attacker only within
+// the 1500 party range of the victim, body to body in 3D, measured from the
+// attacker itself: a pet in range credits its owner even when the owner
+// stands out of range.
+func TestRewardRangeMeasuresTheAttackersBody(t *testing.T) {
+	t.Parallel()
+	const partyRange = 1500
+	cases := []struct {
+		name string
+		// offset places the monster along +x from the owner; the pet
+		// stands 40 units along +x from the owner.
+		offset  func(reach float64) int
+		byPet   bool
+		counted bool
+	}{
+		{"owner at the edge", func(reach float64) int { return int(reach) }, false, true},
+		{"owner one unit past the edge", func(reach float64) int { return int(reach) + 1 }, false, false},
+		{"pet in range, owner out", func(reach float64) int { return int(reach) + 30 }, true, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h, pet := bootRewardPet(t, 50)
+			owner := onlinePlayer(t, h.srv, h.ownerID)
+			ox, oy, oz := owner.Position()
+			if px, py, pz := pet.Position(); px != ox+40 || py != oy || pz != oz {
+				t.Fatalf("pet at (%d,%d,%d), want 40 along +x from the owner at (%d,%d,%d)", px, py, pz, ox, oy, oz)
+			}
+			tmpl := rewardMonsterTemplate()
+			reach := float64(partyRange) + tmpl.CollisionRadius + owner.CollisionRadius()
+			monster := h.srv.SpawnHostileNPCTemplateAt(t, tmpl, location.Location{X: ox + tc.offset(reach), Y: oy, Z: oz})
+			drainUntilQuiet(t, h.client)
+			if !monster.Knows(owner) || !monster.Knows(pet) {
+				t.Fatal("monster does not know the owner and pet")
+			}
+
+			var attacker attackable.Combatant = owner
+			if tc.byPet {
+				attacker = pet
+			}
+			if !monster.TakeDamage(1000, attacker) {
+				t.Fatal("hit did not kill the monster")
+			}
+
+			gain := findSystemMessage(t, drainFrames(t, h.client), serverpackets.SystemMessageYouEarnedS1ExpAndS2SP)
+			if !tc.counted {
+				if gain != nil {
+					t.Fatal("out-of-range attacker earned exp")
+				}
+				return
+			}
+			if gain == nil {
+				t.Fatal("in-range attacker earned no exp")
+			}
+			// The expType-50 pet keeps half either way: round(5000*0.5), 25-13.
+			if exp, sp := earnedExpSp(t, [][]byte{gain}); exp != 2500 || sp != 12 {
+				t.Fatalf("owner earned %d exp %d SP, want 2500/12", exp, sp)
+			}
+		})
+	}
 }
 
 // TestPetOverhitGrantsOwnerBonus pays a pet's overhit to its owner: damage
