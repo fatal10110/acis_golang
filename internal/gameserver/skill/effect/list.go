@@ -57,9 +57,13 @@ func WithCancelLesser(cancel bool) Option {
 
 // WithClock makes a list that runs on no queue of its own read the time
 // from q's clock, so its effect periods follow the same clock as the timers
-// of q's owner.
+// of q's owner. A nil q keeps the default.
 func WithClock(q *sim.Queue) Option {
-	return func(l *List) { l.clock = q }
+	return func(l *List) {
+		if q != nil {
+			l.clock = q
+		}
+	}
 }
 
 // ActivityRegistry records whether a list has effects to tick.

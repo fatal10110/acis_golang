@@ -2875,3 +2875,14 @@ type deadTarget struct {
 func (*deadTarget) Dead() bool { return true }
 
 func (a fakeConditionActor) CurrentHeading() int { return 0 }
+
+// TestWithClockNilKeepsTheDefaultClock covers a caster whose Queue() is nil:
+// WithClock(nil) must not install a nil clock the list then reads on its
+// first add.
+func TestWithClockNilKeepsTheDefaultClock(t *testing.T) {
+	e := &Effect{Skill: Skill{ID: 1}, Template: modelskill.EffectTemplate{Name: "test", Count: 1, Time: 1}}
+	NewList(&funcOwner{}, WithClock(nil)).Add(e)
+	if !e.InUse() {
+		t.Fatal("effect not in use after Add on a WithClock(nil) list")
+	}
+}

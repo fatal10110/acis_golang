@@ -181,11 +181,13 @@ func TestRuntime_ActionIsIdempotent(t *testing.T) {
 	fireCount := 0
 	r := NewRuntime(Storm, 1, 30, time.Second, func() { fireCount++ }, func() {}, q)
 
+	// A second Action() halfway through the interval must not restart it.
 	r.Action()
+	in.Advance(500 * time.Millisecond)
 	r.Action()
-	in.Advance(time.Second)
+	in.Advance(500 * time.Millisecond)
 	if fireCount != 1 {
-		t.Fatalf("fireCount after Action() twice and one interval = %d, want 1 (idempotent)", fireCount)
+		t.Fatalf("fireCount one interval after the first Action() = %d, want 1 (a repeat Action() does not restart the tick)", fireCount)
 	}
 }
 
