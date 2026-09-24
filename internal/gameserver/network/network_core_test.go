@@ -98,6 +98,13 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 	if len(failure) == 0 || failure[0] != serverpackets.OpcodeAuthLoginFail {
 		t.Fatalf("AuthLoginFail = %x, want cleartext opcode %#x", failure, serverpackets.OpcodeAuthLoginFail)
 	}
+	closing, err := wire.ReadFrame(client)
+	if err != nil {
+		t.Fatalf("read ServerClose: %v", err)
+	}
+	if len(closing) == 0 || closing[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("ServerClose = %x, want cleartext opcode %#x", closing, serverpackets.OpcodeServerClose)
+	}
 	<-done
 }
 

@@ -194,6 +194,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			ok, err := l.authenticate(ctx, client, req)
 			if err != nil || !ok {
+				// A rejection already answered AuthLoginFail; it also closes
+				// with ServerClose. A canceled wait or a lost login link
+				// closes silently.
+				if err == nil {
+					client.closeNow()
+				}
 				return
 			}
 			session.CompleteHandshake()
@@ -396,6 +402,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			entering = c
 
 		case clientpackets.OpcodeEnterWorld:
+			// Unreachable while the state gate admits EnterWorld only in
+			// StateEntering, which character selection enters together with
+			// entering; closed like any other failed entry if that changes.
 			if entering == nil {
 				client.closeNow()
 				return
@@ -406,6 +415,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			entered, ok := l.enterWorld(ctx, client, entering)
 			live = entered
 			if !ok {
+				client.closeNow()
 				return
 			}
 			client.SetState(StateInGame)

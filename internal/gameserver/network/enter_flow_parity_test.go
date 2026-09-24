@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -312,6 +313,74 @@ func TestMalformedInGamePacketPastThresholdClosesWithServerClose(t *testing.T) {
 	}
 
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeMoveBackwardToLocation))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
+}
+
+// TestUnknownExtendedOpcodeInGameClosesWithServerClose pins the in-game
+// unmapped extended sub-opcode against the unknown-packet threshold: the
+// window tolerates maxUnknownPerMin and the next one closes the connection
+// with ServerClose as its last frame.
+func TestUnknownExtendedOpcodeInGameClosesWithServerClose(t *testing.T) {
+	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+
+	for i := 0; i < maxUnknownPerMin; i++ {
+		c.Send(encodeUnknownExtendedOpcode())
+	}
+	// Still dispatching: manor list answers.
+	c.Send(encodeRequestManorList())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-unknown opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
+	}
+
+	c.Send(encodeUnknownExtendedOpcode())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
+}
+
+// TestFailedEnterWorldClosesWithServerClose pins that an EnterWorld whose
+// setup fails (here: the item list cannot be read) closes the connection
+// with ServerClose, not a bare EOF.
+func TestFailedEnterWorldClosesWithServerClose(t *testing.T) {
+	c, _, items, _ := newLinkedGameClientSeedOneChar(t)
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+
+	items.failListByOwner(errors.New("items unavailable"))
+	c.Send(encodeEnterWorld())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
+}
+
+// TestRejectedAuthLoginClosesWithServerClose pins the login server's
+// rejection of an AuthLogin: AuthLoginFail, then ServerClose, then EOF.
+func TestRejectedAuthLoginClosesWithServerClose(t *testing.T) {
+	loginAddr, servers, _ := newTestLoginServer(t, false)
+	servers.Register(1, testHexID)
+	validator := NewSessionValidator()
+	auth := LoginServerAuth{ServerID: 1, HexID: testHexID, HostName: "*", Port: 7777, MaxPlayers: 300}
+	loginLink, err := DialLoginLink(context.Background(), loginAddr, auth, LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("DialLoginLink: %v", err)
+	}
+	t.Cleanup(func() { loginLink.Close() })
+	addr, _, _, _ := newTestGameClientLink(t, func() *LoginLink { return loginLink }, validator)
+
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
+	// No session is registered on the login server, so it rejects the keys.
+	c.Send(encodeAuthLogin("player1", link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeAuthLoginFail {
+		t.Fatalf("reply opcode = %#x, want AuthLoginFail (%#x)", frame[0], serverpackets.OpcodeAuthLoginFail)
+	}
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
 		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
 	}

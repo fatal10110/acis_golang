@@ -2,6 +2,7 @@ package network
 
 import (
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,6 +46,61 @@ func TestPreAuthUnknownOpcodeClosesWithServerClose(t *testing.T) {
 	c.Send(encodeSingleOpcode(0xfe))
 	if got := c.Read(); got[0] != serverpackets.OpcodeServerClose {
 		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", got[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
+}
+
+// TestTooManyFloodsClosesWithServerClose drives three floods inside one
+// minute on a stepped packet-accounting clock. Each flood onset answers
+// ActionFailed; once the third clears, the next packet that would run closes
+// the connection with ServerClose as its last frame.
+func TestTooManyFloodsClosesWithServerClose(t *testing.T) {
+	var clock atomic.Int64
+	testLinkNow = func() time.Time { return time.Unix(0, clock.Load()) }
+	defer func() { testLinkNow = nil }()
+	c, _, _, _ := newLinkedGameClient(t)
+
+	// A create whose name always fails validation answers CharCreateFail
+	// whenever it runs, so every send gets exactly one reply.
+	create := encodeRequestCharacterCreate("!!", 0, 0, 0, 1, 0, 0)
+	flood := func() {
+		t.Helper()
+		for range 2 * maxPacketsPerSecond {
+			c.Send(create)
+			switch op := c.Read()[0]; op {
+			case serverpackets.OpcodeActionFailed:
+				return
+			case serverpackets.OpcodeCharCreateFail:
+			default:
+				t.Fatalf("opcode %#x while flooding, want CharCreateFail or ActionFailed", op)
+			}
+		}
+		t.Fatal("flood never detected")
+	}
+	// quiet steps the clock one second per packet until the flood clears,
+	// returning the reply of the first packet that is not dropped.
+	quiet := func() byte {
+		t.Helper()
+		for range 2 * floodMeasureInterval {
+			clock.Add(int64(1100 * time.Millisecond))
+			c.Send(create)
+			if op := c.Read()[0]; op != serverpackets.OpcodeActionFailed {
+				return op
+			}
+		}
+		t.Fatal("flood never cleared")
+		return 0
+	}
+
+	for i := range maxFloodsPerMin {
+		flood()
+		if op := quiet(); op != serverpackets.OpcodeCharCreateFail {
+			t.Fatalf("after flood %d: opcode %#x, want CharCreateFail", i+1, op)
+		}
+	}
+	flood()
+	if op := quiet(); op != serverpackets.OpcodeServerClose {
+		t.Fatalf("after flood %d: opcode %#x, want ServerClose (%#x)", maxFloodsPerMin+1, op, serverpackets.OpcodeServerClose)
 	}
 	c.ExpectClosed()
 }
