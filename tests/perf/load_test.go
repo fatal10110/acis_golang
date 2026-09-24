@@ -67,6 +67,7 @@ func TestLoadBaseline(t *testing.T) {
 		gameservertest.WithCharacter("Perf0", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithProductionTickers(),
+		gameservertest.WithRealPool(), // measures the production executor
 	)
 	conns := []*testsupport.ScriptedClient{srv.Client}
 	ids := []int32{srv.SoleObjectID(t)}

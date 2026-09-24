@@ -61,6 +61,9 @@ type Conn struct {
 	// observeRead, when set, runs before each wait for an inbound frame;
 	// see ObserveReads.
 	observeRead func()
+	// observePersistWait, when set, brackets each wait for queued saves;
+	// see ObservePersistWaits.
+	observePersistWait func(owners []int32) (done func())
 }
 
 func newConn(c net.Conn, log zerolog.Logger) *Conn {
@@ -216,6 +219,17 @@ func (c *Conn) ObserveSends(fn func(payload []byte)) {
 // handler; unset, a read pays only a nil check.
 func (c *Conn) ObserveReads(fn func()) {
 	c.observeRead = fn
+}
+
+// ObservePersistWaits installs fn to run on the reading goroutine each time
+// the handler of a frame read from c starts waiting for the saves queued for
+// owners (every owner when owners is empty); the func fn returns runs once
+// that wait ends. It is a test seam for knowing a frame's handler is parked
+// on the persistence worker rather than still working. fn must not retain
+// owners. Call it before c reaches its handler; unset, a wait pays only a nil
+// check.
+func (c *Conn) ObservePersistWaits(fn func(owners []int32) (done func())) {
+	c.observePersistWait = fn
 }
 
 func (c *Conn) signal() {

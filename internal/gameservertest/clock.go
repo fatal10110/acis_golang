@@ -14,10 +14,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-// Advance lets d pass for the actor queues. On a driven clock (DriveClock)
-// it first lets the server catch up (see catchUp), then moves the Inline
-// clock by d and runs every timer and task that comes due, without waiting;
-// on an executor that follows the wall clock it sleeps for d. Either way the
+// Advance lets d pass for the actor queues. On the inline executor it first
+// lets the server catch up (see catchUp), then moves the Inline clock by d
+// and runs every timer and task that comes due, without waiting; on the
+// real pool it sleeps for d. Either way the
 // tasks posted by then have run when it returns.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
@@ -32,8 +32,8 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	s.Settle(tb)
 }
 
-// DrivesClock reports whether the test moves the actor queues' clock
-// (DriveClock) rather than the wall clock doing it.
+// DrivesClock reports whether the test moves the actor queues' clock (the
+// inline executor) rather than the wall clock doing it (the real pool).
 func (s *Server) DrivesClock() bool { return s.queues.advance != nil }
 
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
@@ -70,6 +70,9 @@ type connTraffic struct {
 	waits atomic.Int64 // reads started: frames fully handled + 1
 	sent  atomic.Int64 // frames queued to the client
 	done  atomic.Bool  // the connection's handler returned
+	// parked holds the owners whose saves the handler is waiting for (empty:
+	// every owner), nil while it is not waiting.
+	parked atomic.Pointer[[]int32]
 }
 
 // track starts counting conn's frames; the returned func marks it closed.
@@ -82,6 +85,11 @@ func (t *traffic) track(conn *network.Conn) (sent func(), done func()) {
 	t.conns[conn.RemoteAddr().String()] = ct
 	t.mu.Unlock()
 	conn.ObserveReads(func() { ct.waits.Add(1) })
+	conn.ObservePersistWaits(func(owners []int32) func() {
+		owners = append([]int32{}, owners...)
+		ct.parked.Store(&owners)
+		return func() { ct.parked.Store(nil) }
+	})
 	return func() { ct.sent.Add(1) }, func() { ct.done.Store(true) }
 }
 
@@ -129,6 +137,30 @@ func (s *Server) catchUp() error {
 	return nil
 }
 
+// parkedOnHeldLane reports whether ct's handler is waiting for saves on a
+// lane the test holds: it cannot finish until the test releases the lane, so
+// the clock may move meanwhile, as a slow database round trip lets time pass.
+func (s *Server) parkedOnHeldLane(ct *connTraffic) bool {
+	owners := ct.parked.Load()
+	if owners == nil {
+		return false
+	}
+	for lane := range s.heldLanes {
+		if s.heldLanes[lane].Load() == 0 {
+			continue
+		}
+		if len(*owners) == 0 {
+			return true
+		}
+		for _, id := range *owners {
+			if int(persist.LaneIndex(id)) == lane {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (s *Server) flushUnheldLanes() error {
 	// One owner id per unheld lane: Flush takes owners, not lanes.
 	var owners []int32
@@ -163,7 +195,7 @@ func (s *Server) handledAll() bool {
 		if ct == nil {
 			return false // accepted but not yet tracked
 		}
-		if !ct.done.Load() && ct.waits.Load()-1 != c.Sent() {
+		if !ct.done.Load() && ct.waits.Load()-1 != c.Sent() && !s.parkedOnHeldLane(ct) {
 			return false
 		}
 	}

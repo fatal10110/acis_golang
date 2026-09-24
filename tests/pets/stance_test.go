@@ -46,8 +46,8 @@ func TestAttackStanceTimeoutBroadcastsSummonAutoAttackStop(t *testing.T) {
 	}
 
 	seen := map[int32]bool{}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && (len(seen) < 2) {
+	deadline := h.client.Now().Add(3 * time.Second)
+	for h.client.Now().Before(deadline) && (len(seen) < 2) {
 		frame := h.client.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil {
 			continue

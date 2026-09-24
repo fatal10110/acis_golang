@@ -356,15 +356,15 @@ func disablePlayerSkill(t *testing.T, srv *gameservertest.Server, objID int32, d
 
 func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window time.Duration) []int32 {
 	t.Helper()
-	deadline := time.Now().Add(window)
+	deadline := c.Now().Add(window)
 	quiet := 500 * time.Millisecond
 	var ids []int32
-	for time.Now().Before(deadline) {
+	for c.Now().Before(deadline) {
 		timeout := 200 * time.Millisecond
 		if len(ids) > 0 {
 			timeout = quiet
 		}
-		remaining := time.Until(deadline)
+		remaining := deadline.Sub(c.Now())
 		if remaining <= 0 {
 			break
 		}
@@ -577,7 +577,7 @@ func TestUseEnergyStoneCapsForceCharges(t *testing.T) {
 		t.Fatalf("second stone use produced no ForceMaxLevelReached across %d frames", len(second))
 	}
 
-	waitFor(t, "both stones consumed", func() bool {
+	srv.AdvanceUntil(t, "both stones consumed", func() bool {
 		srv.InventoryUpdates.Tick()
 		srv.FlushItems(t)
 		for _, inst := range persistedItems(t, srv, objID) {

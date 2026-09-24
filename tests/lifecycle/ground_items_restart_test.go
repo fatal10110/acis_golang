@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -94,21 +93,11 @@ func TestGroundItemsRestartRoundTrip(t *testing.T) {
 	if rows := groundRows(t, srv2); len(rows) != 0 {
 		t.Fatalf("items_on_ground rows after pickup = %+v, want none", rows)
 	}
-	// The pickup handler persists the merged stack from its own goroutine
-	// after enqueueing the pickup frames (pickupLiveGroundItem sends before
-	// applyPersistActions), so observing the frames does not synchronize
-	// with the UPDATE commit — a slow runner can legitimately still see the
-	// pre-pickup row here (#1723). Poll for the merge; a store error keeps
-	// the poll failing until the deadline and the log dump above shows it.
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		counts := persistedAdena(t, srv2, objID)
-		if len(counts) == 1 && counts[0] == 100 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("persisted adena stacks after pickup = %v, want one stack of 100 within 3s", counts)
-		}
-		time.Sleep(20 * time.Millisecond)
+	// The pickup task queues the merged stack's write after it sends the
+	// pickup frames, so wait for the task, then for its write.
+	srv2.Settle(t)
+	srv2.FlushPersistence(t)
+	if counts := persistedAdena(t, srv2, objID); len(counts) != 1 || counts[0] != 100 {
+		t.Fatalf("persisted adena stacks after pickup = %v, want one stack of 100", counts)
 	}
 }

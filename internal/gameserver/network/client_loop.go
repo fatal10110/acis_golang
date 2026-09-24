@@ -75,7 +75,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		if live != nil {
 			var owners []int32
 			onLive(live, func() { owners = l.detachLivePlayer(live) })
-			_ = l.awaitPersistence(owners...)
+			_ = l.awaitPersistence(conn, owners...)
 		}
 		if l.clients != nil {
 			l.clients.Release(client.AccountName(), client)
@@ -368,7 +368,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// selection restores the character from its saved row.
 			// A wait that gave up refuses the selection silently, as the
 			// other early exits here do, rather than load unwritten rows.
-			if l.awaitPersistence(c.ObjectID()) != nil {
+			if l.awaitPersistence(conn, c.ObjectID()) != nil {
 				continue
 			}
 			fresh, err := l.roster.Load(ctx, c.ObjectID())
@@ -980,7 +980,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if refused {
 				continue
 			}
-			_ = l.awaitPersistence(owners...)
+			_ = l.awaitPersistence(conn, owners...)
 			live = nil
 			entering = nil
 			client.SetState(StateAuthed)

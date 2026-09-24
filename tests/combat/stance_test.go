@@ -239,8 +239,8 @@ func (worldActor) Queue() *sim.Queue { return nil }
 // must not abort a live cast.
 func readSkippingCombat(t *testing.T, c *scriptedClient, want byte, what string) []byte {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(3 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil {
 			continue

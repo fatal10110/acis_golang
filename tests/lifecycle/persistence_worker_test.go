@@ -57,7 +57,7 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, "player left world", func() bool {
+	srv.AdvanceUntil(t, "player left world", func() bool {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
@@ -91,6 +91,10 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithPersistWait(200*time.Millisecond),
+		// The wait budget is a wall-clock deadline on the connection
+		// goroutine; on a driven clock the read below would let virtual time
+		// pass while the budget has not.
+		gameservertest.WithRealPool(),
 	)
 	startInWorld(t, srv.Client)
 	objID := srv.SoleObjectID(t)
@@ -99,7 +103,7 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, "player left world", func() bool {
+	srv.AdvanceUntil(t, "player left world", func() bool {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
@@ -112,6 +116,10 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 
 	release()
 	srv.FlushPersistence(t)
+	// A selection that kept waiting instead of giving up answers now.
+	if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
+		t.Fatalf("refused selection answered %#x once the lane drained: it waited past its budget", frame[0])
+	}
 	c.Send(encodeRequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
@@ -123,15 +131,4 @@ func persistedHPAndOnline(t *testing.T, srv *gameservertest.Server, objID int32)
 		t.Fatalf("read characters row: %v", err)
 	}
 	return hp, online
-}
-
-func waitUntil(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("%s not observed within 5s", what)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 }

@@ -30,7 +30,7 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	waitForWorldPosition(t, srv.State, objID, target)
+	waitForWorldPosition(t, srv, objID, target)
 }
 
 func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
@@ -62,7 +62,7 @@ func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	waitForWorldPosition(t, srv.State, objID, location.Location{X: target.X, Y: target.Y, Z: 150})
+	waitForWorldPosition(t, srv, objID, location.Location{X: target.X, Y: target.Y, Z: 150})
 }
 
 // TestMoveBackwardToLocationRejectsBeyond9900Units pins

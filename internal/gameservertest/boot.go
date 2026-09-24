@@ -583,9 +583,9 @@ func (s *Server) PlayerInventory(tb testing.TB, objID int32) *itemcontainer.Inve
 // PlayerQueue returns the live player's actor queue so suites can park it on
 // a gate task and pin the order of work queued behind that gate.
 //
-// Parking is not per-player under ACIS_SIM_EXECUTOR=inline: every queue there
-// shares one FIFO drained by a single pump, so a gate blocks every queue in
-// the process and freezes the virtual clock until it is released, which also
+// Parking is not per-player on the inline executor: every queue there shares
+// one FIFO drained by a single runner, so a gate blocks every queue in the
+// process and freezes the virtual clock until it is released, which also
 // stops every Queue.After and Queue.Every. Only a suite that drives one actor
 // and posts its own ticks may park a queue; one that waits on another actor
 // or on a sim timer hangs under inline while passing under pool.

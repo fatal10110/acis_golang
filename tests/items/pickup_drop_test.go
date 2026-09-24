@@ -252,7 +252,7 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 	// Walk out of pickup range before clicking; wait until the server
 	// reports the player at the destination.
 	c.Send(encodeMoveBackwardToLocation(spawnX+200, spawnY, spawnZ, spawnX, spawnY, spawnZ))
-	waitFor(t, "walk away completed", func() bool {
+	srv.AdvanceUntil(t, "walk away completed", func() bool {
 		x, _, _ := srv.PlayerPosition(t, objID)
 		return x >= spawnX+195
 	})
@@ -262,9 +262,9 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pending-action release")
 
 	// The approach walk runs before the collection resolves.
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := c.Now().Add(15 * time.Second)
 	var getItem []byte
-	for time.Now().Before(deadline) {
+	for c.Now().Before(deadline) {
 		if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
 			if frame[0] == serverpackets.OpcodeGetItem {
 				getItem = frame
@@ -469,10 +469,10 @@ func TestWeightGaugeRefreshesOnEveryChange(t *testing.T) {
 	c.Send(encodeRequestDestroyItem(potion, 2))
 	// Let the handler settle, then drive the batching task: its drain sends
 	// the InventoryUpdate and refreshes the carried weight afterwards.
-	time.Sleep(200 * time.Millisecond)
+	srv.Advance(t, 200*time.Millisecond)
 	srv.InventoryUpdates.Tick()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil {
 			continue
@@ -589,25 +589,12 @@ func soleGroundObjectID(t *testing.T, srv *gameservertest.Server) int32 {
 	return snaps[0].ObjectID
 }
 
-// waitFor polls cond until it holds or the deadline passes.
-func waitFor(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("%s not observed within 10s", what)
-}
-
 // waitForInventoryUpdate reads frames until an InventoryUpdate carrying
 // objectID with wantCount arrives.
 func waitForInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectID int32) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil || frame[0] != serverpackets.OpcodeInventoryUpdate {
 			continue

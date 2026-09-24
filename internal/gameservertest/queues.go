@@ -13,33 +13,23 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
-// SimExecutorEnv selects what actor queues drain on for a test run: "pool"
-// (the default) is the production sim.Pool, one worker per GOMAXPROCS;
-// "inline" is sim.Inline, one global FIFO run by a single goroutine. In a
-// suite that called DriveClock, "inline" is also the default and its clock
-// moves only on Server.Advance; elsewhere it advances with the wall clock.
+// SimExecutorEnv selects what actor queues drain on for a test run:
+// "inline" (the default) is sim.Inline, one global FIFO run by a single
+// goroutine, with a clock that moves only when a test lets time pass
+// (Server.Advance, Server.AdvanceUntil, client reads); "pool" is the
+// production sim.Pool, one worker per GOMAXPROCS, on the wall clock.
 const SimExecutorEnv = "ACIS_SIM_EXECUTOR"
 
-// inlinePumpInterval is how long the inline runner sleeps once it finds no
+// inlinePollInterval is how long the inline runner sleeps once it finds no
 // work, bounding the delay a posted task waits before it runs.
-const inlinePumpInterval = time.Millisecond
-
-// drivenClock is set by DriveClock before any test runs and only read after.
-var drivenClock bool
-
-// DriveClock makes every Boot in the calling test binary run actor queues on
-// sim.Inline with a clock that moves only when a test calls Server.Advance
-// or Server.AdvanceUntil, unless SimExecutorEnv=pool asks for the real pool.
-// Call it from TestMain before running the tests.
-func DriveClock() { drivenClock = true }
+const inlinePollInterval = time.Millisecond
 
 // queues is the harness executor. It records every queue it creates so
 // Settle can wait for the work already posted to them.
 type queues struct {
 	newQueue func(id string) *sim.Queue
-	// inline and advance are set on a driven clock (DriveClock): the loop,
-	// and a call that moves its clock by d on the runner and runs what
-	// comes due.
+	// inline and advance are set on the inline executor: the loop, and a
+	// call that moves its clock by d on the runner and runs what comes due.
 	inline  *sim.Inline
 	advance func(d time.Duration)
 
@@ -79,8 +69,8 @@ func (q *queues) settle() error {
 	return nil
 }
 
-// startQueues starts the executor WithRealPool, SimExecutorEnv and
-// DriveClock select, in that order of precedence, and stops it on cleanup.
+// startQueues starts the executor WithRealPool or SimExecutorEnv selects, in
+// that order of precedence, and stops it on cleanup.
 // Register it before anything whose cleanup still posts to queues (the
 // listener, whose connection handlers detach players on their queues).
 func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
@@ -88,11 +78,9 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 	mode := os.Getenv(SimExecutorEnv)
 	if realPool {
 		mode = "pool"
-	} else if mode == "" && drivenClock {
-		mode = "inline"
 	}
 	switch mode {
-	case "", "pool":
+	case "pool":
 		pool := sim.NewPool(0, log)
 		pool.Start(context.Background())
 		tb.Cleanup(func() {
@@ -103,7 +91,7 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 			}
 		})
 		return &queues{newQueue: pool.NewQueue}
-	case "inline":
+	case "", "inline":
 		return startInline(tb)
 	default:
 		tb.Fatalf("%s=%q: want pool or inline", SimExecutorEnv, mode)
@@ -113,12 +101,10 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 
 // startInline runs a sim.Inline loop on one runner goroutine, which is the
 // only caller of Run and Advance. Connection goroutines post each frame's
-// work and wait for it, so the runner keeps draining on its own. Under
-// DriveClock the clock moves only through the returned advance; otherwise
-// the runner advances it with the wall clock.
+// work and wait for it, so the runner keeps running posted tasks on its own;
+// its clock moves only through the returned advance.
 func startInline(tb testing.TB) *queues {
-	start := time.Now()
-	inline := sim.NewInline(start)
+	inline := sim.NewInline(time.Now())
 	type step struct {
 		d    time.Duration
 		done chan struct{}
@@ -127,15 +113,8 @@ func startInline(tb testing.TB) *queues {
 	stop, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(stopped)
-		last := start
 		for {
-			if drivenClock {
-				inline.Advance(0) // runs tasks and the timers already due
-			} else {
-				now := time.Now()
-				inline.Advance(now.Sub(last))
-				last = now
-			}
+			inline.Advance(0) // runs tasks and the timers already due
 			select {
 			case s := <-steps:
 				inline.Advance(s.d)
@@ -143,7 +122,7 @@ func startInline(tb testing.TB) *queues {
 			case <-stop:
 				inline.Run()
 				return
-			case <-time.After(inlinePumpInterval):
+			case <-time.After(inlinePollInterval):
 			}
 		}
 	}()
@@ -151,16 +130,11 @@ func startInline(tb testing.TB) *queues {
 		close(stop)
 		<-stopped
 	})
-	q := &queues{newQueue: inline.NewQueue}
-	if drivenClock {
-		q.inline = inline
-		q.advance = func(d time.Duration) {
-			s := step{d: d, done: make(chan struct{})}
-			steps <- s
-			<-s.done
-		}
-	}
-	return q
+	return &queues{newQueue: inline.NewQueue, inline: inline, advance: func(d time.Duration) {
+		s := step{d: d, done: make(chan struct{})}
+		steps <- s
+		<-s.done
+	}}
 }
 
 // OpenActorQueues counts the actor queues created so far that still accept a

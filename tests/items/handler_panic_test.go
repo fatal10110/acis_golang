@@ -2,7 +2,6 @@ package items
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -23,13 +22,9 @@ import (
 // persisted proves detachLivePlayer ran and enqueued its saves.
 func TestPanicInQueuedHandlerDropsSession(t *testing.T) {
 	t.Parallel()
-	if os.Getenv(gameservertest.SimExecutorEnv) == "inline" {
-		// sim.Inline deliberately does not recover, so a panicking task
-		// takes the harness pump goroutine and the test process with it.
-		// The policy under test is a production (pool) one.
-		t.Skip("sim.Inline does not recover task panics")
-	}
-	srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { panic("enchant roll panic") }, 0, false, nil)
+	// sim.Inline deliberately does not recover a panicking task; the
+	// recovery under test is the production pool's.
+	srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { panic("enchant roll panic") }, 0, false, nil, gameservertest.WithRealPool())
 	c := srv.Client
 
 	const damage = 10

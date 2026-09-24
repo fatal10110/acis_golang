@@ -30,8 +30,8 @@ func TestDestroyFlushesBatchedUpdate(t *testing.T) {
 	c.Send(encodeRequestDestroyItem(potion, 2))
 	// The background batching tick may deliver the weight refresh and the
 	// update ahead of the barrier reply; wait for the ItemList itself.
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(300 * time.Millisecond)
 		if frame != nil && frame[0] == serverpackets.OpcodeItemList {
 			break
@@ -252,7 +252,7 @@ func onQueueTask(q *sim.Queue) (ok bool) {
 func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectID, wantCount int32) {
 	t.Helper()
 	sawItemList := false
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+	for deadline := c.Now().Add(5 * time.Second); c.Now().Before(deadline); {
 		frame := c.ReadWithTimeout(500 * time.Millisecond)
 		switch {
 		case frame == nil:
@@ -276,7 +276,7 @@ func assertItemListPrecedesInventoryUpdate(t *testing.T, c *testsupport.Scripted
 func readUntilOpcode(t *testing.T, c *testsupport.ScriptedClient, opcode byte) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); {
+	for deadline := c.Now().Add(5 * time.Second); c.Now().Before(deadline); {
 		frame := c.ReadWithTimeout(500 * time.Millisecond)
 		if frame == nil {
 			continue

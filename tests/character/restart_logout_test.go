@@ -33,7 +33,7 @@ func TestRestartReturnsToCharacterSelect(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	waitForWorldPosition(t, srv.State, objID, target)
+	waitForWorldPosition(t, srv, objID, target)
 	walkHeading := spawn.HeadingTo(target)
 
 	// detachLivePlayer's Stop() reaches the cast controller
@@ -88,7 +88,7 @@ func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	waitForWorldPosition(t, srv.State, objID, target)
+	waitForWorldPosition(t, srv, objID, target)
 	walkHeading := spawn.HeadingTo(target)
 
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))

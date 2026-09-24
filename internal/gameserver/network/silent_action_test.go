@@ -1,12 +1,13 @@
 package network
 
 import (
+	"bytes"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestGameClientLinkNeverGoesSilentOnActionRequests is the guardrail against
@@ -16,10 +17,9 @@ import (
 // picked-up item that never leaves the ground, or an item-window click that
 // does nothing. Every case here sends a request built to be rejected (a
 // nonexistent object id, an unclaimed action id, a command with no target to
-// act on) and asserts at least one frame comes back. It intentionally does
-// not assert which frame — the point is that the handler answered at all,
-// not what it said — so this test keeps working (and keeps catching
-// regressions) as new rejection reasons and messages are added.
+// act on) and asserts the exact rejection frames that come back, read up to a
+// manor-list barrier so nothing is left in flight for the next case. A new
+// rejection reason or message updates the case's want list.
 //
 // Scope limit: every case here is a *rejected* request, so this guardrail
 // cannot catch a flow that answers rejections correctly but leaves the
@@ -51,30 +51,29 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	cases := []struct {
 		name    string
 		payload []byte
+		want    []byte // reply opcodes, in wire order
 	}{
-		{"UseItem on an object the player doesn't hold", encodeUseItem(missingObjectID, false)},
-		{"RequestUnEquipItem for an empty body slot", encodeRequestUnEquipItem(0)},
-		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false)},
-		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false)},
+		{"UseItem on an object the player doesn't hold", encodeUseItem(missingObjectID, false), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestUnEquipItem for an empty body slot", encodeRequestUnEquipItem(0), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c.Send(tc.payload)
-			// The first read is the actual assertion: it must prove the
-			// server answered at all, so it gets a generous timeout. Any
-			// further frames from the same rejection (e.g. a system
-			// message followed by ActionFailed) are already in flight by
-			// the time the first one arrives, so a short timeout is
-			// enough to drain them before the next case's send.
-			first := c.ReadWithTimeout(2 * time.Second)
-			if first == nil {
+			frames := testsupport.SyncBarrierFrames(t, c, func() {
+				c.Send(tc.payload)
+				c.Send(encodeRequestManorList())
+			}, serverpackets.OpcodeExtended)
+			if len(frames) == 0 {
 				t.Fatalf("%s: no reply at all — the request was silently dropped, leaving the client's action unresolved", tc.name)
 			}
-			if first[0] != serverpackets.OpcodeSystemMessage && first[0] != serverpackets.OpcodeActionFailed {
-				t.Fatalf("%s: reply opcode = %#x, want a rejection frame", tc.name, first[0])
+			got := make([]byte, len(frames))
+			for i, f := range frames {
+				got[i] = f[0]
 			}
-			for c.ReadWithTimeout(100*time.Millisecond) != nil {
+			if !bytes.Equal(got, tc.want) {
+				t.Fatalf("%s: reply opcodes = %x, want %x", tc.name, got, tc.want)
 			}
 		})
 	}
