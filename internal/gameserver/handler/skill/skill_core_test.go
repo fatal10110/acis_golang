@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -828,7 +829,7 @@ type disablerFake struct {
 
 func newDisablerFake(id int32) *disablerFake {
 	d := &disablerFake{id: id, list: effect.NewList(nil), successOK: true}
-	d.aggro = attackable.NewThreatTable(d)
+	d.aggro = attackable.NewThreatTable(d, time.Now)
 	d.hate = attackable.NewHateTable(d)
 	return d
 }

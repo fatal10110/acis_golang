@@ -169,7 +169,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	}
 	castTarget := Target(target)
 
-	plan, err := a.Controller.Start(time.Now(), castTarget, def)
+	plan, err := a.Controller.Start(a.Controller.Now(), castTarget, def)
 	if err != nil {
 		return
 	}

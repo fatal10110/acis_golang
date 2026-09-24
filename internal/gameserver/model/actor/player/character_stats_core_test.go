@@ -819,6 +819,8 @@ func TestCharacterAlikeDeadUnionsRealDeathAndFakeDeath(t *testing.T) {
 func TestCharacterRecentFakeDeathTracksGracePeriodAfterMarking(t *testing.T) {
 	c := &Character{ID: 1}
 	attachTestLive(t, c)
+	clock := sim.NewInline(time.Unix(0, 0))
+	c.Live.SetQueue(clock.NewQueue("test"))
 
 	if c.RecentFakeDeath() {
 		t.Fatal("RecentFakeDeath() = true before MarkRecentFakeDeath was ever called")
@@ -829,9 +831,14 @@ func TestCharacterRecentFakeDeathTracksGracePeriodAfterMarking(t *testing.T) {
 		t.Fatal("RecentFakeDeath() = false right after MarkRecentFakeDeath, want true")
 	}
 
-	c.recentFakeDeathUntil = time.Now().Add(-time.Second)
+	// The grace runs on the character's queue clock, not the wall clock.
+	clock.Advance(recentFakeDeathGrace - time.Millisecond)
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false before the grace period elapsed on the queue clock")
+	}
+	clock.Advance(time.Millisecond)
 	if c.RecentFakeDeath() {
-		t.Fatal("RecentFakeDeath() = true after the grace period elapsed")
+		t.Fatal("RecentFakeDeath() = true after the grace period elapsed on the queue clock")
 	}
 }
 

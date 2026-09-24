@@ -69,7 +69,6 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		afterCanCast = l.groundCastAfterCanCast(live, def)
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
-		Now:         time.Now(),
 		Controller:  controller,
 		Caster:      live.Character,
 		Selected:    live.Target(),

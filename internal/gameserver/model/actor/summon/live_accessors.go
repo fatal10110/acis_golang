@@ -1,6 +1,8 @@
 package summon
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -49,6 +51,9 @@ func (a *Actor) Queue() *sim.Queue {
 	}
 	return a.queue
 }
+
+// Now reads the clock this summon's queue runs on.
+func (a *Actor) Now() time.Time { return a.Queue().Now() }
 
 // Kind reports KindSummon.
 func (a *Actor) Kind() actor.Kind { return actor.KindSummon }

@@ -104,7 +104,10 @@ func (p *Persistence) SaveState(c *player.Character) SaveState {
 		return SaveState{}
 	}
 	classIndex := c.SkillSaveClassIndex()
-	rows := effect.BuildSaveRows(p.liveActiveEffects(c), c.SkillReuseTimers(p.currentTime()), classIndex)
+	// Reuse expiries and effect periods run on c's queue clock, so the save
+	// reads that clock rather than p.now.
+	now := c.Now()
+	rows := effect.BuildSaveRows(p.liveActiveEffects(c, now), c.SkillReuseTimers(now), classIndex)
 	return SaveState{charID: c.ID, classIndex: classIndex, rows: rows, ok: true}
 }
 
@@ -124,12 +127,11 @@ func (p *Persistence) Save(ctx context.Context, st SaveState) error {
 // getAllEffects(): the effect list itself is the single source of truth for
 // what gets saved, not a separate write-only registry. An effect whose skill
 // definition no longer resolves is dropped, matching a stale datapack change.
-func (p *Persistence) liveActiveEffects(c *player.Character) []effect.ActiveEffect {
+func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []effect.ActiveEffect {
 	list := c.EffectList()
 	if list == nil {
 		return nil
 	}
-	now := p.currentTime()
 	var out []effect.ActiveEffect
 	for _, e := range list.All() {
 		if !e.InUse() {
@@ -177,6 +179,9 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 	if err != nil {
 		return fmt.Errorf("restore skill state for character %d: %w", c.ID, err)
 	}
+	// Restore runs at login, before c has a queue, so it filters on p.now;
+	// the timers it keeps carry their stored expiry and are checked on c's
+	// queue clock from then on.
 	plan := effect.BuildRestorePlan(rows, p.currentTime().UnixMilli(), p.lookup)
 	for _, reuse := range plan.Reuse {
 		def, ok := p.definition(reuse.Skill)
