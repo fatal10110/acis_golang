@@ -130,10 +130,17 @@ func (w *Worker) Flush(ctx context.Context, ownerIDs ...int32) error {
 		// long as the lane keeps busy.
 		high := w.lanes[i].owedHigh()
 		pending.Add(2)
-		// A closed lane runs every job it accepted before exiting, and Close
-		// waits for that, so nothing is left to wait for.
+		// A closed lane still runs every job it accepted before its
+		// goroutine exits, and Close marks lanes closed before that drain
+		// finishes, so a refused marker waits for the drain instead.
 		if !w.lanes[i].push(pending.Done) {
-			pending.Done()
+			// ponytail: waits for every lane's drain, not just this one;
+			// only reachable while Close is running, per-lane exit signal if
+			// that window ever matters.
+			go func() {
+				w.done.Wait()
+				pending.Done()
+			}()
 		}
 		go w.lanes[i].waitSettled(high, pending.Done)
 	}
