@@ -3,10 +3,13 @@ package loginserver
 import (
 	"context"
 	"database/sql"
+	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/dbtest"
+	"github.com/fatal10110/acis_golang/internal/link"
 	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -66,6 +69,82 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 	}
 	if stored.Host != "127.0.0.1" {
 		t.Fatalf("stored.Host = %q, want 127.0.0.1", stored.Host)
+	}
+}
+
+// TestGameServerLinkHostResolution drives registration with a stubbed
+// resolver: a resolved host is stored as its address, and a host that fails
+// to resolve or resolves to nothing falls back to the connection IP in both
+// the registry and the persisted gameservers row.
+func TestGameServerLinkHostResolution(t *testing.T) {
+	const advertised = "gs.invalid"
+	tests := []struct {
+		name     string
+		resolved []string
+		err      error
+		wantHost string
+	}{
+		{name: "resolved", resolved: []string{"10.1.2.3", "10.1.2.4"}, wantHost: "10.1.2.3"},
+		{name: "lookup error", err: &net.DNSError{Err: "no such host", Name: advertised, IsNotFound: true}, wantHost: "127.0.0.1"},
+		{name: "empty result", wantHost: "127.0.0.1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newIntegrationDB(t)
+			gameServers := loginsql.NewGameServerStore(db)
+
+			var looked []string
+			addr, _, servers, _, _ := newTestLinkCommon(t, true, loginsql.NewAccountStore(db), gameServers, func(l *GameServerLink) {
+				l.lookupHost = func(host string) ([]string, error) {
+					looked = append(looked, host)
+					return tt.resolved, tt.err
+				}
+			})
+
+			gs := dialGameServer(t, addr)
+			gs.handshake()
+			gs.sendGameServerAuth(1, false, false, advertised, 7777, 300, testHexID)
+			if ok, id, _, _ := gs.readAuthResult(); !ok || id != 1 {
+				t.Fatalf("readAuthResult() = ok=%v id=%d, want ok=true id=1", ok, id)
+			}
+
+			entry, exists := servers.Get(1)
+			if !exists || entry.Host != tt.wantHost {
+				t.Fatalf("registry entry = %+v (exists=%v), want Host %q", entry, exists, tt.wantHost)
+			}
+			if len(looked) != 1 || looked[0] != advertised {
+				t.Fatalf("lookupHost calls = %q, want [%q]", looked, advertised)
+			}
+			stored, err := gameServers.GameServer(context.Background(), 1)
+			if err != nil {
+				t.Fatalf("GameServer(1): %v", err)
+			}
+			if stored.Host != tt.wantHost {
+				t.Fatalf("stored.Host = %q, want %q", stored.Host, tt.wantHost)
+			}
+		})
+	}
+}
+
+// TestGameServerLinkRejectedAuthSkipsHostResolution proves a registration
+// that is refused never resolves the advertised host.
+func TestGameServerLinkRejectedAuthSkipsHostResolution(t *testing.T) {
+	var lookups atomic.Int32
+	addr, _, _, _, _ := newTestLinkCommon(t, false, nil, nil, func(l *GameServerLink) {
+		l.lookupHost = func(string) ([]string, error) {
+			lookups.Add(1)
+			return nil, &net.DNSError{Err: "no such host", Name: "gs.invalid", IsNotFound: true}
+		}
+	})
+
+	gs := dialGameServer(t, addr)
+	gs.handshake()
+	gs.sendGameServerAuth(1, false, false, "gs.invalid", 7777, 300, testHexID)
+	if ok, _, _, reason := gs.readAuthResult(); ok || reason != byte(link.ReasonWrongHexID) {
+		t.Fatalf("readAuthResult() = ok=%v reason=%d, want ok=false reason=%d", ok, reason, link.ReasonWrongHexID)
+	}
+	if n := lookups.Load(); n != 0 {
+		t.Fatalf("lookupHost calls = %d, want 0 on a rejected registration", n)
 	}
 }
 
