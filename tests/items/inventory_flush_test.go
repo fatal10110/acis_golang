@@ -223,10 +223,13 @@ func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
 }
 
 // onQueueTask reports whether the calling goroutine is running one of q's
-// tasks. sim.AssertOwner alone only proves someone drains q outside simdebug,
-// and q may already be on its next task when an off-task send happens, so the
-// caller's own stack must also be inside a queue drain (sim.drainAs; renaming
-// it fails this check loudly rather than passing it).
+// tasks, q being the only live player's queue. Outside simdebug,
+// sim.AssertOwner only proves that some goroutine drains q, and a caller
+// inside any drain would pass a check for a sim.drainAs frame. The caller's
+// own stack must therefore hold the task body that onQueue posts: onQueue
+// posts it only to the live player's own queue, and this suite has one
+// player. Renaming that closure fails this check loudly rather than passing
+// it.
 func onQueueTask(q *sim.Queue) (ok bool) {
 	defer func() {
 		if recover() != nil {
@@ -235,7 +238,7 @@ func onQueueTask(q *sim.Queue) (ok bool) {
 	}()
 	sim.AssertOwner(q)
 	buf := make([]byte, 64<<10)
-	return bytes.Contains(buf[:runtime.Stack(buf, false)], []byte("/sim.drainAs("))
+	return bytes.Contains(buf[:runtime.Stack(buf, false)], []byte("/network.onQueue.func1("))
 }
 
 // assertItemListPrecedesInventoryUpdate reads until the drain's
