@@ -81,6 +81,50 @@ func TestConnDeliversLargeBurstInOrderWithoutBlocking(t *testing.T) {
 	}
 }
 
+// sendLast seals the connection: frames queued ahead of it still arrive in
+// order, it arrives last, and every later send is dropped and released, so
+// the peer reads it and then EOF once Close flushes.
+func TestConnSendLastDropsLaterSends(t *testing.T) {
+	server, client := net.Pipe()
+	defer client.Close()
+	c := newConn(server, zerolog.Nop())
+
+	var released atomic.Int64
+	if !sendWithin(t, c, countedFrame(t, 16, 0, &released)) {
+		t.Fatal("frame ahead of the last one rejected")
+	}
+	if !c.sendLast(countedFrame(t, 16, 1, &released)) {
+		t.Fatal("sendLast rejected on an open connection")
+	}
+	if sendWithin(t, c, countedFrame(t, 16, 2, &released)) {
+		t.Fatal("SendFrame after sendLast accepted, want dropped")
+	}
+	if c.sendLast(countedFrame(t, 16, 3, &released)) {
+		t.Fatal("second sendLast accepted, want dropped")
+	}
+
+	closed := make(chan error, 1)
+	go func() { closed <- c.Close() }()
+	for want := range uint32(2) {
+		payload, err := wire.ReadFrame(client)
+		if err != nil {
+			t.Fatalf("read frame %d: %v", want, err)
+		}
+		if got := binary.LittleEndian.Uint32(payload); got != want {
+			t.Fatalf("frame %d arrived as sequence %d", want, got)
+		}
+	}
+	if _, err := wire.ReadFrame(client); err == nil {
+		t.Fatal("read past the last frame succeeded, want connection closed")
+	}
+	if err := <-closed; err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := released.Load(); got != 4 {
+		t.Fatalf("released %d frames, want 4", got)
+	}
+}
+
 // A peer that never reads is disconnected once its unwritten backlog would
 // pass the high-water mark; no send ever blocks and every frame is
 // released exactly once.
