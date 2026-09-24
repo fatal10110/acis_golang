@@ -427,6 +427,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Level:           npcTmpl.Level,
 		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		OwnerInventory:  live.Inventory(),
+		ExpPenalty:      def.ExpPenalty,
 		Lifetime: summon.LifetimeState{
 			TimeRemaining:    def.SummonTotalLifeTime,
 			TotalLifeTime:    def.SummonTotalLifeTime,

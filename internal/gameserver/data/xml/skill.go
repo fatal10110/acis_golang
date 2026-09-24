@@ -532,6 +532,7 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		CubicActivationTime:   a.intDefault("activationtime", 8),
 		CubicActivationChance: a.intDefault("activationchance", 30),
 		SummonTotalLifeTime:   a.intDefault("summonTotalLifeTime", 1200000),
+		ExpPenalty:            a.float32Default("expPenalty", 0),
 
 		WeaponsAllowed: a.strDefault("weaponsAllowed", ""),
 

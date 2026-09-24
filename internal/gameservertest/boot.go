@@ -79,6 +79,7 @@ type options struct {
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
+	deepBlueDropRules      bool
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
 	persistWait            time.Duration
@@ -205,6 +206,12 @@ func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 // death may cost experience/karma (default false).
 func WithAllowDelevel(allow bool) Option {
 	return func(o *options) { o.allowDelevel = allow }
+}
+
+// WithDeepBlueDropRules sets the DeepBlueDropRules gate: whether an
+// out-leveled kill cuts the drop chance (default false).
+func WithDeepBlueDropRules(enabled bool) Option {
+	return func(o *options) { o.deepBlueDropRules = enabled }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -378,6 +385,7 @@ type Server struct {
 	templates        *player.TemplateTable
 	itemTable        *item.Table
 	levelTable       *player.LevelTable
+	deepBlueDrops    bool
 	ids              *sequentialIDs
 	positions        *task.PositionUpdates
 	addr             net.Addr
@@ -1297,6 +1305,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		State:            state,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
+		deepBlueDrops:    o.deepBlueDropRules,
 		DB:               db,
 		Chars:            chars,
 		Items:            items,

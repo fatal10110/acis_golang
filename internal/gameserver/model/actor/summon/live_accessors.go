@@ -121,6 +121,10 @@ func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
 // IsPet reports whether this live summon is a pet rather than a servitor.
 func (a *Actor) IsPet() bool { return a.isPet }
 
+// ExpPenalty is the share of kill exp this servitor withholds from its
+// owner; 0 for a pet.
+func (a *Actor) ExpPenalty() float32 { return a.expPenalty }
+
 // SummonType returns the client-visible summon type code.
 func (a *Actor) SummonType() int {
 	if a.isPet {
