@@ -69,12 +69,14 @@ func (s *Server) SpawnHostileNPCTemplateAt(t *testing.T, tmpl *npc.Template, at 
 	return s.spawnHostile(t, tmpl, at, parkedAttack{})
 }
 
-// killRewards is the fixture kill-reward config: the suite's level table and
-// stock x1 drop rates.
+// killRewards is the fixture kill-reward config: the suite's level table,
+// stock x1 drop rates, and the stock party range.
 func (s *Server) killRewards() gamemanager.KillRewardConfig {
 	return gamemanager.KillRewardConfig{
-		PlayerLevels: s.levelTable,
-		Rates:        item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
+		PlayerLevels:      s.levelTable,
+		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
+		PartyRange:        1500,
+		DeepBlueDropRules: s.deepBlueDrops,
 	}
 }
 

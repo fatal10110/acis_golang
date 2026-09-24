@@ -173,6 +173,16 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		t.Fatalf("Len() = %d, want %d", got, want)
 	}
 
+	t.Run("servitor exp penalty", func(t *testing.T) {
+		// Summon Kat the Cat sets expPenalty 0.3; Power Strike sets none.
+		if d, ok := table.Get(1111, 1); !ok || d.ExpPenalty != float32(0.3) {
+			t.Fatalf("skill 1111 level 1 ExpPenalty = %v (loaded %v), want 0.3", d.ExpPenalty, ok)
+		}
+		if d, ok := table.Get(3, 1); !ok || d.ExpPenalty != 0 {
+			t.Fatalf("skill 3 level 1 ExpPenalty = %v (loaded %v), want 0", d.ExpPenalty, ok)
+		}
+	})
+
 	t.Run("regular level with table-substituted fields", func(t *testing.T) {
 		d, ok := table.Get(3, 1)
 		if !ok {

@@ -61,8 +61,10 @@ func (o *overhitState) valid(player attackable.Combatant) bool {
 	if !o.enabled || o.attacker == nil || player == nil {
 		return false
 	}
+	// By object id: a summon's owner and the rewarded player can be
+	// different wrappers around the same character.
 	acting := overhitActingPlayer(o.attacker)
-	return acting != nil && acting == player
+	return acting != nil && acting.ObjectID() == player.ObjectID()
 }
 
 func overhitActingPlayer(a attackable.Combatant) attackable.Combatant {
