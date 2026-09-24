@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -46,7 +47,7 @@ func TestNewNpcsWithoutSinkFactoryWarns(t *testing.T) {
 	if _, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()}}), fakeGeo{}, state, &sequentialIDs{},
 		decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.New(&logs), nil, actorcast.EffectHandlers{},
-		walker, nil, nil, npcQueues()); err != nil {
+		walker, nil, effect.Env{}, npcQueues()); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 	if !strings.Contains(logs.String(), "no NPC event sink factory") {

@@ -99,3 +99,6 @@ func (a hostileStatActor) ActiveSkillLevel(id int) (int, bool) {
 func (a hostileStatActor) ActiveEffectLevel(effectID int) (int, bool) {
 	return a.h.EffectList().ActiveBySkillID(effectID)
 }
+
+// IsNight satisfies conditions.Actor.
+func (a hostileStatActor) IsNight() bool { return a.h.EffectList().IsNight() }

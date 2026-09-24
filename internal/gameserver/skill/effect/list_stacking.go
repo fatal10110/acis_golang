@@ -97,7 +97,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			pos++
 		}
 		queue = slices.Insert(queue, pos, e)
-		if l.shouldCancelLesser() && !e.Herb && len(queue) > 1 {
+		if l.cancelLesser && !e.Herb && len(queue) > 1 {
 			victim := queue[1]
 			queue = slices.Delete(queue, 1, 2)
 			// The victim leaves the newcomer's visible list, not its own: a

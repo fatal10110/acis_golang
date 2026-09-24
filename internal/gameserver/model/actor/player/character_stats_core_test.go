@@ -218,7 +218,7 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 		t.Fatalf("PhysicalSkillInput neutral multipliers = %+v", phys)
 	}
 
-	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -257,7 +257,7 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if got, want := fatal.SkillPower, formulas.SkillPowerFor("FATAL", 100, hpRatio); !closeFloat(got, want) {
 		t.Fatalf("FATAL SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
 	}
-	deathlink, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"})
+	deathlink, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"}, true)
 	if !ok {
 		t.Fatal("DEATHLINK MagicDamageInput() ok = false")
 	}
@@ -274,7 +274,7 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if got, want := fatal.SkillPower, formulas.SkillPowerFor("FATAL", 100, hpRatio); !closeFloat(got, want) {
 		t.Fatalf("FATAL SkillPower at HP ratio %v = %v, want %v", hpRatio, got, want)
 	}
-	deathlink, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"})
+	deathlink, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 100, SkillType: "DEATHLINK"}, true)
 	if !ok {
 		t.Fatal("DEATHLINK MagicDamageInput() at low HP ok = false")
 	}
@@ -2793,7 +2793,7 @@ func TestCharacterSkillDamageInputsUseElementalSkillModifier(t *testing.T) {
 		t.Fatalf("PhysicalSkillInput ElementalMul = %v, want 0.75", phys.ElementalMul)
 	}
 
-	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM", Element: modelskill.ElementFire})
+	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM", Element: modelskill.ElementFire}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -2801,7 +2801,7 @@ func TestCharacterSkillDamageInputsUseElementalSkillModifier(t *testing.T) {
 		t.Fatalf("MagicDamageInput ElementalMul = %v, want 0.75", magic.ElementalMul)
 	}
 
-	neutral, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	neutral, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput(neutral) ok = false")
 	}
@@ -2823,7 +2823,7 @@ func TestCharacterMagicDamageInputRollsMagicCritical(t *testing.T) {
 		}
 		return 7
 	})
-	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -2837,7 +2837,7 @@ func TestCharacterMagicDamageInputRollsMagicCritical(t *testing.T) {
 		}
 		return 8
 	})
-	magic, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	magic, ok = target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() second call ok = false")
 	}
@@ -3042,7 +3042,7 @@ func TestCharacterMagicDamageInputCarriesShieldDefense(t *testing.T) {
 				}
 				return tt.roll
 			})
-			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 			if !ok {
 				t.Fatal("MagicDamageInput() ok = false")
 			}
@@ -3082,7 +3082,7 @@ func TestCharacterMagicDamageInputPerfectShieldSkipsMagicFailure(t *testing.T) {
 		return 9999
 	})
 
-	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -3121,7 +3121,7 @@ func TestCharacterMagicDamageInputShieldIgnoresMagicCrit(t *testing.T) {
 		return 9999
 	})
 
-	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
@@ -3136,9 +3136,6 @@ func TestCharacterMagicDamageInputShieldIgnoresMagicCrit(t *testing.T) {
 func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
 	tmpl := combatTemplate()
 	items := combatItems()
-	prev := formulas.MagicFailuresEnabled()
-	formulas.SetMagicFailures(true)
-	t.Cleanup(func() { formulas.SetMagicFailures(prev) })
 
 	for _, tt := range []struct {
 		name      string
@@ -3147,7 +3144,10 @@ func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
 		second    int
 		want      formulas.MagicFailure
 		wantRolls int
+		off       bool
 	}{
+		// MagicFailures=false skips the resist roll entirely.
+		{name: "switch off", tgtLevel: 11, first: 0, second: 0, want: formulas.MagicFailureNone, wantRolls: 0, off: true},
 		{name: "half", tgtLevel: 1, first: 0, second: 9999, want: formulas.MagicFailureHalf, wantRolls: 2},
 		{name: "full second miss", tgtLevel: 1, first: 0, second: 0, want: formulas.MagicFailureFull, wantRolls: 2},
 		{name: "full past gap", tgtLevel: 11, first: 0, second: 9999, want: formulas.MagicFailureFull, wantRolls: 2},
@@ -3167,7 +3167,7 @@ func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
 				}
 				return 9999
 			})
-			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, !tt.off)
 			if !ok {
 				t.Fatal("MagicDamageInput() ok = false")
 			}
@@ -3241,7 +3241,7 @@ func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermissio
 	if _, ok := target.PhysicalSkillInput(caster, def); !ok {
 		t.Fatal("PhysicalSkillInput rejected an invulnerable target")
 	}
-	if _, ok := target.MagicDamageInput(caster, def); !ok {
+	if _, ok := target.MagicDamageInput(caster, def, true); !ok {
 		t.Fatal("MagicDamageInput rejected an invulnerable target")
 	}
 	if _, ok := target.BlowInput(caster, def); !ok {
@@ -3256,7 +3256,7 @@ func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermissio
 	if _, ok := target.PhysicalSkillInput(caster, def); ok {
 		t.Fatal("PhysicalSkillInput accepted an attacker without damage permission")
 	}
-	if _, ok := target.MagicDamageInput(caster, def); ok {
+	if _, ok := target.MagicDamageInput(caster, def, true); ok {
 		t.Fatal("MagicDamageInput accepted an attacker without damage permission")
 	}
 	if _, ok := target.BlowInput(caster, def); ok {
@@ -3343,7 +3343,7 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 		ShotsMask: item.ShotSpirit.Mask(),
 	}
 	spiritCaster := liveCharacter(3, tmpl, items, spiritWeapon)
-	magic, ok := target.MagicDamageInput(spiritCaster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	magic, ok := target.MagicDamageInput(spiritCaster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput(spirit) ok = false")
 	}
@@ -3363,7 +3363,7 @@ func TestCharacterDamageInputsUseChargedShots(t *testing.T) {
 		ShotsMask: item.ShotBlessedSpirit.Mask(),
 	}
 	blessedCaster := liveCharacter(4, tmpl, items, blessedWeapon)
-	magic, ok = target.MagicDamageInput(blessedCaster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	magic, ok = target.MagicDamageInput(blessedCaster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput(blessed) ok = false")
 	}
@@ -3399,7 +3399,7 @@ func TestCharacterDamageInputsUsePvPMultipliers(t *testing.T) {
 		t.Fatalf("BlowInput PvP = %v mul %v, want true/0.8", blow.IsPvP, blow.PvPMul)
 	}
 
-	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM", Magic: true})
+	magic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM", Magic: true}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput(magic) ok = false")
 	}
@@ -3407,7 +3407,7 @@ func TestCharacterDamageInputsUsePvPMultipliers(t *testing.T) {
 		t.Fatalf("MagicDamageInput magic PvPMul = %v, want 1.3", magic.PvPMul)
 	}
 
-	physicalMagic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"})
+	physicalMagic, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, true)
 	if !ok {
 		t.Fatal("MagicDamageInput(physical skill type) ok = false")
 	}
@@ -5726,9 +5726,7 @@ func TestTemplateReachableSkillGrants(t *testing.T) {
 }
 
 func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
-	t.Cleanup(func() { creature.SetNightSource(nil) })
-
-	place := func(t *testing.T, ax, ay int) (*Character, *Character) {
+	place := func(t *testing.T, ax, ay int, night bool) (*Character, *Character) {
 		t.Helper()
 		tmpl := combatTemplate()
 		items := combatItems()
@@ -5736,10 +5734,16 @@ func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 		attacker := liveCharacter(2, tmpl, items)
 		target.SetLastKnownPosition(location.Location{X: 0, Y: 0, Z: 0}, 0)
 		attacker.SetLastKnownPosition(location.Location{X: ax, Y: ay, Z: 0}, 0)
+		live, err := creature.NewLive(location.Location{X: ax, Y: ay, Z: 0}, 0, permissiveGeo{}, attacker, effect.WithEnv(effect.Env{Night: hitNight(night)}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		live.SetQueue(idleQueue())
+		attacker.Live = live
 		return attacker, target
 	}
 
-	attacker, target := place(t, 100, 0)
+	attacker, target := place(t, 100, 0, false)
 	acc := attacker.Accuracy()
 	eva := target.Evasion()
 	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
@@ -5769,8 +5773,7 @@ func TestCharacterMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creature.SetNightSource(hitNight(tt.night))
-			attacker, target := place(t, tt.ax, tt.ay)
+			attacker, target := place(t, tt.ax, tt.ay, tt.night)
 			attacker.SetRollSource(func(int) int { return tt.roll })
 			hit := attacker.MakeAttackHit(target, false)
 			if hit.Miss != tt.wantMiss {

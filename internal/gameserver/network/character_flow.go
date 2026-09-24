@@ -611,7 +611,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.RefreshExpertisePenalty()
 
 	x, y, z := c.Position()
-	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c, effect.WithActivityRegistry(l.effects))
+	creatureLive, err := creature.NewLive(location.Location{X: x, Y: y, Z: z}, c.RunSpeed(), l.geo, c, effect.WithEnv(l.effects))
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}

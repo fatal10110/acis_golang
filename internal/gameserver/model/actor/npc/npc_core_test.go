@@ -1259,11 +1259,8 @@ func TestSiegeGuardMovementDisabledDoesNotCountGeoFail(t *testing.T) {
 
 func TestAddGeoPathFailCountOverflowResetsWithoutIncrement(t *testing.T) {
 	const max = 2
-	prev := MaxGeoPathFailCount()
-	SetMaxGeoPathFailCount(max)
-	t.Cleanup(func() { SetMaxGeoPathFailCount(prev) })
-
 	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile.SetMaxGeoPathFailCount(max)
 	for i := 1; i <= max; i++ {
 		hostile.AddGeoPathFailCount()
 		if got := hostile.GeoPathFailCount(); got != i {
@@ -2061,20 +2058,22 @@ type hitNight bool
 func (n hitNight) IsNight() bool { return bool(n) }
 
 func TestMakeAttackHitAppliesFacingAndNight(t *testing.T) {
-	t.Cleanup(func() { creature.SetNightSource(nil) })
-
 	tpl := &Template{ID: 1, Type: "Monster"}
-	place := func(t *testing.T, ax, ay int) (*Hostile, *Hostile) {
+	place := func(t *testing.T, ax, ay int, night bool) (*Hostile, *Hostile) {
 		t.Helper()
 		state := world.New()
 		target := newCombatHostile(t, 1, tpl)
-		attacker := newCombatHostile(t, 2, tpl)
+		live := newHostileLive(t, effect.WithEnv(effect.Env{Night: hitNight(night)}))
+		attacker, err := NewHostile(&Instance{ObjectID: 2, Template: tpl, Kind: "Monster"}, live, &hostileMove{}, &hostileAttack{})
+		if err != nil {
+			t.Fatal(err)
+		}
 		state.Spawn(target, 0, 0, 0, 0)
 		state.Spawn(attacker, ax, ay, 0, 0)
 		return attacker, target
 	}
 
-	attacker, target := place(t, 100, 0)
+	attacker, target := place(t, 100, 0, false)
 	acc := int(attacker.calcStat(stat.AccuracyCombat, 0))
 	eva := target.Evasion()
 	frontRate := formulas.HitRate(acc, eva, 0, false, false, true)
@@ -2104,8 +2103,7 @@ func TestMakeAttackHitAppliesFacingAndNight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			creature.SetNightSource(hitNight(tt.night))
-			attacker, target := place(t, tt.ax, tt.ay)
+			attacker, target := place(t, tt.ax, tt.ay, tt.night)
 			attacker.SetRollSource(func(int) int { return tt.roll })
 			hit := attacker.MakeAttackHit(target, false)
 			if hit.Miss != tt.wantMiss {

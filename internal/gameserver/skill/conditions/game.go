@@ -16,13 +16,12 @@ type NightSource interface {
 	IsNight() bool
 }
 
-// GameTime requires the current in-game time of day to match Night.
-// Clock supplies "is it night right now" as an explicit dependency.
+// GameTime requires the current in-game time of day on the effector's
+// server to match Night.
 type GameTime struct {
-	Clock NightSource
 	Night bool
 }
 
 func (c GameTime) Test(effector, effected Actor, skill Skill) bool {
-	return c.Clock.IsNight() == c.Night
+	return effector.IsNight() == c.Night
 }

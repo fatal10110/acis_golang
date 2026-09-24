@@ -24,7 +24,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -81,7 +80,7 @@ func provideGameClientLink(
 	shadowItems *task.ShadowItems,
 	autosave *task.Autosave,
 	effects *network.TaskEffects,
-	activeEffects *task.Effects,
+	effectEnv effect.Env,
 	gameplay gameplayConfig,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
@@ -90,12 +89,11 @@ func provideGameClientLink(
 	pool *sim.Pool,
 	log zerolog.Logger,
 ) *network.GameClientLink {
-	formulas.SetMagicFailures(bool(gameplay.MagicFailures))
-	effect.SetCancelLesser(bool(gameplay.CancelLesserEffect))
 	playerConfig := network.PlayerConfig{
 		RespawnRestoreHP:         float64(gameplay.RespawnRestoreHP),
 		DeathPenaltyChance:       int(gameplay.DeathPenaltyChance),
 		MaxBuffsAmount:           int(gameplay.MaxBuffsAmount),
+		MagicFailures:            bool(gameplay.MagicFailures),
 		PerfectShieldBlockRate:   int(gameplay.PerfectShieldBlockRate),
 		SpawnProtection:          time.Duration(gameplay.SpawnProtection),
 		SkillEnchantSPBookNeeded: bool(gameplay.SkillEnchantSPBookNeeded),
@@ -111,7 +109,7 @@ func provideGameClientLink(
 	}
 	link := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
-		Effects:       activeEffects,
+		Effects:       effectEnv,
 		NoCipher:      !cfg.UseBlowfishCipher,
 		LoginLink:     links.get,
 		Roster:        roster,

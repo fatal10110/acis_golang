@@ -139,6 +139,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideAI,
 			providePositionUpdates,
 			provideEffects,
+			provideEffectEnv,
 			provideNPCRegen,
 			provideKillRewardConfig,
 			provideSpellbookPolicy,
@@ -149,6 +150,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			providePlayerClock,
 			provideGameClientLink,
 		),
-		fx.Invoke(wireGameClock, startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
 	}
 }

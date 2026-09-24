@@ -429,7 +429,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	}
 
 	servitor, err := summon.NewServitor(summon.ServitorConfig{
-		Activity:        link.effects,
+		Effects:         link.effects,
 		ObjectID:        objID,
 		Owner:           live,
 		NPCID:           def.NpcID,
