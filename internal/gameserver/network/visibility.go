@@ -6,7 +6,9 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -31,17 +33,12 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
-					var frame wire.Frame
-					err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
-						var buildErr error
-						frame, buildErr = serverpackets.FramePetItemList(items, inv.Templates())
-						return buildErr
-					})
-					if err != nil {
-						p.log.Error().Err(err).Msg("build PetItemList")
-						return
-					}
-					p.sendVisibilityFrame(frame)
+					// PetInventoryUpdate is drained and sent on p's queue, but
+					// discovery can run on another actor's: a summon-friend cast
+					// teleports p from the caster's queue. Building the snapshot
+					// there would let an update drained after it overtake it, so
+					// the snapshot is always taken and sent on p's queue.
+					p.Queue().Post(func() { p.sendPetItemList(o, inv) })
 				}
 			}
 			return
@@ -61,6 +58,27 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
+}
+
+// sendPetItemList sends the owner's full pet inventory, draining the pending
+// PetInventoryUpdate queue it supersedes. It runs on p's queue; a pet
+// unsummoned before it ran gets nothing.
+func (p *livePlayer) sendPetItemList(pet *summon.Actor, inv *itemcontainer.Inventory) {
+	sim.AssertOwner(p.Queue())
+	if !pet.Visible() {
+		return
+	}
+	var frame wire.Frame
+	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+		var buildErr error
+		frame, buildErr = serverpackets.FramePetItemList(items, inv.Templates())
+		return buildErr
+	})
+	if err != nil {
+		p.log.Error().Err(err).Msg("build PetItemList")
+		return
+	}
+	p.sendVisibilityFrame(frame)
 }
 
 // liveSummonOwner returns the connected player controlling a.
