@@ -21,6 +21,7 @@ import (
 // flush would re-insert it, so the guard has to keep answering for an item
 // until its write has run rather than until a save merely picked it up.
 func TestDestroyedCollarIsNotRestoredWhileItsDeleteIsQueued(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)})
 	// Holding the collar's lane must not also hold the owner's, or it would
 	// stall the logout instead of the delete the test is about.

@@ -13,6 +13,7 @@ import (
 // Fixture NPCs are not registered on the 1s AI task, so an idle intention
 // after this call means the combat-hate path queued the desire and waited.
 func TestFirstCombatHateAttacksWithoutAITick(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -35,6 +36,7 @@ func TestFirstCombatHateAttacksWithoutAITick(t *testing.T) {
 // skips the immediate AI loop when a most-hated attacker is already on the
 // threat table. The desire still queues; the next tick promotes it.
 func TestAttackDesireWithExistingHateWaitsForTick(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -58,6 +60,7 @@ func TestAttackDesireWithExistingHateWaitsForTick(t *testing.T) {
 // does not count as most-hated, so the first attack desire still runs the
 // AI loop immediately.
 func TestFirstAttackDesireWithoutMostHatedAttacksWithoutAITick(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

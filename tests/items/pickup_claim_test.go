@@ -20,6 +20,7 @@ import (
 // same click picks it up, and the claim a pickup keeps means the drop can
 // never be taken a second time.
 func TestPickupLosesToEarlierClaim(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -62,6 +63,7 @@ func TestPickupLosesToEarlierClaim(t *testing.T) {
 // drop and is then refused (here by a full inventory) hands it back, so the
 // next picker still can take it.
 func TestRejectedPickupReleasesClaim(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -87,6 +89,7 @@ func TestRejectedPickupReleasesClaim(t *testing.T) {
 // inventory. Run on the real pool (ACIS_SIM_EXECUTOR=pool) this is where two
 // pickups actually overlap.
 func TestConcurrentPickupsTakeOneItem(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	first := srv.Client
 	firstID := srv.SoleObjectID(t)
@@ -122,6 +125,7 @@ func TestConcurrentPickupsTakeOneItem(t *testing.T) {
 // expired drop a pickup is holding stays in the world, and the next tick
 // after the pickup gives it back expires it.
 func TestGroundCleanupSkipsClaimedDrop(t *testing.T) {
+	t.Parallel()
 	tmpl := &item.Template{ID: 57, Stackable: true}
 	now := time.Unix(0, 0)
 	state := world.New()

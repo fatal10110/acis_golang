@@ -33,6 +33,7 @@ func bootCorpsePlayerCaster(t *testing.T, def modelskill.Definition) *gameserver
 }
 
 func TestCorpsePlayerCastRejections(t *testing.T) {
+	t.Parallel()
 	t.Run("living target", func(t *testing.T) {
 		srv := bootCorpsePlayerCaster(t, corpsePlayerSkill())
 		caster := srv.Client

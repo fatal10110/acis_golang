@@ -71,6 +71,7 @@ func assertRestoredBy(t *testing.T, r *wire.Reader, healer string, amount int32)
 // self-cast: the hit-time StatusUpdate reports both the restored HP — clamped
 // at the stat-computed max — and the charged MP.
 func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -105,6 +106,7 @@ func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 }
 
 func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
+	t.Parallel()
 	const (
 		skillID  = 1219
 		headroom = 8
@@ -138,6 +140,7 @@ func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
 }
 
 func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
+	t.Parallel()
 	const (
 		damageSkillID = 1227
 		healSkillID   = 1228
@@ -178,6 +181,7 @@ func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
 // damaged caster and verifies each production effect sweep visibly restores
 // HP until the caster reaches full health, where the ticks fall silent.
 func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -239,6 +243,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 // self-cast and checks the number-only restored message. The reported
 // amount is the first applied restore, not the doubled HP actually added.
 func TestHealEffectSelfCastSendsHPRestoredMessage(t *testing.T) {
+	t.Parallel()
 	const (
 		skillID   = 1221
 		headroom  = 8
@@ -277,6 +282,7 @@ func TestHealEffectSelfCastSendsHPRestoredMessage(t *testing.T) {
 // TestManaHealEffectSelfCastSendsMPRestoredMessage lands a ManaHeal effect
 // on a self-cast and checks the number-only restored message.
 func TestManaHealEffectSelfCastSendsMPRestoredMessage(t *testing.T) {
+	t.Parallel()
 	const (
 		skillID   = 1222
 		headroom  = 8
@@ -322,6 +328,7 @@ func TestManaHealEffectSelfCastSendsMPRestoredMessage(t *testing.T) {
 // TestHealEffectOtherCastSendsHPRestoredByHealer lands a Heal effect from
 // one player onto another and checks the named restored-by message.
 func TestHealEffectOtherCastSendsHPRestoredByHealer(t *testing.T) {
+	t.Parallel()
 	const (
 		skillID   = 1223
 		headroom  = 8

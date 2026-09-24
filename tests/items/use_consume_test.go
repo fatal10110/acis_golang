@@ -145,6 +145,7 @@ func assertSystemMessageSkill(t *testing.T, frame []byte, messageID, skillID, le
 // packets, the tick-driven stack decrement in both the packet stream and
 // the items row, and the reuse-window rejection for the second use.
 func TestUseHealingPotionAppliesAndConsumes(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -186,6 +187,7 @@ func TestUseHealingPotionAppliesAndConsumes(t *testing.T) {
 // player's own object with its real reuse delay, and one unit of the scroll
 // is consumed once the cast starts.
 func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -208,6 +210,7 @@ func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
 }
 
 func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -240,6 +243,7 @@ func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 // intention, which runs when the first cast finishes. Each routed cast
 // consumes one stack unit.
 func TestUseTwoSkillItemQueuesLaterAICast(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -270,6 +274,7 @@ func TestUseTwoSkillItemQueuesLaterAICast(t *testing.T) {
 // attached skill still on reuse answers S1_PREPARED_FOR_REUSE without
 // cancelling the first skill's already-started cast timeline.
 func TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -299,6 +304,7 @@ func TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst(t *testing.T) {
 // one replaces the earlier, and only that last skill runs when the swing
 // finishes — one stack unit consumed.
 func TestUseTwoSkillItemWhileAttackingCastsOnlyLast(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -385,6 +391,7 @@ func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window
 // dead gate. Each rejection answers instead of silently dropping the click,
 // and the connection stays responsive.
 func TestUseItemGates(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -435,6 +442,7 @@ func barrier(t *testing.T, c *testsupport.ScriptedClient) {
 // player in a flying transport mode, the potion's use condition answers
 // S1_CANNOT_BE_USED naming the item, and the stack is untouched.
 func TestUseFlyingConditionRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -457,6 +465,7 @@ func TestUseFlyingConditionRejected(t *testing.T) {
 // for an item under an active disable produces no reply at all and consumes
 // nothing.
 func TestDisabledItemUseIsSilent(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -480,6 +489,7 @@ func TestDisabledItemUseIsSilent(t *testing.T) {
 // restore skill is announced, a StatusUpdate carries the refreshed MP once
 // the batching task drains, and one unit leaves the stack and the row.
 func TestUseManaPotionRestoresMPAndConsumes(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -511,6 +521,7 @@ func TestUseManaPotionRestoresMPAndConsumes(t *testing.T) {
 // where it reports ForceMaxLevelReached instead, consuming one stone per
 // use either way.
 func TestUseEnergyStoneCapsForceCharges(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -582,6 +593,7 @@ func TestUseEnergyStoneCapsForceCharges(t *testing.T) {
 // AI-cast path: a second scroll use inside the reuse window answers
 // S1_PREPARED_FOR_REUSE only and consumes nothing further.
 func TestEscapeScrollReuseIsRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(consumableSkills(t)),
 		gameservertest.WithCharacter("Newbie", 5, 0),

@@ -96,6 +96,7 @@ func bootEnchanter(t *testing.T, roll func() float64, weaponEnchant int32, bless
 // scroll. Each branch is asserted on packets, world-independent inventory
 // state, and the persisted rows.
 func TestEnchantScrollFlow(t *testing.T) {
+	t.Parallel()
 	t.Run("success persists enchant level", func(t *testing.T) {
 		srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { return 0.0 }, 0, false, nil)
 		c := srv.Client
@@ -236,6 +237,7 @@ func TestEnchantScrollFlow(t *testing.T) {
 // 9900-distance rejection still cancels — the reference clears the
 // selection before that cap is checked.
 func TestWalkCancelsActiveEnchant(t *testing.T) {
+	t.Parallel()
 	t.Run("accepted walk closes enchant then moves", func(t *testing.T) {
 		srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { return 0.0 }, 0, false, nil)
 		c := srv.Client
@@ -276,6 +278,7 @@ func TestWalkCancelsActiveEnchant(t *testing.T) {
 // TestEnchantRequestWithoutSelectionIsSilent pins the missing-selection
 // branch: RequestEnchantItem with no scroll opened produces no reply at all.
 func TestEnchantRequestWithoutSelectionIsSilent(t *testing.T) {
+	t.Parallel()
 	srv, _, weapon, _ := bootEnchanter(t, func() float64 { return 0.0 }, 0, false, nil)
 	c := srv.Client
 	drainUntilQuiet(t, c)

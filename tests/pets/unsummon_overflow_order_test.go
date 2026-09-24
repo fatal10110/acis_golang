@@ -23,6 +23,7 @@ import (
 // object id would keep the adena and drop the food; container order keeps the
 // food and drops the adena.
 func TestUnsummonOverflowFollowsContainerOrder(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t,
 		seedItem{TemplateID: item.AdenaID, Count: 100},
 		seedItem{TemplateID: wolfFoodID, Count: 2},

@@ -17,6 +17,7 @@ import (
 // Sense (skill 294) through the real stores and verifies EnterWorld announces
 // the night/day state change with the skill-name parameter tuple.
 func TestEnterWorldAnnouncesShadowSenseState(t *testing.T) {
+	t.Parallel()
 	var objID int32
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
@@ -131,6 +132,7 @@ func seedEnchanter(t *testing.T, currentLevel int, opts ...gameservertest.Option
 // bound shortcut before the success message lands, refreshes the skill list
 // and user info, and persists the enchanted level.
 func TestEnchantSkillSuccessRefreshesShortcut(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := seedEnchanter(t, 1, gameservertest.WithSkillTrees(enchantTree(101, 100)))
 	bindSkillShortcut(t, srv, objID, 0, 1, 1)
 	startInWorld(t, c)
@@ -160,6 +162,7 @@ func TestEnchantSkillSuccessRefreshesShortcut(t *testing.T) {
 // 0, deterministic dice above the rate) resets the skill to its top
 // non-enchanted level, re-points the shortcut first, and reports the failure.
 func TestEnchantSkillFailureResetsShortcutAndLevel(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := seedEnchanter(t, 101,
 		gameservertest.WithSkillTrees(enchantTree(102, 0)),
 		gameservertest.WithSkillEnchantRoll(func() int { return 50 }),

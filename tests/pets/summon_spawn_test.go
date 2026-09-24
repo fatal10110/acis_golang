@@ -13,6 +13,7 @@ import (
 // SUMMON_A_PET, MagicSkillUse cast by the player, then PetInfo +
 // PetItemList once the spawn lands — with no pets row written yet.
 func TestCollarUseSpawnsWolfBesideOwner(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 
 	pet, burst := h.spawnWolf(t)
@@ -66,6 +67,7 @@ func TestCollarUseSpawnsWolfBesideOwner(t *testing.T) {
 // while the wolf is out: the cast runs again but the spawn is rejected with
 // SUMMON_ONLY_ONE and the original wolf stays.
 func TestSecondCollarUseWhilePetActiveAnswersSummonOnlyOne(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	first, _ := h.spawnWolf(t)
 
@@ -92,6 +94,7 @@ func TestSecondCollarUseWhilePetActiveAnswersSummonOnlyOne(t *testing.T) {
 // silent, no despawn, no persistence write. Only the return command (19)
 // sends a pet back into its collar.
 func TestUnsummonShortcutOnAPetStaysSilent(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
@@ -112,6 +115,7 @@ func TestUnsummonShortcutOnAPetStaysSilent(t *testing.T) {
 // (action 19): after the pet's StopMove, the owner gets PetDelete, world
 // state drops the summon, and the collar's pets row persists full vitals.
 func TestReturnCommandDespawnsPetAndSavesRow(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
@@ -136,6 +140,7 @@ func TestReturnCommandDespawnsPetAndSavesRow(t *testing.T) {
 // returns the pet, then respawns: the restored wolf carries the persisted
 // name instead of the template default.
 func TestRespawnAfterSaveRestoresSavedName(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 

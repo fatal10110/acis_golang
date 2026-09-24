@@ -20,6 +20,7 @@ import (
 // one InventoryUpdates tick delivers exactly one modified-entry
 // InventoryUpdate, and the items row matches the remaining stack.
 func TestDestroyFlushesBatchedUpdate(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -52,6 +53,7 @@ func TestDestroyFlushesBatchedUpdate(t *testing.T) {
 // the removed source row and the added crystal reward, mirrored by the items
 // rows.
 func TestCrystallizeGrantsCrystals(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -110,6 +112,7 @@ func TestCrystallizeGrantsCrystals(t *testing.T) {
 // crystallize skill the request answers CrystallizeLevelTooLow only, and the
 // weapon row survives.
 func TestCrystallizeWithoutSkillIsRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -132,6 +135,7 @@ func TestCrystallizeWithoutSkillIsRejected(t *testing.T) {
 // the ItemList and nothing else about that stack, and the drain that follows
 // has nothing left to send.
 func TestItemListDiscardsPendingInventoryUpdates(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -180,6 +184,7 @@ func TestItemListDiscardsPendingInventoryUpdates(t *testing.T) {
 // task, placing them right behind it on the queue with no gate or sleep, and
 // the client must see the snapshot before that drain's InventoryUpdate.
 func TestItemListReplyPrecedesDrainQueuedBehindIt(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

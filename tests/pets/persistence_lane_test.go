@@ -19,6 +19,7 @@ import (
 // for the lane nor read the stale row: it restores the state the return
 // queued, so the gained exp survives.
 func TestRespawnRestoresQueuedReturnSave(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 	pet.AddExpAndSp(100, 0)
@@ -42,6 +43,7 @@ func TestRespawnRestoresQueuedReturnSave(t *testing.T) {
 // behind the collar's held lane, then renames it. The rename's pets-row write must land
 // after the queued autosave write, so the row keeps the new name.
 func TestRenameLandsAfterQueuedPetSave(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
@@ -65,6 +67,7 @@ func TestRenameLandsAfterQueuedPetSave(t *testing.T) {
 // hands between them, as the reference's synchronous store on unsummon
 // guarantees.
 func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	buyerID := h.srv.SeedCharacterFor(t, "player2", "Buyer", 1, 0).ID
 	if buyerID%persist.Lanes == h.ownerID%persist.Lanes {
@@ -135,6 +138,7 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 // delete must wait behind the queued save: once the lane drains, the pets row
 // is gone rather than recreated by the save landing after the delete.
 func TestDestroyedCollarPetRowStaysDeleted(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 

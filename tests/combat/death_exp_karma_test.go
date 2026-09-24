@@ -111,6 +111,7 @@ func readExpLossMessage(t *testing.T, c *scriptedClient, wantLost int64) {
 // round(span * ExpLossAtDeath / 100) — 200 of its 1500 — announced on the
 // wire and persisted at logout.
 func TestDeathCostsConfiguredExperience(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSeed(seedExperiencedCharacter(1500, 0)),
@@ -146,6 +147,7 @@ func TestDeathCostsConfiguredExperience(t *testing.T) {
 // karma-positive victim's loss percentage is scaled by RateKarmaExpLost
 // (400 instead of 200) and its karma drops by floor(lostExp / modifier / 15).
 func TestKarmaDeathLosesKarma(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSeed(seedExperiencedCharacter(1500, 240)),

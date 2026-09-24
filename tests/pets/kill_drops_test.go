@@ -26,6 +26,7 @@ func dropMonsterTemplate() *npc.Template {
 // to the pet's owner, the pet's acting player, whether the pet deals the
 // whole lethal hit or only a final hit too small to count as reward damage.
 func TestPetKillDropsLootProtectedToOwner(t *testing.T) {
+	t.Parallel()
 	cases := map[string]func(*npc.Hostile, attackable.Combatant) bool{
 		"lethal hit": func(monster *npc.Hostile, pet attackable.Combatant) bool {
 			return monster.TakeDamage(1_000_000, pet)

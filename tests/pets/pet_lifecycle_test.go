@@ -15,6 +15,7 @@ import (
 // get their update frames in the transfer's registration order, and the
 // items rows reflect owner and pet stacks.
 func TestGiveItemToPetMovesStackAndPersists(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 100})
 	h.spawnWolf(t)
 	adenaID := h.seededItem(t, item.AdenaID)
@@ -64,6 +65,7 @@ func (h *petWorld) petInventoryAdena(t *testing.T) item.InstanceState {
 
 // TestGetItemFromPetReturnsStackToOwner pulls a carried stack back out.
 func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 100})
 	h.spawnWolf(t)
 	adenaID := h.seededItem(t, item.AdenaID)
@@ -86,6 +88,7 @@ func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
 // names the pet as picker, the ground object despawns, and the stack lands
 // in the pet's carried inventory.
 func TestPetPickupGroundItem(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 40})
 	petActor, _ := h.spawnWolf(t)
 	adenaID := h.seededItem(t, item.AdenaID)
@@ -141,6 +144,7 @@ func TestPetPickupGroundItem(t *testing.T) {
 // a pet looting armor or a weapon announces 1535 to nearby other clients
 // with the owner name; the owner never receives the attention packet.
 func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		templateID int32
@@ -189,6 +193,7 @@ func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
 }
 
 func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
+	t.Parallel()
 	srv := bootPets(t)
 	ownerID := srv.SoleObjectID(t)
 	collarID := srv.GiveItem(t, ownerID, wolfCollarID, 1)
@@ -232,6 +237,7 @@ func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
 }
 
 func TestPetPickupAttentionSkippedForEtcItems(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 40})
 	h.spawnWolf(t)
 	adenaID := h.seededItem(t, item.AdenaID)
@@ -269,6 +275,7 @@ func TestPetPickupAttentionSkippedForEtcItems(t *testing.T) {
 // unit is consumed, and the meal gauge stays capped (the pet spawns fed to
 // its max meal) through the return-time save.
 func TestFeedPetConsumesFoodAndRaisesMealGauge(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: wolfFoodID, Count: 2})
 	petActor, _ := h.spawnWolf(t)
 	foodID := h.seededItem(t, wolfFoodID)

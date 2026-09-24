@@ -11,6 +11,7 @@ import (
 // Christmas Tree: like any creature target it answers ValidateLocation
 // before MyTargetSelected.
 func TestSelectingDecorationSendsValidateLocationFirst(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: treeKitID, Count: 1})
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
 	frame := mustRead(t, h.client, "tree NPCInfo")

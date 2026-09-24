@@ -35,6 +35,7 @@ func bootCorpsePetCaster(t *testing.T) *gameservertest.Server {
 // gets INVALID_TARGET, and a dead non-pet gets S1_CANNOT_BE_USED carrying
 // that skill's name, then the actor's MoveToPawn rotation.
 func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
+	t.Parallel()
 	t.Run("living target", func(t *testing.T) {
 		srv := bootCorpsePetCaster(t)
 		c := srv.Client

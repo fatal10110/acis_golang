@@ -15,6 +15,7 @@ var playerOrigin = location.Location{X: 10, Y: 20, Z: 30}
 // ValidateLocation, MyTargetSelected naming the monster, and the monster's
 // full-health StatusUpdate snapshot.
 func TestActionSelectSendsTargetPackets(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -33,6 +34,7 @@ func TestActionSelectSendsTargetPackets(t *testing.T) {
 // MyTargetSelected, StatusUpdate — and the repeated request attacks:
 // AutoAttackStart and Attack go out, and a hit visibly drains the monster.
 func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -62,6 +64,7 @@ func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
 // regression: clients attack by plain-clicking twice; the second Action click
 // on an in-range target must swing immediately.
 func TestSecondActionClickAttacksSelectedTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -84,6 +87,7 @@ func TestSecondActionClickAttacksSelectedTarget(t *testing.T) {
 // of the same regression: the second plain click on a far mob must answer
 // with MoveToPawn — the walk into range — not silence.
 func TestSecondActionClickWalksTowardDistantTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -109,6 +113,7 @@ func sitPlayer(t *testing.T, c *scriptedClient) {
 // a second Action click on an in-range target answers ActionFailed and does
 // not start a swing.
 func TestSittingPlayerCannotAttackSelectedTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -136,6 +141,7 @@ func TestSittingPlayerCannotAttackSelectedTarget(t *testing.T) {
 // gate: a second Action click on a distant target answers ActionFailed and
 // does not start MoveToPawn.
 func TestSittingPlayerCannotApproachSelectedTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -159,6 +165,7 @@ func TestSittingPlayerCannotApproachSelectedTarget(t *testing.T) {
 // AttackRequest on a far target only selects it — no AutoAttackStart until
 // the actor is actually in range.
 func TestAttackRequestOnDistantTargetSelectsOnly(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -181,6 +188,7 @@ func TestAttackRequestOnDistantTargetSelectsOnly(t *testing.T) {
 // TestRequestTargetCancelAnswersActionFailed pins the Esc/unselect reply:
 // RequestTargetCancel answers ActionFailed after clearing the target.
 func TestRequestTargetCancelAnswersActionFailed(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

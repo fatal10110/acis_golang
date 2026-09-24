@@ -13,6 +13,7 @@ import (
 // casting. The stun aborts the cast, so the monster keeps its HP once the hit
 // would have come due, and the pet's idle returns it to following its owner.
 func TestStunnedPetStrikeLandsNothing(t *testing.T) {
+	t.Parallel()
 	h, petActor, hostile := bootWolfStriker(t)
 	startWolfStrike(t, h)
 

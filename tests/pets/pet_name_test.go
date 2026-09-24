@@ -29,6 +29,7 @@ func sysMessages(frames [][]byte) [][]byte {
 // TestRenamePetAppliesAndPersists renames an unnamed pet: the pet's name
 // changes in world state and the pets row is written immediately.
 func TestRenamePetAppliesAndPersists(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 
@@ -56,6 +57,7 @@ func TestRenamePetAppliesAndPersists(t *testing.T) {
 // TestRenamePetValidationOrder walks the reference's rejection gates: empty
 // length first, then invalid pattern; both leave the pet unnamed.
 func TestRenamePetValidationOrder(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
@@ -79,6 +81,7 @@ func TestRenamePetValidationOrder(t *testing.T) {
 // TestRenamePetRejectsTakenName seeds another pet's row with the target
 // name: uniqueness is global across pets, answered with its own message.
 func TestRenamePetRejectsTakenName(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 	if err := h.srv.Pets.Save(petCtx(), 999999, pet.State{Name: "Fenrir", Level: wolfLevel}); err != nil {
@@ -95,6 +98,7 @@ func TestRenamePetRejectsTakenName(t *testing.T) {
 // TestRenamePetNPCNameCollisionIsSilent covers the npc-name collision:
 // naming a pet after an NPC template rejects silently, before any packet.
 func TestRenamePetNPCNameCollisionIsSilent(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 
@@ -113,6 +117,7 @@ func TestRenamePetNPCNameCollisionIsSilent(t *testing.T) {
 // TestAlreadyNamedPetCannotBeRenamedAgain pins the once-only naming rule:
 // a named pet rejects any further rename request with its own message.
 func TestAlreadyNamedPetCannotBeRenamedAgain(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 	renameTo(t, h, "Fenrir")

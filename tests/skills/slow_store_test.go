@@ -26,6 +26,7 @@ const slowStoreDelay = 120 * time.Millisecond
 // speed, the watchdog logs nothing, and the row lands once the worker
 // drains.
 func TestSlowKnownSkillStoreKeepsQueuesFree(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t,
 		gameservertest.WithCharacter("Newbie", 5, 50),
 		gameservertest.WithWantChars(1),

@@ -913,9 +913,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		o.log = zerolog.New(logs)
 	}
 
-	prevCancelLesser := effect.CancelLesser()
-	effect.SetCancelLesser(o.cancelLesserEffect)
-	t.Cleanup(func() { effect.SetCancelLesser(prevCancelLesser) })
+	// The switch is process-wide. Write it only when a test overrides the
+	// default, so parallel tests that keep the default never race on it;
+	// a test that overrides it must not call t.Parallel.
+	if prev := effect.CancelLesser(); prev != o.cancelLesserEffect {
+		effect.SetCancelLesser(o.cancelLesserEffect)
+		t.Cleanup(func() { effect.SetCancelLesser(prev) })
+	}
 
 	db := sqltest.SharedDB(t)
 	chars := gamesql.NewCharacterStore(db)

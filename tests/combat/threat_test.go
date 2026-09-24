@@ -41,6 +41,7 @@ var (
 // TestThreatOrdersAttackersByHateNotDamage pins the ordering rule: the most
 // hated attacker is the one with the highest hate, not the highest damage.
 func TestThreatOrdersAttackersByHateNotDamage(t *testing.T) {
+	t.Parallel()
 	f := newThreatFixture(t)
 	f.owner.AddDamage(f.first, 100, 10)
 	f.owner.AddDamage(f.second, 5, 50)
@@ -54,6 +55,7 @@ func TestThreatOrdersAttackersByHateNotDamage(t *testing.T) {
 // TestThreatMostHatedSkipsNonPositiveHate pins that stopped or zeroed hate
 // keeps its entry but can no longer win MostHated.
 func TestThreatMostHatedSkipsNonPositiveHate(t *testing.T) {
+	t.Parallel()
 	f := newThreatFixture(t)
 	f.owner.AddDamage(f.first, 50, 50)
 	f.owner.AddDamage(f.second, 10, 10)
@@ -74,6 +76,7 @@ func TestThreatMostHatedSkipsNonPositiveHate(t *testing.T) {
 // TestThreatDecayReducesAllHate pins the decay primitive: one reduction pass
 // lowers every attacker's hate by the decay amount.
 func TestThreatDecayReducesAllHate(t *testing.T) {
+	t.Parallel()
 	f := newThreatFixture(t)
 	f.owner.AddDamage(f.first, 100, 100)
 	f.owner.AddDamage(f.second, 40, 60)
@@ -94,6 +97,7 @@ func TestThreatDecayReducesAllHate(t *testing.T) {
 // TestThreatRefreshDropsLostAttackers pins the visibility sweep: attackers
 // that are no longer visible leave the table; visible ones stay.
 func TestThreatRefreshDropsLostAttackers(t *testing.T) {
+	t.Parallel()
 	f := newThreatFixture(t)
 	f.owner.AddDamage(f.first, 100, 100)
 	f.owner.AddDamage(f.second, 40, 60)

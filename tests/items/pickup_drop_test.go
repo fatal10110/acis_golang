@@ -29,6 +29,7 @@ const (
 // tick-driven InventoryUpdate), and an empty items_on_ground table after the
 // pickup. Movement must stay responsive after the pickup resolves.
 func TestDropGroundItemRoundTrip(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -157,6 +158,7 @@ func TestDropGroundItemRoundTrip(t *testing.T) {
 // CannotDiscardThisItem system message answers, and nothing leaves the
 // inventory.
 func TestDropItemRejectsZeroCount(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -233,6 +235,7 @@ func mustFindItemByTemplate(t *testing.T, srv *gameservertest.Server, ownerID, t
 // in-range click does — GetItem, DeleteObject broadcast, merged inventory
 // stack, and an empty items_on_ground table.
 func TestPickupWalksToDistantGroundItem(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -293,6 +296,7 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 // player's drop answers ActionFailed plus the failed-pickup system message,
 // and the ground item stays where it is.
 func TestPickupRejectsLootLockedByOtherOwner(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
@@ -316,6 +320,7 @@ func TestPickupRejectsLootLockedByOtherOwner(t *testing.T) {
 // picker has an open trade, a pickup click answers ActionFailed followed by
 // CannotPickupOrUseItemTrading, and nothing leaves the ground.
 func TestPickupRejectedWhileTrading(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -350,6 +355,7 @@ func TestPickupRejectedWhileTrading(t *testing.T) {
 // TestPickupSlotsFullRejection pins the full-inventory rejection: ActionFailed
 // leads the SlotsFull message so the client's click is always released.
 func TestPickupSlotsFullRejection(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -378,6 +384,7 @@ func TestPickupSlotsFullRejection(t *testing.T) {
 // attention system message naming the picker and the item; an etc-item
 // pickup announces nothing.
 func TestPickupAttentionAnnouncedToObservers(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -417,6 +424,7 @@ func TestPickupAttentionAnnouncedToObservers(t *testing.T) {
 }
 
 func TestPickupAttentionSkippedForEtcItems(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -451,6 +459,7 @@ func TestPickupAttentionSkippedForEtcItems(t *testing.T) {
 // any weight change — not only band crossings — sends StatusUpdate(CUR_LOAD)
 // to the owner.
 func TestWeightGaugeRefreshesOnEveryChange(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -483,6 +492,7 @@ func TestWeightGaugeRefreshesOnEveryChange(t *testing.T) {
 // The full carry/warehouse/quest filtering matrix stays in the itemcontainer
 // package's pure-function tests.
 func TestPackageSendableList(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

@@ -17,6 +17,7 @@ import (
 // synchronously on the killer's queue, so the order holds on the worker pool
 // as well as inline.
 func TestLethalHitOrdersStatusRewardDie(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

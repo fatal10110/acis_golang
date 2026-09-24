@@ -13,6 +13,7 @@ import (
 // arrived-blocked correction: observers get MoveToLocation to the actor's
 // current cell, not StopMove.
 func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -90,6 +91,7 @@ func (g *routedGateGeo) FindPath(_, _ location.Location) ([]location.Location, b
 }
 
 func TestBlockedMidRouteBroadcastsNextLegMoveToLocation(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

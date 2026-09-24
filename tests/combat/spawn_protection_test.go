@@ -68,6 +68,7 @@ func readProtectionMessage(t *testing.T, c *scriptedClient) string {
 // teleport-completing Appearing activates protection, the next movement
 // answers that acting lifted it.
 func TestSpawnProtectionEndsWhenPlayerActs(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -86,6 +87,7 @@ func TestSpawnProtectionEndsWhenPlayerActs(t *testing.T) {
 // TestSpawnProtectionExpires pins the timer leg: protection left untouched
 // ends on its own with the ended announcement.
 func TestSpawnProtectionExpires(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

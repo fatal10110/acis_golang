@@ -3,6 +3,7 @@ package pets
 import "testing"
 
 func TestAutosavePersistsLivePetState(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	actor, _ := h.spawnWolf(t)
 	actor.SetHP(37)

@@ -12,6 +12,7 @@ const petStopAction = int32(17)
 // aggressor's queue. Run under -race on the real pool, an unguarded target
 // or intention field fails here.
 func TestPetTargetAndIntentSurviveAnotherActorsCommands(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)

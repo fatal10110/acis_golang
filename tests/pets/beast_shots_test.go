@@ -12,6 +12,7 @@ import (
 // the charge cast by the pet itself, one per-hit unit leaves the stack, and
 // the pet reports itself charged.
 func TestBeastSoulshotChargesPetAndConsumes(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: beastSoulshotID, Count: 10})
 	petActor, _ := h.spawnWolf(t)
 	shotID := h.seededItem(t, beastSoulshotID)
@@ -51,6 +52,7 @@ func TestBeastSoulshotChargesPetAndConsumes(t *testing.T) {
 // PETS_ARE_NOT_AVAILABLE_AT_THIS_TIME when no summon is out and consumes
 // nothing.
 func TestBeastSoulshotWithoutSummonRejectsWithoutConsuming(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: beastSoulshotID, Count: 10})
 	shotID := h.seededItem(t, beastSoulshotID)
 
@@ -68,6 +70,7 @@ func TestBeastSoulshotWithoutSummonRejectsWithoutConsuming(t *testing.T) {
 // charged pet attacking a targeted monster, the first landed hit consumes
 // the charge and its stack unit.
 func TestPetAttackConsumesChargedBeastSoulshot(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: beastSoulshotID, Count: 10})
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
