@@ -93,9 +93,10 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 	f.conn.SetReadDeadline(time.Now().Add(frameInFlight))
 	payload, err := wire.ReadFrame(io.MultiReader(bytes.NewReader(first[:]), f.conn))
 	if err != nil {
-		// Not a timeout to the callers that tolerate one: the stream is
-		// already misaligned.
-		return nil, fmt.Errorf("frame cut off after its first byte: %w", err)
+		// Formatted, not wrapped: a caller that tolerates a timeout must
+		// not find one in here, however it inspects the error, because the
+		// stream is already misaligned.
+		return nil, fmt.Errorf("frame cut off after its first byte: %v", err)
 	}
 	f.received.Add(1)
 	return payload, nil
