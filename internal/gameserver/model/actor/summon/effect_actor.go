@@ -17,19 +17,40 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 	return a.owner, true
 }
 
-// AbortAll does nothing yet: effect-driven aborts are not wired. Despawn
-// already aborts through the AI's AbortAll; wiring this means delegating to
-// it.
-func (a *Actor) AbortAll(bool) {}
+// AbortAll stops the summon's movement, attack and cast and sends it idle,
+// then clears its target when resetTarget is set. None of it is
+// client-visible beyond the stop broadcasts the controllers already send.
+//
+// ponytail: the idle is unconditional. An actor already disabled before the
+// interrupting effect keeps its intention instead, but no command can give a
+// disabled summon a new intention, so it is already idle by then.
+func (a *Actor) AbortAll(resetTarget bool) {
+	if a.brain != nil {
+		a.brain.AbortAll()
+	}
+	a.TryToIdle()
+	if resetTarget {
+		a.SetTarget(nil)
+	}
+}
 
-// StopMove does nothing yet: effect-driven movement stops are not wired.
-func (a *Actor) StopMove() {}
+// StopMove stops the summon's movement.
+func (a *Actor) StopMove() {
+	if a.brain != nil {
+		a.brain.StopMove()
+	}
+}
 
-// ClearTarget does nothing yet: effect-driven target clearing is not wired.
-func (a *Actor) ClearTarget() {}
+// ClearTarget clears the summon's target.
+func (a *Actor) ClearTarget() { a.SetTarget(nil) }
 
-// StopAttack does nothing yet: effect-driven attack stops are not wired.
-func (a *Actor) StopAttack() {}
+// StopAttack stops the summon's attack and sends it idle; see AbortAll.
+func (a *Actor) StopAttack() {
+	if a.brain != nil {
+		a.brain.StopAttack()
+	}
+	a.TryToIdle()
+}
 
 // Afraid reports false: summon fear state is not modeled yet.
 func (a *Actor) Afraid() bool { return false }

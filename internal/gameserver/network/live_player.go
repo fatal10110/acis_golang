@@ -373,6 +373,33 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 	return pet
 }
 
+// tryToIdle drops every intention p holds, active and queued, and stops its
+// movement. A character that was already unable to act keeps its intentions
+// and only answers ActionFailed. One still casting answers ActionFailed too:
+// its idle waits on the cast, which every caller stops next.
+//
+// ponytail: the sit/stand transition also defers the idle in the same way;
+// not modeled, since no effect-driven stop reaches a player mid-transition
+// with anything queued to drop.
+func (p *livePlayer) tryToIdle(denied bool) {
+	if denied {
+		p.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	casting := p.CastingNow()
+	p.takePickup()
+	p.takeDeferredPickup()
+	p.takeDeferredMagicSkill()
+	p.takeDeferredItemAICast()
+	p.takePetInteract()
+	if p.combat != nil {
+		p.combat.Stop()
+	}
+	if casting {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
 // clearParkedApproaches drops pickup, pet-interact, and deferred-magic
 // approach slots so a later walk or chase cannot inherit them.
 func (p *livePlayer) clearParkedApproaches() {

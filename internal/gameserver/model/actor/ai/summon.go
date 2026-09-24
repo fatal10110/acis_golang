@@ -166,6 +166,12 @@ func (s *Summon) TryToIdle() {
 	s.move.Stop()
 }
 
+// StopMove stops movement; intentions are left as they are.
+func (s *Summon) StopMove() { s.move.Stop() }
+
+// StopAttack stops the attack cycle; intentions are left as they are.
+func (s *Summon) StopAttack() { s.attack.Stop() }
+
 // AbortAll stops movement, the attack cycle and any in-flight cast, in that
 // order. Intentions are left as they are.
 func (s *Summon) AbortAll() {

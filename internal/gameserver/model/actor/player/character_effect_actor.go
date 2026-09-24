@@ -1,27 +1,40 @@
 package player
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 var _ effect.PlayerActor = (*Character)(nil)
 
+// AbortAll stops c's movement, attack and cast, then clears its target when
+// resetTarget is set.
+func (c *Character) AbortAll(resetTarget bool) {
+	c.emit(event.ActionsStopRequested{Move: true, Attack: true, Cast: true, AIDenied: c.aiDeniedBeforeEffect()})
+	if resetTarget {
+		c.SetTarget(nil)
+	}
+}
+
+// StopMove stops c's movement.
+func (c *Character) StopMove() { c.emit(event.ActionsStopRequested{Move: true}) }
+
+// ClearTarget clears c's target.
+func (c *Character) ClearTarget() { c.SetTarget(nil) }
+
+// StopAttack stops c's attack.
+func (c *Character) StopAttack() {
+	c.emit(event.ActionsStopRequested{Attack: true, AIDenied: c.aiDeniedBeforeEffect()})
+}
+
+func (c *Character) aiDeniedBeforeEffect() bool {
+	return c.Dead() || c.liveLocked().AIDeniedBeforeEffect()
+}
+
 // The effect hooks below have no player behavior yet; each is a deliberate
 // no-op (or false) so the effect runs exactly as it did before the player
 // side existed.
-
-// AbortAll does nothing yet: aborting every in-progress action is not wired.
-func (c *Character) AbortAll(bool) {}
-
-// StopMove does nothing yet: effect-driven movement stops are not wired.
-func (c *Character) StopMove() {}
-
-// ClearTarget does nothing yet: effect-driven target clearing is not wired.
-func (c *Character) ClearTarget() {}
-
-// StopAttack does nothing yet: effect-driven attack stops are not wired.
-func (c *Character) StopAttack() {}
 
 // FearImmune reports false: fear immunity is not modeled yet.
 func (c *Character) FearImmune() bool { return false }

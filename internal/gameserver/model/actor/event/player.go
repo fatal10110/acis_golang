@@ -12,6 +12,12 @@ import (
 // IncludeMP, its MP) that observers must see.
 type VitalsChanged struct{ IncludeMP bool }
 
+// ActionsStopRequested asks for the named in-progress actions to be stopped
+// by the server rather than the client: movement, then the attack, then the
+// cast. AIDenied reports that the character was already unable to take AI
+// actions before the effect that requested the stop landed.
+type ActionsStopRequested struct{ Move, Attack, Cast, AIDenied bool }
+
 // BowDrawn reports that a bow shot started drawing; GaugeMs covers the attack
 // time plus reuse.
 type BowDrawn struct{ GaugeMs int }
@@ -209,6 +215,7 @@ type ChargeMessage struct {
 type ChargesChanged struct{}
 
 func (VitalsChanged) event()          {}
+func (ActionsStopRequested) event()   {}
 func (BowDrawn) event()               {}
 func (StanceChanged) event()          {}
 func (FakeDeathRevived) event()       {}

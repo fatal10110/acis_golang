@@ -27,6 +27,10 @@ type AI interface {
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
 	TryToCast(target attackable.Combatant, ref modelskill.Ref) bool
+	// AbortAll stops movement, the attack cycle and any in-flight cast.
+	AbortAll()
+	StopMove()
+	StopAttack()
 	// AttackingNow reports whether this summon's own attack cycle is
 	// currently in flight, matching CreatureAttack.isAttackingNow
 	// (CreatureAttack.java:56-59): a plain start/stop flag on the summon's

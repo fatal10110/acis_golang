@@ -239,6 +239,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
 		}
+	case event.ActionsStopRequested:
+		stopLiveActions(live, e)
 	case event.CastAborted:
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:
@@ -353,4 +355,23 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		return
 	}
 	live.combat.Stop()
+}
+
+// stopLiveActions stops the actions e names in movement, attack, cast order.
+// Stopping the attack sends the character idle, then answers ActionFailed;
+// stopping the cast answers MagicSkillCanceled (when one was running) and
+// ActionFailed, then sends the character idle.
+func stopLiveActions(live *livePlayer, e event.ActionsStopRequested) {
+	if e.Move {
+		live.move.Stop()
+	}
+	if e.Attack {
+		live.attack.Stop()
+		live.tryToIdle(e.AIDenied)
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+	if e.Cast {
+		live.StopCast()
+		live.tryToIdle(e.AIDenied)
+	}
 }
