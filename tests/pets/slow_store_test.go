@@ -23,7 +23,8 @@ const slowStoreDelay = 120 * time.Millisecond
 // goroutine that is already waiting — so a pets table slower than the sim
 // pool's slow-task budget stalls neither the queue nor the client's replies.
 func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
-	t.Parallel()
+	// Not parallel: the slow-task budget and the drain's read timeout are
+	// wall-clock, so other tests' CPU load fails them spuriously.
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithCapturedLog(),
 		gameservertest.WithRealPool(), // the slow-task watchdog runs only on the pool
