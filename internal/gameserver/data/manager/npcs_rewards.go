@@ -172,7 +172,8 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 		return
 	}
 	for _, entry := range entries {
-		if entry.actor.AlikeDead() {
+		// Only real death forfeits the exp; Fake Death keeps it.
+		if entry.actor.Dead() {
 			continue
 		}
 		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)

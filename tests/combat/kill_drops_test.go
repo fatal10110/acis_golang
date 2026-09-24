@@ -4,9 +4,12 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -110,6 +113,51 @@ func TestDeadTopDealerReceivesDrops(t *testing.T) {
 	if !monster.SpoilPool().Sweepable() {
 		t.Fatal("spoil pool empty, want the dead top dealer's spoil roll")
 	}
+}
+
+// TestFakeDeadAttackerKeepsKillExp pins the exp gate to real death: an
+// attacker playing dead when a guard finishes the monster still earns the
+// kill's exp and SP.
+func TestFakeDeadAttackerKeepsKillExp(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithLevels(levelTableFor(t)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	monster := spawnRewardedNPC(t, srv, 5000, 25)
+	guard := srv.SpawnHostileNPCKindAt(t, "Guard", location.Location{X: hostileX + 40, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	player, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %T is not an online character", obj)
+	}
+
+	if monster.TakeDamage(int(monster.CurrentHP())/2, player) {
+		t.Fatal("player's half-HP hit killed the monster")
+	}
+	fakeDeath, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatalf("new fake-death effect: %v", err)
+	}
+	fakeDeath.Effected = player
+	player.EffectList().Add(fakeDeath)
+	if !player.FakeDead() || player.Dead() {
+		t.Fatalf("player FakeDead=%v Dead=%v, want fake death only", player.FakeDead(), player.Dead())
+	}
+	if !monster.TakeDamage(1_000_000, guard) {
+		t.Fatal("guard's lethal hit did not kill the monster")
+	}
+
+	// The guard is no reward entry, so the player's damage is the whole
+	// total and earns the full share.
+	wantExp, wantSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
+	readExpSpGain(t, c, wantExp, wantSp)
 }
 
 // TestKillWithoutPlayerReceiverDropsNothing covers every death no player
