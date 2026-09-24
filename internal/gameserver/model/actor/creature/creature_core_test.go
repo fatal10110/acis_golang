@@ -501,10 +501,6 @@ type facingStub struct {
 func (s facingStub) Position() (int, int, int) { return s.x, s.y, s.z }
 func (s facingStub) Heading() int              { return s.heading }
 
-type nightStub bool
-
-func (n nightStub) IsNight() bool { return bool(n) }
-
 func TestAttackFacingBehindFrontAndSide(t *testing.T) {
 	target := facingStub{heading: 0}
 
@@ -521,26 +517,6 @@ func TestAttackFacingBehindFrontAndSide(t *testing.T) {
 	behind, inFront = AttackFacing(target, facingStub{y: 100})
 	if behind || inFront {
 		t.Fatalf("side attacker: behind=%v inFront=%v, want false, false", behind, inFront)
-	}
-}
-
-func TestNightReadsInstalledSource(t *testing.T) {
-	prev := nightSource.Load()
-	t.Cleanup(func() { nightSource.Store(prev) })
-
-	SetNightSource(nil)
-	if Night() {
-		t.Fatal("Night() = true with no source, want day")
-	}
-
-	SetNightSource(nightStub(true))
-	if !Night() {
-		t.Fatal("Night() = false after installing night source")
-	}
-
-	SetNightSource(nightStub(false))
-	if Night() {
-		t.Fatal("Night() = true after installing day source")
 	}
 }
 

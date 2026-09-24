@@ -52,7 +52,7 @@ func (Creature) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {
 func (Creature) PhysicalSkillInput(creature.FormulaActor, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return formulas.PhysicalSkillInput{}, false
 }
-func (Creature) MagicDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.MagicDamageInput, bool) {
+func (Creature) MagicDamageInput(creature.FormulaActor, modelskill.Definition, bool) (formulas.MagicDamageInput, bool) {
 	return formulas.MagicDamageInput{}, false
 }
 func (Creature) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {

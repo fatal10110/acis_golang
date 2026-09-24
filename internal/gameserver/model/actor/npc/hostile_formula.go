@@ -299,9 +299,9 @@ func (h *Hostile) PhysicalSkillInput(caster creature.FormulaActor, def modelskil
 }
 
 // MagicDamageInput resolves the damage formula input for a magic skill cast by
-// caster against h.
-func (h *Hostile) MagicDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.MagicDamageInput, bool) {
-	return creature.ResolveMagicDamageInput(caster, h, def, creature.Playable(caster) && h.Kind().Playable())
+// caster against h, rolling resist when magicFailures is set.
+func (h *Hostile) MagicDamageInput(caster creature.FormulaActor, def modelskill.Definition, magicFailures bool) (formulas.MagicDamageInput, bool) {
+	return creature.ResolveMagicDamageInput(caster, h, def, creature.Playable(caster) && h.Kind().Playable(), magicFailures)
 }
 
 // BlowInput resolves the damage formula input for a blow skill cast by caster

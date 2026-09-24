@@ -192,8 +192,9 @@ func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.
 }
 
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
-// pair.
-func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.MagicDamageInput, bool) {
+// pair. magicFailures is the server's MagicFailures switch: when set, the cast
+// rolls for a half or full resist.
+func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Definition, pvp, magicFailures bool) (formulas.MagicDamageInput, bool) {
 	if attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
 	}
@@ -219,16 +220,13 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 		BlessedSoulShot: bsps,
 		Shield:          shield,
 	}
-	if shield != formulas.ShieldPerfect {
+	if shield != formulas.ShieldPerfect && magicFailures {
 		applyMagicFailure(&in, attacker, target, def)
 	}
 	return in, true
 }
 
 func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaActor, def modelskill.Definition) {
-	if !formulas.MagicFailuresEnabled() {
-		return
-	}
 	rate := formulas.MagicSuccessRate(target.Level(), attacker.Level(), def.MagicLevel, def.LevelDepend, attacker.WeaponGradePenalty())
 	first := formulas.MagicSucceeds(rate, attacker.Roll(10000))
 	isPlayer := attacker.Kind() == actor.KindPlayer

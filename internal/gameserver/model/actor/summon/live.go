@@ -257,7 +257,7 @@ type PetTickResult struct {
 
 // PetConfig carries the minimum state needed to create a live pet.
 type PetConfig struct {
-	Activity        effect.ActivityRegistry
+	Effects         effect.Env
 	ObjectID        int32
 	Owner           Owner
 	ControlItemID   int32
@@ -307,7 +307,7 @@ type PetConfig struct {
 
 // ServitorConfig carries the minimum state needed to create a live servitor.
 type ServitorConfig struct {
-	Activity        effect.ActivityRegistry
+	Effects         effect.Env
 	ObjectID        int32
 	Owner           Owner
 	NPCID           int
@@ -367,7 +367,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		return nil, err
 	}
 	a.initVitals()
-	a.effects = effect.NewList(a, effect.WithActivityRegistry(cfg.Activity))
+	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	return a, nil
 }
 
@@ -422,7 +422,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		return nil, err
 	}
 	a.initVitals()
-	a.effects = effect.NewList(a, effect.WithActivityRegistry(cfg.Activity))
+	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	return a, nil
 }
 

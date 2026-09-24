@@ -133,6 +133,8 @@ type PlayerConfig struct {
 	// count every character starts with. Known Divine Inspiration levels
 	// add on top of this at MaxBuffCount time.
 	MaxBuffsAmount int
+	// MagicFailures makes magic-damage casts roll for a half or full resist.
+	MagicFailures bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -171,7 +173,7 @@ type GameClientLink struct {
 	attackStance  AttackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
-	effects       effect.ActivityRegistry
+	effects       effect.Env
 	positions     *task.PositionUpdates
 	playerClock   *task.PlayerClock
 	gameClock     *task.GameClock
@@ -271,7 +273,7 @@ type GameClientLinkConfig struct {
 	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
-	Effects       effect.ActivityRegistry
+	Effects       effect.Env
 	Positions     *task.PositionUpdates
 	PlayerClock   *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
@@ -381,12 +383,12 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 		trades:           tradebook.NewBook(time.Now),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
-		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, handlerskill.SignetDeps{
+		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, handlerskill.SignetDeps{
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,
 			NewSink:   EffectPointSinks(cfg.World),
-			Activity:  cfg.Effects,
+			Effects:   cfg.Effects,
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
@@ -405,7 +407,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 // itemcontainer.NewPetInventoryWithDelivery (delivery and persistence) before
 // calling this method; NewPetInventory has neither.
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
-	cfg.Activity = l.effects
+	cfg.Effects = l.effects
 	cfg.Config = &l.petConfig
 	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
 	if cfg.SkillDefs == nil {

@@ -160,7 +160,9 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
-type mdamHandler struct{}
+// mdamHandler resolves MDAM/DEATHLINK; magicFailures is the server's
+// MagicFailures switch.
+type mdamHandler struct{ magicFailures bool }
 
 func (mdamHandler) Types() []string { return []string{"MDAM", "DEATHLINK"} }
 
@@ -168,7 +170,7 @@ func (h mdamHandler) Use(cast Cast) {
 	h.UseResult(cast)
 }
 
-func (mdamHandler) UseResult(cast Cast) Result {
+func (h mdamHandler) UseResult(cast Cast) Result {
 	var result Result
 	if alikeDead(cast.Caster) {
 		return result
@@ -178,7 +180,7 @@ func (mdamHandler) UseResult(cast Cast) Result {
 		if !ok || target.Dead() {
 			continue
 		}
-		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill)
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
 		if !ok {
 			continue
 		}

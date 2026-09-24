@@ -87,7 +87,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithActivityRegistry(s.Effects))
+	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithEnv(s.effectEnv))
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
@@ -99,6 +99,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
+	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	hostile.Attach(npc.Runtime{
 		World: s.State,
 		Items: s.itemTable,
@@ -297,7 +298,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	inst.HasHome = true
 	inst.Home = home
 	statRef := &movingHostileStatRef{}
-	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithActivityRegistry(s.Effects))
+	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithEnv(s.effectEnv))
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)
 	}
@@ -316,6 +317,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	if err != nil {
 		t.Fatalf("new hostile npc: %v", err)
 	}
+	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile

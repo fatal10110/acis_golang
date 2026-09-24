@@ -132,8 +132,8 @@ Two entry points, both untagged:
   service, held until the test ends, then truncated and returned. Each test running in parallel
   gets its own, and a `t.Run` subtest gets a different one from its parent, so seed and `Boot`
   on the same `t`. Pair it with `TestMain(m) { os.Exit(sqltest.Main(m)) }`. This is what
-  behavior suites and `gameservertest.Boot` use. Suites may call `t.Parallel()`, except a test
-  that overrides a process-wide switch such as `WithCancelLesserEffect` (#2481).
+  behavior suites and `gameservertest.Boot` use. Suites may call `t.Parallel()`: gameplay
+  settings are per server (`Boot` options), never package globals.
 - `sqltest.NewDB(t)` — a dedicated database per call on the shared MariaDB service; reserved for
   store-level tests that want full isolation.
 

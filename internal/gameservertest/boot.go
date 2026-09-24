@@ -43,6 +43,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -85,6 +86,9 @@ type options struct {
 	maxBuffsAmount         int
 	storeSkillCooltime     bool
 	cancelLesserEffect     bool
+	magicFailures          bool
+	night                  conditions.NightSource
+	maxGeoPathFailCount    int
 	seed                   func(*gamesql.CharacterStore, *gamesql.ItemStore)
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
@@ -221,6 +225,25 @@ func WithMaxBuffsAmount(amount int) Option {
 // effect it displaces (default true).
 func WithCancelLesserEffect(enabled bool) Option {
 	return func(o *options) { o.cancelLesserEffect = enabled }
+}
+
+// WithMagicFailures sets the players.properties MagicFailures switch:
+// whether magic-damage casts roll for a half or full resist (default true).
+func WithMagicFailures(enabled bool) Option {
+	return func(o *options) { o.magicFailures = enabled }
+}
+
+// WithNightSource sets the in-game clock <game night=.../> stat conditions
+// and melee hit chance read on this server (default nil: always day).
+func WithNightSource(src conditions.NightSource) Option {
+	return func(o *options) { o.night = src }
+}
+
+// WithMaxGeoPathFailCount sets the geoengine.properties MaxGeopathFailCount
+// overflow threshold of every hostile the fixtures spawn (default 0: the
+// shipped 50).
+func WithMaxGeoPathFailCount(n int) Option {
+	return func(o *options) { o.maxGeoPathFailCount = n }
 }
 
 // WithSeed inserts rows through the real SQL stores before the client dials.
@@ -365,11 +388,15 @@ type Server struct {
 	autosaveClock    *autosaveClock
 	persist          *persist.Worker
 	logs             *lockedBuffer
-	queues           *queues
-	traffic          *traffic
-	heldLanes        [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
-	log              zerolog.Logger
-	sendObserver     *atomic.Pointer[func(payload []byte)]
+	// effectEnv is the Env every effect list this server builds shares.
+	effectEnv effect.Env
+	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
+	maxGeoPathFail int
+	queues         *queues
+	traffic        *traffic
+	heldLanes      [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
+	log            zerolog.Logger
+	sendObserver   *atomic.Pointer[func(payload []byte)]
 
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
@@ -917,6 +944,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		serverBypassDelay:      100 * time.Millisecond,
 		maxBuffsAmount:         20,
 		cancelLesserEffect:     true,
+		magicFailures:          true,
 		storeSkillCooltime:     true,
 	}
 	for _, opt := range opts {
@@ -927,14 +955,6 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.captureLog {
 		logs = &lockedBuffer{}
 		o.log = zerolog.New(logs)
-	}
-
-	// The switch is process-wide. Write it only when a test overrides the
-	// default, so parallel tests that keep the default never race on it;
-	// a test that overrides it must not call t.Parallel.
-	if prev := effect.CancelLesser(); prev != o.cancelLesserEffect {
-		effect.SetCancelLesser(o.cancelLesserEffect)
-		t.Cleanup(func() { effect.SetCancelLesser(prev) })
 	}
 
 	db := sqltest.SharedDB(t)
@@ -989,6 +1009,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// never decayed or despawned), so the next Boot in this process starts
 	// from an empty registry instead of also ticking this test's leftovers.
 	t.Cleanup(taskEffects.Reset)
+	effectEnv := effect.Env{Activity: taskEffects, KeepLesser: !o.cancelLesserEffect, Night: o.night}
 	groundStore := gamesql.NewGroundItemStore(db)
 	groundItems := task.NewGroundItems(state, task.GroundItemOptions{ItemAutoDestroy: time.Hour, PlayerDroppedMultiplier: 1}, time.Now)
 	clock := task.NewGameClock(time.Now)
@@ -1094,7 +1115,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	gclConfig := network.GameClientLinkConfig{
 		Validator:        validator,
-		Effects:          taskEffects,
+		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
 		Roster:           roster,
 		Items:            items,
@@ -1128,7 +1149,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
@@ -1286,6 +1307,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ShadowItems:      shadowItems,
 		AttackStance:     attackStance,
 		Effects:          taskEffects,
+		effectEnv:        effectEnv,
+		maxGeoPathFail:   o.maxGeoPathFailCount,
 		AI:               ai,
 		account:          o.account,
 		templates:        templates,
