@@ -58,6 +58,9 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 		frame.Release()
 		return false
 	}
+	if observe := s.conn.observeSend; observe != nil {
+		observe(frameBytes[frameHeaderSize:])
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
