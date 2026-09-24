@@ -552,6 +552,14 @@ func (l *GameClientLink) DeliverHitResult(result actorcast.EffectResult) {
 	l.sendSkillHandlerResult(nil, result)
 }
 
+// HostileCastEffects returns the effect handlers a hostile NPC's AI cast
+// dispatches through: the link's own target and skill registries (both
+// read-only after construction, so NPC and player queues share them) and
+// DeliverHitResult for target-addressed messages.
+func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
+	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, OnHitResult: l.DeliverHitResult}
+}
+
 // sendSkillHandlerResult delivers both caster-addressed messages (sent to
 // live, when connected) and target-addressed messages (resolved by ID
 // through l.livePlayerByID, independent of whether live is connected or

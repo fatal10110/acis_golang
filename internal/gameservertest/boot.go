@@ -24,6 +24,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -398,6 +399,8 @@ type Server struct {
 	logs             *lockedBuffer
 	// effectEnv is the Env every effect list this server builds shares.
 	effectEnv effect.Env
+	// castEffects is the link's hostile-NPC cast seam, as boot wires it.
+	castEffects actorcast.EffectHandlers
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
 	queues         *queues
@@ -1320,6 +1323,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		AttackStance:     attackStance,
 		Effects:          taskEffects,
 		effectEnv:        effectEnv,
+		castEffects:      gcl.HostileCastEffects(),
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		AI:               ai,
 		account:          o.account,

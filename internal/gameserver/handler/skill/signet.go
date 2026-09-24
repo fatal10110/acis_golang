@@ -3,6 +3,7 @@ package skill
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -43,8 +44,9 @@ type signetHeaded interface {
 	Heading() int
 }
 
-// signetGrounded optionally reports the ground point a caster picked for a
-// ground-targeted signet; a caster without one spawns the actor on itself.
+// signetGrounded optionally reports the ground point a player caster picked
+// for a ground-targeted signet; a caster without one spawns the actor on
+// itself.
 type signetGrounded interface {
 	GroundTarget() (int, int, int)
 }
@@ -179,19 +181,21 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	// caster's session, and its list's OnExit is what despawns it, so a
 	// queue closed by the caster's logout would strand the point in world.
 	queue := h.queues.NewQueue(fmt.Sprintf("effectpoint-%d", id))
-	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithEnv(h.effects))
+	point, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithEnv(h.effects))
 	if err != nil {
 		queue.Close()
 		return nil, false
 	}
-	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
+	point.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(point)})
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {
 		return nil, false
 	}
 	x, y, z := pos.Position()
-	if def.Target == modelskill.TargetGround {
+	// Only a player owns a picked ground point; any other caster of a
+	// ground-targeted signet spawns the point on itself.
+	if caster.Kind() == actor.KindPlayer && def.Target == modelskill.TargetGround {
 		if ground, ok := caster.(signetGrounded); ok {
 			x, y, z = ground.GroundTarget()
 		}
@@ -200,8 +204,8 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if hd, ok := caster.(signetHeaded); ok {
 		heading = hd.Heading()
 	}
-	actor.Spawn(x, y, z, heading)
-	return actor, true
+	point.Spawn(x, y, z, heading)
+	return point, true
 }
 
 // signetEffectMeta builds the effect metadata a signet-family effect
