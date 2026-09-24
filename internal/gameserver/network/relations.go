@@ -44,7 +44,7 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 	if l.world == nil {
 		return
 	}
-	karma := live.KarmaPoints
+	karma := live.Karma()
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
 
@@ -94,7 +94,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 	if l.world == nil || pet == nil {
 		return
 	}
-	karma := live.KarmaPoints
+	karma := live.Karma()
 	pvpFlag := live.PvPFlagState()
 	relation := relationBits(karma, pvpFlag)
 

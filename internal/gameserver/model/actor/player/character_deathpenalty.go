@@ -66,31 +66,17 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 // reference's
 // EtcStatusUpdate + DEATH_PENALTY_LEVEL_S1_ADDED send (Player.java:6527-6528).
 func (c *Character) RaiseDeathPenaltyLevel(killer attackable.Combatant, roll int) (int, bool) {
-	c.stateMu.Lock()
+	// Everything read from the killer, the karma counters, zones and the
+	// effect list is gathered before stateMu, which holds no other lock.
+	_, byPlayer := killer.(*Character)
+	karma := c.Karma()
+	inExemptZone := c.InPvPZone() || c.InSiegeZone()
+	charmOfLuck := c.EffectList().IsAffected(effect.FlagCharmOfLuck) && (killer == nil || killer.RaidRelated())
+	phoenixBlessing := c.EffectList().IsAffected(effect.FlagPhoenixBlessing)
 
-	if c.deathPenaltyLevel >= maxDeathPenaltyLevel {
-		c.stateMu.Unlock()
-		return c.deathPenaltyLevel, false
-	}
-	if _, byPlayer := killer.(*Character); byPlayer {
-		c.stateMu.Unlock()
-		return c.deathPenaltyLevel, false
-	}
-	if c.InPvPZone() || c.InSiegeZone() {
-		c.stateMu.Unlock()
-		return c.deathPenaltyLevel, false
-	}
-	if c.KarmaPoints <= 0 && roll > c.deathPenaltyChance {
-		c.stateMu.Unlock()
-		return c.deathPenaltyLevel, false
-	}
-	if c.EffectList().IsAffected(effect.FlagCharmOfLuck) {
-		if killer == nil || killer.RaidRelated() {
-			c.stateMu.Unlock()
-			return c.deathPenaltyLevel, false
-		}
-	}
-	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
+	c.stateMu.Lock()
+	if c.deathPenaltyLevel >= maxDeathPenaltyLevel || byPlayer || inExemptZone ||
+		(karma <= 0 && roll > c.deathPenaltyChance) || charmOfLuck || phoenixBlessing {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}

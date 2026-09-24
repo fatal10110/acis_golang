@@ -57,7 +57,7 @@ func EnchantOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 	if c == nil || trees == nil || skills == nil || skills.skills == nil {
 		return EnchantOffer{}, false
 	}
-	if !EnchantEligible(c.ClassID, c.CharLevel) {
+	if !EnchantEligible(c.ClassID, c.Level()) {
 		return EnchantOffer{}, false
 	}
 	if c.SkillLevel(skillID) >= level {
@@ -70,7 +70,7 @@ func EnchantOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 	if !ok {
 		return EnchantOffer{}, false
 	}
-	rate, ok := node.SuccessRateForLevel(c.CharLevel)
+	rate, ok := node.SuccessRateForLevel(c.Level())
 	if !ok {
 		return EnchantOffer{}, false
 	}
@@ -103,10 +103,11 @@ func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Templat
 	node := offer.Skill
 	result := EnchantResult{SkillID: skillID, Level: level, SP: node.SP, Exp: node.Exp}
 
-	if c.SP < node.SP {
+	progression := c.ProgressionValues()
+	if progression.SP < node.SP {
 		return result, EnchantNeedsSP, nil
 	}
-	if c.Exp-int64(node.Exp) < table.RequiredExpForLevel(EnchantMinCharLevel) {
+	if progression.Exp-int64(node.Exp) < table.RequiredExpForLevel(EnchantMinCharLevel) {
 		return result, EnchantNeedsExp, nil
 	}
 	if spBookNeeded && node.ItemID != 0 {

@@ -248,6 +248,27 @@ pool (Phase 2), so no queued task can block on the DB.
   every hook they fire today moves to a post on the owner's queue after unlock.
 - Atomics for HP/MP/CP, position, dead, target id; `atomic.Pointer` stat snapshot republished on
   recalculation (reuse `player.Vitals`, `npcinfo.Snapshot`, `attack.Snapshot`).
+  *Landed as (#2271 slice 4):* the cross-mutable subset already sits under per-actor leaf locks
+  that other actors take synchronously — `Character.vitalsMu`, `Hostile`'s `creature.Health`,
+  `mpMu` and `deathMu`, `summon.Actor`'s `vitals.mu`/`statusMu`, `ai.Attackable.mu` for hate, the
+  effect list's own lock — none held across a call-out. Position and heading are the
+  `world.Presence` seqlock; `dead`, status flags and abnormal masks are atomics; stat reads go
+  through per-stat `effect.Calculator` locks. No read moved to an atomic or `atomic.Pointer`
+  snapshot: the per-hit reads are uncontended `RLock`s and the perf re-run shows no regression.
+  The audit of every cross-actor surface (`attackable.Combatant`, `creature.FormulaActor`,
+  `effect.Actor`, the skill handlers' `Creature`/`Player`/`NPC`/`Summon`, `CharInfo`/`NpcInfo`
+  builders) found three unguarded groups, now fixed:
+  - progression and karma. A death runs on the killer's queue (or the victim's, for a DOT), so
+    the victim's exp, level and karma loss and the killer's PK/PvP counters are written off their
+    owner's queue. `Character.progressionMu` now also guards `KarmaPoints`, `PvPKills` and
+    `PKKills`; `Level`, `Karma` and `ProgressionValues` read under it, and every progression
+    change runs its events and level refreshes after unlock (`progressionHooks`, closes #2258).
+    Progression therefore stays a cross-actor lock, not queue-owned state.
+  - `item.SpoilPool` and `npc.SeedState`. Spoilers, sowers and harvesters act from their own
+    queues while the killer's fills and reads them; both take a mutex, and `Mark`, `Sow` and
+    `ClaimHarvest` check and claim in one step.
+  - `RaiseDeathPenaltyLevel` read the effect list and the killer while holding `stateMu`; it now
+    gathers those first.
 - Observers: region `OnInactiveRegion` posts the NPC reset (effects stopped, AI back to peace) to
   the NPC's queue with an on-arrival re-check that the region is still inactive; `OnActiveRegion`
   only clears an atomic latch and stays inline. *Landed as:* `world.Observer.Discover/Forget`
@@ -281,9 +302,13 @@ pool (Phase 2), so no queued task can block on the DB.
   re-run on the pool; perf baseline re-run.
 
 ### Phase 5 — mutex deletion sweeps (one PR per group; each site becomes `sim.AssertOwner`) — #2273
-1. `model/actor/player` + `network/live_player.go` (18 locks → `vitalsMu`; closes #2258 —
-   progression is queue-owned, level-up hooks run on the queue with nothing held).
+1. `model/actor/player` + `network/live_player.go` (18 locks → `vitalsMu`). `progressionMu` is
+   cross-actor (death exp/karma loss and PK/PvP credit run on another actor's queue, see Phase 3),
+   so it stays a leaf lock or folds into `vitalsMu`; #2258 closed with Phase 3 slice 4.
 2. `model/actor/npc` + `ai` + `summon` (16 → `vitalsMu`; summon state is owner-queue-owned).
+   `npc.SeedState.mu` and `item.SpoilPool.mu` (Phase 3 slice 4) guard per-life NPC state that
+   sowers, harvesters, spoilers and the killer change from their own queues; fold them into the
+   NPC's `vitalsMu` or keep them as leaf locks, but they stay cross-actor.
 3. `move`/`attack`/`cast`/`cubic`. The move/attack/cast controller locks stay as leaf container
    locks, because other actors stop, abort and interrupt them synchronously (Phase 3, landed).
    The same goes for the AI brains' locks (`ai.Attackable`, `ai.PlayerAttack`, `ai.Summon`) and
@@ -337,7 +362,8 @@ pool (Phase 2), so no queued task can block on the DB.
 - Phase 4: shutdown with online players saves every one before exit; relog mid-fight.
 - End state check: `rg -n "sync\.(RW)?Mutex" internal/gameserver/model internal/gameserver/skill`
   reports only `vitalsMu` (one per actor type), `Inventory`/container locks, and the leaf locks
-  cross-actor commands take synchronously (controllers, AI brains, target/stance state).
+  cross-actor commands take synchronously (controllers, AI brains, target/stance state), plus
+  `progressionMu`, `SeedState.mu` and `SpoilPool.mu` unless sweeps 1–2 fold them into `vitalsMu`.
 - Manual: run two clients in one region, trade, fight an NPC, relog mid-fight (autosave/detach
   ordering) per `docs/run-servers.md`.
 

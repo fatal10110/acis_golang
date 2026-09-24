@@ -47,12 +47,15 @@ func calculatePKKillKarmaGain(pkKills int) int {
 // others stay dormant until their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 	pk := killerPlayer(killer)
-	if pk == nil || pk == c || c.KarmaPoints != 0 || c.PvPFlagState() != task.PvPFlagNone {
+	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
+	pk.progressionMu.Lock()
 	pk.PKKills++
 	pk.KarmaPoints += calculatePKKillKarmaGain(pk.PKKills)
-	pk.notifyKarmaChanged()
+	karma := pk.KarmaPoints
+	pk.progressionMu.Unlock()
+	pk.notifyKarmaChanged(karma)
 	pk.UpdateUserInfo()
 	pk.BroadcastRelations()
 }
@@ -75,10 +78,18 @@ func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
 	pk.stateMu.RLock()
 	awardPKKillPVPPoint := pk.awardPKKillPVPPoint
 	pk.stateMu.RUnlock()
-	if c.KarmaPoints < 0 || (c.KarmaPoints > 0 && !awardPKKillPVPPoint) || (c.KarmaPoints == 0 && (pk.KarmaPoints != 0 || c.PvPFlagState() == task.PvPFlagNone)) {
+	victimKarma := c.Karma()
+	if victimKarma < 0 || (victimKarma > 0 && !awardPKKillPVPPoint) {
+		return
+	}
+	victimUnflagged := c.PvPFlagState() == task.PvPFlagNone
+	pk.progressionMu.Lock()
+	if victimKarma == 0 && (pk.KarmaPoints != 0 || victimUnflagged) {
+		pk.progressionMu.Unlock()
 		return
 	}
 	pk.PvPKills++
+	pk.progressionMu.Unlock()
 	pk.UpdateUserInfo()
 }
 
@@ -93,6 +104,6 @@ func killerPlayer(killer attackable.Combatant) *Character {
 	return pk
 }
 
-func (c *Character) notifyKarmaChanged() {
-	c.emit(event.KarmaChanged{Karma: c.KarmaPoints})
+func (c *Character) notifyKarmaChanged(karma int) {
+	c.emit(event.KarmaChanged{Karma: karma})
 }

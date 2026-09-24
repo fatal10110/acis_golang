@@ -70,6 +70,8 @@ func (sowHandler) Use(cast Cast) {
 		return
 	}
 
+	// A concurrent sower can take this life first; the loser stays silent,
+	// as the already-seeded branch above does.
 	state.Sow(caster.ObjectID(), seed)
 }
 
@@ -105,15 +107,12 @@ func (harvestHandler) Use(cast Cast) {
 		return
 	}
 
+	// The claim checks sown, unharvested and allowed-to-harvest in one step,
+	// so two harvesters cannot both take one crop.
 	state := target.SeedState()
-	if state == nil || !state.Seeded() || state.Harvested() {
+	if state == nil || !state.ClaimHarvest(caster.ObjectID()) {
 		return
 	}
-	if !state.AllowedToHarvest(caster.ObjectID()) {
-		return
-	}
-
-	state.MarkHarvested()
 
 	diff := caster.Level() - target.Level()
 	if rnd.Get(100) >= formulas.HarvestSuccessRate(diff) {

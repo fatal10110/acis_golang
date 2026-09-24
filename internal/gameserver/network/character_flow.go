@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
@@ -397,10 +398,11 @@ func expSpGainMessage(exp int64, sp int) wire.Frame {
 // messages go out, so a combined removal orders StatusUpdate(SP) ahead of
 // EXP_DECREASED_BY_S1 (PlayerStatus.java:583-603, PlayableStatus.java:133-145,
 // PlayerStatus.java:881-891).
-func sendExpSpLossFrames(live *livePlayer, exp int64, sp int) {
+func sendExpSpLossFrames(live *livePlayer, e event.ExpSPLost) {
+	exp, sp := e.Exp, e.SP
 	if sp > 0 {
 		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
-			{Type: serverpackets.StatusSP, Value: live.SP},
+			{Type: serverpackets.StatusSP, Value: e.SPLeft},
 		}))
 	}
 	if exp > 0 {

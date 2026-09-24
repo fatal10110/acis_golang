@@ -121,7 +121,7 @@ func (a characterStatActor) IsSitting() bool { return !a.c.Standing() }
 func (a characterStatActor) IsInOlympiadMode() bool { return false }
 
 // PkKills satisfies conditions.PlayerActor.
-func (a characterStatActor) PkKills() int { return a.c.PKKills }
+func (a characterStatActor) PkKills() int { return a.c.ProgressionValues().PKKills }
 
 // PledgeClass satisfies conditions.PlayerActor. Always 0: pledge rank isn't
 // modeled on Character yet (tracked in #1507), and no shipped stat func's

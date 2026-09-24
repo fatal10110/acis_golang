@@ -634,13 +634,13 @@ func targetColor(attacker *player.Character, target world.Tracked) int {
 	if !ok || !attackableTarget.AttackableBy(attacker) {
 		return 0
 	}
-	return attacker.CharLevel - targetLevel(target)
+	return attacker.Level() - targetLevel(target)
 }
 
 func targetLevel(target world.Tracked) int {
 	switch t := target.(type) {
 	case *livePlayer:
-		return t.CharLevel
+		return t.Level()
 	case *npc.Hostile:
 		if t.Instance != nil && t.Instance.Template != nil {
 			return t.Instance.Template.Level

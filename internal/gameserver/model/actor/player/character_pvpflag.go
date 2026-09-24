@@ -63,7 +63,7 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 		return false
 	}
 	if victim := pvpTargetPlayer(target); victim != nil {
-		return victim != c && (victim.PvPFlagState() != task.PvPFlagNone || victim.KarmaPoints > 0)
+		return victim != c && (victim.PvPFlagState() != task.PvPFlagNone || victim.Karma() > 0)
 	}
 	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
 		return false
@@ -92,12 +92,12 @@ func pvpTargetPlayer(target attackable.Combatant) *Character {
 // target.getActingPlayer() == null bail.
 func (c *Character) notePvPHitFromAttacker(attacker any) {
 	pk, ok := attacker.(*Character)
-	if !ok || pk == c || c.KarmaPoints != 0 {
+	if !ok || pk == c || c.Karma() != 0 {
 		return
 	}
 	if pk.InPvPZone() && c.InPvPZone() {
 		return
 	}
-	useFlagged := pk.KarmaPoints == 0 && c.PvPFlagState() != task.PvPFlagNone
+	useFlagged := pk.Karma() == 0 && c.PvPFlagState() != task.PvPFlagNone
 	pk.flagPvP(useFlagged)
 }

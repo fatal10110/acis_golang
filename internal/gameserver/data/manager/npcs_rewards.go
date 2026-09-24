@@ -112,9 +112,7 @@ func rewardLeader(entries []playerRewardEntry) (*player.Character, int) {
 			maxDealer = entry.actor
 			maxDamage = entry.damage
 		}
-		if entry.actor.CharLevel > highestLevel {
-			highestLevel = entry.actor.CharLevel
-		}
+		highestLevel = max(highestLevel, entry.actor.Level())
 	}
 	return maxDealer, highestLevel
 }
@@ -147,7 +145,7 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 		return
 	}
 	for _, entry := range entries {
-		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.CharLevel-d.tmpl.Level)
+		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
 		if d.hostile.OverhitValid(entry.actor) {
 			entry.actor.NotifyOverHit()
 			exp += d.hostile.OverhitBonus(exp)

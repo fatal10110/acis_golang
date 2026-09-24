@@ -291,13 +291,15 @@ func (c *Character) CharacterName() string { return c.Name }
 
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {
-	return c.CharLevel
+	return c.Level()
 }
 
 // Level satisfies the cast/target handler interfaces (cancelTarget,
 // seedableTarget, spoilableTarget, sowCaster, harvestCaster, magicCaster)
 // that require a Level() int method.
 func (c *Character) Level() int {
+	c.progressionMu.RLock()
+	defer c.progressionMu.RUnlock()
 	return c.CharLevel
 }
 
@@ -305,6 +307,8 @@ func (c *Character) Level() int {
 // Guard's or friendly monster's attack-target rule) that type-assert for a
 // Karma() int method.
 func (c *Character) Karma() int {
+	c.progressionMu.RLock()
+	defer c.progressionMu.RUnlock()
 	return c.KarmaPoints
 }
 

@@ -117,7 +117,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.ExpSPGained:
 		live.SendFrame(expSpGainMessage(e.Exp, e.SP))
 	case event.ExpSPLost:
-		sendExpSpLossFrames(live, e.Exp, e.SP)
+		sendExpSpLossFrames(live, e)
 	case event.KarmaChanged:
 		sendKarmaChangeFrames(live, e.Karma)
 	case event.RelationChanged:
