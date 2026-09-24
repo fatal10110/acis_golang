@@ -26,7 +26,9 @@ import (
 // gameSummonSpawner spawns a live player's pet or servitor for its summon
 // request events: it has the world, npc templates, summon-item table and
 // pet persistence the domain layer intentionally doesn't depend on directly.
-// One is created per connected live player.
+// It holds no state of its own: one is built per summon-request event from
+// the connection's link and live player, so per-player state belongs on
+// livePlayer, not here.
 type gameSummonSpawner struct {
 	link *GameClientLink
 	live *livePlayer
