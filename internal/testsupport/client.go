@@ -6,6 +6,9 @@
 package testsupport
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync/atomic"
@@ -70,7 +73,11 @@ func (f *ScriptedClient) Received() int64 { return f.received.Load() }
 // address for it.
 func (f *ScriptedClient) LocalAddr() net.Addr { return f.conn.LocalAddr() }
 
-// readFrame reads one raw frame, waiting up to d for it, and counts it.
+// readFrame reads one raw frame, waiting up to d for it to start, and counts
+// it. A frame whose first byte has arrived is read to the end within
+// frameInFlight: a deadline that ran out between its header and its payload
+// would report a timeout with part of the frame already consumed, and every
+// later read would start mid-frame.
 func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 	if f.await != nil {
 		if !f.await(d) {
@@ -78,12 +85,21 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 		}
 		d = frameInFlight
 	}
+	var first [1]byte
 	f.conn.SetReadDeadline(time.Now().Add(d))
-	payload, err := wire.ReadFrame(f.conn)
-	if err == nil {
-		f.received.Add(1)
+	if _, err := io.ReadFull(f.conn, first[:]); err != nil {
+		return nil, err
 	}
-	return payload, err
+	f.conn.SetReadDeadline(time.Now().Add(frameInFlight))
+	payload, err := wire.ReadFrame(io.MultiReader(bytes.NewReader(first[:]), f.conn))
+	if err != nil {
+		// Formatted, not wrapped: a caller that tolerates a timeout must
+		// not find one in here, however it inspects the error, because the
+		// stream is already misaligned.
+		return nil, fmt.Errorf("frame cut off after its first byte: %v", err)
+	}
+	f.received.Add(1)
+	return payload, nil
 }
 
 // writeFrame writes one raw frame and counts it.
