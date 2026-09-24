@@ -198,6 +198,8 @@ func TestTickerDropsTicksWhileOneIsQueued(t *testing.T) {
 	p := startPool(t, 1, zerolog.Nop())
 	q := p.NewQueue("q")
 	release := make(chan struct{})
+	unblock := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(unblock) // runs before startPool's stop, so a failure does not stall it
 	q.Post(func() { <-release })
 
 	var ticks int // queue-owned
@@ -223,7 +225,7 @@ func TestTickerDropsTicksWhileOneIsQueued(t *testing.T) {
 	waitFor("fired again", func() bool { return !tm.next.Equal(queuedNext) })
 	got := make(chan int)
 	q.Post(func() { got <- ticks }) // behind the one tick queued during the block
-	close(release)
+	unblock()
 
 	if n := <-got; n != 1 {
 		t.Fatalf("%d ticks ran for several periods blocked behind one task, want 1", n)
