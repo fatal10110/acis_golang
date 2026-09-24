@@ -64,20 +64,19 @@ func TestCollarUseSpawnsWolfBesideOwner(t *testing.T) {
 }
 
 // TestSecondCollarUseWhilePetActiveAnswersSummonOnlyOne re-uses the collar
-// while the wolf is out: the cast runs again but the spawn is rejected with
-// SUMMON_ONLY_ONE and the original wolf stays.
+// while the wolf is out: SummonItems.java:42-46 answers SUMMON_ONLY_ONE
+// before any cast starts, and the original wolf stays.
 func TestSecondCollarUseWhilePetActiveAnswersSummonOnlyOne(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	first, _ := h.spawnWolf(t)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET"), serverpackets.SystemMessageSummonAPet)
-	frame := mustRead(t, h.client, "second collar MagicSkillUse")
-	assertFrameOpcode(t, frame, serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
-
-	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeSystemMessage, "SUMMON_ONLY_ONE")
-	assertStaticSystemMessage(t, frames[len(frames)-1], serverpackets.SystemMessageSummonOnlyOne)
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_ONLY_ONE"), serverpackets.SystemMessageSummonOnlyOne)
+	assertNoCastFrames(t, drainFrames(t, h.client), "second collar use")
+	if h.srv.PlayerCastingNow(t, h.ownerID) {
+		t.Fatal("second collar use started a cast")
+	}
 
 	again, ok := h.srv.State.Summon(h.ownerID)
 	if !ok {
