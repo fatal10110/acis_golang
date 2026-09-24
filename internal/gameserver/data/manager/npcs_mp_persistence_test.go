@@ -62,7 +62,7 @@ func bootMPTestNpcs(t *testing.T, spawns *Spawns, templates *npc.Table) (*Npcs, 
 	}
 
 	npcs, err := NewNpcs(spawns, templates, fakeGeo{}, state, ids, decay, respawnTask, ai, positions, items,
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{}, npcQueues())
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

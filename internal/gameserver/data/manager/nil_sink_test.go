@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -47,7 +48,7 @@ func TestNewNpcsWithoutSinkFactoryWarns(t *testing.T) {
 	if _, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()}}), fakeGeo{}, state, &sequentialIDs{},
 		decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.New(&logs), nil, actorcast.EffectHandlers{},
-		walker, nil, effect.Env{}, npcQueues()); err != nil {
+		walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues()); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 	if !strings.Contains(logs.String(), "no NPC event sink factory") {
@@ -82,3 +83,19 @@ func TestNewWorldObjectsWithoutSinkFactoryWarns(t *testing.T) {
 // npcQueues runs NPC work on a virtual clock no test advances: timers armed
 // on its queues never fire.
 func npcQueues() *sim.Inline { return sim.NewInline(time.Unix(0, 0)) }
+
+// Without an effect activity registry no NPC effect would ever expire.
+func TestNewNpcsRejectsMissingEffectRegistry(t *testing.T) {
+	state := world.New()
+	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
+	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
+	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
+
+	_, err := NewNpcs(NewSpawns(&spawn.Table{}, nil), npc.NewTable(nil), fakeGeo{}, state, &sequentialIDs{},
+		decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{},
+		walker, nil, effect.Env{}, npcQueues())
+	if err == nil || !strings.Contains(err.Error(), "effect activity registry") {
+		t.Fatalf("NewNpcs() error = %v, want missing effect activity registry", err)
+	}
+}

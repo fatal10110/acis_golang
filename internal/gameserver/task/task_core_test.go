@@ -147,7 +147,10 @@ func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
 
 	// Each due actor costs the one task posted to its queue. The sweep
 	// itself allocates nothing; the few extra allow for the test loop
-	// growing its task slice.
+	// growing its task slice. The budget describes the production build.
+	if simdebugBuild {
+		return
+	}
 	if allocs := testing.AllocsPerRun(100, tick); allocs > float64(len(actors)+4) {
 		t.Fatalf("AllocsPerRun(128 actors) = %v, want <= %d", allocs, len(actors)+4)
 	}
@@ -586,7 +589,10 @@ func TestDecayTickAllocationIsFlat(t *testing.T) {
 
 	// Each due actor costs the one task posted to its queue. The sweep
 	// itself allocates nothing; the few extra allow for the test loop
-	// growing its task slice.
+	// growing its task slice. The budget describes the production build.
+	if simdebugBuild {
+		return
+	}
 	if allocs := testing.AllocsPerRun(100, tick); allocs > float64(len(actors)+4) {
 		t.Fatalf("AllocsPerRun(128 actors) = %v, want <= %d", allocs, len(actors)+4)
 	}
@@ -1651,6 +1657,9 @@ func TestPvPFlagsTickUpdatesBlinksAndExpires(t *testing.T) {
 // pre-sized to len(entries) would add ~5.1 KB more
 // (128 * sizeof(deadlineEntry[PvPFlagActor])) on every single call.
 func TestPvPFlagsTickDuePartitionIsNotPreSized(t *testing.T) {
+	if simdebugBuild {
+		t.Skip("byte budget describes the production build; simdebug drains allocate per task")
+	}
 	now := time.UnixMilli(0)
 	flags := NewPvPFlags(DefaultPvPFlagOptions(), func() time.Time { return now })
 	for i := 0; i < 128; i++ {

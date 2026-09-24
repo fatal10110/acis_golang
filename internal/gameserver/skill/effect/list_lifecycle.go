@@ -96,7 +96,7 @@ func (l *List) notifyActivityTransition() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	active := !l.emptyLocked()
+	active := !l.emptyLocked() && !l.untracked
 	if active == l.tracked {
 		return
 	}
