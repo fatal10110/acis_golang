@@ -130,7 +130,7 @@ func TestConfirmOutOfRangeCancelsTradeForBoth(t *testing.T) {
 		text   string
 	}{
 		{"first", h.first, "TraderTwo"},
-		{"second", h.second, "TraderOne"},
+		{"second", h.second, "TraderTwo"},
 	} {
 		frame := who.client.Read()
 		assertFrameOpcode(t, frame, serverpackets.OpcodeSendTradeDone, who.name+" SendTradeDone")
