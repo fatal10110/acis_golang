@@ -22,8 +22,9 @@ const (
 // local midnight preceding boot, then advances one in-game minute per Tick.
 // Night spans 00:00-05:59 in-game.
 //
-// All methods are safe for concurrent use; mu guards minutes, night and
-// dayNight.
+// All methods are safe for concurrent use; mu guards minutes, night and the
+// listener slices. Tick runs on the game-minute ticker while every actor
+// queue reads the time of day.
 type GameClock struct {
 	now   func() time.Time
 	start time.Time

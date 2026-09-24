@@ -91,10 +91,10 @@ type Actor struct {
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
 	// lifetime, combat stat bases, and invul:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
-	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
-	// the owner-connection and tick goroutines write them, per
-	// world.Observer's concurrency contract
-	// (internal/gameserver/world/visibility.go).
+	// via Level/Name/Fed/Lifetime when another player discovers this summon,
+	// on the queue that drives that visibility change, while the owner's
+	// queue writes them (world.Observer's contract,
+	// internal/gameserver/world/visibility.go).
 	statusMu sync.RWMutex
 	invul    bool
 	level    int
@@ -129,6 +129,8 @@ type Actor struct {
 	timeLostActive   int
 	itemConsumeID    int32
 	itemConsumeCount int
+	// expPenalty is immutable after construction.
+	expPenalty float32
 
 	petInventory  *itemcontainer.Inventory
 	petConfig     *petmodel.Config
@@ -327,9 +329,12 @@ type ServitorConfig struct {
 	TimeLostActive   int
 	ItemConsumeID    int32
 	ItemConsumeCount int
-	Roll             func(int) int
-	Stats            CombatStats
-	MaxBuffsAmount   int
+	// ExpPenalty is the share of kill exp this servitor withholds from its
+	// owner, from the summoning skill.
+	ExpPenalty     float32
+	Roll           func(int) int
+	Stats          CombatStats
+	MaxBuffsAmount int
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
@@ -359,6 +364,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		timeLostActive:   defaultPositive(cfg.TimeLostActive, 1000),
 		itemConsumeID:    cfg.ItemConsumeID,
 		itemConsumeCount: cfg.ItemConsumeCount,
+		expPenalty:       cfg.ExpPenalty,
 		roll:             defaultRoll(cfg.Roll),
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,

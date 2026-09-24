@@ -57,7 +57,9 @@ func (f Flag) String() string {
 // active until every zone that raised it has released it. The zero value
 // is ready to use.
 //
-// mu guards counts.
+// mu guards counts. Revalidation writes them from whichever queue moved the
+// actor (a summon-friend teleport runs on the caster's), while movement and
+// exit checks read them from the actor's own queue.
 type Flags struct {
 	mu     sync.RWMutex
 	counts [FlagCount]int32

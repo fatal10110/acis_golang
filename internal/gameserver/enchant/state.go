@@ -2,7 +2,8 @@ package enchant
 
 import "sync"
 
-// State owns per-player active enchant scroll selection. mu guards active.
+// State owns per-player active enchant scroll selection. mu guards active,
+// one map shared by every player's queue.
 type State struct {
 	mu     sync.Mutex
 	active map[int32]int32

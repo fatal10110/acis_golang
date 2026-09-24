@@ -38,7 +38,8 @@ func (a *Actor) combatStats() CombatStats {
 }
 
 type summonVitals struct {
-	// mu guards hp, mp, and Actor.dead.
+	// mu guards hp, mp, and Actor.dead. An attacker's hit writes them
+	// from the attacker's queue.
 	mu     sync.RWMutex
 	hp, mp float64
 }
@@ -46,7 +47,8 @@ type summonVitals struct {
 type summonStatCalcs struct {
 	// mu guards calcs slot creation; each slot's own Calculator then
 	// guards its own Mods independently, so a warm read only ever takes
-	// mu's read lock.
+	// mu's read lock. An attacker's formulas read these stats from the
+	// attacker's queue.
 	mu    sync.RWMutex
 	calcs [stat.Count]*effect.Calculator
 }

@@ -13,8 +13,9 @@ import (
 // TestSettleConfirmedTradeOutOfRangeCancels pins the settlement re-validate:
 // when the pair no longer passes liveness/distance at exchange time, the
 // reference cancels the whole trade for both players (SendTradeDone failure
-// plus canceled-trade messages), matching every other cancel path — it does
-// not finish the trade with the exchange-ended transfer-failure messages.
+// plus canceled-trade messages naming the confirmer, who cancels), matching
+// every other cancel path — it does not finish the trade with the
+// exchange-ended transfer-failure messages.
 func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	ctx := context.Background()
@@ -35,7 +36,7 @@ func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 	testsupport.AssertOpcodeSequence(t, secondCap.Frames(),
 		serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
 	assertTradeDoneFrame(t, secondCap.Frames()[0], false)
-	assertSystemMessageStringFrame(t, secondCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, "TraderOne")
+	assertSystemMessageStringFrame(t, secondCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, "TraderTwo")
 
 	if link.trades.HasActive(first.ObjectID()) || link.trades.HasActive(second.ObjectID()) {
 		t.Fatal("trade session was not cleared after failed settlement re-validation")
@@ -62,6 +63,32 @@ func TestSettleConfirmedTradePartnerGoneCancelsConfirmer(t *testing.T) {
 	assertSystemMessageStringFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, "TraderOne")
 	if n := len(secondCap.Frames()); n != 0 {
 		t.Fatalf("departed partner received %d frames, want none", n)
+	}
+}
+
+// TestCancelTradePartnerGoneCancelsCanceller pins a cancel whose partner left
+// the world while the session was still open: the canceller still gets the
+// SendTradeDone failure plus the canceled-trade message naming itself, and
+// the one who left gets nothing.
+func TestCancelTradePartnerGoneCancelsCanceller(t *testing.T) {
+	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
+	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
+	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
+
+	link.world.RemovePlayer(second.ObjectID())
+	testsupport.ResetCapture(firstCap, secondCap)
+
+	link.cancelTradeByID(first.ObjectID())
+
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
+		serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
+	assertTradeDoneFrame(t, firstCap.Frames()[0], false)
+	assertSystemMessageStringFrame(t, firstCap.Frames()[1], serverpackets.SystemMessageS1CanceledTrade, "TraderOne")
+	if n := len(secondCap.Frames()); n != 0 {
+		t.Fatalf("departed partner received %d frames, want none", n)
+	}
+	if link.trades.HasActive(first.ObjectID()) {
+		t.Fatal("trade session was not cleared after cancel")
 	}
 }
 

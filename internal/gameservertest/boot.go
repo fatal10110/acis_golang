@@ -24,6 +24,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -79,6 +80,7 @@ type options struct {
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
+	deepBlueDropRules      bool
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
 	persistWait            time.Duration
@@ -205,6 +207,12 @@ func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 // death may cost experience/karma (default false).
 func WithAllowDelevel(allow bool) Option {
 	return func(o *options) { o.allowDelevel = allow }
+}
+
+// WithDeepBlueDropRules sets the DeepBlueDropRules gate: whether an
+// out-leveled kill cuts the drop chance (default false).
+func WithDeepBlueDropRules(enabled bool) Option {
+	return func(o *options) { o.deepBlueDropRules = enabled }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -378,6 +386,7 @@ type Server struct {
 	templates        *player.TemplateTable
 	itemTable        *item.Table
 	levelTable       *player.LevelTable
+	deepBlueDrops    bool
 	ids              *sequentialIDs
 	positions        *task.PositionUpdates
 	addr             net.Addr
@@ -390,6 +399,8 @@ type Server struct {
 	logs             *lockedBuffer
 	// effectEnv is the Env every effect list this server builds shares.
 	effectEnv effect.Env
+	// castEffects is the link's hostile-NPC cast seam, as boot wires it.
+	castEffects actorcast.EffectHandlers
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
 	queues         *queues
@@ -1297,6 +1308,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		State:            state,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
+		deepBlueDrops:    o.deepBlueDropRules,
 		DB:               db,
 		Chars:            chars,
 		Items:            items,
@@ -1311,6 +1323,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		AttackStance:     attackStance,
 		Effects:          taskEffects,
 		effectEnv:        effectEnv,
+		castEffects:      gcl.HostileCastEffects(),
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		AI:               ai,
 		account:          o.account,

@@ -9,9 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
-	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
-	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -67,21 +64,8 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zer
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
 func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, effects effect.Env, pool *sim.Pool) (*manager.Npcs, error) {
-	// castTargets/castHandlers are a boot-owned instance for the hostile-NPC
-	// AI cast seam (issue #1612), built the same way NewGameClientLink builds
-	// its own per-connection instance — NPCs are spawned before any client
-	// connects, so they cannot share that one.
-	castTargets := skilltarget.NewRegistry(skilltarget.WorldKnown{State: state})
-	castHandlers := handlerskill.NewDefaultRegistryWithSignet(data.Skills, bool(gameplay.MagicFailures), handlerskill.SignetDeps{
-		Effects:   effects,
-		Templates: data.NPCs,
-		IDs:       ids,
-		World:     state,
-		Queues:    pool,
-		Log:       log,
-	})
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, actorcast.EffectHandlers{Targets: castTargets, Skills: castHandlers, OnHitResult: link.DeliverHitResult}, walker, network.HostileSinks(state), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), effects, pool, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), effects, pool, data.Zones)
 	if err != nil {
 		return nil, err
 	}

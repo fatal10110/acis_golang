@@ -135,6 +135,9 @@ type Definition struct {
 	CubicActivationTime   int
 	CubicActivationChance int
 	SummonTotalLifeTime   int
+	// ExpPenalty is the share of kill exp a servitor summoned by this skill
+	// withholds from its owner.
+	ExpPenalty float32
 
 	// WeaponsAllowed is the raw comma-separated weapon/armor type list a
 	// level restricts casting to, or "" when unrestricted. Resolving a name
@@ -275,6 +278,7 @@ type DefinitionAttrs struct {
 	CubicActivationTime   int
 	CubicActivationChance int
 	SummonTotalLifeTime   int
+	ExpPenalty            float32
 
 	WeaponsAllowed string
 
@@ -396,6 +400,7 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		CubicActivationTime:   a.CubicActivationTime,
 		CubicActivationChance: a.CubicActivationChance,
 		SummonTotalLifeTime:   a.SummonTotalLifeTime,
+		ExpPenalty:            a.ExpPenalty,
 
 		WeaponsAllowed: a.WeaponsAllowed,
 

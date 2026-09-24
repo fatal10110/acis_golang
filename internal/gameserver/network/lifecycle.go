@@ -216,6 +216,10 @@ func savePet(store petStore, actor *summon.Actor, ownerInv *itemcontainer.Invent
 // unsummon or logout queued and whose write has not run yet. A summon restores
 // from it instead of reading a row that is still behind the owner's lane, so
 // it never waits on persistence.
+//
+// mu stays a lock: add runs on the saving owner's queue, written on the
+// control item's persistence lane, and latest on whichever player summons
+// with that item next, which need not be the one who saved it.
 type queuedPets struct {
 	mu      sync.Mutex
 	seq     uint64

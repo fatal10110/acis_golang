@@ -2,7 +2,8 @@ package creature
 
 import "sync"
 
-// Health guards one actor's current hit points.
+// Health guards one actor's current hit points. An attacker's hit damages
+// them from the attacker's queue.
 type Health struct {
 	mu      sync.Mutex
 	current *float64

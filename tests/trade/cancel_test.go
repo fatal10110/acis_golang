@@ -13,7 +13,7 @@ import (
 
 // TestCancelMidWayReturnsItemsUntouched pins the mid-trade cancel: one side
 // answering TradeDone with response 0 ends the session for both players with
-// SendTradeDone failure plus the canceled-trade message, offered items stay
+// SendTradeDone failure plus the canceled-trade message naming the canceller, offered items stay
 // in their owners' inventories, and the cleared session ignores further
 // add-item packets.
 func TestCancelMidWayReturnsItemsUntouched(t *testing.T) {
@@ -32,7 +32,7 @@ func TestCancelMidWayReturnsItemsUntouched(t *testing.T) {
 		client *testsupport.ScriptedClient
 		text   string
 	}{
-		{"first", h.first, "TraderTwo"},
+		{"first", h.first, "TraderOne"},
 		{"second", h.second, "TraderOne"},
 	} {
 		frame := who.client.Read()
