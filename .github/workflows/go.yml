@@ -9,8 +9,22 @@ permissions:
 
 jobs:
   go:
+    name: go (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The slowest behavior suites get their own runners. In a single
+        # `go test ./...` they queue behind compiling every other package.
+        # Keep the `rest` exclusion list in sync with these packages.
+        shard:
+          - name: skills-pets
+            pkgs: ./tests/skills ./tests/pets
+          - name: combat-items
+            pkgs: ./tests/combat ./tests/items
+          - name: rest
+            pkgs: ""
     services:
       mariadb:
         image: mariadb:11
@@ -34,6 +48,7 @@ jobs:
           cache: true
 
       - name: Format
+        if: matrix.shard.name == 'rest'
         run: |
           out="$(gofmt -l cmd internal ops tests)"
           if [ -n "$out" ]; then
@@ -43,13 +58,23 @@ jobs:
           fi
 
       - name: Build
+        if: matrix.shard.name == 'rest'
         run: go build ./...
 
       - name: Vet
+        if: matrix.shard.name == 'rest'
         run: go vet ./...
 
       - name: Test
-        run: go test -race ./...
+        env:
+          PKGS: ${{ matrix.shard.pkgs }}
+        run: |
+          if [ -z "$PKGS" ]; then
+            PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
+          fi
+          # shellcheck disable=SC2086 # PKGS is a space-separated package list
+          go test -race $PKGS
 
       - name: Test (simdebug)
+        if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
