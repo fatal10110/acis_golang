@@ -287,17 +287,6 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 	id := int(auth.DesiredID)
 	entry, exists := l.servers.Get(id)
 	persist := false
-	host := auth.HostName
-	if host != "*" {
-		if resolved, err := l.lookupHost(host); err == nil && len(resolved) > 0 {
-			host = resolved[0]
-		} else {
-			l.log.Error().Str("host", host).Err(err).Msg("gameserver link: couldn't resolve hostname")
-			host = c.remoteIP.String()
-		}
-	} else {
-		host = c.remoteIP.String()
-	}
 
 	switch {
 	case exists && bytes.Equal(entry.HexID, auth.HexID):
@@ -329,6 +318,19 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 			return false
 		}
 		persist = true
+	}
+
+	// Only an accepted registration resolves its advertised host.
+	host := auth.HostName
+	if host != "*" {
+		if resolved, err := l.lookupHost(host); err == nil && len(resolved) > 0 {
+			host = resolved[0]
+		} else {
+			l.log.Error().Str("host", host).Err(err).Msg("gameserver link: couldn't resolve hostname")
+			host = c.remoteIP.String()
+		}
+	} else {
+		host = c.remoteIP.String()
 	}
 
 	if persist {
