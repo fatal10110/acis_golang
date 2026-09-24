@@ -321,16 +321,12 @@ func skillSaveRow(t *testing.T, srv *gameservertest.Server, objID, skillID, leve
 }
 
 // logout sends the logout request and consumes its reply sequence: the
-// LeaveWorld ack, the detach's unconditional cast-stop ActionFailed, and a
-// closed connection.
+// LeaveWorld ack, then a closed connection with nothing in between.
 func logout(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Send(encodeLogout())
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout reply opcode = %#x, want LeaveWorld", reply[0])
-	}
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack", reply[0])
 	}
 	c.ExpectClosed()
 }

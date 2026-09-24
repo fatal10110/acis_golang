@@ -46,9 +46,7 @@ func TestOnlineFlagTracksGamePresence(t *testing.T) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
+	// LeaveWorld is the last frame: detach's cast-stop ack is dropped.
 	c.ExpectClosed()
 
 	if got := persistedOnline(t, srv, objID); got != 0 {
@@ -92,9 +90,7 @@ func TestOnlineTimeAccruesAcrossSessions(t *testing.T) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
+	// LeaveWorld is the last frame: detach's cast-stop ack is dropped.
 	c.ExpectClosed()
 
 	final := persistedOnlineTime(t, srv, objID)

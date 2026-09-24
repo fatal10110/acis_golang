@@ -96,9 +96,7 @@ func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout opcode = %#x, want LeaveWorld (%#x)", reply[0], serverpackets.OpcodeLeaveWorld)
 	}
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("post-logout opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
+	// LeaveWorld is the last frame: detach's cast-stop ack is dropped.
 	c.ExpectClosed()
 
 	if _, ok := srv.State.Player(objID); ok {

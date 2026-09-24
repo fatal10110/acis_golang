@@ -230,8 +230,16 @@ func (s *fakeCharStore) updateCharacter(t *testing.T, id int32, update func(*pla
 }
 
 type fakeItemStore struct {
-	mu    sync.Mutex
-	items map[int32][]*item.Instance
+	mu             sync.Mutex
+	items          map[int32][]*item.Instance
+	listByOwnerErr error
+}
+
+// failListByOwner makes every later ListByOwner return err.
+func (s *fakeItemStore) failListByOwner(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.listByOwnerErr = err
 }
 
 func newFakeItemStore() *fakeItemStore {
@@ -257,6 +265,9 @@ func (s *fakeItemStore) DeleteByOwner(_ context.Context, ownerID int32) (int64, 
 func (s *fakeItemStore) ListByOwner(_ context.Context, ownerID int32) ([]*item.Instance, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.listByOwnerErr != nil {
+		return nil, s.listByOwnerErr
+	}
 	return append([]*item.Instance(nil), s.items[ownerID]...), nil
 }
 
