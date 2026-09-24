@@ -81,8 +81,9 @@ type Hostile struct {
 	// followSlots are the eight escort points around this NPC, occupied by
 	// minion object ids (0 is empty). Only a master uses them.
 	followSlots [escortSlotCount]int32
-	// lastFollowingLoc is the master's position recorded after this minion's
-	// last escort step; hasLastFollow reports whether that snapshot is set.
+	// lastFollowingLoc is the master position this minion's last escort step
+	// laid the slots out around, taken before the move; hasLastFollow reports
+	// whether it is set.
 	lastFollowingLoc location.Location
 	hasLastFollow    bool
 
