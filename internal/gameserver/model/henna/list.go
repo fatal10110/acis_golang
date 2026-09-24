@@ -45,6 +45,9 @@ type Row struct {
 }
 
 // List is the equipped-dye container for one class_index slot.
+//
+// mu stays a lock: the dye bonuses feed the owner's base stats, which an
+// attacker's formulas read from the attacker's queue.
 type List struct {
 	mu    sync.Mutex
 	slots [MaxAmount]*Henna

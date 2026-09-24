@@ -20,7 +20,8 @@ type HateEntry struct {
 // between two siege guards, and reports no most-hated attacker while its
 // owner is alike dead.
 //
-// mu guards entries.
+// mu guards entries. An attacker's hit adds hate from the attacker's queue
+// while the owner's AI reads it.
 type HateTable struct {
 	owner Combatant
 

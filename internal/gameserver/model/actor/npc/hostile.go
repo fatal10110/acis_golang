@@ -71,10 +71,15 @@ type Hostile struct {
 	// nil" contract.
 	rewards creature.Rewarder
 
+	// deathMu guards dead and decayed. The killing hit latches death
+	// (TakeDamage → Die → MarkDead) on the attacker's queue.
 	deathMu sync.Mutex
 	dead    bool
 	decayed bool
 
+	// minionsMu guards master and the minion list. A minion claims its
+	// follow slot under its master's lock from the minion's own queue
+	// (claimFollowSlot).
 	minionsMu sync.RWMutex
 	master    *Hostile
 	minions   map[int32]*Hostile
@@ -113,6 +118,8 @@ type Hostile struct {
 	hp     float64
 
 	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
+	// A caster's mana-burn or mana-drain skill reduces it from the caster's
+	// queue (ReduceMP).
 	mpMu sync.RWMutex
 	mp   float64
 
@@ -152,7 +159,8 @@ type Hostile struct {
 
 	// statMu guards statCalcs slot creation; each slot's own Calculator
 	// then guards its own Mods independently, so a warm read only ever
-	// takes statMu's read lock.
+	// takes statMu's read lock. An attacker's formulas read these stats
+	// from the attacker's queue.
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
 

@@ -42,9 +42,9 @@ type TargetSnapshot struct {
 // CreatureMove holds movement state owned and updated by one caller.
 //
 // origin is the actor's current server-authoritative position. mu guards
-// every mutable field below, since an accepted MoveToLocation arms a timer
-// on the owner's queue that advances origin and fires the arrived hook
-// independently of the caller.
+// every mutable field below. The arrival timer runs on the owner's queue,
+// but another actor's effect stops the move synchronously from its own
+// queue (AbortAll or StopMove).
 //
 // A single request may resolve into multiple segments: when the straight
 // line is blocked, route resolution produces a sequence of waypoints

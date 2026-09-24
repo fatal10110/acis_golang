@@ -14,7 +14,8 @@ const maxDesires = 50
 // DesireQueue is a concurrency-safe, weight-ranked collection of an actor's
 // pending Desires.
 //
-// mu guards desires.
+// mu guards desires. An attacker's hit queues an attack desire from the
+// attacker's queue (AddAttackDesire) while the owner's AI ranks them.
 type DesireQueue struct {
 	mu      sync.RWMutex
 	desires []*Desire

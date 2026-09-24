@@ -115,7 +115,8 @@ func (l *List) emptyLocked() bool {
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
 // concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, and callbacks
-// into owner.
+// into owner. Other actors add and dispel effects synchronously from their own
+// queues while the owner's effect tick runs.
 type List struct {
 	mu sync.Mutex
 
