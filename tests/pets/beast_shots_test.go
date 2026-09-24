@@ -87,7 +87,7 @@ func TestPetAttackConsumesChargedBeastSoulshot(t *testing.T) {
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestActionUse(16, false))
 
-	waitFor(t, "pet hit consuming the charged soulshot", func() bool {
+	h.srv.AdvanceUntil(t, "pet hit consuming the charged soulshot", func() bool {
 		return !petActor.SoulshotCharged()
 	})
 	h.srv.FlushItems(t)

@@ -106,7 +106,7 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 
-	waitFor(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	wantExp, wantSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
 	if wantExp <= 0 || wantSp <= 0 {
@@ -115,16 +115,14 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 	readExpSpGain(t, c, wantExp, wantSp)
 
 	// Logout persists the character; the reward must survive the round-trip.
-	c.Send(encodeLogout())
-	var saved *playermodel.Character
-	waitFor(t, "persisted exp", func() bool {
-		ch, err := srv.Chars.Get(context.Background(), objID)
-		if err == nil && ch.Exp >= wantExp {
-			saved = ch
-			return true
-		}
-		return false
-	})
+	logoutPersisted(t, srv, c)
+	saved, err := srv.Chars.Get(context.Background(), objID)
+	if err != nil {
+		t.Fatalf("load saved character: %v", err)
+	}
+	if saved.Exp < wantExp {
+		t.Fatalf("persisted exp = %d, want at least %d", saved.Exp, wantExp)
+	}
 	if saved.SP < wantSp {
 		t.Fatalf("persisted SP = %d, want at least %d", saved.SP, wantSp)
 	}
@@ -152,7 +150,7 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
-	waitFor(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	var sawSkillList bool
 	for i := 0; i < 50 && !sawSkillList; i++ {
@@ -169,11 +167,10 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 	}
 
 	// Logout persists the character; the promoted level must survive.
-	c.Send(encodeLogout())
-	waitFor(t, "persisted level", func() bool {
-		ch, err := srv.Chars.Get(context.Background(), objID)
-		return err == nil && ch.CharLevel == 6
-	})
+	logoutPersisted(t, srv, c)
+	if ch, err := srv.Chars.Get(context.Background(), objID); err != nil || ch.CharLevel != 6 {
+		t.Fatalf("persisted character = %+v, %v; want level 6", ch, err)
+	}
 }
 
 func overhitKillSkillDefs() []modelskill.Definition {
@@ -209,7 +206,7 @@ func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 
-	waitFor(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	baseExp, baseSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
 	if baseExp <= 0 || baseSp <= 0 {

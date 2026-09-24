@@ -93,7 +93,7 @@ func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
 
 	beforeHP := srv.PlayerCurrentHP(t, objID)
 
-	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	attacker.DoAttack(t, victim.(attackable.Combatant))
 	frame := assertAttackBy(t, c, attacker.ObjectID())
 	damage := assertLandedDamagingHit(t, frame, objID)
 
@@ -127,7 +127,7 @@ func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 	victim.SetInvul(true)
 	beforeHP := srv.PlayerCurrentHP(t, objID)
 
-	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	attacker.DoAttack(t, victim.(attackable.Combatant))
 	frame := assertAttackBy(t, c, attacker.ObjectID())
 	assertLandedDamagingHit(t, frame, objID)
 
@@ -158,7 +158,7 @@ func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
 
 	beforeHP := srv.PlayerCurrentHP(t, objID)
 
-	attacker.DoAttack(t, victim.(attackable.Combatant), 5*time.Second)
+	attacker.DoAttack(t, victim.(attackable.Combatant))
 	frame := assertAttackBy(t, c, attacker.ObjectID())
 	assertLandedDamagingHit(t, frame, objID)
 
@@ -235,7 +235,7 @@ func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
-	waitFor(t, "invulnerable NPC registers attacker hate", func() bool {
+	srv.AdvanceUntil(t, "invulnerable NPC registers attacker hate", func() bool {
 		return target.AI().CurrentIntention() == ai.IntentionAttack
 	})
 	if got := target.CurrentHP(); got != beforeHP {
@@ -268,7 +268,7 @@ func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
-	waitFor(t, "NPC registers damage-denied attacker hate", func() bool {
+	srv.AdvanceUntil(t, "NPC registers damage-denied attacker hate", func() bool {
 		return target.AI().CurrentIntention() == ai.IntentionAttack
 	})
 	if got := target.CurrentHP(); got != beforeHP {

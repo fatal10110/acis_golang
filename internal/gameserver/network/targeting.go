@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -618,7 +618,7 @@ func (l *GameClientLink) updateLiveAbnormalEffect(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	entries := live.EffectList().IconEntries(time.Now())
+	entries := live.EffectList().IconEntries(sim.Now(live.Queue()))
 	effects := make([]serverpackets.AbnormalStatusEffect, len(entries))
 	for i, e := range entries {
 		effects[i] = serverpackets.AbnormalStatusEffect{

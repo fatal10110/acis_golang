@@ -81,7 +81,7 @@ func TestPetStrikeLandsOnTarget(t *testing.T) {
 	t.Parallel()
 	h, _, hostile := bootWolfStriker(t)
 	startWolfStrike(t, h)
-	waitFor(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
+	h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
 	drainUntilQuiet(t, h.client)
 }
 
@@ -89,11 +89,11 @@ func TestPetStrikeLandsOnTarget(t *testing.T) {
 // its strike has launched but before the hit comes due. The despawn aborts
 // the cast, so the monster keeps its HP and observers see no hit.
 //
-// The owner's queue is parked across the launch deadline so that the
-// launch task and the despawn run back to back, in that order, before the
-// hit is ever armed. Under ACIS_SIM_EXECUTOR=inline the park freezes the
-// virtual clock instead, so the despawn runs first and the scenario reduces
-// to a pre-launch unsummon; it still must land nothing.
+// On a driven clock the clock stops midway between the launch and hit
+// deadlines. On the real pool the owner's queue is parked across the launch
+// deadline instead, so the launch task and the despawn run back to back, in
+// that order, before the hit is ever armed. Parking would block the driven
+// clock's single runner, hence the two paths.
 func TestPetDespawnedBetweenLaunchAndHitLandsNothing(t *testing.T) {
 	t.Parallel()
 	h, petActor, hostile := bootWolfStriker(t)
@@ -102,28 +102,30 @@ func TestPetDespawnedBetweenLaunchAndHitLandsNothing(t *testing.T) {
 		t.Fatal("pet has no actor queue")
 	}
 	startWolfStrike(t, h)
-	castStarted := time.Now()
 
-	release := make(chan struct{})
-	if !q.Post(func() { <-release }) {
-		t.Fatal("park owner queue: queue closed")
-	}
-	// Let the launch deadline pass so its task queues behind the park.
-	time.Sleep(time.Until(castStarted.Add(wolfStrikeLaunch + 300*time.Millisecond)))
-	if !q.Post(petActor.Unsummon) {
+	const toHit = wolfStrikeHitTime*time.Millisecond - wolfStrikeLaunch
+	if h.srv.DrivesClock() {
+		h.srv.Advance(t, wolfStrikeLaunch+toHit/2)
+		if !q.Post(petActor.Unsummon) {
+			t.Fatal("post unsummon: queue closed")
+		}
+	} else {
+		castStarted := time.Now()
+		release := make(chan struct{})
+		if !q.Post(func() { <-release }) {
+			t.Fatal("park owner queue: queue closed")
+		}
+		// Let the launch deadline pass so its task queues behind the park.
+		time.Sleep(time.Until(castStarted.Add(wolfStrikeLaunch + 300*time.Millisecond)))
+		if !q.Post(petActor.Unsummon) {
+			close(release)
+			t.Fatal("post unsummon: queue closed")
+		}
 		close(release)
-		t.Fatal("post unsummon: queue closed")
 	}
-	close(release)
-
 	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete")
-	// Wait out the hit that the launch would have armed, then let the
-	// queue drain.
-	time.Sleep(600 * time.Millisecond)
-	done := make(chan struct{})
-	if q.Post(func() { close(done) }) {
-		<-done
-	}
+	// Let the hit the launch armed come due.
+	h.srv.Advance(t, toHit)
 
 	if hp, full := hostile.HP(), float64(hostile.MaxHP()); hp != full {
 		t.Fatalf("monster HP = %v after despawn between launch and hit, want untouched %v", hp, full)

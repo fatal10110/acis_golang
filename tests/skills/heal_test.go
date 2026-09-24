@@ -161,7 +161,7 @@ func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
 	maxCP := srv.PlayerMaxCP(t, objID)
 	c.Send(encodeRequestMagicSkillUse(damageSkillID, false, false))
 	readCastStartFrames(t, c, objID, damageSkillID, 1, 500, 0, objID)
-	time.Sleep(700 * time.Millisecond)
+	srv.Advance(t, 700*time.Millisecond)
 	drainUntilQuiet(t, c)
 	if current := srv.PlayerCurrentCP(t, objID); current >= maxCP {
 		t.Fatalf("caster CP after damage = %d, want below %d", current, maxCP)
@@ -205,7 +205,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	readCastStartFrames(t, c, objID, 1220, 1, 500, 0, objID)
 	// Let the 500ms hit fire before draining, so the effect-start frames
 	// land inside this drain instead of the first tick's read.
-	time.Sleep(700 * time.Millisecond)
+	srv.Advance(t, 700*time.Millisecond)
 	drainUntilQuiet(t, c)
 
 	before := srv.PlayerCurrentHP(t, objID)
@@ -214,7 +214,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	// first tick restores the whole remaining gap to the stat-computed max
 	// and reports both bounds; every later tick heals nothing and stays
 	// silent, matching the reference's bypass on a zero-amount setter.
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 	frame := c.ReadWithTimeout(time.Second)
 	if frame == nil {
@@ -228,7 +228,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 		t.Fatalf("tick 1: HP = %d, want restored to computed max %d (was %d)", got, maxHP, before)
 	}
 
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 	if frame := c.ReadWithTimeout(time.Second); frame != nil {
 		t.Fatalf("full-health tick frame opcode %#x, want silence", frame[0])

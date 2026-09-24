@@ -56,7 +56,7 @@ func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
 	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
-	waitFor(t, "swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 	drainUntilQuiet(t, c)
 }
 
@@ -79,7 +79,7 @@ func TestSecondActionClickAttacksSelectedTarget(t *testing.T) {
 	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
-	waitFor(t, "second-click swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	srv.AdvanceUntil(t, "second-click swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 	drainUntilQuiet(t, c)
 }
 

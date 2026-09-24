@@ -20,7 +20,7 @@ func TestPetAttackCommandSendsPetAgainstTarget(t *testing.T) {
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestActionUse(petAttackAction, false))
 
-	waitFor(t, "pet's hits landing on the target", func() bool {
+	h.srv.AdvanceUntil(t, "pet's hits landing on the target", func() bool {
 		return hostile.HP() < 1000
 	})
 	if hostile.HP() <= 0 {
