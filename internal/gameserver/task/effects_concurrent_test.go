@@ -51,8 +51,11 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	}()
 	go func() {
 		defer wg.Done()
+		// The only Run caller: each tick's posted List.Tick runs here,
+		// racing the Add and Remove goroutines above.
 		for i := 0; i < 200; i++ {
 			e.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -136,4 +139,5 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// Tick must not panic or otherwise choke on the now-unregistered
 	// leftover — it should simply not be visited.
 	e.Tick()
+	testLoop.Run()
 }
