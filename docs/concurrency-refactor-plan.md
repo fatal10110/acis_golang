@@ -215,8 +215,10 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
   character create, delete-mark and restore at the selection screen.
 - **Guarantee**: writes for one owner land in enqueue order; `Flush(ctx, owners...)` waits for
   them (the character-select barrier, `awaitPersistence`); a clean shutdown drains every lane
-  (`drainItemInstances` → `Worker.Close` → retry item save → DB close), so an orderly stop loses
-  nothing. An **unclean stop** (`kill -9`, OOM kill, a fatal panic) loses whatever the lanes still
+  (`drainItemInstances` → `Worker.Close` → retry item save → DB close), so an orderly stop that
+  reaches that hook within `gameServerStopTimeout` loses nothing. On a degraded database the
+  earlier stop hooks can spend the whole budget first, and fx then skips the drain (see the
+  shutdown budget below; tracked on #267). An **unclean stop** (`kill -9`, OOM kill, a fatal panic) loses whatever the lanes still
   hold — normally the queue latency, up to the per-job timeouts below when the database is slow.
 - **Reference**: stores synchronously at the same points — `Player.deleteMe` → `store()`
   (character base, subclass, effects) on logout, `Summon.doUnsummon` → `store()` (the pet row) on
@@ -238,17 +240,28 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     - `petRestoreTimeout` = 5 s (`network/summon_spawn.go`): the pets-row read a summon cast
       queues on the collar's lane.
   - `livePlayerPersistWait` = 3 × `livePlayerDetachSaveTimeout` + `task.ItemInstanceSaveTimeout`
-    = 16 s bounds the character-select barrier. An autosave or other job queued ahead of the
-    detach counts against it; a wait that gives up is logged and refuses the selection
-    (`network/client_loop.go`) rather than load unwritten rows.
+    = 16 s bounds every `awaitPersistence` wait: character select, restart, and a connection
+    handler's exit after its detach. An autosave or other job queued ahead of the detach counts
+    against it. A select wait that gives up is logged and refuses the selection
+    (`network/client_loop.go`) rather than load unwritten rows; the restart and disconnect waits
+    log and carry on.
   - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-tick save and per shutdown step.
-  - `gameServerStopTimeout` = 30 s (`cmd/gameserver/main.go`): fx's whole stop budget. The
-    listener stop waits for connection handlers (each detach enqueues, it does not wait for the
-    writes), the item ticker's stop can block up to one `ItemInstanceSaveTimeout`, then
-    `drainItemInstances` runs save → `Worker.Close` → save, each step on its own detached
-    `ItemInstanceSaveTimeout`, so the drain can run past the fx budget rather than be skipped by
-    it. `TestItemInstanceSaveTimeoutFitsShutdownBudget` pins `ItemInstanceSaveTimeout <
-    gameServerStopTimeout`.
+  - `gameServerStopTimeout` = 30 s (`cmd/gameserver/main.go`): fx's whole stop budget, shared by
+    every stop hook in reverse start order. fx checks it before each hook and skips the rest once
+    it has expired. Before the drain starts it has to cover:
+    - the listener stop, which closes every connection and waits for the handlers; each handler
+      detaches its player and waits up to `livePlayerPersistWait` (16 s, in parallel across
+      handlers) for those writes;
+    - the spawn-data save (`startNpcPersistence`), which runs on what is left of fx's ctx;
+    - the item ticker's stop, which can block up to one `ItemInstanceSaveTimeout` on an in-flight
+      tick.
+
+    Only then does `drainItemInstances` run save → `Worker.Close` → save, each step on its own
+    detached `ItemInstanceSaveTimeout`. Those budgets let a drain that has started finish past
+    fx's deadline; they do not stop fx from skipping a drain it never reached.
+    `TestItemInstanceSaveTimeoutFitsShutdownBudget` pins only `ItemInstanceSaveTimeout <
+    gameServerStopTimeout`. The reference's shutdown runs its saves in sequence with no overall
+    deadline, and its final item save always runs. The ordering gap is tracked on #267.
 - **Hardening**: the M14 soak (#261) includes an unclean kill with players online, measuring how
   much state a crash costs at the target player count.
 
