@@ -106,6 +106,6 @@ func (a *Autosave) Tick() {
 	a.mu.Unlock()
 
 	for _, actor := range due {
-		post(actor.Queue(), func() { a.effects.Save(actor) })
+		actor.Queue().Post(func() { a.effects.Save(actor) })
 	}
 }

@@ -76,6 +76,6 @@ func (p *PositionUpdates) Tick() {
 	defer p.releaseSnapshot()
 
 	for _, actor := range p.snapshot() {
-		post(actor.Queue(), func() { actor.PositionUpdate() })
+		actor.Queue().Post(func() { actor.PositionUpdate() })
 	}
 }

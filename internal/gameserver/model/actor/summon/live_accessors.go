@@ -43,8 +43,7 @@ func (a *Actor) SetQueue(q *sim.Queue) {
 	a.effects.SetQueue(q)
 }
 
-// Queue returns the queue this summon's work runs on, or nil when none was
-// set.
+// Queue returns the queue this summon's work runs on.
 func (a *Actor) Queue() *sim.Queue {
 	if a == nil {
 		return nil

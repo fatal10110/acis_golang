@@ -365,7 +365,7 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   client frame (`network.Conn.ObserveReads`, frame counts on both ends) and flushes the persistence
   lanes a test does not hold, so a database round trip takes no virtual time; restore-window tests
   hold the lane instead of slowing the store. Effect periods read the owner queue's clock
-  (`sim.Queue.Now`; a signet point's off-queue list via `effect.WithClock`), and the pet-restore
+  (`sim.Queue.Now`; a signet point runs on its own queue), and the pet-restore
   hold ceiling moved onto `queue.After`. CI keeps these suites' real-pool run as a
   `ACIS_SIM_EXECUTOR=pool` step. Other wall-clock reads (reuse, disabled items, cast interrupt)
   still use `time.Now` (#2482).
@@ -392,8 +392,11 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   network's no-queue branches in `onQueue`/`postLive`: a link's `Queues` is now required. Unit tests
   build actors on a `sim.Inline` queue and drive it with `Advance`, including the NPC wander
   recheck, walker arrival and signet tick tests that used to wait out 1–2 s wall-clock timers.
-  Effect lists without a queue read `sim.SystemClock`. The task/NPC/summon "post or run inline"
-  branches for actors built without a queue are left to #2488.
+  #2488 then made a queue required for every live actor: the task registries post to
+  `Queue()` unconditionally, the hostile NPC reset and summon offensive-follow ticker have no
+  queue-less path, `NewGameClientLink` and `manager.NewNpcs` reject a missing queue source, a
+  signet effect point gets its own queue (closed on despawn) instead of ticking on the effect
+  task's goroutine, and an effect list reads only its owner queue's clock.
 
 ## Performance notes (why this does not regress the hot spot)
 - Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor

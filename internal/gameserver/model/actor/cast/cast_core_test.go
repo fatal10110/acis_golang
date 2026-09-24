@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -401,6 +402,7 @@ func TestPlayerActorExitSignetGroundDropsOnlyTheSignetEffect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 
 	lasting := modelskill.EffectTemplate{Time: 60}
@@ -1180,7 +1182,7 @@ func (f *fakeCubicEffectTarget) EffectList() *effect.List  { return f.list }
 func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *testing.T) {
 	registry := handlerskill.NewDefaultRegistry()
 	caster := &fakeCubicEffectCaster{id: 1}
-	target := &fakeCubicEffectTarget{id: 2, list: effect.NewList(nil)}
+	target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
 
 	def := modelskill.Definition{
 		SkillType: "DEBUFF",
@@ -1710,6 +1712,7 @@ func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	hostile, err := npc.NewHostile(&npc.Instance{ObjectID: id, Template: &npc.Template{ID: int(id), Type: kind}, Kind: npc.InstanceKind(kind)}, live, castHostileMove{}, castHostileAttack{})
 	if err != nil {
 		t.Fatal(err)
@@ -2049,6 +2052,7 @@ func TestPlayerActorMPCostAppliesDanceSurcharge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 	actor := PlayerActor{Character: ch}
 
@@ -2076,6 +2080,7 @@ func TestPlayerActorMPCostAppliesSkillMPConsumeRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 	owner := effect.ModOwnerSkill(modelskill.Ref{ID: 1, Level: 1})
 	ch.AddStatFuncs([]effect.Mod{
@@ -2117,6 +2122,7 @@ func TestPlayerActorAllSkillsDisabledReflectsCrowdControl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 	actor := PlayerActor{Character: ch}
 
@@ -2676,6 +2682,7 @@ func requestCharacterFakingDeath(t *testing.T) *player.Character {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 
 	e, err := effect.New(effect.Skill{ID: fakeDeathSkillID}, modelskill.EffectTemplate{Name: "FakeDeath"})
@@ -3107,3 +3114,13 @@ func (*effectsActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.A
 }
 
 var _ handlerskill.Creature = (*fakeCubicEffectTarget)(nil)
+
+// newTestList returns a list whose owner runs on its own inline queue, with
+// the clock reading the wall time at creation.
+func newTestList(owner effect.StatOwner) *effect.List {
+	l := effect.NewList(owner)
+	l.SetQueue(sim.NewInline(time.Now()).NewQueue("test"))
+	return l
+}
+
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }

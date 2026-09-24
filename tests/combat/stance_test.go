@@ -229,6 +229,8 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 	assertFrameOpcode(t, mustRead(t, c, "MagicSkillLaunched"), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
 }
 
+// worldActor is a lookup key for InAttackStance, which reads only the id;
+// it never reaches a tick, so it carries no queue.
 type worldActor struct{ id int32 }
 
 func (a worldActor) ObjectID() int32 { return a.id }

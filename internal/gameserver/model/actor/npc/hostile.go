@@ -689,11 +689,7 @@ func (h *Hostile) OnInactiveRegion() {
 		}
 		h.enterInactiveRegion()
 	}
-	if q := h.Queue(); q != nil {
-		q.Post(reset)
-		return
-	}
-	reset()
+	h.Queue().Post(reset)
 }
 
 // OnActiveRegion clears the deactivation latch once players wake the region.
@@ -832,9 +828,7 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 		respawn()
 	}
 	// A respawn is a new Hostile on a new queue; this one takes no more work.
-	if q := h.Queue(); q != nil {
-		q.Close()
-	}
+	h.Queue().Close()
 	return true
 }
 

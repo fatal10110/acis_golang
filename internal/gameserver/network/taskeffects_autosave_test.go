@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -104,7 +105,14 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	defer worker.Close(context.Background())
 
-	live := &livePlayer{Character: &player.Character{ID: 45}, log: zerolog.Nop()}
+	ch := &player.Character{ID: 45}
+	creatureLive, err := creature.NewLive(location.Location{}, 0, testGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	creatureLive.SetQueue(idleQueue())
+	ch.Live = creatureLive
+	live := &livePlayer{Character: ch, log: zerolog.Nop()}
 	state.AddPlayer(live)
 
 	entered := make(chan struct{})

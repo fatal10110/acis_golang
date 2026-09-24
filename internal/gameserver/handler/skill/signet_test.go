@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -34,8 +35,8 @@ type signetFakeCaster struct {
 	dead       bool
 	mp         float64
 	list       *effect.List
-	// clock drives queue, the caster's own queue, whose clock the caster's
-	// list and every effect point it spawns measure effect periods on.
+	// clock drives queue, the caster's own queue, and the queue of every
+	// effect point it spawns, so both measure effect periods on one clock.
 	clock *sim.Inline
 	queue *sim.Queue
 }
@@ -43,7 +44,8 @@ type signetFakeCaster struct {
 func newSignetFakeCaster(id int32, x, y, z int, mp float64) *signetFakeCaster {
 	c := &signetFakeCaster{id: id, x: x, y: y, z: z, mp: mp, clock: sim.NewInline(time.Unix(1000, 0))}
 	c.queue = c.clock.NewQueue("caster")
-	c.list = effect.NewList(noopStatOwner{}, effect.WithClock(c.queue))
+	c.list = effect.NewList(noopStatOwner{})
+	c.list.SetQueue(c.queue)
 	return c
 }
 
@@ -95,7 +97,7 @@ type signetFakeTarget struct {
 
 func newSignetFakeTarget(id int32) *signetFakeTarget {
 	t := &signetFakeTarget{id: id}
-	t.list = effect.NewList(noopStatOwner{})
+	t.list = newTestList(noopStatOwner{})
 	return t
 }
 
@@ -198,7 +200,9 @@ func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 	activity := h.effects.Activity.(*signetActivity)
 
-	h.Use(Cast{Caster: newSignetFakeCaster(1, 100, 100, 0, 100), Skill: modelskill.Definition{
+	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
+	h.Use(Cast{Caster: caster, Skill: modelskill.Definition{
 		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
 		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
 	}})
@@ -223,16 +227,18 @@ func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
 func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T) {
 	state := world.New()
 	activity := newSignetActivity()
+	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	r := NewDefaultRegistryWithSignet(nil, true, SignetDeps{
 		Effects:   effect.Env{Activity: activity},
 		Templates: fakeSignetTemplates{byID: map[int]*npc.Template{13018: {ID: 13018, Type: "EffectPoint"}}},
 		IDs:       &fakeSignetIDs{},
 		World:     state,
 		NewSink:   func(*npc.EffectPoint) event.Sink { return &event.Recorder{} },
+		Queues:    caster.clock,
 		Log:       zerolog.Nop(),
 	})
 
-	if !r.Use(Cast{Caster: newSignetFakeCaster(1, 100, 100, 0, 100), Skill: modelskill.Definition{
+	if !r.Use(Cast{Caster: caster, Skill: modelskill.Definition{
 		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
 		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
 	}}) {
@@ -258,6 +264,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	target := newSignetFakeTarget(2)
 	state.Spawn(target, 120, 100, 0, 0)
 
@@ -295,6 +302,7 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 func TestSignetSpawnsAtGroundTarget(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	caster.gx, caster.gy, caster.gz = 300, 400, 50
 
 	h.Use(Cast{Caster: caster, Skill: modelskill.Definition{
@@ -315,6 +323,7 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	target := newSignetFakeTarget(2)
 	target.magicOK = true
 	target.magicInput = formulas.MagicDamageInput{MAtk: 100, MDef: 1, SkillPower: 1, PvPMul: 1, ElementalMul: 1}
@@ -367,6 +376,7 @@ func TestSignetCasttimeMDamSpawnsPaysMPAndDamagesOnItsLiveTick(t *testing.T) {
 func TestSignetCasttimeAppliesEveryRecognizedSelfEffectTemplate(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 
 	def := modelskill.Definition{
 		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
@@ -394,6 +404,7 @@ func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
 	h, _, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 5) // below the skill's mpConsume
+	h.queues = caster.clock
 	def := modelskill.Definition{
 		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME", EffectNpcID: 13018, Radius: 180, MPConsume: 10,
 		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, Count: 3, Time: 1}},
@@ -422,6 +433,7 @@ func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
 	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	target := newSignetFakeTarget(2)
 	state.Spawn(target, 120, 100, 0, 0)
 	target.list.Add(&effect.Effect{Skill: effect.Skill{ID: 999, Dance: true}, Template: modelskill.EffectTemplate{Time: 60, Count: 1}, OnStart: func(*effect.Effect) bool { return true }})
@@ -453,6 +465,7 @@ func TestSignetAntiSummonUnsummonsAfterFirstTick(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	target := newSignetFakeTarget(2)
 	state.Spawn(target, 120, 100, 0, 0)
 
@@ -508,7 +521,9 @@ func (noopStatOwner) UpdateEffectIcons() {}
 // off the caster's queue. The point's OnExit is what despawns it, and it
 // outlives the caster's session: bound to the caster's queue, a logout
 // (detachLivePlayer closes that queue) would strand the point in world with
-// its effect list registered forever.
+// its effect list registered forever. The tick takes the production path:
+// the effect task posts the list's Tick to the point's own queue, and the
+// despawn closes that queue.
 func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
 		{ID: 5123, Level: 1}: {
@@ -517,8 +532,11 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 		},
 	}}
 	h, state, _ := newTestSignetHandler(defs)
+	effects := task.NewEffects()
+	h.effects = effect.Env{Activity: effects}
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
+	h.queues = caster.clock
 	def := modelskill.Definition{
 		ID: 454, Level: 1, SkillType: "SIGNET", EffectID: 5123, EffectNpcID: 13018, Radius: 180,
 		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
@@ -531,16 +549,23 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 		t.Fatalf("spawned actors = %d, want 1", len(all))
 	}
 	actor := all[0]
-	if q := actor.EffectList().Queue(); q != nil {
-		t.Fatal("effect point's list is bound to a queue; its expiry must not depend on one")
+	if actor.EffectList().Queue() == caster.queue {
+		t.Fatal("effect point's list is bound to its caster's queue; its expiry must not depend on it")
 	}
 
 	// The caster logs out: its queue is closed and drops every later task.
 	caster.queue.Close()
 
 	caster.clock.Advance(tickInterval)
-	actor.EffectList().Tick()
+	effects.Tick()
+	if _, ok := state.Object(actor.ObjectID()); !ok {
+		t.Fatal("effect point left the world before its queue ran the tick; the list ticked off its queue")
+	}
+	caster.clock.Run()
 	if _, ok := state.Object(actor.ObjectID()); ok {
 		t.Fatal("effect point still in world after its driving effect exited")
+	}
+	if actor.Queue().Post(func() {}) {
+		t.Fatal("effect point's queue still accepts work after despawn")
 	}
 }

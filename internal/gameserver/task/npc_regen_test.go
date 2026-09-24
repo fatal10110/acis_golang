@@ -16,16 +16,12 @@ type countingRegenActor struct {
 	world.Presence
 	id    int32
 	ticks int
-	on    func()
 }
 
 func (a *countingRegenActor) ObjectID() int32 { return a.id }
 func (*countingRegenActor) Kind() actor.Kind  { return actor.KindNPC }
 func (a *countingRegenActor) TickRegen() {
 	a.ticks++
-	if a.on != nil {
-		a.on()
-	}
 }
 
 // TestNPCRegenTickReusesScratchAcrossShrinkingPopulation is the regression
@@ -44,6 +40,7 @@ func TestNPCRegenTickReusesScratchAcrossShrinkingPopulation(t *testing.T) {
 
 	regen := NewNPCRegen(state)
 	regen.Tick()
+	testLoop.Run()
 	for _, a := range actors {
 		if a.ticks != 1 {
 			t.Fatalf("actor %d ticks = %d after first Tick, want 1", a.id, a.ticks)
@@ -53,6 +50,7 @@ func TestNPCRegenTickReusesScratchAcrossShrinkingPopulation(t *testing.T) {
 	state.RemoveObject(actors[2].id)
 	state.RemoveObject(actors[4].id)
 	regen.Tick()
+	testLoop.Run()
 
 	for i, a := range actors {
 		want := 2
@@ -65,37 +63,28 @@ func TestNPCRegenTickReusesScratchAcrossShrinkingPopulation(t *testing.T) {
 	}
 }
 
-// TestNPCRegenTickLogsReentrantCall proves the tickGuard added alongside
-// the scratch-buffer reuse actually fires: a second Tick call arriving
-// while the first is still running (here, from inside a TickRegen hook,
-// the same pattern AttackStance's own reentrant test uses) must be
-// rejected and logged rather than appending into the in-flight scratch
-// buffer from two call sites at once.
+// TestNPCRegenTickLogsReentrantCall proves the tickGuard fires: a Tick
+// arriving while another is still in flight must be rejected and logged
+// rather than appending into the in-flight scratch buffer from two call
+// sites at once.
 func TestNPCRegenTickLogsReentrantCall(t *testing.T) {
 	state := world.New()
 	regen := NewNPCRegen(state)
 	var buf bytes.Buffer
 	regen.log = zerolog.New(&buf)
-
-	reentered := false
 	actor := &countingRegenActor{id: 1}
-	actor.on = func() {
-		reentered = true
-		regen.Tick()
-	}
 	state.AddObject(actor)
+	regen.ticking.Store(true) // another Tick is in flight
 
 	regen.Tick()
+	testLoop.Run()
 
-	if !reentered {
-		t.Fatal("reentrant Tick was never attempted")
-	}
-	if actor.ticks != 1 {
-		t.Fatalf("actor ticks = %d, want 1 (reentrant Tick must not run TickRegen again)", actor.ticks)
+	if actor.ticks != 0 {
+		t.Fatalf("actor ticks = %d, want 0 (reentrant Tick must not run TickRegen)", actor.ticks)
 	}
 	if !strings.Contains(buf.String(), "NPCRegen.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
 		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
 	}
 }
 
-func (*countingRegenActor) Queue() *sim.Queue { return nil }
+func (*countingRegenActor) Queue() *sim.Queue { return testQueue }

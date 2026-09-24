@@ -197,7 +197,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
-	gcl := NewGameClientLink(GameClientLinkConfig{
+	gcl, err := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        loginLink,
 		Roster:           roster,
@@ -224,6 +224,9 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		Log:              log,
 		Now:              testLinkNow,
 	})
+	if err != nil {
+		t.Fatalf("new game client link: %v", err)
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -369,6 +372,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 	control := &testControllerSink{}
 	moveCtl, err := move.NewController(ch.Move(), ch, control)
@@ -418,6 +422,7 @@ func newTestHostileNPC(t *testing.T, id int32) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	hostile, err := npc.NewHostile(inst, live, testHostileMove{}, testHostileAttack{})
 	if err != nil {
 		t.Fatal(err)
@@ -471,3 +476,5 @@ func testQueues(t *testing.T) *sim.Pool {
 	})
 	return pool
 }
+
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }

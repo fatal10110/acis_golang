@@ -144,9 +144,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if err != nil {
 		return nil, nil, err
 	}
-	if queue != nil {
-		live.SetQueue(queue)
-	}
+	live.SetQueue(queue)
 	if zones != nil {
 		live.Move().SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
 			water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
@@ -166,9 +164,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 
 	actorRef := &creatureActorRef{}
 	attackCtl := attack.NewAttackable(actorRef, control)
-	if queue != nil {
-		attackCtl.SetQueue(queue)
-	}
+	attackCtl.SetQueue(queue)
 
 	routeMove := &atomic.Bool{}
 	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
@@ -189,9 +185,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	// SummonActor's caller relies on before l.skills is ready.
 	if castDefs != nil {
 		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
-		if queue != nil {
-			castController.SetQueue(queue)
-		}
+		castController.SetQueue(queue)
 		aiController := &actorcast.AIController{
 			Controller:  castController,
 			Definitions: castDefs,

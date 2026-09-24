@@ -250,7 +250,7 @@ func TestNewBuildsBuffWithRuntimeStatFuncs(t *testing.T) {
 	}
 
 	owner := &funcOwner{}
-	NewList(owner).Add(e)
+	newTestList(owner).Add(e)
 	if !reflect.DeepEqual(owner.funcs, e.Funcs) {
 		t.Fatalf("owner funcs = %#v, want effect funcs", owner.funcs)
 	}
@@ -508,7 +508,7 @@ func TestFusionEffectActionNeverEndsOnItsOwnTick(t *testing.T) {
 }
 
 func TestFusionEffectIncreaseEffectGrowsLevelAndReapplies(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -531,7 +531,7 @@ func TestFusionEffectIncreaseEffectGrowsLevelAndReapplies(t *testing.T) {
 }
 
 func TestFusionEffectIncreaseEffectAtMaxLevelIsANoop(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 5}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -554,7 +554,7 @@ func TestFusionEffectIncreaseEffectAtMaxLevelIsANoop(t *testing.T) {
 }
 
 func TestFusionEffectDecreaseForceShrinksLevelAndReapplies(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 3}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -577,7 +577,7 @@ func TestFusionEffectDecreaseForceShrinksLevelAndReapplies(t *testing.T) {
 }
 
 func TestFusionEffectDecreaseForceBelowOneRemovesWithoutReapply(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Fusion", Time: 15})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -634,7 +634,7 @@ func TestSeedEffectPowerIgnoresSkillLevel(t *testing.T) {
 }
 
 func TestSeedEffectIncreasePowerGrowsLevelInPlace(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -661,7 +661,7 @@ func TestSeedEffectIncreasePowerGrowsLevelInPlace(t *testing.T) {
 // granting a fresh full period. In this port that means growing a seed's
 // power in place must leave its already-set nextAction/remaining alone.
 func TestSeedRecastDoesNotExtendDeadline(t *testing.T) {
-	target := &liveEffectTarget{list: NewList(nil)}
+	target := &liveEffectTarget{list: newTestList(nil)}
 	e, err := New(Skill{Level: 1}, modelskill.EffectTemplate{Name: "Seed", Time: 5})
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
@@ -1173,7 +1173,7 @@ func TestItemPassiveFuncsOnlyAppliesLoadedPassiveSkills(t *testing.T) {
 
 // ---- from list_activebyskillid_test.go ----
 func TestListActiveBySkillIDFindsActiveEffectLevel(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	list.Add(&Effect{Skill: Skill{ID: 1285}, Level: 3, Type: TypeBuff})
 
 	level, ok := list.ActiveBySkillID(1285)
@@ -1183,7 +1183,7 @@ func TestListActiveBySkillIDFindsActiveEffectLevel(t *testing.T) {
 }
 
 func TestListActiveBySkillIDMissReportsNotFound(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	list.Add(&Effect{Skill: Skill{ID: 1285}, Level: 3, Type: TypeBuff})
 
 	level, ok := list.ActiveBySkillID(5104)
@@ -1193,7 +1193,7 @@ func TestListActiveBySkillIDMissReportsNotFound(t *testing.T) {
 }
 
 func TestListActiveBySkillIDIgnoresRemovedEffect(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	e := &Effect{Skill: Skill{ID: 5104}, Level: 2, Type: TypeBuff}
 	list.Add(e)
 	list.Remove(e)
@@ -1318,7 +1318,7 @@ func requireNames(t *testing.T, got []*Effect, want []string) {
 
 func TestListReplacesLowerOrderStackedEffect(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events})
+	list := newTestList(eventOwner{events: &events})
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	strong := namedEffect("strong", 2, "speed", 2, false, &events)
@@ -1345,7 +1345,7 @@ func TestListReplacesLowerOrderStackedEffect(t *testing.T) {
 
 func TestListReactivatesNextStackedEffectWhenCancellationDisabled(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
+	list := newTestList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	strong := namedEffect("strong", 2, "speed", 2, false, &events)
@@ -1376,7 +1376,7 @@ func TestListReactivatesNextStackedEffectWhenCancellationDisabled(t *testing.T) 
 }
 
 func TestListOrdersBuffsBeforeTogglesThenDebuffs(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	first := newEffect("first", 1, "none", 0, false)
 	toggle := newEffect("toggle", 2, "none", 0, false)
 	toggle.Skill.Toggle = true
@@ -1393,7 +1393,7 @@ func TestListOrdersBuffsBeforeTogglesThenDebuffs(t *testing.T) {
 }
 
 func TestListDanceCountCountsOnlyActiveDanceSkillToggles(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 
 	dance1 := newEffect("dance1", 1, "none", 0, false)
 	dance1.Skill.Toggle = true
@@ -1420,7 +1420,7 @@ func TestListDanceCountCountsOnlyActiveDanceSkillToggles(t *testing.T) {
 
 func TestListReplacesIdenticalBuffButRejectsIdenticalDebuff(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events})
+	list := newTestList(eventOwner{events: &events})
 
 	buff1 := namedEffect("buff1", 1, "none", 0, false, &events)
 	buff2 := namedEffect("buff2", 1, "none", 0, false, &events)
@@ -1467,7 +1467,7 @@ func buffSlotEffect(name string, id modelskill.ID, events *[]string) *Effect {
 
 func TestListEvictsOldestBuffSlotEffectAtCapacity(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events, maxBuff: 2})
+	list := newTestList(eventOwner{events: &events, maxBuff: 2})
 
 	first := buffSlotEffect("first", 1, &events)
 	second := buffSlotEffect("second", 2, &events)
@@ -1494,7 +1494,7 @@ func TestListEvictsOldestBuffSlotEffectAtCapacity(t *testing.T) {
 
 func TestListDropsHerbEffectAtCapacityWithoutEvicting(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events, maxBuff: 1})
+	list := newTestList(eventOwner{events: &events, maxBuff: 1})
 
 	real := buffSlotEffect("real", 1, &events)
 	herb := namedEffect("herb", 2, "none", 0, false, &events)
@@ -1516,7 +1516,7 @@ func TestListDropsHerbEffectAtCapacityWithoutEvicting(t *testing.T) {
 
 func TestListSkipsCapEvictionForIncomingStackingBuff(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events, maxBuff: 2})
+	list := newTestList(eventOwner{events: &events, maxBuff: 2})
 
 	unrelated := buffSlotEffect("unrelated", 1, &events)
 	weak := namedEffect("weak", 2, "speed", 1, false, &events)
@@ -1560,7 +1560,7 @@ func runWithDeadlockGuard(t *testing.T, name string, fn func()) {
 }
 
 func TestListOnStartHookCanReenterAddWithoutDeadlock(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	followUp := newEffect("followup", 2, "none", 0, false)
 
 	reentrant := newEffect("reentrant", 1, "none", 0, false)
@@ -1580,7 +1580,7 @@ func TestListOnStartHookCanReenterAddWithoutDeadlock(t *testing.T) {
 }
 
 func TestListOnExitHookCanReenterAddWithoutDeadlock(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	var followUp *Effect
 
 	reentrant := newEffect("reentrant", 1, "none", 0, false)
@@ -1600,7 +1600,7 @@ func TestListOnExitHookCanReenterAddWithoutDeadlock(t *testing.T) {
 }
 
 func TestListFlagsAggregatesActiveEffectFlagsAndDropsThemOnRemoval(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 
 	stun := newEffect("stun", 1, "none", 0, true)
 	stun.Flag = FlagStunned
@@ -1666,7 +1666,7 @@ func TestListRejectsSecondFlagGatedEffectOfEachKindWhileFirstIsActive(t *testing
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var events []string
-			list := NewList(eventOwner{events: &events})
+			list := newTestList(eventOwner{events: &events})
 
 			first := flagGatedEffect(tt.name+"1", 1, tt.flag, &events)
 			second := flagGatedEffect(tt.name+"2", 2, tt.flag, &events)
@@ -1692,7 +1692,7 @@ func TestListRejectsSecondFlagGatedEffectOfEachKindWhileFirstIsActive(t *testing
 
 func TestListRejectsFlagGatedEffectWhenFlagIsSetByADifferentEffectKind(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events})
+	list := newTestList(eventOwner{events: &events})
 
 	// stunSelf carries FlagStunned but, like the reference StunSelf effect,
 	// is not itself flag-gated: it only ever blocks other Stunned-flag
@@ -1721,7 +1721,7 @@ func TestListRejectsFlagGatedEffectWhenFlagIsSetByADifferentEffectKind(t *testin
 
 func TestListDoesNotFlagGateParalyzeOrPetrificationEffects(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events})
+	list := newTestList(eventOwner{events: &events})
 
 	// Paralyze and Petrification both carry FlagParalyzed but, unlike
 	// Stun/Root/Sleep/Fear, neither is flag-gated: a second one proceeds
@@ -1752,7 +1752,7 @@ func TestListDoesNotFlagGateParalyzeOrPetrificationEffects(t *testing.T) {
 
 func TestListRejectsSameSkillRecastOfFlagGatedEffectBeforeIdenticalDebuffLogic(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events})
+	list := newTestList(eventOwner{events: &events})
 
 	first := flagGatedEffect("stun", 7, FlagStunned, &events)
 	recast := flagGatedEffect("stun", 7, FlagStunned, &events)
@@ -1796,7 +1796,7 @@ func (o abnormalUpdateOwner) UpdateEffectIcons() {
 func TestListNotifiesAbnormalUpdateOnEveryAddAndRemove(t *testing.T) {
 	var events []string
 	var calls int
-	list := NewList(abnormalUpdateOwner{eventOwner: eventOwner{events: &events}, calls: &calls})
+	list := newTestList(abnormalUpdateOwner{eventOwner: eventOwner{events: &events}, calls: &calls})
 
 	e := namedEffect("buff", 1, "none", 0, false, &events)
 	list.Add(e)
@@ -1811,7 +1811,7 @@ func TestListNotifiesAbnormalUpdateOnEveryAddAndRemove(t *testing.T) {
 }
 
 func TestListIconEntriesSkipsEffectsWithoutShowIconOrNotActive(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 
 	shown := &Effect{
 		Skill:    Skill{ID: 10, Level: 3},
@@ -1849,7 +1849,7 @@ func TestListIconEntriesSkipsEffectsWithoutShowIconOrNotActive(t *testing.T) {
 // counter (grown by IncreasePower), so the icon must read Skill.Level
 // instead of the grown Level.
 func TestListIconEntriesSeedShowsSkillLevelNotGrownPower(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 
 	seed := &Effect{
 		Skill:    Skill{ID: 1285, Level: 1},
@@ -1867,7 +1867,7 @@ func TestListIconEntriesSeedShowsSkillLevelNotGrownPower(t *testing.T) {
 }
 
 func TestListIconEntriesReportsToggleAndRepeatCountDurations(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 
 	toggle := &Effect{
 		Skill:    Skill{ID: 20, Level: 1, Toggle: true},
@@ -1945,7 +1945,7 @@ func TestIconDurationRepeatCountDecrementsEverySecond(t *testing.T) {
 // restarting from the template.
 func TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRestartOnPromotion(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
+	list := newTestList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	weak.Template.Count, weak.Template.Time = 5, 2
@@ -1990,7 +1990,7 @@ func TestListDisplacedStackedEffectDrainsCountWithoutActingAndResumesWithoutRest
 // 291-313).
 func TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActivating(t *testing.T) {
 	var events []string
-	list := NewList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
+	list := newTestList(eventOwner{events: &events}, WithEnv(Env{KeepLesser: true}))
 
 	weak := namedEffect("weak", 1, "speed", 1, false, &events)
 	weak.Template.Count, weak.Template.Time = 2, 2
@@ -2033,7 +2033,7 @@ func TestListDisplacedStackedEffectSelfRemovesOnCountExhaustionWithoutEverActiva
 func TestListEffectExpiryMessages(t *testing.T) {
 	t.Run("worn off on count exhaustion", func(t *testing.T) {
 		var events []string
-		list := NewList(eventOwner{events: &events})
+		list := newTestList(eventOwner{events: &events})
 		e := namedEffect("wornoff", 10, "none", 0, false, &events)
 		e.Skill.Level = 3
 		e.Template.Count, e.Template.Time, e.Template.Icon = 1, 1, true
@@ -2050,7 +2050,7 @@ func TestListEffectExpiryMessages(t *testing.T) {
 
 	t.Run("disappeared on early removal", func(t *testing.T) {
 		var events []string
-		list := NewList(eventOwner{events: &events})
+		list := newTestList(eventOwner{events: &events})
 		e := namedEffect("early", 11, "none", 0, false, &events)
 		e.Skill.Level = 2
 		e.Template.Count, e.Template.Time, e.Template.Icon = 5, 1, true
@@ -2065,7 +2065,7 @@ func TestListEffectExpiryMessages(t *testing.T) {
 
 	t.Run("aborted on toggle turned off", func(t *testing.T) {
 		var events []string
-		list := NewList(eventOwner{events: &events})
+		list := newTestList(eventOwner{events: &events})
 		e := namedEffect("toggle", 12, "none", 0, false, &events)
 		e.Skill.Level = 1
 		e.Skill.Toggle = true
@@ -2081,7 +2081,7 @@ func TestListEffectExpiryMessages(t *testing.T) {
 
 	t.Run("no message without icon", func(t *testing.T) {
 		var events []string
-		list := NewList(eventOwner{events: &events})
+		list := newTestList(eventOwner{events: &events})
 		e := namedEffect("noicon", 13, "none", 0, false, &events)
 		list.Add(e)
 
@@ -2096,7 +2096,7 @@ func TestListEffectExpiryMessages(t *testing.T) {
 }
 
 func TestListRemoveStackedEffectWithoutQueueLeavesVisible(t *testing.T) {
-	list := NewList(nil)
+	list := newTestList(nil)
 	e := newEffect("stacked", 1, "speed", 1, false)
 	list.Add(e)
 
@@ -2107,7 +2107,7 @@ func TestListRemoveStackedEffectWithoutQueueLeavesVisible(t *testing.T) {
 }
 
 func TestListRemoveStackedEffectAbsentFromQueueRemovesVisible(t *testing.T) {
-	list := NewList(nil, WithEnv(Env{KeepLesser: true}))
+	list := newTestList(nil, WithEnv(Env{KeepLesser: true}))
 	removed := newEffect("removed", 1, "speed", 1, false)
 	remaining := newEffect("remaining", 2, "speed", 2, false)
 	list.Add(removed)
@@ -2892,14 +2892,3 @@ type deadTarget struct {
 func (*deadTarget) Dead() bool { return true }
 
 func (a fakeConditionActor) CurrentHeading() int { return 0 }
-
-// TestWithClockNilKeepsTheDefaultClock covers a caster whose Queue() is nil:
-// WithClock(nil) must not install a nil clock the list then reads on its
-// first add.
-func TestWithClockNilKeepsTheDefaultClock(t *testing.T) {
-	e := &Effect{Skill: Skill{ID: 1}, Template: modelskill.EffectTemplate{Name: "test", Count: 1, Time: 1}}
-	NewList(&funcOwner{}, WithClock(nil)).Add(e)
-	if !e.InUse() {
-		t.Fatal("effect not in use after Add on a WithClock(nil) list")
-	}
-}

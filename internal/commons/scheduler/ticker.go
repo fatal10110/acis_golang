@@ -71,9 +71,6 @@ func tickerName(fn func()) string {
 // for the same ticker name both allocate and both Set: the loser's ticker
 // then writes into a *tickStat nothing publishes, and the winning Set
 // rebinds the key to a zeroed struct, resetting the max high-water mark.
-// Reachable today: every summon derives the same key from the
-// s.recheckOffensiveFollow method value, and StartOffensiveFollowTicker
-// runs on a per-player network goroutine.
 var statsMu sync.Mutex
 
 func statsFor(fn func()) *tickStat {

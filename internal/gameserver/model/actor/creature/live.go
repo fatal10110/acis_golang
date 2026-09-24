@@ -49,8 +49,7 @@ func (l *Live) SetQueue(q *sim.Queue) {
 	l.effects.SetQueue(q)
 }
 
-// Queue returns the queue this creature's work runs on, or nil when none was
-// set.
+// Queue returns the queue this creature's work runs on.
 func (l *Live) Queue() *sim.Queue {
 	if l == nil {
 		return nil

@@ -35,17 +35,6 @@ type StatOwner interface {
 // Option changes List behavior.
 type Option func(*List)
 
-// WithClock makes a list that runs on no queue of its own read the time
-// from q's clock, so its effect periods follow the same clock as the timers
-// of q's owner. A nil q keeps the default.
-func WithClock(q *sim.Queue) Option {
-	return func(l *List) {
-		if q != nil {
-			l.clock = q
-		}
-	}
-}
-
 // ActivityRegistry records whether a list has effects to tick.
 type ActivityRegistry interface {
 	SetActive(*List, bool)
@@ -134,30 +123,25 @@ type List struct {
 	// caller captured before releasing mu — see notifyActivityTransition.
 	tracked bool
 
-	// queue is the owner's queue, which periodic effect actions run on; set
-	// once before the owner is published.
+	// queue is the owner's queue: periodic effect actions run on it and
+	// effect periods are measured on its clock. Set once before the owner is
+	// published.
 	queue *sim.Queue
-	// clock is what effect periods are measured on: the owner's queue, else
-	// the WithClock queue, else the wall clock.
-	clock sim.Clock
 }
 
-func (l *List) now() time.Time { return l.clock.Now() }
+func (l *List) now() time.Time { return l.queue.Now() }
 
 // SetQueue makes q, the owner's queue, the queue this list's periodic
-// actions run on and the clock its effect periods are measured on.
-func (l *List) SetQueue(q *sim.Queue) {
-	l.queue = q
-	l.clock = q
-}
+// actions run on and the clock its effect periods are measured on. Every
+// list needs one before it holds an effect.
+func (l *List) SetQueue(q *sim.Queue) { l.queue = q }
 
-// Queue returns the queue SetQueue installed, or nil.
+// Queue returns the queue SetQueue installed.
 func (l *List) Queue() *sim.Queue { return l.queue }
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {
-	// ponytail: wall-clock default serves only queue-less unit fixtures; #2488 drops it.
-	l := &List{owner: owner, cancelLesser: true, clock: sim.SystemClock{}}
+	l := &List{owner: owner, cancelLesser: true}
 	for _, opt := range opts {
 		opt(l)
 	}

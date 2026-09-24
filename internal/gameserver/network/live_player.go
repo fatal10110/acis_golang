@@ -462,9 +462,7 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 func (p *livePlayer) attackController() *attack.Controller {
 	if p.attack == nil {
 		p.attack = attack.NewPlayer(p.Character, nil)
-		if q := p.Queue(); q != nil {
-			p.attack.SetQueue(q)
-		}
+		p.attack.SetQueue(p.Queue())
 	}
 	return p.attack
 }
@@ -474,9 +472,7 @@ func (p *livePlayer) attackController() *attack.Controller {
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
 		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
-		if q := live.Queue(); q != nil {
-			live.cast.SetQueue(q)
-		}
+		live.cast.SetQueue(live.Queue())
 		live.Character.SetCastController(live.cast)
 	}
 	return live.cast

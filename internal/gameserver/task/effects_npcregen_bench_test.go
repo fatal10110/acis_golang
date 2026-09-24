@@ -32,7 +32,7 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	e := NewEffects()
 	lists := make([]*effect.List, total)
 	for i := 0; i < total; i++ {
-		list := effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
+		list := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 		lists[i] = list
 		if i%activeFraction == 0 {
 			eff, err := effect.New(effect.Skill{ID: modelskill.ID(i + 1)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -47,6 +47,7 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		e.Tick()
+		testLoop.Run()
 	}
 	b.StopTimer()
 	_ = lists // keep the idle 29,700 reachable through the whole benchmark
@@ -65,9 +66,10 @@ func (*benchRegenActor) Kind() actor.Kind  { return actor.KindNPC }
 func (a *benchRegenActor) TickRegen()      {}
 
 // BenchmarkNPCRegenTickManyIdleActors reproduces the review's 30k tracked
-// population for NPCRegen.Tick: the fix removes State.Objects()'s per-tick
-// snapshot allocation via a reused scratch buffer, so steady-state allocs
-// should fall to ~0 once the buffer's capacity stabilizes.
+// population for NPCRegen.Tick: a reused scratch buffer removes
+// State.Objects()'s per-tick snapshot allocation, so once its capacity
+// stabilizes the steady state costs one allocation per NPC: the TickRegen
+// task posted to its queue, which production pays too.
 func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 	const total = 30000
 
@@ -77,11 +79,13 @@ func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 	}
 	regen := NewNPCRegen(state)
 	regen.Tick()
+	testLoop.Run()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		regen.Tick()
+		testLoop.Run()
 	}
 }
 
@@ -93,4 +97,11 @@ func (benchNoopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (benchNoopStatOwner) UpdateEffectIcons() {}
 
-func (*benchRegenActor) Queue() *sim.Queue { return nil }
+func (*benchRegenActor) Queue() *sim.Queue { return testQueue }
+
+// newQueuedList returns a list running on testQueue.
+func newQueuedList(owner effect.StatOwner, opts ...effect.Option) *effect.List {
+	l := effect.NewList(owner, opts...)
+	l.SetQueue(testQueue)
+	return l
+}

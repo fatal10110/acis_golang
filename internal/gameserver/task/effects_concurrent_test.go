@@ -19,7 +19,7 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	const listCount = 20
 	lists := make([]*effect.List, listCount)
 	for i := range lists {
-		lists[i] = effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
+		lists[i] = newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 	}
 	newEffect := func(id int) *effect.Effect {
 		eff, err := effect.New(effect.Skill{ID: modelskill.ID(id)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -51,8 +51,11 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	}()
 	go func() {
 		defer wg.Done()
+		// The only Run caller: each tick's posted List.Tick runs here,
+		// racing the Add and Remove goroutines above.
 		for i := 0; i < 200; i++ {
 			e.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -90,13 +93,13 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 		return eff
 	}
 
-	leftover := effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
+	leftover := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 	leftover.Add(newEffect(1))
 	if !e.contains(leftover) {
 		t.Fatal("leftover list not registered after Add")
 	}
 	other := NewEffects()
-	otherList := effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: other}))
+	otherList := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: other}))
 	otherList.Add(newEffect(2))
 
 	e.Reset()
@@ -127,7 +130,7 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// A fresh owner (the next test server's own NPC) must still be able to
 	// register normally: Reset must not have wedged the hook or the
 	// registry into a state that rejects further registrations.
-	next := effect.NewList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
+	next := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 	next.Add(newEffect(2))
 	if !e.contains(next) {
 		t.Fatal("a list added after Reset failed to register")
@@ -136,4 +139,5 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// Tick must not panic or otherwise choke on the now-unregistered
 	// leftover — it should simply not be visited.
 	e.Tick()
+	testLoop.Run()
 }

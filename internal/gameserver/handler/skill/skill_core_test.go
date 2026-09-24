@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -158,7 +159,7 @@ func (*effectLandingFake) EffectSuccessInput(_ creature.FormulaActor, _ modelski
 }
 
 func TestApplyEffectsRollsEachConfiguredTemplate(t *testing.T) {
-	target := &effectLandingFake{list: effect.NewList(nil)}
+	target := &effectLandingFake{list: newTestList(nil)}
 	templates := []modelskill.EffectTemplate{
 		{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true},
 		{Name: "Buff", Time: 60, EffectPower: 0, EffectPowerSet: true},
@@ -182,26 +183,26 @@ func TestApplyEffectsEffectRangeAtLanding(t *testing.T) {
 		{
 			name:      "outside range",
 			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 101},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), x: 101},
 			templates: configured,
 		},
 		{
 			name:      "at range",
 			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 100},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), x: 100},
 			templates: configured,
 		},
 		{
 			name:      "inside range",
 			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), x: 99},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), x: 99},
 			templates: configured,
 			want:      1,
 		},
 		{
 			name:      "self cast",
 			caster:    &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: effect.NewList(nil), x: 1000},
+			target:    &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: newTestList(nil), x: 1000},
 			templates: configured,
 			want:      1,
 		},
@@ -217,7 +218,7 @@ func TestApplyEffectsEffectRangeAtLanding(t *testing.T) {
 }
 
 func TestApplyEffectsRejectsPerfectShieldBeforeTemplates(t *testing.T) {
-	target := &effectLandingFake{list: effect.NewList(nil)}
+	target := &effectLandingFake{list: newTestList(nil)}
 	applyEffectsWithLanding(nil, target, modelskill.Definition{}, []modelskill.EffectTemplate{{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true}}, formulas.ShieldPerfect, false)
 
 	if got := len(target.list.All()); got != 0 {
@@ -240,62 +241,62 @@ func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T
 		{
 			name:   "offensive vs invul",
 			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), invul: true},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "debuff vs invul",
 			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), invul: true},
 			def:    modelskill.Definition{Debuff: true},
 		},
 		{
 			name:   "buff vs invul still lands",
 			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), invul: true},
 			want:   1,
 		},
 		{
 			name:   "self offensive on invul still lands",
 			caster: &positionedFakeActor{fakeActor: fakeActor{objectID: 1}},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: effect.NewList(nil), invul: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 1}, list: newTestList(nil), invul: true},
 			def:    modelskill.Definition{Offensive: true},
 			want:   1,
 		},
 		{
 			name:   "nil caster still refuses invul offensive",
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil), invul: true},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil), invul: true},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "offensive when caster cannot give damage",
 			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "buff when caster cannot give damage still lands",
 			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: false},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil)},
 			want:   1,
 		},
 		{
 			name:   "offensive when a non-formula combatant cannot give damage",
 			caster: &combatantOnlyCaster{fakeActor: fakeActor{objectID: 1}, allow: false},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 		},
 		{
 			name:   "offensive when a non-formula combatant may give damage",
 			caster: &combatantOnlyCaster{fakeActor: fakeActor{objectID: 1}, allow: true},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 			want:   1,
 		},
 		{
 			name:   "offensive when caster may give damage",
 			caster: &damagePermissionFake{fakeActor: fakeActor{objectID: 1}, allow: true},
-			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: effect.NewList(nil)},
+			target: &effectLandingFake{fakeActor: fakeActor{objectID: 2}, list: newTestList(nil)},
 			def:    modelskill.Definition{Offensive: true},
 			want:   1,
 		},
@@ -311,7 +312,7 @@ func TestApplyEffectsRefusesOffensiveAndDebuffOnInvulOrDeniedDamage(t *testing.T
 }
 
 func TestApplyEffectsRejectsConfiguredTemplateWithoutLandingInput(t *testing.T) {
-	target := &effectListOnlyFake{list: effect.NewList(nil)}
+	target := &effectListOnlyFake{list: newTestList(nil)}
 	applyEffects(nil, target, modelskill.Definition{}, []modelskill.EffectTemplate{
 		{Name: "Buff", Time: 60, EffectPower: 100, EffectPowerSet: true},
 		{Name: "Buff", Time: 60},
@@ -377,7 +378,7 @@ type cancelFakeActor struct {
 }
 
 func newCancelFakeActor(level int) *cancelFakeActor {
-	return &cancelFakeActor{level: level, list: effect.NewList(nil)}
+	return &cancelFakeActor{level: level, list: newTestList(nil)}
 }
 
 func (a *cancelFakeActor) Dead() bool               { return a.dead }
@@ -535,7 +536,7 @@ type continuousFake struct {
 func newContinuousFake(id int32) *continuousFake {
 	return &continuousFake{
 		id:           id,
-		list:         effect.NewList(nil),
+		list:         newTestList(nil),
 		successOK:    true,
 		successInput: formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100},
 		reflectOK:    true,
@@ -828,7 +829,7 @@ type disablerFake struct {
 }
 
 func newDisablerFake(id int32) *disablerFake {
-	d := &disablerFake{id: id, list: effect.NewList(nil), successOK: true}
+	d := &disablerFake{id: id, list: newTestList(nil), successOK: true}
 	d.aggro = attackable.NewThreatTable(d, time.Now)
 	d.hate = attackable.NewHateTable(d)
 	return d
@@ -1228,6 +1229,7 @@ func newTestHostile(t testing.TB, id int32, pAtk float64) *npc.Hostile {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	h, err := npc.NewHostile(&npc.Instance{
 		ObjectID: id,
 		Kind:     "Monster",
@@ -1390,6 +1392,7 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	c.Live = live
 	c.SetRollSource(func(int) int { return 99 })
 	c.Configure(player.Runtime{Rules: player.Rules{PerfectShieldBlockRate: 5}})
@@ -2372,7 +2375,7 @@ func TestMdamReusesResolvedShieldForEffectLanding(t *testing.T) {
 		hp:             2000,
 		magicOK:        true,
 		skillSuccessOK: true,
-		effects:        effect.NewList(nil),
+		effects:        newTestList(nil),
 		magicInput: formulas.MagicDamageInput{
 			MAtk: 400, MDef: 50, SkillPower: 20,
 			PvPMul: 1, ElementalMul: 1,
@@ -2424,7 +2427,7 @@ func TestMdamTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			magicInput: magicInput, magicOK: true,
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
@@ -2442,7 +2445,7 @@ func TestMdamTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("per-effect-template landing resists", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			magicInput: magicInput, magicOK: true,
 			skillSuccessOK: true,
 		}
@@ -2467,7 +2470,7 @@ func TestBlowTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			blowInput: blowInput, blowOK: true,
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
@@ -2485,7 +2488,7 @@ func TestBlowTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("per-effect-template landing resists", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			blowInput: blowInput, blowOK: true,
 			skillSuccessOK: true,
 		}
@@ -2512,7 +2515,7 @@ func TestChargeDamTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			physicalInput: physicalInput, physicalOK: true,
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
@@ -2530,7 +2533,7 @@ func TestChargeDamTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("per-effect-template landing resists", func(t *testing.T) {
 		target := &skillTarget{
-			hp: 2000, effects: effect.NewList(nil),
+			hp: 2000, effects: newTestList(nil),
 			physicalInput: physicalInput, physicalOK: true,
 			skillSuccessOK: true,
 		}
@@ -2556,7 +2559,7 @@ func TestManaDamageTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("skill's own effect-success roll fails", func(t *testing.T) {
 		target := &skillTarget{
-			mp: 100, maxMP: 100, effects: effect.NewList(nil),
+			mp: 100, maxMP: 100, effects: newTestList(nil),
 			manaInput: manaInput, manaOK: true,
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
@@ -2574,7 +2577,7 @@ func TestManaDamageTagsResistedByOrigin(t *testing.T) {
 
 	t.Run("per-effect-template landing resists", func(t *testing.T) {
 		target := &skillTarget{
-			mp: 100, maxMP: 100, effects: effect.NewList(nil),
+			mp: 100, maxMP: 100, effects: newTestList(nil),
 			manaInput: manaInput, manaOK: true,
 			skillSuccessOK: true,
 		}
@@ -2634,8 +2637,8 @@ func TestPdamReportsDodgeWithoutDealingDamage(t *testing.T) {
 func TestHealPercentAndCombatPointHealApplySkillEffects(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{}
-	hp := &skillTarget{hp: 50, maxHP: 100, effects: effect.NewList(noopStatOwner{})}
-	cp := &skillTarget{cp: 50, maxCP: 100, effects: effect.NewList(noopStatOwner{})}
+	hp := &skillTarget{hp: 50, maxHP: 100, effects: newTestList(noopStatOwner{})}
+	cp := &skillTarget{cp: 50, maxCP: 100, effects: newTestList(noopStatOwner{})}
 	effects := []modelskill.EffectTemplate{{Name: "Buff", Time: 60}}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{ID: 1, SkillType: "HEAL_PERCENT", Power: 10, Effects: effects}, Targets: []Actor{hp}})
@@ -2769,7 +2772,7 @@ func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 			VulnMul: 1, Affected: true,
 		},
 		manaOK:  true,
-		effects: effect.NewList(noopStatOwner{}),
+		effects: newTestList(noopStatOwner{}),
 	}
 	for _, name := range []string{"Sleep", "ImmobileUntilAttacked"} {
 		e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: name})
@@ -3453,3 +3456,13 @@ var (
 	_ Creature = (*positionedFakeActor)(nil)
 	_ Creature = (*damagePermissionFake)(nil)
 )
+
+// newTestList returns a list whose owner runs on its own inline queue, with
+// the clock reading the wall time at creation.
+func newTestList(owner effect.StatOwner) *effect.List {
+	l := effect.NewList(owner)
+	l.SetQueue(sim.NewInline(time.Now()).NewQueue("test"))
+	return l
+}
+
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }

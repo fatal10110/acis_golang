@@ -77,6 +77,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 		Templates: data.NPCs,
 		IDs:       ids,
 		World:     state,
+		Queues:    pool,
 		Log:       log,
 	})
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,

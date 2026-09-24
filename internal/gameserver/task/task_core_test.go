@@ -2,6 +2,7 @@ package task
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -101,12 +102,14 @@ func TestAttackStanceAddRefreshesTimeoutAndFiresCubics(t *testing.T) {
 	stance.Add(actor)
 	now = now.Add(time.Second)
 	stance.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before refreshed deadline = %v, want none", got)
 	}
 
 	now = now.Add(14 * time.Second)
 	stance.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"stop 100"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at refreshed deadline = %v, want %v", got, want)
 	}
@@ -133,6 +136,7 @@ func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
 		}
 		now = base.Add(AttackStancePeriod)
 		stance.Tick()
+		testLoop.Run()
 	}
 	tick()
 	for i, entry := range stance.scratch {
@@ -141,8 +145,11 @@ func TestAttackStanceTickAllocationIsFlat(t *testing.T) {
 		}
 	}
 
-	if allocs := testing.AllocsPerRun(100, tick); allocs != 0 {
-		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	// Each due actor costs the one task posted to its queue. The sweep
+	// itself allocates nothing; the few extra allow for the test loop
+	// growing its task slice.
+	if allocs := testing.AllocsPerRun(100, tick); allocs > float64(len(actors)+4) {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want <= %d", allocs, len(actors)+4)
 	}
 }
 
@@ -163,6 +170,7 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 	func() {
 		defer func() { recover() }()
 		stance.Tick()
+		testLoop.Run()
 	}()
 
 	for i, entry := range stance.scratch {
@@ -175,52 +183,40 @@ func TestAttackStanceTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
-type attackStanceReentrantEffects struct {
-	stance   *AttackStance
-	innerErr error
-}
-
-func (e *attackStanceReentrantEffects) AutoAttackStop(AttackStanceActor) {
-	e.innerErr = e.stance.Tick()
-}
-
+// TestAttackStanceTickReturnsErrorOnReentrantCall covers a Tick that starts
+// while another is still in flight: it does nothing and reports it.
 func TestAttackStanceTickReturnsErrorOnReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
-	effects := &attackStanceReentrantEffects{}
+	effects := &attackStanceFakeEffects{}
 	stance, err := NewAttackStance(effects, func() time.Time { return now })
 	if err != nil {
 		t.Fatalf("NewAttackStance() error = %v", err)
 	}
-	effects.stance = stance
 	stance.Add(&attackStanceFakeActor{id: 1})
 	now = now.Add(AttackStancePeriod)
+	stance.ticking.Store(true) // another Tick is in flight
 
-	if err := stance.Tick(); err != nil {
-		t.Fatalf("outer Tick() error = %v, want nil", err)
+	if err := stance.Tick(); !errors.Is(err, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", err)
 	}
-
-	if !errors.Is(effects.innerErr, ErrReentrantTick) {
-		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
-	}
-	if stance.ticking.Load() {
-		t.Fatal("ticking guard left set after outer Tick returned")
+	testLoop.Run()
+	if got := effects.take(); len(got) != 0 {
+		t.Fatalf("reentrant Tick events = %v, want none", got)
 	}
 }
 
 func TestAttackStanceTickLogsReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
-	effects := &attackStanceReentrantEffects{}
-	stance, err := NewAttackStance(effects, func() time.Time { return now })
+	stance, err := NewAttackStance(&attackStanceFakeEffects{}, func() time.Time { return now })
 	if err != nil {
 		t.Fatalf("NewAttackStance() error = %v", err)
 	}
-	effects.stance = stance
 	var buf bytes.Buffer
 	stance.log = zerolog.New(&buf)
-	stance.Add(&attackStanceFakeActor{id: 1})
-	now = now.Add(AttackStancePeriod)
+	stance.ticking.Store(true) // another Tick is in flight
 
 	stance.Tick()
+	testLoop.Run()
 
 	if !strings.Contains(buf.String(), "AttackStance.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
 		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
@@ -237,11 +233,13 @@ func BenchmarkAttackStanceTickManyActors(b *testing.B) {
 		stance.Add(&attackStanceFakeActor{id: int32(i + 1)})
 	}
 	stance.Tick()
+	testLoop.Run()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		stance.Tick()
+		testLoop.Run()
 	}
 }
 
@@ -277,6 +275,7 @@ func TestAttackStanceConcurrentAccess(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 200; i++ {
 			stance.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -292,6 +291,7 @@ func TestAttackStanceTimeoutAlsoStopsPlayerSummon(t *testing.T) {
 	stance.Add(player)
 	now = now.Add(AttackStancePeriod)
 	stance.Tick()
+	testLoop.Run()
 
 	if got, want := effects.take(), []string{"stop 100", "stop 200"}; !slices.Equal(got, want) {
 		t.Fatalf("timeout events = %v, want %v", got, want)
@@ -311,6 +311,7 @@ func TestAttackStanceTimeoutClearsCombatFlag(t *testing.T) {
 	if err := stance.Tick(); err != nil {
 		t.Fatalf("Tick() error = %v", err)
 	}
+	testLoop.Run()
 	if actor.inCombat {
 		t.Fatal("combat flag should clear after attack stance timeout")
 	}
@@ -380,24 +381,28 @@ func TestAutosaveFiresAfterInitialDelayThenRepeatsAtInterval(t *testing.T) {
 
 	now = now.Add(AutosaveInitialDelay - time.Second)
 	a.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before initial delay elapsed = %v, want none", got)
 	}
 
 	now = now.Add(time.Second)
 	a.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 save"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at initial delay = %v, want %v", got, want)
 	}
 
 	now = now.Add(AutosaveInterval - time.Second)
 	a.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before interval elapsed = %v, want none", got)
 	}
 
 	now = now.Add(time.Second)
 	a.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 save"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at next interval = %v, want %v", got, want)
 	}
@@ -414,6 +419,7 @@ func TestAutosaveRemoveStopsSaving(t *testing.T) {
 
 	now = now.Add(AutosaveInitialDelay)
 	a.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick after Remove = %v, want none", got)
 	}
@@ -444,6 +450,7 @@ func TestAutosaveAddAlreadyTrackedActorIsNoop(t *testing.T) {
 	// reset by the second Add.
 	now = time.UnixMilli(0).Add(AutosaveInitialDelay)
 	a.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 save"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick after re-Add = %v, want %v", got, want)
 	}
@@ -479,6 +486,7 @@ func TestAutosaveConcurrentAccess(t *testing.T) {
 		defer wg.Done()
 		for range 200 {
 			a.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -536,12 +544,14 @@ func TestDecayAddThenTickFiresAfterDeadline(t *testing.T) {
 
 	now = now.Add(6 * time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before deadline = %v, want none", got)
 	}
 
 	now = now.Add(time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"decay 100"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at deadline = %v, want %v", got, want)
 	}
@@ -565,6 +575,7 @@ func TestDecayTickAllocationIsFlat(t *testing.T) {
 			decay.Add(actor, -time.Second)
 		}
 		decay.Tick()
+		testLoop.Run()
 	}
 	tick()
 	for i, entry := range decay.scratch {
@@ -573,8 +584,11 @@ func TestDecayTickAllocationIsFlat(t *testing.T) {
 		}
 	}
 
-	if allocs := testing.AllocsPerRun(100, tick); allocs != 0 {
-		t.Fatalf("AllocsPerRun(128 actors) = %v, want 0", allocs)
+	// Each due actor costs the one task posted to its queue. The sweep
+	// itself allocates nothing; the few extra allow for the test loop
+	// growing its task slice.
+	if allocs := testing.AllocsPerRun(100, tick); allocs > float64(len(actors)+4) {
+		t.Fatalf("AllocsPerRun(128 actors) = %v, want <= %d", allocs, len(actors)+4)
 	}
 }
 
@@ -593,6 +607,7 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 	func() {
 		defer func() { recover() }()
 		decay.Tick()
+		testLoop.Run()
 	}()
 
 	for i, entry := range decay.scratch {
@@ -605,50 +620,39 @@ func TestDecayTickClearsScratchOnPanic(t *testing.T) {
 	}
 }
 
-type decayReentrantEffects struct {
-	decay    *Decay
-	innerErr error
-}
-
-func (e *decayReentrantEffects) Decay(DecayActor) {
-	e.innerErr = e.decay.Tick()
-}
-
+// TestDecayTickReturnsErrorOnReentrantCall covers a Tick that starts while
+// another is still in flight: it does nothing and reports it.
 func TestDecayTickReturnsErrorOnReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
-	effects := &decayReentrantEffects{}
+	effects := &decayFakeEffects{}
 	decay, err := NewDecay(effects, func() time.Time { return now })
 	if err != nil {
 		t.Fatalf("NewDecay() error = %v", err)
 	}
-	effects.decay = decay
 	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+	decay.ticking.Store(true) // another Tick is in flight
 
-	if err := decay.Tick(); err != nil {
-		t.Fatalf("outer Tick() error = %v, want nil", err)
+	if err := decay.Tick(); !errors.Is(err, ErrReentrantTick) {
+		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", err)
 	}
-
-	if !errors.Is(effects.innerErr, ErrReentrantTick) {
-		t.Fatalf("reentrant Tick() error = %v, want ErrReentrantTick", effects.innerErr)
-	}
-	if decay.ticking.Load() {
-		t.Fatal("ticking guard left set after outer Tick returned")
+	testLoop.Run()
+	if got := effects.take(); len(got) != 0 {
+		t.Fatalf("reentrant Tick events = %v, want none", got)
 	}
 }
 
 func TestDecayTickLogsReentrantCall(t *testing.T) {
 	now := time.UnixMilli(0)
-	effects := &decayReentrantEffects{}
-	decay, err := NewDecay(effects, func() time.Time { return now })
+	decay, err := NewDecay(&decayFakeEffects{}, func() time.Time { return now })
 	if err != nil {
 		t.Fatalf("NewDecay() error = %v", err)
 	}
-	effects.decay = decay
 	var buf bytes.Buffer
 	decay.log = zerolog.New(&buf)
-	decay.Add(&decayFakeActor{id: 1}, -time.Second)
+	decay.ticking.Store(true) // another Tick is in flight
 
 	decay.Tick()
+	testLoop.Run()
 
 	if !strings.Contains(buf.String(), "Decay.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
 		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())
@@ -665,11 +669,13 @@ func BenchmarkDecayTickManyActors(b *testing.B) {
 		decay.Add(&decayFakeActor{id: int32(i + 1)}, time.Hour)
 	}
 	decay.Tick()
+	testLoop.Run()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		decay.Tick()
+		testLoop.Run()
 	}
 }
 
@@ -711,6 +717,7 @@ func TestDecayCancelStopsPendingDecay(t *testing.T) {
 
 	now = now.Add(time.Hour)
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick after cancel = %v, want none", got)
 	}
@@ -727,12 +734,14 @@ func TestDecayAddReplacesExistingDeadline(t *testing.T) {
 
 	now = now.Add(time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before replaced deadline = %v, want none", got)
 	}
 
 	now = now.Add(9 * time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"decay 100"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at replaced deadline = %v, want %v", got, want)
 	}
@@ -764,6 +773,7 @@ func TestDecayConcurrentAddAndTick(t *testing.T) {
 		defer wg.Done()
 		for range actors {
 			decay.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -793,6 +803,7 @@ func TestDecayOrphanedSummonCancelledBeforeDeadline(t *testing.T) {
 	}
 
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick cancelled orphaned summon = %v, want none", got)
 	}
@@ -814,6 +825,7 @@ func TestDecayLinkedSummonDecaysAtDeadline(t *testing.T) {
 
 	now = now.Add(time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"decay 201"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at deadline = %v, want %v", got, want)
 	}
@@ -834,6 +846,7 @@ func TestDecayOrphanedSummonCancelledEvenWhenDue(t *testing.T) {
 	decay.Add(summon, -time.Second)
 
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("due orphaned summon = %v, want cancel without decay", got)
 	}
@@ -854,6 +867,7 @@ func TestDecayNonSummonActorsUnaffectedByLinkageCheck(t *testing.T) {
 	decay.Add(npc, time.Second)
 
 	decay.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before NPC deadline = %v, want none", got)
 	}
@@ -863,6 +877,7 @@ func TestDecayNonSummonActorsUnaffectedByLinkageCheck(t *testing.T) {
 
 	now = now.Add(time.Second)
 	decay.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"decay 300"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at NPC deadline = %v, want %v", got, want)
 	}
@@ -1101,6 +1116,7 @@ func TestInventoryUpdatesTickSendsVisibleOwnersAndUpdatesWeight(t *testing.T) {
 	updates.Add(inv, owner)
 
 	updates.Tick()
+	testLoop.Run()
 
 	if got, want := owner.sent, [][]itemcontainer.Update{{{ObjectID: 1, TemplateID: 57, Count: 3, State: itemcontainer.UpdateAdded}}}; !slices.EqualFunc(got, want, slices.Equal) {
 		t.Fatalf("sent updates = %+v, want %+v", got, want)
@@ -1131,6 +1147,7 @@ func TestInventoryUpdatesTickBatchesMultipleMutationsIntoOneSend(t *testing.T) {
 	inv.Add(&item.Instance{ObjectID: 2, TemplateID: 58, Count: 1})
 
 	updates.Tick()
+	testLoop.Run()
 
 	if len(owner.sent) != 1 {
 		t.Fatalf("SendInventoryUpdate calls = %d, want 1 (one tick, one batch)", len(owner.sent))
@@ -1209,6 +1226,7 @@ func TestInventoryUpdatesTickDropsInvisibleNonTeleportingOwners(t *testing.T) {
 	updates.Add(inv, owner)
 
 	updates.Tick()
+	testLoop.Run()
 
 	if len(owner.sent) != 0 {
 		t.Fatalf("sent updates = %+v, want none", owner.sent)
@@ -1583,30 +1601,35 @@ func TestPvPFlagsTickUpdatesBlinksAndExpires(t *testing.T) {
 
 	flags.Add(actor, 10*time.Second)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn}; !slices.Equal(got, want) {
 		t.Fatalf("initial Tick events = %v, want %v", got, want)
 	}
 
 	now = now.Add(5 * time.Second)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at exactly five seconds left = %v, want unchanged %v", got, want)
 	}
 
 	now = now.Add(time.Millisecond)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn, PvPFlagBlinking}; !slices.Equal(got, want) {
 		t.Fatalf("Tick inside blink window = %v, want %v", got, want)
 	}
 
 	now = time.UnixMilli(11_000)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn, PvPFlagBlinking}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at exact deadline = %v, want unchanged %v", got, want)
 	}
 
 	now = now.Add(time.Millisecond)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn, PvPFlagBlinking, PvPFlagNone}; !slices.Equal(got, want) {
 		t.Fatalf("Tick after deadline = %v, want %v", got, want)
 	}
@@ -1622,9 +1645,10 @@ func TestPvPFlagsTickUpdatesBlinksAndExpires(t *testing.T) {
 // allocation-count (or count-ratio) assertion cannot see it — it shows up
 // only as extra bytes. Measuring bytes/op via testing.Benchmark, not
 // testing.AllocsPerRun, is what makes this test actually fail when that
-// regression is reintroduced: with all 128 flags non-expiring, tickExpiry's
-// own necessary work (appending every entry to pending) costs ~11.9 KB/op,
-// while a due pre-sized to len(entries) would add ~5.1 KB more
+// regression is reintroduced: with all 128 flags non-expiring, the sweep's
+// own necessary work (appending every entry to pending, then posting each
+// actor's state update to its queue) costs ~24.2 KB/op, while a due
+// pre-sized to len(entries) would add ~5.1 KB more
 // (128 * sizeof(deadlineEntry[PvPFlagActor])) on every single call.
 func TestPvPFlagsTickDuePartitionIsNotPreSized(t *testing.T) {
 	now := time.UnixMilli(0)
@@ -1637,11 +1661,12 @@ func TestPvPFlagsTickDuePartitionIsNotPreSized(t *testing.T) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			flags.Tick()
+			testLoop.Run()
 		}
 	})
 
-	if got := res.AllocedBytesPerOp(); got > 14_000 {
-		t.Fatalf("PvPFlags.Tick = %d B/op at 128 non-expiring flags, want <= 14000; due partition may be pre-sized to the tracked count even though nothing is due", got)
+	if got := res.AllocedBytesPerOp(); got > 26_000 {
+		t.Fatalf("PvPFlags.Tick = %d B/op at 128 non-expiring flags, want <= 26000; due partition may be pre-sized to the tracked count even though nothing is due", got)
 	}
 }
 
@@ -1652,10 +1677,12 @@ func TestPvPFlagsRemoveCanLeaveCurrentFlag(t *testing.T) {
 
 	flags.Add(actor, 10*time.Second)
 	flags.Tick()
+	testLoop.Run()
 	flags.Remove(actor, false)
 
 	now = now.Add(11 * time.Second)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := actor.events, []PvPFlagState{PvPFlagOn}; !slices.Equal(got, want) {
 		t.Fatalf("events after non-reset remove = %v, want %v", got, want)
 	}
@@ -1678,6 +1705,7 @@ func TestPvPFlagsConfiguredDurations(t *testing.T) {
 
 	now = now.Add(2*time.Second + time.Millisecond)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := flagged.events, []PvPFlagState{PvPFlagOn, PvPFlagNone}; !slices.Equal(got, want) {
 		t.Fatalf("flagged timeout events = %v, want %v", got, want)
 	}
@@ -1687,6 +1715,7 @@ func TestPvPFlagsConfiguredDurations(t *testing.T) {
 
 	now = time.UnixMilli(11_001)
 	flags.Tick()
+	testLoop.Run()
 	if got, want := normal.events, []PvPFlagState{PvPFlagOn, PvPFlagNone}; !slices.Equal(got, want) {
 		t.Fatalf("normal timeout events = %v, want %v", got, want)
 	}
@@ -1751,6 +1780,7 @@ func BenchmarkPvPFlagsTickManyNonExpiringFlags(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		flags.Tick()
+		testLoop.Run()
 	}
 }
 
@@ -2086,12 +2116,14 @@ func TestWaterAddStartsCountdownAndDrownsAfterBreathElapses(t *testing.T) {
 
 	now = now.Add(9 * time.Second)
 	w.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick before breath elapsed = %v, want none", got)
 	}
 
 	now = now.Add(time.Second)
 	w.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 drown"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick at breath limit = %v, want %v", got, want)
 	}
@@ -2099,6 +2131,7 @@ func TestWaterAddStartsCountdownAndDrownsAfterBreathElapses(t *testing.T) {
 	// Drowning repeats every tick until the actor is removed.
 	now = now.Add(time.Second)
 	w.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 drown"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick after breath limit = %v, want %v", got, want)
 	}
@@ -2120,6 +2153,7 @@ func TestWaterRemoveStopsDrowning(t *testing.T) {
 	}
 
 	w.Tick()
+	testLoop.Run()
 	if got := effects.take(); len(got) != 0 {
 		t.Fatalf("Tick after Remove = %v, want none", got)
 	}
@@ -2162,6 +2196,7 @@ func TestWaterAddAlreadyTrackedActorIsNoop(t *testing.T) {
 	// The original one-second deadline still applies, not the second call's.
 	now = now.Add(time.Second)
 	w.Tick()
+	testLoop.Run()
 	if got, want := effects.take(), []string{"1 drown"}; !slices.Equal(got, want) {
 		t.Fatalf("Tick after re-Add = %v, want %v", got, want)
 	}
@@ -2197,6 +2232,7 @@ func TestWaterConcurrentAccess(t *testing.T) {
 		defer wg.Done()
 		for i := 0; i < 200; i++ {
 			w.Tick()
+			testLoop.Run()
 		}
 	}()
 	wg.Wait()
@@ -2319,19 +2355,27 @@ func TestGroundItemOptionsFromPropertiesSpecialItemsOverridesDefault(t *testing.
 
 func (waterFakeActor) Kind() actor.Kind { return actor.KindNPC }
 
-func (a *attackStanceFakeActor) Queue() *sim.Queue { return a.queue }
+// testLoop runs the queue of every fake actor built without one of its own;
+// a test calls testLoop.Run after a tick to run the work it posted. No test
+// in this package runs in parallel, so the tests share it.
+var (
+	testLoop  = sim.NewInline(time.UnixMilli(0))
+	testQueue = testLoop.NewQueue("test")
+)
 
-func (*decayFakeActor) Queue() *sim.Queue { return nil }
+func (a *attackStanceFakeActor) Queue() *sim.Queue { return cmp.Or(a.queue, testQueue) }
 
-func (*autosaveFakeActor) Queue() *sim.Queue { return nil }
+func (*decayFakeActor) Queue() *sim.Queue { return testQueue }
 
-func (a *pvpFlagFakeActor) Queue() *sim.Queue { return a.queue }
+func (*autosaveFakeActor) Queue() *sim.Queue { return testQueue }
 
-func (*decayFakeSummon) Queue() *sim.Queue { return nil }
+func (a *pvpFlagFakeActor) Queue() *sim.Queue { return cmp.Or(a.queue, testQueue) }
 
-func (a *waterFakeActor) Queue() *sim.Queue { return a.queue }
+func (*decayFakeSummon) Queue() *sim.Queue { return testQueue }
 
-func (*inventoryUpdateOwnerStub) Queue() *sim.Queue { return nil }
+func (a *waterFakeActor) Queue() *sim.Queue { return cmp.Or(a.queue, testQueue) }
+
+func (*inventoryUpdateOwnerStub) Queue() *sim.Queue { return testQueue }
 
 // TestAttackStanceRefreshBeforeQueuedExpiryKeepsStance covers the ordering a
 // sweep on the ticker goroutine opens up: the expiry runs as a task on the

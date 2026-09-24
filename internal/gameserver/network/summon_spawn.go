@@ -20,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -483,13 +482,9 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	}
 	sink := &summonSink{link: l, actor: actor}
 	// A summon's work runs on its owner's queue.
-	var queue *sim.Queue
-	if owner, ok := liveSummonOwner(actor); ok {
-		queue = owner.Queue()
-	}
-	if queue != nil {
-		actor.SetQueue(queue)
-	}
+	owner, _ := liveSummonOwner(actor)
+	queue := owner.Queue()
+	actor.SetQueue(queue)
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
@@ -507,9 +502,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		}
 	}
 	attackController := attack.NewPlayable(actor, sink)
-	if queue != nil {
-		attackController.SetQueue(queue)
-	}
+	attackController.SetQueue(queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	sink.brain = brain
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
@@ -518,9 +511,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// discarded through the zero-value zerolog.Logger.
 	brain.SetLogger(l.log)
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
-	if queue != nil {
-		castController.SetQueue(queue)
-	}
+	castController.SetQueue(queue)
 	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
@@ -598,7 +589,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// onDespawn's already-despawned path, so a summon that leaves the
 	// world inside this window cannot leave the AI task ticking a dead
 	// actor.
-	sink.onDespawn(brain.StartOffensiveFollowTicker(queue, l.log))
+	sink.onDespawn(brain.StartOffensiveFollowTicker(queue))
 	if l.ai != nil {
 		runner := summonAIActor{Actor: actor, brain: brain}
 		l.ai.Add(runner)

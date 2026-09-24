@@ -29,6 +29,7 @@ import (
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -1153,7 +1154,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			actor.BroadcastSelfSkillUse(1422, 1)
 		}},
 		{"effect point", func(t *testing.T, state *world.State) {
-			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1)
+			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1, sim.NewInline(time.Unix(0, 0)).NewQueue("effect-point"))
 			if err != nil {
 				t.Fatal(err)
 			}
