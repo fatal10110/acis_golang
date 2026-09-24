@@ -1866,6 +1866,29 @@ func TestMinionThinkFollowMovesToEscortSlot(t *testing.T) {
 	}
 }
 
+// A minion scans the escort slots after releasing the master's lock, so
+// another minion can claim a slot in between; the write-back keeps that
+// claim and still applies this minion's changes to untouched slots.
+func TestFollowSlotCommitKeepsAConcurrentClaim(t *testing.T) {
+	master := partyHostile(t, 1, 2, &hostileMove{})
+	var snapshot [escortSlotCount]int32
+	snapshot[3] = 7
+	claimed := snapshot
+	claimed[3] = 0
+	claimed[5] = 2
+	master.followSlots = snapshot
+	master.followSlots[5] = 9
+
+	master.commitFollowSlots(snapshot, claimed)
+
+	if got := master.followSlots[3]; got != 0 {
+		t.Fatalf("slot 3 = %d, want 0 (cleared, unchanged since the snapshot)", got)
+	}
+	if got := master.followSlots[5]; got != 9 {
+		t.Fatalf("slot 5 = %d, want 9 (the concurrent claim stands)", got)
+	}
+}
+
 func TestMinionThinkFollowLooseMovesTowardNonMaster(t *testing.T) {
 	move := &hostileMove{}
 	follower := partyHostile(t, 1, 1, move)
