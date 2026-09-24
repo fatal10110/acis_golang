@@ -24,7 +24,23 @@ func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, temp
 	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, formulas.ShieldFailed, false))
 }
 
+// applyCasterSelfEffects lands a skill's self effects on its caster. Unlike
+// every other landing it has no dead-effected refusal, so a caster the cast
+// just killed still takes them.
+func applyCasterSelfEffects(cast Cast, def modelskill.Definition) {
+	cast.reportResisted(cast.Caster, def, landEffects(cast.Caster, cast.Caster, def, def.SelfEffects, formulas.ShieldFailed, false))
+}
+
+// applyEffectsWithLanding lands templates on effected, refusing a dead
+// effected outright whichever handler resolved it.
 func applyEffectsWithLanding(effector effect.Actor, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
+	if c, ok := asCreature(effected); ok && c.Dead() {
+		return 0
+	}
+	return landEffects(effector, effected, def, templates, shield, bss)
+}
+
+func landEffects(effector effect.Actor, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) (resisted int) {
 	if len(templates) == 0 {
 		return 0
 	}
@@ -192,5 +208,5 @@ func applySelfEffects(cast Cast, def modelskill.Definition) {
 			list.Remove(e)
 		}
 	}
-	applyCastEffects(cast, cast.Caster, def, def.SelfEffects)
+	applyCasterSelfEffects(cast, def)
 }

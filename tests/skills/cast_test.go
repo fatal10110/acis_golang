@@ -832,8 +832,10 @@ func TestFractionallyLethalHPConsumeKillsCaster(t *testing.T) {
 // caster on the skill's cost plus remainder when the hit lands, and asserts
 // the death, its packets, and that the hit still ran to completion.
 //
-// The skill's own buff landing on the now-dead caster is not asserted: the
-// continuous handler skips dead targets, which issue #2384 tracks.
+// The hit's effects then meet a dead caster: the skill's own buff is refused
+// (L2Skill.getEffects rejects a dead effected, L2Skill.java:1147) while its
+// self effect still lands (getEffectsSelf has no such gate,
+// L2Skill.java:1212-1231), both after the death sequence cleared the list.
 func castLethalHPConsume(t *testing.T, remainder float64) {
 	t.Helper()
 	const skillID, hpConsume, hitTime = 291, 10, 1500
@@ -845,6 +847,9 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 			HitTime: hitTime, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
 			HPConsume: hpConsume, SkillType: "BUFF", NumCharges: 1, MaxCharges: 3,
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+			// A different effect type from the buff, so the two could only
+			// share the list rather than one replacing the other.
+			SelfEffects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, Self: true}},
 		}})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -897,6 +902,21 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	waitFor(t, "charge granted by the hit that killed the caster", func() bool {
 		return srv.PlayerCharges(t, objID) == 1
 	})
+
+	// The self effect is applied after every target, so once it is held the
+	// target pass has finished and the dead caster's refusal is final.
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ EffectList() *effect.List })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no EffectList", objID, obj)
+	}
+	waitFor(t, "self effect on the dead caster", func() bool { return len(holder.EffectList().All()) > 0 })
+	if held := holder.EffectList().All(); len(held) != 1 || !held[0].Template.Self {
+		t.Fatalf("dead caster holds %+v, want only the skill's self effect", held)
+	}
 }
 
 // TestLethalToggleHPConsumeAbortsAndKillsCaster drives the other caller of
