@@ -25,6 +25,7 @@ const slowStoreDelay = 120 * time.Millisecond
 func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithCapturedLog(),
+		gameservertest.WithRealPool(), // the slow-task watchdog runs only on the pool
 		gameservertest.WithSlowStores(slowStoreDelay),
 	})
 

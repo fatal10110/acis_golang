@@ -32,9 +32,10 @@ type ScriptedClient struct {
 
 	// sent and received count whole frames written and read.
 	sent, received atomic.Int64
-	// await, when set, stands in for waiting up to d for a frame; see
-	// SetAwait.
+	// await, when set, stands in for waiting up to d for a frame, and now
+	// reads the clock it advances; see SetAwait.
 	await func(d time.Duration) bool
+	now   func() time.Time
 }
 
 // frameInFlight is how long a read waits for a frame await reported as
@@ -42,11 +43,20 @@ type ScriptedClient struct {
 const frameInFlight = 5 * time.Second
 
 // SetAwait makes every read wait through await instead of the wall clock:
-// await(d) lets up to d pass however the caller keeps time and reports
-// whether a frame is on its way to this client. A read that finds none
-// returns as a wall-clock read that timed out would. Set it before the
-// client is used.
-func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool) { f.await = await }
+// await(d) lets up to d pass on the clock now reads and reports whether a
+// frame is on its way to this client. A read that finds none returns as a
+// wall-clock read that timed out would. Set it before the client is used.
+func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool, now func() time.Time) {
+	f.await, f.now = await, now
+}
+
+// clock reads the time reads wait on: SetAwait's clock, else the wall clock.
+func (f *ScriptedClient) clock() time.Time {
+	if f.now != nil {
+		return f.now()
+	}
+	return time.Now()
+}
 
 // Sent is the number of frames this client has written.
 func (f *ScriptedClient) Sent() int64 { return f.sent.Load() }
@@ -131,9 +141,10 @@ func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 // closes without a reply frame.
 func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
 	f.t.Helper()
-	end := time.Now().Add(d)
+	// One budget across every frame drained, on the clock reads wait on.
+	end := f.clock().Add(d)
 	for {
-		_, err := f.readFrame(time.Until(end))
+		_, err := f.readFrame(end.Sub(f.clock()))
 		if err == nil {
 			continue
 		}

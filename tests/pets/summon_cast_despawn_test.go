@@ -88,8 +88,11 @@ func TestPetStrikeLandsOnTarget(t *testing.T) {
 // its strike has launched but before the hit comes due. The despawn aborts
 // the cast, so the monster keeps its HP and observers see no hit.
 //
-// The clock stops midway between the launch and the hit deadlines, so the
-// launch has run and armed the hit when the despawn runs.
+// On a driven clock the clock stops midway between the launch and hit
+// deadlines. On the real pool the owner's queue is parked across the launch
+// deadline instead, so the launch task and the despawn run back to back, in
+// that order, before the hit is ever armed. Parking would block the driven
+// clock's single runner, hence the two paths.
 func TestPetDespawnedBetweenLaunchAndHitLandsNothing(t *testing.T) {
 	h, petActor, hostile := bootWolfStriker(t)
 	q := petActor.Queue()
@@ -99,9 +102,24 @@ func TestPetDespawnedBetweenLaunchAndHitLandsNothing(t *testing.T) {
 	startWolfStrike(t, h)
 
 	const toHit = wolfStrikeHitTime*time.Millisecond - wolfStrikeLaunch
-	h.srv.Advance(t, wolfStrikeLaunch+toHit/2)
-	if !q.Post(petActor.Unsummon) {
-		t.Fatal("post unsummon: queue closed")
+	if h.srv.DrivesClock() {
+		h.srv.Advance(t, wolfStrikeLaunch+toHit/2)
+		if !q.Post(petActor.Unsummon) {
+			t.Fatal("post unsummon: queue closed")
+		}
+	} else {
+		castStarted := time.Now()
+		release := make(chan struct{})
+		if !q.Post(func() { <-release }) {
+			t.Fatal("park owner queue: queue closed")
+		}
+		// Let the launch deadline pass so its task queues behind the park.
+		time.Sleep(time.Until(castStarted.Add(wolfStrikeLaunch + 300*time.Millisecond)))
+		if !q.Post(petActor.Unsummon) {
+			close(release)
+			t.Fatal("post unsummon: queue closed")
+		}
+		close(release)
 	}
 	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete")
 	// Let the hit the launch armed come due.

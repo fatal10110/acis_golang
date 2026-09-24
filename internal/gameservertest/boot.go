@@ -99,6 +99,7 @@ type options struct {
 	geo                    move.Geo
 	itemTemplates          *item.Table
 	productionTickers      bool
+	realPool               bool
 }
 
 type characterSpec struct {
@@ -299,6 +300,11 @@ func WithSlowStores(d time.Duration) Option { return func(o *options) { o.slowSt
 // WithCapturedLog sends every component's log to an in-memory buffer the
 // suite reads back with Server.LogText or Server.SlowTaskLogs.
 func WithCapturedLog() Option { return func(o *options) { o.captureLog = true } }
+
+// WithRealPool runs this Boot's actor queues on the production sim.Pool even
+// in a suite that drives its clock, for a test that needs the pool itself:
+// its slow-task watchdog (Server.SlowTaskLogs) exists only there.
+func WithRealPool() Option { return func(o *options) { o.realPool = true } }
 
 // WithGeo supplies the movement geodata collaborator wired into live
 // players. The default is the always-passable Geo double.
@@ -807,7 +813,7 @@ func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func
 	tb.Helper()
 	held := make(chan struct{})
 	started := make(chan struct{})
-	lane := &s.heldLanes[uint32(ownerID)%persist.Lanes]
+	lane := &s.heldLanes[persist.LaneIndex(ownerID)]
 	lane.Add(1)
 	s.persist.Enqueue(ownerID, func() {
 		close(started)
@@ -1025,7 +1031,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered after the persistence worker and before the listener, so
 	// it stops once every connection has detached on its queue and before
 	// the worker drains.
-	queues := startQueues(t, o.log)
+	queues := startQueues(t, o.log, o.realPool)
 	// Both writers of the items table share one ordering, as production does.
 	itemWrites := persist.NewOrder()
 	var itemFlusher task.ItemFlusher = gamesql.NewItemFlushStore(db)

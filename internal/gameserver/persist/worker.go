@@ -118,7 +118,7 @@ func (w *Worker) Flush(ctx context.Context, ownerIDs ...int32) error {
 	}
 	var lanes [Lanes]bool
 	for _, id := range ownerIDs {
-		lanes[laneIndex(id)] = true
+		lanes[LaneIndex(id)] = true
 	}
 	var pending sync.WaitGroup
 	for i := range w.lanes {
@@ -185,10 +185,11 @@ func (l *lane) owedBefore(high uint64) bool {
 }
 
 func (w *Worker) lane(ownerID int32) *lane {
-	return &w.lanes[laneIndex(ownerID)]
+	return &w.lanes[LaneIndex(ownerID)]
 }
 
-func laneIndex(ownerID int32) uint32 {
+// LaneIndex is the lane ownerID's jobs run on.
+func LaneIndex(ownerID int32) uint32 {
 	return uint32(ownerID) % Lanes
 }
 

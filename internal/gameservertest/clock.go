@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -30,6 +31,10 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	}
 	s.Settle(tb)
 }
+
+// DrivesClock reports whether the test moves the actor queues' clock
+// (DriveClock) rather than the wall clock doing it.
+func (s *Server) DrivesClock() bool { return s.queues.advance != nil }
 
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
 // advanceLimit how far it goes before giving up.
@@ -93,7 +98,7 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 	s.traffic.clients = append(s.traffic.clients, c)
 	s.traffic.mu.Unlock()
 	if s.queues.advance != nil {
-		c.SetAwait(func(d time.Duration) bool { return s.awaitFrame(c, d) })
+		c.SetAwait(func(d time.Duration) bool { return s.awaitFrame(c, d) }, s.queues.inline.Now)
 	}
 }
 
@@ -125,10 +130,18 @@ func (s *Server) catchUp() error {
 }
 
 func (s *Server) flushUnheldLanes() error {
+	// One owner id per unheld lane: Flush takes owners, not lanes.
 	var owners []int32
-	for lane := range s.heldLanes {
+	var seen [persist.Lanes]bool
+	for id, found := int32(0), 0; found < persist.Lanes; id++ {
+		lane := persist.LaneIndex(id)
+		if seen[lane] {
+			continue
+		}
+		seen[lane] = true
+		found++
 		if s.heldLanes[lane].Load() == 0 {
-			owners = append(owners, int32(lane)) // owner id n maps to lane n
+			owners = append(owners, id)
 		}
 	}
 	if len(owners) == 0 {

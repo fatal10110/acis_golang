@@ -79,14 +79,16 @@ func (q *queues) settle() error {
 	return nil
 }
 
-// startQueues starts the executor SimExecutorEnv and DriveClock select and
-// stops it on cleanup. Register it before anything whose cleanup still posts
-// to queues (the listener, whose connection handlers detach players on their
-// queues).
-func startQueues(tb testing.TB, log zerolog.Logger) *queues {
+// startQueues starts the executor WithRealPool, SimExecutorEnv and
+// DriveClock select, in that order of precedence, and stops it on cleanup.
+// Register it before anything whose cleanup still posts to queues (the
+// listener, whose connection handlers detach players on their queues).
+func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 	tb.Helper()
 	mode := os.Getenv(SimExecutorEnv)
-	if mode == "" && drivenClock {
+	if realPool {
+		mode = "pool"
+	} else if mode == "" && drivenClock {
 		mode = "inline"
 	}
 	switch mode {

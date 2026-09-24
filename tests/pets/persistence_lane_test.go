@@ -67,7 +67,7 @@ func TestRenameLandsAfterQueuedPetSave(t *testing.T) {
 func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	buyerID := h.srv.SeedCharacterFor(t, "player2", "Buyer", 1, 0).ID
-	if buyerID%persist.Lanes == h.ownerID%persist.Lanes {
+	if persist.LaneIndex(buyerID) == persist.LaneIndex(h.ownerID) {
 		t.Fatalf("owner %d and buyer %d share a persistence lane; the scenario needs distinct lanes", h.ownerID, buyerID)
 	}
 	buyer := h.srv.DialClient(t, "player2", 1)
