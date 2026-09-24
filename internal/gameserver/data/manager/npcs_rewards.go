@@ -104,7 +104,9 @@ func (d *deathRewards) rewardEntries() ([]playerRewardEntry, float64, *player.Ch
 			owner, _ := pet.Owner()
 			attacker, ok = owner.(*player.Character)
 		}
-		if !ok || attacker.AlikeDead() || !attacker.Knows(d.hostile) {
+		// A dead attacker keeps its damage share and can still be the top
+		// dealer who receives the drops; only the exp grant skips it.
+		if !ok || !attacker.Knows(d.hostile) {
 			continue
 		}
 		entry := -1
@@ -170,6 +172,9 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, totalDamage fl
 		return
 	}
 	for _, entry := range entries {
+		if entry.actor.AlikeDead() {
+			continue
+		}
 		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
 		if d.hostile.OverhitValid(entry.actor) {
 			entry.actor.NotifyOverHit()

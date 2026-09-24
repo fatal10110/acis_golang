@@ -77,6 +77,41 @@ func TestPlayerKillDropsProtectedLoot(t *testing.T) {
 	}
 }
 
+// TestDeadTopDealerReceivesDrops pins the drop receiver to the top damage
+// dealer even after that player died: a guard finishing the monster still
+// drops the loot reserved to the dead player and fills the spoil pool.
+func TestDeadTopDealerReceivesDrops(t *testing.T) {
+	srv, objID, monster := spawnSpoiledDropMonster(t)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	player, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %T is not an online character", obj)
+	}
+	guard := srv.SpawnHostileNPCKindAt(t, "Guard", location.Location{X: hostileX + 40, Y: hostileY, Z: hostileZ})
+
+	if monster.TakeDamage(int(monster.CurrentHP())/2, player) {
+		t.Fatal("player's half-HP hit killed the monster")
+	}
+	srv.MarkPlayerDead(t, objID)
+	if !monster.TakeDamage(1_000_000, guard) {
+		t.Fatal("guard's lethal hit did not kill the monster")
+	}
+
+	drops := groundDrops(srv)
+	if len(drops) != 1 || drops[0].TemplateID != item.AdenaID || drops[0].Count != dropMonsterAdena {
+		t.Fatalf("ground drops = %+v, want one stack of %d adena", drops, dropMonsterAdena)
+	}
+	if drops[0].OwnerID != objID {
+		t.Fatalf("drop protected to %d, want the dead top dealer %d", drops[0].OwnerID, objID)
+	}
+	if !monster.SpoilPool().Sweepable() {
+		t.Fatal("spoil pool empty, want the dead top dealer's spoil roll")
+	}
+}
+
 // TestKillWithoutPlayerReceiverDropsNothing covers every death no player
 // earned: the corpse drops nothing and its spoil pool stays empty.
 func TestKillWithoutPlayerReceiverDropsNothing(t *testing.T) {
@@ -91,9 +126,13 @@ func TestKillWithoutPlayerReceiverDropsNothing(t *testing.T) {
 			guard := srv.SpawnHostileNPCKindAt(t, "Guard", location.Location{X: hostileX + 40, Y: hostileY, Z: hostileZ})
 			return monster.TakeDamage(1_000_000, guard)
 		},
-		// The monster's own lethal HP loss names itself as killer.
-		"self killer": func(_ *testing.T, _ *gameservertest.Server, monster *npc.Hostile) bool {
-			return monster.TakeDamage(1_000_000, monster)
+		// A guard's hit leaves non-player threat, then the monster's own
+		// lethal HP cost names itself as killer.
+		"self killer": func(t *testing.T, srv *gameservertest.Server, monster *npc.Hostile) bool {
+			guard := srv.SpawnHostileNPCKindAt(t, "Guard", location.Location{X: hostileX + 40, Y: hostileY, Z: hostileZ})
+			monster.TakeDamage(10, guard)
+			monster.ConsumeHP(float64(monster.CurrentHP()))
+			return monster.Dead()
 		},
 	}
 	for name, kill := range cases {
