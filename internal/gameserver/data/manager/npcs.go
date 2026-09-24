@@ -147,6 +147,9 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	if geo == nil {
 		return nil, fmt.Errorf("npcs: nil geo")
 	}
+	if effects.Activity == nil {
+		return nil, fmt.Errorf("npcs: nil effect activity registry")
+	}
 	if state == nil {
 		return nil, fmt.Errorf("npcs: nil world state")
 	}
