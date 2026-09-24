@@ -70,6 +70,9 @@ type connTraffic struct {
 	waits atomic.Int64 // reads started: frames fully handled + 1
 	sent  atomic.Int64 // frames queued to the client
 	done  atomic.Bool  // the connection's handler returned
+	// parked holds the owners whose saves the handler is waiting for (empty:
+	// every owner), nil while it is not waiting.
+	parked atomic.Pointer[[]int32]
 }
 
 // track starts counting conn's frames; the returned func marks it closed.
@@ -82,6 +85,11 @@ func (t *traffic) track(conn *network.Conn) (sent func(), done func()) {
 	t.conns[conn.RemoteAddr().String()] = ct
 	t.mu.Unlock()
 	conn.ObserveReads(func() { ct.waits.Add(1) })
+	conn.ObservePersistWaits(func(owners []int32) func() {
+		owners = append([]int32{}, owners...)
+		ct.parked.Store(&owners)
+		return func() { ct.parked.Store(nil) }
+	})
 	return func() { ct.sent.Add(1) }, func() { ct.done.Store(true) }
 }
 
@@ -103,31 +111,17 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 }
 
 // catchUpTimeout bounds the wall time the server may take to handle frames
-// a client already wrote. While a test holds a persistence lane, a handler
-// waiting on that lane cannot finish until the test releases it, so catchUp
-// gives up on the frames after heldLaneGrace and lets the clock move: a held
-// lane is a database round trip that takes time.
-const (
-	catchUpTimeout = 5 * time.Second
-	heldLaneGrace  = 100 * time.Millisecond
-)
+// a client already wrote.
+const catchUpTimeout = 5 * time.Second
 
 // catchUp waits until the server has handled every frame a client wrote,
 // the actor queues have run everything posted and the persistence lanes the
 // test does not hold have run their jobs, so nothing but the clock can start
 // more work.
 func (s *Server) catchUp() error {
-	held := s.anyLaneHeld()
-	limit := catchUpTimeout
-	if held {
-		limit = heldLaneGrace
-	}
-	deadline := time.Now().Add(limit)
+	deadline := time.Now().Add(catchUpTimeout)
 	for !s.handledAll() {
 		if time.Now().After(deadline) {
-			if held {
-				break
-			}
 			return errBehind
 		}
 		time.Sleep(50 * time.Microsecond)
@@ -143,10 +137,25 @@ func (s *Server) catchUp() error {
 	return nil
 }
 
-func (s *Server) anyLaneHeld() bool {
-	for i := range s.heldLanes {
-		if s.heldLanes[i].Load() != 0 {
+// parkedOnHeldLane reports whether ct's handler is waiting for saves on a
+// lane the test holds: it cannot finish until the test releases the lane, so
+// the clock may move meanwhile, as a slow database round trip lets time pass.
+func (s *Server) parkedOnHeldLane(ct *connTraffic) bool {
+	owners := ct.parked.Load()
+	if owners == nil {
+		return false
+	}
+	for lane := range s.heldLanes {
+		if s.heldLanes[lane].Load() == 0 {
+			continue
+		}
+		if len(*owners) == 0 {
 			return true
+		}
+		for _, id := range *owners {
+			if int(persist.LaneIndex(id)) == lane {
+				return true
+			}
 		}
 	}
 	return false
@@ -186,7 +195,7 @@ func (s *Server) handledAll() bool {
 		if ct == nil {
 			return false // accepted but not yet tracked
 		}
-		if !ct.done.Load() && ct.waits.Load()-1 != c.Sent() {
+		if !ct.done.Load() && ct.waits.Load()-1 != c.Sent() && !s.parkedOnHeldLane(ct) {
 			return false
 		}
 	}

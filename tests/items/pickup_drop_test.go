@@ -262,9 +262,9 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pending-action release")
 
 	// The approach walk runs before the collection resolves.
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := c.Now().Add(15 * time.Second)
 	var getItem []byte
-	for time.Now().Before(deadline) {
+	for c.Now().Before(deadline) {
 		if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
 			if frame[0] == serverpackets.OpcodeGetItem {
 				getItem = frame
@@ -471,8 +471,8 @@ func TestWeightGaugeRefreshesOnEveryChange(t *testing.T) {
 	// the InventoryUpdate and refreshes the carried weight afterwards.
 	srv.Advance(t, 200*time.Millisecond)
 	srv.InventoryUpdates.Tick()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil {
 			continue
@@ -593,8 +593,8 @@ func soleGroundObjectID(t *testing.T, srv *gameservertest.Server) int32 {
 // objectID with wantCount arrives.
 func waitForInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectID int32) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil || frame[0] != serverpackets.OpcodeInventoryUpdate {
 			continue

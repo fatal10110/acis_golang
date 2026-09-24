@@ -160,8 +160,8 @@ func assertObserverDeleteObjectFlag(t *testing.T, c, observer *testsupport.Scrip
 
 func readDeleteObjectFlag(t *testing.T, c *testsupport.ScriptedClient, objectID int32) int32 {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(500 * time.Millisecond)
 		if frame == nil {
 			continue
@@ -185,8 +185,8 @@ func readDeleteObjectFlag(t *testing.T, c *testsupport.ScriptedClient, objectID 
 
 func mustReadOpcode(t *testing.T, c *testsupport.ScriptedClient, opcode byte, what string) []byte {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	deadline := c.Now().Add(5 * time.Second)
+	for c.Now().Before(deadline) {
 		frame := c.ReadWithTimeout(500 * time.Millisecond)
 		if frame == nil {
 			continue

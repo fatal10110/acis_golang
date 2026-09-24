@@ -157,9 +157,12 @@ const livePlayerPersistWait = 3*livePlayerDetachSaveTimeout + task.ItemInstanceS
 
 // awaitPersistence waits until every save already enqueued for owners has
 // run, so a read that follows sees the rows those saves write. It reports,
-// and logs, a wait that gave up first. It runs on the connection goroutine,
-// never on game-state paths.
-func (l *GameClientLink) awaitPersistence(owners ...int32) error {
+// and logs, a wait that gave up first. It runs on conn's goroutine, never on
+// game-state paths.
+func (l *GameClientLink) awaitPersistence(conn *Conn, owners ...int32) error {
+	if observe := conn.observePersistWait; observe != nil {
+		defer observe(owners)()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), cmp.Or(l.persistWait, livePlayerPersistWait))
 	defer cancel()
 	err := l.persist.Flush(ctx, owners...)

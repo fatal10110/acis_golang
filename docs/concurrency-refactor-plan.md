@@ -381,8 +381,10 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   behavior suite now runs on the driven clock, so it is the harness default and `DriveClock()` is
   gone; the wall-clock `ACIS_SIM_EXECUTOR=inline` pump is retired (the runner goroutine still runs
   posted tasks, but only a test moves the clock). Pool task-panic recovery tests and `tests/perf`
-  pin `WithRealPool()`. While a test holds a persistence lane, the harness stops waiting for a
-  handler parked on it after 100 ms, so the clock can move past a held database round trip. CI's
+  pin `WithRealPool()`. A connection whose handler waits for saves on a lane the test holds
+  counts as caught up (`network.Conn.ObservePersistWaits` reports the wait's owners), so the clock
+  can move past a held database round trip; read loops are bounded on the read's clock
+  (`ScriptedClient.Now`), not the wall clock. CI's
   real-pool step covers all seven suites. Left for slice 4: the `afterFunc` seams and nil-queue
   fallbacks in `model/actor/{attack,cast,move,cubic}` (`sim.AfterOr`, `sim.Now`, network's
   `onQueue`/`postLive`), their unit tests, and the "after Phase 6" perf row.

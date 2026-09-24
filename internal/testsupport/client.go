@@ -50,8 +50,10 @@ func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool, now func() t
 	f.await, f.now = await, now
 }
 
-// clock reads the time reads wait on: SetAwait's clock, else the wall clock.
-func (f *ScriptedClient) clock() time.Time {
+// Now reads the clock reads wait on: SetAwait's clock, else the wall clock.
+// Bound a loop of reads on it, not on time.Now: on a driven clock each read
+// that finds no frame moves this clock, not the wall clock.
+func (f *ScriptedClient) Now() time.Time {
 	if f.now != nil {
 		return f.now()
 	}
@@ -142,9 +144,9 @@ func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
 	f.t.Helper()
 	// One budget across every frame drained, on the clock reads wait on.
-	end := f.clock().Add(d)
+	end := f.Now().Add(d)
 	for {
-		_, err := f.readFrame(end.Sub(f.clock()))
+		_, err := f.readFrame(end.Sub(f.Now()))
 		if err == nil {
 			continue
 		}
