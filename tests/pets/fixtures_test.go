@@ -273,8 +273,9 @@ func (h *petWorld) syncOnSkillList(t *testing.T) {
 // giveToPet hands an owner inventory stack (or part of it) to the active
 // pet through the give flow, syncing on a neutral round-trip before the
 // batching tick so the transfer has settled, then consuming both
-// inventory-update frames in wire order.
-func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
+// inventory-update frames in wire order. It returns the frames the
+// post-give tick delivered.
+func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) [][]byte {
 	t.Helper()
 	h.srv.InventoryUpdates.Tick()
 	drainFrames(t, h.client)
@@ -287,8 +288,10 @@ func (h *petWorld) giveToPet(t *testing.T, objectID, count int32) {
 	h.syncOnSkillList(t)
 	drainFrames(t, h.client)
 	h.srv.InventoryUpdates.Tick()
-	requireInventoryUpdateOrder(t, drainFrames(t, h.client), "give to pet",
+	frames := drainFrames(t, h.client)
+	requireInventoryUpdateOrder(t, frames, "give to pet",
 		serverpackets.OpcodePetInventoryUpdate, serverpackets.OpcodeInventoryUpdate)
+	return frames
 }
 
 func petCtx() context.Context { return context.Background() }
@@ -421,8 +424,11 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 				t.Fatalf("EnterWorld frame %d (want %#x) never arrived", i, opcode)
 			}
 			// Skip nearby CharInfo/NPCInfo (owner, pets, NPCs) interleaved ahead
-			// of this client's own EnterWorld burst.
-			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeNPCInfo {
+			// of this client's own EnterWorld burst. A weighted seed's load
+			// gauge also lands ahead of the burst (#2535), never inside it.
+			skip := frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeNPCInfo ||
+				(i == 0 && frame[0] == serverpackets.OpcodeStatusUpdate)
+			if !skip {
 				break
 			}
 		}
