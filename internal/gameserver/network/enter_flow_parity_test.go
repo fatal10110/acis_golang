@@ -137,8 +137,6 @@ func TestRequestGameStartUnknownSlotKeepsConnectionOpen(t *testing.T) {
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
 	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
-	}
 }
 
 // TestRequestGameStartBannedCharacterRefusedSilently pins that a character
@@ -166,8 +164,6 @@ func TestRequestGameStartBannedCharacterRefusedSilently(t *testing.T) {
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-refusal opcode = %#x, want a CharCreate reply", frame[0])
-	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
 	}
 }
 
@@ -206,8 +202,6 @@ func TestDuplicateCharacterLoginClosesPreviousClientAndAbortsNewSelection(t *tes
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharCreateOk && frame[0] != serverpackets.OpcodeCharCreateFail {
 		t.Fatalf("post-abort opcode = %#x, want a CharCreate reply", frame[0])
 	}
-	for c.ReadWithTimeout(100*time.Millisecond) != nil {
-	}
 }
 
 // TestQuestListProbeDuringEnteringAnswersEmptyQuestList pins the 0x3f probe
@@ -233,7 +227,8 @@ func TestQuestListProbeDuringEnteringAnswersEmptyQuestList(t *testing.T) {
 // TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect pins that a
 // known IN_GAME extended sub-opcode sent during ENTERING is not absorbed by
 // its in-game handler's live-player guard but counts toward the
-// unknown-packet disconnect threshold like any other unhandled packet.
+// unknown-packet disconnect threshold like any other unhandled packet: the
+// window tolerates maxUnknownPerMin and the next one closes the connection.
 func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 	c, _, _, _ := newLinkedGameClientSeedOneChar(t)
 
@@ -244,6 +239,13 @@ func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 	for i := 0; i < maxUnknownPerMin; i++ {
 		c.Send(encodeRequestAutoSoulShot(11, 1))
 	}
+	// Still dispatching: the loading probe is answered.
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestSkillList))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeQuestList {
+		t.Fatalf("probe reply opcode = %#x, want QuestList (%#x)", frame[0], serverpackets.OpcodeQuestList)
+	}
+
+	c.Send(encodeRequestAutoSoulShot(11, 1))
 	c.ExpectClosed()
 }
 
@@ -268,12 +270,24 @@ func TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown(t *testing.T) {
 
 // TestUnknownTopLevelOpcodeCountsTowardDisconnect pins that an in-game
 // opcode absent from Java's IN_GAME switch remains subject to the existing
-// unknown-packet disconnect threshold.
+// unknown-packet disconnect threshold: the window tolerates maxUnknownPerMin
+// and the next one closes the connection.
 func TestUnknownTopLevelOpcodeCountsTowardDisconnect(t *testing.T) {
 	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin; i++ {
 		c.Send(encodeSingleOpcode(0xfe))
+	}
+	// Still dispatching: manor list answers.
+	c.Send(encodeRequestManorList())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-unknown opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
+	}
+
+	c.Send(encodeSingleOpcode(0xfe))
+	// Detach's cast-stop ack still goes out ahead of the close (#2484).
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("pre-close opcode = %#x, want ActionFailed (%#x)", frame[0], serverpackets.OpcodeActionFailed)
 	}
 	c.ExpectClosed()
 }

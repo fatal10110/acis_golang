@@ -137,13 +137,11 @@ func TestFloodOnsetPacketIsDroppedNotDispatched(t *testing.T) {
 		c.Send(w)
 	}
 
+	// Every reply the burst can produce, then silence: the final two creates
+	// are dropped without one.
 	actionFailed, dispatched := 0, 0
-	for {
-		frame := c.ReadWithTimeout(2 * time.Second)
-		if frame == nil {
-			break
-		}
-		switch frame[0] {
+	for range maxPacketsPerSecond - 1 {
+		switch frame := c.Read(); frame[0] {
 		case serverpackets.OpcodeActionFailed:
 			actionFailed++
 		case serverpackets.OpcodeCharCreateFail:
@@ -152,6 +150,7 @@ func TestFloodOnsetPacketIsDroppedNotDispatched(t *testing.T) {
 			t.Fatalf("unexpected opcode %#x while flooding", frame[0])
 		}
 	}
+	c.ExpectNoFrame()
 	// Two handshake frames share the frozen window with the burst of
 	// maxPacketsPerSecond+1 creates: the window overflows on create
 	// maxPacketsPerSecond-1, which is answered ActionFailed and dropped,

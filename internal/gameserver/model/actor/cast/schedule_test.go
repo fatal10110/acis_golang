@@ -343,12 +343,10 @@ func (t *fakeCastTimer) Stop() bool {
 	return true
 }
 
-// TestScheduleRecoversPanickingHook is the regression test for the panic
-// class fixed in dispatch.go's scheduleAfter (network/dispatch_test.go's
-// TestScheduleAfterRecoversPanickingCallback): a scheduled cast callback
-// (Launch/Hit/Finish) runs on its own goroutine via the real time.AfterFunc
-// default branch, outside any per-connection recover, so an unrecovered
-// panic there would kill the whole process instead of just this cast.
+// TestScheduleRecoversPanickingHook covers a controller with no queue: its
+// scheduled Launch/Hit/Finish runs through sim.AfterOr's nil-queue branch,
+// on a timer goroutine outside any per-connection recover, so that branch
+// must recover and log the panic instead of killing the process.
 func TestScheduleRecoversPanickingHook(t *testing.T) {
 	buf := &syncCastBuffer{}
 	actor := scalingActor()

@@ -361,18 +361,8 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 	m.moveSeq++
 	seq := m.moveSeq
 	source := m.afterFunc
-	if source == nil {
-		log := m.log
-		source = func(d time.Duration, fn func()) scheduledTimer {
-			return time.AfterFunc(d, func() {
-				defer func() {
-					if r := recover(); r != nil {
-						log.Error().Interface("panic", r).Msg("move: recovered panic in arrival callback")
-					}
-				}()
-				fn()
-			})
-		}
+	if source == nil { // no queue: only unit tests build one this way
+		source = func(d time.Duration, fn func()) scheduledTimer { return sim.AfterOr(nil, d, fn, m.log) }
 	}
 	m.timer = source(duration, func() { m.onArrive(seq) })
 }

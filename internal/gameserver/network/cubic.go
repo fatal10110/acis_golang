@@ -56,15 +56,11 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
-		after := l.cubicAfterFunc
-		if after == nil {
-			after = func(d time.Duration, fn func()) cubic.Timer { return live.after(d, fn) }
-		}
 		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id)
-		}, after)
+		}, live.after)
 		live.cubics[id] = runtime
 	}
 	live.cubicsMu.Unlock()
@@ -187,7 +183,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 
 	beforeVitals := live.Vitals()
 	if id == cubic.Life {
-		l.scheduleAfter(live, cubicCastDelay, func() {
+		live.after(cubicCastDelay, func() {
 			// The reference's stop() cancels the in-flight cast task on a
 			// dead/stopped cubic; re-check here since fireCubic only gated
 			// on Dead() at the start of the tick, before this delay.
@@ -207,7 +203,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		})
 		return
 	}
-	l.scheduleAfter(live, cubicCastDelay, func() {
+	live.after(cubicCastDelay, func() {
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
 			return
 		}

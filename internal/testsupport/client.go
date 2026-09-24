@@ -286,12 +286,14 @@ func (f *ScriptedClient) Conn() net.Conn { return f.conn }
 // Close closes the underlying connection.
 func (f *ScriptedClient) Close() error { return f.conn.Close() }
 
-// ExpectClosed fails unless the server closes the connection within 2s.
+// ExpectClosed fails unless the server closes the connection within 2s. A
+// timeout fails too: a connection still open is not closed.
 func (f *ScriptedClient) ExpectClosed() {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	buf := make([]byte, 1)
-	if n, err := f.conn.Read(buf); n != 0 || err == nil {
+	n, err := f.conn.Read(buf)
+	if ne, ok := err.(net.Error); n != 0 || err == nil || ok && ne.Timeout() {
 		f.t.Fatalf("expected connection to close, got n=%d err=%v", n, err)
 	}
 }
