@@ -64,24 +64,17 @@ func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
 // gone (SummonCreature.java:34-41), and a pet built from a destroyed collar
 // would keep answering to a pets row nobody holds.
 func TestSummonDropsCollarDestroyedDuringRestore(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t,
-		[]gameservertest.Option{
-			gameservertest.WithCapturedLog(),
-			gameservertest.WithSlowStores(slowStoreDelay),
-		},
-		seedItem{TemplateID: wyvernCollarID, Count: 1},
-	)
+	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
+	release := h.useCollarRestoreHeld(t)
 	// Runs as an ordinary queue task while the cast and its pets-row read
 	// are in flight.
 	h.client.Send(encodeRequestDestroyItem(h.collarID, 1))
 	drainFrames(t, h.client)
+	release()
 	h.srv.Settle(t)
 	h.srv.FlushPersistence(t)
+	h.srv.Settle(t)
 
 	if obj, ok := h.srv.State.Summon(h.ownerID); ok {
 		t.Fatalf("pet %v spawned from a destroyed collar", obj)
@@ -134,14 +127,9 @@ func assertNotSystemMessage(t *testing.T, frame []byte, messageID int) {
 // caster is in its cast across the identical read: the hold reproduces that
 // rather than adding waiting of its own.
 func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-		gameservertest.WithSlowStores(slowStoreDelay),
-	})
+	h := bootOwnerWithCollar(t)
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
+	release := h.useCollarRestoreHeld(t)
 	// The read is in flight and the pet is not in the world yet, so this is
 	// the window the ordering is about. Without the hold the cast is
 	// already over here: Finish is armed for zero delay off the Hit phase.
@@ -152,8 +140,9 @@ func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
 		t.Fatal("summon cast already finished while the pets-row read was still in flight: the client can see the cast complete before the pet it summoned")
 	}
 
+	release()
 	var endedEarly bool
-	waitFor(t, "pet in world state", func() bool {
+	h.srv.AdvanceUntil(t, "pet in world state", func() bool {
 		if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 			return true
 		}
@@ -196,16 +185,10 @@ func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
 // owner and leave the arriving pet on a mounted player, a state no
 // reference path reaches.
 func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t,
-		[]gameservertest.Option{gameservertest.WithSlowStores(slowStoreDelay)},
-		seedItem{TemplateID: wyvernCollarID, Count: 1},
-	)
+	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 	wyvernCollar := h.seeded[wyvernCollarID][0]
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
+	release := h.useCollarRestoreHeld(t)
 	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 		t.Fatal("pet already in world: the restore window this test needs was never open")
 	}
@@ -217,6 +200,8 @@ func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
 			t.Fatalf("wyvern mounted while the summon restore was in flight: opcodes %x", frameOpcodes(frames))
 		}
 	}
+	release()
+	h.awaitPet(t)
 	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("pet never reached the world")
 	}
@@ -243,15 +228,9 @@ func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
 // (SummonItems.java:36-45 checks isCastingNow() before the summon slot) —
 // see TestWyvernMountRejectedWhileSummonRestoreInFlight.
 func TestAutoSoulShotRejectedDuringRestore(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t,
-		[]gameservertest.Option{gameservertest.WithSlowStores(slowStoreDelay)},
-		seedItem{TemplateID: beastSoulshotID, Count: 10},
-	)
+	h := bootOwnerWithCollar(t, seedItem{TemplateID: beastSoulshotID, Count: 10})
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
+	release := h.useCollarRestoreHeld(t)
 	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
 		t.Fatal("pet already in world: the restore window this test needs was never open")
 	}
@@ -274,6 +253,8 @@ func TestAutoSoulShotRejectedDuringRestore(t *testing.T) {
 	if !rejected {
 		t.Fatalf("auto soulshot toggle during the restore = opcodes %x, want NO_SERVITOR_CANNOT_AUTOMATE_USE", frameOpcodes(frames))
 	}
+	release()
+	h.awaitPet(t)
 	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("pet never reached the world")
 	}
@@ -307,10 +288,43 @@ func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	return w.Bytes()
 }
 
-// ceilingStoreDelay sits between summon_spawn.go's petRestoreHoldCeiling and
-// its petRestoreTimeout, so the hold's deadline fires while the pets-row read
-// is still outstanding and the read itself still succeeds afterwards.
-const ceilingStoreDelay = 3 * time.Second
+// holdCeiling is summon_spawn.go's petRestoreHoldCeiling: how long a summon
+// cast is held open for its pets-row read.
+const holdCeiling = 2 * time.Second
+
+// useCollarRestoreHeld uses the wolf collar with the collar's persistence
+// lane held, so the pets-row read the summon queues there stays outstanding
+// until release is called.
+func (h *petWorld) useCollarRestoreHeld(t *testing.T) (release func()) {
+	t.Helper()
+	release = h.srv.HoldPersistenceLane(t, h.collarID)
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
+	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+	return release
+}
+
+// awaitPet lets time pass until the owner's pet is in the world.
+func (h *petWorld) awaitPet(t *testing.T) {
+	t.Helper()
+	h.srv.AdvanceUntil(t, "pet in world state", func() bool {
+		_, ok := h.srv.State.Summon(h.ownerID)
+		return ok
+	})
+}
+
+// passHoldCeiling lets the hold ceiling pass with the pets-row read still
+// held, and checks it ended the cast.
+func (h *petWorld) passHoldCeiling(t *testing.T) {
+	t.Helper()
+	h.srv.Advance(t, holdCeiling)
+	h.srv.AdvanceUntil(t, "the hold ceiling ending the cast", func() bool {
+		return !h.srv.PlayerCastingNow(t, h.ownerID)
+	})
+	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
+		t.Fatal("pet already in world: the restore was no longer in flight")
+	}
+}
 
 // TestSummonHoldReleasesAtItsCeiling pins the bound on how long a summon
 // cast is held open for its pets-row read. The hold exists to keep the spawn
@@ -325,31 +339,12 @@ const ceilingStoreDelay = 3 * time.Second
 // responsive, so the cast completes first and the pet lands afterwards, as
 // it did before the hold existed.
 func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-		gameservertest.WithSlowStores(ceilingStoreDelay),
-	})
+	h := bootOwnerWithCollar(t)
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
-	deadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
-	var castEnded bool
-	for time.Now().Before(deadline) {
-		if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
-			break
-		}
-		if !h.srv.PlayerCastingNow(t, h.ownerID) {
-			castEnded = true
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if _, spawned := h.srv.State.Summon(h.ownerID); !spawned {
-		t.Fatal("pet never reached the world")
-	}
-	if !castEnded {
-		t.Fatal("the summon cast was still in flight for the whole read: the hold has no ceiling, so a stalled persistence lane keeps the caster casting for as long as it stalls")
-	}
+	release := h.useCollarRestoreHeld(t)
+	h.passHoldCeiling(t)
+	release()
+	h.awaitPet(t)
 }
 
 // TestWyvernMountRejectedAfterHoldCeiling covers the window the hold's own
@@ -364,30 +359,11 @@ func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
 // slot explicitly for as long as the restore is in flight, ceiling or not,
 // or the owner ends up mounted with a pet arriving beside them.
 func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t,
-		[]gameservertest.Option{gameservertest.WithSlowStores(ceilingStoreDelay)},
-		seedItem{TemplateID: wyvernCollarID, Count: 1},
-	)
+	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 	wyvernCollar := h.seeded[wyvernCollarID][0]
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
-	// Wait for the ceiling to end the cast, with the read still running.
-	deadline := time.Now().Add(ceilingStoreDelay)
-	for time.Now().Before(deadline) {
-		if !h.srv.PlayerCastingNow(t, h.ownerID) {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if h.srv.PlayerCastingNow(t, h.ownerID) {
-		t.Fatal("cast never ended: the ceiling window this test needs was never open")
-	}
-	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
-		t.Fatal("pet already in world: the restore was no longer in flight")
-	}
+	release := h.useCollarRestoreHeld(t)
+	h.passHoldCeiling(t)
 
 	h.client.Send(encodeUseItem(wyvernCollar, false))
 	frames := drainFrames(t, h.client)
@@ -397,16 +373,9 @@ func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
 		}
 	}
 
-	// The rejection is silent, so the drain above returns long before the
-	// read lands; wait the rest of it out to prove the pet still arrives.
-	petDeadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
-	for time.Now().Before(petDeadline) {
-		if _, ok := h.srv.State.Summon(h.ownerID); ok {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatal("pet never reached the world")
+	// The rejection is silent; the pet must still arrive once the read runs.
+	release()
+	h.awaitPet(t)
 }
 
 // TestSecondCollarSilentAfterHoldCeiling covers the pet branch of item use
@@ -422,27 +391,10 @@ func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
 // rejects broadcasts MagicSkillUse and MagicSkillLaunched to everyone nearby
 // before answering, which the reference never sends here.
 func TestSecondCollarSilentAfterHoldCeiling(t *testing.T) {
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-		gameservertest.WithSlowStores(ceilingStoreDelay),
-	})
+	h := bootOwnerWithCollar(t)
 
-	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
-	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
-
-	deadline := time.Now().Add(ceilingStoreDelay)
-	for time.Now().Before(deadline) {
-		if !h.srv.PlayerCastingNow(t, h.ownerID) {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if h.srv.PlayerCastingNow(t, h.ownerID) {
-		t.Fatal("cast never ended: the ceiling window this test needs was never open")
-	}
-	if _, spawned := h.srv.State.Summon(h.ownerID); spawned {
-		t.Fatal("pet already in world: the restore was no longer in flight")
-	}
+	release := h.useCollarRestoreHeld(t)
+	h.passHoldCeiling(t)
 
 	// Clear the first cast's own tail (its MagicSkillLaunched broadcast)
 	// so what the drain below collects is the second use's answer alone.
@@ -457,12 +409,6 @@ func TestSecondCollarSilentAfterHoldCeiling(t *testing.T) {
 		t.Fatalf("second collar past the hold ceiling = opcodes %x, want silence: the reference returns at SummonItems.java:37-38 without starting a cast", frameOpcodes(frames))
 	}
 
-	petDeadline := time.Now().Add(ceilingStoreDelay + 5*time.Second)
-	for time.Now().Before(petDeadline) {
-		if _, ok := h.srv.State.Summon(h.ownerID); ok {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatal("pet never reached the world")
+	release()
+	h.awaitPet(t)
 }

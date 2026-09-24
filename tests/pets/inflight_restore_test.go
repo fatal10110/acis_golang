@@ -29,7 +29,7 @@ func TestDestroyedCollarIsNotRestoredWhileItsDeleteIsQueued(t *testing.T) {
 	}
 
 	h.client.Send(encodeRequestDestroyItem(h.collarID, 1))
-	waitFor(t, "collar destroyed", func() bool {
+	h.srv.AdvanceUntil(t, "collar destroyed", func() bool {
 		return liveInventory(t, h).ItemByObjectID(h.collarID) == nil
 	})
 	drainUntilQuiet(t, h.client)

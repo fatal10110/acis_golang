@@ -94,7 +94,7 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 	h.client.Send(encodeTradeDone(1))
 	drainUntilQuiet(t, buyer)
 	buyer.Send(encodeTradeDone(1))
-	waitFor(t, "collar in the buyer's inventory", func() bool {
+	h.srv.AdvanceUntil(t, "collar in the buyer's inventory", func() bool {
 		obj, ok := h.srv.State.Player(buyerID)
 		if !ok {
 			return false
@@ -108,7 +108,7 @@ func TestCollarTradeKeepsPetsRowWritesOrdered(t *testing.T) {
 
 	buyer.Send(encodeUseItem(h.collarID, false))
 	var buyerPet *summon.Actor
-	waitFor(t, "buyer's pet in world state", func() bool {
+	h.srv.AdvanceUntil(t, "buyer's pet in world state", func() bool {
 		obj, ok := h.srv.State.Summon(buyerID)
 		if ok {
 			buyerPet, ok = obj.(*summon.Actor)

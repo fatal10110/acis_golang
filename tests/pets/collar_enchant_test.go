@@ -112,7 +112,7 @@ func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
 	if !h.client.AwaitClose(2 * time.Second) {
 		t.Fatal("logout did not close the connection")
 	}
-	waitFor(t, "owner left world", func() bool {
+	h.srv.AdvanceUntil(t, "owner left world", func() bool {
 		_, ok := h.srv.State.Player(h.ownerID)
 		return !ok
 	})

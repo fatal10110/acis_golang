@@ -47,7 +47,7 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	drainUntilQuiet(t, srv.Client)
 
 	fullHP := srv.PlayerCurrentHP(t, objID)
-	attacker.DoAttack(t, obj.(attackable.Combatant), 5*time.Second)
+	attacker.DoAttack(t, obj.(attackable.Combatant))
 	hitHP := srv.PlayerCurrentHP(t, objID)
 	if hitHP >= fullHP || hitHP <= 0 {
 		t.Fatalf("HP after the hit = %d, want a survived hit below %d", hitHP, fullHP)

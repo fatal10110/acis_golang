@@ -7,6 +7,8 @@ package testsupport
 
 import (
 	"net"
+	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +29,58 @@ type ScriptedClient struct {
 	conn       net.Conn
 	handshaken bool
 	cipher     *gamecipher.Cipher
+
+	// sent and received count whole frames written and read.
+	sent, received atomic.Int64
+	// await, when set, stands in for waiting up to d for a frame; see
+	// SetAwait.
+	await func(d time.Duration) bool
+}
+
+// frameInFlight is how long a read waits for a frame await reported as
+// already on its way.
+const frameInFlight = 5 * time.Second
+
+// SetAwait makes every read wait through await instead of the wall clock:
+// await(d) lets up to d pass however the caller keeps time and reports
+// whether a frame is on its way to this client. A read that finds none
+// returns as a wall-clock read that timed out would. Set it before the
+// client is used.
+func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool) { f.await = await }
+
+// Sent is the number of frames this client has written.
+func (f *ScriptedClient) Sent() int64 { return f.sent.Load() }
+
+// Received is the number of frames this client has read.
+func (f *ScriptedClient) Received() int64 { return f.received.Load() }
+
+// LocalAddr is the client end of the connection, the server's remote
+// address for it.
+func (f *ScriptedClient) LocalAddr() net.Addr { return f.conn.LocalAddr() }
+
+// readFrame reads one raw frame, waiting up to d for it, and counts it.
+func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
+	if f.await != nil {
+		if !f.await(d) {
+			return nil, os.ErrDeadlineExceeded
+		}
+		d = frameInFlight
+	}
+	f.conn.SetReadDeadline(time.Now().Add(d))
+	payload, err := wire.ReadFrame(f.conn)
+	if err == nil {
+		f.received.Add(1)
+	}
+	return payload, err
+}
+
+// writeFrame writes one raw frame and counts it.
+func (f *ScriptedClient) writeFrame(payload []byte) error {
+	if err := wire.WriteFrame(f.conn, payload); err != nil {
+		return err
+	}
+	f.sent.Add(1)
+	return nil
 }
 
 // Dial connects to the server at addr and registers connection cleanup with t.
@@ -59,8 +113,7 @@ func (f *ScriptedClient) ReadWithTimeout(d time.Duration) []byte {
 // instead of failing the test: nil, nil on timeout, the read error otherwise.
 // Safe to call from a goroutine other than the test's.
 func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
-	f.conn.SetReadDeadline(time.Now().Add(d))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := f.readFrame(d)
 	if err != nil {
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			return nil, nil
@@ -78,9 +131,9 @@ func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 // closes without a reply frame.
 func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
 	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(d))
+	end := time.Now().Add(d)
 	for {
-		_, err := wire.ReadFrame(f.conn)
+		_, err := f.readFrame(time.Until(end))
 		if err == nil {
 			continue
 		}
@@ -98,12 +151,11 @@ func (f *ScriptedClient) SendProtocolVersion(revision int32) {
 	f.t.Helper()
 	w := wire.NewPacketWriter(clientpackets.OpcodeProtocolVersion)
 	w.WriteInt32(revision)
-	if err := wire.WriteFrame(f.conn, w.Bytes()); err != nil {
+	if err := f.writeFrame(w.Bytes()); err != nil {
 		f.t.Fatalf("write ProtocolVersion: %v", err)
 	}
 
-	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	raw, err := wire.ReadFrame(f.conn)
+	raw, err := f.readFrame(5 * time.Second)
 	if err != nil {
 		f.t.Fatalf("read VersionCheck: %v", err)
 	}
@@ -147,7 +199,7 @@ func (f *ScriptedClient) TrySend(payload []byte) error {
 	if f.cipher != nil {
 		f.cipher.Encrypt(buf)
 	}
-	return wire.WriteFrame(f.conn, buf)
+	return f.writeFrame(buf)
 }
 
 // Read blocks until one frame arrives or the 5s deadline expires, returning
@@ -157,8 +209,7 @@ func (f *ScriptedClient) Read() []byte {
 	if !f.handshaken {
 		f.t.Fatal("read called before ProtocolVersion/VersionCheck handshake")
 	}
-	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	payload, err := wire.ReadFrame(f.conn)
+	payload, err := f.readFrame(5 * time.Second)
 	if err != nil {
 		f.t.Fatalf("ReadFrame: %v", err)
 	}
@@ -171,8 +222,7 @@ func (f *ScriptedClient) Read() []byte {
 // ExpectNoFrame fails the test if any frame arrives within 100ms.
 func (f *ScriptedClient) ExpectNoFrame() {
 	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if payload, err := wire.ReadFrame(f.conn); err == nil {
+	if payload, err := f.readFrame(100 * time.Millisecond); err == nil {
 		if f.cipher != nil {
 			f.cipher.Decrypt(payload)
 		}

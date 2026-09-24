@@ -130,11 +130,10 @@ func TestPlayerKillGrantsPKKarma(t *testing.T) {
 	// kill awards 240 — then StatusUpdate(KARMA).
 	assertKarmaChangeFrames(t, c, objID, 240)
 
-	c.Send(encodeLogout())
-	waitFor(t, "persisted PK counters", func() bool {
-		ch, err := srv.Chars.Get(context.Background(), objID)
-		return err == nil && ch.PKKills == 1 && ch.KarmaPoints == 240
-	})
+	logoutPersisted(t, srv, c)
+	if ch, err := srv.Chars.Get(context.Background(), objID); err != nil || ch.PKKills != 1 || ch.KarmaPoints != 240 {
+		t.Fatalf("persisted killer = %+v, %v; want 1 PK kill and karma 240", ch, err)
+	}
 }
 
 // selectPlayerTarget clicks another player and consumes the click's reply

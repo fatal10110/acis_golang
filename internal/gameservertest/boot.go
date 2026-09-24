@@ -360,6 +360,8 @@ type Server struct {
 	persist          *persist.Worker
 	logs             *lockedBuffer
 	queues           *queues
+	traffic          *traffic
+	heldLanes        [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
 	log              zerolog.Logger
 	sendObserver     *atomic.Pointer[func(payload []byte)]
 
@@ -430,6 +432,7 @@ func (s *Server) SeedCharacterFor(tb testing.TB, account, name string, level, sp
 func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsupport.ScriptedClient {
 	t.Helper()
 	c := testsupport.Dial(t, s.addr.String())
+	s.addClient(c)
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
@@ -804,13 +807,20 @@ func (s *Server) HoldPersistenceLane(tb testing.TB, ownerID int32) (release func
 	tb.Helper()
 	held := make(chan struct{})
 	started := make(chan struct{})
+	lane := &s.heldLanes[uint32(ownerID)%persist.Lanes]
+	lane.Add(1)
 	s.persist.Enqueue(ownerID, func() {
 		close(started)
 		<-held
 	})
 	<-started
 	var once sync.Once
-	release = func() { once.Do(func() { close(held) }) }
+	release = func() {
+		once.Do(func() {
+			lane.Add(-1)
+			close(held)
+		})
+	}
 	tb.Cleanup(release)
 	return release
 }
@@ -1186,8 +1196,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		waitHandlers()
 	})
 	sendObserver := new(atomic.Pointer[func(payload []byte)])
+	frames := new(traffic)
 	go network.Serve(ctx, ln, func(ctx context.Context, conn *network.Conn) {
+		sent, closed := frames.track(conn)
+		defer closed()
 		conn.ObserveSends(func(payload []byte) {
+			sent()
 			if observe := sendObserver.Load(); observe != nil {
 				(*observe)(payload)
 			}
@@ -1244,7 +1258,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("initial char count = %d, want %d", count, o.wantChars)
 	}
 
-	return &Server{
+	srv := &Server{
 		Client:           c,
 		State:            state,
 		itemTable:        itemTemplates,
@@ -1275,12 +1289,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autosaveClock:    autosaveClock,
 		persist:          persistWorker,
 		queues:           queues,
+		traffic:          frames,
 		log:              o.log,
 		logs:             logs,
 		cancel:           cancel,
 		waitHandlers:     waitHandlers,
 		sendObserver:     sendObserver,
 	}
+	srv.addClient(c)
+	return srv
 }
 
 // ObserveSends has fn see the cleartext payload of every frame any of this

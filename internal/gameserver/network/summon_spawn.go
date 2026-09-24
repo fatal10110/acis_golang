@@ -169,7 +169,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// it leaves the owner mounted with a pet arriving beside them.
 	live.petRestoreInFlight.Store(true)
 	releaseFinish := link.castController(live).HoldFinish()
-	time.AfterFunc(petRestoreHoldCeiling, releaseFinish)
+	sim.AfterOr(live.Queue(), petRestoreHoldCeiling, releaseFinish, link.log)
 	if !link.persist.Enqueue(controlItem.ObjectID, func() {
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()

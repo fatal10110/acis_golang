@@ -90,7 +90,7 @@ func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	waitFor(t, "PDAM drain", func() bool { return hostile.CurrentHP() < maxHP })
+	srv.AdvanceUntil(t, "PDAM drain", func() bool { return hostile.CurrentHP() < maxHP })
 	if hp := hostile.CurrentHP(); hp >= maxHP {
 		t.Fatalf("monster HP after PDAM = %d, want drained below %d", hp, maxHP)
 	}
@@ -124,7 +124,7 @@ func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(81, false, false))
 	readCastStartFrames(t, c, objID, 81, 1, 500, 60_000, hostile.ObjectID())
-	waitFor(t, "Punch of Doom caster stun", func() bool { return len(liveHeldSkillIDs(t, srv, objID)) == 1 })
+	srv.AdvanceUntil(t, "Punch of Doom caster stun", func() bool { return len(liveHeldSkillIDs(t, srv, objID)) == 1 })
 
 	targetEffects := hostile.EffectList().All()
 	if len(targetEffects) != 1 || targetEffects[0].Type != effect.TypeBuff {
@@ -174,10 +174,10 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	before := hostile.CurrentHP()
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 	afterFirst := hostile.CurrentHP()
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 	afterSecond := hostile.CurrentHP()
 
@@ -234,7 +234,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(44, true, false))
 	readCastStartFrames(t, c, objID, 44, 1, 500, 60_000, victim.ID)
 
-	waitFor(t, "MDAM damage on the victim", func() bool {
+	srv.AdvanceUntil(t, "MDAM damage on the victim", func() bool {
 		return srv.PlayerCurrentHP(t, victim.ID) < before
 	})
 	drainUntilQuiet(t, vc)
@@ -319,7 +319,7 @@ func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(45, false, false))
 	readCastStartFrames(t, c, objID, 45, 1, 500, 60_000, hostile.ObjectID())
-	waitFor(t, "MDAM half-fail drain", func() bool { return hostile.CurrentHP() < maxHP })
+	srv.AdvanceUntil(t, "MDAM half-fail drain", func() bool { return hostile.CurrentHP() < maxHP })
 
 	found := false
 	for i := 0; i < 50 && !found; i++ {
@@ -393,9 +393,9 @@ func setCasterMagicRolls(t *testing.T, srv *gameservertest.Server, objID int32, 
 
 func tickSignetMDamLive(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
-	time.Sleep(500 * time.Millisecond)
+	srv.Advance(t, 500*time.Millisecond)
 	for range 3 {
-		time.Sleep(1100 * time.Millisecond)
+		srv.Advance(t, 1100*time.Millisecond)
 		srv.TickEffects()
 	}
 }
@@ -583,10 +583,10 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 
 	hostile.SetInvul(true)
 	beforeHP := hostile.CurrentHP()
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 
-	waitFor(t, "invulnerable NPC registers DOT hate", func() bool {
+	srv.AdvanceUntil(t, "invulnerable NPC registers DOT hate", func() bool {
 		return hostile.AI().CurrentIntention() == ai.IntentionAttack
 	})
 	if hp := hostile.CurrentHP(); hp != beforeHP {
@@ -628,7 +628,7 @@ func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 
-	waitFor(t, "invulnerable NPC registers PDAM hate", func() bool {
+	srv.AdvanceUntil(t, "invulnerable NPC registers PDAM hate", func() bool {
 		return hostile.AI().CurrentIntention() == ai.IntentionAttack
 	})
 	if hp := hostile.CurrentHP(); hp != beforeHP {
@@ -667,7 +667,7 @@ func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(45, false, false))
 	readCastStartFrames(t, c, objID, 45, 1, 500, 60_000, hostile.ObjectID())
 
-	waitFor(t, "invulnerable NPC registers MDAM hate", func() bool {
+	srv.AdvanceUntil(t, "invulnerable NPC registers MDAM hate", func() bool {
 		return hostile.AI().CurrentIntention() == ai.IntentionAttack
 	})
 	if hp := hostile.CurrentHP(); hp != beforeHP {
@@ -795,19 +795,16 @@ func TestSignetPointExpiresThroughTheEffectTicker(t *testing.T) {
 	readCastStartFrames(t, c, objID, 454, 1, 500, 60_000, objID)
 
 	var point *npc.EffectPoint
-	for deadline := time.Now().Add(3 * time.Second); point == nil && time.Now().Before(deadline); {
-		time.Sleep(50 * time.Millisecond)
+	srv.AdvanceUntil(t, "signet effect point", func() bool {
 		for _, obj := range srv.State.Objects() {
 			if ep, ok := obj.(*npc.EffectPoint); ok {
 				point = ep
 			}
 		}
-	}
-	if point == nil {
-		t.Fatal("signet cast spawned no effect point")
-	}
+		return point != nil
+	})
 
-	time.Sleep(1100 * time.Millisecond)
+	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
 	if _, ok := srv.State.Object(point.ObjectID()); ok {
 		t.Fatal("effect point still in world after its only tick: its list never reached the effect ticker")

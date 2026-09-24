@@ -79,6 +79,9 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 // ReadFrame call: decode it before reading again, or copy it. Only one
 // goroutine may call ReadFrame.
 func (s *Session) ReadFrame() ([]byte, error) {
+	if observe := s.conn.observeRead; observe != nil {
+		observe()
+	}
 	timeout := clientReadIdleTimeout
 	if s.handshaking {
 		timeout = clientReadHandshakeTimeout
