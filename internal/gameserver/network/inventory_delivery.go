@@ -43,22 +43,40 @@ type petInventoryDelivery struct {
 }
 
 func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory) {
-	if d == nil || d.updates == nil || d.live == nil || d.state == nil || d.live.detached() {
+	if d == nil || d.updates == nil {
 		return
+	}
+	if pet, ok := d.pet(inv); ok {
+		d.updates.Add(inv, &petInventoryOwner{live: d.live, pet: pet, log: d.log})
+	}
+}
+
+// UpdateInventoryWeight republishes the pet's status (owner PetStatusUpdate,
+// NpcInfo to other watchers) and then the owner's PetInfo window, which
+// carries the new carried weight.
+// TODO(#2524): refresh the pet's weight-penalty band first.
+func (d *petInventoryDelivery) UpdateInventoryWeight(inv *itemcontainer.Inventory) {
+	if pet, ok := d.pet(inv); ok {
+		pet.UpdateStatus()
+		sendSummonInfosToOwner(pet)
+	}
+}
+
+// pet returns the owner's live pet when inv is still its inventory.
+func (d *petInventoryDelivery) pet(inv *itemcontainer.Inventory) (*summon.Actor, bool) {
+	if d == nil || d.live == nil || d.state == nil || d.live.detached() {
+		return nil, false
 	}
 	obj, ok := d.state.Summon(d.live.ObjectID())
 	if !ok {
-		return
+		return nil, false
 	}
 	pet, ok := obj.(*summon.Actor)
 	if !ok || pet.PetInventory() != inv {
-		return
+		return nil, false
 	}
-	d.updates.Add(inv, &petInventoryOwner{live: d.live, pet: pet, log: d.log})
+	return pet, true
 }
-
-// TODO(#2381): match PetInventory.updateWeight's pet status and info refresh.
-func (*petInventoryDelivery) UpdateInventoryWeight(*itemcontainer.Inventory) {}
 
 // ownerItemPersister is the live persistence dependency of one inventory: its
 // items' writes register with the lazy item task under the inventory's owner,

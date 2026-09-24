@@ -478,6 +478,7 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Handler: "PetFoods"},
 			AttachedSkills: []item.SkillRef{{ID: 2048, Level: 1}},
+			Weight:         40,
 		},
 	})
 }
