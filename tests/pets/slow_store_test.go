@@ -23,8 +23,8 @@ const slowStoreDelay = 120 * time.Millisecond
 // goroutine that is already waiting — so a pets table slower than the sim
 // pool's slow-task budget stalls neither the queue nor the client's replies.
 func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
-	// Not parallel: the slow-task budget and the drain's read timeout are
-	// wall-clock, so other tests' CPU load fails them spuriously.
+	// Not parallel: the slow-task budget is wall-clock, so other tests' CPU
+	// load fails it spuriously.
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithCapturedLog(),
 		gameservertest.WithRealPool(), // the slow-task watchdog runs only on the pool
@@ -36,18 +36,20 @@ func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
 		t.Fatalf("fresh pet Name() = %q, want template name", got)
 	}
 
-	frames := renameTo(t, h, "Fenrir")
-	var sawRefresh bool
-	for _, frame := range frames {
-		if frame[0] == serverpackets.OpcodePetInfo {
-			sawRefresh = true
-			if _, name := readPetInfoName(t, frame); name != "Fenrir" {
-				t.Fatalf("refreshed PetInfo name = %q, want Fenrir", name)
-			}
+	// The reply trails the slow uniqueness read, so wait for it on Read's
+	// generous bound rather than drainFrames' short quiet window, which
+	// other packages' CPU load can outlast. Whether the read held a queue is
+	// the watchdog's question, asserted below.
+	h.client.Send(encodeRequestChangePetName("Fenrir"))
+	for {
+		frame := mustRead(t, h.client, "refreshed PetInfo")
+		if frame[0] != serverpackets.OpcodePetInfo {
+			continue
 		}
-	}
-	if !sawRefresh {
-		t.Fatalf("rename frames = opcodes %x, want a refreshed PetInfo", frameOpcodes(frames))
+		if _, name := readPetInfoName(t, frame); name != "Fenrir" {
+			t.Fatalf("refreshed PetInfo name = %q, want Fenrir", name)
+		}
+		break
 	}
 
 	h.srv.Settle(t)
