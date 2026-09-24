@@ -73,6 +73,20 @@ func (f *fakeGameServer) sendFrame(payload []byte) {
 	}
 }
 
+// waitUntil polls cond until it holds, for state the login server applies
+// after reading a frame that has no reply. The deadline only bounds a real
+// hang; a loaded machine just takes more polls.
+func waitUntil(t *testing.T, want string, cond func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", want)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // expectClosed asserts the login server closed the connection without
 // sending anything further.
 func (f *fakeGameServer) expectClosed() {
@@ -380,23 +394,16 @@ func TestGameServerLinkFreshRegistrationAndStatus(t *testing.T) {
 	}
 
 	gs.sendServerStatus(map[int32]int32{7: 42}) // MAX_PLAYERS attribute
-	time.Sleep(50 * time.Millisecond)
-	entry, _ = servers.Get(1)
-	if entry.MaxPlayers != 42 {
-		t.Fatalf("MaxPlayers after ServerStatus = %d, want 42", entry.MaxPlayers)
-	}
+	waitUntil(t, "MaxPlayers after ServerStatus = 42", func() bool {
+		entry, _ := servers.Get(1)
+		return entry.MaxPlayers == 42
+	})
 
 	gs.sendPlayerInGame("acc1", "acc2")
-	time.Sleep(50 * time.Millisecond)
-	if got := servers.OnlineAccountCount(1); got != 2 {
-		t.Fatalf("OnlineAccountCount() = %d, want 2", got)
-	}
+	waitUntil(t, "OnlineAccountCount() = 2", func() bool { return servers.OnlineAccountCount(1) == 2 })
 
 	gs.sendPlayerLogout("acc1")
-	time.Sleep(50 * time.Millisecond)
-	if got := servers.OnlineAccountCount(1); got != 1 {
-		t.Fatalf("OnlineAccountCount() after logout = %d, want 1", got)
-	}
+	waitUntil(t, "OnlineAccountCount() after logout = 1", func() bool { return servers.OnlineAccountCount(1) == 1 })
 }
 
 func TestGameServerLinkWrongHexIDRejected(t *testing.T) {
@@ -553,12 +560,10 @@ func TestGameServerLinkDisconnectMarksOffline(t *testing.T) {
 	}
 
 	gs.conn.Close()
-	time.Sleep(100 * time.Millisecond)
-
-	entry, _ := servers.Get(1)
-	if entry.Authed {
-		t.Fatal("entry.Authed = true after disconnect, want false")
-	}
+	waitUntil(t, "entry.Authed = false after disconnect", func() bool {
+		entry, _ := servers.Get(1)
+		return !entry.Authed
+	})
 }
 
 func TestGameServerLinkBannedIPRejected(t *testing.T) {
