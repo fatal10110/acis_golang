@@ -60,8 +60,8 @@ type entry struct {
 // List is a player's set of active cubics, capped at a caller-supplied slot
 // count and ordered by grant time so the oldest entry is evicted first when
 // a new cubic is admitted past the cap. The zero value is an empty, usable
-// list. Mutations are guarded by mu, since a cubic's own admit/expire
-// timers and an owner's command handler both touch it.
+// list. mu is taken from other actors' queues: a party member's cubic cast
+// admits cubics on the caster's queue.
 type List struct {
 	mu      sync.RWMutex
 	entries []entry
