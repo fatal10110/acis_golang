@@ -584,15 +584,19 @@ func TestInventory_DrainUpdates_CoalescesStackableCounts(t *testing.T) {
 // silently losing queued deltas when the frame build fails (e.g. an item
 // whose template isn't loaded): draining before build succeeds would throw
 // the pending updates away with nothing sent and no way to retry them.
+// The requeue must also re-register the inventory with its delivery: the
+// batching task may have seen the drained, empty queue and dropped it.
 func TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
-	inv := NewPetInventory(1, templates)
+	delivery := &inventoryDeliveryRecorder{}
+	inv := NewPetInventoryWithDelivery(1, templates, delivery, nil)
 	inv.AddNew(1, 1, 1)
 	if !inv.HasUpdates() {
 		t.Fatal("expected AddNew to queue an update")
 	}
+	delivery.updates = 0
 
 	buildErr := errors.New("boom")
 	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
@@ -603,6 +607,9 @@ func TestInventory_BuildAndDrainUpdates_KeepsQueueOnBuildError(t *testing.T) {
 	}
 	if !inv.HasUpdates() {
 		t.Fatal("BuildAndDrainUpdates() drained the queue despite a failed build")
+	}
+	if delivery.updates != 1 {
+		t.Fatalf("update deliveries after a failed build = %d, want 1", delivery.updates)
 	}
 }
 
