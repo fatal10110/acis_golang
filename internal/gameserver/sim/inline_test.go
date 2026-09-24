@@ -97,11 +97,8 @@ func TestQueueNowReadsItsExecutorClock(t *testing.T) {
 	in := NewInline(epoch)
 	q := in.NewQueue("q")
 	in.Advance(time.Minute)
-	if got := Now(q); !got.Equal(epoch.Add(time.Minute)) {
-		t.Fatalf("Now(q) = %v, want the Inline clock %v", got, epoch.Add(time.Minute))
-	}
-	if got := Now(nil); got.Before(time.Now().Add(-time.Minute)) {
-		t.Fatalf("Now(nil) = %v, want the wall clock", got)
+	if got := q.Now(); !got.Equal(epoch.Add(time.Minute)) {
+		t.Fatalf("q.Now() = %v, want the Inline clock %v", got, epoch.Add(time.Minute))
 	}
 }
 

@@ -130,29 +130,27 @@ type List struct {
 	// queue is the owner's queue, which periodic effect actions run on; set
 	// once before the owner is published.
 	queue *sim.Queue
-	// clock is WithClock's queue, read only when queue is nil.
-	clock *sim.Queue
+	// clock is what effect periods are measured on: the owner's queue, else
+	// the WithClock queue, else the wall clock.
+	clock sim.Clock
 }
 
-// now reads the clock effect periods run on: the list's queue, else the
-// WithClock queue, else the wall clock.
-func (l *List) now() time.Time {
-	if l.queue != nil {
-		return l.queue.Now()
-	}
-	return sim.Now(l.clock)
-}
+func (l *List) now() time.Time { return l.clock.Now() }
 
 // SetQueue makes q, the owner's queue, the queue this list's periodic
-// actions run on.
-func (l *List) SetQueue(q *sim.Queue) { l.queue = q }
+// actions run on and the clock its effect periods are measured on.
+func (l *List) SetQueue(q *sim.Queue) {
+	l.queue = q
+	l.clock = q
+}
 
 // Queue returns the queue SetQueue installed, or nil.
 func (l *List) Queue() *sim.Queue { return l.queue }
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {
-	l := &List{owner: owner}
+	// ponytail: wall-clock default serves only queue-less unit fixtures; #2488 drops it.
+	l := &List{owner: owner, clock: sim.SystemClock{}}
 	for _, opt := range opts {
 		opt(l)
 	}

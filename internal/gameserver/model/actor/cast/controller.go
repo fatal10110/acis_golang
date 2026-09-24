@@ -10,7 +10,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/rs/zerolog"
 )
 
 var (
@@ -121,16 +120,6 @@ type DamageInterrupt struct {
 	Fusion       bool
 }
 
-// scheduledTimer is the subset of *time.Timer the delayed cast scheduler
-// needs, narrow enough for tests to substitute a fake clock.
-type scheduledTimer interface {
-	Stop() bool
-}
-
-// afterFunc matches time.AfterFunc's signature, injectable for deterministic
-// tests.
-type afterFunc func(time.Duration, func()) scheduledTimer
-
 // Controller coordinates validation, resource consumption, cooldowns and
 // interruption state for one actor's active cast.
 //
@@ -154,7 +143,7 @@ type Controller struct {
 	// Finish callback belonging to a superseded cast can recognize itself
 	// as stale and no-op instead of acting on the wrong cast.
 	castSeq   uint64
-	timers    []scheduledTimer
+	timers    []*sim.Timer
 	fusionEnd func()
 	// finishHolds counts the outstanding HoldFinish grants for the active
 	// cast, and finishArm is the Finish arming Hit deferred because of
@@ -163,9 +152,8 @@ type Controller struct {
 	// behalf.
 	finishHolds int
 	finishArm   func()
-	afterFunc   afterFunc
+	queue       *sim.Queue
 	sink        event.Sink
-	log         zerolog.Logger
 }
 
 // NewController returns a cast controller for actor. sink receives, each
@@ -195,19 +183,11 @@ func (c *Controller) emit(e event.Event) {
 }
 
 // SetQueue runs the controller's scheduled launch, hit and finish callbacks
-// as tasks on q, the owning actor's queue.
+// as tasks on q, the owning actor's queue. A scheduled cast needs one.
 func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
-}
-
-// SetLogger records where a panic recovered from a scheduled cast callback
-// (Launch/Hit/Finish) is logged. The zero value discards it.
-func (c *Controller) SetLogger(log zerolog.Logger) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.log = log
+	c.queue = q
 }
 
 // HoldFinish keeps the active cast's Finish phase from being armed until
@@ -783,11 +763,7 @@ func (c *Controller) stopTimersLocked() {
 }
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
-	source := c.afterFunc
-	if source == nil { // no queue: only unit tests build one this way
-		source = func(d time.Duration, fn func()) scheduledTimer { return sim.AfterOr(nil, d, fn, c.log) }
-	}
-	c.timers = append(c.timers, source(delay, f))
+	c.timers = append(c.timers, c.queue.After(delay, f))
 }
 
 func positive(n int) int {

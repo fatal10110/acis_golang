@@ -137,6 +137,7 @@ func TestUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	servitor.SetQueue(srv.PlayerQueue(t, objID))
 	srv.State.AddSummon(objID, servitor)
 	drainUntilQuiet(t, c)
 

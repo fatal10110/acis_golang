@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/rs/zerolog"
 )
 
 // FollowMode identifies the active follow task flavor.
@@ -43,8 +42,8 @@ type TargetSnapshot struct {
 // CreatureMove holds movement state owned and updated by one caller.
 //
 // origin is the actor's current server-authoritative position. mu guards
-// every mutable field below, since an accepted MoveToLocation schedules a
-// timer goroutine that advances origin and fires the arrived hook
+// every mutable field below, since an accepted MoveToLocation arms a timer
+// on the owner's queue that advances origin and fires the arrived hook
 // independently of the caller.
 //
 // A single request may resolve into multiple segments: when the straight
@@ -75,11 +74,9 @@ type CreatureMove struct {
 	followOffset         int
 	followMode           FollowMode
 	owner                moveOwner
-	timer                scheduledTimer
+	timer                *sim.Timer
 	moveSeq              uint64
-	afterFunc            func(time.Duration, func()) scheduledTimer
 	queue                *sim.Queue
-	log                  zerolog.Logger
 }
 
 // moveOwner is the controller a CreatureMove reports its movement milestones
@@ -95,10 +92,6 @@ type moveOwner interface {
 	// for the first segment (MoveToLocation already returns it) or for the
 	// final segment's completion (arrived does).
 	segmentAdvanced(event.Move)
-}
-
-type scheduledTimer interface {
-	Stop() bool
 }
 
 // NewCreatureMove builds movement state at origin with a non-negative ground
@@ -148,21 +141,12 @@ func (m *CreatureMove) setOwner(owner moveOwner) {
 	m.owner = owner
 }
 
-// SetLogger records where a panic recovered from an arrival callback is
-// logged. The zero value discards it.
-func (m *CreatureMove) SetLogger(log zerolog.Logger) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.log = log
-}
-
 // SetQueue runs this movement's arrival callbacks as tasks on q, the owning
-// actor's queue.
+// actor's queue. A move with a positive duration needs one.
 func (m *CreatureMove) SetQueue(q *sim.Queue) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.queue = q
-	m.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
 }
 
 // Queue returns the queue SetQueue installed, or nil.
@@ -360,11 +344,7 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 	}
 	m.moveSeq++
 	seq := m.moveSeq
-	source := m.afterFunc
-	if source == nil { // no queue: only unit tests build one this way
-		source = func(d time.Duration, fn func()) scheduledTimer { return sim.AfterOr(nil, d, fn, m.log) }
-	}
-	m.timer = source(duration, func() { m.onArrive(seq) })
+	m.timer = m.queue.After(duration, func() { m.onArrive(seq) })
 }
 
 func (m *CreatureMove) onArrive(seq uint64) {

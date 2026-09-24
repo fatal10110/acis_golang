@@ -60,7 +60,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 			l.fireCubic(live, id, runtime)
 		}, func() {
 			l.expireCubic(live, id)
-		}, live.after)
+		}, live.Queue())
 		live.cubics[id] = runtime
 	}
 	live.cubicsMu.Unlock()

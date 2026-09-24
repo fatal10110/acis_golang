@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -48,6 +49,7 @@ func TestCharacterPoleAttackConfigAndKnownCombatants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	c.Live = live
 	c.AddStatFuncs([]effect.Mod{
 		{Stat: stat.PowerAttackRange, Op: effect.OpAdd, Value: 25},
@@ -618,6 +620,7 @@ func attachTestLive(t *testing.T, c *Character) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	c.Live = live
 }
 
@@ -754,6 +757,7 @@ func attachThrowUpTestLive(t *testing.T, c *Character) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	c.Live = live
 }
 
@@ -885,7 +889,7 @@ func TestCharacterTeleportingReportsLiveState(t *testing.T) {
 
 // ---- from character_charges_test.go ----
 func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 
 	if ok := c.IncreaseCharges(2, 5); !ok || c.Charges() != 2 {
 		t.Fatalf("after +2: Charges() = %d, ok = %v, want 2, true", c.Charges(), ok)
@@ -902,7 +906,7 @@ func TestCharacterIncreaseChargesClampsToMax(t *testing.T) {
 }
 
 func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	rec := recordEvents(c)
 
 	if !c.IncreaseCharges(5, 5) {
@@ -920,7 +924,7 @@ func TestCharacterIncreaseChargesNotifiesStatusOnlyAfterSuccessfulAdd(t *testing
 }
 
 func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	rec := recordEvents(c)
 
 	c.IncreaseCharges(2, 5)
@@ -939,7 +943,7 @@ func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) 
 }
 
 func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	c.IncreaseCharges(2, 5)
 
 	if ok := c.DecreaseCharges(3); ok || c.Charges() != 2 {
@@ -951,7 +955,7 @@ func TestCharacterDecreaseChargesReportsInsufficientCharges(t *testing.T) {
 }
 
 func TestCharacterDecreaseChargesNotifiesStatusOnlyAfterSuccessfulRemoval(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	c.IncreaseCharges(2, 5)
 	rec := recordEvents(c)
 
@@ -970,7 +974,7 @@ func TestCharacterDecreaseChargesNotifiesStatusOnlyAfterSuccessfulRemoval(t *tes
 }
 
 func TestCharacterClearChargesResetsToZero(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	c.IncreaseCharges(4, 5)
 
 	c.ClearCharges()
@@ -981,7 +985,7 @@ func TestCharacterClearChargesResetsToZero(t *testing.T) {
 }
 
 func TestCharacterClearChargesNotifiesStatusOnlyWhenChargesChange(t *testing.T) {
-	c := &Character{ID: 1}
+	c := chargingCharacter(t)
 	c.IncreaseCharges(4, 5)
 	rec := recordEvents(c)
 
@@ -996,7 +1000,7 @@ func TestCharacterClearChargesNotifiesStatusOnlyWhenChargesChange(t *testing.T) 
 }
 
 func TestCharacterDieClearsCharges(t *testing.T) {
-	c := liveCharacter(1, combatTemplate(), combatItems())
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.SetHP(1)
 	c.IncreaseCharges(3, 5)
 
@@ -1718,6 +1722,7 @@ func withEffectList(t *testing.T, c *Character) *Character {
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	c.Live = live
 	return c
 }
@@ -6060,4 +6065,28 @@ func TestLevelUpUserInfoPrecedesSPGain(t *testing.T) {
 	if len(sink.sp) != 2 || sink.sp[0] != 0 || sink.sp[1] != 40 {
 		t.Fatalf("UserInfo SP values = %v, want [0 40]", sink.sp)
 	}
+}
+
+// idleQueue is a queue on a virtual clock no test advances: timers armed on
+// it never fire.
+func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// chargingCharacter is an in-world character whose charge auto-clear timer
+// arms on a queue nothing advances.
+func chargingCharacter(t *testing.T) *Character {
+	t.Helper()
+	return attachIdleLive(t, &Character{ID: 1})
+}
+
+// attachIdleLive puts c in the world on a queue nothing advances, so the
+// timers it arms (the charge auto-clear) never fire.
+func attachIdleLive(t *testing.T, c *Character) *Character {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 0, permissiveGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.SetQueue(idleQueue())
+	c.Live = live
+	return c
 }

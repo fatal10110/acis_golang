@@ -3,18 +3,9 @@ package cubic
 import (
 	"sync"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
-
-// Timer is the narrow surface Runtime needs from a scheduled callback,
-// satisfied by *time.Timer.
-type Timer interface {
-	Stop() bool
-}
-
-// AfterFunc schedules fn to run once after d elapses, returning a handle
-// that can cancel it. Tests inject a deterministic stand-in; production
-// wiring passes time.AfterFunc.
-type AfterFunc func(d time.Duration, fn func()) Timer
 
 // Runtime is one live cubic's timers: the recurring action tick (started
 // immediately for the Life Cubic, or lazily via Action() the first time the
@@ -35,7 +26,7 @@ type Runtime struct {
 	interval         time.Duration
 	fire             func()
 	disappear        func()
-	afterFunc        AfterFunc
+	queue            *sim.Queue
 
 	mu      sync.Mutex
 	running bool
@@ -47,18 +38,16 @@ type Runtime struct {
 	// Action()/StopAction() call run on different goroutines) would leave
 	// two independent timer chains running, doubling the fire rate.
 	generation     int
-	actionTimer    Timer
-	disappearTimer Timer
+	actionTimer    *sim.Timer
+	disappearTimer *sim.Timer
 }
 
-// NewRuntime builds a cubic runtime. fire runs one action tick; disappear
-// runs once when the granted lifetime elapses. Neither timer starts until
-// Action() and RefreshDisappear() are called.
-func NewRuntime(id ID, level, activationChance int, interval time.Duration, fire, disappear func(), afterFunc AfterFunc) *Runtime {
-	if afterFunc == nil {
-		afterFunc = func(d time.Duration, fn func()) Timer { return time.AfterFunc(d, fn) }
-	}
-	return &Runtime{id: id, Level: level, ActivationChance: activationChance, interval: interval, fire: fire, disappear: disappear, afterFunc: afterFunc}
+// NewRuntime builds a cubic runtime whose timers run as tasks on q, the
+// owner's queue. fire runs one action tick; disappear runs once when the
+// granted lifetime elapses. Neither timer starts until Action() and
+// RefreshDisappear() are called.
+func NewRuntime(id ID, level, activationChance int, interval time.Duration, fire, disappear func(), q *sim.Queue) *Runtime {
+	return &Runtime{id: id, Level: level, ActivationChance: activationChance, interval: interval, fire: fire, disappear: disappear, queue: q}
 }
 
 // ID satisfies task.AttackStanceCubic.
@@ -75,7 +64,7 @@ func (r *Runtime) Action() {
 	r.running = true
 	r.generation++
 	gen := r.generation
-	r.actionTimer = r.afterFunc(r.interval, func() { r.tick(gen) })
+	r.actionTimer = r.queue.After(r.interval, func() { r.tick(gen) })
 }
 
 func (r *Runtime) tick(gen int) {
@@ -90,7 +79,7 @@ func (r *Runtime) tick(gen int) {
 	// Action()'s no-op-if-already-active guard silently block every future
 	// stance re-entry, stalling this cubic for the rest of its grant even
 	// though the panic itself gets contained and logged by the caller's
-	// recovered afterFunc. Reset state like StopAction() before re-panicking
+	// queue's per-task recovery. Reset state like StopAction() before re-panicking
 	// so the caller's recover still logs the value.
 	defer func() {
 		if p := recover(); p != nil {
@@ -107,7 +96,7 @@ func (r *Runtime) tick(gen int) {
 
 	r.mu.Lock()
 	if r.running && gen == r.generation {
-		r.actionTimer = r.afterFunc(r.interval, func() { r.tick(gen) })
+		r.actionTimer = r.queue.After(r.interval, func() { r.tick(gen) })
 	}
 	r.mu.Unlock()
 }
@@ -134,7 +123,7 @@ func (r *Runtime) RefreshDisappear(lifetime time.Duration) {
 	if r.disappearTimer != nil {
 		r.disappearTimer.Stop()
 	}
-	r.disappearTimer = r.afterFunc(lifetime, r.disappear)
+	r.disappearTimer = r.queue.After(lifetime, r.disappear)
 }
 
 // Stop cancels both timers, matching Cubic.stop().

@@ -108,6 +108,7 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(sim.NewInline(time.Unix(0, 0)).NewQueue("walker"))
 	ctl, err := move.NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)

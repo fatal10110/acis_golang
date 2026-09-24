@@ -25,6 +25,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -219,6 +220,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		SevenSigns:       sevenSigns,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
+		Queues:           testQueues(t),
 		Log:              log,
 		Now:              testLinkNow,
 	})
@@ -453,3 +455,19 @@ func (testHostileAttack) Stop()                               {}
 func (testHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (testHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+
+// testQueues runs each linked player's work on a real pool, stopped once the
+// test's connection handlers have returned.
+func testQueues(t *testing.T) *sim.Pool {
+	t.Helper()
+	pool := sim.NewPool(2, zerolog.Nop())
+	pool.Start(context.Background())
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := pool.Stop(ctx); err != nil {
+			t.Errorf("stop pool: %v", err)
+		}
+	})
+	return pool
+}

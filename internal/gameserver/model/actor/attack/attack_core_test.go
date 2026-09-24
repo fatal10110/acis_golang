@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -47,19 +48,23 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
 	target := &timingTarget{id: 2}
-	clock := &timingClock{}
+	clock := newTimingClock()
 	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	rec := &event.Recorder{}
 	ctrl.sink = rec
 	finished := func() int { return event.Count[event.AttackFinished](rec) }
+	// Each hit arms the next step only once it has landed, so a hit whose
+	// task runs late on a busy queue delays the rest of the attack with it.
+	target.onDamage = func() {
+		if got, want := armedTimers(ctrl), 1+target.hits; got != want {
+			t.Fatalf("timers armed while hit %d lands = %d, want %d", target.hits, got, want)
+		}
+	}
 
 	ctrl.DoAttack(target)
-	if got := clock.activeCount(500 * time.Millisecond); got != 1 {
-		t.Fatalf("first-hit timers at attackTime/2 = %d, want 1", got)
-	}
-	if got := clock.activeCount(time.Second); got != 0 {
-		t.Fatalf("completion timers before second landing = %d, want 0", got)
+	if next := clock.next(); next != 500*time.Millisecond {
+		t.Fatalf("first timer due at %v, want attackTime/2", next)
 	}
 
 	clock.fire(250 * time.Millisecond)
@@ -87,42 +92,12 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	}
 }
 
-func TestControllerDualSlowFirstHitDelaysSecondHitAndCompletion(t *testing.T) {
-	actor := &timingActor{attackType: item.WeaponDual, attackSpeed: 500}
-	target := &timingTarget{id: 2}
-	clock := &timingClock{}
-	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
-	rec := &event.Recorder{}
-	ctrl.sink = rec
-	finished := func() int { return event.Count[event.AttackFinished](rec) }
-	target.onDamage = func() {
-		if target.hits == 1 {
-			clock.fire(time.Second)
-		}
-	}
-
-	ctrl.DoAttack(target)
-	clock.fire(500 * time.Millisecond)
-	if target.hits != 1 || finished() != 0 {
-		t.Fatalf("after slow first hit: hits = %d, finished = %d; want 1, 0", target.hits, finished())
-	}
-	clock.fire(1500 * time.Millisecond)
-	if target.hits != 2 || finished() != 0 {
-		t.Fatalf("after delayed second hit: hits = %d, finished = %d; want 2, 0", target.hits, finished())
-	}
-	clock.fire(2 * time.Second)
-	if finished() != 1 {
-		t.Fatalf("finished after delayed second hit = %d, want 1", finished())
-	}
-}
-
 func TestControllerStopsWhenMainTargetDiesBeforeHit(t *testing.T) {
 	actor := &timingActor{attackSpeed: 500}
 	target := &timingTarget{id: 2}
-	clock := &timingClock{}
+	clock := newTimingClock()
 	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(target)
 	target.dead = true
@@ -154,7 +129,7 @@ func TestControllerBowFireConsumesThenDrawsThenBroadcasts(t *testing.T) {
 	}}
 	target := &timingTarget{id: 2}
 	ctrl := NewPlayer(actor, nil)
-	ctrl.afterFunc = (&timingClock{}).AfterFunc
+	ctrl.SetQueue(newTimingClock().q)
 
 	ctrl.DoAttack(target)
 	if got, want := actor.events, []string{"consume", "mp", "hit", "draw", "broadcast"}; !slices.Equal(got, want) {
@@ -169,7 +144,7 @@ func TestControllerBowFireSkipsPlayerPacketsForCreatures(t *testing.T) {
 	actor := &timingActor{attackType: item.WeaponBow, attackSpeed: 500}
 	target := &timingTarget{id: 2}
 	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = (&timingClock{}).AfterFunc
+	ctrl.SetQueue(newTimingClock().q)
 
 	ctrl.DoAttack(target)
 	if got, want := actor.events, []string{"mp", "hit", "broadcast"}; !slices.Equal(got, want) {
@@ -187,9 +162,9 @@ func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
 		reuse:       1500 * time.Millisecond,
 	}}
 	target := &timingTarget{id: 2}
-	clock := &timingClock{}
+	clock := newTimingClock()
 	ctrl := NewPlayer(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(target)
 	if actor.drawMs != 2035 {
@@ -198,13 +173,16 @@ func TestControllerBowReuseIsFrozenAtFireTime(t *testing.T) {
 
 	actor.attackSpeed = 350
 	clock.fire(time.Second)
-	clock.fire(time.Second)
-
-	if got := clock.activeCount(2035 * time.Millisecond); got != 1 {
-		t.Fatalf("frozen reuse timers at 2035ms = %d, want 1", got)
+	if !ctrl.BowCoolingDown() {
+		t.Fatal("BowCoolingDown() once the attack finished = false, want true")
 	}
-	if got := clock.activeCount(2478 * time.Millisecond); got != 0 {
-		t.Fatalf("live-recomputed reuse timers at 2478ms = %d, want 0", got)
+	clock.fire(time.Second + 1034*time.Millisecond)
+	if !ctrl.BowCoolingDown() {
+		t.Fatal("BowCoolingDown() 1ms before the frozen 1035ms reuse = false, want true")
+	}
+	clock.fire(time.Second + 1035*time.Millisecond)
+	if ctrl.BowCoolingDown() {
+		t.Fatal("BowCoolingDown() at the frozen 1035ms reuse = true, want false (a live recompute would hold it to 1478ms)")
 	}
 }
 
@@ -224,16 +202,17 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 		poleMax:     3,
 	}
 	actor.known = []attackable.Combatant{actor, primary, outsideCone, first, second, beyondCap, behind, outOfRange, notAttackable}
-	clock := &timingClock{}
+	clock := newTimingClock()
 	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	rec := &event.Recorder{}
 	ctrl.sink = rec
 	finished := func() int { return event.Count[event.AttackFinished](rec) }
 	primary.onDamage = func() {
-		clock.fire(time.Second)
-		if finished() != 0 {
-			t.Fatalf("pole completed during hit group: finished = %d, want 0", finished())
+		// One timer for the whole pole group; completion is armed only
+		// after the group has landed.
+		if got := armedTimers(ctrl); got != 2 {
+			t.Fatalf("timers armed while the pole group lands = %d, want 2 (hit animation, one pole group)", got)
 		}
 		actor.dead = true
 		ctrl.Stop()
@@ -250,14 +229,14 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	if actor.broadcasts != 1 {
 		t.Fatalf("attack broadcasts = %d, want 1", actor.broadcasts)
 	}
-	if got := clock.count(500 * time.Millisecond); got != 1 {
-		t.Fatalf("timers at attackTime/2 = %d, want one pole group", got)
-	}
-	if got := clock.activeCount(time.Second); got != 0 {
-		t.Fatalf("completion timers before pole group landing = %d, want 0", got)
+	if next := clock.next(); next != 500*time.Millisecond {
+		t.Fatalf("first timer due at %v, want the pole group at attackTime/2", next)
 	}
 
 	clock.fire(500 * time.Millisecond)
+	if finished() != 0 {
+		t.Fatalf("pole completed with its hit group: finished = %d, want 0", finished())
+	}
 	if want := []int32{2, 3, 4}; !slices.Equal(landed, want) {
 		t.Fatalf("landing order = %v, want %v", landed, want)
 	}
@@ -282,9 +261,9 @@ func TestControllerPoleSingleTargetEffectKeepsOnlyPrimary(t *testing.T) {
 		poleMax:     1,
 		known:       []attackable.Combatant{secondary},
 	}
-	clock := &timingClock{}
+	clock := newTimingClock()
 	ctrl := NewCreature(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	ctrl.DoAttack(primary)
 
@@ -305,59 +284,39 @@ func snapshotTargetIDs(snapshot event.Attack) []int32 {
 	return ids
 }
 
+// timingClock drives a controller's queue on a virtual clock, addressed in
+// offsets from the attack's start.
 type timingClock struct {
-	now    time.Duration
-	timers []*timingTimer
+	in    *sim.Inline
+	q     *sim.Queue
+	start time.Time
 }
 
-func (c *timingClock) AfterFunc(delay time.Duration, f func()) scheduledTimer {
-	timer := &timingTimer{delay: c.now + delay, f: f}
-	c.timers = append(c.timers, timer)
-	return timer
+func newTimingClock() *timingClock {
+	start := time.Unix(1000, 0)
+	in := sim.NewInline(start)
+	return &timingClock{in: in, q: in.NewQueue("attacker"), start: start}
 }
 
-func (c *timingClock) fire(delay time.Duration) {
-	c.now = delay
-	for _, timer := range c.timers {
-		if timer.delay == delay && !timer.stopped {
-			timer.stopped = true
-			timer.f()
-		}
+// fire runs everything due up to offset at.
+func (c *timingClock) fire(at time.Duration) {
+	c.in.Advance(c.start.Add(at).Sub(c.in.Now()))
+}
+
+// next is the offset of the earliest armed timer.
+func (c *timingClock) next() time.Duration {
+	at, ok := c.in.NextTimer()
+	if !ok {
+		return -1
 	}
+	return at.Sub(c.start)
 }
 
-func (c *timingClock) activeCount(delay time.Duration) int {
-	count := 0
-	for _, timer := range c.timers {
-		if timer.delay == delay && !timer.stopped {
-			count++
-		}
-	}
-	return count
-}
-
-func (c *timingClock) count(delay time.Duration) int {
-	count := 0
-	for _, timer := range c.timers {
-		if timer.delay == delay {
-			count++
-		}
-	}
-	return count
-}
-
-type timingTimer struct {
-	delay   time.Duration
-	f       func()
-	stopped bool
-}
-
-func (t *timingTimer) Stop() bool {
-	if t.stopped {
-		return false
-	}
-	t.stopped = true
-	return true
+// armedTimers counts the timers ctrl armed for its current attack.
+func armedTimers(ctrl *Controller) int {
+	ctrl.mu.RLock()
+	defer ctrl.mu.RUnlock()
+	return len(ctrl.timers)
 }
 
 type timingActor struct {

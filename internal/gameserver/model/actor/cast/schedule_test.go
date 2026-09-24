@@ -1,16 +1,13 @@
 package cast
 
 import (
-	"bytes"
 	"errors"
-	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/rs/zerolog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // scalingActor and scalingDef are the exact fixture TestStartScalesTimingAndInstallsReuse
@@ -25,10 +22,10 @@ func scalingActor() *testActor {
 var scalingDef = modelskill.Definition{ID: 10, Level: 2, Magic: true, HitTime: 1500, CoolTime: 600, ReuseDelay: 12000}
 
 func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -48,12 +45,12 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 		t.Fatalf("hooks fired before any timer, order = %v", order)
 	}
 
-	clock.fire(plan.LaunchDelay)
+	clock.advance(plan.LaunchDelay)
 	if got := []string{"launch"}; !equalStrings(order, got) {
 		t.Fatalf("order after launch delay = %v, want %v", order, got)
 	}
 
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.HitDelay)
 	if got := []string{"launch", "hit"}; !equalStrings(order, got) {
 		t.Fatalf("order after hit delay = %v, want %v", order, got)
 	}
@@ -61,7 +58,7 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 		t.Fatal("CastingNow() = false between Hit and Finish, want still casting")
 	}
 
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.FinalDelay)
 	if got := []string{"launch", "hit", "finish"}; !equalStrings(order, got) {
 		t.Fatalf("order after final delay = %v, want %v", order, got)
 	}
@@ -71,10 +68,10 @@ func TestScheduleRunsLaunchHitAndFinishInOrder(t *testing.T) {
 }
 
 func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
@@ -89,7 +86,7 @@ func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 		Hit:    func() { hitCalled = true },
 	})
 
-	clock.fire(plan.LaunchDelay)
+	clock.advance(plan.LaunchDelay)
 
 	if hitCalled {
 		t.Fatal("Hit hook ran after Launch rejected the cast")
@@ -100,10 +97,10 @@ func TestScheduleStopsWhenLaunchRejectsTheCast(t *testing.T) {
 }
 
 func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100, hitCost: 50}
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, StaticHitTime: true, HitTime: 1000, StaticReuse: true, MPConsume: 50}
@@ -121,8 +118,8 @@ func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 		Failed: func(err error) { failed = err },
 	})
 
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
 
 	if !errors.Is(failed, ErrNotEnoughMP) {
 		t.Fatalf("Failed hook error = %v, want ErrNotEnoughMP", failed)
@@ -139,10 +136,10 @@ func TestScheduleFailedHitStopsBeforeFinish(t *testing.T) {
 }
 
 func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -154,9 +151,9 @@ func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 	hitCalled := false
 	ctrl.Schedule(plan, Hooks{Hit: func() { hitCalled = true }})
 
-	clock.fire(plan.LaunchDelay)
+	clock.advance(plan.LaunchDelay)
 	ctrl.Stop()
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.HitDelay)
 
 	if hitCalled {
 		t.Fatal("Hit hook ran on a timer belonging to a stopped cast")
@@ -164,10 +161,10 @@ func TestScheduleCancelsPendingTimersOnStop(t *testing.T) {
 }
 
 func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := scalingActor()
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := scalingDef
@@ -183,8 +180,8 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 		t.Fatal("InterruptOnDamage() = false inside the interrupt window with a guaranteed break")
 	}
 
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
 
 	if hitCalled {
 		t.Fatal("Hit hook ran after InterruptOnDamage aborted the cast")
@@ -195,10 +192,10 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 // guard directly: a timer captured for one cast must not act on a later,
 // unrelated cast that reused the same Controller.
 func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	actor := &testActor{mp: 100, hp: 100, mAtkSpd: 333, pAtkSpd: 333, magicReuseRate: 1, physicalReuseRate: 1}
 	ctrl := NewController(actor, nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 	now := time.Unix(1000, 0)
 
 	def := modelskill.Definition{ID: 1, Level: 1, Magic: true, StaticHitTime: true, HitTime: 1000, StaticReuse: true}
@@ -221,7 +218,7 @@ func TestScheduleStartedAfterInterruptDoesNotFireStaleTimer(t *testing.T) {
 	// Fire every timer queued so far, including the stale first-cast Launch
 	// timer that Stop should have cancelled.
 	for _, d := range []time.Duration{plan.LaunchDelay, secondPlan.LaunchDelay, secondPlan.HitDelay} {
-		clock.fire(d)
+		clock.advance(d)
 	}
 
 	if firstHit {
@@ -244,32 +241,19 @@ func equalStrings(a, b []string) bool {
 	return true
 }
 
-type fakeCastClock struct {
-	timers []*fakeCastTimer
+// castClock runs a controller's queue on a virtual clock.
+type castClock struct {
+	in *sim.Inline
+	q  *sim.Queue
 }
 
-func (c *fakeCastClock) AfterFunc(delay time.Duration, f func()) scheduledTimer {
-	timer := &fakeCastTimer{delay: delay, f: f}
-	c.timers = append(c.timers, timer)
-	return timer
+func newCastClock() *castClock {
+	in := sim.NewInline(time.Unix(1000, 0))
+	return &castClock{in: in, q: in.NewQueue("caster")}
 }
 
-// fire runs every not-yet-stopped timer registered with the given delay, in
-// registration order.
-func (c *fakeCastClock) fire(delay time.Duration) {
-	for _, timer := range c.timers {
-		if timer.delay == delay && !timer.stopped {
-			timer.stopped = true
-			timer.f()
-		}
-	}
-}
-
-type fakeCastTimer struct {
-	delay   time.Duration
-	f       func()
-	stopped bool
-}
+// advance moves the clock by d, running every timer due on the way.
+func (c *castClock) advance(d time.Duration) { c.in.Advance(d) }
 
 func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	now := time.Unix(1000, 0)
@@ -278,8 +262,8 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeCastClock{}
-	ctrl.afterFunc = clock.AfterFunc
+	clock := newCastClock()
+	ctrl.SetQueue(clock.q)
 	ended := 0
 	abortsBeforeEnd := -1
 	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() {
@@ -299,7 +283,7 @@ func TestScheduleFusionEndsOnAbortOrChannelCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctrl.ScheduleFusion(plan, time.Second, func() bool { return true }, func() { ended++ })
-	clock.fire(plan.LaunchDelay)
+	clock.advance(plan.LaunchDelay)
 	if ended != 2 {
 		t.Fatalf("fusion end calls after natural completion = %d, want 2", ended)
 	}
@@ -312,11 +296,11 @@ func TestScheduleFusionStopsWhenRecurringCheckFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeCastClock{}
-	ctrl.afterFunc = clock.AfterFunc
+	clock := newCastClock()
+	ctrl.SetQueue(clock.q)
 	ended := 0
 	ctrl.ScheduleFusion(plan, time.Second, func() bool { return false }, func() { ended++ })
-	clock.fire(time.Second)
+	clock.advance(time.Second)
 	if ended != 1 || ctrl.CastingNow() {
 		t.Fatalf("failed fusion check = end calls %d, casting %v; want 1 and false", ended, ctrl.CastingNow())
 	}
@@ -335,68 +319,14 @@ func TestScheduleFusionReportsWhenCastAlreadyStopped(t *testing.T) {
 	}
 }
 
-func (t *fakeCastTimer) Stop() bool {
-	if t.stopped {
-		return false
-	}
-	t.stopped = true
-	return true
-}
-
-// TestScheduleRecoversPanickingHook covers a controller with no queue: its
-// scheduled Launch/Hit/Finish runs through sim.AfterOr's nil-queue branch,
-// on a timer goroutine outside any per-connection recover, so that branch
-// must recover and log the panic instead of killing the process.
-func TestScheduleRecoversPanickingHook(t *testing.T) {
-	buf := &syncCastBuffer{}
-	actor := scalingActor()
-	ctrl := NewController(actor, nil)
-	ctrl.SetLogger(zerolog.New(buf))
-	now := time.Unix(1000, 0)
-
-	def := scalingDef
-	plan, err := ctrl.Start(now, testTarget{}, def)
-	if err != nil {
-		t.Fatalf("Start() error: %v", err)
-	}
-	ctrl.Schedule(plan, Hooks{Launch: func() bool { panic("boom") }})
-
-	deadline := time.Now().Add(time.Second)
-	for !strings.Contains(buf.String(), "boom") {
-		if time.Now().After(deadline) {
-			t.Fatalf("panic was not recovered and logged, got: %s", buf.String())
-		}
-		time.Sleep(time.Millisecond)
-	}
-}
-
-// syncCastBuffer is a mutex-guarded bytes.Buffer safe for a test's polling
-// goroutine to read while a scheduled callback's goroutine writes to it.
-type syncCastBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (s *syncCastBuffer) Write(p []byte) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.buf.Write(p)
-}
-
-func (s *syncCastBuffer) String() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.buf.String()
-}
-
 // TestHoldFinishDefersFinishUntilReleased covers the grant a Hit effect
 // takes when its own work has to leave the actor's queue and come back: Hit
 // still runs on time, Finish waits for the release, and the release arms it
 // even though the final delay already elapsed while the hold stood.
 func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	ctrl := NewController(scalingActor(), nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
 	if err != nil {
@@ -410,13 +340,13 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 		Finish: func() { order = append(order, "finish") },
 	})
 
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
 	if got := []string{"hit"}; !equalStrings(order, got) {
 		t.Fatalf("order after hit delay = %v, want %v", order, got)
 	}
 
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.FinalDelay)
 	if got := []string{"hit"}; !equalStrings(order, got) {
 		t.Fatalf("order after final delay while held = %v, want Finish still pending (%v)", order, got)
 	}
@@ -425,7 +355,7 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 	}
 
 	release()
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.FinalDelay)
 	if got := []string{"hit", "finish"}; !equalStrings(order, got) {
 		t.Fatalf("order after release = %v, want %v", order, got)
 	}
@@ -435,7 +365,7 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 
 	// Releasing again must not arm a second Finish for a cast that ended.
 	release()
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.FinalDelay)
 	if got := []string{"hit", "finish"}; !equalStrings(order, got) {
 		t.Fatalf("order after a repeated release = %v, want %v", order, got)
 	}
@@ -446,9 +376,9 @@ func TestHoldFinishDefersFinishUntilReleased(t *testing.T) {
 // late release neither revives that cast's Finish nor leaks into the next
 // cast on the same controller.
 func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
-	clock := &fakeCastClock{}
+	clock := newCastClock()
 	ctrl := NewController(scalingActor(), nil)
-	ctrl.afterFunc = clock.AfterFunc
+	ctrl.SetQueue(clock.q)
 
 	plan, err := ctrl.Start(time.Unix(1000, 0), testTarget{}, scalingDef)
 	if err != nil {
@@ -461,8 +391,8 @@ func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 		Hit:    func() { release = ctrl.HoldFinish() },
 		Finish: func() { finishes++ },
 	})
-	clock.fire(plan.LaunchDelay)
-	clock.fire(plan.HitDelay)
+	clock.advance(plan.LaunchDelay)
+	clock.advance(plan.HitDelay)
 
 	ctrl.Stop()
 	if ctrl.CastingNow() {
@@ -470,7 +400,7 @@ func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 	}
 
 	release()
-	clock.fire(plan.FinalDelay)
+	clock.advance(plan.FinalDelay)
 	if finishes != 0 {
 		t.Fatalf("Finish ran %d times for a stopped cast, want 0", finishes)
 	}
@@ -482,9 +412,9 @@ func TestHoldFinishDroppedWhenCastStops(t *testing.T) {
 		t.Fatalf("second Start() error: %v", err)
 	}
 	ctrl.Schedule(plan2, Hooks{Finish: func() { order = append(order, "finish") }})
-	clock.fire(plan2.LaunchDelay)
-	clock.fire(plan2.HitDelay)
-	clock.fire(plan2.FinalDelay)
+	clock.advance(plan2.LaunchDelay)
+	clock.advance(plan2.HitDelay)
+	clock.advance(plan2.FinalDelay)
 	if got := []string{"finish"}; !equalStrings(order, got) {
 		t.Fatalf("second cast order = %v, want %v", order, got)
 	}

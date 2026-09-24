@@ -13,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -95,12 +94,6 @@ type Hit struct {
 	Shield   formulas.ShieldDefense
 }
 
-type scheduledTimer interface {
-	Stop() bool
-}
-
-type afterFunc func(time.Duration, func()) scheduledTimer
-
 // Controller coordinates attack validation, animation state and packet
 // broadcast for one creature.
 //
@@ -117,27 +110,18 @@ type Controller struct {
 	attacking      bool
 	bowCooling     bool
 	inHitAnimation bool
-	timers         []scheduledTimer
+	timers         []*sim.Timer
 	attackSeq      uint64
-	afterFunc      afterFunc
+	queue          *sim.Queue
 	sink           event.Sink
-	log            zerolog.Logger
 }
 
 // SetQueue runs the controller's scheduled hit and finish callbacks as tasks
-// on q, the owning actor's queue.
+// on q, the owning actor's queue. An attack needs one.
 func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.afterFunc = func(d time.Duration, fn func()) scheduledTimer { return q.After(d, fn) }
-}
-
-// SetLogger records where a panic recovered from a scheduled attack callback
-// is logged. The zero value discards it.
-func (c *Controller) SetLogger(log zerolog.Logger) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.log = log
+	c.queue = q
 }
 
 // Every constructor takes the sink that receives AttackStarted, as each
@@ -554,11 +538,7 @@ func (c *Controller) scaledBowReuse() time.Duration {
 }
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
-	source := c.afterFunc
-	if source == nil { // no queue: only unit tests build one this way
-		source = func(d time.Duration, fn func()) scheduledTimer { return sim.AfterOr(nil, d, fn, c.log) }
-	}
-	c.timers = append(c.timers, source(delay, f))
+	c.timers = append(c.timers, c.queue.After(delay, f))
 }
 
 func (c *Controller) stopTimerLocked() {

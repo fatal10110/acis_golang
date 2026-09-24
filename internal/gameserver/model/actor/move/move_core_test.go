@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // ---- from controller_3d_follow_test.go ----
@@ -60,6 +61,7 @@ func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +109,7 @@ func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) 
 			if err != nil {
 				t.Fatal(err)
 			}
+			mover.SetQueue(newMoveClock().q)
 			controller, err := NewController(mover, tt.self, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -129,7 +132,7 @@ func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +161,7 @@ func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -184,7 +187,7 @@ func TestControllerDefersToActorOwnedOffensiveFollowTicker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -224,6 +227,7 @@ func TestControllerMoveHomeTeleportsAfterTenBlockedPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -263,6 +267,7 @@ func TestControllerMoveHomeReturnsMoveErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -289,6 +294,7 @@ func TestControllerMoveHomeResetsFailCountOnRoutedPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -309,6 +315,7 @@ func TestControllerMoveToLocationIncrementsFailCountOnBlockedPath(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -339,6 +346,7 @@ func TestControllerMoveToLocationResetsFailCountOnRoutedPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -362,6 +370,7 @@ func TestControllerMoveToLocationLeavesFailCountOnDirectPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -386,6 +395,7 @@ func TestControllerMoveToLocationEventIncrementsFailCountOnBlockedPath(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -406,6 +416,7 @@ func TestControllerOffensiveFollowIncrementsFailCountOnBlockedPath(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	controller, err := NewController(mover, self, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -427,11 +438,8 @@ func TestControllerOffensiveFollowIncrementsFailCountOnBlockedPath(t *testing.T)
 // TestCreatureMove_FollowTickAllocs locks in FollowTick's zero-steady-state
 // allocation property (#421, #425): the no-op path (target already in range,
 // or not following) must stay allocation-free as AI/follow call sites are
-// added, and the move-triggering path's ceiling is the one allocation that's
-// inherent to scheduling a new arrival timer through the afterFunc
-// indirection (the closure captured for time.AfterFunc-shaped calls always
-// escapes to heap, since the compiler can't prove an indirect call won't
-// retain it).
+// added, and the move-triggering path allocates only what arming the arrival
+// timer on the queue costs, plus the arrival closure it captures.
 func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 	origin := location.Location{X: 10, Y: 20, Z: 30}
 	geo := staticGeo{canMove: true, height: 30}
@@ -441,7 +449,7 @@ func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+		mover.SetQueue(newMoveClock().q)
 		target := TargetSnapshot{ObjectID: 2, Known: true, Position: location.Location{X: 500, Y: 20, Z: 30}}
 
 		allocs := testing.AllocsPerRun(1000, func() {
@@ -459,7 +467,8 @@ func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		mover.afterFunc = func(time.Duration, func()) scheduledTimer { return noAllocTimer{} }
+		clock := newMoveClock()
+		mover.SetQueue(clock.q)
 		mover.StartFriendlyFollow(2, 70)
 		target := TargetSnapshot{
 			ObjectID:        2,
@@ -468,9 +477,10 @@ func TestCreatureMove_FollowTickAllocs(t *testing.T) {
 			CollisionRadius: 10.9,
 		}
 
-		// One allocation: the closure scheduling the arrival timer, captured
-		// for time.AfterFunc-shaped call through the afterFunc indirection.
-		const wantAllocsCeiling = 1
+		timerAllocs := testing.AllocsPerRun(1000, func() {
+			clock.q.After(time.Second, func() {}).Stop()
+		})
+		wantAllocsCeiling := timerAllocs + 1 // the arrival closure
 		allocs := testing.AllocsPerRun(1000, func() {
 			if _, moved, err := mover.FollowTick(target, 9.9); err != nil || !moved {
 				t.Fatalf("FollowTick() = moved %v err %v, want a move", moved, err)
@@ -516,6 +526,8 @@ func TestNewCreatureMoveAcceptsZeroSpeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewCreatureMove() error = %v, want nil", err)
 	}
+
+	m.SetQueue(newMoveClock().q)
 
 	if _, err := m.MoveToLocation(location.Location{X: 100, Y: 20, Z: 30}); err == nil {
 		t.Fatal("MoveToLocation() error = nil, want error for zero-speed actor")
@@ -610,52 +622,17 @@ func (g staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 
 func (g staticGeo) Walkable(int, int, int) bool { return true }
 
-// fakeMoveClock/fakeMoveTimer are the sanctioned clock/timer infra-seam
-// exception (docs/agents/test-strategy.md): determinism is the point, not
-// integration coverage. Kept as-is.
-type fakeMoveClock struct {
-	timers []*fakeMoveTimer
+// moveClock runs a mover's queue on a virtual clock that moves only on
+// Advance, so an arrival timer fires only when a test lets it.
+type moveClock struct {
+	in *sim.Inline
+	q  *sim.Queue
 }
 
-func (c *fakeMoveClock) AfterFunc(delay time.Duration, f func()) scheduledTimer {
-	timer := &fakeMoveTimer{delay: delay, f: f}
-	c.timers = append(c.timers, timer)
-	return timer
+func newMoveClock() *moveClock {
+	in := sim.NewInline(time.Unix(1000, 0))
+	return &moveClock{in: in, q: in.NewQueue("mover")}
 }
-
-// fire runs every still-pending timer, latest scheduled first, so a
-// superseded earlier timer (already Stop()ped by the newer request) is
-// correctly skipped even though both share the same delay.
-func (c *fakeMoveClock) fire(delay time.Duration) {
-	for i := len(c.timers) - 1; i >= 0; i-- {
-		timer := c.timers[i]
-		if timer.delay == delay && !timer.stopped {
-			timer.stopped = true
-			timer.f()
-		}
-	}
-}
-
-type fakeMoveTimer struct {
-	delay   time.Duration
-	f       func()
-	stopped bool
-}
-
-func (t *fakeMoveTimer) Stop() bool {
-	if t.stopped {
-		return false
-	}
-	t.stopped = true
-	return true
-}
-
-// noAllocTimer is a zero-size scheduledTimer: converting a zero-width value
-// to an interface does not allocate, so installing it as afterFunc isolates
-// FollowTick's own allocation profile from the real runtime timer's.
-type noAllocTimer struct{}
-
-func (noAllocTimer) Stop() bool { return true }
 
 // ---- from creature_follow_test.go ----
 func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
@@ -672,6 +649,7 @@ func TestCreatureMove_FollowTickUsesCurrentPosition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	mover.SetPosition(current)
 	mover.StartFriendlyFollow(target.ObjectID, 20)
 
@@ -700,6 +678,7 @@ func TestCreatureMove_FriendlyFollowTick(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	mover.StartFriendlyFollow(target.ObjectID, 70)
 	ev, moved, err := mover.FollowTick(target, 9.9)
@@ -742,6 +721,7 @@ func TestCreatureMove_FriendlyFollowTickMovesAtExactRange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	mover.StartFriendlyFollow(target.ObjectID, 70)
 
 	ev, moved, err := mover.FollowTick(target, 9.9)
@@ -822,6 +802,7 @@ func TestCreatureMove_FollowTickSkipsWhenTargetDoesNotNeedMove(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			mover.SetQueue(newMoveClock().q)
 			if test.start != nil {
 				test.start(mover)
 			}
@@ -856,6 +837,7 @@ func TestCreatureMove_OffensiveFollowTick(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	mover.StartOffensiveFollow(9, 40)
 	if got := mover.FollowInterval(); got != 500*time.Millisecond {
@@ -894,6 +876,7 @@ func TestCreatureMove_CancelFollow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	mover.StartFriendlyFollow(2, 70)
 	mover.CancelFollow()
@@ -1037,6 +1020,7 @@ func TestCreatureMove_MoveToLocationScenarios(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			mover.SetQueue(newMoveClock().q)
 			if test.initialTarget != nil {
 				if _, err := mover.MoveToLocation(*test.initialTarget); err != nil {
 					t.Fatal(err)
@@ -1071,6 +1055,7 @@ func TestCreatureMove_MoveToLocationPassesGeodataCoordinates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
@@ -1091,6 +1076,7 @@ func TestCreatureMove_UpdatePositionStopsWhenObstacleCloses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -1127,6 +1113,7 @@ func TestCreatureMove_UpdatePositionChecksFinalStepForNewObstacle(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -1161,6 +1148,7 @@ func TestCreatureMove_UpdatePositionStopsWhenDynamicNSWECloses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }, onBlocked: func() { blocked++ }})
@@ -1199,6 +1187,7 @@ func TestCreatureMove_UpdatePositionAdvancesNextWaypointWhenObstacleClosesMidRou
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	arrived := 0
 	blocked := 0
 	advanced := 0
@@ -1286,6 +1275,7 @@ func startBlockedMidRouteMove(t *testing.T) (mover *CreatureMove, allow *bool, a
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	arrivedN, blockedN := 0, 0
 	arrived, blocked = &arrivedN, &blockedN
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedN++ }, onBlocked: func() { blockedN++ }})
@@ -1367,6 +1357,7 @@ func TestCreatureMove_UpdatePositionResamplesDestinationHeight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
 	}
@@ -1397,6 +1388,7 @@ func TestCreatureMove_UpdatePositionBiasesGroundHeightAndCapsWorldZ(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	if _, err := mover.MoveToLocation(target); err != nil {
 		t.Fatal(err)
 	}
@@ -1427,6 +1419,7 @@ func TestCreatureMove_MoveToLocationUsesCurrentPosition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(current); err != nil {
 		t.Fatal(err)
@@ -1463,6 +1456,7 @@ func TestCreatureMove_MoveToLocationRejectsUnrepresentableDuration(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 
 	if _, err := mover.MoveToLocation(location.Location{X: 11, Y: 20, Z: 999}); err == nil {
 		t.Fatal("MoveToLocation() error = nil")
@@ -1500,8 +1494,8 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeMoveClock{}
-	mover.afterFunc = clock.AfterFunc
+	clock := newMoveClock()
+	mover.SetQueue(clock.q)
 	arrivedCalls := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
@@ -1538,7 +1532,7 @@ func TestCreatureMove_MoveToLocationRoutesThroughPathfindWaypoints(t *testing.T)
 		if !mover.Moving() {
 			t.Fatalf("Moving() = false before firing segment %d", i)
 		}
-		clock.fire(ev.Duration)
+		clock.in.Advance(ev.Duration)
 	}
 
 	// After the last segment finishes, the arrived hook fires exactly once,
@@ -1572,8 +1566,8 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	clock := &fakeMoveClock{}
-	mover.afterFunc = clock.AfterFunc
+	clock := newMoveClock()
+	mover.SetQueue(clock.q)
 	arrivedCalls := 0
 	mover.setOwner(&hookOwner{onArrived: func() { arrivedCalls++ }})
 
@@ -1591,7 +1585,7 @@ func TestCreatureMove_MoveToLocationPartialFallbackWalksPartialRoute(t *testing.
 		t.Fatalf("ValidLocation() calls = %d, want 1", got)
 	}
 
-	clock.fire(ev.Duration)
+	clock.in.Advance(ev.Duration)
 	if arrivedCalls != 1 {
 		t.Fatalf("arrived hook calls = %d, want 1", arrivedCalls)
 	}
@@ -1617,6 +1611,7 @@ func TestCreatureMove_MoveToLocationNoProgressFallbackStartsZeroDistanceArrival(
 	if err != nil {
 		t.Fatal(err)
 	}
+	mover.SetQueue(newMoveClock().q)
 	// Seed an in-flight destination so the new request must replace it.
 	mover.destination = prior
 	mover.moving = true

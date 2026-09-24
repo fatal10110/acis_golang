@@ -7,8 +7,6 @@ package sim
 import (
 	"sync"
 	"time"
-
-	"github.com/rs/zerolog"
 )
 
 // Clock reports the current time. Inline's clock moves only on Advance.
@@ -66,15 +64,6 @@ func (q *Queue) Post(fn func()) bool {
 // virtual clock on an Inline loop. Deadlines compared against q's timers
 // must be taken from it.
 func (q *Queue) Now() time.Time { return q.exec.Now() }
-
-// Now is q.Now, or the wall clock for a nil q (an actor built without a
-// queue).
-func Now(q *Queue) time.Time {
-	if q == nil {
-		return time.Now()
-	}
-	return q.Now()
-}
 
 // Close cancels every armed timer and ticker and refuses later posts. Tasks
 // already accepted still run. Safe to call more than once.
@@ -194,23 +183,6 @@ func (t *Timer) run() {
 	}
 	q.mu.Unlock()
 	t.fn()
-}
-
-// AfterOr runs fn once d has elapsed: as a task on q, or, for a nil q (an
-// actor built without a queue), on a timer goroutine that logs a panic to
-// log instead of crashing the process. The result stops the timer.
-func AfterOr(q *Queue, d time.Duration, fn func(), log zerolog.Logger) interface{ Stop() bool } {
-	if q != nil {
-		return q.After(d, fn)
-	}
-	return time.AfterFunc(d, func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error().Interface("panic", r).Msg("sim: recovered panic in timer callback")
-			}
-		}()
-		fn()
-	})
 }
 
 // Ticker is a periodic callback armed by Queue.Every.

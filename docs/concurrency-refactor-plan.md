@@ -385,9 +385,15 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   counts as caught up (`network.Conn.ObservePersistWaits` reports the wait's owners), so the clock
   can move past a held database round trip; read loops are bounded on the read's clock
   (`ScriptedClient.Now`), not the wall clock. CI's
-  real-pool step covers all seven suites. Left for slice 4: the `afterFunc` seams and nil-queue
-  fallbacks in `model/actor/{attack,cast,move,cubic}` (`sim.AfterOr`, `sim.Now`, network's
-  `onQueue`/`postLive`), their unit tests, and the "after Phase 6" perf row.
+  real-pool step covers all seven suites.
+  *Slice 4 (`model/actor/*` and the nil-queue fallbacks) landed as:* the attack, cast and move
+  controllers and the cubic runtime hold their owner's `*sim.Queue` and arm every timer with
+  `queue.After`. The `afterFunc` seams, their loggers and `sim.AfterOr`/`sim.Now` are gone, as are
+  network's no-queue branches in `onQueue`/`postLive`: a link's `Queues` is now required. Unit tests
+  build actors on a `sim.Inline` queue and drive it with `Advance`, including the NPC wander
+  recheck, walker arrival and signet tick tests that used to wait out 1–2 s wall-clock timers.
+  Effect lists without a queue read `sim.SystemClock`. The task/NPC/summon "post or run inline"
+  branches for actors built without a queue are left to #2488.
 
 ## Performance notes (why this does not regress the hot spot)
 - Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor

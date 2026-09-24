@@ -19,7 +19,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -996,5 +995,5 @@ func (h *Hostile) scheduleWanderRecheck() {
 			Z: position.Z,
 		})
 	}
-	sim.AfterOr(h.Queue(), delay, recheck, h.log)
+	h.Queue().After(delay, recheck)
 }
