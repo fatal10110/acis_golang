@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -154,8 +155,92 @@ func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *event
 		13018: {ID: 13018, Type: "EffectPoint"},
 	}}
 	rec := &event.Recorder{}
-	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }}
+	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }, activity: newSignetActivity()}
 	return h, state, rec
+}
+
+// signetActivity records which effect lists are registered for ticking.
+type signetActivity struct {
+	mu     sync.Mutex
+	active map[*effect.List]bool
+}
+
+func newSignetActivity() *signetActivity {
+	return &signetActivity{active: make(map[*effect.List]bool)}
+}
+
+func (a *signetActivity) SetActive(list *effect.List, active bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if active {
+		a.active[list] = true
+	} else {
+		delete(a.active, list)
+	}
+}
+
+func (a *signetActivity) isActive(list *effect.List) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.active[list]
+}
+
+// TestSignetPointListRegistersForTickingUntilDespawn pins the activity
+// registry a spawned point's list reports to: without it the point's
+// effects never reach the ticker, so they never expire and the point never
+// despawns.
+func TestSignetPointListRegistersForTickingUntilDespawn(t *testing.T) {
+	h, state, _ := newTestSignetHandler(nil)
+	activity := h.activity.(*signetActivity)
+
+	h.Use(Cast{Caster: newSignetFakeCaster(1, 100, 100, 0, 100), Skill: modelskill.Definition{
+		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
+		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
+	}})
+
+	actors := findEffectPointObjects(state)
+	if len(actors) != 1 {
+		t.Fatalf("spawned actors = %d, want 1", len(actors))
+	}
+	list := actors[0].EffectList()
+	if !activity.isActive(list) {
+		t.Fatal("point's effect list not registered for ticking after its effect landed")
+	}
+
+	actors[0].Despawn()
+	if activity.isActive(list) {
+		t.Fatal("point's effect list still registered for ticking after Despawn")
+	}
+}
+
+// TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints covers the
+// SignetDeps.Activity hop, not just the handler literal above.
+func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T) {
+	state := world.New()
+	activity := newSignetActivity()
+	r := NewDefaultRegistryWithSignet(nil, SignetDeps{
+		Activity:  activity,
+		Templates: fakeSignetTemplates{byID: map[int]*npc.Template{13018: {ID: 13018, Type: "EffectPoint"}}},
+		IDs:       &fakeSignetIDs{},
+		World:     state,
+		NewSink:   func(*npc.EffectPoint) event.Sink { return &event.Recorder{} },
+		Log:       zerolog.Nop(),
+	})
+
+	if !r.Use(Cast{Caster: newSignetFakeCaster(1, 100, 100, 0, 100), Skill: modelskill.Definition{
+		ID: 454, Level: 1, SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180,
+		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 2, Time: 1}},
+	}}) {
+		t.Fatal("registry has no SIGNET handler")
+	}
+
+	actors := findEffectPointObjects(state)
+	if len(actors) != 1 {
+		t.Fatalf("spawned actors = %d, want 1", len(actors))
+	}
+	if !activity.isActive(actors[0].EffectList()) {
+		t.Fatal("SignetDeps.Activity did not reach the spawned point's effect list")
+	}
 }
 
 func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {

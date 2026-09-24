@@ -768,3 +768,48 @@ func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
 		t.Fatal("MANADAM from damage-denied caster never drained MP across repeated casts")
 	}
 }
+
+// TestSignetPointExpiresThroughTheEffectTicker casts a plain SIGNET through
+// the production client path and drives only the server's effect ticker:
+// the spawned point's list must be registered with that ticker, or its
+// driving effect never expires and the point stays in world forever.
+func TestSignetPointExpiresThroughTheEffectTicker(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+		SkillType: "SIGNET", EffectNpcID: 13018, Radius: 180, MPConsume: 1,
+		Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{ID: 13018, Type: "EffectPoint", CollisionRadius: 8}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 454, 1)
+	startInWorldAmongPlayers(t, c)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(454, false, false))
+	readCastStartFrames(t, c, objID, 454, 1, 500, 60_000, objID)
+
+	var point *npc.EffectPoint
+	for deadline := time.Now().Add(3 * time.Second); point == nil && time.Now().Before(deadline); {
+		time.Sleep(50 * time.Millisecond)
+		for _, obj := range srv.State.Objects() {
+			if ep, ok := obj.(*npc.EffectPoint); ok {
+				point = ep
+			}
+		}
+	}
+	if point == nil {
+		t.Fatal("signet cast spawned no effect point")
+	}
+
+	time.Sleep(1100 * time.Millisecond)
+	srv.TickEffects()
+	if _, ok := srv.State.Object(point.ObjectID()); ok {
+		t.Fatal("effect point still in world after its only tick: its list never reached the effect ticker")
+	}
+}
