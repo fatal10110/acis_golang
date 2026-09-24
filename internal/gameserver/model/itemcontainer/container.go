@@ -10,6 +10,7 @@ import (
 
 // nowMillis stamps an item as it enters a container. Containers order their
 // contents newest-first, so this is the ordering key, not just bookkeeping.
+// It is persisted with the item, so it stays on the wall clock.
 func nowMillis() int64 { return time.Now().UnixMilli() }
 
 // orderedItem is an instance paired with its ordering key, copied out once

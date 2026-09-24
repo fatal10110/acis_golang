@@ -14,7 +14,7 @@ func (h *Hostile) SkillDisabled(key int32) bool {
 	if !ok {
 		return false
 	}
-	if time.Now().Before(expiresAt) {
+	if h.Now().Before(expiresAt) {
 		return true
 	}
 	delete(h.disabledSkills, key)
@@ -31,7 +31,7 @@ func (h *Hostile) DisableSkill(key int32, delay time.Duration) {
 	if h.disabledSkills == nil {
 		h.disabledSkills = make(map[int32]time.Time)
 	}
-	h.disabledSkills[key] = time.Now().Add(delay)
+	h.disabledSkills[key] = h.Now().Add(delay)
 }
 
 // AddSkillReuse installs an NPC-local skill reuse delay. Hostiles do not

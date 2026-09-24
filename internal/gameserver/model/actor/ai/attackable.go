@@ -58,6 +58,9 @@ type AttackableActor interface {
 	RestoreSpawnHeadingIfAtHome()
 	RealMoveSpeed() float64
 	MoveFromSpawnUsingRandomOffset(offset int)
+	// Now reads the clock the actor's queue runs on; hate, desire and
+	// wander stamps use it.
+	Now() time.Time
 }
 
 // MoveController controls movement requests emitted by the AI loop.
@@ -165,9 +168,9 @@ type Attackable struct {
 	// odd pulses (about once every two seconds at the 1s AI tick).
 	followPulse int
 
-	// now returns the current time; the out-of-territory sweep reads it
-	// instead of calling time.Now directly so tests can simulate
-	// staleThreatAge elapsing without a real 90-second wait.
+	// now returns the current time, the actor's queue clock by default;
+	// tests replace it to simulate staleThreatAge elapsing without a real
+	// 90-second wait.
 	now func() time.Time
 
 	// lastDesire is the intention kind of the last executed desire, used so
@@ -189,18 +192,19 @@ type Attackable struct {
 
 // NewAttackable builds an idle hostile NPC AI loop.
 func NewAttackable(actor AttackableActor, move MoveController, attack AttackController) *Attackable {
-	return &Attackable{
+	a := &Attackable{
 		actor:          actor,
 		move:           move,
 		attack:         attack,
-		threats:        attackable.NewThreatTable(actor),
 		hates:          attackable.NewHateTable(actor),
 		desires:        NewDesireQueue(),
 		current:        intention{kind: IntentionIdle},
-		now:            time.Now,
+		now:            actor.Now,
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
 	}
+	a.threats = attackable.NewThreatTable(actor, func() time.Time { return a.now() })
+	return a
 }
 
 // SetRandomWalkRate records npcs.properties RandomWalkRate for subsequent
@@ -357,7 +361,7 @@ func (a *Attackable) queueAttackDesireOnly(attacker attackable.Combatant, hate f
 		Kind:         IntentionAttack,
 		FinalTarget:  attacker,
 		Weight:       hate,
-		QueuedAt:     time.Now(),
+		QueuedAt:     a.now(),
 		MoveToTarget: moveToTarget,
 	})
 }
@@ -386,7 +390,7 @@ func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool
 		Kind:     IntentionMoveTo,
 		Location: loc,
 		Weight:   weight,
-		QueuedAt: time.Now(),
+		QueuedAt: a.now(),
 	})
 	return true
 }
@@ -399,7 +403,7 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 		Kind:        IntentionFollow,
 		FinalTarget: target,
 		Weight:      weight,
-		QueuedAt:    time.Now(),
+		QueuedAt:    a.now(),
 	})
 }
 
@@ -425,7 +429,7 @@ func (a *Attackable) queueIdleWander() {
 		Kind:     IntentionWander,
 		Timer:    defaultWanderTimer,
 		Weight:   defaultWanderWeight,
-		QueuedAt: time.Now(),
+		QueuedAt: a.now(),
 	})
 }
 

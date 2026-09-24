@@ -33,7 +33,7 @@ func (c *Character) SaveState() SaveState {
 		PvPKills:          progression.PvPKills,
 		PKKills:           progression.PKKills,
 		DeathPenaltyLevel: c.DeathPenaltyLevel(),
-		OnlineTime:        c.TotalOnlineTime(time.Now()),
+		OnlineTime:        c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
 		Location:          c.CurrentLocation(),
 		Heading:           c.CurrentHeading(),
 	}
