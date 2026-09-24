@@ -43,7 +43,9 @@ type Summon struct {
 	cast   CastController
 	log    zerolog.Logger
 
-	mu      sync.Mutex // guards current and next.
+	// mu guards current and next. A Betray effect turns the summon on its
+	// owner (TryToAttack) from the caster's queue.
+	mu      sync.Mutex
 	current intention
 	next    intention
 }

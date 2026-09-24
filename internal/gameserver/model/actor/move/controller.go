@@ -83,6 +83,9 @@ type PositionUpdateRegistry interface {
 // movement surface, translating a follow/attack-range decision into
 // CreatureMove's StartOffensiveFollow/CancelFollow calls and a return-home
 // request into MoveToLocation.
+//
+// mu guards the follow state below. Another actor's effect stops the move
+// synchronously from its own queue (AbortAll or StopMove).
 type Controller struct {
 	move            *CreatureMove
 	self            Actor

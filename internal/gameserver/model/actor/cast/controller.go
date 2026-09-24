@@ -124,7 +124,9 @@ type DamageInterrupt struct {
 // interruption state for one actor's active cast.
 //
 // mu guards every mutable field below, including the scheduled timers
-// Schedule installs. It is never held while the actor pays a cast cost
+// Schedule installs. Another actor interrupts or aborts the cast
+// synchronously from its own queue (InterruptCastOnDamage from a hit, or AbortAll from a stun). It is
+// never held while the actor pays a cast cost
 // (item, reuse, MP, HP, charges): paying one can end the cast, which calls
 // back into the controller.
 type Controller struct {

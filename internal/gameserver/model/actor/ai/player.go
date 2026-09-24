@@ -24,12 +24,13 @@ type PlayerAttackActor interface {
 // player cancels.
 //
 // mu serializes the whole decision in thinkLocked, not just the target
-// field: Start runs on the packet-handling goroutine while Think can also
-// run concurrently from a movement-arrived or attack-finished hook on a
-// timer goroutine. Locking only the target read would let two goroutines
-// both observe AttackingNow()==false and both reach DoAttack — a logic race
-// on the compound decision that -race can't see, since each individual
-// field access would still be individually synchronized.
+// field. Start, Think and the movement/attack hooks run on the player's
+// queue, but an effect another actor lands (AbortAll from a stun) stops this
+// intention from that actor's queue (ActionsStopRequested → tryToIdle →
+// Stop). Locking only the target read would let two goroutines both observe
+// AttackingNow()==false and both reach DoAttack — a logic race on the
+// compound decision that -race can't see, since each individual field
+// access would still be individually synchronized.
 type PlayerAttack struct {
 	actor  PlayerAttackActor
 	move   MoveController

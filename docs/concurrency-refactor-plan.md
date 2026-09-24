@@ -361,7 +361,12 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
    another queue), `queuedPets.mu` (written on the control item's persistence lane, read by the
    next summoner), `henna.List.mu` (dye bonuses feed base stats an attacker's formulas read),
    `task.GameClock.mu` (ticker writes, every queue reads), `enchant.State.mu` (one map shared by
-   every player's queue), `manager.Npcs.mu` and the `task` registries (containers).
+   every player's queue), `manager.Npcs.mu` and the `task` registries (containers). The
+   Phase 3 leaf locks no sweep covered now name their off-queue caller too: vitals, death and
+   MP locks (an attacker's hit or mana skill), `statMu` slots (an attacker's formulas),
+   hate/threat/desire tables and `ai.Attackable.mu` (an attacker's hit, `thinkIfNoMostHated`),
+   `ai.Summon.mu` (Betray), the move/attack/cast controllers and `ai.PlayerAttack.mu` (an
+   effect's `AbortAll`), `effect.List.mu` and `scheduleMu` (a caster adds or dispels).
 
 ### Phase 6 — test cleanup — #2274 (runs before Phase 5)
 - Replace the `afterFunc` test seams and the `time.Sleep`/`Eventually`/`waitFor` waits in

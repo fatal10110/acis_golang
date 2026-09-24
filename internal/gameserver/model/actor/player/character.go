@@ -68,7 +68,9 @@ type Character struct {
 	maxHP, curHP float64
 	maxCP, curCP float64
 	maxMP, curMP float64
-	// vitalsMu guards maxHP/curHP, maxCP/curCP and maxMP/curMP.
+	// vitalsMu guards maxHP/curHP, maxCP/curCP and maxMP/curMP. An
+	// attacker's hit or skill writes them from the attacker's queue
+	// (ReduceHP, ReduceMP, TakeDamage), and its formulas read them.
 	vitalsMu sync.RWMutex
 
 	Face, HairStyle, HairColor int
@@ -154,11 +156,14 @@ type Character struct {
 
 	// statMu guards statCalcs slot creation; each slot's own Calculator
 	// then guards its own Mods independently, so a warm read only ever
-	// takes statMu's read lock.
+	// takes statMu's read lock. An attacker's formulas read these stats
+	// from the attacker's queue, and removing an effect another actor
+	// dispels drops its mods (RemoveStatsByOwner) from that actor's queue.
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
 
 	// stateMu guards transient live flags and item-use disabled timestamps.
+	// A killer's queue raises the death penalty (RaiseDeathPenaltyLevel).
 	stateMu              sync.RWMutex
 	stateInit            bool
 	running              bool

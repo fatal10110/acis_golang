@@ -136,11 +136,11 @@ type intention struct {
 // One AI loop owns the current and next intentions. Threat and hate tables,
 // and the attack desire queue, are internally synchronized so combat code
 // can raise hate while the loop reads target selection. mu guards
-// current/next/step: Think and Tick run on the periodic AI task's goroutine,
-// but movement-arrived and attack-finished hooks can also call Think from a
-// timer goroutine, and the first attack desire against an actor with no
-// most-hated target calls Think from the combat path so the reaction does
-// not wait for the next tick. Entry points must serialize against each other.
+// current/next/step: the AI task posts Think and Tick to the NPC's queue,
+// where the movement and attack hooks also run, but the first attack desire
+// against an actor with no most-hated target calls Think from the
+// attacker's queue (thinkIfNoMostHated) so the reaction does not wait for
+// the next tick. Entry points must serialize against each other.
 type Attackable struct {
 	actor   AttackableActor
 	move    MoveController

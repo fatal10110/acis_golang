@@ -91,10 +91,10 @@ type Actor struct {
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
 	// lifetime, combat stat bases, and invul:
 	// petInfoSnapshot (internal/gameserver/network/visibility.go) reads them
-	// from the world-visibility goroutine via Level/Name/Fed/Lifetime while
-	// the owner-connection and tick goroutines write them, per
-	// world.Observer's concurrency contract
-	// (internal/gameserver/world/visibility.go).
+	// via Level/Name/Fed/Lifetime when another player discovers this summon,
+	// on the queue that drives that visibility change, while the owner's
+	// queue writes them (world.Observer's contract,
+	// internal/gameserver/world/visibility.go).
 	statusMu sync.RWMutex
 	invul    bool
 	level    int

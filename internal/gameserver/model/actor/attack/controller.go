@@ -97,8 +97,9 @@ type Hit struct {
 // Controller coordinates attack validation, animation state and packet
 // broadcast for one creature.
 //
-// mu guards every mutable field below. Timers take the same lock before
-// changing state.
+// mu guards every mutable field below. Timers run on the owner's queue, but
+// another actor's effect aborts the attack synchronously from its own queue
+// (AbortAll from a stun → ActionsStopRequested → Stop).
 type Controller struct {
 	actor    CreatureActor
 	playable PlayableActor

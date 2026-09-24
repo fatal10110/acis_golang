@@ -45,6 +45,9 @@ type Effect struct {
 
 	inUse bool
 
+	// scheduleMu guards remaining and nextAction. The caster that adds or
+	// dispels this effect starts or stops its schedule from the caster's
+	// queue, while the owner's effect tick claims actions (claimAction).
 	scheduleMu sync.Mutex
 	remaining  int
 	nextAction time.Time
