@@ -156,22 +156,14 @@ func (p *PvPFlags) Tick() {
 	// by the stale one.
 	p.tickPending(now,
 		func(actor PvPFlagActor, expiresAt time.Time) {
-			if q := actor.Queue(); q != nil {
-				q.Post(func() { p.expire(actor, expiresAt) })
-				return
-			}
-			p.expire(actor, expiresAt)
+			actor.Queue().Post(func() { p.expire(actor, expiresAt) })
 		},
 		func(actor PvPFlagActor, expiresAt time.Time) {
 			state := PvPFlagOn
 			if now.After(expiresAt.Add(-5 * time.Second)) {
 				state = PvPFlagBlinking
 			}
-			if q := actor.Queue(); q != nil {
-				q.Post(func() { p.update(actor, expiresAt, state) })
-				return
-			}
-			p.update(actor, expiresAt, state)
+			actor.Queue().Post(func() { p.update(actor, expiresAt, state) })
 		},
 	)
 }

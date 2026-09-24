@@ -1167,7 +1167,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if ai != nil {
 		gclConfig.AI = ai
 	}
-	gcl := network.NewGameClientLink(gclConfig)
+	gcl, err := network.NewGameClientLink(gclConfig)
+	if err != nil {
+		t.Fatalf("gameservertest: build game client link: %v", err)
+	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
 	if o.productionTickers {
 		for _, start := range []func(zerolog.Logger) *scheduler.Ticker{

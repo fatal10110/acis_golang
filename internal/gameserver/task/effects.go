@@ -84,6 +84,6 @@ func (e *Effects) Tick() {
 	defer e.releaseSnapshot()
 
 	for _, list := range e.snapshot() {
-		post(list.Queue(), list.Tick)
+		list.Queue().Post(list.Tick)
 	}
 }

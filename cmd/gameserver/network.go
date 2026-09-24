@@ -89,7 +89,7 @@ func provideGameClientLink(
 	itemWrites *persist.Order,
 	pool *sim.Pool,
 	log zerolog.Logger,
-) *network.GameClientLink {
+) (*network.GameClientLink, error) {
 	formulas.SetMagicFailures(bool(gameplay.MagicFailures))
 	effect.SetCancelLesser(bool(gameplay.CancelLesserEffect))
 	playerConfig := network.PlayerConfig{
@@ -109,7 +109,7 @@ func provideGameClientLink(
 		CharacterSelectDelay:     time.Duration(gameplay.CharacterSelectDelay),
 		ServerBypassDelay:        time.Duration(gameplay.ServerBypassDelay),
 	}
-	link := network.NewGameClientLink(network.GameClientLinkConfig{
+	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
 		Effects:       activeEffects,
 		NoCipher:      !cfg.UseBlowfishCipher,
@@ -159,10 +159,13 @@ func provideGameClientLink(
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		Log:              log,
 	})
+	if err != nil {
+		return nil, err
+	}
 	if effects != nil {
 		effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	}
-	return link
+	return link, nil
 }
 
 func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig, worker *persist.Worker, log zerolog.Logger) *skillstate.Persistence {

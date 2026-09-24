@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"time"
 
@@ -324,7 +325,10 @@ type GameClientLinkConfig struct {
 // loginLink returns the game server's current link to the login server, or
 // nil while disconnected/reconnecting: session validation fails clients
 // gracefully (AuthLoginFail) rather than panicking while the link is down.
-func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
+func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
+	if cfg.Queues == nil {
+		return nil, errors.New("network: GameClientLinkConfig.Queues is required")
+	}
 	link := &GameClientLink{
 		validator:     cfg.Validator,
 		clients:       NewClientRegistry(),
@@ -387,6 +391,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 			World:     cfg.World,
 			NewSink:   EffectPointSinks(cfg.World),
 			Activity:  cfg.Effects,
+			Queues:    cfg.Queues,
 			Log:       cfg.Log,
 		}),
 		log:          cfg.Log,
@@ -397,7 +402,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) *GameClientLink {
 	// Built here, not lazily: every client goroutine shares this link.
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
 	link.wireWaterZones()
-	return link
+	return link, nil
 }
 
 // newPet builds a pet with the shared effect, config and skill wiring. A live

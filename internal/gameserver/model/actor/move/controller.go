@@ -69,8 +69,7 @@ const HomeGeoFailLimit = 10
 type PositionUpdater interface {
 	ObjectID() int32
 	PositionUpdate() bool
-	// Queue is the queue position updates run on; nil runs them on the
-	// ticking goroutine.
+	// Queue is the queue position updates run on.
 	Queue() *sim.Queue
 }
 

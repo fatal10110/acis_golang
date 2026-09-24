@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -27,16 +28,20 @@ type EffectPoint struct {
 }
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
-// to ownerID (the acting player's object id).
-func NewEffectPoint(objectID int32, template *Template, ownerID int32, opts ...effect.Option) (*EffectPoint, error) {
+// to ownerID (the acting player's object id), whose work runs on queue.
+func NewEffectPoint(objectID int32, template *Template, ownerID int32, queue *sim.Queue, opts ...effect.Option) (*EffectPoint, error) {
 	inst, err := NewInstance(objectID, template)
 	if err != nil {
 		return nil, err
 	}
 	ep := &EffectPoint{objectID: objectID, Instance: inst, ownerID: ownerID}
 	ep.effects = effect.NewList(ep, opts...)
+	ep.effects.SetQueue(queue)
 	return ep, nil
 }
+
+// Queue returns the queue this actor's work runs on.
+func (ep *EffectPoint) Queue() *sim.Queue { return ep.effects.Queue() }
 
 // ObjectID returns the actor's world object id.
 func (ep *EffectPoint) ObjectID() int32 { return ep.objectID }
@@ -97,6 +102,8 @@ func (ep *EffectPoint) Despawn() {
 	// registered after Despawn would tick a signet forever past its
 	// caster's control.
 	ep.effects.Untrack()
+	// Nothing posts to the point after it leaves the world.
+	ep.Queue().Close()
 }
 
 // ForEachNearby calls fn for every world object within radius units of

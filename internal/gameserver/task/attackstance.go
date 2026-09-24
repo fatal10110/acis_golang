@@ -135,11 +135,7 @@ func (a *AttackStance) Tick() error {
 	// refreshes the deadline ahead of it keeps the stance, instead of the
 	// stale expiry stopping a stance the actor has just renewed.
 	a.sweepDue(a.now(), func(actor AttackStanceActor, deadline time.Time) {
-		if q := actor.Queue(); q != nil {
-			q.Post(func() { a.expire(actor, deadline) })
-			return
-		}
-		a.expire(actor, deadline)
+		actor.Queue().Post(func() { a.expire(actor, deadline) })
 	})
 	return nil
 }

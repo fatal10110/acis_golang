@@ -33,7 +33,7 @@ func (noopStatOwner) MaxBuffCount() int                  { return 20 }
 // logic already on the real (*player.Character).IncreaseCharges.
 func TestApplyRestoredDeliversOnStartToLiveEffectList(t *testing.T) {
 	target := inWorldCharacter(t)
-	list := effect.NewList(noopStatOwner{})
+	list := newTestList(noopStatOwner{})
 	meta := effect.Skill{ID: 7, Level: 3}
 	templates := []modelskill.EffectTemplate{{Name: "IncreaseCharges", Value: 2, Count: 5}}
 
@@ -53,7 +53,7 @@ func TestApplyRestoredDeliversOnStartToLiveEffectList(t *testing.T) {
 
 func TestApplyRestoredSkipsUnsupportedTemplatesWithoutFailingTheRest(t *testing.T) {
 	target := inWorldCharacter(t)
-	list := effect.NewList(noopStatOwner{})
+	list := newTestList(noopStatOwner{})
 	meta := effect.Skill{ID: 8}
 	templates := []modelskill.EffectTemplate{
 		{Name: "not-a-real-effect"},
@@ -100,3 +100,11 @@ func (openGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 func (openGeo) Walkable(int, int, int) bool { return true }
+
+// newTestList returns a list whose owner runs on its own inline queue, with
+// the clock reading the wall time at creation.
+func newTestList(owner effect.StatOwner) *effect.List {
+	l := effect.NewList(owner)
+	l.SetQueue(sim.NewInline(time.Now()).NewQueue("test"))
+	return l
+}

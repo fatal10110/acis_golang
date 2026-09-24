@@ -96,7 +96,7 @@ func (a *AI) Tick() error {
 				continue
 			}
 		}
-		post(actor.Queue(), func() {
+		actor.Queue().Post(func() {
 			actor.Tick()
 			if err := actor.TickThink(); err != nil {
 				a.log.Warn().Err(err).Int32("actor_id", actor.ObjectID()).Msg("ai: think")

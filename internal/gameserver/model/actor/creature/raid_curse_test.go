@@ -2,11 +2,13 @@ package creature
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -302,7 +304,7 @@ type cursePlayable struct {
 func newCursePlayable(t *testing.T, level int) *cursePlayable {
 	t.Helper()
 	p := &cursePlayable{id: 1, level: level}
-	p.list = effect.NewList(p)
+	p.list = newTestList(p)
 	return p
 }
 
@@ -439,3 +441,11 @@ func (*cursePlayable) NotifyEffectDisappeared(modelskill.ID, int) {}
 func (*cursePlayable) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (*cursePlayable) UpdateEffectIcons() {}
+
+// newTestList returns a list whose owner runs on its own inline queue, with
+// the clock reading the wall time at creation.
+func newTestList(owner effect.StatOwner) *effect.List {
+	l := effect.NewList(owner)
+	l.SetQueue(sim.NewInline(time.Now()).NewQueue("test"))
+	return l
+}

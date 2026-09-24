@@ -616,9 +616,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
-	if l.queues != nil {
-		creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
-	}
+	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	delivery.live = live
 	c.Attach(creatureLive, live)
@@ -628,9 +626,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	moveCtl.SetPositionUpdates(l.positions)
 	attackCtl := attack.NewPlayer(c, live)
-	if q := creatureLive.Queue(); q != nil {
-		attackCtl.SetQueue(q)
-	}
+	attackCtl.SetQueue(creatureLive.Queue())
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))

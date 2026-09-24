@@ -129,8 +129,7 @@ type Queues interface {
 }
 
 // NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot
-// base and RandomWalkRate, each running its work on a queue from queues (nil
-// runs it on the goroutine that triggers it).
+// base and RandomWalkRate, each running its work on a queue from queues.
 func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, maxBuffsAmount, randomWalkRate int, effects effect.ActivityRegistry, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, maxBuffsAmount, randomWalkRate, effects, queues, zoneIndexes...)
 }
@@ -147,6 +146,9 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	}
 	if state == nil {
 		return nil, fmt.Errorf("npcs: nil world state")
+	}
+	if queues == nil {
+		return nil, fmt.Errorf("npcs: nil queues")
 	}
 	if newSink == nil {
 		// NPCs spawned without a sink factory never reach a client: no

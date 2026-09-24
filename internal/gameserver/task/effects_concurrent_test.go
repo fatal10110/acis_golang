@@ -19,7 +19,7 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	const listCount = 20
 	lists := make([]*effect.List, listCount)
 	for i := range lists {
-		lists[i] = effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
+		lists[i] = newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	}
 	newEffect := func(id int) *effect.Effect {
 		eff, err := effect.New(effect.Skill{ID: modelskill.ID(id)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -90,13 +90,13 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 		return eff
 	}
 
-	leftover := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
+	leftover := newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	leftover.Add(newEffect(1))
 	if !e.contains(leftover) {
 		t.Fatal("leftover list not registered after Add")
 	}
 	other := NewEffects()
-	otherList := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(other))
+	otherList := newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(other))
 	otherList.Add(newEffect(2))
 
 	e.Reset()
@@ -127,7 +127,7 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// A fresh owner (the next test server's own NPC) must still be able to
 	// register normally: Reset must not have wedged the hook or the
 	// registry into a state that rejects further registrations.
-	next := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
+	next := newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 	next.Add(newEffect(2))
 	if !e.contains(next) {
 		t.Fatal("a list added after Reset failed to register")

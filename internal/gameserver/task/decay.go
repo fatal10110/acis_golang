@@ -115,11 +115,7 @@ func (d *Decay) Tick() error {
 
 	d.cancelUnlinkedSummons()
 	d.tickDue(d.now(), func(actor DecayActor) {
-		if q := actor.Queue(); q != nil {
-			q.Post(func() { d.effects.Decay(actor) })
-			return
-		}
-		d.effects.Decay(actor)
+		actor.Queue().Post(func() { d.effects.Decay(actor) })
 	})
 	return nil
 }

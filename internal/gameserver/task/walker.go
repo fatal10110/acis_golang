@@ -126,11 +126,7 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 // Start launches the fixed one-second walker task.
 func (w *Walker) Start(log zerolog.Logger) *scheduler.Ticker {
 	w.log = log
-	return scheduler.Start(WalkerTick, func() {
-		for _, err := range w.Tick() {
-			log.Error().Err(err).Msg("walker route tick")
-		}
-	}, log)
+	return scheduler.Start(WalkerTick, w.Tick, log)
 }
 
 // StartRoute registers actor on routeName/npcName and immediately requests
@@ -225,11 +221,9 @@ func (w *Walker) MoveToNextPoint(actor WalkerActor) error {
 }
 
 // Tick releases delayed route walkers whose wait has elapsed and that are no
-// longer moving, each on its own queue, where a route error is logged. For a
-// walker without a queue the release runs here, and Tick returns its error so
-// tests and callers can surface bad route state without stopping the
-// recurring task.
-func (w *Walker) Tick() []error {
+// longer moving, each on its own queue, where a route error is logged
+// without stopping the recurring task.
+func (w *Walker) Tick() {
 	now := w.now()
 	w.mu.Lock()
 	var due []WalkerActor
@@ -240,21 +234,13 @@ func (w *Walker) Tick() []error {
 	}
 	w.mu.Unlock()
 
-	var errs []error
 	for _, actor := range due {
-		if q := actor.Queue(); q != nil {
-			q.Post(func() {
-				if err := w.release(actor, now); err != nil {
-					w.log.Error().Err(err).Msg("walker route tick")
-				}
-			})
-			continue
-		}
-		if err := w.release(actor, now); err != nil {
-			errs = append(errs, err)
-		}
+		actor.Queue().Post(func() {
+			if err := w.release(actor, now); err != nil {
+				w.log.Error().Err(err).Msg("walker route tick")
+			}
+		})
 	}
-	return errs
 }
 
 // release requests actor's next route node if its wait, as of now, has

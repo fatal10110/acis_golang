@@ -104,7 +104,7 @@ func (u *InventoryUpdates) Tick() {
 		// Draining on the owner's queue leaves an entry that turns out empty
 		// registered; the next tick finds no updates and drops it then.
 		inv, owner := entry.inventory, entry.owner
-		post(owner.Queue(), func() {
+		owner.Queue().Post(func() {
 			if updates := inv.DrainUpdates(); len(updates) > 0 {
 				owner.SendInventoryUpdate(updates)
 				inv.UpdateWeight()

@@ -32,6 +32,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 	if err != nil {
 		t.Fatal(err)
 	}
+	live.SetQueue(idleQueue())
 	ch.Live = live
 
 	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, items: items, visibilitySend: capture.Send}

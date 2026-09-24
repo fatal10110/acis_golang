@@ -355,7 +355,10 @@ type SignetDeps struct {
 	// NewSink builds the event sink a spawned signet effect point reports
 	// through; nil disables signet spawning.
 	NewSink func(*npc.EffectPoint) event.Sink
-	Log     zerolog.Logger
+	// Queues creates each spawned effect point's own queue; nil disables
+	// signet spawning.
+	Queues signetQueues
+	Log    zerolog.Logger
 }
 
 // NewDefaultRegistryWithSignet returns the same handlers as
@@ -363,7 +366,7 @@ type SignetDeps struct {
 // signet's own world-spawning collaborators.
 func NewDefaultRegistryWithSignet(defs Definitions, signet SignetDeps) *Registry {
 	r := NewDefaultRegistryWithDefinitions(defs)
-	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, activity: signet.Activity, log: signet.Log})
+	r.Register(signetHandler{defs: defs, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, activity: signet.Activity, queues: signet.Queues, log: signet.Log})
 	return r
 }
 

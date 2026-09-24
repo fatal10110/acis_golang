@@ -1,6 +1,8 @@
 package skill
 
 import (
+	"fmt"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -15,6 +17,12 @@ import (
 // actor.
 type signetIDAllocator interface {
 	NextID() (int32, error)
+}
+
+// signetQueues creates the queue a spawned signet actor's work runs on; id
+// names it in logs.
+type signetQueues interface {
+	NewQueue(id string) *sim.Queue
 }
 
 // signetTemplates resolves an NPC template by id, the source of a signet
@@ -70,6 +78,7 @@ type signetHandler struct {
 	world     *world.State
 	newSink   func(*npc.EffectPoint) event.Sink
 	activity  effect.ActivityRegistry
+	queues    signetQueues
 	log       zerolog.Logger
 }
 
@@ -156,7 +165,7 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	if !ok {
 		return nil, false
 	}
-	if h.newSink == nil {
+	if h.newSink == nil || h.queues == nil {
 		return nil, false
 	}
 	id, err := h.ids.NextID()
@@ -165,17 +174,15 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	}
 
 	ownerID := caster.ObjectID()
-	opts := []effect.Option{effect.WithActivityRegistry(h.activity)}
-	if queued, ok := caster.(interface{ Queue() *sim.Queue }); ok {
-		opts = append(opts, effect.WithClock(queued.Queue()))
-	}
-	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, opts...)
+	// The point runs on its own queue, not the caster's: it outlives the
+	// caster's session, and its list's OnExit is what despawns it, so a
+	// queue closed by the caster's logout would strand the point in world.
+	queue := h.queues.NewQueue(fmt.Sprintf("effectpoint-%d", id))
+	actor, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithActivityRegistry(h.activity))
 	if err != nil {
+		queue.Close()
 		return nil, false
 	}
-	// The point's own effect list stays off the caster's queue: it outlives
-	// the caster's session, and its OnExit is what despawns the point, so a
-	// queue closed by the caster's logout would strand the point in world.
 	actor.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(actor)})
 
 	pos, ok := caster.(signetPositioned)

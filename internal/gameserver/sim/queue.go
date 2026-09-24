@@ -14,12 +14,6 @@ type Clock interface {
 	Now() time.Time
 }
 
-// SystemClock is the wall clock.
-type SystemClock struct{}
-
-// Now returns time.Now().
-func (SystemClock) Now() time.Time { return time.Now() }
-
 // executor is what a Queue runs on: a Pool or an Inline loop. Now is the
 // clock its timers run on.
 type executor interface {

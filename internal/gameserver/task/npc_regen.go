@@ -64,11 +64,7 @@ func (r *NPCRegen) Tick() {
 		if !ok {
 			continue
 		}
-		if q := actor.Queue(); q != nil {
-			q.Post(actor.TickRegen)
-			continue
-		}
-		actor.TickRegen()
+		actor.Queue().Post(actor.TickRegen)
 	}
 	// Drop references past this tick's length so a shrinking population
 	// doesn't keep despawned objects reachable through unused capacity.

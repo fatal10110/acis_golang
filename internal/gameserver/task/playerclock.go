@@ -160,7 +160,7 @@ func (p *PlayerClock) onDayNight(night bool) {
 		if !ok {
 			continue
 		}
-		post(actor.Queue(), func() {
+		actor.Queue().Post(func() {
 			if !actor.HasSkill(shadowSenseSkillID) {
 				return
 			}

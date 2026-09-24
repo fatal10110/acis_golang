@@ -83,7 +83,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	sevenSigns.Start()
 	t.Cleanup(sevenSigns.Stop)
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, npc.NewTable(nil), ids, gamemanager.DefaultDeleteAfter, time.Now)
-	gcl := NewGameClientLink(GameClientLinkConfig{
+	gcl, err := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        func() *LoginLink { return loginLink },
 		Roster:           roster,
@@ -110,6 +110,9 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 		Queues:           testQueues(t),
 		Log:              zerolog.Nop(),
 	})
+	if err != nil {
+		t.Fatalf("new game client link: %v", err)
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)

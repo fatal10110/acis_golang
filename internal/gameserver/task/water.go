@@ -141,10 +141,6 @@ func (w *Water) Tick() {
 	// water, or started a fresh breath, before the callback ran is no longer
 	// the submerged actor this sweep saw.
 	for _, entry := range due {
-		if q := entry.actor.Queue(); q != nil {
-			q.Post(func() { w.drown(entry) })
-			continue
-		}
-		w.drown(entry)
+		entry.actor.Queue().Post(func() { w.drown(entry) })
 	}
 }

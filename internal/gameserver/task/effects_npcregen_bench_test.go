@@ -32,7 +32,7 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	e := NewEffects()
 	lists := make([]*effect.List, total)
 	for i := 0; i < total; i++ {
-		list := effect.NewList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
+		list := newQueuedList(benchNoopStatOwner{}, effect.WithActivityRegistry(e))
 		lists[i] = list
 		if i%activeFraction == 0 {
 			eff, err := effect.New(effect.Skill{ID: modelskill.ID(i + 1)}, modelskill.EffectTemplate{Name: "Buff"})
@@ -93,4 +93,11 @@ func (benchNoopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
 
 func (benchNoopStatOwner) UpdateEffectIcons() {}
 
-func (*benchRegenActor) Queue() *sim.Queue { return nil }
+func (*benchRegenActor) Queue() *sim.Queue { return testQueue }
+
+// newQueuedList returns a list running on testQueue.
+func newQueuedList(owner effect.StatOwner, opts ...effect.Option) *effect.List {
+	l := effect.NewList(owner, opts...)
+	l.SetQueue(testQueue)
+	return l
+}

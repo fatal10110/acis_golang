@@ -137,9 +137,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	live.Character.DetachSession()
 	// Timers still armed on the queue are cancelled, and later posts to it
 	// (another actor's command, a straggling tick) are dropped.
-	if q := live.Queue(); q != nil {
-		q.Close()
-	}
+	live.Queue().Close()
 	return owners
 }
 
