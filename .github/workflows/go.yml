@@ -1,16 +1,34 @@
 name: Go
 
 on:
+  # Branch pushes are covered by pull_request (the ruleset requires an
+  # up-to-date PR). main pushes still run: they trigger Deploy and are the
+  # only runs whose Go build cache other branches can restore.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  go:
+  test:
+    name: test (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # The slowest behavior suites get their own runners. In a single
+        # `go test ./...` they queue behind compiling every other package.
+        # Keep the `rest` exclusion list in sync with these packages.
+        shard:
+          - name: skills-pets
+            pkgs: ./tests/skills ./tests/pets
+          - name: combat-items
+            pkgs: ./tests/combat ./tests/items
+          - name: rest
+            pkgs: ""
     services:
       mariadb:
         image: mariadb:11
@@ -31,9 +49,21 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          # setup-go keys its cache on go.sum only, so it is saved once and
+          # never refreshed. Cache per shard and commit instead.
+          cache: false
+
+      - name: Restore Go cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
+          restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
 
       - name: Format
+        if: matrix.shard.name == 'rest'
         run: |
           out="$(gofmt -l cmd internal ops tests)"
           if [ -n "$out" ]; then
@@ -43,13 +73,42 @@ jobs:
           fi
 
       - name: Build
+        if: matrix.shard.name == 'rest'
         run: go build ./...
 
       - name: Vet
+        if: matrix.shard.name == 'rest'
         run: go vet ./...
 
       - name: Test
-        run: go test -race ./...
+        env:
+          PKGS: ${{ matrix.shard.pkgs }}
+        run: |
+          if [ -z "$PKGS" ]; then
+            PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
+          fi
+          # shellcheck disable=SC2086 # PKGS is a space-separated package list
+          go test -race $PKGS
 
       - name: Test (simdebug)
+        if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
+
+      # Only main saves, so every branch can restore it.
+      - name: Save Go cache
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
+
+  # The ruleset requires a single check named "go"; it passes only when
+  # every shard does.
+  go:
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ needs.test.result }}" = success ]'
