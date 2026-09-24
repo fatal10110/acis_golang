@@ -20,8 +20,14 @@ func (c *Character) AbortAll(resetTarget bool) {
 // StopMove stops c's movement.
 func (c *Character) StopMove() { c.emit(event.ActionsStopRequested{Move: true}) }
 
-// ClearTarget clears c's target.
-func (c *Character) ClearTarget() { c.SetTarget(nil) }
+// ClearTarget clears c's target selection without touching its intentions.
+func (c *Character) ClearTarget() {
+	if c.sink == nil {
+		c.StoreTarget(nil)
+		return
+	}
+	c.emit(event.ActionsStopRequested{ClearTarget: true})
+}
 
 // StopAttack stops c's attack.
 func (c *Character) StopAttack() {

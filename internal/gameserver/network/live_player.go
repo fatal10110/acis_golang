@@ -374,7 +374,8 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 }
 
 // tryToIdle drops every intention p holds, active and queued, and stops its
-// movement. A character that was already unable to act keeps its intentions
+// movement (combat.Stop stops the shared move controller, whatever the walk
+// was for). A character that was already unable to act keeps its intentions
 // and only answers ActionFailed. One still casting answers ActionFailed too:
 // its idle waits on the cast, which every caller stops next.
 //

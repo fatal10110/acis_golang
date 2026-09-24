@@ -17,13 +17,14 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 	return a.owner, true
 }
 
-// AbortAll stops the summon's movement, attack and cast and sends it idle,
-// then clears its target when resetTarget is set. None of it is
-// client-visible beyond the stop broadcasts the controllers already send.
+// AbortAll stops the summon's movement, attack and cast and sends it idle
+// (see TryToIdle), then clears its target when resetTarget is set. None of
+// it is client-visible beyond the stop broadcasts the controllers already
+// send.
 //
 // ponytail: the idle is unconditional. An actor already disabled before the
 // interrupting effect keeps its intention instead, but no command can give a
-// disabled summon a new intention, so it is already idle by then.
+// disabled summon a new intention, so it already holds the one this sets.
 func (a *Actor) AbortAll(resetTarget bool) {
 	if a.brain != nil {
 		a.brain.AbortAll()

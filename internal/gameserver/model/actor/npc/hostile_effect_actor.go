@@ -7,9 +7,9 @@ import (
 
 var _ effect.NPCActor = (*Hostile)(nil)
 
-// AbortAll stops the NPC's movement, attack and cast. Its intentions and
-// hate stay: while the effect that asked for the abort holds, the think loop
-// declines to act on them. An NPC keeps no selected target apart from its
+// AbortAll stops the NPC's movement, attack and cast without sending it
+// idle: while the effect that asked for the abort holds, the think loop
+// declines to act on its intentions. An NPC keeps no selected target apart from its
 // intentions, so resetTarget has nothing to clear.
 func (h *Hostile) AbortAll(bool) {
 	h.brain.AbortAll()

@@ -547,8 +547,21 @@ func (a *Actor) TryToFollow(target world.Tracked) {
 	a.brain.TryToFollow(combatant)
 }
 
-// TryToIdle cancels the attached AI's current intention.
+// TryToIdle sends the summon idle the way an effect or an interrupted
+// action does: a summon that follows its owner goes back to following it,
+// and picks the walk up again once it can move.
 func (a *Actor) TryToIdle() {
+	if a.followOff.Load() || a.owner == nil || a.brain == nil {
+		a.idle()
+		return
+	}
+	a.setIntent(IntentFollowOwner)
+	a.brain.FollowInstead(a.owner)
+}
+
+// idle cancels the attached AI's current intention without falling back to
+// following the owner.
+func (a *Actor) idle() {
 	a.setIntent(IntentIdle)
 	if a.brain != nil {
 		a.brain.TryToIdle()
@@ -603,7 +616,7 @@ func (a *Actor) Lifetime() LifetimeState {
 }
 
 // FollowActive reports whether this actor is following its owner.
-func (a *Actor) FollowActive() bool { return a.followActive }
+func (a *Actor) FollowActive() bool { return !a.followOff.Load() }
 
 // Intent returns the live action this actor is currently pursuing.
 func (a *Actor) Intent() Intent {

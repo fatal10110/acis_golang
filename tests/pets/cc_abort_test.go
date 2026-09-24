@@ -10,8 +10,8 @@ import (
 )
 
 // TestStunnedPetStrikeLandsNothing stuns the pet while its strike is still
-// casting. The stun aborts the cast and sends the pet idle, so the monster
-// keeps its HP once the hit would have come due.
+// casting. The stun aborts the cast, so the monster keeps its HP once the hit
+// would have come due, and the pet's idle returns it to following its owner.
 func TestStunnedPetStrikeLandsNothing(t *testing.T) {
 	h, petActor, hostile := bootWolfStriker(t)
 	startWolfStrike(t, h)
@@ -35,7 +35,7 @@ func TestStunnedPetStrikeLandsNothing(t *testing.T) {
 	if hp, full := hostile.HP(), float64(hostile.MaxHP()); hp != full {
 		t.Fatalf("monster HP = %v after the pet was stunned mid-cast, want untouched %v", hp, full)
 	}
-	if got := petActor.Intent(); got != summon.IntentIdle {
-		t.Fatalf("pet intent = %v after stun, want idle", got)
+	if got := petActor.Intent(); got != summon.IntentFollowOwner {
+		t.Fatalf("pet intent = %v after stun, want follow-owner", got)
 	}
 }

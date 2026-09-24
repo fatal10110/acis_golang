@@ -23,14 +23,18 @@ type effectHolder interface {
 
 // landStun applies a real Stun effect to target on target's own queue, the
 // way a landed stun skill does, and waits for its start hook to finish.
-func landStun(t *testing.T, target effectHolder) {
+func landStun(t *testing.T, target effectHolder) { landEffect(t, target, "Stun") }
+
+// landEffect applies the named real effect to target on target's own queue
+// and waits for its start hook to finish.
+func landEffect(t *testing.T, target effectHolder, name string) {
 	t.Helper()
 	e, err := effect.New(
 		effect.Skill{ID: ccStunSkillID, Level: 1, Debuff: true},
-		modelskill.EffectTemplate{Name: "Stun", Time: 30},
+		modelskill.EffectTemplate{Name: name, Time: 30},
 	)
 	if err != nil {
-		t.Fatalf("effect.New(Stun): %v", err)
+		t.Fatalf("effect.New(%s): %v", name, err)
 	}
 	e.Effector, e.Effected = target, target
 	done := make(chan struct{})
@@ -132,5 +136,60 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 	}
 	if hostile.IsMoving() {
 		t.Fatal("IsMoving() = true after stun, want the walk stopped")
+	}
+}
+
+// TestRemoveTargetStopsWalkingPlayer pins RemoveTarget landing on a player
+// who is walking with nothing selected: the cleared selection answers
+// ActionFailed, the attack stop's idle stops the walk (StopMove) and answers
+// ActionFailed, and the cast stop answers the last ActionFailed.
+func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
+	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
+	drainUntilQuiet(t, c)
+
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	player, ok := obj.(interface {
+		effectHolder
+		IsMoving() bool
+	})
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is not an effect holder", objID, obj)
+	}
+	if !player.IsMoving() {
+		t.Fatal("IsMoving() = false before RemoveTarget, want a live walk")
+	}
+	landEffect(t, player, "RemoveTarget")
+
+	assertFrameOpcode(t, mustRead(t, c, "unselect ActionFailed"), serverpackets.OpcodeActionFailed, "unselect ActionFailed")
+	stop := mustRead(t, c, "StopMove")
+	assertFrameOpcode(t, stop, serverpackets.OpcodeStopMove, "StopMove")
+	if got := int32(binary.LittleEndian.Uint32(stop[1:5])); got != objID {
+		t.Fatalf("StopMove object = %d, want %d", got, objID)
+	}
+	assertFrameOpcode(t, mustRead(t, c, "attack-stop ActionFailed"), serverpackets.OpcodeActionFailed, "attack-stop ActionFailed")
+	assertFrameOpcode(t, mustRead(t, c, "cast-stop ActionFailed"), serverpackets.OpcodeActionFailed, "cast-stop ActionFailed")
+	for {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeMoveToLocation || frame[0] == serverpackets.OpcodeStopMove {
+			t.Fatalf("post-RemoveTarget frame opcode %#x: the walk must stay stopped", frame[0])
+		}
+	}
+	if player.IsMoving() {
+		t.Fatal("IsMoving() = true after RemoveTarget, want the walk stopped")
 	}
 }
