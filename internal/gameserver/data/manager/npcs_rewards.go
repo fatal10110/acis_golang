@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -40,9 +41,37 @@ type playerRewardEntry struct {
 func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	d.scheduleDecay()
 
+	// A corpse nobody fought pays nothing: no loot, no spoil, no exp.
+	if d.hostile.AI().Threats().IsEmpty() {
+		return
+	}
 	entries, totalDamage, maxDealer, highestLevel := d.rewardEntries()
-	d.rollDrops(killer, maxDealer, highestLevel)
+	if receiver := dropReceiver(killer, maxDealer); receiver != nil {
+		d.rollDrops(receiver, highestLevel)
+	}
 	d.grantExpAndSp(entries, totalDamage)
+}
+
+// dropReceiver returns the player credited with the drops: the top damage
+// dealer, else the killer's acting player (a summon's owner). Nil means no
+// player earned the kill — an NPC, the victim itself, or no killer at all —
+// and nothing drops.
+func dropReceiver(killer attackable.Combatant, maxDealer *player.Character) attackable.Combatant {
+	if maxDealer != nil {
+		return maxDealer
+	}
+	if killer == nil {
+		return nil
+	}
+	switch killer.Kind() {
+	case actor.KindPlayer:
+		return killer
+	case actor.KindSummon:
+		if owner, ok := killer.Owner(); ok {
+			return owner
+		}
+	}
+	return nil
 }
 
 func (d *deathRewards) scheduleDecay() {
@@ -117,7 +146,7 @@ func rewardLeader(entries []playerRewardEntry) (*player.Character, int) {
 	return maxDealer, highestLevel
 }
 
-func (d *deathRewards) rollDrops(killer attackable.Combatant, maxDealer *player.Character, highestLevel int) {
+func (d *deathRewards) rollDrops(receiver attackable.Combatant, highestLevel int) {
 	if len(d.categories) == 0 {
 		return
 	}
@@ -133,10 +162,6 @@ func (d *deathRewards) rollDrops(killer attackable.Combatant, maxDealer *player.
 		autoLootItems = d.config.AutoLootRaid
 	}
 
-	receiver := killer
-	if maxDealer != nil {
-		receiver = maxDealer
-	}
 	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).CalculateRewards(receiver)
 }
 
