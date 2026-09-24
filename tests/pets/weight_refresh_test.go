@@ -11,19 +11,28 @@ import (
 // TestPetWeightChangeRefreshesOwnerStatusAndInfo drives a give that changes
 // the pet's carried weight: the batching tick follows the PetInventoryUpdate
 // with PetStatusUpdate and then a PetInfo carrying the new weight, as the
-// reference's PetInventory.updateWeight does. A weightless give leaves the
-// weight unchanged and sends neither.
+// reference's PetInventory.updateWeight does, and another player watching
+// the pet receives its NpcInfo. A weightless give leaves the weight
+// unchanged and sends none of them.
 func TestPetWeightChangeRefreshesOwnerStatusAndInfo(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t,
 		seedItem{TemplateID: wolfFoodID, Count: 5},
 		seedItem{TemplateID: item.AdenaID, Count: 100},
 	)
-	h.spawnWolf(t)
+	h.srv.SeedCharacterFor(t, "player2", "Watcher", 1, 0)
+	observer := h.srv.DialClient(t, "player2", 1)
+	startInWorld(t, observer)
+	drainUntilQuiet(t, h.client)
+	pet, _ := h.spawnWolf(t)
+	drainUntilQuiet(t, observer)
 
 	frames := h.giveToPet(t, h.seededItem(t, item.AdenaID), 10)
 	if n := countOpcode(frames, serverpackets.OpcodePetStatusUpdate) + countOpcode(frames, serverpackets.OpcodePetInfo); n != 0 {
 		t.Fatalf("weightless give sent a pet refresh: opcodes %x", frameOpcodes(frames))
+	}
+	if n := countNPCInfoFor(drainFrames(t, observer), pet.ObjectID()); n != 0 {
+		t.Fatalf("weightless give sent the observer %d pet NpcInfo, want 0", n)
 	}
 
 	frames = h.giveToPet(t, h.seededItem(t, wolfFoodID), 3)
@@ -45,6 +54,20 @@ func TestPetWeightChangeRefreshesOwnerStatusAndInfo(t *testing.T) {
 	if weight := readPetInfoWeight(t, info); weight != 120 {
 		t.Fatalf("refreshed PetInfo current weight = %d, want 120 (3 food x 40)", weight)
 	}
+	if n := countNPCInfoFor(drainFrames(t, observer), pet.ObjectID()); n != 1 {
+		t.Fatalf("weight change sent the observer %d pet NpcInfo, want 1", n)
+	}
+}
+
+// countNPCInfoFor counts the NpcInfo frames describing objectID.
+func countNPCInfoFor(frames [][]byte, objectID int32) int {
+	n := 0
+	for _, frame := range frames {
+		if len(frame) > 0 && frame[0] == serverpackets.OpcodeNPCInfo && wire.NewReader(frame[1:]).ReadInt32() == objectID {
+			n++
+		}
+	}
+	return n
 }
 
 // readPetInfoWeight returns PetInfo's current carried-weight field.
