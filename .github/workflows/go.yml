@@ -1,15 +1,19 @@
 name: Go
 
 on:
+  # Branch pushes are covered by pull_request (the ruleset requires an
+  # up-to-date PR). main pushes still run: they trigger Deploy and are the
+  # only runs whose Go build cache other branches can restore.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  go:
-    name: go (${{ matrix.shard.name }})
+  test:
+    name: test (${{ matrix.shard.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -78,3 +82,12 @@ jobs:
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
+
+  # The ruleset requires a single check named "go"; it passes only when
+  # every shard does.
+  go:
+    if: always()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - run: '[ "${{ needs.test.result }}" = success ]'
