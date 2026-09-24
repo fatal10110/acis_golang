@@ -240,9 +240,9 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// This re-check is against the world, not against restoringSummon: the
 	// restore still in flight here is this spawn's own, so consulting it
 	// would reject every restored pet. It catches a summon that reached the
-	// world while the read was outstanding — the owner's own handlers keep
-	// running throughout, and past the hold ceiling the cast no longer
-	// blocks them either. Silent, like SpawnPet's own re-check.
+	// world while the read was outstanding. Every summon entry already
+	// refuses to start while restoringSummon holds, so this is an unreachable
+	// backstop. Silent, like SpawnPet's own re-check.
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
 		return
 	}
@@ -399,9 +399,10 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	// A pet restore still in flight owns the slot even though world.Summon
 	// cannot show it yet: past the hold ceiling this cast could otherwise
 	// take the slot and the inbound pet would be dropped at
-	// spawnRestoredPet's re-check. handleMagicSkillUse already refuses to
-	// start a servitor cast in that window, so this is a backstop for a cast
-	// that began before the read did.
+	// spawnRestoredPet's re-check. The restoringSummon half is an unreachable
+	// backstop: every summon entry, handleMagicSkillUse included, refuses to
+	// start while it holds, and a cast in flight blocks the collar that would
+	// begin a read.
 	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false

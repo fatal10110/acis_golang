@@ -47,8 +47,14 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// still in, whether or not its hold already ended. A servitor cast started
 	// there would pay its item and MP, only to lose the slot to the inbound
 	// pet at hit, so it is refused the way an already-casting caster is: an
-	// ActionFailed with no reason.
+	// ActionFailed with no reason. The pre-attempt checks (reuse, disabled
+	// skills) still answer first, with their own reason, as they would for
+	// any caster.
 	if known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
+		if err := l.castController(live).CanAttemptCast(live.Character, def); err != nil {
+			sendMagicCastFailure(live, def, err)
+			return
+		}
 		sendMagicActionFailed(live)
 		return
 	}

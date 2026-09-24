@@ -23,6 +23,7 @@ const (
 	catNPCID         = 12600
 	catConsumeItemID = 20 // the shared catalog's stackable Potion
 	catMPConsume     = 5
+	catReuseDelay    = 600_000
 )
 
 // bootSummoner is bootOwnerWithCollarOpts with the long cast and the servitor
@@ -42,7 +43,7 @@ func bootSummoner(t *testing.T, seeds ...seedItem) *petWorld {
 		{
 			ID: summonCatSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON", NpcID: catNPCID, SummonTotalLifeTime: 1_200_000,
-			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
+			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: catReuseDelay,
 			MPConsume: catMPConsume, ItemConsumeID: catConsumeItemID, ItemConsumeCount: 1,
 		},
 	}), gamesql.NewCharacterSkillStore(db))
@@ -174,6 +175,50 @@ func TestServitorCastRefusedDuringRestoreKeepsCosts(t *testing.T) {
 	if s, ok := obj.(interface{ NPCID() int }); !ok || s.NPCID() != wolfNPCID {
 		t.Fatalf("active summon = %v, want the inbound wolf", obj)
 	}
+}
+
+// TestServitorCastOnReuseDuringRestoreAnswersReuseFirst casts the servitor
+// skill once, dismisses it, then casts it again inside a pet's pets-row read
+// while it is still on reuse. PlayableAI.tryToCast runs canAttemptCast before
+// the casting-now queue (PlayableAI.java:306 vs :313), so the reuse refusal
+// still answers with S1_PREPARED_FOR_REUSE ahead of ActionFailed, and nothing
+// is paid.
+func TestServitorCastOnReuseDuringRestoreAnswersReuseFirst(t *testing.T) {
+	t.Parallel()
+	h := bootSummoner(t, seedItem{TemplateID: catConsumeItemID, Count: 5})
+	h.client.Send(encodeRequestMagicSkillUse(summonCatSkillID))
+	h.srv.AdvanceUntil(t, "servitor in world state", func() bool {
+		_, ok := h.srv.State.Summon(h.ownerID)
+		return ok
+	})
+	drainFrames(t, h.client)
+	h.client.Send(encodeRequestActionUse(petUnsummonAction, false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete")
+	drainFrames(t, h.client)
+
+	release := h.useCollarRestoreHeld(t)
+	h.passHoldCeiling(t)
+	drainFrames(t, h.client)
+	mpBefore := h.srv.PlayerCurrentMP(t, h.ownerID)
+	inv := h.srv.PlayerInventory(t, h.ownerID)
+	itemsBefore := inv.ItemCount(catConsumeItemID, -1, true)
+
+	h.client.Send(encodeRequestMagicSkillUse(summonCatSkillID))
+	frames := drainFrames(t, h.client)
+	if len(frames) != 2 {
+		t.Fatalf("servitor cast on reuse during the restore = opcodes %x, want S1_PREPARED_FOR_REUSE then ActionFailed", frameOpcodes(frames))
+	}
+	assertSystemMessageID(t, frames[0], serverpackets.SystemMessageS1PreparedForReuse)
+	assertFrameOpcode(t, frames[1], serverpackets.OpcodeActionFailed, "ActionFailed")
+	if got := h.srv.PlayerCurrentMP(t, h.ownerID); got != mpBefore {
+		t.Fatalf("MP = %d after a refused servitor cast, want %d", got, mpBefore)
+	}
+	if got := inv.ItemCount(catConsumeItemID, -1, true); got != itemsBefore {
+		t.Fatalf("consume item count = %d after a refused servitor cast, want %d", got, itemsBefore)
+	}
+
+	release()
+	h.awaitPet(t)
 }
 
 // TestWyvernRejectedAfterCastStoppedMidRestore stops the collar's cast with a
