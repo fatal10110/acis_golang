@@ -23,8 +23,8 @@ type summonSink struct {
 	brain *ai.Summon
 	move  *move.Controller
 	// cleanupMu guards cleanup and despawned. Registration runs on the
-	// spawning goroutine while the AI task and the offensive-follow ticker
-	// can already reach this sink and drive it to Despawned, so the two
+	// owner's queue while the summon can already be driven to Despawned
+	// from another actor's queue (a hostile Erase, a signet), so the two
 	// sides must not race: onDespawn runs fn immediately when the summon
 	// has already left the world, which is what keeps a registration that
 	// lost that race from leaking.

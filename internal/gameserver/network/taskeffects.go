@@ -33,6 +33,11 @@ const autosaveSaveTimeout = 5 * time.Second
 
 // liveZoneActor adapts a live player to the zone package without changing
 // Character's world.Position method signature.
+//
+// mu serializes zone revalidation for this player. Movement revalidates on
+// the player's own queue, but a summon-friend cast teleports the player from
+// the caster's queue (TeleportRequested → teleportLivePlayer), and logout
+// removes it from the zones on the detach path.
 type liveZoneActor struct {
 	mu    sync.Mutex
 	live  *livePlayer
@@ -106,11 +111,13 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 }
 
 // TaskEffects routes periodic task effects to their current live player.
+//
+// The Set* wiring runs once during boot, before any task or listener starts,
+// so the fields it writes are read-only by the time a task reads them.
 type TaskEffects struct {
 	state *world.State
 	log   zerolog.Logger
 
-	mu      sync.RWMutex
 	expire  func(*livePlayer, *item.Instance)
 	roster  *manager.Roster
 	skills  *skillstate.Persistence
@@ -124,8 +131,6 @@ func NewTaskEffects(state *world.State) *TaskEffects {
 
 // SetShadowItemExpiry connects expiry to the live inventory owner.
 func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instance)) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.expire = expire
 }
 
@@ -135,8 +140,6 @@ func (e *TaskEffects) SetShadowItemExpiry(expire func(*livePlayer, *item.Instanc
 // construction (like SetShadowItemExpiry above) since TaskEffects itself is
 // what task.Autosave needs to be built.
 func (e *TaskEffects) SetAutosave(roster *manager.Roster, skills *skillstate.Persistence, pets petStore, worker *persist.Worker, log zerolog.Logger) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
 	e.roster = roster
 	e.skills = skills
 	e.pets = pets
@@ -194,9 +197,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 // of detach's jobs on the lane or is never enqueued. Its online write
 // therefore cannot land after detach's offline write (#1948).
 func (e *TaskEffects) Save(actor task.AutosaveActor) {
-	e.mu.RLock()
 	roster, skills, pets, worker, log := e.roster, e.skills, e.pets, e.persist, e.log
-	e.mu.RUnlock()
 	if actor == nil || e.state == nil || roster == nil {
 		return
 	}
@@ -281,11 +282,8 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 		if current, ok := e.state.Player(actorID); !ok || current != live {
 			return
 		}
-		e.mu.RLock()
-		expire := e.expire
-		e.mu.RUnlock()
-		if expire != nil {
-			expire(live, inst)
+		if e.expire != nil {
+			e.expire(live, inst)
 		}
 	})
 }

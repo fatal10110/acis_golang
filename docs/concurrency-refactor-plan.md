@@ -354,6 +354,14 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
    moved to Phase 0.)
 7. `task`: registries stay as containers; delete per-task locks that only guarded actor calls.
 8. Remaining single-field guards from #2262 that survive to this point → atomics or deletion.
+   *Landed as (6–8, sweep 4):* `TaskEffects.mu` deleted — its fields are wired once during boot,
+   before any task or listener starts. Everything else stays, each commented with its off-queue
+   caller: `liveZoneActor.mu` and `zone.Flags.mu` (a summon-friend teleport revalidates zones on
+   the caster's queue), `summonSink.cleanupMu` (a hostile Erase or signet despawns the summon from
+   another queue), `queuedPets.mu` (written on the control item's persistence lane, read by the
+   next summoner), `henna.List.mu` (dye bonuses feed base stats an attacker's formulas read),
+   `task.GameClock.mu` (ticker writes, every queue reads), `enchant.State.mu` (one map shared by
+   every player's queue), `manager.Npcs.mu` and the `task` registries (containers).
 
 ### Phase 6 — test cleanup — #2274 (runs before Phase 5)
 - Replace the `afterFunc` test seams and the `time.Sleep`/`Eventually`/`waitFor` waits in
