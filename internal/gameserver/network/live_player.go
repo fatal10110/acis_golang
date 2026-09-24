@@ -268,7 +268,10 @@ func (p *livePlayer) detached() bool {
 	return p.deliveryStopped.Load()
 }
 
+// markDetaching runs on p's queue, where autosave and shadow-item expiry
+// check detached, so neither enqueues after detach's own writes (#1948).
 func (p *livePlayer) markDetaching() {
+	sim.AssertOwner(p.Queue())
 	p.deliveryStopped.Store(true)
 }
 

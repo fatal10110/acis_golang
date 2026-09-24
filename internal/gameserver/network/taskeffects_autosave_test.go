@@ -29,8 +29,8 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := autosaveLive(t, 42)
-	live.markDetaching()
+	live := queuedTestLive(t, 42)
+	sim.RunOwned(live.Queue(), live.markDetaching)
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
@@ -50,7 +50,7 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := autosaveLive(t, 43)
+	live := queuedTestLive(t, 43)
 	state.AddPlayer(live)
 
 	effects := NewTaskEffects(state)
@@ -73,7 +73,7 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
-	live := autosaveLive(t, 44)
+	live := queuedTestLive(t, 44)
 	live.Character.SetLastKnownPosition(location.Location{X: 100, Y: 200, Z: 300}, 12345)
 	state.AddPlayer(live)
 
@@ -106,7 +106,7 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	worker := persist.New(zerolog.Nop())
 	defer worker.Close(context.Background())
 
-	live := autosaveLive(t, 45)
+	live := queuedTestLive(t, 45)
 	state.AddPlayer(live)
 
 	entered := make(chan struct{})
@@ -140,9 +140,9 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	}
 }
 
-// autosaveLive builds an attached player on its own queue; the autosave tick
-// runs Save there.
-func autosaveLive(t *testing.T, id int32) *livePlayer {
+// queuedTestLive builds an attached player on its own queue, where the
+// autosave tick runs Save and detach runs.
+func queuedTestLive(t *testing.T, id int32) *livePlayer {
 	t.Helper()
 	ch := &player.Character{ID: id}
 	creatureLive, err := creature.NewLive(location.Location{}, 0, testGeo{}, ch)
@@ -152,4 +152,25 @@ func autosaveLive(t *testing.T, id int32) *livePlayer {
 	creatureLive.SetQueue(idleQueue())
 	ch.Live = creatureLive
 	return &livePlayer{Character: ch, log: zerolog.Nop()}
+}
+
+// TestAutosaveSaveSkipsANewerSessionOfTheSameCharacter: a Save posted to a
+// session's queue before its detach closed it can run after the character
+// has entered the world again on a new queue. It must not save the newer
+// session from the old queue.
+func TestAutosaveSaveSkipsANewerSessionOfTheSameCharacter(t *testing.T) {
+	chars := newFakeCharStore()
+	state := world.New()
+	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
+
+	stale := queuedTestLive(t, 46)
+	state.AddPlayer(queuedTestLive(t, 46))
+
+	effects := NewTaskEffects(state)
+	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
+	sim.RunOwned(stale.Queue(), func() { effects.Save(stale) })
+
+	if got := chars.saves(46); got != 0 {
+		t.Fatalf("roster.Save calls from a stale session's queue = %d, want 0", got)
+	}
 }

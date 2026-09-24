@@ -197,8 +197,9 @@ func AssertOwner(q *Queue) {
 	assertDrainer(q)
 }
 
-// RunOwned runs fn on the calling goroutine as q's owner, once the task q is
-// running, if any, has returned. It is for work that must still run after
+// RunOwned runs fn on the calling goroutine as q's owner, once q's in-flight
+// drain, if any, has returned; on a Pool that is the whole batch the drain
+// took, not one task. It is for work that must still run after
 // Post refused it: the queue is closed or its pool is stopping, but tasks it
 // accepted earlier may still be draining. A task must not call it for its
 // own queue.

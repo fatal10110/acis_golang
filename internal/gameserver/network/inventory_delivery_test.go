@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -13,8 +14,8 @@ import (
 func TestInventoryDeliverySkipsDetachedOrDespawnedOwners(t *testing.T) {
 	templates := item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}}})
 	updates := task.NewInventoryUpdates()
-	live := &livePlayer{Character: &player.Character{ID: 1}}
-	live.markDetaching()
+	live := queuedTestLive(t, 1)
+	sim.RunOwned(live.Queue(), live.markDetaching)
 
 	playerInv := itemcontainer.NewPlayerInventoryWithDelivery(1, templates, &playerInventoryDelivery{updates: updates, live: live, character: live.Character}, nil)
 	playerInv.AddNew(1, 1, 1)
