@@ -269,7 +269,8 @@ var (
 // instance. Databases are pooled per test binary: a test checks one out and
 // returns it, truncated, when it completes, so parallel tests each hold their
 // own database while sequential tests reuse one. Repeated calls from the
-// same test return the same database. The package's TestMain must call Main
+// same test return the same database; a t.Run subtest is a different test
+// and gets a different database from its parent. The package's TestMain must call Main
 // so every pooled database is dropped once, after the package's tests.
 func SharedDB(tb testing.TB) *sql.DB {
 	tb.Helper()

@@ -84,32 +84,34 @@ Confirm the actual socket path with `docker context ls` first — `default/docke
 default Colima profile. Disabling Ryuk only skips its container-cleanup sidecar; testcontainers still
 tears down each container it starts.
 
-### `sqltest.SharedDB`: one container per package instead of one per test
+### `sqltest.SharedDB`: pooled databases, one per running test
 
-`sqltest.NewDB(t)` boots a fresh MariaDB container for that single test. For a package with many
-persistence tests this means many container boots, which dominates the default run's
-wall-clock time. `sqltest.SharedDB(tb)` boots one container per package instead: a package-level
-`sync.Once` starts it lazily on the first call within that test binary (Go compiles each package's
-tests into its own binary, so "once per binary" is "once per package"), and every caller gets the
-package's tables truncated via `tb.Cleanup` after its own test so tests don't see rows left behind
-by earlier tests in the package.
+`sqltest.NewDB(t)` creates a fresh database and applies the schema for that single test. For a
+package with many persistence tests, repeating the schema dominates wall-clock time.
+`sqltest.SharedDB(tb)` instead checks a database out of a per-test-binary pool (Go compiles each
+package's tests into its own binary, so the pool is per package). The test holds it until its
+`tb.Cleanup`, which truncates the tables and returns it. Sequential tests therefore reuse one
+database, and each test running at the same time under `t.Parallel()` gets its own. Repeated
+calls with the same `tb` return the same database.
 
-Because the container isn't torn down per test, a package using `SharedDB` must add a `TestMain`
-that terminates it once, after every test in the package has run:
+- **Subtests:** a `t.Run` subtest is a different `tb`, so it gets a different database from its
+  parent. Seed rows and call `gameservertest.Boot` on the same `t`.
+- **Process-wide switches:** behavior suites may call `t.Parallel()`, but a test that overrides a
+  process-wide switch (for example `gameservertest.WithCancelLesserEffect`, see #2481) must stay
+  sequential.
+
+The pooled databases outlive individual tests, so a package using `SharedDB` must add a
+`TestMain` that drops them once, after every test in the package has run:
 
 ```go
 func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
 ```
 
-Without this, the container leaks — harmless on CI where Ryuk normally reaps it, but on Colima
-(Ryuk disabled, see above) leaked containers accumulate across local runs and can OOM-kill each
-other on a memory-constrained VM. All five packages migrated to `SharedDB` (`cmd/gameserver`,
-`internal/gameserver/data/manager`, `internal/gameserver/data/sql`, `internal/gameserver/network`,
-`internal/gameserver/skill`) have this `TestMain`; add one to any new package that adopts `SharedDB`.
+Without it, the package's databases leak on the shared MariaDB instance and pile up across local
+runs. Add it to any new package that adopts `SharedDB`.
 
 Use `NewDB` instead of `SharedDB` for a test that mutates the schema itself (e.g. dropping a table to
-force a downstream failure) — that would corrupt the shared container for every other test in the
-package.
+force a downstream failure), because the database goes back to the pool for the package's next test.
 
 ### Datapack oracle tests are local-only — CI cannot run them
 
