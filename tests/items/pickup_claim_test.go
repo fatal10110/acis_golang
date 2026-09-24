@@ -106,7 +106,7 @@ func TestConcurrentPickupsTakeOneItem(t *testing.T) {
 		groundID := soleGroundObjectID(t, srv)
 		first.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
 		other.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
-		waitFor(t, "drop leaves the ground", func() bool {
+		srv.AdvanceUntil(t, "drop leaves the ground", func() bool {
 			_, ok := srv.State.Object(groundID)
 			return !ok
 		})
@@ -117,7 +117,7 @@ func TestConcurrentPickupsTakeOneItem(t *testing.T) {
 		}
 		// Let the winner's post-pickup paralysis lapse so the next round's
 		// clicks are not deferred behind it.
-		time.Sleep(250 * time.Millisecond)
+		srv.Advance(t, 250*time.Millisecond)
 	}
 }
 

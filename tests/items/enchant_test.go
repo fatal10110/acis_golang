@@ -59,14 +59,14 @@ func openEnchantSelection(t *testing.T, c *testsupport.ScriptedClient, scrollObj
 // level plus one weapon enchant scroll (blessed when requested). extra runs
 // before the character enters the world, so anything it seeds is part of the
 // loaded inventory.
-func bootEnchanter(t *testing.T, roll func() float64, weaponEnchant int32, blessed bool, extra func(t *testing.T, srv *gameservertest.Server, objID int32)) (*gameservertest.Server, int32, int32, int32) {
+func bootEnchanter(t *testing.T, roll func() float64, weaponEnchant int32, blessed bool, extra func(t *testing.T, srv *gameservertest.Server, objID int32), more ...gameservertest.Option) (*gameservertest.Server, int32, int32, int32) {
 	t.Helper()
 	opts := []gameservertest.Option{
 		gameservertest.WithEnchantRoll(roll),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 	}
-	srv := gameservertest.Boot(t, opts...)
+	srv := gameservertest.Boot(t, append(opts, more...)...)
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
 	weapon := srv.GiveItem(t, objID, 30, 1)

@@ -377,6 +377,15 @@ the locks that stay are listed on #2273; `AssertOwner` has no production caller 
   timeout as a close. They now pin the exact threshold, and a read timeout fails the test. The
   remaining polls (login link, session validator, the item-flush order) wait on a socket or a
   goroutine the test starts, not on a queue timer. Close-path frames are tracked in #2484.
+  *Slice 3 (`tests/character`, `tests/items`, `tests/lifecycle`, `tests/trade`) landed as:* every
+  behavior suite now runs on the driven clock, so it is the harness default and `DriveClock()` is
+  gone; the wall-clock `ACIS_SIM_EXECUTOR=inline` pump is retired (the runner goroutine still runs
+  posted tasks, but only a test moves the clock). Pool task-panic recovery tests and `tests/perf`
+  pin `WithRealPool()`. While a test holds a persistence lane, the harness stops waiting for a
+  handler parked on it after 100 ms, so the clock can move past a held database round trip. CI's
+  real-pool step covers all seven suites. Left for slice 4: the `afterFunc` seams and nil-queue
+  fallbacks in `model/actor/{attack,cast,move,cubic}` (`sim.AfterOr`, `sim.Now`, network's
+  `onQueue`/`postLive`), their unit tests, and the "after Phase 6" perf row.
 
 ## Performance notes (why this does not regress the hot spot)
 - Pool size = cores; per-actor queues are independent, so contention is bounded by the per-actor

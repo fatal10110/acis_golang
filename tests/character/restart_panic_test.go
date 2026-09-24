@@ -1,7 +1,6 @@
 package character
 
 import (
-	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -58,12 +57,12 @@ func (p *panicOnStanceRemove) Remove(task.AttackStanceActor) bool {
 // only come from the deferred detach, which runs precisely because live was
 // left in place.
 func TestPanicInQueuedRestartHandlerDropsSession(t *testing.T) {
-	skipWithoutTaskRecovery(t)
 	stance := &panicOnStanceCheck{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithAttackStanceTracker(stance),
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithRealPool(), // sim.Inline does not recover task panics
 	)
 	c := srv.Client
 	enterWorld(t, c)
@@ -93,12 +92,12 @@ func TestPanicInQueuedRestartHandlerDropsSession(t *testing.T) {
 // reached it; finding the reduced HP persisted proves the re-entrant detach
 // ran that far and not merely that the session closed.
 func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
-	skipWithoutTaskRecovery(t)
 	stance := &panicOnStanceRemove{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithAttackStanceTracker(stance),
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithRealPool(), // sim.Inline does not recover task panics
 	)
 	c := srv.Client
 	enterWorld(t, c)
@@ -130,16 +129,5 @@ func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
 	}
 	if ch := persistedCharacter(t, srv, objID); ch.CurrentHP() != wantHP {
 		t.Fatalf("persisted HP = %d, want %d: the re-entrant detach never reached the character save", ch.CurrentHP(), wantHP)
-	}
-}
-
-// skipWithoutTaskRecovery skips a panic-driving test under the inline
-// executor: sim.Inline deliberately does not recover, so a panicking task
-// takes the harness pump goroutine with it. The policy under test is a
-// production (pool) one.
-func skipWithoutTaskRecovery(t *testing.T) {
-	t.Helper()
-	if os.Getenv(gameservertest.SimExecutorEnv) == "inline" {
-		t.Skip("sim.Inline does not recover task panics")
 	}
 }

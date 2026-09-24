@@ -28,10 +28,10 @@ jobs:
             pool: ./tests/skills ./tests/pets
           - name: combat-items
             pkgs: ./tests/combat ./tests/items
-            pool: ./tests/combat
+            pool: ./tests/combat ./tests/items
           - name: rest
             pkgs: ""
-            pool: ""
+            pool: ./tests/character ./tests/lifecycle ./tests/trade
     services:
       mariadb:
         image: mariadb:11
@@ -93,8 +93,9 @@ jobs:
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
           go test -race $PKGS
 
-      # Suites that drive their own clock run on sim.Inline by default; this
-      # keeps their run on the real pool, with real interleavings.
+      # Behavior suites run on sim.Inline with a test-driven clock by
+      # default; this keeps their run on the real pool, with real
+      # interleavings.
       - name: Test (real pool)
         if: matrix.shard.pool != ''
         env:

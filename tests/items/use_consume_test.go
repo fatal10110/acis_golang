@@ -577,7 +577,7 @@ func TestUseEnergyStoneCapsForceCharges(t *testing.T) {
 		t.Fatalf("second stone use produced no ForceMaxLevelReached across %d frames", len(second))
 	}
 
-	waitFor(t, "both stones consumed", func() bool {
+	srv.AdvanceUntil(t, "both stones consumed", func() bool {
 		srv.InventoryUpdates.Tick()
 		srv.FlushItems(t)
 		for _, inst := range persistedItems(t, srv, objID) {

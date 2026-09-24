@@ -14,10 +14,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-// Advance lets d pass for the actor queues. On a driven clock (DriveClock)
-// it first lets the server catch up (see catchUp), then moves the Inline
-// clock by d and runs every timer and task that comes due, without waiting;
-// on an executor that follows the wall clock it sleeps for d. Either way the
+// Advance lets d pass for the actor queues. On the inline executor it first
+// lets the server catch up (see catchUp), then moves the Inline clock by d
+// and runs every timer and task that comes due, without waiting; on the
+// real pool it sleeps for d. Either way the
 // tasks posted by then have run when it returns.
 func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	tb.Helper()
@@ -32,8 +32,8 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 	s.Settle(tb)
 }
 
-// DrivesClock reports whether the test moves the actor queues' clock
-// (DriveClock) rather than the wall clock doing it.
+// DrivesClock reports whether the test moves the actor queues' clock (the
+// inline executor) rather than the wall clock doing it (the real pool).
 func (s *Server) DrivesClock() bool { return s.queues.advance != nil }
 
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
@@ -103,17 +103,31 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 }
 
 // catchUpTimeout bounds the wall time the server may take to handle frames
-// a client already wrote.
-const catchUpTimeout = 5 * time.Second
+// a client already wrote. While a test holds a persistence lane, a handler
+// waiting on that lane cannot finish until the test releases it, so catchUp
+// gives up on the frames after heldLaneGrace and lets the clock move: a held
+// lane is a database round trip that takes time.
+const (
+	catchUpTimeout = 5 * time.Second
+	heldLaneGrace  = 100 * time.Millisecond
+)
 
 // catchUp waits until the server has handled every frame a client wrote,
 // the actor queues have run everything posted and the persistence lanes the
 // test does not hold have run their jobs, so nothing but the clock can start
 // more work.
 func (s *Server) catchUp() error {
-	deadline := time.Now().Add(catchUpTimeout)
+	held := s.anyLaneHeld()
+	limit := catchUpTimeout
+	if held {
+		limit = heldLaneGrace
+	}
+	deadline := time.Now().Add(limit)
 	for !s.handledAll() {
 		if time.Now().After(deadline) {
+			if held {
+				break
+			}
 			return errBehind
 		}
 		time.Sleep(50 * time.Microsecond)
@@ -127,6 +141,15 @@ func (s *Server) catchUp() error {
 	}
 	s.queues.advance(0)
 	return nil
+}
+
+func (s *Server) anyLaneHeld() bool {
+	for i := range s.heldLanes {
+		if s.heldLanes[i].Load() != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) flushUnheldLanes() error {

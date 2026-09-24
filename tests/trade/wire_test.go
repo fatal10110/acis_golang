@@ -1,6 +1,7 @@
 package trade
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -213,12 +214,11 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return frames
 }
 
-// waitForArrival polls the live player's world position until the walk to
-// wantX/spawnY/spawnZ registers, failing after a deadline.
+// waitForArrival lets time pass until the walk to wantX/spawnY/spawnZ
+// registers in the live player's world position.
 func waitForArrival(t *testing.T, h *traders, objID, wantX int32) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	h.srv.AdvanceUntil(t, fmt.Sprintf("player %d walk arrival at x=%d", objID, wantX), func() bool {
 		obj, ok := h.srv.State.Player(objID)
 		if !ok {
 			t.Fatalf("world.Player(%d) missing while waiting for walk arrival", objID)
@@ -228,14 +228,8 @@ func waitForArrival(t *testing.T, h *traders, objID, wantX int32) {
 			t.Fatalf("world.Player(%d) = %T has no Position method", objID, obj)
 		}
 		x, _, _ := positioned.Position()
-		if int32(x) == wantX {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("player %d position x = %d after walk, want %d", objID, x, wantX)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return int32(x) == wantX
+	})
 }
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {

@@ -1,14 +1,14 @@
 package character
 
 import (
+	"fmt"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -150,11 +150,10 @@ func assertStatusAttrs(t *testing.T, frame []byte, objectID int32, attrs []serve
 	}
 }
 
-func waitForWorldPosition(t *testing.T, state *world.State, objID int32, want location.Location) {
+func waitForWorldPosition(t *testing.T, srv *gameservertest.Server, objID int32, want location.Location) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		obj, ok := state.Player(objID)
+	srv.AdvanceUntil(t, fmt.Sprintf("walk arrival at %+v", want), func() bool {
+		obj, ok := srv.State.Player(objID)
 		if !ok {
 			t.Fatal("world player missing while waiting for walk arrival")
 		}
@@ -163,12 +162,6 @@ func waitForWorldPosition(t *testing.T, state *world.State, objID int32, want lo
 			t.Fatal("world player has no Position method")
 		}
 		x, y, z := positioned.Position()
-		if x == want.X && y == want.Y && z == want.Z {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("player position after walk = (%d,%d,%d), want %+v", x, y, z, want)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return x == want.X && y == want.Y && z == want.Z
+	})
 }

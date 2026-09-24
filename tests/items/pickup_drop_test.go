@@ -252,7 +252,7 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 	// Walk out of pickup range before clicking; wait until the server
 	// reports the player at the destination.
 	c.Send(encodeMoveBackwardToLocation(spawnX+200, spawnY, spawnZ, spawnX, spawnY, spawnZ))
-	waitFor(t, "walk away completed", func() bool {
+	srv.AdvanceUntil(t, "walk away completed", func() bool {
 		x, _, _ := srv.PlayerPosition(t, objID)
 		return x >= spawnX+195
 	})
@@ -469,7 +469,7 @@ func TestWeightGaugeRefreshesOnEveryChange(t *testing.T) {
 	c.Send(encodeRequestDestroyItem(potion, 2))
 	// Let the handler settle, then drive the batching task: its drain sends
 	// the InventoryUpdate and refreshes the carried weight afterwards.
-	time.Sleep(200 * time.Millisecond)
+	srv.Advance(t, 200*time.Millisecond)
 	srv.InventoryUpdates.Tick()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -587,19 +587,6 @@ func soleGroundObjectID(t *testing.T, srv *gameservertest.Server) int32 {
 		t.Fatalf("tracked ground items = %d, want 1", len(snaps))
 	}
 	return snaps[0].ObjectID
-}
-
-// waitFor polls cond until it holds or the deadline passes.
-func waitFor(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("%s not observed within 10s", what)
 }
 
 // waitForInventoryUpdate reads frames until an InventoryUpdate carrying

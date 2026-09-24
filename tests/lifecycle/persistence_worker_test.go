@@ -57,7 +57,7 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, "player left world", func() bool {
+	srv.AdvanceUntil(t, "player left world", func() bool {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
@@ -99,7 +99,7 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, "player left world", func() bool {
+	srv.AdvanceUntil(t, "player left world", func() bool {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
@@ -123,15 +123,4 @@ func persistedHPAndOnline(t *testing.T, srv *gameservertest.Server, objID int32)
 		t.Fatalf("read characters row: %v", err)
 	}
 	return hp, online
-}
-
-func waitUntil(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("%s not observed within 5s", what)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
 }

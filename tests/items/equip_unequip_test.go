@@ -175,7 +175,7 @@ func TestDeadPlayerItemGates(t *testing.T) {
 	}
 
 	c.Send(encodeRequestDestroyItem(potion, 1))
-	waitFor(t, "dead destroy consumed one unit", func() bool {
+	srv.AdvanceUntil(t, "dead destroy consumed one unit", func() bool {
 		srv.InventoryUpdates.Tick()
 		srv.FlushItems(t)
 		for _, inst := range persistedItems(t, srv, objID) {
