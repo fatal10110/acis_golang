@@ -66,14 +66,14 @@ const petRestoreHoldCeiling = 2 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
 // beside the owner, and registers it as the owner's active summon,
-// mirroring SummonCreature.java:44-76. It sends SUMMON_ONLY_ONE and stops if
-// the owner already has a pet or servitor tracked — the reference re-checks
-// this at the handler layer even though SummonItems.java already gated it
-// once before the cast started.
+// mirroring SummonCreature.java:44-76. It stops if the owner already has a
+// pet or servitor tracked, or another pets-row read in flight — a re-check of
+// the gate useSummonItem already answered before the cast started.
 //
-// Every other rejection below (missing template, unmapped or non-pet
-// summon item, missing npc template, a restore-state error, ID exhaustion,
-// an unresolvable level) sends no further packet and simply stops. This runs
+// Every rejection below (that re-check, missing template, unmapped or
+// non-pet summon item, missing npc template, a restore-state error, ID
+// exhaustion, an unresolvable level) sends no further packet and simply
+// stops. This runs
 // inside the cast's already-committed Hit phase — MagicSkillUse, the
 // SUMMON_A_PET system message and MagicSkillLaunched are already sent by the
 // caller before SpawnPet runs — and Java's own handler is silent for the
@@ -91,7 +91,6 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		return
 	}
 	if link.hasActiveSummon(live) || link.restoringSummon(live) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
 	}
 
@@ -243,9 +242,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// would reject every restored pet. It catches a summon that reached the
 	// world while the read was outstanding — the owner's own handlers keep
 	// running throughout, and past the hold ceiling the cast no longer
-	// blocks them either.
+	// blocks them either. Silent, like SpawnPet's own re-check.
 	if _, ok := link.world.Summon(live.ObjectID()); ok {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return
 	}
 
@@ -401,21 +399,9 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	// A pet restore still in flight owns the slot even though world.Summon
 	// cannot show it yet: past the hold ceiling this cast could otherwise
 	// take the slot and the inbound pet would be dropped at
-	// spawnRestoredPet's re-check.
-	//
-	// This is the servitor path's only restoringSummon gate, and it is
-	// deliberately asymmetric with the two item branches, which each also
-	// reject before their cast starts (summon_item_use.go:69,111). The
-	// reference rejects all three in the same place — PlayableAI.thinkCast
-	// goes idle on isCastingNow() (PlayableAI.java:82-86), so no SUMMON
-	// cast starts while its read is running — and rejecting only here costs
-	// the caster real resources: Controller.Start has already destroyed the
-	// skill's ItemConsumeID stack and Controller.Hit has already taken the
-	// MP by the time this runs. Both are real for SUMMON skills (1225
-	// Summon Mew the Cat: itemConsumeId 1458, mpConsume 31-109). Closing it
-	// needs a pre-cast gate on the generic cast entry plus a decision on
-	// what that rejection answers, which the reference makes silently
-	// through an AI intention rather than a packet — tracked as #2412.
+	// spawnRestoredPet's re-check. handleMagicSkillUse already refuses to
+	// start a servitor cast in that window, so this is a backstop for a cast
+	// that began before the read did.
 	if link.hasActiveSummon(live) || link.restoringSummon(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return false

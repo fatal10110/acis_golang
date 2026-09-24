@@ -43,6 +43,15 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		sendMagicActionFailed(live)
 		return
 	}
+	// A pets-row read still in flight stands in for a cast the caster is
+	// still in, whether or not its hold already ended. A servitor cast started
+	// there would pay its item and MP, only to lose the slot to the inbound
+	// pet at hit, so it is refused the way an already-casting caster is: an
+	// ActionFailed with no reason.
+	if known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
+		sendMagicActionFailed(live)
+		return
+	}
 
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	controller := l.castController(live)
