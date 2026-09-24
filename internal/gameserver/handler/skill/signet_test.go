@@ -299,13 +299,19 @@ func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
 	}
 }
 
+// signetFakePlayerCaster is a signetFakeCaster of player kind, the only
+// kind whose picked ground point a ground-targeted signet spawns at.
+type signetFakePlayerCaster struct{ *signetFakeCaster }
+
+func (signetFakePlayerCaster) Kind() actor.Kind { return actor.KindPlayer }
+
 func TestSignetSpawnsAtGroundTarget(t *testing.T) {
 	h, state, _ := newTestSignetHandler(nil)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	h.queues = caster.clock
 	caster.gx, caster.gy, caster.gz = 300, 400, 50
 
-	h.Use(Cast{Caster: caster, Skill: modelskill.Definition{
+	h.Use(Cast{Caster: signetFakePlayerCaster{caster}, Skill: modelskill.Definition{
 		ID: 454, Level: 1, SkillType: "SIGNET", Target: modelskill.TargetGround,
 		EffectNpcID: 13018, Effects: []modelskill.EffectTemplate{{Name: "Signet", Count: 1, Time: 1}},
 	}})
