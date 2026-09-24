@@ -139,9 +139,9 @@ func TestWyvernCollarMountsPlayer(t *testing.T) {
 }
 
 // TestUnsummonShortcutDismissesServitor casts a servitor SUMMON skill on a
-// fresh session (no pet collar used first) and presses the unsummon
-// shortcut: the owner gets PetDelete, and both the owner's summon slot and
-// the object registry drop the servitor.
+// fresh session (no pet collar used first): the owner gets the servitor's
+// PetInfo. The unsummon shortcut then sends PetDelete, and both the owner's
+// summon slot and the object registry drop the servitor.
 func TestUnsummonShortcutDismissesServitor(t *testing.T) {
 	t.Parallel()
 	const (
@@ -177,7 +177,9 @@ func TestUnsummonShortcutDismissesServitor(t *testing.T) {
 		}
 		return ok
 	})
-	drainUntilQuiet(t, c)
+	if !sawServitorPetInfo(drainFrames(t, c), servitor.ObjectID()) {
+		t.Fatalf("spawn burst carried no servitor PetInfo for %d", servitor.ObjectID())
+	}
 
 	// Despawn sends PetDelete before it clears the object registry; the
 	// harness read returns only once the server has finished the request.
@@ -200,4 +202,19 @@ func encodeRequestMagicSkillUse(skillID int32) []byte {
 	w.WriteInt32(0) // ctrl
 	w.WriteUint8(0) // shift
 	return w.Bytes()
+}
+
+// sawServitorPetInfo reports whether frames hold a servitor (summon type 1)
+// PetInfo for objectID.
+func sawServitorPetInfo(frames [][]byte, objectID int32) bool {
+	for _, frame := range frames {
+		if len(frame) == 0 || frame[0] != serverpackets.OpcodePetInfo {
+			continue
+		}
+		r := wire.NewReader(frame[1:])
+		if r.ReadInt32() == 1 && r.ReadInt32() == objectID {
+			return true
+		}
+	}
+	return false
 }
