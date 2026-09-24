@@ -19,6 +19,7 @@ const slowStoreDelay = 120 * time.Millisecond
 // packets come back at memory speed, the watchdog logs nothing, and the rows
 // land once the worker drains.
 func TestSlowItemStoreKeepsQueuesFree(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCapturedLog(),
 		gameservertest.WithSlowStores(slowStoreDelay),

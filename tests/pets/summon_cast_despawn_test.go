@@ -78,6 +78,7 @@ func startWolfStrike(t *testing.T, h *petWorld) {
 // TestPetStrikeLandsOnTarget is the control for the despawn scenario below:
 // left alone, the same strike reaches its hit and drops the monster's HP.
 func TestPetStrikeLandsOnTarget(t *testing.T) {
+	t.Parallel()
 	h, _, hostile := bootWolfStriker(t)
 	startWolfStrike(t, h)
 	h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
@@ -94,6 +95,7 @@ func TestPetStrikeLandsOnTarget(t *testing.T) {
 // that order, before the hit is ever armed. Parking would block the driven
 // clock's single runner, hence the two paths.
 func TestPetDespawnedBetweenLaunchAndHitLandsNothing(t *testing.T) {
+	t.Parallel()
 	h, petActor, hostile := bootWolfStriker(t)
 	q := petActor.Queue()
 	if q == nil {

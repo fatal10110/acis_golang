@@ -17,6 +17,7 @@ import (
 // player's. The player's logout drives the deactivation; the effect's exit
 // hook runs inside the reset and reports which queue it ran on.
 func TestRegionDeactivationResetsHostileOnItsQueue(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

@@ -253,58 +253,83 @@ var schemaStmts = []string{
 	sevenSignsStatusSchema, sevenSignsStatusSeed,
 }
 
+type pooledDB struct {
+	db   *sql.DB
+	name string
+}
+
 var (
-	sharedOnce   sync.Once
-	sharedDB     *sql.DB
-	sharedDBName string
-	sharedErr    error
+	sharedMu   sync.Mutex
+	sharedFree []*sql.DB
+	sharedAll  []pooledDB
+	sharedHeld = map[testing.TB]*sql.DB{}
 )
 
-// SharedDB returns a MariaDB pool shared by every test in the current test
-// binary, backed by one database on the shared instance (Go compiles each
-// package's tests into its own binary, so the sync.Once below fires exactly
-// once per package). The package's TestMain must call Main so the database
-// is dropped once, after every test in the package has run, instead of
-// leaking for cleanup.
-//
-// Each caller gets the tables truncated after its own test via tb.Cleanup,
-// so tests don't see rows left behind by earlier tests in the package.
+// SharedDB returns a MariaDB pool for tb, backed by a database on the shared
+// instance. Databases are pooled per test binary: a test checks one out and
+// returns it, truncated, when it completes, so parallel tests each hold their
+// own database while sequential tests reuse one. Repeated calls from the
+// same test return the same database; a t.Run subtest is a different test
+// and gets a different database from its parent. The package's TestMain must call Main
+// so every pooled database is dropped once, after the package's tests.
 func SharedDB(tb testing.TB) *sql.DB {
 	tb.Helper()
-	sharedOnce.Do(func() {
-		sharedDBName = dbtest.NewName()
-		sharedDB, sharedErr = dbtest.Open(context.Background(), sharedDBName, schemaStmts...)
-	})
-	if sharedErr != nil {
-		tb.Fatalf("shared mariadb db: %v", sharedErr)
+	sharedMu.Lock()
+	if db, ok := sharedHeld[tb]; ok {
+		sharedMu.Unlock()
+		return db
 	}
+	var db *sql.DB
+	if n := len(sharedFree); n > 0 {
+		db = sharedFree[n-1]
+		sharedFree = sharedFree[:n-1]
+	}
+	sharedMu.Unlock()
+
+	if db == nil {
+		name := dbtest.NewName()
+		opened, err := dbtest.Open(context.Background(), name, schemaStmts...)
+		if err != nil {
+			tb.Fatalf("shared mariadb db: %v", err)
+		}
+		db = opened
+		sharedMu.Lock()
+		sharedAll = append(sharedAll, pooledDB{db: db, name: name})
+		sharedMu.Unlock()
+	}
+	sharedMu.Lock()
+	sharedHeld[tb] = db
+	sharedMu.Unlock()
 
 	tb.Cleanup(func() {
 		ctx := context.Background()
 		for _, table := range sharedTables {
-			if _, err := sharedDB.ExecContext(ctx, "TRUNCATE TABLE `"+table+"`"); err != nil {
+			if _, err := db.ExecContext(ctx, "TRUNCATE TABLE `"+table+"`"); err != nil {
 				tb.Fatalf("truncate %s: %v", table, err)
 			}
 			if seed, ok := sharedReseeds[table]; ok {
-				if _, err := sharedDB.ExecContext(ctx, seed); err != nil {
+				if _, err := db.ExecContext(ctx, seed); err != nil {
 					tb.Fatalf("reseed %s: %v", table, err)
 				}
 			}
 		}
+		sharedMu.Lock()
+		delete(sharedHeld, tb)
+		sharedFree = append(sharedFree, db)
+		sharedMu.Unlock()
 	})
-	return sharedDB
+	return db
 }
 
-// Main runs a package's tests and drops the SharedDB database afterward, if
-// one was created. Every package using SharedDB must call it from a
-// TestMain:
+// Main runs a package's tests and drops every SharedDB database afterward.
+// Every package using SharedDB must call it from a TestMain:
 //
 //	func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
 func Main(m *testing.M) int {
 	code := m.Run()
-	if sharedDB != nil {
-		sharedDB.Close()
-		dbtest.Drop(sharedDBName)
+	for _, p := range sharedAll {
+		p.db.Close()
+		dbtest.Drop(p.name)
 	}
 	return code
 }

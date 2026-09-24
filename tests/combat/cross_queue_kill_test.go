@@ -24,6 +24,7 @@ type killableVictim interface {
 // on the worker pool the two queues update the killer at the same time; every
 // kill must still count.
 func TestPKCountersSurviveKillsOnTwoQueues(t *testing.T) {
+	t.Parallel()
 	const rounds = 25
 
 	srv := gameservertest.Boot(t,

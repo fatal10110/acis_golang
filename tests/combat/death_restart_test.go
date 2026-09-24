@@ -78,6 +78,7 @@ func abs(v int) int {
 // player selecting a restart point is revived (revive broadcast on the wire),
 // teleported to the nearest town point, and stands back up alive.
 func TestRestartPointRevivesDeadPlayer(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -106,6 +107,7 @@ func TestRestartPointRevivesDeadPlayer(t *testing.T) {
 // TestKarmaRestartsAtChaosPoint pins the karma branch of the same flow: a
 // karma-positive player's restart resolves to the chaotic list.
 func TestKarmaRestartsAtChaosPoint(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSeed(seedKarmaCharacter(240)),

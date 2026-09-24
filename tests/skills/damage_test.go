@@ -66,6 +66,7 @@ func targetHostile(t *testing.T, c *testsupport.ScriptedClient, hostileID int32)
 // its target, and the monster's health drops. Exact damage numbers stay
 // with the formula core tests; here only the drain is pinned.
 func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -101,6 +102,7 @@ func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
 // but its stun is held by the caster while retaining the struck actor as the
 // effect's affected participant.
 func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Tyrant", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -148,6 +150,7 @@ func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
 // the fixture monster and verifies each production effect sweep drains more
 // health until the effect's count runs out.
 func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -195,6 +198,7 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 // damage itself lands, and the caster's own client receives the
 // resisted-your-skill system message naming the target and the skill.
 func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -274,6 +278,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 // follows the half-damage branch: the caster receives ATTACK_FAILED and
 // the monster still loses HP.
 func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -424,6 +429,7 @@ func findSystemMessage(t *testing.T, c *testsupport.ScriptedClient, wantID int32
 // pair: the caster gets ATTACK_FAILED, the target gets RESISTED_S1_MAGIC,
 // and HP still drops by the failed amount.
 func TestSignetMDamHalfFailureSendsResistMessages(t *testing.T) {
+	t.Parallel()
 	srv, c, vc, objID, victimID := bootSignetMDamPair(t)
 	magicRolls := 0
 	setCasterMagicRolls(t, srv, objID, func() int {
@@ -456,6 +462,7 @@ func TestSignetMDamHalfFailureSendsResistMessages(t *testing.T) {
 // magic-success rolls forced to fail: the caster gets S1_RESISTED_YOUR_S2
 // naming the victim, and HP still drops.
 func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
+	t.Parallel()
 	srv, c, vc, objID, victimID := bootSignetMDamPair(t)
 	setCasterMagicRolls(t, srv, objID, func() int { return 0 })
 
@@ -505,6 +512,7 @@ func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
 // message's first parameter, because the reference builds it from the target
 // creature's name unconditionally rather than gating on a non-empty name.
 func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -556,6 +564,7 @@ func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
 // damageBlocked short circuit, so it reaches ReduceHPByDOT even when the
 // target is invulnerable. Issue #2328.
 func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -602,6 +611,7 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 // ResolvePhysicalSkillInput return ok=false, so pdamHandler never called
 // ReduceHP at all and no hate registered.
 func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -641,6 +651,7 @@ func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 // TestPdamOnInvulnerableNPCRegistersHateWithoutDamage: same fix, same
 // damageBlocked call site inside ResolveMagicDamageInput.
 func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -682,6 +693,7 @@ func TestMdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 // signal to wait on here — Manadam.java never calls reduceCurrentHp — so
 // this only pins the MP side: an invulnerable NPC target loses no MP.
 func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -726,6 +738,7 @@ func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
 // calcManaDam never call canGiveDamage() on the attacker, so a caster whose
 // access level forbids dealing damage still drains MP with a MANADAM skill.
 func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Mage", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -774,6 +787,7 @@ func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
 // the spawned point's list must be registered with that ticker, or its
 // driving effect never expires and the point stays in world forever.
 func TestSignetPointExpiresThroughTheEffectTicker(t *testing.T) {
+	t.Parallel()
 	def := modelskill.Definition{
 		ID: 454, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,

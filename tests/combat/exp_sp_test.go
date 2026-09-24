@@ -87,6 +87,7 @@ func readExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {
 // TestKillNPCPaysExpAndSp walks the reward chain end to end: killing the
 // monster reports the exact awarded amounts on the wire and persists them.
 func TestKillNPCPaysExpAndSp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -131,6 +132,7 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 // a reward that crosses a threshold announces the new level and re-derives
 // the character's SkillList.
 func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -185,6 +187,7 @@ func overhitKillSkillDefs() []modelskill.Definition {
 // arrives before the exp/SP gain, XP includes the 25% cap bonus, SP is
 // unchanged from the non-overhit share.
 func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

@@ -14,6 +14,7 @@ import (
 // forceWalkStance before the home move: observers receive ChangeMoveType
 // (walk) immediately followed by MoveToLocation.
 func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -40,6 +41,7 @@ func TestReturnHomeBroadcastsWalkThenMove(t *testing.T) {
 // AI task, so the first TickThink is cycle 0 and must stay idle. Arrival
 // at spawn idles (SiegeGuard does not idle-wander).
 func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

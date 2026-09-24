@@ -59,6 +59,7 @@ func onNPCQueue(t *testing.T, hostile *npc.Hostile, fn func()) {
 // survives the payment, and the monster does not enter its own threat
 // table.
 func TestNPCHPCostDoesNotWakeOrAggroCaster(t *testing.T) {
+	t.Parallel()
 	srv, hostile, cast := bootNPCCostCaster(t)
 	onNPCQueue(t, hostile, func() {
 		hostile.EffectList().Add(&effect.Effect{
@@ -92,6 +93,7 @@ func TestNPCHPCostDoesNotWakeOrAggroCaster(t *testing.T) {
 // with HP above its cost, so the monster loses the difference and turns
 // invulnerable while the cast is in flight.
 func TestInvulNPCPaysLethalHPCostAndDies(t *testing.T) {
+	t.Parallel()
 	srv, hostile, cast := bootNPCCostCaster(t)
 	onNPCQueue(t, hostile, func() { hostile.SetHP(npcHPCost + 1) })
 	drainUntilQuiet(t, srv.Client)
@@ -115,6 +117,7 @@ func TestInvulNPCPaysLethalHPCostAndDies(t *testing.T) {
 // cost, so the overhit check stores the monster itself over the player who
 // armed it, and that player no longer qualifies for the overhit bonus.
 func TestNPCLethalHPCostReplacesPlayerOverhit(t *testing.T) {
+	t.Parallel()
 	srv, hostile, cast := bootNPCCostCaster(t)
 	obj, ok := srv.State.Player(srv.SoleObjectID(t))
 	if !ok {

@@ -23,6 +23,7 @@ const slowStoreDelay = 120 * time.Millisecond
 // goroutine that is already waiting — so a pets table slower than the sim
 // pool's slow-task budget stalls neither the queue nor the client's replies.
 func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithCapturedLog(),
 		gameservertest.WithRealPool(), // the slow-task watchdog runs only on the pool
@@ -65,6 +66,7 @@ func TestSlowPetStoreKeepsQueuesFree(t *testing.T) {
 // gone (SummonCreature.java:34-41), and a pet built from a destroyed collar
 // would keep answering to a pets row nobody holds.
 func TestSummonDropsCollarDestroyedDuringRestore(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 
 	release := h.useCollarRestoreHeld(t)
@@ -128,6 +130,7 @@ func assertNotSystemMessage(t *testing.T, frame []byte, messageID int) {
 // caster is in its cast across the identical read: the hold reproduces that
 // rather than adding waiting of its own.
 func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 
 	release := h.useCollarRestoreHeld(t)
@@ -186,6 +189,7 @@ func TestFirstSummonSpawnPrecedesCastFinish(t *testing.T) {
 // owner and leave the arriving pet on a mounted player, a state no
 // reference path reaches.
 func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 	wyvernCollar := h.seeded[wyvernCollarID][0]
 
@@ -229,6 +233,7 @@ func TestWyvernMountRejectedWhileSummonRestoreInFlight(t *testing.T) {
 // (SummonItems.java:36-45 checks isCastingNow() before the summon slot) —
 // see TestWyvernMountRejectedWhileSummonRestoreInFlight.
 func TestAutoSoulShotRejectedDuringRestore(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: beastSoulshotID, Count: 10})
 
 	release := h.useCollarRestoreHeld(t)
@@ -340,6 +345,7 @@ func (h *petWorld) passHoldCeiling(t *testing.T) {
 // responsive, so the cast completes first and the pet lands afterwards, as
 // it did before the hold existed.
 func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 
 	release := h.useCollarRestoreHeld(t)
@@ -360,6 +366,7 @@ func TestSummonHoldReleasesAtItsCeiling(t *testing.T) {
 // slot explicitly for as long as the restore is in flight, ceiling or not,
 // or the owner ends up mounted with a pet arriving beside them.
 func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: wyvernCollarID, Count: 1})
 	wyvernCollar := h.seeded[wyvernCollarID][0]
 
@@ -392,6 +399,7 @@ func TestWyvernMountRejectedAfterHoldCeiling(t *testing.T) {
 // rejects broadcasts MagicSkillUse and MagicSkillLaunched to everyone nearby
 // before answering, which the reference never sends here.
 func TestSecondCollarSilentAfterHoldCeiling(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 
 	release := h.useCollarRestoreHeld(t)

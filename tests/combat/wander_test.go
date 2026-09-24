@@ -34,6 +34,7 @@ func tickThinkWander(t *testing.T, h interface{ TickThink() error }) {
 // first idle step: walk stance, then a MoveToLocation offset from the spawn
 // home (offset = walk speed * 3) on each axis.
 func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -67,6 +68,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 // territory so the private is treated as in-territory even after leaving
 // its own spawn point.
 func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -106,6 +108,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 // pull the private out of territory. The private keeps wandering around
 // its current XY even when both actors are far from spawn home.
 func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -141,6 +144,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 // consumer: a private 500 off its own spawn still gets the 300 opening
 // hate while its living master is in territory.
 func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -165,6 +169,7 @@ func TestMinionOpeningHateUsesMasterTerritory(t *testing.T) {
 // TestGuardDoesNotIdleWander pins hold-position kinds: a Guard with an empty
 // desire queue stays idle instead of rolling a random walk.
 func TestGuardDoesNotIdleWander(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -191,6 +196,7 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 // cycle after that promotes wander. lastDesire is still wander, so
 // thinkWander arms the timer instead of MoveFromSpawnUsingRandomOffset.
 func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
+	t.Parallel()
 	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
 		hostile.AI().Arrived()
 	})
@@ -199,6 +205,7 @@ func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
 // TestIdleHostileWanderArrivedBlockedClearsDesire pins
 // NpcAI.onEvtArrivedBlocked: a blocked wander step also drops WANDER.
 func TestIdleHostileWanderArrivedBlockedClearsDesire(t *testing.T) {
+	t.Parallel()
 	assertWanderArrivalClearsDesire(t, func(hostile *hostileHandle) {
 		hostile.AI().ArrivedBlocked()
 	})
@@ -270,6 +277,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 // sample: a maker NPC's wander destination stays inside the maker polygon
 // and is an offset sample, not the triangle-center fallback.
 func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -313,6 +321,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 // it, so the destination is the geo-validated triangle centroid
 // (55+65+60)/3, (15+15+28)/3.
 func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -344,6 +353,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 // is a no-op (inside 2D drift) and random walk is skipped, so intention
 // drops to idle and the wander desire leaves the queue.
 func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

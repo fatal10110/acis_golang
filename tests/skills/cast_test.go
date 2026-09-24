@@ -82,6 +82,7 @@ type clientReader interface {
 // since the reference never answers a SkillCoolTime request: the client
 // learns remaining reuse from unsolicited pushes, not queries.
 func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -121,6 +122,7 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 // the recast must answer with the prepared-for-reuse message and leave the
 // walk's StopMove unsent.
 func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -160,6 +162,7 @@ func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
 // skill before arrival. The live RequestMagicSkillUse path must stop that
 // walk and store a heading toward the non-self target before MagicSkillUse.
 func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
+	t.Parallel()
 	const skillID = 4
 	defs := []modelskill.Definition{
 		{
@@ -234,6 +237,7 @@ func playerHeading(t *testing.T, srv *gameservertest.Server, objID int32) int {
 }
 
 func TestCastSkillMasteryCooldownBypass(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name      string
 		skillType string
@@ -297,6 +301,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 // TestCastRejectedInsufficientMP verifies a caster without the MP pays
 // nothing: the not-enough-MP message and no cast starts.
 func TestCastRejectedInsufficientMP(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -320,6 +325,7 @@ func TestCastRejectedInsufficientMP(t *testing.T) {
 }
 
 func TestSelfCubicCastRejectsWhenListIsFull(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -350,6 +356,7 @@ func TestSelfCubicCastRejectsWhenListIsFull(t *testing.T) {
 }
 
 func TestCastItemConsumeShortageNamesSkill(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -371,6 +378,7 @@ func TestCastItemConsumeShortageNamesSkill(t *testing.T) {
 // branch: the cast walks through ValidateLocation, lands the buff on the
 // caster (icon visible in AbnormalStatusUpdate), and charges MP.
 func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -412,6 +420,7 @@ func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
 // GROUND maybeMoveToLocation approach walk, so the recast must answer with
 // the prepared-for-reuse message and never start a MoveToLocation approach.
 func TestGroundCastReuseRejectionDoesNotStartApproachWalk(t *testing.T) {
+	t.Parallel()
 	const skillID = 5
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -454,6 +463,7 @@ func TestGroundCastReuseRejectionDoesNotStartApproachWalk(t *testing.T) {
 // PlayerCast.canAttemptCast (PlayerCast.java:224) rejects this silently:
 // no system message, no movement, no cast.
 func TestGroundCastWithUnsetSignetIsRejectedSilently(t *testing.T) {
+	t.Parallel()
 	const skillID = 5
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -489,6 +499,7 @@ func TestGroundCastWithUnsetSignetIsRejectedSilently(t *testing.T) {
 // before arrival. StopMove must land with the pre-face heading, then
 // ValidateLocation faces the signet.
 func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
+	t.Parallel()
 	const skillID = 5
 	const groundX, groundY, groundZ = 1000, 2000, 300
 	srv := gameservertest.Boot(t,
@@ -541,6 +552,7 @@ func (blindGeo) CanSeeActor(int, int, int, float64, int, int, int, float64) bool
 // click behind terrain still emits CANT_SEE_TARGET then ActionFailed, instead
 // of collapsing to a bare ActionFailed via the nil-target path.
 func TestGroundCastNoLineOfSightSendsCantSeeTarget(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -567,6 +579,7 @@ func TestGroundCastNoLineOfSightSendsCantSeeTarget(t *testing.T) {
 // TestGroundCastShiftOutOfRangeRejected verifies the shift-click variant
 // refuses a ground point beyond cast range with the target-too-far message.
 func TestGroundCastShiftOutOfRangeRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -592,6 +605,7 @@ func TestGroundCastShiftOutOfRangeRejected(t *testing.T) {
 // packet stays silent for a non-ground skill and for an unlearned skill id,
 // matching the reference's silent drops.
 func TestGroundCastIgnoresNonGroundAndUnknownSkill(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -627,6 +641,7 @@ func TestGroundCastIgnoresNonGroundAndUnknownSkill(t *testing.T) {
 // directions answer with only the instantaneous MagicSkillUse ack plus the
 // icon refresh — no message, cast bar, or launch report.
 func TestToggleActivatesThenDeactivates(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -674,6 +689,7 @@ func TestToggleActivatesThenDeactivates(t *testing.T) {
 // hook. Activating a toggle mid-walk must broadcast StopMove before the
 // instantaneous MagicSkillUse ack.
 func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
+	t.Parallel()
 	const skillID = 288
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -714,6 +730,7 @@ func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
 // toggle on cooldown must keep walking, not get halted by a press that
 // itself did nothing.
 func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
+	t.Parallel()
 	const blockerSkillID, toggleSkillID = 21, 288
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -758,6 +775,7 @@ func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
 // cannot afford still broadcasts its instant ack, then the cost-failure
 // message, the cast-cancel broadcast, and the pending-action release.
 func TestToggleCostFailureBroadcastsCastAbort(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -806,6 +824,7 @@ func skillCase(skillID int32) string {
 // this cost; paying it must run the full death sequence instead of leaving
 // the caster alive at 0 HP while the hit runs on to completion.
 func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
+	t.Parallel()
 	castLethalHPConsume(t, 0)
 }
 
@@ -818,6 +837,7 @@ func TestExactlyLethalHPConsumeKillsCaster(t *testing.T) {
 // half-integers at most level bands and TickRegen writes the scaled result
 // straight into current HP.
 func TestFractionallyLethalHPConsumeKillsCaster(t *testing.T) {
+	t.Parallel()
 	castLethalHPConsume(t, 0.4)
 }
 
@@ -925,6 +945,7 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 // doDie -> abortAll(true) -> stop() with the cast still in flight. The
 // client therefore sees MagicSkillUse, then MagicSkillCanceled, then Die.
 func TestLethalToggleHPConsumeAbortsAndKillsCaster(t *testing.T) {
+	t.Parallel()
 	const skillID, hpConsume = 292, 10
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Caster", 5, 0),

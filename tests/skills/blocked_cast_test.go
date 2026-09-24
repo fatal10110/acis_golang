@@ -14,6 +14,7 @@ import (
 // blocked-arrival arm: DIST_TOO_FAR_CASTING_STOPPED (748) then the base
 // same-cell MoveToLocation correction.
 func TestBlockedCastSendsDistTooFarThenMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	srv := bootBlockedGroundCast(t, geo)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -42,6 +43,7 @@ func TestBlockedCastSendsDistTooFarThenMoveToLocation(t *testing.T) {
 // client walk replaces the parked CAST slot: blocked arrival is MOVE_TO
 // (same-cell MoveToLocation only), not DIST_TOO_FAR_CASTING_STOPPED.
 func TestBlockedWalkAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	srv := bootBlockedGroundCast(t, geo)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -76,6 +78,7 @@ func TestBlockedWalkAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
 // arrival is PICK_UP (same-cell MoveToLocation only), not
 // DIST_TOO_FAR_CASTING_STOPPED.
 func TestBlockedPickupAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	srv := bootBlockedGroundCast(t, geo)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -116,6 +119,7 @@ func TestBlockedPickupAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
 // attack chase replaces the parked CAST slot: blocked arrival is ATTACK
 // (same-cell MoveToLocation only), not DIST_TOO_FAR_CASTING_STOPPED.
 func TestBlockedAttackAfterGroundCastBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	srv := bootBlockedGroundCast(t, geo)
 	c, objID := srv.Client, srv.SoleObjectID(t)

@@ -13,6 +13,7 @@ import (
 // the cast — MagicSkillCanceled followed by ActionFailed — and no launch
 // ever goes out, instead of the not-casting clear-target reply.
 func TestTargetCancelAbortsCastInsideInterruptWindow(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

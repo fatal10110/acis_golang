@@ -23,6 +23,7 @@ import (
 // implementation that ordered on object id alone would keep it last; ordering
 // on entry time moves it to the front.
 func TestItemListOrdersByEntryTimeThenObjectID(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

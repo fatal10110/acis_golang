@@ -22,6 +22,7 @@ import (
 // RequestUnEquipItem and requires the inventory slot restore in both the
 // packet stream and the items row.
 func TestEquipUnequipRoundTrip(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -58,6 +59,7 @@ func TestEquipUnequipRoundTrip(t *testing.T) {
 // a plain item answers S1_DISARMED while an enchanted one answers
 // EQUIPMENT_S1_S2_REMOVED carrying the enchant level and item name.
 func TestUnequipMessageReflectsEnchantLevel(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		enchant    int32
@@ -121,6 +123,7 @@ func TestUnequipMessageReflectsEnchantLevel(t *testing.T) {
 // TestUnequipEmptySlotIsRejected pins RequestUnEquipItem against an empty
 // paperdoll slot: only ActionFailed answers.
 func TestUnequipEmptySlotIsRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	startInWorld(t, c)
@@ -136,6 +139,7 @@ func TestUnequipEmptySlotIsRejected(t *testing.T) {
 // unequipping, while destroy and crystallize stay reachable — matching the
 // reference's per-operation gates.
 func TestDeadPlayerItemGates(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -201,6 +205,7 @@ func TestDeadPlayerItemGates(t *testing.T) {
 // beyond drop range answer CannotDiscardDistanceTooFar and nothing leaves
 // the inventory.
 func TestDropFarCoordinatesRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -220,6 +225,7 @@ func TestDropFarCoordinatesRejected(t *testing.T) {
 // when a player equips a weapon, every client that knows them receives a
 // CharInfo refresh.
 func TestEquipBroadcastsCharInfoToObservers(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -252,6 +258,7 @@ func TestEquipBroadcastsCharInfoToObservers(t *testing.T) {
 // wire: a zero count and a count above the held stack each answer
 // CANNOT_DESTROY_NUMBER_INCORRECT and change nothing.
 func TestDestroyCountGates(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -271,6 +278,7 @@ func TestDestroyCountGates(t *testing.T) {
 // TestUnequipDuringCastIsRejected pins the casting gate: unequipping while
 // mid-cast answers S1_CANNOT_BE_USED instead of applying.
 func TestUnequipDuringCastIsRejected(t *testing.T) {
+	t.Parallel()
 	db := sqltest.SharedDB(t)
 	store := gamesql.NewSkillSaveStore(db)
 	known := gamesql.NewCharacterSkillStore(db)

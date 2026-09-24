@@ -17,6 +17,7 @@ func partyParams(partyType int) *commons.StatSet {
 }
 
 func TestMinionAssistsMasterOnCombatDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -42,6 +43,7 @@ func TestMinionAssistsMasterOnCombatDamage(t *testing.T) {
 }
 
 func TestPartyPrivateFollowsMasterWhenIdle(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -82,6 +84,7 @@ func liveCombatant(t *testing.T, srv *gameservertest.Server) attackable.Combatan
 }
 
 func TestStationaryMinionHoldsAttackWhenPlayerInRange(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -113,6 +116,7 @@ func TestStationaryMinionHoldsAttackWhenPlayerInRange(t *testing.T) {
 }
 
 func TestStationaryMinionDropsAttackWhenPlayerOutOfRange(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

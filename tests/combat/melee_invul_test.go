@@ -79,6 +79,7 @@ func assertLandedDamagingHit(t *testing.T, frame []byte, targetID int32) int32 {
 // non-lethally, so the invul tests' "HP unchanged" is proven to mean the
 // guard blocked a real hit rather than a miss or a zero-damage roll.
 func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -111,6 +112,7 @@ func TestNonInvulnerablePlayerTakesMeleeDamage(t *testing.T) {
 // Attack frame itself still goes out (PlayerStatus never suppresses the
 // swing, only its damage).
 func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -140,6 +142,7 @@ func TestInvulnerablePlayerTakesNoMeleeDamage(t *testing.T) {
 // restart-point teleport rather than SetInvul directly, driven through a
 // real NPC auto-attack.
 func TestSpawnProtectedPlayerTakesNoMeleeDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -183,6 +186,7 @@ func (a deniedDamageAttacker) ObjectID() int32   { return a.objID }
 // (:136-140), so a hit from a damage-denied attacker still stands the
 // player up even though it deals no damage.
 func TestNoDamagePermissionAttackerStillWakesSeatedPlayer(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -213,6 +217,7 @@ func TestNoDamagePermissionAttackerStillWakesSeatedPlayer(t *testing.T) {
 // unconditionally one layer above the invul guard — the NPC still aggroes
 // on the attacker.
 func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -244,6 +249,7 @@ func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 // even to a live target, but — same Npc.reduceCurrentHp layering as
 // above — the NPC still aggroes on the attacker.
 func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

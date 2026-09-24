@@ -61,6 +61,7 @@ func bindSkillShortcut(t *testing.T, srv *gameservertest.Server, objID, slot, sk
 // that learning without the book is rejected with the item-missing message
 // while the trainer list keeps offering the skill.
 func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t, append(generalLearnOpts(t, 50),
 		gameservertest.WithSpellbooks(bookPolicy(t, 3)))...)
 	startInWorld(t, c)
@@ -102,6 +103,7 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 // character_skills row, and the shortcut bound to the skill re-pointed at
 // the newly learned level.
 func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t, generalLearnOpts(t, 50)...)
 	bindSkillShortcut(t, srv, objID, 3, 3, -1)
 	startInWorld(t, c)
@@ -131,6 +133,7 @@ func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
 // the not-enough-SP message and an unchanged trainer list, and nothing is
 // persisted.
 func TestLearnSkillRejectsInsufficientSP(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t, generalLearnOpts(t, 49)...)
 	startInWorld(t, c)
 
@@ -159,6 +162,7 @@ func TestLearnSkillRejectsInsufficientSP(t *testing.T) {
 // requirement type 4), learning consumes the required items, syncs the
 // storage cap, and persists the skill.
 func TestFishingSkillTreeGating(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t,
 		gameservertest.WithCharacter("Newbie", 5, 50),
 		gameservertest.WithWantChars(1),
@@ -213,6 +217,7 @@ func TestFishingSkillTreeGating(t *testing.T) {
 // fishing item gets the item-missing message and a fishing trainer list,
 // and nothing is learned or persisted.
 func TestFishingSkillTreeRejectsMissingItem(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t,
 		gameservertest.WithCharacter("Newbie", 5, 50),
 		gameservertest.WithWantChars(1),

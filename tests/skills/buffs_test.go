@@ -17,6 +17,7 @@ import (
 // remaining duration, and the production effect sweep retires it on time,
 // clearing the icon list.
 func TestBuffIconPersistsUntilExpiry(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -60,6 +61,7 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 // chance still plays the cast (ack, use message, launch report) but answers
 // with the attack-failed message and applies nothing.
 func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -88,6 +90,7 @@ func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
 // an invulnerable monster: the cast still plays, AttackFailed stays silent
 // (the land roll succeeded), and the NPC receives no effect.
 func TestDebuffDoesNotLandOnInvulnerableNPC(t *testing.T) {
+	t.Parallel()
 	srv, c, _ := bootOneShotDebuff(t, 6)
 	hostile := srv.SpawnHostileNPC(t)
 	hostile.SetInvul(true)
@@ -111,6 +114,7 @@ func TestDebuffDoesNotLandOnInvulnerableNPC(t *testing.T) {
 // sibling of invulnerability: a caster forbidden to deal damage still
 // completes the cast without AttackFailed, but the debuff does not apply.
 func TestDebuffDoesNotLandWhenCasterCannotGiveDamage(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootOneShotDebuff(t, 7)
 	denyCasterDamage(t, srv, objID)
 	hostile := srv.SpawnHostileNPC(t)
@@ -186,6 +190,7 @@ func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
 // further casts get ActionFailed only — no reason message — and walk
 // requests are released with ActionFailed too.
 func TestStunBlocksCastingAndMovement(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -281,6 +286,7 @@ func liveMaxBuffCount(t *testing.T, srv *gameservertest.Server, objID int32) int
 // MaxBuffsAmount value is the live buff-slot cap when Divine Inspiration
 // is unknown: a third slot-family buff evicts the oldest at cap 2.
 func TestBuffSlotCapUsesMaxBuffsAmount(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -314,6 +320,7 @@ func TestBuffSlotCapUsesMaxBuffsAmount(t *testing.T) {
 // (skill 1405) raises the live cap by its skill level: at MaxBuffsAmount 2
 // plus level 1, three slot-family buffs fit and the fourth evicts the oldest.
 func TestDivineInspirationAddsBuffSlots(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -381,6 +388,7 @@ func liveHeldSkillIDs(t *testing.T, srv *gameservertest.Server, objID int32) []i
 // CancelLesserEffect=True behavior: a stronger same-stack buff removes the
 // weaker one from the held list, so only the stronger icon remains.
 func TestStackedStrongerBuffCancelsLesserByDefault(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -408,6 +416,7 @@ func TestStackedStrongerBuffCancelsLesserByDefault(t *testing.T) {
 // the weaker same-stack buff stays queued, so when the stronger expires the
 // weaker icon returns.
 func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
+	// Not parallel: WithCancelLesserEffect(false) flips a process-wide switch.
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -445,6 +454,7 @@ func TestStackedLesserSurvivesWhenCancelLesserDisabled(t *testing.T) {
 // visible list, so a buff victim of a debuff newcomer stays held, inactive
 // and icon-less, until it wears off on its own with S1_HAS_WORN_OFF.
 func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
+	t.Parallel()
 	blocker := modelskill.Definition{
 		ID: 301, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,
@@ -493,6 +503,7 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 // touches the visible list. The victim is never released by its own
 // schedule: it stays held, inactive, until relog.
 func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
+	t.Parallel()
 	blocker := modelskill.Definition{
 		ID: 302, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,
@@ -538,6 +549,7 @@ func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 // seeing the held victim's stack type and a later same-type cast wrongly
 // evicts an unrelated buff-slot buff instead of just cancelling itself.
 func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
+	t.Parallel()
 	blocker := modelskill.Definition{
 		ID: 306, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,

@@ -18,6 +18,7 @@ import (
 // animation: known recipients get AutoAttackStop for the owner and for the
 // summon, matching the reference timeout's summon broadcast.
 func TestAttackStanceTimeoutBroadcastsSummonAutoAttackStop(t *testing.T) {
+	t.Parallel()
 	var nowMS atomic.Int64
 	srv := bootPets(t, gameservertest.WithAttackStanceClock(func() time.Time { return time.UnixMilli(nowMS.Load()) }))
 	ownerID := srv.SoleObjectID(t)

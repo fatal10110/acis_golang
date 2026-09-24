@@ -11,6 +11,7 @@ import (
 // the pet-attack shortcut: the pet engages, and its swings drain the
 // monster's HP through the real combat stack.
 func TestPetAttackCommandSendsPetAgainstTarget(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
@@ -35,6 +36,7 @@ func TestPetAttackCommandSendsPetAgainstTarget(t *testing.T) {
 // contract with nothing summoned: every pet command still resolves the
 // client's click with ActionFailed instead of silence.
 func TestPetCommandsWithNoActiveSummonAnswerActionFailed(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	for _, action := range []int32{15, petAttackAction, 17, petReturnAction, petUnsummonAction} {
 		h.client.Send(encodeRequestActionUse(action, false))
@@ -47,6 +49,7 @@ func TestPetCommandsWithNoActiveSummonAnswerActionFailed(t *testing.T) {
 // the item is consumed, a Christmas Tree decoration spawns at the user's
 // spot, and a second use nearby is rejected without consuming.
 func TestDecorativeSummonSpawnsTreeAndBlocksDuplicate(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: treeKitID, Count: 2})
 	treeKit := h.seededItem(t, treeKitID)
 
@@ -71,6 +74,7 @@ func TestDecorativeSummonSpawnsTreeAndBlocksDuplicate(t *testing.T) {
 // mount and UserInfo refreshes the player's own view; while mounted, a
 // second wyvern collar answers SUMMON_ONLY_ONE.
 func TestWyvernCollarMountsPlayer(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t,
 		seedItem{TemplateID: wyvernCollarID, Count: 2},
 	)

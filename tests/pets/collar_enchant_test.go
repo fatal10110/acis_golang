@@ -14,6 +14,7 @@ import (
 // as soon as the pet's level is applied: live item, queued InventoryUpdate,
 // persisted row, and PetInfo, without waiting for autosave or return.
 func TestFirstSpawnSyncsCollarEnchantToPetLevel(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	actor, burst := h.spawnWolf(t)
 	if actor.Level() != wolfLevel {
@@ -29,6 +30,7 @@ func TestFirstSpawnSyncsCollarEnchantToPetLevel(t *testing.T) {
 // the live setter lifts the collar to the new level, queues InventoryUpdate,
 // and refreshes the owner with PetInfo at that moment.
 func TestLevelUpSyncsCollarEnchantToNewLevel(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	actor, _ := h.spawnWolf(t)
 	h.assertCollarEnchantedTo(t, wolfLevel)
@@ -50,6 +52,7 @@ func TestLevelUpSyncsCollarEnchantToNewLevel(t *testing.T) {
 // already shows the saved level: no InventoryUpdate and no extra PetInfo
 // beyond the spawn announcement.
 func TestMatchingCollarEnchantSendsNoExtraPackets(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 	h.returnPet(t)
@@ -75,6 +78,7 @@ func TestMatchingCollarEnchantSendsNoExtraPackets(t *testing.T) {
 // periodic save still writes the pets row and leaves the control item at
 // the saved level after the live setter has already applied it.
 func TestAutosaveSyncsCollarEnchantToPetLevel(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	actor, _ := h.spawnWolf(t)
 	if actor.Level() != wolfLevel {
@@ -90,6 +94,7 @@ func TestAutosaveSyncsCollarEnchantToPetLevel(t *testing.T) {
 // same collar lift must land when the owner returns the pet, not only on
 // the periodic autosave tick.
 func TestReturnPetSyncsCollarEnchantToPetLevel(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 
@@ -104,6 +109,7 @@ func TestReturnPetSyncsCollarEnchantToPetLevel(t *testing.T) {
 // from the items table as detach left it — FlushItems after despawn would
 // not replay a lift that missed that flush.
 func TestLogoutSyncsCollarEnchantToPetLevel(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	h.spawnWolf(t)
 

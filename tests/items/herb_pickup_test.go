@@ -52,6 +52,7 @@ func bootHerbField(t *testing.T) (*gameservertest.Server, int32, int32) {
 // the herb never reaches the inventory, the packet stream as an item row, or
 // the persisted items table.
 func TestHerbPickupConsumesWithoutStoring(t *testing.T) {
+	t.Parallel()
 	srv, objID, groundID := bootHerbField(t)
 	c := srv.Client
 
@@ -92,6 +93,7 @@ func TestHerbPickupConsumesWithoutStoring(t *testing.T) {
 // TestHerbPickupMirrorsOntoServitor pins issue #1246's gate: an active
 // servitor receives a mirrored copy of the herb's cast; a pet would not.
 func TestHerbPickupMirrorsOntoServitor(t *testing.T) {
+	t.Parallel()
 	srv, objID, groundID := bootHerbField(t)
 	c := srv.Client
 

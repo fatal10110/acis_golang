@@ -15,6 +15,7 @@ import (
 // offensive ONE-target skill is rejected unless CTRL is pressed and the
 // skill is a damage type.
 func TestOffensiveCastOnGuardRequiresCtrlDamage(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		skillType  string
@@ -70,6 +71,7 @@ func TestOffensiveCastOnGuardRequiresCtrlDamage(t *testing.T) {
 // TestOffensiveCastOnSiegeGuardDoesNotUseFolkOrGuardBranch proves SiegeGuard
 // is not a Folk/Guard target: PDAM without CTRL starts the cast.
 func TestOffensiveCastOnSiegeGuardDoesNotUseFolkOrGuardBranch(t *testing.T) {
+	t.Parallel()
 	const skillID int32 = 47
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -103,6 +105,7 @@ func TestOffensiveCastOnSiegeGuardDoesNotUseFolkOrGuardBranch(t *testing.T) {
 // cast boundary with real actors. Door coverage stays in the target core: the
 // boot fixture does not construct a door.
 func TestUnlockableCastRejectionsUseProductionPackets(t *testing.T) {
+	t.Parallel()
 	const skillID int32 = 2065
 	newServer := func(t *testing.T) (*gameservertest.Server, int32) {
 		t.Helper()

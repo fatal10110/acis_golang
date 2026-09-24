@@ -31,6 +31,7 @@ type liveBowPlayer interface {
 // gets the ready-to-shoot message plus a red SetupGauge covering attack time
 // plus scaled reuse, then the Attack animation. InventoryUpdate is batched.
 func TestBowFireConsumesArrowAndMPAndSendsGauge(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

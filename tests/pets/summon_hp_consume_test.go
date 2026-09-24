@@ -11,6 +11,7 @@ import (
 // cost is consumption, not a hit: invulnerability does not waive it, and
 // the owner is told of the damage with the pet itself named as its source.
 func TestInvulPetPaysStrikeHPCostAndTellsOwner(t *testing.T) {
+	t.Parallel()
 	const hpCost = 7
 	strike := wolfStrike()
 	strike.HPConsume = hpCost

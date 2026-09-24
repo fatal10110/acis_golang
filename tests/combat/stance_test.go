@@ -19,6 +19,7 @@ import (
 // client-initiated walk cancels the active attack, so no further swings land
 // after the move.
 func TestWalkAwayStopsAutoAttack(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -47,6 +48,7 @@ func TestWalkAwayStopsAutoAttack(t *testing.T) {
 // MoveToPawn starts the approach and the first swing lands only after real
 // arrival — the world-grid arrival path, not a premature hit.
 func TestAttackWalksIntoRangeThenLandsSwing(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -67,6 +69,7 @@ func TestAttackWalksIntoRangeThenLandsSwing(t *testing.T) {
 // TestTargetCancelStopsSwingLoop pins that cancelling the target ends the
 // swing loop: the cancel answers ActionFailed and no further swings land.
 func TestTargetCancelStopsSwingLoop(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -113,6 +116,7 @@ func (silentStanceEffects) AutoAttackStop(task.AttackStanceActor) {}
 // CANNOT_RESTART_WHILE_FIGHTING + RestartResponse(false) and logout with
 // CANNOT_LOGOUT_WHILE_FIGHTING + ActionFailed.
 func TestAttackStanceBlocksRestartAndLogout(t *testing.T) {
+	t.Parallel()
 	stance, err := task.NewAttackStance(silentStanceEffects{}, time.Now)
 	if err != nil {
 		t.Fatalf("build attack stance tracker: %v", err)
@@ -161,6 +165,7 @@ const stanceTimeoutDummySkill = 3
 // instead of MagicSkillCanceled. Combat and cubic runtimes share that Stop
 // method, so a surviving cast is the same proof they were left running.
 func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T) {
+	t.Parallel()
 	var nowMS atomic.Int64
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),

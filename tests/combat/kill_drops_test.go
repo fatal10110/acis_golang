@@ -54,6 +54,7 @@ func groundDrops(srv *gameservertest.Server) []item.GroundSnapshot {
 // TestPlayerKillDropsProtectedLoot is the control: a player kill rolls the
 // drop onto the ground reserved to the player and fills the spoil pool.
 func TestPlayerKillDropsProtectedLoot(t *testing.T) {
+	t.Parallel()
 	srv, objID, monster := spawnSpoiledDropMonster(t)
 	obj, ok := srv.State.Player(objID)
 	if !ok {
@@ -84,6 +85,7 @@ func TestPlayerKillDropsProtectedLoot(t *testing.T) {
 // dealer even after that player died: a guard finishing the monster still
 // drops the loot reserved to the dead player and fills the spoil pool.
 func TestDeadTopDealerReceivesDrops(t *testing.T) {
+	t.Parallel()
 	srv, objID, monster := spawnSpoiledDropMonster(t)
 	obj, ok := srv.State.Player(objID)
 	if !ok {
@@ -119,6 +121,7 @@ func TestDeadTopDealerReceivesDrops(t *testing.T) {
 // attacker playing dead when a guard finishes the monster still earns the
 // kill's exp and SP.
 func TestFakeDeadAttackerKeepsKillExp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -163,6 +166,7 @@ func TestFakeDeadAttackerKeepsKillExp(t *testing.T) {
 // TestKillWithoutPlayerReceiverDropsNothing covers every death no player
 // earned: the corpse drops nothing and its spoil pool stays empty.
 func TestKillWithoutPlayerReceiverDropsNothing(t *testing.T) {
+	t.Parallel()
 	cases := map[string]func(*testing.T, *gameservertest.Server, *npc.Hostile) bool{
 		// No attacker registers any threat: the threat table is empty.
 		"no threat": func(_ *testing.T, _ *gameservertest.Server, monster *npc.Hostile) bool {

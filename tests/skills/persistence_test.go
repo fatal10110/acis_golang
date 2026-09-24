@@ -15,6 +15,7 @@ import (
 // second login: the character_skills row survives the session, the restored
 // SkillList reports it, and no save row lingers.
 func TestLearnedSkillSurvivesRelogin(t *testing.T) {
+	t.Parallel()
 	srv, c, objID := bootLearner(t, generalLearnOpts(t, 50)...)
 	startInWorld(t, c)
 
@@ -41,6 +42,7 @@ func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 // replays during EnterWorld (its icon lands inside the entry burst) and the
 // reuse timer comes back through SkillCoolTime.
 func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -109,6 +111,7 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 }
 
 func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
+	t.Parallel()
 	const skillID, level = 1204, 2
 	defs := []modelskill.Definition{{
 		ID: skillID, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -159,6 +162,7 @@ func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 // reuse timers. Closing the stack without Logout simulates a process crash
 // before detach; a fresh Boot must restore the buff from that autosave row.
 func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T) {
+	t.Parallel()
 	defs := []modelskill.Definition{
 		{
 			ID: 1204, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -244,6 +248,7 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 // the effect: EnterWorld has no AbnormalStatusUpdate, and a second logout
 // writes a reuse-only row.
 func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
+	t.Parallel()
 	const skillID, level = 40, 1
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),

@@ -51,6 +51,7 @@ func seedKarmaCharacter(karma int) func(*gamesql.CharacterStore, *gamesql.ItemSt
 // silently rejected — no packet, stack untouched — mirroring the reference's
 // bare return.
 func TestKarmaBlocksRecallTeleportItemUse(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithKarmaTeleport(false),
@@ -81,6 +82,7 @@ func TestKarmaBlocksRecallTeleportItemUse(t *testing.T) {
 // TestKarmaBlocksDirectRecallCast pins the same gate on the direct-cast path:
 // a karma'd player casting the RECALL skill gets ActionFailed and no cast.
 func TestKarmaBlocksDirectRecallCast(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithKarmaTeleport(false),
@@ -104,6 +106,7 @@ func TestKarmaBlocksDirectRecallCast(t *testing.T) {
 // announces the new karma total (SystemMessage before StatusUpdate), and
 // persists both counters.
 func TestPlayerKillGrantsPKKarma(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Killer", 5, 0),
 		gameservertest.WithWantChars(1),

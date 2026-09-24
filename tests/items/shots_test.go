@@ -34,6 +34,7 @@ func bootShotRig(t *testing.T, shotTemplate int32, shotCount int32) (*gameserver
 // both the packet stream and the items row. A second use while already
 // charged is silent.
 func TestUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
+	t.Parallel()
 	srv, shot := bootShotRig(t, 1463, 10)
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -63,6 +64,7 @@ func TestUseSoulshotChargesWeaponAndConsumes(t *testing.T) {
 // soulshot against a D-grade weapon answers the mismatch message plus
 // ActionFailed and consumes nothing.
 func TestUseSoulshotGradeMismatchIsRejected(t *testing.T) {
+	t.Parallel()
 	srv, shot := bootShotRig(t, 1464, 10)
 	c := srv.Client
 
@@ -76,6 +78,7 @@ func TestUseSoulshotGradeMismatchIsRejected(t *testing.T) {
 // known inventory shot echoes ExAutoSoulShot plus its system message each
 // way.
 func TestAutoSoulShotToggle(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -96,6 +99,7 @@ func TestAutoSoulShotToggle(t *testing.T) {
 // the not-enough message but still disables auto use (ExAutoSoulShot off,
 // cancellation message, ActionFailed for the click).
 func TestUseSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
+	t.Parallel()
 	srv, shot := bootShotRig(t, 1463, 0)
 	c := srv.Client
 
@@ -118,6 +122,7 @@ func TestUseSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 // the servitor rather than the player, and the servitor's per-hit count
 // consumed from the stack.
 func TestUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -163,6 +168,7 @@ func TestUseBeastSoulshotChargesSummonAndConsumes(t *testing.T) {
 // PetsNotAvailableAtThisTime only, matching the reference handler, and
 // nothing consumed.
 func TestUseBeastSoulshotWithoutSummonIsRejected(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -180,6 +186,7 @@ func TestUseBeastSoulshotWithoutSummonIsRejected(t *testing.T) {
 // ignore branches: an unknown item id and a fishing-shot item both produce
 // no reply at all and never enable auto use.
 func TestAutoSoulShotIgnoresUnknownAndFishingShots(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

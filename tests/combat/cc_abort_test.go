@@ -49,6 +49,7 @@ func landEffect(t *testing.T, target effectHolder, name string) {
 // running cast), then the cast stop broadcasts MagicSkillCanceled and
 // answers ActionFailed, and the aborted cast never launches.
 func TestStunAbortsPlayerCastInFlight(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -109,6 +110,7 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 // TestStunStopsWalkingNPC pins a stun landing on a walking monster: its walk
 // ends with a StopMove broadcast to observers before anything else.
 func TestStunStopsWalkingNPC(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -144,6 +146,7 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 // ActionFailed, the attack stop's idle stops the walk (StopMove) and answers
 // ActionFailed, and the cast stop answers the last ActionFailed.
 func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

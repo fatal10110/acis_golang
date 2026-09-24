@@ -18,6 +18,7 @@ import (
 // the live state, and the owner can call it again on the next login instead
 // of being refused because a ghost still holds the summon slot.
 func TestRestartTakesPetOutOfWorldAndAllowsResummon(t *testing.T) {
+	t.Parallel()
 	// No character-select reuse delay: the relog below follows at once.
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)})
 	pet, _ := h.spawnWolf(t)
@@ -59,6 +60,7 @@ func TestRestartTakesPetOutOfWorldAndAllowsResummon(t *testing.T) {
 // the live state, lift the collar, and hand the pet's items back, exactly
 // as the owner's own return command does.
 func TestHostileUnsummonRoutesSettleThePet(t *testing.T) {
+	t.Parallel()
 	routes := []struct {
 		name string
 		do   func(*summon.Actor)
@@ -106,6 +108,7 @@ func TestHostileUnsummonRoutesSettleThePet(t *testing.T) {
 // TestHostileUnsummonLeavesDeadPetAlone keeps the rule that a dead summon is
 // not unsummoned: its corpse stays, and nothing is settled for it.
 func TestHostileUnsummonLeavesDeadPetAlone(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 	killPet(t, h, pet)
@@ -123,6 +126,7 @@ func TestHostileUnsummonLeavesDeadPetAlone(t *testing.T) {
 // reuses, so its items must come back to the owner, and its row must record
 // the death rather than leave an older, living save to restore from.
 func TestRestartWithDeadPetReturnsItemsAndKeepsItDead(t *testing.T) {
+	t.Parallel()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)},
 		seedItem{TemplateID: item.AdenaID, Count: 40})
 	pet, _ := h.spawnWolf(t)

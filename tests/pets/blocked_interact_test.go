@@ -15,6 +15,7 @@ import (
 // distance: ActionFailed, StopMove, then the pet status window. The base
 // same-cell MoveToLocation correction must not fire.
 func TestBlockedInteractInRangeBroadcastsStopMoveAndPetStatus(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)
@@ -43,6 +44,7 @@ func TestBlockedInteractInRangeBroadcastsStopMoveAndPetStatus(t *testing.T) {
 // blocked-arrival arm when the target is still too far: ActionFailed plus
 // the base same-cell MoveToLocation, and no pet window.
 func TestBlockedInteractOutOfRangeBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)
@@ -79,6 +81,7 @@ func TestBlockedInteractOutOfRangeBroadcastsMoveToLocation(t *testing.T) {
 // client walk replaces the parked INTERACT slot: blocked arrival is MOVE_TO
 // (same-cell MoveToLocation), not StopMove + PetStatusShow.
 func TestBlockedWalkAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)
@@ -121,6 +124,7 @@ func TestBlockedWalkAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
 // interaction range, so the interact gate passes and onInteract has no
 // world-presence check.
 func TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)
@@ -150,6 +154,7 @@ func TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus(t *testing.T) {
 // attack chase replaces the parked INTERACT slot: blocked arrival is ATTACK
 // (same-cell MoveToLocation), not StopMove + PetStatusShow.
 func TestBlockedAttackAfterPetApproachBroadcastsMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)

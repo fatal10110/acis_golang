@@ -19,6 +19,7 @@ func deathEffectSkills() []modelskill.Definition {
 }
 
 func TestDeathConsumesBlessingsAndCleansOrdinaryEffects(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		cast    []int

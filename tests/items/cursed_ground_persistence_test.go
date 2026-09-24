@@ -14,6 +14,7 @@ import (
 // must never appear in a persisted snapshot, while an ordinary ground item
 // dropped alongside it still does.
 func TestCursedWeaponGroundItemExcludedFromShutdownPersistence(t *testing.T) {
+	t.Parallel()
 	const cursedItemID = 8190 // Demonic Sword Zariche
 
 	table, err := entity.NewCursedWeaponTable([]entity.CursedWeapon{{ItemID: cursedItemID}})

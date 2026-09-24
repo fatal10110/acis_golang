@@ -22,6 +22,7 @@ import (
 // carries: nothing else writes current HP to the row, so finding it
 // persisted proves detachLivePlayer ran and enqueued its saves.
 func TestPanicInQueuedHandlerDropsSession(t *testing.T) {
+	t.Parallel()
 	if os.Getenv(gameservertest.SimExecutorEnv) == "inline" {
 		// sim.Inline deliberately does not recover, so a panicking task
 		// takes the harness pump goroutine and the test process with it.

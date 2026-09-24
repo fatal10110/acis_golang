@@ -29,6 +29,7 @@ var (
 // one-item list would read 01 00 at the flag offset and pass the "shown"
 // assertion, and the count guard is what catches that.
 func TestItemListShowWindowPerCallSite(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
