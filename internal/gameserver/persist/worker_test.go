@@ -238,3 +238,45 @@ func TestFlushOfAnotherLaneIgnoresOwedWork(t *testing.T) {
 		t.Fatalf("Flush(lane of owner 2) error = %v", err)
 	}
 }
+
+// Close marks a lane closed before its goroutine has run what it accepted, so
+// a Flush landing in that window must wait for the drain rather than read the
+// refused marker as a lane with nothing left.
+func TestFlushDuringCloseWaitsForTheDrain(t *testing.T) {
+	w := New(zerolog.Nop())
+	release := make(chan struct{})
+	ran := false
+	w.Enqueue(1, func() { <-release; ran = true })
+
+	closed := make(chan error, 1)
+	go func() { closed <- w.Close(context.Background()) }()
+	l := w.lane(1)
+	for {
+		l.mu.Lock()
+		c := l.closed
+		l.mu.Unlock()
+		if c {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := w.Flush(ctx, 1); err == nil {
+		t.Fatal("Flush returned nil while Close was still draining an accepted job")
+	}
+
+	flushed := make(chan error, 1)
+	go func() { flushed <- w.Flush(context.Background(), 1) }()
+	close(release)
+	if err := <-flushed; err != nil {
+		t.Fatal(err)
+	}
+	if !ran {
+		t.Fatal("Flush returned before the accepted job ran")
+	}
+	if err := <-closed; err != nil {
+		t.Fatal(err)
+	}
+}

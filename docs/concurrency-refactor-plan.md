@@ -202,6 +202,45 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
   player → `persist.Flush(ctx)` → close DB.
 - Gate: relog mid-fight and autosave-during-detach scenarios in `internal/gameservertest`; `-race`.
 
+#### Durability trade (accepted, #2406)
+- **Asynchronous now** (the call returns before the row is written; the job runs on the owner's
+  lane): the detach save — characters row (exp, HP/MP/CP, karma, position, death penalty,
+  offline mark) and skill state (active effects, reuse timers) (`network/lifecycle.go`
+  `detachLivePlayer`); the pets row on unsummon, logout and rename (`savePet`, `pet_name.go`); the
+  autosave (`network/taskeffects.go` `Save`); shortcut and character-skill rows; single-item
+  writes from enchant, pickup, pet and trade (`applyPersistActions` → `queueItemWrite`); and the
+  container flush (`flushItemPersistence`) plus the item tick's per-owner jobs.
+- **Still inline** on the calling goroutine: the online mark at enter-world
+  (`Roster.SaveOnlineRecency`, `network/character_flow.go`), plus login-time reads and
+  character create, delete-mark and restore at the selection screen.
+- **Guarantee**: writes for one owner land in enqueue order; `Flush(ctx, owners...)` waits for
+  them (the character-select barrier, `awaitPersistence`); a clean shutdown drains every lane
+  (`drainItemInstances` → `Worker.Close` → retry item save → DB close), so an orderly stop loses
+  nothing. An **unclean stop** (`kill -9`, OOM kill, a fatal panic) loses whatever the lanes still
+  hold — normally the queue latency, up to the per-job timeouts below when the database is slow.
+- **Reference**: stores synchronously at the same points — `Player.deleteMe` → `store()`
+  (character base, subclass, effects) on logout, `Summon.doUnsummon` → `store()` (the pet row) on
+  unsummon and on the owner's logout — so a crash right after those calls loses nothing there. That
+  is the divergence. Item rows are not part of it: the reference already writes them lazily from
+  `ItemInstanceTaskManager` on a 60 s tick and once at shutdown, so a crash loses up to a minute of
+  item changes there; the Go container flush at logout lands sooner than that.
+- **Operator knobs** and how they add up (constants, not config today):
+  - `persist.Lanes` = 4: lanes shared by every owner; one slow job holds the owners hashed to its
+    lane.
+  - `livePlayerDetachSaveTimeout` = 2 s (`network/lifecycle.go`): budget per queued job
+    (character save, pet row, item row). `livePlayerPersistWait` = 3 × that +
+    `task.ItemInstanceSaveTimeout` = 16 s bounds the character-select barrier.
+  - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-tick save and per shutdown step.
+  - `gameServerStopTimeout` = 30 s (`cmd/gameserver/main.go`): fx's whole stop budget. The
+    listener stop waits for connection handlers (each detach enqueues, it does not wait for the
+    writes), the item ticker's stop can block up to one `ItemInstanceSaveTimeout`, then
+    `drainItemInstances` runs save → `Worker.Close` → save, each step on its own detached
+    `ItemInstanceSaveTimeout`, so the drain can run past the fx budget rather than be skipped by
+    it. `TestItemInstanceSaveTimeoutFitsShutdownBudget` pins `ItemInstanceSaveTimeout <
+    gameServerStopTimeout`.
+- **Hardening**: the M14 soak (#261) includes an unclean kill with players online, measuring how
+  much state a crash costs at the target player count.
+
 ### Phase 2 — route all actor work onto queues (locks untouched, now uncontended) — #2270
 - Pre-conditions: Phase 4 merged; Phase 0 outbox merged and perf baseline recorded on #2268;
   #2278 merged. Any sync DB call still reachable from a queued task is a bug the watchdog will
