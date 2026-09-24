@@ -232,6 +232,10 @@ type clientConn struct {
 func (c *clientConn) send(payload []byte) error {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
+	return c.sendLocked(payload)
+}
+
+func (c *clientConn) sendLocked(payload []byte) error {
 	if wire.FrameHeaderSize+commoncrypt.PaddedSize(len(payload)+8) > wire.MaxFrameLength {
 		return fmt.Errorf("login packet exceeds maximum frame length")
 	}
@@ -248,9 +252,13 @@ func (c *clientConn) kick() {
 }
 
 // closeWith replies LoginFail with reason and closes the connection; safe
-// to call while the handler goroutine is blocked reading.
+// to call while the handler goroutine is blocked reading. The close happens
+// under sendMu, so LoginFail is the last frame: a handler reply racing it
+// fails on the closed connection instead of following it.
 func (c *clientConn) closeWith(reason serverpackets.LoginFailReason) {
-	_ = c.send(serverpackets.EncodeLoginFail(reason))
+	c.sendMu.Lock()
+	defer c.sendMu.Unlock()
+	_ = c.sendLocked(serverpackets.EncodeLoginFail(reason))
 	c.conn.Close()
 }
 
