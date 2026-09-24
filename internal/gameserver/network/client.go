@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
@@ -44,6 +45,12 @@ type Client struct {
 // NewClient returns a Client wrapping session, starting in StateConnected.
 func NewClient(session *Session) *Client {
 	return &Client{Session: session, state: StateConnected, stats: newClientStats()}
+}
+
+// closeNow starts a forced disconnect: ServerClose is the last packet the
+// client receives, and the caller ends the session, which closes the socket.
+func (c *Client) closeNow() {
+	c.Session.sendLast(serverpackets.FrameServerClose())
 }
 
 // State returns the client's current state.

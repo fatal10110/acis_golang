@@ -53,6 +53,17 @@ func NewSession(conn *Conn, cipher *gamecipher.Cipher) *Session {
 // of frame and releases it once the connection writer is done with it, or
 // immediately when the connection is closed or aborted for a stalled peer.
 func (s *Session) SendFrame(frame wire.Frame) bool {
+	return s.send(frame, false)
+}
+
+// sendLast sends frame as the last packet the client receives: every later
+// send is dropped, and the socket closes, frame flushed, once the connection
+// is closed. A session already sealed or closed drops frame. It never blocks.
+func (s *Session) sendLast(frame wire.Frame) {
+	s.send(frame, true)
+}
+
+func (s *Session) send(frame wire.Frame, last bool) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {
 		frame.Release()
@@ -67,6 +78,9 @@ func (s *Session) SendFrame(frame wire.Frame) bool {
 
 	if s.cryptEnabled {
 		s.cipher.Encrypt(frameBytes[frameHeaderSize:])
+	}
+	if last {
+		return s.conn.sendLast(frame)
 	}
 	return s.conn.SendFrame(frame)
 }
@@ -116,11 +130,11 @@ func (s *Session) EnableCrypt() {
 	s.cipher.Encrypt(nil)
 }
 
-// Close sends the ServerClose packet and closes the connection once every
-// queued frame — that packet included — has been written. It is the
-// server-initiated eviction path for a client whose session another
-// selection took over; safe to call from any goroutine.
+// Close sends the ServerClose packet as the connection's last and waits until
+// the connection is closed. It is the server-initiated eviction path for a
+// client whose session another selection took over; safe to call from any
+// goroutine.
 func (s *Session) Close() {
-	s.SendFrame(serverpackets.FrameServerClose())
+	s.sendLast(serverpackets.FrameServerClose())
 	_ = s.conn.Close()
 }

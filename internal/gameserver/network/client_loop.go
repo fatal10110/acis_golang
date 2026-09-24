@@ -41,6 +41,7 @@ func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte
 	if err != nil {
 		l.log.Warn().Err(err).Msg("game client")
 		if errors.Is(err, wire.ErrShortPacket) && (client.State() == StateConnected || client.countUnderflow()) {
+			client.closeNow()
 			return req, errMalformedPacketDisconnect
 		}
 	}
@@ -131,9 +132,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		} else if client.stats.floodsExceeded() {
 			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packet floods")
+			client.closeNow()
 			return
 		} else if client.State() == StateConnected && client.stats.processedPackets > preAuthMaxProcessedPackets {
 			l.log.Warn().Str("state", client.State().String()).Msg("game client disconnected: too many packets in non-authed state")
+			client.closeNow()
 			return
 		}
 		if !client.Accept(opcode) {
@@ -142,6 +145,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// authenticated, tolerate up to maxUnknownPerMin within a 60s
 			// sliding window, mirroring GameClient.onUnknownPacket.
 			if client.State() == StateConnected || client.countUnknownPacket() {
+				client.closeNow()
 				return
 			}
 			continue
@@ -393,6 +397,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeEnterWorld:
 			if entering == nil {
+				client.closeNow()
 				return
 			}
 			// Assigned before the check: a failure after the player was
@@ -421,6 +426,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					Str("state", client.State().String()).
 					Msg("game client: accepted extended opcode not handled while entering")
 				if client.countUnknownPacket() {
+					client.closeNow()
 					return
 				}
 				continue
@@ -509,6 +515,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				// no pre-auth immediate-disconnect case here; just count toward the
 				// same sliding-60s threshold as GameClient.onUnknownPacket.
 				if client.countUnknownPacket() {
+					client.closeNow()
 					return
 				}
 			}
@@ -577,7 +584,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 						refused = true
 						return
 					}
-					session.SendFrame(serverpackets.FrameLeaveWorld())
+					// LeaveWorld is the last packet: what detach sends
+					// afterwards never reaches the client.
+					session.sendLast(serverpackets.FrameLeaveWorld())
 				})
 				if refused {
 					continue

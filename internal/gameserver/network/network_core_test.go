@@ -1055,10 +1055,20 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 	validation := func([]byte) (int, error) {
 		return 0, errors.New("clientpackets: invalid value")
 	}
+	// A disconnect sends ServerClose, so the client needs a live session.
+	discardClient := func(t *testing.T) *Client {
+		cipher, err := gamecipher.NewCipher(make([]byte, gamecipher.KeySize))
+		if err != nil {
+			t.Fatalf("NewCipher: %v", err)
+		}
+		conn := newConn(discardConn{}, zerolog.Nop())
+		t.Cleanup(func() { conn.Close() })
+		return NewClient(NewSession(conn, cipher))
+	}
 
 	t.Run("short packet disconnects immediately pre-auth", func(t *testing.T) {
 		l := &GameClientLink{}
-		client := NewClient(nil)
+		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, shortPacket); !errors.Is(err, errMalformedPacketDisconnect) {
 			t.Fatalf("decodeClientPacket() error = %v, want errMalformedPacketDisconnect", err)
@@ -1067,7 +1077,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 
 	t.Run("validation error never disconnects pre-auth", func(t *testing.T) {
 		l := &GameClientLink{}
-		client := NewClient(nil)
+		client := discardClient(t)
 
 		if _, err := decodeClientPacket(l, client, nil, validation); errors.Is(err, errMalformedPacketDisconnect) {
 			t.Fatalf("decodeClientPacket() error = %v, want no disconnect", err)
@@ -1076,7 +1086,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 
 	t.Run("short packet tolerates first, disconnects past threshold post-auth", func(t *testing.T) {
 		l := &GameClientLink{}
-		client := NewClient(nil)
+		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
 		for i := range maxUnderflowsPerMin {
@@ -1091,7 +1101,7 @@ func TestDecodeClientPacketClassifiesShortPacketVsValidationErrors(t *testing.T)
 
 	t.Run("validation error never disconnects post-auth even past threshold", func(t *testing.T) {
 		l := &GameClientLink{}
-		client := NewClient(nil)
+		client := discardClient(t)
 		client.SetAuthenticated("acc", link.SessionKey{})
 
 		for i := range maxUnderflowsPerMin + 2 {

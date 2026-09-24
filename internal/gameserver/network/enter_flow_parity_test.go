@@ -246,6 +246,9 @@ func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 	}
 
 	c.Send(encodeRequestAutoSoulShot(11, 1))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
+	}
 	c.ExpectClosed()
 }
 
@@ -285,9 +288,32 @@ func TestUnknownTopLevelOpcodeCountsTowardDisconnect(t *testing.T) {
 	}
 
 	c.Send(encodeSingleOpcode(0xfe))
-	// Detach's cast-stop ack still goes out ahead of the close (#2484).
-	if frame := c.Read(); frame[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("pre-close opcode = %#x, want ActionFailed (%#x)", frame[0], serverpackets.OpcodeActionFailed)
+	// ServerClose is the last frame: detach's cast-stop ack is dropped.
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
+}
+
+// TestMalformedInGamePacketPastThresholdClosesWithServerClose pins the
+// in-game buffer-underflow disconnect: the window tolerates
+// maxUnderflowsPerMin short packets, and the next one closes the connection
+// with ServerClose as its last frame, ahead of anything detach sends.
+func TestMalformedInGamePacketPastThresholdClosesWithServerClose(t *testing.T) {
+	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+
+	for i := 0; i < maxUnderflowsPerMin; i++ {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeMoveBackwardToLocation))
+	}
+	// Still dispatching: manor list answers.
+	c.Send(encodeRequestManorList())
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeExtended {
+		t.Fatalf("post-underflow opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
+	}
+
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeMoveBackwardToLocation))
+	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
 	}
 	c.ExpectClosed()
 }

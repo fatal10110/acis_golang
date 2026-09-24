@@ -13,7 +13,7 @@ import (
 
 // TestPreAuthPacketCapDisconnects drives the hard cap on packets processed
 // pre-auth: three accepted CONNECTED-state frames run, the fourth closes
-// the connection without a reply.
+// the connection with ServerClose as its last frame.
 func TestPreAuthPacketCapDisconnects(t *testing.T) {
 	log := zerolog.New(os.Stderr)
 	addr, _, _, _ := newTestGameClientLinkWithLog(t, nil, nil, log)
@@ -28,9 +28,25 @@ func TestPreAuthPacketCapDisconnects(t *testing.T) {
 	}
 
 	c.Send(encodeProtocolVersion(746)) // processed packet 4: over the cap
-	if !c.AwaitClose(2 * time.Second) {
-		t.Fatal("frame past the pre-auth cap did not close the connection")
+	if got := c.Read(); got[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", got[0], serverpackets.OpcodeServerClose)
 	}
+	c.ExpectClosed()
+}
+
+// TestPreAuthUnknownOpcodeClosesWithServerClose pins the pre-auth branch of
+// the unknown-packet disconnect: the first opcode the CONNECTED state does
+// not accept closes the connection with ServerClose as its last frame.
+func TestPreAuthUnknownOpcodeClosesWithServerClose(t *testing.T) {
+	addr, _, _, _ := newTestGameClientLinkWithLog(t, nil, nil, zerolog.Nop())
+	c := testsupport.Dial(t, addr)
+	c.SendProtocolVersion(746)
+
+	c.Send(encodeSingleOpcode(0xfe))
+	if got := c.Read(); got[0] != serverpackets.OpcodeServerClose {
+		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", got[0], serverpackets.OpcodeServerClose)
+	}
+	c.ExpectClosed()
 }
 
 func TestPerformFloodProtectedReuseGate(t *testing.T) {
