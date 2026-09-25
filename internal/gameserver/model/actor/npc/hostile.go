@@ -1031,7 +1031,11 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 		}
 		return true
 	}
-	if !h.MovementDisabled() || h.GeoPathFailCount() >= move.HomeGeoFailLimit {
+	if h.GeoPathFailCount() >= move.HomeGeoFailLimit {
+		_ = h.move.MoveHome(h.Instance.Home)
+		return true
+	}
+	if !h.MovementDisabled() {
 		_ = h.move.MoveHome(h.Instance.Home)
 	}
 	h.scheduleWanderRecheck()
