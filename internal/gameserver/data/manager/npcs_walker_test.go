@@ -281,6 +281,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		Alias:       "chasetest",
 		HPMax:       100,
 		RunSpeed:    7000, // fast enough that both route and leash moves below finish in ~1 position tick
+		CanMove:     true,
 		AIParams:    commons.NewStatSet(),
 		NoSleepMode: true,
 	}})

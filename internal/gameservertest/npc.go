@@ -250,6 +250,36 @@ type hostileActorRef struct{ attack.CreatureActor }
 
 type movingHostileLocatedRef struct{ move.Actor }
 
+func (r *movingHostileLocatedRef) GeoPathFailCount() int {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		return h.GeoPathFailCount()
+	}
+	return 0
+}
+
+func (r *movingHostileLocatedRef) ResetGeoPathFailCount() {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.ResetGeoPathFailCount()
+	}
+}
+
+func (r *movingHostileLocatedRef) AddGeoPathFailCount() {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.AddGeoPathFailCount()
+	}
+}
+
+func (r *movingHostileLocatedRef) TeleportTo(target location.Location) {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.TeleportTo(target)
+	}
+}
+
+func (r *movingHostileLocatedRef) OffensiveFollowLead() bool {
+	h, ok := r.Actor.(*npc.Hostile)
+	return ok && h.OffensiveFollowLead()
+}
+
 // SpawnMovingHostileNPCAt seeds a hostile monster with the production move
 // controller wired through BroadcastMove, so leash-return and other
 // server-initiated moves emit real observer packets.
