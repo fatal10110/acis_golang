@@ -2550,6 +2550,34 @@ func TestChargeDamTagsResistedByOrigin(t *testing.T) {
 	})
 }
 
+// TestChargeDamEvasionReportsDodgeBeforeEffects covers L2SkillChargeDmg.java:46-56:
+// an evaded target gets the dodge report and skips the effect-landing roll, so
+// neither a Resisted entry nor damage nor effects result, even when the
+// effect-success roll would have failed.
+func TestChargeDamEvasionReportsDodgeBeforeEffects(t *testing.T) {
+	registry := NewDefaultRegistry()
+	target := &skillTarget{
+		hp: 1000, effects: newTestList(nil),
+		physicalInput: formulas.PhysicalSkillInput{Evaded: true}, physicalOK: true,
+		skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+	}
+
+	result, ok := registry.UseResult(Cast{
+		Caster:  &skillTarget{},
+		Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []Actor{target},
+	})
+	if !ok {
+		t.Fatal("UseResult() handled = false, want true for CHARGEDAM")
+	}
+	if len(result.Dodges) != 1 || len(result.Resisted) != 0 {
+		t.Fatalf("Dodges = %d, Resisted = %+v; want one dodge and no resist", len(result.Dodges), result.Resisted)
+	}
+	if target.hp != 1000 || len(target.effects.All()) != 0 {
+		t.Fatalf("hp = %v, effects = %d; want untouched target", target.hp, len(target.effects.All()))
+	}
+}
+
 // TestManaDamageTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin
 // for MANADAM's checkSkillSuccess-gated resist (Manadam.java:55) vs. the
 // per-effect-template one it produces on a successful roll.

@@ -122,6 +122,13 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		if !ok {
 			continue
 		}
+		if in.Evaded {
+			result.Dodges = append(result.Dodges, Dodge{
+				AttackerID: counterattackObjectID(cast.Caster), AttackerName: actorName(cast.Caster),
+				DefenderID: counterattackObjectID(target), DefenderName: actorName(target),
+			})
+			continue
+		}
 		applyChargeDamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in) * modifier
 		if damage <= 0 {
