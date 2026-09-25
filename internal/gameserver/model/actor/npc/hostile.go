@@ -77,6 +77,11 @@ type Hostile struct {
 	dead    bool
 	decayed bool
 
+	// attackedByMu guards attackers recorded by positive physical hits and
+	// offensive casts. Rewards read the live attackers' levels at death.
+	attackedByMu sync.Mutex
+	attackedBy   map[int32]attackable.Combatant
+
 	// minionsMu guards master and the minion list. A minion claims its
 	// follow slot under its master's lock from the minion's own queue
 	// (claimFollowSlot).
@@ -524,6 +529,45 @@ func (h *Hostile) AddDefaultHate(attacker attackable.Combatant) {
 	h.brain.AddDefaultHate(attacker)
 }
 
+// RecordAttacker keeps a creature that physically hit or cast an offensive
+// skill at this NPC, independently of damage and hate accounting.
+func (h *Hostile) RecordAttacker(attacker attackable.Combatant) {
+	if attacker == nil || attacker.ObjectID() == h.ObjectID() {
+		return
+	}
+	h.attackedByMu.Lock()
+	if h.attackedBy == nil {
+		h.attackedBy = make(map[int32]attackable.Combatant)
+	}
+	h.attackedBy[attacker.ObjectID()] = attacker
+	h.attackedByMu.Unlock()
+}
+
+// HighestAttackerLevel returns the highest current level in the attacked-by
+// set, or fallback when no attack has been recorded.
+func (h *Hostile) HighestAttackerLevel(fallback int) int {
+	h.attackedByMu.Lock()
+	attackers := make([]attackable.Combatant, 0, len(h.attackedBy))
+	for _, attacker := range h.attackedBy {
+		attackers = append(attackers, attacker)
+	}
+	h.attackedByMu.Unlock()
+	if len(attackers) == 0 {
+		return fallback
+	}
+	level := 0
+	for _, attacker := range attackers {
+		level = max(level, attacker.Level())
+	}
+	return level
+}
+
+func (h *Hostile) clearAttackers() {
+	h.attackedByMu.Lock()
+	h.attackedBy = nil
+	h.attackedByMu.Unlock()
+}
+
 // monsterInstanceKinds is the subset of hostileInstanceKinds whose
 // counterpart type is Monster-family, consulted by hostility-redirect
 // effects that only accept a Monster-family actor as their target.
@@ -740,6 +784,7 @@ func (h *Hostile) canRunAI() bool {
 
 func (h *Hostile) enterInactiveRegion() {
 	if h.regionInactive.CompareAndSwap(false, true) {
+		h.clearAttackers()
 		h.EffectList().StopAll()
 		h.brain.SetBackToPeace()
 	}
@@ -800,6 +845,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if !creature.Die(h, killer, rewards) {
 		return false
 	}
+	h.clearAttackers()
 	h.BroadcastDie()
 	return true
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -27,6 +28,24 @@ func TestRegionDeactivationResetsHostileOnItsQueue(t *testing.T) {
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
 	srv.Settle(t)
+	obj, ok := srv.State.Player(srv.SoleObjectID(t))
+	if !ok {
+		t.Fatal("player missing from world")
+	}
+	player, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatal("player is not online")
+	}
+	hostile.TakeDamage(0, player)
+	if got := hostile.HighestAttackerLevel(1); got != 1 {
+		t.Fatalf("highest attacker level after zero damage = %d, want empty-set fallback 1", got)
+	}
+	if hostile.TakeDamage(1, player) {
+		t.Fatal("one-point hit unexpectedly killed the monster")
+	}
+	if got := hostile.HighestAttackerLevel(1); got != 5 {
+		t.Fatalf("highest attacker level before deactivation = %d, want 5", got)
+	}
 
 	q := hostile.Queue()
 	onQueue := make(chan bool, 1)
@@ -49,6 +68,9 @@ func TestRegionDeactivationResetsHostileOnItsQueue(t *testing.T) {
 	srv.Settle(t)
 	if got := hostile.EffectList().All(); len(got) != 0 {
 		t.Fatalf("effects after region deactivation = %d, want 0", len(got))
+	}
+	if got := hostile.HighestAttackerLevel(1); got != 1 {
+		t.Fatalf("highest attacker level after deactivation = %d, want empty-set fallback 1", got)
 	}
 }
 
