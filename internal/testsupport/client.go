@@ -7,6 +7,7 @@ package testsupport
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -95,12 +96,17 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 	if err != nil {
 		// Formatted, not wrapped: a caller that tolerates a timeout must
 		// not find one in here, however it inspects the error, because the
-		// stream is already misaligned.
-		return nil, fmt.Errorf("frame cut off after its first byte: %v", err)
+		// stream is already misaligned. It wraps errFrameCutOff instead, which
+		// carries no timeout.
+		return nil, fmt.Errorf("%w: %v", errFrameCutOff, err)
 	}
 	f.received.Add(1)
 	return payload, nil
 }
+
+// errFrameCutOff marks a frame whose first byte arrived but whose rest did
+// not: the server closed or stalled mid-frame.
+var errFrameCutOff = errors.New("frame cut off after its first byte")
 
 // writeFrame writes one raw frame and counts it.
 func (f *ScriptedClient) writeFrame(payload []byte) error {
@@ -304,14 +310,30 @@ func (f *ScriptedClient) Conn() net.Conn { return f.conn }
 // Close closes the underlying connection.
 func (f *ScriptedClient) Close() error { return f.conn.Close() }
 
-// ExpectClosed fails unless the server closes the connection within 2s. A
-// timeout fails too: a connection still open is not closed.
+// ExpectClosed fails unless the server closes the connection without sending
+// another frame. It waits the way reads do: on the harness's driven clock the
+// wait lasts until the server has finished handling everything this client
+// sent (the logout's detach and the saves it hands the persistence lanes),
+// then allows Read's 5s for the close itself; without one (the pool
+// executor) it is Read's 5s on the wall clock. A timeout fails too: a
+// connection still open is not closed.
 func (f *ScriptedClient) ExpectClosed() {
 	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-	buf := make([]byte, 1)
-	n, err := f.conn.Read(buf)
-	if ne, ok := err.(net.Error); n != 0 || err == nil || ok && ne.Timeout() {
-		f.t.Fatalf("expected connection to close, got n=%d err=%v", n, err)
+	if err := f.closed(5 * time.Second); err != nil {
+		f.t.Fatal(err)
 	}
+}
+
+// closed reports why the connection is not closed within d, or nil once the
+// server has closed it. Part of a frame before the close is not a clean
+// close, nor is a frame stalled mid-way.
+func (f *ScriptedClient) closed(d time.Duration) error {
+	payload, err := f.readFrame(d)
+	if err == nil {
+		return fmt.Errorf("expected connection to close, got frame %x", payload)
+	}
+	if ne, ok := err.(net.Error); ok && ne.Timeout() || errors.Is(err, errFrameCutOff) {
+		return fmt.Errorf("expected connection to close, got %v", err)
+	}
+	return nil
 }

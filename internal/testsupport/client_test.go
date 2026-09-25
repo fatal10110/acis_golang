@@ -71,6 +71,54 @@ func TestAwaitCloseSpendsOneBudgetOnTheAwaitClock(t *testing.T) {
 	}
 }
 
+// TestExpectClosedWaitsOnTheAwaitClock pins that ExpectClosed waits through
+// await, as every read does, so on a driven clock it waits for the server's
+// progress rather than a raw socket deadline, and that a server which never
+// closes still fails it once await gives up.
+func TestExpectClosedWaitsOnTheAwaitClock(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() { clientConn.Close() })
+	c := &ScriptedClient{t: t, conn: clientConn, handshaken: true}
+
+	var now time.Time
+	awaited := 0
+	c.SetAwait(func(d time.Duration) bool {
+		awaited++
+		now = now.Add(d)
+		return false
+	}, func() time.Time { return now })
+	if err := c.closed(5 * time.Second); err == nil {
+		t.Fatal("closed reported a close the server never made")
+	}
+	if awaited != 1 {
+		t.Fatalf("await calls = %d, want 1", awaited)
+	}
+
+	c.SetAwait(func(time.Duration) bool {
+		serverConn.Close()
+		return true
+	}, func() time.Time { return now })
+	if err := c.closed(5 * time.Second); err != nil {
+		t.Fatalf("closed after the server closed = %v, want nil", err)
+	}
+}
+
+// TestExpectClosedFailsOnAPartialFrame pins that bytes before the close are
+// not a clean close: a frame cut off by the close, or stalled mid-frame past
+// its read bound, fails ExpectClosed like a whole frame or a timeout does.
+func TestExpectClosedFailsOnAPartialFrame(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() { clientConn.Close() })
+	c := &ScriptedClient{t: t, conn: clientConn, handshaken: true}
+	go func() {
+		serverConn.Write([]byte{5})
+		serverConn.Close()
+	}()
+	if err := c.closed(time.Second); err == nil {
+		t.Fatal("closed reported a clean close after a partial frame")
+	}
+}
+
 // TestReadFinishesAFrameWhoseDeadlinePassesMidFrame pins that a read never
 // splits a frame: once a frame's header has arrived, its payload is read to
 // the end even when the caller's wait runs out first. Reporting a timeout
