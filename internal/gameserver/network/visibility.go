@@ -38,7 +38,8 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 					// teleports p from the caster's queue. Building the snapshot
 					// there would let an update drained after it overtake it, so
 					// the snapshot is always taken and sent on p's queue.
-					p.Queue().Post(func() { p.sendPetItemList(o, inv) })
+					seen := p.petSightings.Add(1)
+					p.Queue().Post(func() { p.sendPetItemList(inv, seen) })
 				}
 			}
 			return
@@ -61,11 +62,12 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 }
 
 // sendPetItemList sends the owner's full pet inventory, draining the pending
-// PetInventoryUpdate queue it supersedes. It runs on p's queue; a pet
-// unsummoned before it ran gets nothing.
-func (p *livePlayer) sendPetItemList(pet *summon.Actor, inv *itemcontainer.Inventory) {
+// PetInventoryUpdate queue it supersedes. It runs on p's queue, and sends
+// nothing once p has forgotten the pet (unsummoned or out of view) or seen it
+// again since the Discover numbered seen.
+func (p *livePlayer) sendPetItemList(inv *itemcontainer.Inventory, seen uint32) {
 	sim.AssertOwner(p.Queue())
-	if !pet.Visible() {
+	if p.petSightings.Load() != seen {
 		return
 	}
 	var frame wire.Frame
@@ -128,6 +130,7 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		// generic DeleteObject other Tracked kinds get. Non-owners received
 		// SummonInfo, so they receive the corresponding DeleteObject below.
 		if o.OwnerID() == p.ObjectID() {
+			p.petSightings.Add(1)
 			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
 			return
 		}

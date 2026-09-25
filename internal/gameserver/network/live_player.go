@@ -104,6 +104,11 @@ type livePlayer struct {
 	// fusion channel holds, or 0; cleared only by the channel that set it.
 	fusionTargetID atomic.Int32
 
+	// petSightings counts this player's Discover and Forget of their own
+	// summon, which can run on another actor's queue. A PetItemList posted by
+	// one Discover is dropped once a later one has run.
+	petSightings atomic.Uint32
+
 	// petInteractMu is taken from another actor's queue for the same reason
 	// as pickupMu.
 	petInteractMu sync.Mutex
