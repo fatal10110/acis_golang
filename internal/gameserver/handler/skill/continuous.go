@@ -44,7 +44,7 @@ func (h continuousHandler) Use(cast Cast) {
 }
 
 func (h continuousHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	def := h.effectSkill(cast.Skill)
 	skillType := skillTypeKey(def.SkillType)
 
@@ -101,6 +101,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 
 		if !acted {
 			result.AttackFailed++
+			result.record(AttackFailedMessage{})
 			continue
 		}
 

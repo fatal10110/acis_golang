@@ -5,11 +5,17 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -28,12 +34,14 @@ func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T)
 	l := &GameClientLink{world: state}
 
 	l.sendSkillHandlerResult(nil, actorcast.EffectResult{
-		MagicResists:      []handlerskill.MagicResist{{TargetID: 42, AttackerName: "Orc"}},
-		ManaDrains:        []handlerskill.ManaDrain{{TargetID: 42, CasterName: "Orc", MP: 30}},
-		Resisted:          []handlerskill.Resisted{{TargetName: "Orc", SkillID: 1, SkillLevel: 1}},
-		AttackFailed:      1,
-		ManaDamageMissed:  1,
-		OpponentMPReduced: []int32{5},
+		Messages: []any{
+			handlerskill.MagicResist{TargetID: 42, AttackerName: "Orc"},
+			handlerskill.ManaDrain{TargetID: 42, CasterName: "Orc", MP: 30},
+			handlerskill.Resisted{TargetName: "Orc", SkillID: 1, SkillLevel: 1},
+			handlerskill.AttackFailedMessage{},
+			handlerskill.ManaDamageMissedMessage{},
+			handlerskill.OpponentMPReducedMessage{MP: 5},
+		},
 	})
 
 	got := frames.Frames()
@@ -42,6 +50,106 @@ func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T)
 	}
 	assertSystemMessageStringFrame(t, got[0], serverpackets.SystemMessageResistedS1Magic, "Orc")
 	assertSystemMessageStringNumberFrame(t, got[1], serverpackets.SystemMessageS2MPHasBeenDrainedByS1, "Orc", 30)
+}
+
+func TestSendSkillHandlerResultKeepsTargetMessageOrder(t *testing.T) {
+	resist := handlerskill.Resisted{TargetName: "First", SkillID: 1, SkillLevel: 1}
+	counter := handlerskill.Counterattack{AttackerID: 1, DefenderID: 3, DefenderName: "Second"}
+	for _, tc := range []struct {
+		name     string
+		messages []any
+		want     []int
+	}{
+		{"blow resist before counter", []any{resist, counter}, []int{serverpackets.SystemMessageS1ResistedYourS2, serverpackets.SystemMessageS1PerformingCounterattack}},
+		{"pdam dodge before later counter", []any{handlerskill.Dodge{AttackerID: 1, DefenderID: 2}, counter}, []int{serverpackets.SystemMessageS1DodgesAttack, serverpackets.SystemMessageS1PerformingCounterattack}},
+		{"pdam failure before later lethal", []any{handlerskill.AttackFailedMessage{}, handlerskill.Lethal{AttackerID: 1, TargetID: 3}}, []int{serverpackets.SystemMessageAttackFailed, serverpackets.SystemMessageLethalStrikeSuccessful}},
+		{"manadam miss before later resist", []any{handlerskill.ManaDamageMissedMessage{}, resist}, []int{serverpackets.SystemMessageMissedTarget, serverpackets.SystemMessageS1ResistedYourS2}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frames := &testsupport.FrameCapture{}
+			caster := newTestLivePlayer(t, 1, frames)
+			state := world.New()
+			state.AddPlayer(caster)
+			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
+			state.AddPlayer(newTestLivePlayer(t, 3, &testsupport.FrameCapture{}))
+			l := &GameClientLink{world: state}
+			l.sendSkillHandlerResult(caster, actorcast.EffectResult{Messages: tc.messages})
+			got := frames.Frames()
+			if len(got) != len(tc.want) {
+				t.Fatalf("caster frame count = %d, want %d", len(got), len(tc.want))
+			}
+			for i, want := range tc.want {
+				assertSystemMessageIDFrame(t, got[i], want)
+			}
+		})
+	}
+}
+
+type orderedSkillActor struct {
+	skilltest.Creature
+	world.Presence
+	id      int32
+	kind    actor.Kind
+	effects *effect.List
+	counter float64
+	blow    formulas.BlowInput
+}
+
+func (a *orderedSkillActor) ObjectID() int32                                 { return a.id }
+func (a *orderedSkillActor) Kind() actor.Kind                                { return a.kind }
+func (a *orderedSkillActor) CharacterName() string                           { return "Target" }
+func (a *orderedSkillActor) AttackableBy(skilltarget.Actor) bool             { return true }
+func (a *orderedSkillActor) AttackableWithoutForceBy(skilltarget.Actor) bool { return true }
+func (a *orderedSkillActor) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
+	return false
+}
+func (a *orderedSkillActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+func (a *orderedSkillActor) EffectList() *effect.List                                 { return a.effects }
+func (a *orderedSkillActor) CounterSkillPhysical() float64                            { return a.counter }
+func (a *orderedSkillActor) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
+	return a.blow, true
+}
+func (a *orderedSkillActor) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}, true
+}
+
+func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
+	for _, cubic := range []bool{false, true} {
+		name := "resolved cast"
+		if cubic {
+			name = "cubic cast"
+		}
+		t.Run(name, func(t *testing.T) {
+			frames := &testsupport.FrameCapture{}
+			live := newTestLivePlayer(t, 1, frames)
+			state := world.New()
+			state.AddPlayer(live)
+			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
+			link := &GameClientLink{world: state}
+			caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
+			target := &orderedSkillActor{id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
+				blow: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}}
+			def := modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
+				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}}
+			skills := handlerskill.NewDefaultRegistry()
+			var result actorcast.EffectResult
+			if cubic {
+				result = actorcast.ApplyCubicEffect(skills, caster, def, target)
+			} else {
+				result = actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: skilltarget.NewRegistry(nil), Skills: skills}, caster, target, def)
+			}
+			if !result.Handled {
+				t.Fatal("cast was not handled")
+			}
+			link.sendSkillHandlerResult(live, result)
+			got := frames.Frames()
+			if len(got) != 2 {
+				t.Fatalf("caster frame count = %d, want 2", len(got))
+			}
+			assertSystemMessageStringSkillNameFrame(t, got[0], serverpackets.SystemMessageS1ResistedYourS2, "Target", 7, 20)
+			assertSystemMessageStringFrame(t, got[1], serverpackets.SystemMessageS1PerformingCounterattack, "Player")
+		})
+	}
 }
 
 // TestDeliverHitResultForwardsToSendSkillHandlerResult pins the exported
@@ -55,7 +163,7 @@ func TestDeliverHitResultForwardsToSendSkillHandlerResult(t *testing.T) {
 	l := &GameClientLink{world: state}
 
 	l.DeliverHitResult(actorcast.EffectResult{
-		ManaDrains: []handlerskill.ManaDrain{{TargetID: 43, CasterName: "Orc", MP: 12}},
+		Messages: []any{handlerskill.ManaDrain{TargetID: 43, CasterName: "Orc", MP: 12}},
 	})
 
 	got := frames.Frames()

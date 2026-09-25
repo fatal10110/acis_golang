@@ -26,6 +26,7 @@ type EffectHandlers struct {
 // which player-visible outcomes that handler produced.
 type EffectResult struct {
 	Handled           bool
+	Messages          []any
 	AttackFailed      int
 	Counterattacks    []handlerskill.Counterattack
 	Lethals           []handlerskill.Lethal
@@ -194,6 +195,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	}
 	return EffectResult{
 		Handled:           true,
+		Messages:          result.Messages,
 		AttackFailed:      result.AttackFailed,
 		Counterattacks:    result.Counterattacks,
 		Lethals:           result.Lethals,
