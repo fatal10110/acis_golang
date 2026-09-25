@@ -144,6 +144,7 @@ func TestChargeDamageConsumesSoulshotUnlessStaticReuse(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 			readCastStartFrames(t, c, objID, skillID, 1, 500, 0, hostile.ObjectID())
 			srv.AdvanceUntil(t, "CHARGEDAM damage", func() bool { return hostile.CurrentHP() < maxHP })
+			srv.Settle(t)
 			if got := charged.SoulshotCharged(); got != staticReuse {
 				t.Fatalf("soulshot charged after cast = %t, want %t", got, staticReuse)
 			}
