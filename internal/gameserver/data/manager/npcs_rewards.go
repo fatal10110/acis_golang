@@ -52,7 +52,7 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 		maxDealer = nil
 	}
 	if receiver := dropReceiver(killer, maxDealer); receiver != nil {
-		d.rollDrops(receiver, attackersTopLevel(threats, d.hostile.ObjectID(), receiver.Level()))
+		d.rollDrops(receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
 	}
 	d.grantExpAndSp(entries, summonDamage, totalDamage)
 }
@@ -164,27 +164,6 @@ func (d *deathRewards) inPartyRange(c attackable.Combatant) bool {
 	dx, dy, dz := int64(hx-cx), int64(hy-cy), int64(hz-cz)
 	reach := float64(d.config.PartyRange) + d.hostile.CollisionRadius() + c.CollisionRadius()
 	return float64(dx*dx+dy*dy+dz*dz) <= reach*reach
-}
-
-// attackersTopLevel is the highest level among the victim's damaging
-// attackers of any kind, else fallback.
-//
-// ponytail: damage > 0 threat entries stand in for a full attacked-by set,
-// which also holds zero-damage offensive casters and outlives the death
-// until the region deactivates; upgrade when an attacked event records it
-// (#2533).
-func attackersTopLevel(threats []attackable.Threat, victimID int32, fallback int) int {
-	level, found := 0, false
-	for _, threat := range threats {
-		if threat.Damage <= 0 || threat.Attacker.ObjectID() == victimID {
-			continue
-		}
-		level, found = max(level, threat.Attacker.Level()), true
-	}
-	if !found {
-		return fallback
-	}
-	return level
 }
 
 func (d *deathRewards) rollDrops(receiver attackable.Combatant, attackerLevel int) {
