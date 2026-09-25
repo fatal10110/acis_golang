@@ -251,7 +251,8 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 // effect-landing roll can never succeed (IgnoreResists returns BaseLandRate
 // verbatim, and a zero rate never beats the roll) at another player: the
 // damage itself lands, and the caster's own client receives the
-// resisted-your-skill system message naming the target and the skill.
+// resisted-your-skill system message naming the target and the skill (level 1
+// regardless of the cast level).
 func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -259,7 +260,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
-				ID: 44, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				ID: 44, Level: 7, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
 				SkillType: "MDAM", Power: 1_000_000,
 				IgnoreResists: true, BaseLandRate: 0,
@@ -268,7 +269,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	seedKnownSkill(t, srv, objID, 44, 1)
+	seedKnownSkill(t, srv, objID, 44, 7)
 	victim := srv.SeedCharacterFor(t, "victim", "Victim", 1, 0)
 	vc := srv.DialClient(t, "victim", 1)
 	startInWorldAmongPlayers(t, vc)
@@ -291,7 +292,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	// An unflagged innocent is only attackable with force (ctrl), matching
 	// the reference's isAttackableWithoutForce gate.
 	c.Send(encodeRequestMagicSkillUse(44, true, false))
-	readCastStartFrames(t, c, objID, 44, 1, 500, 60_000, victim.ID)
+	readCastStartFrames(t, c, objID, 44, 7, 500, 60_000, victim.ID)
 
 	srv.AdvanceUntil(t, "MDAM damage on the victim", func() bool {
 		return srv.PlayerCurrentHP(t, victim.ID) < before
@@ -319,6 +320,8 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 			t.Fatalf("resisted message first parameter = text Victim")
 		}
 		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamSkillName || r.ReadInt32() != 44 || r.ReadInt32() != 1 {
+			// The cast is level 7; Mdam adds the skill by id only, so the
+			// message carries level 1.
 			t.Fatalf("resisted message second parameter = skill 44 level 1")
 		}
 	}

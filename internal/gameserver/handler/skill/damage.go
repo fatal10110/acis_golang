@@ -242,7 +242,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 			return
 		}
 		if !succeeded {
-			appendResisted(result, effected, cast.Skill, true)
+			appendResisted(result, effected, cast.Skill, 1, true) // id-only addSkillName overload: level 1
 			return
 		}
 	}
@@ -351,7 +351,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 		// Formulas.java:614 gates this send `attacker instanceof Player` —
 		// unlike Mdam/Blow/Manadam's own unconditional skill-level resist —
 		// so it never reaches a Summon's owner in the reference.
-		appendResisted(result, target, cast.Skill, false)
+		appendResisted(result, target, cast.Skill, cast.Skill.Level, false)
 	}
 	if target.Kind() == actor.KindPlayer {
 		result.MagicResists = append(result.MagicResists, MagicResist{
@@ -402,11 +402,15 @@ func deliverMagicFailure(caster Creature, target Actor, def modelskill.Definitio
 // message from the target creature's name unconditionally, and the datapack
 // ships nameless targetable monsters (npc ids 27201-27213), so an empty name
 // still owes the caster the report.
-func appendResisted(result *Result, target Actor, def modelskill.Definition, unconditional bool) {
+//
+// level is the skill level written into the message: the reference builds it
+// from the skill object (the cast level) at most producers, but Mdam adds only
+// the skill id, so its message always carries level 1.
+func appendResisted(result *Result, target Actor, def modelskill.Definition, level int, unconditional bool) {
 	if result == nil {
 		return
 	}
-	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: def.Level, Unconditional: unconditional})
+	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: level, Unconditional: unconditional})
 }
 
 // appendResistedCount records count per-effect-template resists produced by
@@ -415,7 +419,7 @@ func appendResisted(result *Result, target Actor, def modelskill.Definition, unc
 // unconditional skill-level resist.
 func appendResistedCount(result *Result, target Actor, def modelskill.Definition, count int) {
 	for range count {
-		appendResisted(result, target, def, false)
+		appendResisted(result, target, def, def.Level, false)
 	}
 }
 
@@ -450,7 +454,7 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 		return
 	}
 	if !succeeded {
-		appendResisted(result, effected, cast.Skill, true)
+		appendResisted(result, effected, cast.Skill, cast.Skill.Level, true)
 		return
 	}
 	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
@@ -471,7 +475,7 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 			return
 		}
 		if !succeeded {
-			appendResisted(result, effected, cast.Skill, true)
+			appendResisted(result, effected, cast.Skill, cast.Skill.Level, true)
 			return
 		}
 	}
@@ -526,7 +530,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			if ok && succeeded {
 				appendResistedCount(&result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false))
 			} else if ok {
-				appendResisted(&result, effected, cast.Skill, true)
+				appendResisted(&result, effected, cast.Skill, cast.Skill.Level, true)
 			}
 		}
 		rawDamage := formulas.ManaDamage(in)
