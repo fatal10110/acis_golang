@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -94,6 +95,60 @@ func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
 	srv.AdvanceUntil(t, "PDAM drain", func() bool { return hostile.CurrentHP() < maxHP })
 	if hp := hostile.CurrentHP(); hp >= maxHP {
 		t.Fatalf("monster HP after PDAM = %d, want drained below %d", hp, maxHP)
+	}
+}
+
+func TestChargeDamageConsumesSoulshotUnlessStaticReuse(t *testing.T) {
+	for _, staticReuse := range []bool{false, true} {
+		t.Run(map[bool]string{false: "normal", true: "static reuse"}[staticReuse], func(t *testing.T) {
+			t.Parallel()
+			const skillID = 6
+			srv := gameservertest.Boot(t,
+				gameservertest.WithCharacter("Newbie", 5, 0),
+				gameservertest.WithWantChars(1),
+				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+					CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: staticReuse,
+					SkillType: "CHARGEDAM", Power: 1_000_000,
+				}})),
+			)
+			c, objID := srv.Client, srv.SoleObjectID(t)
+			weapon := srv.GiveItem(t, objID, 30, 1)
+			shot := srv.GiveItem(t, objID, 1463, 10)
+			seedKnownSkill(t, srv, objID, skillID, 1)
+			startInWorld(t, c)
+
+			useItem := func(objectID int32) {
+				w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
+				w.WriteInt32(objectID)
+				w.WriteInt32(0)
+				c.Send(w.Bytes())
+				srv.InventoryUpdates.Tick()
+				drainUntilQuiet(t, c)
+			}
+			useItem(weapon)
+			useItem(shot)
+			player, ok := srv.State.Player(objID)
+			if !ok {
+				t.Fatalf("world.Player(%d) missing", objID)
+			}
+			charged := player.(interface{ SoulshotCharged() bool })
+			if !charged.SoulshotCharged() {
+				t.Fatal("soulshot was not charged before cast")
+			}
+
+			hostile := srv.SpawnHostileNPC(t)
+			drainUntilQuiet(t, c)
+			maxHP := targetHostile(t, c, hostile.ObjectID())
+			drainUntilQuiet(t, c)
+			c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+			readCastStartFrames(t, c, objID, skillID, 1, 500, 0, hostile.ObjectID())
+			srv.AdvanceUntil(t, "CHARGEDAM damage", func() bool { return hostile.CurrentHP() < maxHP })
+			srv.Settle(t)
+			if got := charged.SoulshotCharged(); got != staticReuse {
+				t.Fatalf("soulshot charged after cast = %t, want %t", got, staticReuse)
+			}
+		})
 	}
 }
 

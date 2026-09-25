@@ -139,6 +139,9 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	if caster, ok := cast.Caster.(shotCharger); ok {
+		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
+	}
 	return result
 }
 
