@@ -304,16 +304,29 @@ func (f *ScriptedClient) Conn() net.Conn { return f.conn }
 // Close closes the underlying connection.
 func (f *ScriptedClient) Close() error { return f.conn.Close() }
 
-// ExpectClosed fails unless the server closes the connection within 5s, the
-// same generous bound Read gives a frame: the close trails the detach path's
-// persistence, which other packages' CPU load can stretch past a couple of
-// seconds. A timeout fails too: a connection still open is not closed.
+// ExpectClosed fails unless the server closes the connection without sending
+// another frame. It waits the way reads do: on the harness's driven clock the
+// wait lasts until the server has finished handling everything this client
+// sent (the logout's detach and the saves it hands the persistence lanes),
+// then allows Read's 5s for the close itself; without one (the pool
+// executor) it is Read's 5s on the wall clock. A timeout fails too: a
+// connection still open is not closed.
 func (f *ScriptedClient) ExpectClosed() {
 	f.t.Helper()
-	f.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	buf := make([]byte, 1)
-	n, err := f.conn.Read(buf)
-	if ne, ok := err.(net.Error); n != 0 || err == nil || ok && ne.Timeout() {
-		f.t.Fatalf("expected connection to close, got n=%d err=%v", n, err)
+	if err := f.closed(5 * time.Second); err != nil {
+		f.t.Fatal(err)
 	}
+}
+
+// closed reports why the connection is not closed within d, or nil once the
+// server has closed it.
+func (f *ScriptedClient) closed(d time.Duration) error {
+	payload, err := f.readFrame(d)
+	if err == nil {
+		return fmt.Errorf("expected connection to close, got frame %x", payload)
+	}
+	if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		return fmt.Errorf("expected connection to close, got %v", err)
+	}
+	return nil
 }
