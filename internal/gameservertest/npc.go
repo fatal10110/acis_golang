@@ -248,7 +248,37 @@ type movingHostileStatRef struct{ effect.StatOwner }
 // at construction). Shared by the moving and stationary attacking fixtures.
 type hostileActorRef struct{ attack.CreatureActor }
 
-type movingHostileLocatedRef struct{ *npc.Hostile }
+type movingHostileLocatedRef struct{ move.Actor }
+
+func (r *movingHostileLocatedRef) GeoPathFailCount() int {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		return h.GeoPathFailCount()
+	}
+	return 0
+}
+
+func (r *movingHostileLocatedRef) ResetGeoPathFailCount() {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.ResetGeoPathFailCount()
+	}
+}
+
+func (r *movingHostileLocatedRef) AddGeoPathFailCount() {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.AddGeoPathFailCount()
+	}
+}
+
+func (r *movingHostileLocatedRef) TeleportTo(target location.Location) {
+	if h, ok := r.Actor.(*npc.Hostile); ok {
+		h.TeleportTo(target)
+	}
+}
+
+func (r *movingHostileLocatedRef) OffensiveFollowLead() bool {
+	h, ok := r.Actor.(*npc.Hostile)
+	return ok && h.OffensiveFollowLead()
+}
 
 // SpawnMovingHostileNPCAt seeds a hostile monster with the production move
 // controller wired through BroadcastMove, so leash-return and other
@@ -321,7 +351,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
-	locRef.Hostile = hostile
+	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
