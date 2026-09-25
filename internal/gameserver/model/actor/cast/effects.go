@@ -163,6 +163,17 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		}
 	}
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
+	if def.Offensive {
+		switch def.SkillType {
+		case "AGGREDUCE", "AGGREMOVE", "AGGREDUCE_CHAR":
+		default:
+			for _, target := range affected {
+				if recorder, ok := target.(interface{ RecordAttacker(attackable.Combatant) }); ok {
+					recorder.RecordAttacker(castCaster)
+				}
+			}
+		}
+	}
 
 	if def.Overhit && caster.Kind().Playable() {
 		for _, t := range affected {

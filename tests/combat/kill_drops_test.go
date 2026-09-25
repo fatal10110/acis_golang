@@ -2,6 +2,7 @@ package combat
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -12,6 +13,84 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
+
+// TestDebufferLevelPenalizesDrops exercises the cast event rather than the
+// damage table: the high-level player never damages the monsters.
+func TestDebufferLevelPenalizesDrops(t *testing.T) {
+	t.Parallel()
+	const (
+		debuffID    = 1069
+		aggReduceID = 1068
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Debuffer", 10, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithDeepBlueDropRules(true),
+		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{
+			{
+				ID: debuffID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 0, StaticHitTime: true, StaticReuse: true,
+				SkillType: "DEBUFF", Debuff: true, Offensive: true,
+				Effects: []modelskill.EffectTemplate{{Name: "Sleep", Time: 10, EffectPower: 100, EffectPowerSet: true}},
+			},
+			{
+				ID: aggReduceID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				CastRange: 900, HitTime: 500, ReuseDelay: 0, StaticHitTime: true, StaticReuse: true,
+				SkillType: "AGGREDUCE", Offensive: true,
+			},
+		})),
+	)
+	c, debufferID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, debufferID, debuffID, 1)
+	seedKnownSkill(t, srv, debufferID, aggReduceID, 1)
+	startInWorld(t, c)
+	low := srv.SeedCharacterFor(t, "low", "Low", 1, 0)
+	lowClient := srv.DialClient(t, "low", 1)
+	startInWorld(t, lowClient)
+	drainUntilQuiet(t, c)
+	lowObj, ok := srv.State.Player(low.ObjectID())
+	if !ok {
+		t.Fatal("low-level player missing from world")
+	}
+	lowPlayer, ok := network.OnlineCharacter(lowObj)
+	if !ok {
+		t.Fatal("low-level player is not online")
+	}
+
+	const kills = 30
+	for i := range kills {
+		monster := srv.SpawnHostileNPCTemplateAt(t, dropMonsterTemplate(), location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+		drainUntilQuiet(t, c)
+		targetHostile(t, c, monster.ObjectID())
+		drainUntilQuiet(t, c)
+		if i == 0 {
+			c.Send(encodeRequestMagicSkillUse(aggReduceID, false, false))
+			readCastStartFrames(t, c, debufferID, aggReduceID, 1, 500, 0, monster.ObjectID())
+			srv.Advance(t, time.Second)
+			drainUntilQuiet(t, c)
+			if got := monster.HighestAttackerLevel(1); got != 1 {
+				t.Fatalf("highest attacker level after AGGREDUCE = %d, want empty-set fallback 1", got)
+			}
+		}
+		c.Send(encodeRequestMagicSkillUse(debuffID, false, false))
+		readCastStartFrames(t, c, debufferID, debuffID, 1, 500, 0, monster.ObjectID())
+		srv.AdvanceUntil(t, "debuff hit", func() bool { return monster.HighestAttackerLevel(1) == 10 })
+		drainUntilQuiet(t, c)
+		if got := monster.HighestAttackerLevel(1); got != 10 {
+			t.Fatalf("highest attacker level after debuff = %d, want 10", got)
+		}
+		if !monster.TakeDamage(1_000_000, lowPlayer) {
+			t.Fatal("low-level player's hit did not kill the monster")
+		}
+		if got := monster.HighestAttackerLevel(0); got != 0 {
+			t.Fatalf("highest attacker level after death = %d, want an empty set", got)
+		}
+		drainUntilQuiet(t, c)
+	}
+	if drops := groundDrops(srv); len(drops) == kills {
+		t.Fatalf("all %d kills dropped, want the high-level debuffer's deep-blue penalty", kills)
+	}
+}
 
 // dropMonsterAdena is the guaranteed currency drop of dropMonsterTemplate.
 const dropMonsterAdena = 10
