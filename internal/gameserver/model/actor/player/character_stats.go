@@ -472,7 +472,7 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 		}
 	}
 	c.curHP -= amount
-	dead = c.curHP <= 0
+	dead = c.curHP < creature.DeathHP
 	if dead {
 		c.curHP = 0
 	}
