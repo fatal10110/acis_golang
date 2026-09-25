@@ -6,7 +6,9 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -31,17 +33,13 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
 				if inv := o.PetInventory(); inv != nil {
-					var frame wire.Frame
-					err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
-						var buildErr error
-						frame, buildErr = serverpackets.FramePetItemList(items, inv.Templates())
-						return buildErr
-					})
-					if err != nil {
-						p.log.Error().Err(err).Msg("build PetItemList")
-						return
-					}
-					p.sendVisibilityFrame(frame)
+					// PetInventoryUpdate is drained and sent on p's queue, but
+					// discovery can run on another actor's: a summon-friend cast
+					// teleports p from the caster's queue. Building the snapshot
+					// there would let an update drained after it overtake it, so
+					// the snapshot is always taken and sent on p's queue.
+					seen := p.petSightings.Add(1)
+					p.Queue().Post(func() { p.sendPetItemList(inv, seen) })
 				}
 			}
 			return
@@ -61,6 +59,28 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	}
+}
+
+// sendPetItemList sends the owner's full pet inventory, draining the pending
+// PetInventoryUpdate queue it supersedes. It runs on p's queue, and sends
+// nothing once p has forgotten the pet (unsummoned or out of view) or seen it
+// again since the Discover numbered seen.
+func (p *livePlayer) sendPetItemList(inv *itemcontainer.Inventory, seen uint32) {
+	sim.AssertOwner(p.Queue())
+	if p.petSightings.Load() != seen {
+		return
+	}
+	var frame wire.Frame
+	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
+		var buildErr error
+		frame, buildErr = serverpackets.FramePetItemList(items, inv.Templates())
+		return buildErr
+	})
+	if err != nil {
+		p.log.Error().Err(err).Msg("build PetItemList")
+		return
+	}
+	p.sendVisibilityFrame(frame)
 }
 
 // liveSummonOwner returns the connected player controlling a.
@@ -110,6 +130,7 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		// generic DeleteObject other Tracked kinds get. Non-owners received
 		// SummonInfo, so they receive the corresponding DeleteObject below.
 		if o.OwnerID() == p.ObjectID() {
+			p.petSightings.Add(1)
 			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
 			return
 		}
