@@ -495,7 +495,7 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceHP applies skill HP damage and marks the summon dead at zero HP.
+// ReduceHP applies skill HP damage and marks the summon dead below creature.DeathHP.
 func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
 		return
@@ -531,7 +531,7 @@ func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	a.drainHP(amount)
 }
 
-// drainHP takes amount off a live summon's HP, marks it dead at zero, and
+// drainHP takes amount off a live summon's HP, marks it dead below DeathHP, and
 // refreshes its status. It reports false when the summon was already dead.
 func (a *Actor) drainHP(amount float64) bool {
 	a.vitals.mu.Lock()
@@ -540,7 +540,7 @@ func (a *Actor) drainHP(amount float64) bool {
 		return false
 	}
 	a.vitals.hp -= amount
-	if a.vitals.hp <= 0 {
+	if a.vitals.hp < creature.DeathHP {
 		a.vitals.hp = 0
 		a.dead = true
 	}

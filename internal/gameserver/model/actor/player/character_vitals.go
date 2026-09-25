@@ -1,6 +1,9 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+)
 
 // Vitals snapshots the character's current visible resources.
 type Vitals struct {
@@ -98,8 +101,8 @@ func (c *Character) CurrentCP() int {
 // newly killed the character.
 //
 // Death is a half-point threshold, not a zero crossing: the reference sets
-// HP and then dies on `_hp < 0.5` (PlayerStatus.java:217-238,
-// CreatureStatus.java:249-250), so any remainder under half a point is
+// HP and then dies on `_hp < 0.5` (PlayerStatus.java:222-239,
+// CreatureStatus.java:255-256), so any remainder under half a point is
 // already a death. A zero crossing would miss it, and the gap is reachable
 // rather than theoretical because the callers that gate on affordability
 // compare against truncated HP: a character on 10.4 HP reports 10, pays a
@@ -107,11 +110,7 @@ func (c *Character) CurrentCP() int {
 // at 0 HP either way. The remainder is then cleared so a repeat call sees
 // an already-dead character.
 //
-// The rule belongs to every creature, but only this site applies it: the
-// damage tails still declare death on a zero crossing, so the same
-// character survives a blow that leaves the identical remainder. Deferred,
-// tracked so it stays linked rather than silently approximated (issue
-// #2389).
+// Every damage route applies the same threshold (creature.DeathHP).
 func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
@@ -122,7 +121,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 		return false
 	}
 	c.curHP -= float64(amount)
-	if c.curHP >= 0.5 {
+	if c.curHP >= creature.DeathHP {
 		return false
 	}
 	c.curHP = 0

@@ -2,6 +2,12 @@ package creature
 
 import "sync"
 
+// DeathHP is the half-point death threshold every creature shares: HP that
+// falls below it is a death, not just HP that reaches zero. Fractional current
+// HP is ordinary (regeneration and heals write fractions straight into it),
+// so a remainder in (0, DeathHP) after a blow is already dead.
+const DeathHP = 0.5
+
 // Health guards one actor's current hit points. An attacker's hit damages
 // them from the attacker's queue.
 type Health struct {
@@ -60,7 +66,7 @@ func (h *Health) Add(amount, max float64) float64 {
 }
 
 // Damage applies non-negative damage, clamps at zero, and reports whether
-// this damage newly reached zero.
+// this damage newly left HP below DeathHP.
 func (h *Health) Damage(dmg int) bool {
 	if dmg < 0 {
 		dmg = 0
@@ -69,7 +75,7 @@ func (h *Health) Damage(dmg int) bool {
 }
 
 // DamageValue applies non-negative fractional damage, clamps at zero, and
-// reports whether this damage newly reached zero.
+// reports whether this damage newly left HP below DeathHP.
 func (h *Health) DamageValue(dmg float64) bool {
 	if dmg < 0 {
 		dmg = 0
@@ -81,7 +87,7 @@ func (h *Health) DamageValue(dmg float64) bool {
 	}
 
 	*h.current -= dmg
-	if *h.current > 0 {
+	if *h.current >= DeathHP {
 		return false
 	}
 	*h.current = 0
