@@ -565,38 +565,7 @@ func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
 // through l.livePlayerByID, independent of whether live is connected or
 // even nil) from a resolved skill-handler result.
 func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
-	messages := result.Messages
-	if messages == nil {
-		// Callers that construct an EffectResult directly still use its typed fields.
-		for _, m := range result.Counterattacks {
-			messages = append(messages, m)
-		}
-		for _, m := range result.Dodges {
-			messages = append(messages, m)
-		}
-		for _, m := range result.Lethals {
-			messages = append(messages, m)
-		}
-		for _, m := range result.Resisted {
-			messages = append(messages, m)
-		}
-		for i := 0; i < result.AttackFailed; i++ {
-			messages = append(messages, skillhandler.AttackFailedMessage{})
-		}
-		for _, m := range result.MagicResists {
-			messages = append(messages, m)
-		}
-		for i := 0; i < result.ManaDamageMissed; i++ {
-			messages = append(messages, skillhandler.ManaDamageMissedMessage{})
-		}
-		for _, m := range result.ManaDrains {
-			messages = append(messages, m)
-		}
-		for _, mp := range result.OpponentMPReduced {
-			messages = append(messages, skillhandler.OpponentMPReducedMessage{MP: mp})
-		}
-	}
-	for _, message := range messages {
+	for _, message := range result.Messages {
 		switch m := message.(type) {
 		case skillhandler.Counterattack:
 			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)

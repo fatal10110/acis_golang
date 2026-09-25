@@ -54,9 +54,11 @@ func TestWireSummonAIForwardsManaFieldsToOwner(t *testing.T) {
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
-		ManaDamageMissed:  1,
-		ManaDrains:        []handlerskill.ManaDrain{{TargetID: 200, CasterName: "Servitor", MP: 15}},
-		OpponentMPReduced: []int32{999},
+		Messages: []any{
+			handlerskill.ManaDamageMissedMessage{},
+			handlerskill.ManaDrain{TargetID: 200, CasterName: "Servitor", MP: 15},
+			handlerskill.OpponentMPReducedMessage{MP: 999},
+		},
 	})
 
 	ownerGot := ownerFrames.Frames()
@@ -111,12 +113,6 @@ func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
 			handlerskill.Dodge{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
 			handlerskill.Counterattack{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
 		},
-		Dodges: []handlerskill.Dodge{
-			{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
-		},
-		Counterattacks: []handlerskill.Counterattack{
-			{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
-		},
 	})
 
 	if ownerGot := ownerFrames.Frames(); len(ownerGot) != 0 {
@@ -166,12 +162,6 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 			handlerskill.Resisted{TargetName: "Orc", SkillID: 2, SkillLevel: 1},
 			handlerskill.Resisted{TargetName: "Orc", SkillID: 1, SkillLevel: 1, Unconditional: true},
 			handlerskill.ManaDamageMissedMessage{},
-		},
-		AttackFailed:     1,
-		ManaDamageMissed: 1,
-		Resisted: []handlerskill.Resisted{
-			{TargetName: "Orc", SkillID: 1, SkillLevel: 1, Unconditional: true},
-			{TargetName: "Orc", SkillID: 2, SkillLevel: 1, Unconditional: false},
 		},
 	})
 

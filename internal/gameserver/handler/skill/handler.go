@@ -261,6 +261,8 @@ type OpponentMPReducedMessage struct{ MP int32 }
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	// Messages retains the order in which handler messages were produced.
+	// Skill damage messages are not ported yet; #2557 must record them here
+	// at their per-target position when they are added.
 	Messages       []any
 	messages       *[]any
 	AttackFailed   int

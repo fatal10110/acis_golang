@@ -551,13 +551,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		// unconditional forwarding; the
 		// generic per-effect L2Skill.getEffects resist is gated
 		// `effector instanceof Player` and never fires for a Summon caster.
-		var resisted []handlerskill.Resisted
 		var messages []any
-		for _, r := range result.Resisted {
-			if r.Unconditional {
-				resisted = append(resisted, r)
-			}
-		}
 		for _, message := range result.Messages {
 			switch m := message.(type) {
 			case handlerskill.Resisted:
@@ -570,17 +564,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 				messages = append(messages, message)
 			}
 		}
-		l.sendSkillHandlerResult(owner, actorcast.EffectResult{
-			Messages:         messages,
-			AttackFailed:     result.AttackFailed,
-			Lethals:          result.Lethals,
-			MagicResists:     result.MagicResists,
-			ManaDamageMissed: result.ManaDamageMissed,
-			ManaDrains:       result.ManaDrains,
-			Dodges:           result.Dodges,
-			Counterattacks:   result.Counterattacks,
-			Resisted:         resisted,
-		})
+		l.sendSkillHandlerResult(owner, actorcast.EffectResult{Messages: messages})
 	}
 	brain.SetCastController(aiController)
 	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
