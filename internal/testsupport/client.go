@@ -7,6 +7,7 @@ package testsupport
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -95,12 +96,17 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 	if err != nil {
 		// Formatted, not wrapped: a caller that tolerates a timeout must
 		// not find one in here, however it inspects the error, because the
-		// stream is already misaligned.
-		return nil, fmt.Errorf("frame cut off after its first byte: %v", err)
+		// stream is already misaligned. It wraps errFrameCutOff instead, which
+		// carries no timeout.
+		return nil, fmt.Errorf("%w: %v", errFrameCutOff, err)
 	}
 	f.received.Add(1)
 	return payload, nil
 }
+
+// errFrameCutOff marks a frame whose first byte arrived but whose rest did
+// not: the server closed or stalled mid-frame.
+var errFrameCutOff = errors.New("frame cut off after its first byte")
 
 // writeFrame writes one raw frame and counts it.
 func (f *ScriptedClient) writeFrame(payload []byte) error {
@@ -319,13 +325,14 @@ func (f *ScriptedClient) ExpectClosed() {
 }
 
 // closed reports why the connection is not closed within d, or nil once the
-// server has closed it.
+// server has closed it. Part of a frame before the close is not a clean
+// close, nor is a frame stalled mid-way.
 func (f *ScriptedClient) closed(d time.Duration) error {
 	payload, err := f.readFrame(d)
 	if err == nil {
 		return fmt.Errorf("expected connection to close, got frame %x", payload)
 	}
-	if ne, ok := err.(net.Error); ok && ne.Timeout() {
+	if ne, ok := err.(net.Error); ok && ne.Timeout() || errors.Is(err, errFrameCutOff) {
 		return fmt.Errorf("expected connection to close, got %v", err)
 	}
 	return nil
