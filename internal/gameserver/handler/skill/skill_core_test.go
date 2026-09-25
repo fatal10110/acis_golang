@@ -2420,7 +2420,9 @@ func chanceOf(v float64) *float64 { return &v }
 // Mdam's own effect-success roll (Mdam.java:69, unconditional
 // creature.sendPacket) must tag Resisted.Unconditional true, while a
 // resisted per-effect-template landing (L2Skill.java:1196-1197, gated
-// `effector instanceof Player`) must tag it false.
+// `effector instanceof Player`) must tag it false. Mdam.java:69 also adds the
+// skill by id only, so its own resist carries level 1 while the per-effect
+// landing (and every sibling handler) carries the cast level, 20 here.
 func TestMdamTagsResistedByOrigin(t *testing.T) {
 	registry := NewDefaultRegistry()
 	magicInput := formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1}
@@ -2432,14 +2434,14 @@ func TestMdamTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for MDAM")
 		}
-		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 1 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true, SkillLevel=1", result.Resisted)
 		}
 	})
 
@@ -2450,14 +2452,14 @@ func TestMdamTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true,
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "MDAM", Effects: resistedIconTemplate},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MDAM", Effects: resistedIconTemplate},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for MDAM")
 		}
-		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false, SkillLevel=20", result.Resisted)
 		}
 	})
 }
@@ -2475,14 +2477,14 @@ func TestBlowTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "BLOW", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for BLOW")
 		}
-		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true, SkillLevel=20", result.Resisted)
 		}
 	})
 
@@ -2493,14 +2495,14 @@ func TestBlowTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true,
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "BLOW", Effects: resistedIconTemplate},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", Effects: resistedIconTemplate},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for BLOW")
 		}
-		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false, SkillLevel=20", result.Resisted)
 		}
 	})
 }
@@ -2520,14 +2522,14 @@ func TestChargeDamTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for CHARGEDAM")
 		}
-		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true, SkillLevel=20", result.Resisted)
 		}
 	})
 
@@ -2538,14 +2540,14 @@ func TestChargeDamTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true,
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: resistedIconTemplate},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "CHARGEDAM", Effects: resistedIconTemplate},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for CHARGEDAM")
 		}
-		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false, SkillLevel=20", result.Resisted)
 		}
 	})
 }
@@ -2564,7 +2566,7 @@ func TestChargeDamEvasionReportsDodgeBeforeEffects(t *testing.T) {
 
 	result, ok := registry.UseResult(Cast{
 		Caster:  &skillTarget{},
-		Skill:   modelskill.Definition{SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "CHARGEDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 		Targets: []Actor{target},
 	})
 	if !ok {
@@ -2592,14 +2594,14 @@ func TestManaDamageTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true, skillSuccessChance: chanceOf(0),
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "MANADAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MANADAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for MANADAM")
 		}
-		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true", result.Resisted)
+		if len(result.Resisted) != 1 || !result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=true, SkillLevel=20", result.Resisted)
 		}
 	})
 
@@ -2610,14 +2612,14 @@ func TestManaDamageTagsResistedByOrigin(t *testing.T) {
 			skillSuccessOK: true,
 		}
 		result, ok := registry.UseResult(Cast{
-			Skill:   modelskill.Definition{SkillType: "MANADAM", Effects: resistedIconTemplate},
+			Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MANADAM", Effects: resistedIconTemplate},
 			Targets: []Actor{target},
 		})
 		if !ok {
 			t.Fatal("UseResult() handled = false, want true for MANADAM")
 		}
-		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional {
-			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false", result.Resisted)
+		if len(result.Resisted) != 1 || result.Resisted[0].Unconditional || result.Resisted[0].SkillLevel != 20 {
+			t.Fatalf("Resisted = %+v, want one entry with Unconditional=false, SkillLevel=20", result.Resisted)
 		}
 	})
 }
