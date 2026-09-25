@@ -42,9 +42,10 @@ func (h *Hostile) RealMoveSpeed() float64 {
 // Maker NPCs sample from the current position inside the maker territory.
 // Privates (a live master, no maker) offset from the NPC's current XY.
 // Other nil-maker spawns offset from spawn home. No spawn point or a
-// sub-noticeable offset is a no-op.
+// sub-noticeable offset is a no-op, as is a movement-disabled NPC: it keeps
+// its wander intention but starts no walk.
 func (h *Hostile) MoveFromSpawnUsingRandomOffset(offset int) {
-	if h.Instance == nil || !h.Instance.HasHome || offset < minWanderOffset {
+	if h.Instance == nil || !h.Instance.HasHome || offset < minWanderOffset || h.MovementDisabled() {
 		return
 	}
 	from := h.location()

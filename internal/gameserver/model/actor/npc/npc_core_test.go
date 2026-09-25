@@ -1376,6 +1376,88 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	}
 }
 
+// wanderGeo accepts every requested wander destination, unlike hostileGeo
+// which reflects the origin.
+type wanderGeo struct{ hostileGeo }
+
+func (wanderGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
+
+// A movement-disabled NPC keeps its WANDER intention but starts no walk:
+// the wander destination is only followed when the actor can move. Fear is
+// not a movement lock, so a feared NPC still walks.
+func TestMoveFromSpawnUsingRandomOffsetHonorsMovementLock(t *testing.T) {
+	cases := []struct {
+		name     string
+		disable  func(*testing.T, *Hostile)
+		wantMove bool
+	}{
+		{"free", func(*testing.T, *Hostile) {}, true},
+		{"fear", func(t *testing.T, h *Hostile) { addHostileEffect(t, h, "Fear") }, true},
+		{"root", func(t *testing.T, h *Hostile) { addHostileEffect(t, h, "Root") }, false},
+		{"sleep", func(t *testing.T, h *Hostile) { addHostileEffect(t, h, "Sleep") }, false},
+		{"stun", func(t *testing.T, h *Hostile) { addHostileEffect(t, h, "Stun") }, false},
+		{"paralyze", func(t *testing.T, h *Hostile) { addHostileEffect(t, h, "Paralyze") }, false},
+		{"canMove false", func(_ *testing.T, h *Hostile) { h.Instance.Template.CanMove = false }, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			movement := &hostileMove{}
+			live, err := creature.NewLive(location.Location{}, 100, wanderGeo{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			live.SetQueue(idleQueue())
+			hostile, err := NewHostile(&Instance{
+				ObjectID: 101,
+				Template: &Template{ID: 9001, Type: "Monster", CanMove: true},
+				Kind:     "Monster",
+				HasHome:  true,
+			}, live, movement, &hostileAttack{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			world.New().Spawn(hostile, 100, 500, 500, 0)
+			tc.disable(t, hostile)
+
+			hostile.MoveFromSpawnUsingRandomOffset(120)
+
+			if got := len(movement.locations) > 0; got != tc.wantMove {
+				t.Fatalf("wander move issued = %v (moves %v), want %v", got, movement.locations, tc.wantMove)
+			}
+		})
+	}
+}
+
+func TestReturnHomeWanderRecheckSkippedWhileRooted(t *testing.T) {
+	movement := &hostileMove{moved: make(chan location.Location, 1)}
+	hostile := newTestHostile(t, movement, &hostileAttack{})
+	hostile.Instance.HasHome = true
+	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
+	hostile.Instance.Template.WalkSpeed = 100
+	hostile.Instance.Template.CollisionRadius = 30
+	hostile.roll = func(int) int { return 0 }
+	world.New().Spawn(hostile, 100, 500, 0, 0)
+	clock := driveHostile(hostile)
+	hostile.SetHeading(0)
+	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
+	if err := hostile.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	addHostileEffect(t, hostile, "Root")
+
+	clock.Advance(1500 * time.Millisecond)
+	select {
+	case got := <-movement.moved:
+		t.Fatalf("rooted NPC's wander recheck moved to %#v, want no movement", got)
+	default:
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want WANDER kept", got)
+	}
+}
+
 func TestGrandBossReturnHomeNeverWalksBack(t *testing.T) {
 	// GrandBoss.returnHome is unconditionally false. A boss spawned
 	// outside drift range must not MoveHome or take the Attackable

@@ -996,7 +996,7 @@ func (h *Hostile) scheduleWanderRecheck() {
 	}
 	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
 	recheck := func() {
-		if h.brain.CurrentIntention() != ai.IntentionWander {
+		if h.brain.CurrentIntention() != ai.IntentionWander || h.MovementDisabled() {
 			return
 		}
 		position := h.location()
