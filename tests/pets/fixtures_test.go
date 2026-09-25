@@ -496,12 +496,14 @@ func requireInventoryUpdateOrder(t *testing.T, frames [][]byte, what string, wan
 }
 
 // readUntilOpcode collects frames until one carries want, returning every
-// frame read including the match.
+// frame read including the match. Each frame gets Read's generous bound: a
+// reply that trails persistence (a restart's CharSelectInfo) can lag well
+// past a second when other packages load the CPU.
 func readUntilOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte, what string) [][]byte {
 	t.Helper()
 	frames := make([][]byte, 0, 4)
 	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(time.Second)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("%s never arrived", what)
 		}
