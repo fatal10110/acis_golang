@@ -178,6 +178,7 @@ func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creatur
 	}
 	return EffectResult{
 		Handled:           true,
+		Messages:          result.Messages,
 		AttackFailed:      result.AttackFailed,
 		Counterattacks:    result.Counterattacks,
 		Lethals:           result.Lethals,

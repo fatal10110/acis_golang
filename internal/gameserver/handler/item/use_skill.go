@@ -195,6 +195,7 @@ func UseAll(req UseRequest) []UseResult {
 			result := actorcast.ApplyEffectsResult(req.Effects, req.Caster, req.Caster, def)
 			if mirrorToSummon {
 				summonResult := actorcast.ApplyEffectsResult(req.Effects, req.Summon, req.Summon, def)
+				result.Messages = append(result.Messages, summonResult.Messages...)
 				result.AttackFailed += summonResult.AttackFailed
 				result.Handled = result.Handled || summonResult.Handled
 				result.Counterattacks = append(result.Counterattacks, summonResult.Counterattacks...)

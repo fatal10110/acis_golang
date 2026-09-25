@@ -44,6 +44,39 @@ func TestSendSkillHandlerResultDeliversTargetMessagesWithNilCaster(t *testing.T)
 	assertSystemMessageStringNumberFrame(t, got[1], serverpackets.SystemMessageS2MPHasBeenDrainedByS1, "Orc", 30)
 }
 
+func TestSendSkillHandlerResultKeepsTargetMessageOrder(t *testing.T) {
+	resist := handlerskill.Resisted{TargetName: "First", SkillID: 1, SkillLevel: 1}
+	counter := handlerskill.Counterattack{AttackerID: 1, DefenderID: 3, DefenderName: "Second"}
+	for _, tc := range []struct {
+		name     string
+		messages []any
+		want     []int
+	}{
+		{"blow resist before counter", []any{resist, counter}, []int{serverpackets.SystemMessageS1ResistedYourS2, serverpackets.SystemMessageS1PerformingCounterattack}},
+		{"pdam dodge before later counter", []any{handlerskill.Dodge{AttackerID: 1, DefenderID: 2}, counter}, []int{serverpackets.SystemMessageS1DodgesAttack, serverpackets.SystemMessageS1PerformingCounterattack}},
+		{"pdam failure before later lethal", []any{handlerskill.AttackFailedMessage{}, handlerskill.Lethal{AttackerID: 1, TargetID: 3}}, []int{serverpackets.SystemMessageAttackFailed, serverpackets.SystemMessageLethalStrikeSuccessful}},
+		{"manadam miss before later resist", []any{handlerskill.ManaDamageMissedMessage{}, resist}, []int{serverpackets.SystemMessageMissedTarget, serverpackets.SystemMessageS1ResistedYourS2}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frames := &testsupport.FrameCapture{}
+			caster := newTestLivePlayer(t, 1, frames)
+			state := world.New()
+			state.AddPlayer(caster)
+			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
+			state.AddPlayer(newTestLivePlayer(t, 3, &testsupport.FrameCapture{}))
+			l := &GameClientLink{world: state}
+			l.sendSkillHandlerResult(caster, actorcast.EffectResult{Messages: tc.messages})
+			got := frames.Frames()
+			if len(got) != len(tc.want) {
+				t.Fatalf("caster frame count = %d, want %d", len(got), len(tc.want))
+			}
+			for i, want := range tc.want {
+				assertSystemMessageIDFrame(t, got[i], want)
+			}
+		})
+	}
+}
+
 // TestDeliverHitResultForwardsToSendSkillHandlerResult pins the exported
 // wrapper boot wiring uses to give a hostile NPC's OnHitResult a delivery
 // path with no live caster connection (issue #2350).

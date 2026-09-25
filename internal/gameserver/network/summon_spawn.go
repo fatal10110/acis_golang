@@ -552,12 +552,26 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		// generic per-effect L2Skill.getEffects resist is gated
 		// `effector instanceof Player` and never fires for a Summon caster.
 		var resisted []handlerskill.Resisted
+		var messages []any
 		for _, r := range result.Resisted {
 			if r.Unconditional {
 				resisted = append(resisted, r)
 			}
 		}
+		for _, message := range result.Messages {
+			switch m := message.(type) {
+			case handlerskill.Resisted:
+				if m.Unconditional {
+					messages = append(messages, m)
+				}
+			case handlerskill.OpponentMPReducedMessage:
+				// This caster-only message does not reach a summon's owner.
+			default:
+				messages = append(messages, message)
+			}
+		}
 		l.sendSkillHandlerResult(owner, actorcast.EffectResult{
+			Messages:         messages,
 			AttackFailed:     result.AttackFailed,
 			Lethals:          result.Lethals,
 			MagicResists:     result.MagicResists,

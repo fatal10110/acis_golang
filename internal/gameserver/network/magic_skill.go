@@ -565,80 +565,108 @@ func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
 // through l.livePlayerByID, independent of whether live is connected or
 // even nil) from a resolved skill-handler result.
 func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
-	for _, counterattack := range result.Counterattacks {
-		attacker, attackerOnline := l.livePlayerByID(counterattack.AttackerID)
-		defender, defenderOnline := l.livePlayerByID(counterattack.DefenderID)
-		attackerName := counterattack.AttackerName
-		if attackerOnline {
-			attackerName = attacker.Name
+	messages := result.Messages
+	if messages == nil {
+		// Callers that construct an EffectResult directly still use its typed fields.
+		for _, m := range result.Counterattacks {
+			messages = append(messages, m)
 		}
-		defenderName := counterattack.DefenderName
-		if defenderOnline {
-			defenderName = defender.Name
+		for _, m := range result.Dodges {
+			messages = append(messages, m)
 		}
-		if defenderOnline {
-			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
+		for _, m := range result.Lethals {
+			messages = append(messages, m)
 		}
-		if attackerOnline {
-			attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, defenderName))
-		}
-	}
-	for _, dodge := range result.Dodges {
-		attacker, attackerOnline := l.livePlayerByID(dodge.AttackerID)
-		defender, defenderOnline := l.livePlayerByID(dodge.DefenderID)
-		attackerName := dodge.AttackerName
-		if attackerOnline {
-			attackerName = attacker.Name
-		}
-		defenderName := dodge.DefenderName
-		if defenderOnline {
-			defenderName = defender.Name
-		}
-		if attackerOnline {
-			attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
-		}
-		if defenderOnline {
-			defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
-		}
-	}
-	for _, lethal := range result.Lethals {
-		if target, online := l.livePlayerByID(lethal.TargetID); online {
-			target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrike))
-		}
-		if attacker, online := l.livePlayerByID(lethal.AttackerID); online {
-			attacker.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
-		}
-	}
-	if live != nil {
-		for _, resisted := range result.Resisted {
-			live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, resisted.TargetName, int32(resisted.SkillID), int32(resisted.SkillLevel)))
+		for _, m := range result.Resisted {
+			messages = append(messages, m)
 		}
 		for i := 0; i < result.AttackFailed; i++ {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+			messages = append(messages, skillhandler.AttackFailedMessage{})
 		}
-	}
-	for _, resist := range result.MagicResists {
-		target, online := l.livePlayerByID(resist.TargetID)
-		if !online {
-			continue
+		for _, m := range result.MagicResists {
+			messages = append(messages, m)
 		}
-		target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, resist.AttackerName))
-	}
-	if live != nil {
 		for i := 0; i < result.ManaDamageMissed; i++ {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+			messages = append(messages, skillhandler.ManaDamageMissedMessage{})
 		}
-	}
-	for _, drain := range result.ManaDrains {
-		target, online := l.livePlayerByID(drain.TargetID)
-		if !online {
-			continue
+		for _, m := range result.ManaDrains {
+			messages = append(messages, m)
 		}
-		target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, drain.CasterName, drain.MP))
-	}
-	if live != nil {
 		for _, mp := range result.OpponentMPReduced {
-			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, mp))
+			messages = append(messages, skillhandler.OpponentMPReducedMessage{MP: mp})
+		}
+	}
+	for _, message := range messages {
+		switch m := message.(type) {
+		case skillhandler.Counterattack:
+			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)
+			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
+			attackerName := m.AttackerName
+			if attackerOnline {
+				attackerName = attacker.Name
+			}
+			defenderName := m.DefenderName
+			if defenderOnline {
+				defenderName = defender.Name
+			}
+			if defenderOnline {
+				defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
+			}
+			if attackerOnline {
+				attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, defenderName))
+			}
+		case skillhandler.Dodge:
+			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)
+			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
+			attackerName := m.AttackerName
+			if attackerOnline {
+				attackerName = attacker.Name
+			}
+			defenderName := m.DefenderName
+			if defenderOnline {
+				defenderName = defender.Name
+			}
+			if attackerOnline {
+				attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
+			}
+			if defenderOnline {
+				defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
+			}
+		case skillhandler.Lethal:
+			if target, online := l.livePlayerByID(m.TargetID); online {
+				target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrike))
+			}
+			if attacker, online := l.livePlayerByID(m.AttackerID); online {
+				attacker.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
+			}
+		case skillhandler.Resisted:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))
+			}
+		case skillhandler.AttackFailedMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+			}
+		case skillhandler.MagicResist:
+			target, online := l.livePlayerByID(m.TargetID)
+			if !online {
+				continue
+			}
+			target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, m.AttackerName))
+		case skillhandler.ManaDamageMissedMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+			}
+		case skillhandler.ManaDrain:
+			target, online := l.livePlayerByID(m.TargetID)
+			if !online {
+				continue
+			}
+			target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, m.CasterName, m.MP))
+		case skillhandler.OpponentMPReducedMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, m.MP))
+			}
 		}
 	}
 }

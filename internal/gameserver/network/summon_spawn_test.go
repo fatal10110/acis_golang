@@ -107,6 +107,10 @@ func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
+		Messages: []any{
+			handlerskill.Dodge{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
+			handlerskill.Counterattack{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
+		},
 		Dodges: []handlerskill.Dodge{
 			{AttackerID: 300, AttackerName: "Servitor", DefenderID: 200, DefenderName: "Target"},
 		},
@@ -123,8 +127,8 @@ func TestWireSummonAIForwardsDodgeAndCounterattackToTarget(t *testing.T) {
 	if len(targetGot) != 2 {
 		t.Fatalf("target frame count = %d, want 2 (AVOIDED_S1_ATTACK, COUNTERED_S1_ATTACK)", len(targetGot))
 	}
-	assertSystemMessageStringFrame(t, targetGot[0], serverpackets.SystemMessageCounteredS1Attack, "Servitor")
-	assertSystemMessageStringFrame(t, targetGot[1], serverpackets.SystemMessageAvoidedS1Attack, "Servitor")
+	assertSystemMessageStringFrame(t, targetGot[0], serverpackets.SystemMessageAvoidedS1Attack, "Servitor")
+	assertSystemMessageStringFrame(t, targetGot[1], serverpackets.SystemMessageCounteredS1Attack, "Servitor")
 }
 
 // TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner pins issue #2354:
@@ -157,6 +161,14 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 	aiController := l.wireSummonAI(servitor)
 
 	aiController.OnHitResult(actorcast.EffectResult{
+		Messages: []any{
+			handlerskill.AttackFailedMessage{},
+			handlerskill.Resisted{TargetName: "Orc", SkillID: 2, SkillLevel: 1},
+			handlerskill.Resisted{TargetName: "Orc", SkillID: 1, SkillLevel: 1, Unconditional: true},
+			handlerskill.ManaDamageMissedMessage{},
+		},
+		AttackFailed:     1,
+		ManaDamageMissed: 1,
 		Resisted: []handlerskill.Resisted{
 			{TargetName: "Orc", SkillID: 1, SkillLevel: 1, Unconditional: true},
 			{TargetName: "Orc", SkillID: 2, SkillLevel: 1, Unconditional: false},
@@ -164,10 +176,12 @@ func TestWireSummonAIForwardsOnlyUnconditionalResistedToOwner(t *testing.T) {
 	})
 
 	ownerGot := ownerFrames.Frames()
-	if len(ownerGot) != 1 {
-		t.Fatalf("owner frame count = %d, want 1 (only the unconditional Resisted entry forwards)", len(ownerGot))
+	if len(ownerGot) != 3 {
+		t.Fatalf("owner frame count = %d, want 3 in handler order", len(ownerGot))
 	}
-	assertSystemMessageStringSkillNameFrame(t, ownerGot[0], serverpackets.SystemMessageS1ResistedYourS2, "Orc", 1, 1)
+	assertStaticSystemMessageFrame(t, ownerGot[0], serverpackets.SystemMessageAttackFailed)
+	assertSystemMessageStringSkillNameFrame(t, ownerGot[1], serverpackets.SystemMessageS1ResistedYourS2, "Orc", 1, 1)
+	assertStaticSystemMessageFrame(t, ownerGot[2], serverpackets.SystemMessageMissedTarget)
 }
 
 // recordingAIRegistry records the AI-task registrations wireSummonAI makes.
