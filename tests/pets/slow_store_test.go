@@ -303,13 +303,25 @@ const holdCeiling = 2 * time.Second
 
 // useCollarRestoreHeld uses the wolf collar with the collar's persistence
 // lane held, so the pets-row read the summon queues there stays outstanding
-// until release is called.
+// until release is called. It returns once that read is queued: MagicSkillUse
+// only proves the cast started, and its Hit phase, which queues the read,
+// runs later on its own timer, so a test that stops the cast before then
+// aborts the summon instead of opening the window.
 func (h *petWorld) useCollarRestoreHeld(t *testing.T) (release func()) {
 	t.Helper()
 	release = h.srv.HoldPersistenceLane(t, h.collarID)
 	h.client.Send(encodeUseItem(h.collarID, false))
 	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
 	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner missing from world state")
+	}
+	owner, ok := obj.(interface{ RestoringSummon() bool })
+	if !ok {
+		t.Fatalf("world player %T lacks RestoringSummon", obj)
+	}
+	h.srv.AdvanceUntil(t, "the collar's pets-row read in flight", owner.RestoringSummon)
 	return release
 }
 

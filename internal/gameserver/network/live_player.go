@@ -131,6 +131,10 @@ func OnlineCharacter(p world.Player) (*player.Character, bool) {
 	return live.Character, true
 }
 
+// RestoringSummon reports whether a summon cast that already hit is still
+// waiting for its pets-row read.
+func (p *livePlayer) RestoringSummon() bool { return p.petRestoreInFlight.Load() }
+
 // AccountName returns the owning account of this in-world player, used to
 // report the online roster and per-account entries to the login server.
 func (p *livePlayer) AccountName() string { return p.Character.AccountName }
