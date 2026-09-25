@@ -70,6 +70,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame {
 			return frames.FlyTo(h.ObjectID(), e.Dest, location.Location{X: x, Y: y, Z: z}, e.Flight)
 		})
+	case event.Teleported:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(h.ObjectID(), e.To, false) })
 	case event.PositionCorrected:
 		x, y, z := h.Position()
 		s.broadcast(func() wire.Frame {

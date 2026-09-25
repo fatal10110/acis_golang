@@ -11,13 +11,39 @@ func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
 	h.emit(event.Flight{Dest: dest, Flight: flight})
 }
 
-// TeleportTo snaps the NPC to target and broadcasts the forced correction.
-// A teleport clears the geo-path fail streak: the next pathfinding attempt
-// is from a new cell, not a continuation of the stall that triggered recovery.
+// TeleportTo jumps the NPC to target. It aborts movement, attack and cast,
+// grounds target unless it lies in water, announces the jump to the NPC's
+// current observers, then leaves and re-enters the world grid so every
+// observer around either end forgets and rediscovers it. A teleport that
+// starts while another is in progress is dropped. A teleport clears the
+// geo-path fail streak: the next pathfinding attempt is from a new cell, not
+// a continuation of the stall that triggered recovery.
 func (h *Hostile) TeleportTo(target location.Location) {
-	h.SetXYZ(target.X, target.Y, target.Z)
-	h.BroadcastPosition()
+	if h.Live != nil {
+		if !h.SetTeleporting(true) {
+			return
+		}
+		if h.inWater == nil || !h.inWater(target) {
+			target.Z = int(h.Move().Height(target.X, target.Y, target.Z))
+		}
+	}
+	h.brain.AbortAll()
+	h.emit(event.Teleported{To: target})
+	if h.Live != nil {
+		h.Move().SetPosition(target)
+	}
+	if h.world != nil {
+		_ = h.world.Teleport(h, target.X, target.Y, target.Z)
+	}
+	h.SetTeleporting(false)
 	h.ResetGeoPathFailCount()
+}
+
+// SetWaterZone installs the query TeleportTo uses to keep a destination
+// inside a water zone at its own height. It must be set before the NPC is
+// published.
+func (h *Hostile) SetWaterZone(inWater func(location.Location) bool) {
+	h.inWater = inWater
 }
 
 // SetXYZ moves the NPC immediately and reseeds its ordinary movement state.

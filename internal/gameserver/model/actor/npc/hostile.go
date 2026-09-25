@@ -97,6 +97,10 @@ type Hostile struct {
 	lastFollowingLoc location.Location
 	hasLastFollow    bool
 
+	// inWater reports whether a location lies in a water zone; nil means
+	// none does. Set before the NPC is published.
+	inWater func(location.Location) bool
+
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 	running        atomic.Bool

@@ -12,13 +12,12 @@ import (
 
 func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 	for _, tc := range []struct {
-		name          string
-		geoFailures   int
-		initialOpcode byte
-		wantRecheck   bool
+		name        string
+		geoFailures int
+		wantRecheck bool
 	}{
-		{"ordinary walk", 9, serverpackets.OpcodeMoveToLocation, true},
-		{"recovery teleport", 10, serverpackets.OpcodeValidateLocation, false},
+		{"ordinary walk", 9, true},
+		{"recovery teleport", 10, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -45,10 +44,25 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			if !hostile.ReturnHome() {
 				t.Fatal("ReturnHome() = false outside drift range")
 			}
-			assertFrameOpcode(t, mustRead(t, c, "return home"), tc.initialOpcode, "return home")
-			if !tc.wantRecheck {
+			if tc.wantRecheck {
+				assertFrameOpcode(t, mustRead(t, c, "return home"), serverpackets.OpcodeMoveToLocation, "return home")
+			} else {
+				// The first wander step is still walking, so the teleport's
+				// abort stops it before the jump is announced.
+				stop := mustRead(t, c, "StopMove")
+				assertFrameOpcode(t, stop, serverpackets.OpcodeStopMove, "StopMove")
+				if id := wireReader(stop[1:]).ReadInt32(); id != hostile.ObjectID() {
+					t.Fatalf("StopMove object id = %d, want %d", id, hostile.ObjectID())
+				}
+				assertNPCTeleportFrames(t, c, hostile.ObjectID(), home)
+				if hostile.IsMoving() {
+					t.Fatal("IsMoving() = true after recovery teleport")
+				}
 				if x, y, z := hostile.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 					t.Fatalf("position after recovery = (%d,%d,%d), want %+v", x, y, z, home)
+				}
+				if got := hostile.GeoPathFailCount(); got != 0 {
+					t.Fatalf("GeoPathFailCount() after recovery = %d, want 0", got)
 				}
 			}
 
@@ -62,5 +76,52 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frame[0])
 			}
 		})
+	}
+}
+
+// assertNPCTeleportFrames asserts what an observer who sees an NPC before and
+// after its teleport receives: TeleportToLocation to the destination with the
+// fast-teleport flag off, DeleteObject as the NPC leaves the grid, then
+// NpcInfo as it re-enters.
+func assertNPCTeleportFrames(t *testing.T, c *scriptedClient, objectID int32, to location.Location) {
+	t.Helper()
+	frame := mustRead(t, c, "TeleportToLocation")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeTeleportToLocation, "TeleportToLocation")
+	if len(frame) != 21 {
+		t.Fatalf("TeleportToLocation length = %d, want 21", len(frame))
+	}
+	r := wireReader(frame[1:])
+	for _, field := range []struct {
+		name string
+		want int32
+	}{
+		{"object id", objectID},
+		{"x", int32(to.X)},
+		{"y", int32(to.Y)},
+		{"z", int32(to.Z)},
+		{"fast teleport", 0},
+	} {
+		if got := r.ReadInt32(); got != field.want {
+			t.Fatalf("TeleportToLocation %s = %d, want %d", field.name, got, field.want)
+		}
+	}
+
+	frame = mustRead(t, c, "DeleteObject")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeDeleteObject, "DeleteObject")
+	if len(frame) != 9 {
+		t.Fatalf("DeleteObject length = %d, want 9", len(frame))
+	}
+	r = wireReader(frame[1:])
+	if id := r.ReadInt32(); id != objectID {
+		t.Fatalf("DeleteObject object id = %d, want %d", id, objectID)
+	}
+	if mode := r.ReadInt32(); mode != 1 {
+		t.Fatalf("DeleteObject mode = %d, want 1 (delete without standing up)", mode)
+	}
+
+	frame = mustRead(t, c, "NpcInfo")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeNPCInfo, "NpcInfo")
+	if id := wireReader(frame[1:]).ReadInt32(); id != objectID {
+		t.Fatalf("NpcInfo object id = %d, want %d", id, objectID)
 	}
 }
