@@ -60,6 +60,10 @@ type Flight struct {
 	Flight modelskill.Flight
 }
 
+// Teleported is a discontinuous jump to To, announced before the actor
+// leaves its old surroundings.
+type Teleported struct{ To location.Location }
+
 // MoveToPawn is a target-relative approach or a rotation-only turn toward
 // TargetID from Origin, Distance away.
 type MoveToPawn struct {
@@ -85,3 +89,4 @@ func (Died) event()                  {}
 func (MagicSkillUse) event()         {}
 func (AbnormalEffectChanged) event() {}
 func (Flight) event()                {}
+func (Teleported) event()            {}
