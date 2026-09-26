@@ -730,3 +730,140 @@ func TestMoveWaitsForPlacementLatch(t *testing.T) {
 		})
 	}
 }
+
+// ---- teleport ----
+
+type teleportLog struct {
+	mu     sync.Mutex
+	events []string
+}
+
+func (l *teleportLog) add(event string) {
+	l.mu.Lock()
+	l.events = append(l.events, event)
+	l.mu.Unlock()
+}
+
+func (l *teleportLog) take() []string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	events := l.events
+	l.events = nil
+	return events
+}
+
+type teleportObserver struct {
+	Presence
+	id  int32
+	log *teleportLog
+}
+
+func (o *teleportObserver) ObjectID() int32 { return o.id }
+func (*teleportObserver) Kind() actor.Kind  { return actor.KindNPC }
+func (o *teleportObserver) Discover(obj Tracked) {
+	o.log.add(fmt.Sprintf("%d discover %d", o.id, obj.ObjectID()))
+}
+func (o *teleportObserver) Forget(obj Tracked) {
+	o.log.add(fmt.Sprintf("%d forget %d", o.id, obj.ObjectID()))
+}
+
+// teleportRegionAt returns the center of grid column col on row 50.
+func teleportRegionAt(col int) (int, int) {
+	return MinX + col*regionSize + regionSize/2, MinY + 50*regionSize + regionSize/2
+}
+
+// A teleport leaves the grid and re-enters it: observers around only the old
+// region forget the object, observers around only the new one discover it,
+// and observers in a region both neighborhoods share do both, forgets first.
+func TestTeleportRejoinsObserversAroundBothEnds(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	for id, col := range map[int32]int{1: 49, 2: 51, 3: 53, 4: 56} {
+		x, y := teleportRegionAt(col)
+		s.Spawn(&teleportObserver{id: id, log: log}, x, y, 0, 0)
+	}
+	subject := &regionTestObject{id: 99}
+	x, y := teleportRegionAt(50)
+	s.Spawn(subject, x, y, 0, 0)
+	log.take()
+
+	nx, ny := teleportRegionAt(52)
+	if err := s.Teleport(subject, nx, ny, 7); err != nil {
+		t.Fatalf("Teleport() error: %v", err)
+	}
+	// Observer 1 sees only the old end, 3 only the new end, 2 both; 4 neither.
+	want := []string{"1 forget 99", "2 forget 99", "2 discover 99", "3 discover 99"}
+	if got := log.take(); !slices.Equal(got, want) {
+		t.Fatalf("callbacks = %q, want %q", got, want)
+	}
+	if next, _ := s.RegionAt(nx, ny); subject.presence().region.Load() != next {
+		t.Fatal("subject is not in its destination region")
+	}
+	if px, py, pz := subject.Position(); px != nx || py != ny || pz != 7 {
+		t.Fatalf("Position() = (%d,%d,%d), want (%d,%d,7)", px, py, pz, nx, ny)
+	}
+}
+
+// Teleporting within one region still cycles every observer around it.
+func TestTeleportWithinRegionRejoinsEveryObserver(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	subject := &regionTestObject{id: 99}
+	s.Spawn(subject, x+10, y, 0, 0)
+	log.take()
+
+	if err := s.Teleport(subject, x+20, y, 0); err != nil {
+		t.Fatalf("Teleport() error: %v", err)
+	}
+	if got, want := log.take(), []string{"1 forget 99", "1 discover 99"}; !slices.Equal(got, want) {
+		t.Fatalf("callbacks = %q, want %q", got, want)
+	}
+}
+
+// An object off the grid only has its position updated.
+func TestTeleportOffGridOnlyUpdatesPosition(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	log.take()
+	subject := &regionTestObject{id: 99}
+
+	if err := s.Teleport(subject, x, y, 5); err != nil {
+		t.Fatalf("Teleport() error: %v", err)
+	}
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("callbacks = %q, want none", got)
+	}
+	if subject.presence().region.Load() != nil {
+		t.Fatal("off-grid subject was placed on the grid")
+	}
+	if px, py, pz := subject.Position(); px != x || py != y || pz != 5 {
+		t.Fatalf("Position() = (%d,%d,%d), want (%d,%d,5)", px, py, pz, x, y)
+	}
+}
+
+// A destination outside the world fails and leaves the object where the
+// grid had it, with no callbacks.
+func TestTeleportOutOfBoundsKeepsRegion(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	subject := &regionTestObject{id: 99}
+	s.Spawn(subject, x, y, 0, 0)
+	log.take()
+	region := subject.presence().region.Load()
+
+	if err := s.Teleport(subject, MaxX+100, y, 0); err == nil {
+		t.Fatal("Teleport() outside the world returned no error")
+	}
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("callbacks = %q, want none", got)
+	}
+	if subject.presence().region.Load() != region {
+		t.Fatal("out-of-bounds teleport changed the subject's region")
+	}
+}

@@ -50,7 +50,7 @@ func TestReturnHomeMovementDisabledSkipsWalkButKeepsRecoveryTeleport(t *testing.
 			if !hostile.ReturnHome() {
 				t.Fatal("ReturnHome() = false at geo fail limit, want teleport")
 			}
-			assertNPCTeleportFrames(t, c, hostile.ObjectID(), home)
+			assertNPCTeleportFrames(t, c, mustRead(t, c, "TeleportToLocation"), hostile.ObjectID(), home)
 			if x, y, z := hostile.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 				t.Fatalf("position after recovery = (%d,%d,%d), want %+v", x, y, z, home)
 			}
