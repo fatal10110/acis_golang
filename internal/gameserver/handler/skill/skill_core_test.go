@@ -3771,7 +3771,7 @@ func TestPhysicalSkillsReportDamageAfterTheHit(t *testing.T) {
 	for _, tc := range []struct {
 		skillType string
 		pcrit     bool
-	}{{"PDAM", false}, {"BLOW", true}} {
+	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
 		t.Run(tc.skillType, func(t *testing.T) {
 			target := &skillTarget{fakeActor: fakeActor{objectID: 2}, hp: 5000,
 				physicalInput: pdam, physicalOK: true, blowInput: blow, blowOK: true}
@@ -3798,7 +3798,7 @@ func TestCounteredSkillReportsCounterDamageToTheDefender(t *testing.T) {
 	for _, tc := range []struct {
 		skillType string
 		pcrit     bool
-	}{{"PDAM", false}, {"BLOW", true}} {
+	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
 		t.Run(tc.skillType, func(t *testing.T) {
 			caster := &skillTarget{fakeActor: fakeActor{objectID: 1}, hp: 5000, isPlayer: true}
 			defender := &counteringSkillTarget{skillTarget: &skillTarget{fakeActor: fakeActor{objectID: 2}, hp: 5000, isPlayer: true,
