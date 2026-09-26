@@ -24,9 +24,10 @@ type Tracked interface {
 // before returning rather than posting to the observer's queue: the subject's
 // next updates go out from the goroutine that moved it, and a deferred info
 // packet would reach the observer's client after them. They must
-// not call State's transition methods (Spawn, Move, Despawn, or DespawnAll)
-// from a callback: the subject's placement is still being delivered, and two
-// callbacks repositioning each other's subjects would wait on each other.
+// not call State's transition methods (Spawn, Move, Teleport, Leave, Rejoin,
+// Despawn, or DespawnAll) from a callback: the subject's placement is still
+// being delivered, and two callbacks repositioning each other's subjects would
+// wait on each other.
 // Read-only queries such as Knows, AppendKnown and RegionActivity are safe.
 // Panics propagate and skip remaining callbacks, but region membership remains
 // consistent.
@@ -146,6 +147,35 @@ func (s *State) Teleport(t Tracked, x, y, z int) error {
 	}
 	s.relocateAndUnlock(t, next, true, nil)
 	return nil
+}
+
+// Leave takes t off the grid but keeps it registered: observers around it
+// forget it and it forgets them, as with Despawn. While off the grid, Move
+// and Teleport only update its position; Rejoin puts it back.
+func (s *State) Leave(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	s.relocateAndUnlock(t, nil, false, nil)
+}
+
+// Rejoin puts t, taken off the grid by Leave, back on it at its current
+// position; observers around it discover it and it discovers them. It does
+// nothing when t is already on the grid or was despawned.
+func (s *State) Rejoin(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	x, y, _ := p.Position()
+	next, ok := s.RegionAt(x, y)
+	if p.region.Load() != nil || !p.visible.Load() || !ok {
+		p.releaseLatch()
+		s.mu.Unlock()
+		return
+	}
+	s.relocateAndUnlock(t, next, false, nil)
 }
 
 // Despawn removes t from the world: it leaves its region, observers that

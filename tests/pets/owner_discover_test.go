@@ -4,24 +4,22 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // TestOwnerDiscoversPetOffOwnQueueSendsItemListOnOwnQueue drives the owner's
-// discover of their own pet from another goroutine, the way a summon-friend
-// cast teleports the owner from the caster's queue. The PetItemList must
+// discover of their own pet from another goroutine, the way the pet walking
+// back into view from its own queue does. The PetItemList must
 // still be built and sent on the owner's queue (the send asserts it), so a
 // pet-inventory removal drained there afterwards reaches the client behind
 // the snapshot that still lists the item, never ahead of it.
 func TestOwnerDiscoversPetOffOwnQueueSendsItemListOnOwnQueue(t *testing.T) {
 	t.Parallel()
-	h, pet, owner, queue, away := bootOwnerPetOutOfView(t)
-	owner.TeleportTo(away.X, away.Y, away.Z, 0)
+	h, pet, queue, home := bootOwnerPetOutOfView(t)
+	pet.SyncPosition(home)
 	queue.Post(func() { pet.PetInventory().DestroyByTemplateID(wolfFoodID, 5) })
 	h.srv.Settle(t)
 	h.srv.InventoryUpdates.Tick()
@@ -49,10 +47,10 @@ func TestOwnerDiscoversPetOffOwnQueueSendsItemListOnOwnQueue(t *testing.T) {
 // the PetDelete: it must send nothing rather than list a pet that is gone.
 func TestOwnerPetItemListDroppedWhenPetUnsummonedFirst(t *testing.T) {
 	t.Parallel()
-	h, pet, owner, queue, away := bootOwnerPetOutOfView(t)
+	h, pet, queue, home := bootOwnerPetOutOfView(t)
 
 	queue.Post(func() {
-		owner.TeleportTo(away.X, away.Y, away.Z, 0)
+		pet.SyncPosition(home)
 		pet.Unsummon()
 	})
 	h.srv.Settle(t)
@@ -65,13 +63,13 @@ func TestOwnerPetItemListDroppedWhenPetUnsummonedFirst(t *testing.T) {
 // inventory updates.
 func TestOwnerPetItemListDroppedWhenPetLeftViewFirst(t *testing.T) {
 	t.Parallel()
-	h, pet, owner, queue, away := bootOwnerPetOutOfView(t)
-	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	h, pet, queue, home := bootOwnerPetOutOfView(t)
+	away := location.Location{X: home.X + 20000, Y: home.Y, Z: home.Z}
 
 	queue.Post(func() {
 		pet.PetInventory().DestroyByTemplateID(wolfFoodID, 1)
-		owner.TeleportTo(away.X, away.Y, away.Z, 0)
-		pet.SyncPosition(location.Location{X: x, Y: y, Z: z})
+		pet.SyncPosition(home)
+		pet.SyncPosition(away)
 	})
 	h.srv.Settle(t)
 	requireNoPetItemListAfterPetDelete(t, drainFrames(t, h.client))
@@ -82,8 +80,8 @@ func TestOwnerPetItemListDroppedWhenPetLeftViewFirst(t *testing.T) {
 
 // bootOwnerPetOutOfView spawns the owner's wolf holding 5 food, then moves it
 // 20000 units away on the owner's queue so the owner forgets it. It returns
-// the pet's new location.
-func bootOwnerPetOutOfView(t *testing.T) (*petWorld, *summon.Actor, *player.Character, *sim.Queue, location.Location) {
+// the owner's location, where moving the pet brings it back into view.
+func bootOwnerPetOutOfView(t *testing.T) (*petWorld, *summon.Actor, *sim.Queue, location.Location) {
 	t.Helper()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: wolfFoodID, Count: 5})
 	pet, _ := h.spawnWolf(t)
@@ -97,16 +95,7 @@ func bootOwnerPetOutOfView(t *testing.T) (*petWorld, *summon.Actor, *player.Char
 	queue.Post(func() { pet.SyncPosition(away) })
 	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete as the pet leaves view")
 	drainUntilQuiet(t, h.client)
-
-	obj, ok := h.srv.State.Player(h.ownerID)
-	if !ok {
-		t.Fatal("owner missing from world state")
-	}
-	owner, ok := network.OnlineCharacter(obj)
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T is not an online character", h.ownerID, obj)
-	}
-	return h, pet, owner, queue, away
+	return h, pet, queue, location.Location{X: x, Y: y, Z: z}
 }
 
 // requireNoPetItemListAfterPetDelete fails unless frames hold a PetDelete

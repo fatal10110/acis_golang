@@ -33,6 +33,12 @@ func TestOwnerTeleportDropsSummonThreatInNearbyHostiles(t *testing.T) {
 		t.Fatalf("world.Player(%d) = %T is not an online character", h.ownerID, obj)
 	}
 
+	// A bystander keeps the region awake while the owner is off the grid;
+	// alone, the owner's departure would put the monster back to peace.
+	h.srv.SeedCharacterFor(t, "bystander", "Bystander", 1, 0)
+	startInWorld(t, h.srv.DialClient(t, "bystander", 1))
+	drainUntilQuiet(t, h.client)
+
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	owner.TeleportTo(x+300, y, z, 0)
 	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner TeleportToLocation")

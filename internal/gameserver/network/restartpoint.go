@@ -65,9 +65,12 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 }
 
 // teleportLivePlayer relocates live to a scattered, ground-height-snapped
-// point near target, cancelling any attack/combat in progress, then
-// broadcasts the discontinuous-position packet to live's own session and
-// every observer.
+// point near target, cancelling any attack/combat in progress. It broadcasts
+// the discontinuous-position packet to live's own session and every
+// observer, then takes live off the grid: everything around the old position
+// forgets live and live forgets it, even what the destination still sees.
+// live rejoins the grid at the destination once its client reports it
+// appeared (completeLivePlayerTeleport).
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
 	if !live.SetTeleporting(true) {
 		return
@@ -91,20 +94,32 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// threat even when the destination is still in that hostile's sight.
 	npc.DropThreatAround(l.world, live)
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
-	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameTeleportToLocation(live.ObjectID(), target, false)
 	})
+	if l.world != nil {
+		l.world.Leave(live)
+	}
+	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
+	// A teleport started off live's queue (a summon-friend cast) can race
+	// the client's Appearing. If Appearing already cleared the flag, its
+	// rejoin may have run before the Leave above; rejoin here so live never
+	// stays off the grid once it is no longer teleporting.
+	if l.world != nil && !live.Teleporting() {
+		l.world.Rejoin(live)
+	}
 }
 
 func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	if live == nil || !live.SetTeleporting(false) {
 		return
 	}
-	l.activateSpawnProtection(live)
 	if l.world == nil {
+		l.activateSpawnProtection(live)
 		return
 	}
+	l.world.Rejoin(live)
+	l.activateSpawnProtection(live)
 	active, ok := l.world.Summon(live.ObjectID())
 	if !ok {
 		return
