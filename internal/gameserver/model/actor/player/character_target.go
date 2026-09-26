@@ -24,6 +24,19 @@ func (c *Character) StoreTarget(t world.Tracked) {
 	c.target = t
 }
 
+// ClearTargetIf clears the selection when it is t and reports whether it
+// did. The check and the clear are one step, so a selection made by the
+// character's own goroutine in between is never wiped by another goroutine.
+func (c *Character) ClearTargetIf(t world.Tracked) bool {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if t == nil || c.target != t {
+		return false
+	}
+	c.target = nil
+	return true
+}
+
 // CurrentTarget implements the retargetableOnAggression capability the
 // AGGDEBUFF continuous-effect handler consults to decide whether to retarget
 // or attack a playable target hit by a landed aggression-debuff effect.

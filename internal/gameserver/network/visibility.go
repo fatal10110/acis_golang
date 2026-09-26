@@ -132,9 +132,11 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		if o.OwnerID() == p.ObjectID() {
 			p.petSightings.Add(1)
 			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
+			p.forgetTarget(obj)
 			return
 		}
 	}
+	p.forgetTarget(obj)
 	if !rendersObject(obj) {
 		return
 	}
@@ -143,6 +145,15 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 		seated = other.seated()
 	}
 	p.sendVisibilityFrame(serverpackets.FrameDeleteObject(obj.ObjectID(), seated))
+}
+
+// forgetTarget clears a selection that left the known list, with the same
+// answer as a cancelled selection. It runs before the object's DeleteObject;
+// the owner's own summon clears after its PetDelete instead.
+func (p *livePlayer) forgetTarget(obj world.Tracked) {
+	if p.link != nil && p.ClearTargetIf(obj) {
+		p.link.announceTargetCleared(p, obj)
+	}
 }
 
 type groundItemObject interface {
