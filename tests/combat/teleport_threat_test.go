@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -33,8 +34,12 @@ func TestPlayerTeleportDropsItsThreatInNearbyHostiles(t *testing.T) {
 		t.Fatal("player's hit left no threat entry")
 	}
 
+	// The bystander keeps the region awake while the player is off the grid.
+	joinBystander(t, srv)
 	player.TeleportTo(hostileX+300, hostileY, hostileZ, 0)
 	readUntil(t, srv.Client, serverpackets.OpcodeTeleportToLocation, "TeleportToLocation")
+	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	readUntil(t, srv.Client, serverpackets.OpcodeUserInfo, "Appearing UserInfo")
 	if !monster.Knows(player) {
 		t.Fatal("player out of the monster's sight after the teleport; the case needs it still known")
 	}

@@ -868,3 +868,110 @@ func TestTeleportOutOfBoundsKeepsRegion(t *testing.T) {
 		t.Fatal("out-of-bounds teleport changed the subject's region")
 	}
 }
+
+// ---- leave / rejoin ----
+
+// Leave drops a player off the grid but keeps it registered: observers
+// forget it, and the last player leaving deactivates its neighborhood. Off
+// the grid, Move only updates the position. Rejoin puts it back where it
+// stands now, and a second Rejoin is a no-op.
+func TestLeaveThenRejoin(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	subject := &regionTestPlayer{regionTestObject{id: 99}}
+	s.Spawn(subject, x+10, y, 0, 0)
+	log.take()
+	region, _ := s.RegionAt(x, y)
+	if !region.Active() {
+		t.Fatal("region inactive with a player in it")
+	}
+
+	s.Leave(subject)
+	if got, want := log.take(), []string{"1 forget 99"}; !slices.Equal(got, want) {
+		t.Fatalf("Leave callbacks = %q, want %q", got, want)
+	}
+	if subject.Visible() {
+		t.Fatal("subject still on the grid after Leave")
+	}
+	if region.Active() {
+		t.Fatal("region still active after its only player left")
+	}
+	if _, ok := s.Object(99); !ok {
+		t.Fatal("Leave unregistered the subject")
+	}
+
+	if err := s.Move(subject, x+20, y, 5); err != nil {
+		t.Fatalf("Move() off the grid: %v", err)
+	}
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("Move off the grid delivered %q", got)
+	}
+	if subject.Visible() {
+		t.Fatal("Move put the subject back on the grid")
+	}
+	if px, py, pz := subject.Position(); px != x+20 || py != y || pz != 5 {
+		t.Fatalf("Position() = (%d,%d,%d), want (%d,%d,5)", px, py, pz, x+20, y)
+	}
+
+	s.Rejoin(subject)
+	if got, want := log.take(), []string{"1 discover 99"}; !slices.Equal(got, want) {
+		t.Fatalf("Rejoin callbacks = %q, want %q", got, want)
+	}
+	if !subject.Visible() || !region.Active() {
+		t.Fatal("Rejoin did not put the subject back and wake its region")
+	}
+
+	s.Rejoin(subject)
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("Rejoin on the grid delivered %q", got)
+	}
+}
+
+// A despawn while off the grid is final: Rejoin must not bring it back.
+func TestRejoinAfterDespawnStaysGone(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	subject := &regionTestPlayer{regionTestObject{id: 99}}
+	s.Spawn(subject, x+10, y, 0, 0)
+	s.Leave(subject)
+	s.Despawn(subject)
+	log.take()
+
+	s.Rejoin(subject)
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("Rejoin after Despawn delivered %q", got)
+	}
+	if subject.Visible() {
+		t.Fatal("Rejoin put a despawned subject back on the grid")
+	}
+	if _, ok := s.Object(99); ok {
+		t.Fatal("despawned subject is registered again")
+	}
+}
+
+// Leave of an object that was never placed, or was despawned, does nothing.
+func TestLeaveOffGridIsNoop(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	x, y := teleportRegionAt(50)
+	s.Spawn(&teleportObserver{id: 1, log: log}, x, y, 0, 0)
+	log.take()
+
+	never := &regionTestObject{id: 98}
+	s.Leave(never)
+	gone := &regionTestObject{id: 99}
+	s.Spawn(gone, x+10, y, 0, 0)
+	s.Despawn(gone)
+	log.take()
+	s.Leave(gone)
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("Leave off the grid delivered %q", got)
+	}
+	if never.Visible() || gone.Visible() {
+		t.Fatal("Leave placed an off-grid object")
+	}
+}

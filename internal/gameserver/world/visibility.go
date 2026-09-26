@@ -27,7 +27,9 @@ type Tracked interface {
 // not call State's transition methods (Spawn, Move, Despawn, or DespawnAll)
 // from a callback: the subject's placement is still being delivered, and two
 // callbacks repositioning each other's subjects would wait on each other.
-// Read-only queries such as Knows, AppendKnown and RegionActivity are safe.
+// Read-only queries such as Knows, AppendKnown and RegionActivity are safe;
+// AppendKnown and ForEachKnown for the subject still resolve the neighborhood
+// it left until its callbacks finish.
 // Panics propagate and skip remaining callbacks, but region membership remains
 // consistent.
 type Observer interface {
@@ -146,6 +148,35 @@ func (s *State) Teleport(t Tracked, x, y, z int) error {
 	}
 	s.relocateAndUnlock(t, next, true, nil)
 	return nil
+}
+
+// Leave takes t off the grid but keeps it registered: observers around it
+// forget it and it forgets them, as with Despawn. While off the grid, Move
+// and Teleport only update its position; Rejoin puts it back.
+func (s *State) Leave(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	s.relocateAndUnlock(t, nil, false, nil)
+}
+
+// Rejoin puts t, taken off the grid by Leave, back on it at its current
+// position; observers around it discover it and it discovers them. It does
+// nothing when t is already on the grid or was despawned.
+func (s *State) Rejoin(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	x, y, _ := p.Position()
+	next, ok := s.RegionAt(x, y)
+	if p.region.Load() != nil || !p.visible.Load() || !ok {
+		p.releaseLatch()
+		s.mu.Unlock()
+		return
+	}
+	s.relocateAndUnlock(t, next, false, nil)
 }
 
 // Despawn removes t from the world: it leaves its region, observers that
@@ -302,6 +333,9 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	if rejoin {
 		oldShared, newShared = nil, nil
 	}
+	// Published before the new region, so a concurrent known-list read
+	// never resolves the new area ahead of this move's callbacks.
+	p.knownFrom.Store(prev)
 	p.region.Store(next)
 	// A non-player entering a region that was already active or inactive
 	// sees no setActive transition, so it is notified directly.
@@ -359,6 +393,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	}
 
 	if !notifyArrival && len(toggles) == 0 && len(notifications) == 0 && after == nil {
+		p.knownFrom.Store(nil)
 		p.releaseLatch()
 		s.mu.Unlock()
 		return
@@ -380,6 +415,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 			scratch.notifications = scratch.notifications[:0]
 		}
 		s.mu.Lock()
+		p.knownFrom.Store(nil)
 		p.busy.Store(false)
 		s.idle.Broadcast()
 		s.mu.Unlock()
@@ -542,11 +578,12 @@ func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
 }
 
 // AppendKnown appends every object in t's surrounding regions to out,
-// excluding t itself. It does nothing when t is off the grid. Reusing out lets
-// hot broadcast paths keep one grown snapshot buffer instead of allocating a
-// fresh known-list slice per event.
+// excluding t itself. It does nothing when t is off the grid. While t's own
+// region change is still delivering callbacks, the surroundings are those of
+// the region t left. Reusing out lets hot broadcast paths keep one grown
+// snapshot buffer instead of allocating a fresh known-list slice per event.
 func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
-	r := t.presence().currentRegion()
+	r := t.presence().knownRegion()
 	if r == nil {
 		return out
 	}
