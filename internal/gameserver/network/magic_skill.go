@@ -189,7 +189,9 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
 			l.sendSkillHandlerResult(live, result)
 			l.syncCubicTargets(live, result, def)
-			sendMagicStatusUpdate(live, beforeVitals)
+			if !live.Character.Dead() {
+				sendMagicStatusUpdate(live, beforeVitals)
+			}
 		},
 		Failed: func(err error) {
 			sendMagicCastFailureReason(live, def, err)

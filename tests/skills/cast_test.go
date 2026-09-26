@@ -1068,6 +1068,15 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	if held := holder.EffectList().All(); len(held) != 1 || !held[0].Template.Self {
 		t.Fatalf("dead caster holds %+v, want only the skill's self effect", held)
 	}
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			t.Fatal("self StatusUpdate sent after Die")
+		}
+	}
 }
 
 // TestLethalToggleHPConsumeAbortsAndKillsCaster drives the other caller of
