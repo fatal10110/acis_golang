@@ -820,7 +820,7 @@ func (h *Hostile) Dead() bool {
 	return h.dead
 }
 
-// MarkDead transitions this NPC into its dead state. It reports false when
+// MarkDead clears HP and transitions this NPC into its dead state. It reports false when
 // the NPC was already dead, so a repeated or concurrent kill is a no-op.
 func (h *Hostile) MarkDead() bool {
 	h.deathMu.Lock()
@@ -828,6 +828,7 @@ func (h *Hostile) MarkDead() bool {
 	if h.dead {
 		return false
 	}
+	h.health.SetCurrent(0)
 	h.dead = true
 	return true
 }

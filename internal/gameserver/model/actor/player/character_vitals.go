@@ -117,7 +117,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.curHP <= 0 {
+	if c.Dead() {
 		return false
 	}
 	c.curHP -= float64(amount)
