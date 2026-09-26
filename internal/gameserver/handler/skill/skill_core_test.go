@@ -2507,6 +2507,117 @@ func TestBlowTagsResistedByOrigin(t *testing.T) {
 	})
 }
 
+type counteringSkillTarget struct {
+	*skillTarget
+}
+
+func (*counteringSkillTarget) CounterSkillPhysical() float64 { return 100 }
+
+func TestBlowReportsResistBeforeCounter(t *testing.T) {
+	target := &counteringSkillTarget{skillTarget: &skillTarget{
+		hp: 2000, effects: newTestList(nil),
+		blowInput: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}, blowOK: true,
+		skillSuccessOK: true, skillSuccessChance: chanceOf(0),
+	}}
+	result, ok := NewDefaultRegistry().UseResult(Cast{
+		Caster: &skillTarget{hp: 2000},
+		Skill: modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", CastRange: 40, CanBeReflected: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []Actor{target},
+	})
+	if !ok || len(result.Messages) != 2 {
+		t.Fatalf("messages = %#v, want resist then counter", result.Messages)
+	}
+	if _, ok := result.Messages[0].(Resisted); !ok {
+		t.Fatalf("first message = %T, want Resisted", result.Messages[0])
+	}
+	if _, ok := result.Messages[1].(Counterattack); !ok {
+		t.Fatalf("second message = %T, want Counterattack", result.Messages[1])
+	}
+}
+
+func TestPdamReportsTargetsInOrder(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{hp: 2000}
+	damage := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 60,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+
+	dodger := &skillTarget{physicalInput: formulas.PhysicalSkillInput{Evaded: true}, physicalOK: true}
+	counter := &counteringSkillTarget{skillTarget: &skillTarget{hp: 2000, physicalInput: damage, physicalOK: true}}
+	result, _ := registry.UseResult(Cast{Caster: caster,
+		Skill:   modelskill.Definition{SkillType: "PDAM", CastRange: 40, CanBeReflected: true},
+		Targets: []Actor{dodger, counter}})
+	if len(result.Messages) != 2 {
+		t.Fatalf("dodge/counter messages = %#v", result.Messages)
+	}
+	if _, ok := result.Messages[0].(Dodge); !ok {
+		t.Fatalf("first message = %T, want Dodge", result.Messages[0])
+	}
+	if _, ok := result.Messages[1].(Counterattack); !ok {
+		t.Fatalf("second message = %T, want Counterattack", result.Messages[1])
+	}
+
+	failed := &skillTarget{physicalInput: formulas.PhysicalSkillInput{}, physicalOK: true}
+	lethal := &skillTarget{hp: 2000, physicalInput: damage, physicalOK: true,
+		lethalInput: formulas.LethalInput{AttackerLevel: 40, TargetLevel: 40, LethalMul: 1}, lethalOK: true}
+	result, _ = registry.UseResult(Cast{Caster: caster,
+		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
+		Targets: []Actor{failed, lethal}})
+	if len(result.Messages) != 2 {
+		t.Fatalf("failed/lethal messages = %#v", result.Messages)
+	}
+	if _, ok := result.Messages[0].(AttackFailedMessage); !ok {
+		t.Fatalf("first message = %T, want AttackFailedMessage", result.Messages[0])
+	}
+	if _, ok := result.Messages[1].(Lethal); !ok {
+		t.Fatalf("second message = %T, want Lethal", result.Messages[1])
+	}
+}
+
+func TestManadamReportsMissBeforeLaterResist(t *testing.T) {
+	missed := &skillTarget{manaInput: formulas.ManaDamageInput{Affected: false}, manaOK: true}
+	resisted := &skillTarget{mp: 100, effects: newTestList(nil), skillSuccessOK: true,
+		skillSuccessChance: chanceOf(0),
+		manaInput:          formulas.ManaDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 100, VulnMul: 1, Affected: true},
+		manaOK:             true}
+	result, _ := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{},
+		Skill:   modelskill.Definition{ID: 7, Level: 1, SkillType: "MANADAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []Actor{missed, resisted}})
+	if len(result.Messages) < 2 {
+		t.Fatalf("messages = %#v, want miss before resist", result.Messages)
+	}
+	if _, ok := result.Messages[0].(ManaDamageMissedMessage); !ok {
+		t.Fatalf("first message = %T, want ManaDamageMissedMessage", result.Messages[0])
+	}
+	if _, ok := result.Messages[1].(Resisted); !ok {
+		t.Fatalf("second message = %T, want Resisted", result.Messages[1])
+	}
+}
+
+type interleavedMessageHandler struct{}
+
+func (interleavedMessageHandler) Types() []string { return []string{"ORDER_TEST"} }
+func (interleavedMessageHandler) Use(Cast)        {}
+func (interleavedMessageHandler) UseResult(cast Cast) Result {
+	result := Result{messages: cast.messages, AttackFailed: 1}
+	result.record(AttackFailedMessage{})
+	cast.reportResisted(cast.Targets[0], cast.Skill, 1)
+	result.AttackFailed++
+	result.record(AttackFailedMessage{})
+	return result
+}
+
+func TestRegistryInterleavesGenericEffectReports(t *testing.T) {
+	registry := NewRegistry(interleavedMessageHandler{})
+	result, ok := registry.UseResult(Cast{Skill: modelskill.Definition{ID: 7, Level: 1, SkillType: "ORDER_TEST"}, Targets: []Actor{&skillTarget{}}})
+	if !ok || result.AttackFailed != 2 || len(result.Resisted) != 1 || len(result.Messages) != 3 {
+		t.Fatalf("result = %+v, want two failures with a resist between", result)
+	}
+	if _, ok := result.Messages[1].(Resisted); !ok {
+		t.Fatalf("middle message = %T, want Resisted", result.Messages[1])
+	}
+}
+
 // TestChargeDamTagsResistedByOrigin mirrors TestMdamTagsResistedByOrigin for
 // L2SkillChargeDmg.java:77's unconditional resist vs. the gated per-effect
 // one; CHARGEDAM has no damage-gate on applyChargeDamEffects, unlike

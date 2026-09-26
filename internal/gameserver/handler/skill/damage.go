@@ -58,7 +58,7 @@ func (h pdamHandler) Use(cast Cast) {
 }
 
 func (pdamHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
 		return result
 	}
@@ -76,17 +76,19 @@ func (pdamHandler) UseResult(cast Cast) Result {
 				AttackerID: counterattackObjectID(cast.Caster), AttackerName: actorName(cast.Caster),
 				DefenderID: counterattackObjectID(target), DefenderName: actorName(target),
 			})
+			result.record(result.Dodges[len(result.Dodges)-1])
 			continue
 		}
 		applyPdamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
-			if !applyPhysicalSkillCounter(cast, target, damage, &result) {
+			if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), &result) {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
 			}
 			applyLethalHit(cast, target, &result)
 		} else {
 			result.AttackFailed++
+			result.record(AttackFailedMessage{})
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -105,7 +107,7 @@ func (chargeDamHandler) Use(cast Cast) {
 }
 
 func (chargeDamHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
 		return result
 	}
@@ -127,6 +129,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 				AttackerID: counterattackObjectID(cast.Caster), AttackerName: actorName(cast.Caster),
 				DefenderID: counterattackObjectID(target), DefenderName: actorName(target),
 			})
+			result.record(result.Dodges[len(result.Dodges)-1])
 			continue
 		}
 		applyChargeDamEffects(cast, obj, in.Shield, &result)
@@ -134,7 +137,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		if damage <= 0 {
 			continue
 		}
-		if !applyPhysicalSkillCounter(cast, target, damage, &result) {
+		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), &result) {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
 		}
 	}
@@ -181,7 +184,7 @@ func (h mdamHandler) Use(cast Cast) {
 }
 
 func (h mdamHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
 		return result
 	}
@@ -258,7 +261,7 @@ func (h blowHandler) Use(cast Cast) {
 }
 
 func (blowHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
 		return result
 	}
@@ -278,9 +281,12 @@ func (blowHandler) UseResult(cast Cast) Result {
 				DefenderID:   counterattackObjectID(target),
 				DefenderName: actorName(target),
 			})
+			result.record(result.Dodges[len(result.Dodges)-1])
 			continue
 		}
 		if in.Landed {
+			counter := target.CounterSkillPhysical()
+			applyBlowEffects(cast, obj, in.Shield, counterSkillReflects(cast.Skill, counter), &result)
 			damage := 1
 			if in.Shield != formulas.ShieldPerfect {
 				damage = int(formulas.BlowDamage(in))
@@ -289,11 +295,10 @@ func (blowHandler) UseResult(cast Cast) Result {
 				damage *= 2
 			}
 			if damage > 0 {
-				countered := applyPhysicalSkillCounter(cast, target, float64(damage), &result)
+				countered := applyPhysicalSkillCounter(cast, target, float64(damage), counter, &result)
 				if !countered {
 					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 				}
-				applyBlowEffects(cast, obj, in.Shield, countered, &result)
 			}
 			if caster, ok := cast.Caster.(shotCharger); ok {
 				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
@@ -307,8 +312,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyPhysicalSkillCounter(cast Cast, target Creature, damage float64, result *Result) bool {
-	counter := target.CounterSkillPhysical()
+func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float64, result *Result) bool {
 	if !counterSkillReflects(cast.Skill, counter) {
 		return false
 	}
@@ -322,6 +326,7 @@ func applyPhysicalSkillCounter(cast Cast, target Creature, damage float64, resul
 			DefenderID:   counterattackObjectID(target),
 			DefenderName: actorName(target),
 		})
+		result.record(result.Counterattacks[len(result.Counterattacks)-1])
 	}
 	return true
 }
@@ -347,6 +352,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	switch failure {
 	case formulas.MagicFailureHalf:
 		result.AttackFailed++
+		result.record(AttackFailedMessage{})
 	case formulas.MagicFailureFull:
 		// Formulas.java:614 gates this send `attacker instanceof Player` —
 		// unlike Mdam/Blow/Manadam's own unconditional skill-level resist —
@@ -358,6 +364,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 			TargetID:     target.ObjectID(),
 			AttackerName: actorName(cast.Caster),
 		})
+		result.record(result.MagicResists[len(result.MagicResists)-1])
 	}
 }
 
@@ -411,6 +418,7 @@ func appendResisted(result *Result, target Actor, def modelskill.Definition, lev
 		return
 	}
 	result.Resisted = append(result.Resisted, Resisted{TargetName: actorName(target), SkillID: def.ID, SkillLevel: level, Unconditional: unconditional})
+	result.record(result.Resisted[len(result.Resisted)-1])
 }
 
 // appendResistedCount records count per-effect-template resists produced by
@@ -491,7 +499,7 @@ func (h manaDamageHandler) Use(cast Cast) {
 }
 
 func (manaDamageHandler) UseResult(cast Cast) Result {
-	var result Result
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
 		return result
 	}
@@ -517,11 +525,13 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if !ok {
 			if target.Invulnerable() || target.Invul() {
 				result.ManaDamageMissed++
+				result.record(ManaDamageMissedMessage{})
 			}
 			continue
 		}
 		if !in.Affected {
 			result.ManaDamageMissed++
+			result.record(ManaDamageMissedMessage{})
 			continue
 		}
 		if effected != nil && len(cast.Skill.Effects) > 0 {
@@ -547,9 +557,11 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 				CasterName: actorName(cast.Caster),
 				MP:         int32(mp),
 			})
+			result.record(result.ManaDrains[len(result.ManaDrains)-1])
 		}
 		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
 			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
+			result.record(OpponentMPReducedMessage{MP: int32(mp)})
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
 		// (pre-clamp) damage is positive, after the drain. No production
@@ -599,6 +611,7 @@ func applyLethalHit(cast Cast, obj Actor, result *Result) {
 				AttackerID: counterattackObjectID(cast.Caster),
 				TargetID:   counterattackObjectID(obj),
 			})
+			result.record(result.Lethals[len(result.Lethals)-1])
 		}
 	}
 }

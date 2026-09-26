@@ -184,6 +184,7 @@ type Cast struct {
 	// left untyped deliberately rather than typed against one of them.
 	Item     any
 	resisted *Result
+	messages *[]any
 }
 
 func (c Cast) reportResisted(target Actor, def modelskill.Definition, count int) {
@@ -252,8 +253,18 @@ type ManaDrain struct {
 	MP         int32
 }
 
+// AttackFailedMessage and ManaDamageMissedMessage mark messages without data.
+type AttackFailedMessage struct{}
+type ManaDamageMissedMessage struct{}
+type OpponentMPReducedMessage struct{ MP int32 }
+
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
+	// Messages retains the order in which handler messages were produced.
+	// Skill damage messages are not ported yet; #2557 must record them here
+	// at their per-target position when they are added.
+	Messages       []any
+	messages       *[]any
 	AttackFailed   int
 	Counterattacks []Counterattack
 	Lethals        []Lethal
@@ -281,6 +292,14 @@ type Result struct {
 	// the character-info broadcast.
 	CubicTouched bool
 	CubicID      cubic.ID
+}
+
+func (r *Result) record(message any) {
+	if r.messages != nil {
+		*r.messages = append(*r.messages, message)
+		return
+	}
+	r.Messages = append(r.Messages, message)
 }
 
 type resultHandler interface {
@@ -408,7 +427,9 @@ func (r *Registry) Use(cast Cast) bool {
 
 // UseResult dispatches cast and returns any caster-visible handler result.
 func (r *Registry) UseResult(cast Cast) (Result, bool) {
-	var reported Result
+	var messages []any
+	cast.messages = &messages
+	reported := Result{messages: &messages}
 	cast.resisted = &reported
 	h, ok := r.Handler(cast.Skill.SkillType)
 	if !ok {
@@ -417,9 +438,11 @@ func (r *Registry) UseResult(cast Cast) (Result, bool) {
 	if rh, ok := h.(resultHandler); ok {
 		result := rh.UseResult(cast)
 		result.Resisted = append(result.Resisted, reported.Resisted...)
+		result.Messages = messages
 		return result, true
 	}
 	h.Use(cast)
+	reported.Messages = messages
 	return reported, true
 }
 
