@@ -446,7 +446,7 @@ func (l *GameClientLink) clearLiveTarget(live *livePlayer) {
 }
 
 // announceTargetCleared answers a cleared selection: ActionFailed to live,
-// then TargetUnselected to observers when old was selected.
+// then TargetUnselected to live and its observers when old was selected.
 func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Tracked) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if old != nil {
@@ -533,15 +533,18 @@ func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.
 	})
 }
 
+// broadcastTargetUnselected sends TargetUnselected to live first, then to
+// every known observer.
 func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
-	if l.world == nil {
-		return
-	}
 	x, y, z := live.Position()
 	at := location.Location{X: x, Y: y, Z: z}
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameTargetUnselected(live.ObjectID(), at)
 	}, func(send func(frameReceiver)) {
+		send(live)
+		if l.world == nil {
+			return
+		}
 		l.world.ForEachKnown(live, func(o world.Tracked) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)

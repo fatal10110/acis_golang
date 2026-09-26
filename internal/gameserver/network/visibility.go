@@ -123,6 +123,11 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
+	// A selection that leaves the known list is cleared before the object's
+	// removal frame, with the same answer as a cancelled selection.
+	if p.link != nil && p.ClearTargetIf(obj) {
+		p.link.announceTargetCleared(p, obj)
+	}
 	if o, ok := obj.(*summon.Actor); ok {
 		// A summon's removal signal to its owner is always PetDelete
 		// (Summon.java's doUnsummon sends it unconditionally before
