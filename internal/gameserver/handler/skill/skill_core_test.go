@@ -970,6 +970,44 @@ func TestStunAppliesOnGuaranteedSuccess(t *testing.T) {
 	}
 }
 
+func TestControlDisablersReportFailedRollToPlayer(t *testing.T) {
+	for _, skillType := range []string{"ROOT", "STUN", "SLEEP", "PARALYZE", "MUTE"} {
+		t.Run(skillType, func(t *testing.T) {
+			caster := &skillTarget{isPlayer: true}
+			target := &skillTarget{name: "Victim", effects: newTestList(nil), skillSuccessOK: true, skillSuccessChance: chanceOf(0)}
+			def := modelskill.Definition{ID: 44, Level: 7, SkillType: skillType}
+			result, ok := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
+			if !ok || len(result.Resisted) != 1 || result.Resisted[0] != (Resisted{TargetName: "Victim", SkillID: 44, SkillLevel: 1}) {
+				t.Fatalf("UseResult() = %+v, %t; want one level-1 resisted message", result.Resisted, ok)
+			}
+			if len(result.Messages) != 1 || result.Messages[0] != result.Resisted[0] {
+				t.Fatalf("Messages = %+v, want the resisted message in order", result.Messages)
+			}
+		})
+	}
+}
+
+func TestControlDisablersDoNotReportFailedRollForNPCCaster(t *testing.T) {
+	caster := &skillTarget{}
+	target := &skillTarget{effects: newTestList(nil), skillSuccessOK: true, skillSuccessChance: chanceOf(0)}
+	result, ok := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: modelskill.Definition{ID: 44, Level: 7, SkillType: "STUN"}, Targets: []Actor{target}})
+	if !ok || len(result.Resisted) != 0 {
+		t.Fatalf("UseResult() = %+v, %t; want no player-only resist", result.Resisted, ok)
+	}
+}
+
+func TestReflectedStunReportsResistedCasterAsTarget(t *testing.T) {
+	caster := &skillTarget{isPlayer: true, name: "Caster", skillSuccessOK: true, skillSuccessChance: chanceOf(0)}
+	target := newDisablerFake(1)
+	target.reflects = true
+	result, ok := NewDefaultRegistry().UseResult(Cast{
+		Caster: caster, Skill: modelskill.Definition{ID: 44, Level: 7, SkillType: "STUN"}, Targets: []Actor{target},
+	})
+	if !ok || len(result.Resisted) != 1 || result.Resisted[0] != (Resisted{TargetName: "Caster", SkillID: 44, SkillLevel: 1}) {
+		t.Fatalf("Resisted = %+v, handled = %t; want reflected caster named at level 1", result.Resisted, ok)
+	}
+}
+
 // TestReflectedStunUsesOriginalTargetsPreSwapShieldBlock proves the shield
 // roll that gates a reflected STUN/ROOT/SLEEP/PARALYZE cast is resolved
 // against the original target before the reflect swap, matching
@@ -3293,6 +3331,27 @@ func TestSpoilEventuallyMarksTarget(t *testing.T) {
 		}
 	}
 	t.Fatal("SPOIL never succeeded in 300 attempts")
+}
+
+func TestSpoilReportsFailedMagicRollAtLevelOne(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &spoilFakeCaster{id: 42, level: 1}
+	def := modelskill.Definition{ID: 254, Level: 7, SkillType: "SPOIL", MagicLevel: 1}
+	for i := 0; i < 10; i++ {
+		target := &spoilFakeTarget{level: 100, pool: &item.SpoilPool{}}
+		result, ok := registry.UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
+		if !ok {
+			t.Fatal("UseResult() handled = false for SPOIL")
+		}
+		if target.pool.IsSpoiled() {
+			continue // the reference leaves a 1% success chance even at this level gap
+		}
+		if len(result.Resisted) != 1 || result.Resisted[0] != (Resisted{SkillID: 254, SkillLevel: 1}) {
+			t.Fatalf("Resisted = %+v, want one level-1 failed-roll report", result.Resisted)
+		}
+		return
+	}
+	t.Fatal("SPOIL never failed in 10 attempts")
 }
 
 func TestSpoilAlreadySpoiledIsSkipped(t *testing.T) {

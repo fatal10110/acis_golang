@@ -58,6 +58,8 @@ func (spoilHandler) Use(cast Cast) {
 					notify.NotifySpoilAlready()
 				}
 			}
+		} else if _, ok := asPlayer(cast.Caster); ok {
+			appendResisted(cast.resisted, target, cast.Skill, 1, false)
 		}
 	}
 }
