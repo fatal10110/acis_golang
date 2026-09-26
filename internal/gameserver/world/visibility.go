@@ -27,7 +27,9 @@ type Tracked interface {
 // not call State's transition methods (Spawn, Move, Despawn, or DespawnAll)
 // from a callback: the subject's placement is still being delivered, and two
 // callbacks repositioning each other's subjects would wait on each other.
-// Read-only queries such as Knows, AppendKnown and RegionActivity are safe.
+// Read-only queries such as Knows, AppendKnown and RegionActivity are safe;
+// AppendKnown and ForEachKnown for the subject still resolve the neighborhood
+// it left until its callbacks finish.
 // Panics propagate and skip remaining callbacks, but region membership remains
 // consistent.
 type Observer interface {
@@ -364,6 +366,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 		return
 	}
 	p.busy.Store(true)
+	p.knownFrom.Store(prev)
 	p.releaseLatch()
 	s.mu.Unlock()
 
@@ -380,6 +383,7 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 			scratch.notifications = scratch.notifications[:0]
 		}
 		s.mu.Lock()
+		p.knownFrom.Store(nil)
 		p.busy.Store(false)
 		s.idle.Broadcast()
 		s.mu.Unlock()
@@ -542,11 +546,12 @@ func (s *State) ForEachKnown(t Tracked, fn func(Tracked)) {
 }
 
 // AppendKnown appends every object in t's surrounding regions to out,
-// excluding t itself. It does nothing when t is off the grid. Reusing out lets
-// hot broadcast paths keep one grown snapshot buffer instead of allocating a
-// fresh known-list slice per event.
+// excluding t itself. It does nothing when t is off the grid. While t's own
+// region change is still delivering callbacks, the surroundings are those of
+// the region t left. Reusing out lets hot broadcast paths keep one grown
+// snapshot buffer instead of allocating a fresh known-list slice per event.
 func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
-	r := t.presence().currentRegion()
+	r := t.presence().knownRegion()
 	if r == nil {
 		return out
 	}

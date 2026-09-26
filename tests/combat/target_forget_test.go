@@ -106,3 +106,85 @@ func onlineTarget(t *testing.T, srv *gameservertest.Server, objID int32) interfa
 	}
 	return nil
 }
+
+// TestOwnRegionCrossingTargetClearReachesOldNeighborhood pins who sees the
+// TargetUnselected when a player's own move carries it out of range of its
+// selected monster. The reference assigns the mover's new region only after
+// its forget and discover passes (WorldObject.setRegion), so the broadcast
+// from the target clear resolves the pre-move 3x3 neighborhood: a watcher
+// only in the old one receives it, a watcher only in the new one does not.
+func TestOwnRegionCrossingTargetClearReachesOldNeighborhood(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	oldWatcher := placeWatcher(t, srv, "oldwatch", "OldWatch", location.Location{X: playerOrigin.X - 2048, Y: playerOrigin.Y, Z: playerOrigin.Z})
+	newWatcher := placeWatcher(t, srv, "newwatch", "NewWatch", location.Location{X: playerOrigin.X + 3*2048, Y: playerOrigin.Y, Z: playerOrigin.Z})
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, oldWatcher)
+	drainUntilQuiet(t, newWatcher)
+
+	mover, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	// Two regions east: the monster's region and the old watcher's leave the
+	// mover's neighborhood, the new watcher's enters it.
+	if err := srv.State.Move(mover, playerOrigin.X+2*2048, playerOrigin.Y, playerOrigin.Z); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+
+	if !receivedTargetUnselected(t, c, objID) {
+		t.Fatal("mover never received its own TargetUnselected")
+	}
+	if !receivedTargetUnselected(t, oldWatcher, objID) {
+		t.Fatal("watcher in the old neighborhood never received TargetUnselected")
+	}
+	if receivedTargetUnselected(t, newWatcher, objID) {
+		t.Fatal("watcher only in the new neighborhood received TargetUnselected")
+	}
+	if got := onlineTarget(t, srv, objID); got != nil {
+		t.Fatalf("Target() = %d after the crossing, want none", got.ObjectID())
+	}
+}
+
+// placeWatcher logs a player in on account and teleports it to at.
+func placeWatcher(t *testing.T, srv *gameservertest.Server, account, name string, at location.Location) *scriptedClient {
+	t.Helper()
+	srv.SeedCharacterFor(t, account, name, 1, 0)
+	w := srv.DialClient(t, account, 1)
+	startInWorld(t, w)
+	p, ok := srv.State.PlayerByName(name)
+	if !ok {
+		t.Fatalf("%s missing from world state", name)
+	}
+	if err := srv.State.Teleport(p, at.X, at.Y, at.Z); err != nil {
+		t.Fatalf("teleport %s: %v", name, err)
+	}
+	drainUntilQuiet(t, w)
+	return w
+}
+
+// receivedTargetUnselected drains c until quiet and reports whether a
+// TargetUnselected for objID arrived.
+func receivedTargetUnselected(t *testing.T, c *scriptedClient, objID int32) bool {
+	t.Helper()
+	got := false
+	for range 100 {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			return got
+		}
+		if frame[0] == serverpackets.OpcodeTargetUnselected && wireReader(frame[1:]).ReadInt32() == objID {
+			got = true
+		}
+	}
+	t.Fatal("client kept receiving frames after 100 reads")
+	return false
+}
