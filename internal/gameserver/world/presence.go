@@ -26,6 +26,11 @@ type Presence struct {
 	heading atomic.Int64
 	visible atomic.Bool
 	region  atomic.Pointer[Region]
+	// knownFrom is the region t left, held while that region change's
+	// callbacks are delivered: t's known list still resolves the neighborhood
+	// it is leaving until they finish, as the reference assigns the new region
+	// only after its forget and discover passes.
+	knownFrom atomic.Pointer[Region]
 
 	latch atomic.Bool
 	busy  atomic.Bool
@@ -115,5 +120,15 @@ func (p *Presence) Visible() bool {
 // currentRegion returns the region holding the object, or nil when the
 // object is off the grid.
 func (p *Presence) currentRegion() *Region {
+	return p.region.Load()
+}
+
+// knownRegion returns the region whose neighborhood is the object's known
+// list: the one it is leaving while that move's callbacks are delivered,
+// otherwise its current one.
+func (p *Presence) knownRegion() *Region {
+	if r := p.knownFrom.Load(); r != nil {
+		return r
+	}
 	return p.region.Load()
 }
