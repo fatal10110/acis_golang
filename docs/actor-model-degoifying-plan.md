@@ -194,7 +194,7 @@ are suggestions, payloads are the current hook parameters):
 
 | Existing Character hook (setter in `player`) | Event |
 |---|---|
-| `SetStatusBroadcaster` / `SetMPStatusBroadcaster` | `VitalsChanged{IncludeMP bool}` |
+| `SetStatusBroadcaster` / `SetMPStatusBroadcaster` | `VitalsChanged{}` |
 | `SetRegenMaxSender(count, period, hpRegen)` | `RegenMax{Count, Period int32; HPRegen float64}` |
 | `SetLackHPNotifier` / `SetLackMPNotifier` | `EffectDroppedLackHP{}` / `EffectDroppedLackMP{}` |
 | `SetHealRestoredNotifiers(hp, mp)` / `SetCPRestoredNotifier` | `Restored{Resource; HealerName string; Amount int; ByOther bool}` |

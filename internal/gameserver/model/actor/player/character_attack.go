@@ -153,7 +153,7 @@ func (c *Character) BroadcastAbnormalEffect() {
 	c.emit(event.AbnormalEffectChanged{})
 }
 
-// BroadcastStatus reports a change to this character's current HP.
+// BroadcastStatus reports a change to this character's current HP, MP or CP.
 func (c *Character) BroadcastStatus() {
 	c.emit(event.VitalsChanged{})
 }
@@ -182,13 +182,8 @@ func (c *Character) ConsumeBowMP() {
 		return
 	}
 	if c.ReduceMP(float64(mp)) > 0 {
-		c.BroadcastMPStatus()
+		c.BroadcastStatus()
 	}
-}
-
-// BroadcastMPStatus reports a change to this character's current HP and MP.
-func (c *Character) BroadcastMPStatus() {
-	c.emit(event.VitalsChanged{IncludeMP: true})
 }
 
 // SetRollSource overrides MakeAttackHit's random source for deterministic

@@ -25,6 +25,10 @@ type StatusAttr struct {
 // Status reports changed status values observers must see.
 type Status struct{ Attrs []StatusAttr }
 
+// HPChanged reports a change to an NPC's current HP that the players
+// watching its health bar may need.
+type HPChanged struct{}
+
 // SkillLaunched reports a cast reaching its launch with the targets it hits.
 type SkillLaunched struct {
 	SkillID, Level int32
@@ -55,6 +59,7 @@ type NpcSay struct {
 
 func (NPCInfoChanged) event()  {}
 func (Status) event()          {}
+func (HPChanged) event()       {}
 func (SkillLaunched) event()   {}
 func (SkillCanceled) event()   {}
 func (ShotRecharged) event()   {}

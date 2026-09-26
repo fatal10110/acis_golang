@@ -727,10 +727,7 @@ type liveEffectTarget struct {
 	validLocationFn   func(ox, oy, oz, tx, ty, tz int) location.Location
 	flightDest        location.Location
 	flightType        modelskill.Flight
-	mpBroadcasts      int
 }
-
-func (t *liveEffectTarget) BroadcastMPStatus() { t.mpBroadcasts++ }
 
 func (t *liveEffectTarget) EffectList() *List { return t.list }
 
@@ -2842,7 +2839,6 @@ func (playerStubs) StopFakeDeath() bool                  { return false }
 func (playerStubs) MarkRecentFakeDeath()                 {}
 func (playerStubs) HPFull() bool                         { return false }
 func (playerStubs) BroadcastStatus()                     {}
-func (playerStubs) BroadcastMPStatus()                   {}
 func (playerStubs) SendRegenMax(int32, int32, float64)   {}
 func (playerStubs) NotifyEffectRemovedDueLackHP(*Effect) {}
 func (playerStubs) NotifyEffectRemovedDueLackMP(*Effect) {}

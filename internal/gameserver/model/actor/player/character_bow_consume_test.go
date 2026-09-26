@@ -23,7 +23,7 @@ func TestConsumeBowShotSpendsOffhandArrowAndWeaponMP(t *testing.T) {
 	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
-	mpCalls := countVitals(rec, true)
+	mpCalls := countVitals(rec)
 
 	if arrows.Count != 4 {
 		t.Fatalf("arrow count = %d, want 4", arrows.Count)
@@ -43,7 +43,7 @@ func TestConsumeBowShotEmptyOffhandStillSpendsMP(t *testing.T) {
 	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
-	mpCalls := countVitals(rec, true)
+	mpCalls := countVitals(rec)
 
 	if c.Inventory().ItemAt(itemcontainer.LHand) != nil {
 		t.Fatal("empty off-hand grew an arrow stack")
@@ -64,7 +64,7 @@ func TestConsumeBowShotZeroMPCostSkipsStatusBroadcast(t *testing.T) {
 	rec := recordEvents(c)
 	c.ConsumeBowShot()
 	c.ConsumeBowMP()
-	mpCalls := countVitals(rec, true)
+	mpCalls := countVitals(rec)
 
 	if arrows.Count != 1 {
 		t.Fatalf("arrow count = %d, want 1", arrows.Count)

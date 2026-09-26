@@ -1,6 +1,8 @@
 package network
 
 import (
+	"slices"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -55,6 +57,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(h.ObjectID(), attrs) })
+	case event.HPChanged:
+		s.broadcastHP()
 	case event.AbnormalEffectChanged:
 		s.broadcast(func() wire.Frame { return frames.Info(h.NPCInfoSnapshot()) })
 	case event.NPCInfoChanged:
@@ -103,6 +107,39 @@ func (s *hostileSink) broadcast(build func() wire.Frame) {
 		for _, o := range known.Tracked() {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
+			}
+		}
+	})
+}
+
+// broadcastHP sends the NPC's current HP to the known players targeting it,
+// the only observers that follow its health bar; a player's selection is
+// cleared when the NPC leaves its known list. The bar-segment gate runs only
+// once a watcher exists, so it never advances for an unwatched NPC.
+func (s *hostileSink) broadcastHP() {
+	known := s.known.SnapshotCopy(s.world, s.h)
+	defer known.Release()
+	id := s.h.ObjectID()
+	watching := func(o world.Tracked) (*livePlayer, bool) {
+		p, ok := o.(*livePlayer)
+		if !ok {
+			return nil, false
+		}
+		target := p.Target()
+		return p, target != nil && target.ObjectID() == id
+	}
+	if !slices.ContainsFunc(known.Tracked(), func(o world.Tracked) bool { _, ok := watching(o); return ok }) {
+		return
+	}
+	hp, ok := s.h.HPStatusUpdate()
+	if !ok {
+		return
+	}
+	attrs := []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentHP, Value: hp}}
+	broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(id, attrs) }, func(send func(frameReceiver)) {
+		for _, o := range known.Tracked() {
+			if p, ok := watching(o); ok {
+				send(p)
 			}
 		}
 	})

@@ -23,6 +23,9 @@ func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
 	startInWorld(t, c)
 	hostile := srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, c)
+	// Only a player targeting the NPC receives its HP updates.
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
 	rewards := &countedRewards{}
 	var winners atomic.Int32
 	var wg sync.WaitGroup

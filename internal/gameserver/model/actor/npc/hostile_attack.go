@@ -327,10 +327,10 @@ func (h *Hostile) BroadcastStop() {
 	h.emit(event.Stopped{})
 }
 
-// BroadcastStatus reports this NPC's current/max HP, so a target's health
-// bar reflects damage as it lands rather than only the moment it dies.
+// BroadcastStatus reports a change to this NPC's current HP, so the health
+// bar of every player targeting it reflects damage and regeneration.
 func (h *Hostile) BroadcastStatus() {
-	h.emit(event.Status{Attrs: []event.StatusAttr{{Kind: event.StatusMaxHP, Value: h.MaxHP()}, {Kind: event.StatusCurrentHP, Value: h.CurrentHP()}}})
+	h.emit(event.HPChanged{})
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.

@@ -1358,11 +1358,11 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.ServitorVanished{}, event.ShieldBlocked{}, event.AttackFailed{},
 		event.SkillResisted{}, event.MagicResisted{}, event.UserInfoChanged{},
 		event.PvPFlagged{}, event.RelationChanged{}, event.LevelChanged{},
-		event.WeightPenaltyChanged{},
+		event.WeightPenaltyChanged{}, event.VitalsChanged{},
 	}
 	// Hooks detach left wired: these must keep flowing.
 	stillDelivered := []event.Event{
-		event.VitalsChanged{}, event.Move{}, event.Stopped{}, event.AutoAttackStopped{},
+		event.Move{}, event.Stopped{}, event.AutoAttackStopped{},
 		event.StanceChanged{}, event.FakeDeathRevived{}, event.EffectIconsChanged{},
 		event.AbnormalEffectChanged{}, event.MagicSkillUse{}, event.Flight{},
 		event.PositionCorrected{}, event.ExpSPGained{}, event.ExpSPLost{},

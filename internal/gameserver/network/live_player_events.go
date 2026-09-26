@@ -36,7 +36,7 @@ func sessionOnly(ev event.Event) bool {
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed,
 		event.SkillResisted, event.MagicResisted, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
-		event.WeightPenaltyChanged:
+		event.WeightPenaltyChanged, event.VitalsChanged:
 		return true
 	}
 	return false
@@ -103,11 +103,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 		l.broadcastLiveDie(live)
 	case event.VitalsChanged:
-		if e.IncludeMP {
-			l.broadcastLiveMPStatus(live)
-			return
-		}
-		l.broadcastLiveStatus(live)
+		sendLiveStatus(live)
 	case event.EffectIconsChanged:
 		l.updateLiveAbnormalEffect(live)
 	case event.AbnormalEffectChanged:
