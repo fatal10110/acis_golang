@@ -2703,11 +2703,11 @@ func TestReduceHPByDOTBreaksStunWhenNotARealDOTTick(t *testing.T) {
 
 // TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter mirrors the
 // reference's top-of-method isDead() early return: an already-dead
-// character (curHP already clamped to 0) must not have its SLEEP effect
+// character (dead state set, with HP clamped to 0) must not have its SLEEP effect
 // stopped or get stood up by a stray hit landing after death.
 func TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
-	c.SetHP(0)
+	c.MarkDead()
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
 	c.Sit()
@@ -2726,7 +2726,7 @@ func TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 // ReduceHPByDOT's counterpart to the above.
 func TestReduceHPByDOTSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
-	c.SetHP(0)
+	c.MarkDead()
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
 	c.Sit()

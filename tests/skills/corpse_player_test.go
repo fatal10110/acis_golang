@@ -102,9 +102,10 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 		c := srv.Client
 		startInWorld(t, c)
 		guard := srv.SpawnHostileNPC(t)
-		guard.MarkDead()
 		drainUntilQuiet(t, c)
 		targetHostile(t, c, guard.ObjectID())
+		guard.MarkDead()
+		drainUntilQuiet(t, c)
 
 		c.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePlayerSkillID, 1)
