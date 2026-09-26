@@ -109,6 +109,12 @@ type livePlayer struct {
 	// one Discover is dropped once a later one has run.
 	petSightings atomic.Uint32
 
+	// teleportMu serializes a teleport from its start through the position
+	// update with the Appearing that completes it. A summon-friend cast
+	// teleports this player from the caster's queue, while Appearing runs on
+	// this player's own.
+	teleportMu sync.Mutex
+
 	// petInteractMu is taken from another actor's queue for the same reason
 	// as pickupMu.
 	petInteractMu sync.Mutex
