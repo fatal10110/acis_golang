@@ -256,3 +256,53 @@ func readOverHitThenExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int
 	}
 	t.Fatal("exp/SP gain message not found within 50 frames")
 }
+
+// TestKarmaKillNPCLowersKarma walks a karma player's solo kill: the reward's
+// exp lowers karma by floor(exp / karmaModifier / 15) — 27 for 1024 exp at
+// the datapack's level-5 modifier (bounded Java probe of
+// Formulas.calculateKarmaLost) — announced before the exp/SP gain and
+// persisted at logout. The rewards are powers of two so the damage-share
+// scaling (reward * damage / totalDamage) stays exact for any damage roll.
+func TestKarmaKillNPCLowersKarma(t *testing.T) {
+	t.Parallel()
+	table, err := playermodel.NewLevelTable(map[int]playermodel.Level{
+		1: {RequiredExpToLevelUp: 0},
+		2: {RequiredExpToLevelUp: 1},
+		3: {RequiredExpToLevelUp: 2},
+		4: {RequiredExpToLevelUp: 3},
+		5: {RequiredExpToLevelUp: 1000, KarmaModifier: 2.514219611},
+		6: {RequiredExpToLevelUp: 3000},
+		7: {RequiredExpToLevelUp: 1_000_000_000},
+	})
+	if err != nil {
+		t.Fatalf("build level table: %v", err)
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSeed(seedExperiencedCharacter(1500, 240)),
+		gameservertest.WithSkills(combatPersistence(t, killSkillDefs())),
+		gameservertest.WithLevels(table),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 42, 1)
+	startInWorld(t, c)
+	hostile := spawnRewardedNPC(t, srv, 1024, 32)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(42, false, false))
+	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+
+	assertKarmaChangeFrames(t, c, objID, 213)
+	assertFrameOpcode(t, mustRead(t, c, "karma UserInfo"), serverpackets.OpcodeUserInfo, "karma UserInfo")
+	readExpSpGain(t, c, 1024, 32)
+	drainUntilQuiet(t, c)
+
+	logoutPersisted(t, srv, c)
+	if ch, err := srv.Chars.Get(context.Background(), objID); err != nil || ch.KarmaPoints != 213 || ch.Exp != 2524 {
+		t.Fatalf("persisted character = %+v, %v; want karma 213 and exp 2524", ch, err)
+	}
+}

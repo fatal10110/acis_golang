@@ -209,6 +209,8 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage m
 			entry.actor.NotifyOverHit()
 			exp += d.hostile.OverhitBonus(exp)
 		}
+		// Karma drops by the whole kill exp, before any pet takes its share.
+		entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
 		if own != nil && own.CanReceiveKillReward(d.config.PartyRange) {
 			petExp, petSp := petReward(own.ExpType(), summonDamage[own.ObjectID()], entry.damage, exp, sp)
 			exp -= petExp

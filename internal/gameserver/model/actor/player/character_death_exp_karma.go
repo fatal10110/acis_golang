@@ -23,10 +23,7 @@ import (
 //     arena/olympiad state those branches matter for isn't tracked on
 //     Character yet (#1302, #217, #215);
 //   - the mutual-clan-war halving of percentLost (Player.java:2906,
-//     `atWar`) — clan-war state isn't tracked yet (#149);
-//   - the victim's-own cursed-weapon exemption in updateKarmaLoss
-//     (Player.java:2751) — cursed-weapon-equipped state isn't tracked on
-//     Character yet (#225).
+//     `atWar`) — clan-war state isn't tracked yet (#149).
 //
 // The siege-zone halving (Player.java:2906) and the festival-participant
 // halving are wired: InSiegeZone and FestivalParticipant are live
@@ -101,16 +98,29 @@ func (c *Character) RestoreExp(restorePercent float64) {
 	c.addExpAndSp(table, c.runtimeTemplate, restored, -1)
 }
 
-// updateKarmaLoss reduces this character's karma for a death that cost
-// lostExp experience, matching Player.updateKarmaLoss (Player.java:2749-2757)
-// and Formulas.calculateKarmaLost (Formulas.java:1267-1270). The victim's-own
-// cursed-weapon exemption is deferred (see applyDeathExpKarmaLoss); until
-// #225 lands this always evaluates as not-equipped, which is the common
-// case Java itself reproduces for every non-cursed-weapon death.
+// UpdateKarmaLoss reduces this character's karma for exp experience earned
+// from a kill, announcing the new total when it changes.
+func (c *Character) UpdateKarmaLoss(table *LevelTable, exp int64) {
+	if table == nil {
+		return
+	}
+	var hooks progressionHooks
+	c.progressionMu.Lock()
+	c.updateKarmaLoss(table, exp, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
+}
+
+// updateKarmaLoss reduces this character's karma by an experience amount
+// (gained from a kill or lost to a death), matching Player.updateKarmaLoss
+// (Player.java:2749-2757) and Formulas.calculateKarmaLost
+// (Formulas.java:1267-1270). A cursed-weapon holder keeps its karma; that
+// gate stays dormant until cursed weapons are modeled (#225).
 //
-// The caller holds progressionMu; the karma announcement runs from hooks.
+// The caller holds progressionMu; the karma announcement, UserInfo and
+// relation broadcast run from hooks, in Player.setKarma's order.
 func (c *Character) updateKarmaLoss(table *LevelTable, lostExp int64, hooks *progressionHooks) {
-	if c.KarmaPoints <= 0 {
+	if c.KarmaPoints <= 0 || c.CursedWeaponEquipped() {
 		return
 	}
 	level, ok := table.Level(c.CharLevel)
@@ -130,4 +140,5 @@ func (c *Character) updateKarmaLoss(table *LevelTable, lostExp int64, hooks *pro
 	c.KarmaPoints = newKarma
 	hooks.add(func() { c.notifyKarmaChanged(newKarma) })
 	hooks.add(c.UpdateUserInfo)
+	hooks.add(c.BroadcastRelations)
 }
