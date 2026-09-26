@@ -304,6 +304,9 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	if rejoin {
 		oldShared, newShared = nil, nil
 	}
+	// Published before the new region, so a concurrent known-list read
+	// never resolves the new area ahead of this move's callbacks.
+	p.knownFrom.Store(prev)
 	p.region.Store(next)
 	// A non-player entering a region that was already active or inactive
 	// sees no setActive transition, so it is notified directly.
@@ -361,12 +364,12 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 	}
 
 	if !notifyArrival && len(toggles) == 0 && len(notifications) == 0 && after == nil {
+		p.knownFrom.Store(nil)
 		p.releaseLatch()
 		s.mu.Unlock()
 		return
 	}
 	p.busy.Store(true)
-	p.knownFrom.Store(prev)
 	p.releaseLatch()
 	s.mu.Unlock()
 
