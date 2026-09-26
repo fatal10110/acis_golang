@@ -553,63 +553,17 @@ func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
 	})
 }
 
-// broadcastLiveStatus sends live's current HP to its own session and every
-// currently known observer, so a health bar reflects damage as it lands
-// instead of only the moment the target dies or is reselected.
-func (l *GameClientLink) broadcastLiveStatus(live *livePlayer) {
-	if live == nil {
-		return
-	}
-	attrs, ok := targetHPAttributes(live)
-	if !ok {
-		return
-	}
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameStatusUpdate(live.ObjectID(), attrs)
-	}, func(send func(frameReceiver)) {
-		send(live)
-		if l.world == nil {
-			return
-		}
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
-}
-
-// broadcastLiveMPStatus sends live's current HP and MP to its own session
-// and every currently known observer, matching PlayerStatus's
-// broadcastStatusUpdate() override, which unconditionally includes CUR_MP
-// alongside CUR_HP on every status packet (unlike the generic Creature/Npc
-// broadcast, which is HP-only and threshold-gated). Used for MP-only
-// changes — a mana-drain tick — where the generic HP broadcast alone would
-// leave the client's MP bar stale.
-func (l *GameClientLink) broadcastLiveMPStatus(live *livePlayer) {
-	if live == nil {
-		return
-	}
+// sendLiveStatus sends live's own session its current HP, MP and CP. Other
+// players see a player's health only through the one-off update sent when
+// they select it.
+func sendLiveStatus(live *livePlayer) {
 	resources := live.ResourceValues()
-	attrs := []serverpackets.StatusAttribute{
+	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentHP, Value: int(resources.CurrentHP)},
 		{Type: serverpackets.StatusCurrentMP, Value: int(resources.CurrentMP)},
 		{Type: serverpackets.StatusCurrentCP, Value: int(resources.CurrentCP)},
 		{Type: serverpackets.StatusMaxCP, Value: int(resources.MaxCP)},
-	}
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameStatusUpdate(live.ObjectID(), attrs)
-	}, func(send func(frameReceiver)) {
-		send(live)
-		if l.world == nil {
-			return
-		}
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
+	}))
 }
 
 // updateLiveAbnormalEffect sends live's own session its current active

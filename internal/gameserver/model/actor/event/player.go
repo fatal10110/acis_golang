@@ -8,9 +8,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// VitalsChanged reports a change to the actor's current HP (and, with
-// IncludeMP, its MP) that observers must see.
-type VitalsChanged struct{ IncludeMP bool }
+// VitalsChanged reports a change to the actor's current HP, MP or CP.
+type VitalsChanged struct{}
 
 // ActionsStopRequested asks for the named in-progress actions to be stopped
 // by the server rather than the client: the target selection, then

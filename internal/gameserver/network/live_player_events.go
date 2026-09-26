@@ -103,11 +103,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 		l.broadcastLiveDie(live)
 	case event.VitalsChanged:
-		if e.IncludeMP {
-			l.broadcastLiveMPStatus(live)
-			return
-		}
-		l.broadcastLiveStatus(live)
+		sendLiveStatus(live)
 	case event.EffectIconsChanged:
 		l.updateLiveAbnormalEffect(live)
 	case event.AbnormalEffectChanged:

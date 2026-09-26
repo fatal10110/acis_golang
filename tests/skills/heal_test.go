@@ -212,7 +212,7 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 
 	// The production sweep only advances effects whose period elapsed. The
 	// first tick restores the whole remaining gap to the stat-computed max
-	// and reports both bounds; every later tick heals nothing and stays
+	// and reports it; every later tick heals nothing and stays
 	// silent, matching the reference's bypass on a zero-amount setter.
 	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
@@ -220,9 +220,13 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 	if frame == nil {
 		t.Fatalf("tick 1: no StatusUpdate arrived")
 	}
+	// PlayerStatus.broadcastStatusUpdate (PlayerStatus.java:408-416): self
+	// only, CUR_HP, CUR_MP, CUR_CP, MAX_CP.
 	assertStatusAttrs(t, frame, objID, []serverpackets.StatusAttribute{
-		{Type: serverpackets.StatusMaxHP, Value: maxHP},
 		{Type: serverpackets.StatusCurrentHP, Value: maxHP},
+		{Type: serverpackets.StatusCurrentMP, Value: srv.PlayerCurrentMP(t, objID)},
+		{Type: serverpackets.StatusCurrentCP, Value: srv.PlayerCurrentCP(t, objID)},
+		{Type: serverpackets.StatusMaxCP, Value: srv.PlayerMaxCP(t, objID)},
 	})
 	if got := srv.PlayerCurrentHP(t, objID); got != maxHP {
 		t.Fatalf("tick 1: HP = %d, want restored to computed max %d (was %d)", got, maxHP, before)

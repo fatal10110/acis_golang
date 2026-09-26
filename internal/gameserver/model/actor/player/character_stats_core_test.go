@@ -1603,21 +1603,17 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	if got, want := c.HP(), before-4; got != want {
 		t.Fatalf("HP() = %v, want %v", got, want)
 	}
-	if statusUpdates := countVitals(rec, false); statusUpdates != 1 {
+	if statusUpdates := countVitals(rec); statusUpdates != 1 {
 		t.Fatalf("status updates = %d, want 1", statusUpdates)
 	}
 }
 
 // TestManaDamageOverTimeEffectTargetsCharacter pins Finding 2 of the #1088
-// closed-PR review: a mana-DOT tick must broadcast a status update carrying
-// MP, matching PlayerStatus.broadcastStatusUpdate()'s unconditional CUR_MP
-// inclusion (EffectManaDamOverTime.java:35 -> CreatureStatus.reduceMp/setMp,
+// closed-PR review: a mana-DOT tick must report a status change
+// (EffectManaDamOverTime.java:35 -> CreatureStatus.reduceMp/setMp,
 // CreatureStatus.java:338-355, 274-306 -> the Player override at
-// PlayerStatus.java:408-416, which sends CUR_HP+CUR_MP+CUR_CP on every
-// call, unlike the generic HP-only, threshold-gated broadcast the base
-// Creature/Npc path uses). The generic statusBroadcaster hook is HP-only on
-// the wire (network/targeting.go's targetHPAttributes), so this must go
-// through the separate MP-carrying broadcaster, not the HP one.
+// PlayerStatus.java:408-416, which sends CUR_HP+CUR_MP+CUR_CP+MAX_CP on
+// every call).
 func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	c, err := NewCharacter(1, humanFighterTemplate(), "acct", "dot", 0, 0, 0, SexMale)
 	if err != nil {
@@ -1636,7 +1632,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	if got, want := c.MPValue(), before-4; got != want {
 		t.Fatalf("MPValue() = %v, want %v", got, want)
 	}
-	if mpStatusUpdates := countVitals(rec, true); mpStatusUpdates != 1 {
+	if mpStatusUpdates := countVitals(rec); mpStatusUpdates != 1 {
 		t.Fatalf("MP status updates = %d, want 1", mpStatusUpdates)
 	}
 }
@@ -5257,7 +5253,7 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 		if lost := event.Of[event.ExpSPLost](rec); len(lost) != 1 || lost[0] != (event.ExpSPLost{Exp: 10, SP: 25, SPLeft: 975}) {
 			t.Errorf("loss notifications = %v, want [[10 25 975]]", lost)
 		}
-		if broadcasts := countVitals(rec, false); broadcasts != 0 {
+		if broadcasts := countVitals(rec); broadcasts != 0 {
 			t.Errorf("status broadcasts = %d, want 0", broadcasts)
 		}
 	})
@@ -5268,7 +5264,7 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 		before := c.CharLevel
 		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, c.Exp, 0)
-		notifications, broadcasts := event.Count[event.ExpSPLost](rec), countVitals(rec, false)
+		notifications, broadcasts := event.Count[event.ExpSPLost](rec), countVitals(rec)
 		if c.CharLevel >= before {
 			t.Fatalf("CharLevel = %d, want below %d", c.CharLevel, before)
 		}
@@ -5972,15 +5968,9 @@ func recordEvents(c *Character) *event.Recorder {
 	return rec
 }
 
-// countVitals counts VitalsChanged events carrying MP (includeMP) or not.
-func countVitals(rec *event.Recorder, includeMP bool) int {
-	n := 0
-	for _, e := range event.Of[event.VitalsChanged](rec) {
-		if e.IncludeMP == includeMP {
-			n++
-		}
-	}
-	return n
+// countVitals counts VitalsChanged events.
+func countVitals(rec *event.Recorder) int {
+	return event.Count[event.VitalsChanged](rec)
 }
 
 // pvpFlagCalls returns each PvPFlagged event's duration choice, in order.

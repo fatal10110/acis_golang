@@ -43,7 +43,7 @@ func manaDamageOverTimeAction(e *Effect) bool {
 	// applied amount, not the requested tick damage, so an already-empty
 	// target doesn't get a spurious broadcast.
 	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
-		broadcastMPStatus(e.Effected)
+		broadcastStatus(e.Effected)
 	}
 	return result.Continue
 }
@@ -89,7 +89,7 @@ func manaDrainTick(e *Effect) bool {
 	// See manaDamageOverTimeAction: gate the broadcast on ReduceMP's applied
 	// amount, not the requested tick damage.
 	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
-		broadcastMPStatus(e.Effected)
+		broadcastStatus(e.Effected)
 	}
 	return result.Continue
 }

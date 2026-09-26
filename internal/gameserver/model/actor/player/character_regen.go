@@ -11,6 +11,6 @@ func (c *Character) TickRegen() {
 	changed = c.AddMP(math.Max(1, c.MPRegenRate())) > 0 || changed
 	changed = c.AddCP(math.Max(1, c.CPRegenRate())) > 0 || changed
 	if changed {
-		c.BroadcastMPStatus()
+		c.BroadcastStatus()
 	}
 }

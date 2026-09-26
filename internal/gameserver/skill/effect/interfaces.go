@@ -103,9 +103,6 @@ type PlayerActor interface {
 	HPFull() bool
 
 	BroadcastStatus()
-	// BroadcastMPStatus pushes a status update that carries MP; only player
-	// status broadcasts include it.
-	BroadcastMPStatus()
 	BroadcastAbnormalEffect()
 	SendRegenMax(count, period int32, hpRegen float64)
 	NotifyEffectRemovedDueLackHP(*Effect)

@@ -39,7 +39,7 @@ func healOverTimeStart(e *Effect) bool {
 	return true
 }
 
-// broadcastStatus refreshes effected's health bars for everyone watching.
+// broadcastStatus refreshes a player effected's own HP/MP/CP bars.
 // A periodic effect action runs outside any client request, so unlike the
 // cast and item paths — which send their own batched StatusUpdate at the
 // call site — nothing else would tell the client the tick happened. Only
@@ -47,15 +47,6 @@ func healOverTimeStart(e *Effect) bool {
 func broadcastStatus(effected Actor) {
 	if p, ok := asPlayer(effected); ok {
 		p.BroadcastStatus()
-	}
-}
-
-// broadcastMPStatus pushes an MP-carrying status update to a player target,
-// matching the reference's Player-only unconditional CUR_MP broadcast; other
-// kinds are left alone.
-func broadcastMPStatus(effected Actor) {
-	if p, ok := asPlayer(effected); ok {
-		p.BroadcastMPStatus()
 	}
 }
 
