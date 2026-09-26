@@ -202,8 +202,10 @@ func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {
 func (h *Hostile) teleportNear(target attackable.Combatant, offset int) {
 	pos := combatantLocation(target)
 	if offset > 0 {
-		pos.X += rnd.GetRange(-offset, offset)
-		pos.Y += rnd.GetRange(-offset, offset)
+		nx := pos.X + rnd.GetRange(-offset, offset)
+		ny := pos.Y + rnd.GetRange(-offset, offset)
+		valid := h.ValidLocation(pos.X, pos.Y, pos.Z, nx, ny, pos.Z)
+		pos.X, pos.Y = valid.X, valid.Y
 	}
 	h.TeleportTo(pos)
 }

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -145,10 +146,13 @@ type Attackable struct {
 	actor   AttackableActor
 	move    MoveController
 	attack  AttackController
-	cast    CastController
 	threats *attackable.ThreatTable
 	hates   *attackable.HateTable
 	desires *DesireQueue
+
+	// cast is read without mu so AbortAll can run from inside the think
+	// loop, which holds mu (a return-home teleport aborts the actor).
+	cast atomic.Pointer[CastController]
 
 	mu      sync.Mutex
 	current intention
@@ -234,9 +238,7 @@ func (a *Attackable) ObjectID() int32 {
 // controller. Left unset (the default), IntentionCast desires are ignored,
 // matching an actor with no skills to cast.
 func (a *Attackable) SetCastController(controller CastController) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.cast = controller
+	a.cast.Store(&controller)
 }
 
 // AbortAll stops movement, the attack cycle and any in-flight cast, in that
@@ -259,9 +261,10 @@ func (a *Attackable) StopAttack() { a.attack.Stop() }
 // or inspect the cast wiring directly instead of through full aggro
 // decision-making.
 func (a *Attackable) CastController() CastController {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	return a.cast
+	if cast := a.cast.Load(); cast != nil {
+		return *cast
+	}
+	return nil
 }
 
 // Threats returns the physical-attack threat table.
@@ -410,8 +413,8 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 func (a *Attackable) thinkIdle() {
 	a.move.Stop()
 	a.attack.Stop()
-	if a.cast != nil {
-		a.cast.Stop()
+	if cast := a.CastController(); cast != nil {
+		cast.Stop()
 	}
 	a.actor.ForceWalkStance()
 	a.current = intention{kind: IntentionIdle}
@@ -624,8 +627,13 @@ func (a *Attackable) TickThink() error {
 	return a.think(true)
 }
 
+func (a *Attackable) castingNow() bool {
+	cast := a.CastController()
+	return cast != nil && cast.CastingNow()
+}
+
 func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
-	if a.cast != nil && a.cast.CastingNow() {
+	if a.castingNow() {
 		return false
 	}
 	if !updateTick {
@@ -646,14 +654,14 @@ func (a *Attackable) think(updateTick bool) error {
 	if updateTick {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+			if a.lifeTime > 0 && !a.castingNow() {
 				a.thinkIdle()
 				a.queueIdleFollow()
 				idled = true
 			}
 		}
 		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime > 0 && (a.cast == nil || !a.cast.CastingNow()) {
+			if a.lifeTime > 0 && !a.castingNow() {
 				a.queueIdleWander()
 			}
 		}
@@ -803,10 +811,8 @@ func (a *Attackable) pruneDesires() {
 		if d.Weight <= 0 {
 			return true
 		}
-		if a.cast == nil {
-			return false
-		}
-		return !a.cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
+		cast := a.CastController()
+		return cast != nil && !cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
 	})
 	if a.actor.DenyAIAction() {
 		return
@@ -826,7 +832,7 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 	if a.actor.DenyAIAction() || a.attack.AttackingNow() {
 		return
 	}
-	if a.cast != nil && a.cast.CastingNow() {
+	if a.castingNow() {
 		return
 	}
 	switch a.current.kind {
@@ -882,44 +888,45 @@ func (a *Attackable) thinkAttack() (bool, error) {
 // warrant it, then the final cast attempt. It mirrors thinkAttack's shape
 // for skill casts instead of physical attacks.
 func (a *Attackable) thinkCast() (bool, error) {
-	if a.actor.DenyAIAction() || a.cast == nil {
+	cast := a.CastController()
+	if a.actor.DenyAIAction() || cast == nil {
 		return false, nil
 	}
-	if a.cast.Disabled() {
+	if cast.Disabled() {
 		return false, nil
 	}
 
 	target := a.current.target
 	ref := a.current.skill
-	if a.dropLostCastTarget(target, a.cast.SkillType(ref)) {
+	if a.dropLostCastTarget(target, cast.SkillType(ref)) {
 		return true, nil
 	}
 
-	if !a.cast.CanAttempt(target, ref) {
+	if !cast.CanAttempt(target, ref) {
 		return false, nil
 	}
 
-	following, err := a.move.MaybeStartOffensiveFollow(target, a.cast.Range(ref))
+	following, err := a.move.MaybeStartOffensiveFollow(target, cast.Range(ref))
 	if following {
 		a.actor.ForceRunStance()
 		return false, err
 	}
 
-	if a.cast.StopsMovement(ref) {
+	if cast.StopsMovement(ref) {
 		a.move.Stop()
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.SetHeadingTo(target)
 		}
 	}
 
-	if !a.cast.CanCast(target, ref) {
+	if !cast.CanCast(target, ref) {
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.BroadcastMoveToPawn(target)
 		}
 		return false, nil
 	}
 
-	a.cast.Cast(target, ref)
+	cast.Cast(target, ref)
 	return false, nil
 }
 
