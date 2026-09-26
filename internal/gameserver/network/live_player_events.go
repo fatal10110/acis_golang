@@ -36,7 +36,7 @@ func sessionOnly(ev event.Event) bool {
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed,
 		event.SkillResisted, event.MagicResisted, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
-		event.WeightPenaltyChanged:
+		event.WeightPenaltyChanged, event.VitalsChanged:
 		return true
 	}
 	return false
