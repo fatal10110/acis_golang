@@ -48,6 +48,7 @@ type targetKnower interface {
 
 // homePathRecovery is implemented by hostile NPCs whose return-home path can
 // stall on geodata and must teleport after repeated blocked resolutions.
+// TeleportTo owns aborting the walk in progress.
 type homePathRecovery interface {
 	GeoPathFailCount() int
 	ResetGeoPathFailCount()
@@ -285,10 +286,8 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 func (c *Controller) MoveHome(home location.Location) error {
 	recovery, hasRecovery := c.self.(homePathRecovery)
 	if hasRecovery && recovery.GeoPathFailCount() >= HomeGeoFailLimit {
-		c.move.CancelMove()
 		recovery.TeleportTo(home)
 		recovery.ResetGeoPathFailCount()
-		c.removePositionUpdate()
 		return nil
 	}
 

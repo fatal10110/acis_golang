@@ -66,7 +66,7 @@ func (s *State) Spawn(t Tracked, x, y, z, heading int) {
 	p.heading.Store(int64(heading))
 	p.visible.Store(true)
 	next, _ := s.RegionAt(x, y) // clamped coordinates always land on the grid
-	s.relocateAndUnlock(t, next, func() { s.AddObject(t) })
+	s.relocateAndUnlock(t, next, false, func() { s.AddObject(t) })
 }
 
 // Move updates t's position and, when the new coordinates land in a
@@ -118,7 +118,33 @@ func (s *State) Move(t Tracked, x, y, z int) error {
 		s.mu.Unlock()
 		return nil
 	}
-	s.relocateAndUnlock(t, next, nil)
+	s.relocateAndUnlock(t, next, false, nil)
+	return nil
+}
+
+// Teleport moves t to (x, y, z) as a discontinuous relocation: t leaves the
+// grid and re-enters it, so every observer around its old region forgets it
+// and every observer around the new one discovers it, including observers in
+// regions both neighborhoods share. An object that is not visible only gets
+// its position updated.
+func (s *State) Teleport(t Tracked, x, y, z int) error {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	p.setPosition(x, y, z)
+	if p.region.Load() == nil || !p.visible.Load() {
+		p.releaseLatch()
+		s.mu.Unlock()
+		return nil
+	}
+	next, ok := s.RegionAt(x, y)
+	if !ok {
+		p.releaseLatch()
+		s.mu.Unlock()
+		return fmt.Errorf("teleport object %d: (%d, %d) is outside the world bounds", t.ObjectID(), x, y)
+	}
+	s.relocateAndUnlock(t, next, true, nil)
 	return nil
 }
 
@@ -131,7 +157,7 @@ func (s *State) Despawn(t Tracked) {
 	s.awaitIdleLocked(p)
 	p.acquireLatch()
 	p.visible.Store(false)
-	s.relocateAndUnlock(t, nil, func() { s.removeObjectIfSame(t) })
+	s.relocateAndUnlock(t, nil, false, func() { s.removeObjectIfSame(t) })
 }
 
 // DespawnAll removes every object in ts from the world in one pass. Objects
@@ -251,11 +277,12 @@ func (s *State) awaitIdleLocked(p *Presence) {
 // Every object in a region that leaves t's surroundings exchanges Forget
 // notifications with t, and every object in a region that enters them
 // exchanges Discover notifications; regions shared by both neighborhoods
-// stay silent. For each affected object the other party is notified before
+// stay silent unless rejoin is set, in which case t forgets and rediscovers
+// them too. For each affected object the other party is notified before
 // t itself. A non-player arriving in an already active or inactive region is
 // told that region's activity first; a player's region-activity changes are
 // delivered before its visibility notifications.
-func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
+func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after func()) {
 	p := t.presence()
 	tIsPlayer := isPlayer(t)
 	prev := p.region.Load()
@@ -269,6 +296,11 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 	if next != nil {
 		arrival = next.add(t)
 		newAreas = s.AppendNeighbors(newAreaBuf[:0], next, 1)
+	}
+	// Regions both neighborhoods share stay silent unless t rejoins.
+	oldShared, newShared := newAreas, oldAreas
+	if rejoin {
+		oldShared, newShared = nil, nil
 	}
 	p.region.Store(next)
 	// A non-player entering a region that was already active or inactive
@@ -285,12 +317,12 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 		}
 		// Same unshared-region skip as appendCrossing.
 		for _, r := range oldAreas {
-			if !containsRegion(newAreas, r) {
+			if !containsRegion(oldShared, r) {
 				n += len(r.objects)
 			}
 		}
 		for _, r := range newAreas {
-			if !containsRegion(oldAreas, r) {
+			if !containsRegion(newShared, r) {
 				n += len(r.objects)
 			}
 		}
@@ -301,14 +333,14 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 		if cap(scratch.notifications) < n*2 {
 			scratch.notifications = make([]visibilityNotification, 0, n*2)
 		}
-		scratch.notifications = appendCrossing(scratch.notifications[:0], t, oldAreas, newAreas)
+		scratch.notifications = appendCrossing(scratch.notifications[:0], t, oldAreas, oldShared, newAreas, newShared)
 		notifications = scratch.notifications
 	} else {
 		buf := notificationBuf[:0]
 		if cap(buf) < n*2 {
 			buf = make([]visibilityNotification, 0, n*2)
 		}
-		notifications = appendCrossing(buf, t, oldAreas, newAreas)
+		notifications = appendCrossing(buf, t, oldAreas, oldShared, newAreas, newShared)
 	}
 
 	var toggleBuf [18]regionToggle
@@ -366,12 +398,12 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, after func()) {
 	}
 }
 
-// appendCrossing appends the notifications t's move from oldAreas to
-// newAreas produces: Forget for regions only in oldAreas, then Discover for
-// regions only in newAreas. The caller holds s.mu.
-func appendCrossing(notes []visibilityNotification, t Tracked, oldAreas, newAreas []*Region) []visibilityNotification {
-	notes = appendRegionChange(notes, t, oldAreas, newAreas, false)
-	return appendRegionChange(notes, t, newAreas, oldAreas, true)
+// appendCrossing appends the notifications t's move produces: Forget for
+// regions of oldAreas outside oldShared, then Discover for regions of
+// newAreas outside newShared. The caller holds s.mu.
+func appendCrossing(notes []visibilityNotification, t Tracked, oldAreas, oldShared, newAreas, newShared []*Region) []visibilityNotification {
+	notes = appendRegionChange(notes, t, oldAreas, oldShared, false)
+	return appendRegionChange(notes, t, newAreas, newShared, true)
 }
 
 // appendRegionChange appends, for every object in areas outside shared, the

@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -51,7 +50,7 @@ func TestReturnHomeMovementDisabledSkipsWalkButKeepsRecoveryTeleport(t *testing.
 			if !hostile.ReturnHome() {
 				t.Fatal("ReturnHome() = false at geo fail limit, want teleport")
 			}
-			assertFrameOpcode(t, mustRead(t, c, "ValidateLocation"), serverpackets.OpcodeValidateLocation, "ValidateLocation")
+			assertNPCTeleportFrames(t, c, mustRead(t, c, "TeleportToLocation"), hostile.ObjectID(), home)
 			if x, y, z := hostile.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 				t.Fatalf("position after recovery = (%d,%d,%d), want %+v", x, y, z, home)
 			}

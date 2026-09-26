@@ -173,6 +173,12 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	}
 	hostile.SetMaxBuffsAmount(maxBuffsAmount)
 	hostile.SetMaxGeoPathFailCount(maxGeoPathFailCount)
+	if zones != nil {
+		hostile.SetWaterZone(func(at location.Location) bool {
+			_, ok := zone.FindAt[*zone.Water](zones, at.X, at.Y, at.Z)
+			return ok
+		})
+	}
 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
