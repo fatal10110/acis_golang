@@ -58,6 +58,15 @@ const (
 	SystemMessageS1DodgesAttack                    = 1999
 	SystemMessageAvoidedS1Attack                   = 42
 	SystemMessageMissedTarget                      = 43
+	SystemMessageYouDidS1Dmg                       = 35
+	SystemMessageCriticalHit                       = 44
+	SystemMessageCriticalHitMagic                  = 1280
+	SystemMessagePetHitForS1Damage                 = 1015
+	SystemMessageCriticalHitByPet                  = 1017
+	SystemMessageSummonGaveDamageS1                = 1026
+	SystemMessageCriticalHitBySummonedMob          = 1028
+	SystemMessageOpponentPetrified                 = 1432
+	SystemMessageAttackWasBlocked                  = 1996
 	SystemMessageS2MPHasBeenDrainedByS1            = 970
 	SystemMessageYourOpponentsMPWasReducedByS1     = 1867
 	SystemMessageGettingReadyToShootAnArrow        = 41
