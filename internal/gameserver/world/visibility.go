@@ -150,6 +150,35 @@ func (s *State) Teleport(t Tracked, x, y, z int) error {
 	return nil
 }
 
+// Leave takes t off the grid but keeps it registered: observers around it
+// forget it and it forgets them, as with Despawn. While off the grid, Move
+// and Teleport only update its position; Rejoin puts it back.
+func (s *State) Leave(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	s.relocateAndUnlock(t, nil, false, nil)
+}
+
+// Rejoin puts t, taken off the grid by Leave, back on it at its current
+// position; observers around it discover it and it discovers them. It does
+// nothing when t is already on the grid or was despawned.
+func (s *State) Rejoin(t Tracked) {
+	p := t.presence()
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	x, y, _ := p.Position()
+	next, ok := s.RegionAt(x, y)
+	if p.region.Load() != nil || !p.visible.Load() || !ok {
+		p.releaseLatch()
+		s.mu.Unlock()
+		return
+	}
+	s.relocateAndUnlock(t, next, false, nil)
+}
+
 // Despawn removes t from the world: it leaves its region, observers that
 // could see it are told to forget it (and it forgets them), and it is
 // dropped from the object registry.

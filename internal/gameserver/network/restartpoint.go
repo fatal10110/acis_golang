@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // restartTeleportOffset is the random scatter radius applied to a restart
@@ -65,10 +66,15 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 }
 
 // teleportLivePlayer relocates live to a scattered, ground-height-snapped
-// point near target, cancelling any attack/combat in progress, then
-// broadcasts the discontinuous-position packet to live's own session and
-// every observer.
+// point near target, cancelling any attack/combat in progress. It broadcasts
+// the discontinuous-position packet to live's own session and every
+// observer, then takes live off the grid: everything around the old position
+// forgets live and live forgets it, even what the destination still sees.
+// live rejoins the grid at the destination once its client reports it
+// appeared (completeLivePlayerTeleport).
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
+	live.teleportMu.Lock()
+	defer live.teleportMu.Unlock()
 	if !live.SetTeleporting(true) {
 		return
 	}
@@ -91,20 +97,39 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// threat even when the destination is still in that hostile's sight.
 	npc.DropThreatAround(l.world, live)
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
-	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
+	// Off the grid the heading falls back to the saved one; keep the live
+	// facing across the jump.
+	heading := live.CurrentHeading()
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameTeleportToLocation(live.ObjectID(), target, false)
 	})
+	if l.world != nil {
+		// Forgetting a selected object clears the selection. Do it while
+		// the old neighborhood still sees live, so its observers get the
+		// TargetUnselected too. A self-selection is kept.
+		if selected := live.Target(); selected != nil && selected.ObjectID() != live.ObjectID() && world.Knows(live, selected) {
+			live.forgetTarget(selected)
+		}
+		l.world.Leave(live)
+	}
+	l.updateLivePlayerPosition(live, target, heading)
 }
 
 func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
-	if live == nil || !live.SetTeleporting(false) {
+	if live == nil {
 		return
 	}
-	l.activateSpawnProtection(live)
+	live.teleportMu.Lock()
+	defer live.teleportMu.Unlock()
+	if !live.SetTeleporting(false) {
+		return
+	}
 	if l.world == nil {
+		l.activateSpawnProtection(live)
 		return
 	}
+	l.world.Rejoin(live)
+	l.activateSpawnProtection(live)
 	active, ok := l.world.Summon(live.ObjectID())
 	if !ok {
 		return

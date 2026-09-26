@@ -49,7 +49,7 @@ func (a *liveZoneActor) Position() location.Location { return a.live.CurrentLoca
 func (a *liveZoneActor) ZoneFlags() *zone.Flags      { return &a.flags }
 func (a *liveZoneActor) Class() zone.Class           { return zone.ClassPlayer }
 func (a *liveZoneActor) GM() bool                    { return a.live.isGM }
-func (a *liveZoneActor) Online() bool                { return a.live.Visible() }
+func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return int32(a.live.Character.ClanID) }
 
