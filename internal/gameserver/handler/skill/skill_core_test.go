@@ -3292,6 +3292,8 @@ type spoilFakeCaster struct {
 	distItem       int32
 	distCnt        int32
 	alreadyNotices int
+	notices        []string
+	resisted       []Resisted
 }
 
 func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
@@ -3307,8 +3309,44 @@ func (c *spoilFakeCaster) InParty() bool { return c.inParty }
 func (c *spoilFakeCaster) DistributeItem(itemID, count int32) {
 	c.distItem, c.distCnt = itemID, count
 }
-func (c *spoilFakeCaster) NotifySpoilAlready() { c.alreadyNotices++ }
-func (*spoilFakeCaster) NotifySpoilSuccess()   {}
+func (c *spoilFakeCaster) NotifySpoilAlready() {
+	c.alreadyNotices++
+	c.notices = append(c.notices, "already")
+}
+func (c *spoilFakeCaster) NotifySpoilSuccess() { c.notices = append(c.notices, "success") }
+func (c *spoilFakeCaster) NotifyResistedSkill(name string, id modelskill.ID, level int) {
+	c.notices = append(c.notices, "resisted")
+	c.resisted = append(c.resisted, Resisted{TargetName: name, SkillID: id, SkillLevel: level})
+}
+
+func TestSpoilPreservesPerTargetNoticeOrder(t *testing.T) {
+	rolls := []int{0, 9999} // failed roll, then successful roll
+	registry := NewRegistry(spoilHandler{roll: func(int) int {
+		roll := rolls[0]
+		rolls = rolls[1:]
+		return roll
+	}})
+	caster := &spoilFakeCaster{id: 42, level: 1}
+	failed := &spoilFakeTarget{level: 100, pool: &item.SpoilPool{}}
+	succeeded := &spoilFakeTarget{level: 1, pool: &item.SpoilPool{}}
+	result, ok := registry.UseResult(Cast{
+		Caster: caster, Skill: modelskill.Definition{ID: 302, Level: 7, SkillType: "SPOIL", MagicLevel: 1},
+		Targets: []Actor{failed, succeeded},
+	})
+	if !ok || failed.pool.IsSpoiled() || !succeeded.pool.IsSpoiled() {
+		t.Fatalf("UseResult() handled = %t, spoiled = %t/%t; want false/true", ok, failed.pool.IsSpoiled(), succeeded.pool.IsSpoiled())
+	}
+	// The network delivers Result messages only after the handler returns.
+	for _, message := range result.Messages {
+		if _, ok := message.(Resisted); !ok {
+			t.Fatalf("unexpected deferred message %T", message)
+		}
+		caster.notices = append(caster.notices, "resisted")
+	}
+	if !slices.Equal(caster.notices, []string{"resisted", "success"}) {
+		t.Fatalf("caster notices = %v, want resisted then success", caster.notices)
+	}
+}
 
 func TestSpoilEventuallyMarksTarget(t *testing.T) {
 	// Level-equal caster/target still carries a real magic-resist chance
@@ -3334,24 +3372,17 @@ func TestSpoilEventuallyMarksTarget(t *testing.T) {
 }
 
 func TestSpoilReportsFailedMagicRollAtLevelOne(t *testing.T) {
-	registry := NewDefaultRegistry()
+	registry := NewRegistry(spoilHandler{roll: func(int) int { return 0 }})
 	caster := &spoilFakeCaster{id: 42, level: 1}
 	def := modelskill.Definition{ID: 254, Level: 7, SkillType: "SPOIL", MagicLevel: 1}
-	for i := 0; i < 10; i++ {
-		target := &spoilFakeTarget{level: 100, pool: &item.SpoilPool{}}
-		result, ok := registry.UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
-		if !ok {
-			t.Fatal("UseResult() handled = false for SPOIL")
-		}
-		if target.pool.IsSpoiled() {
-			continue // the reference leaves a 1% success chance even at this level gap
-		}
-		if len(result.Resisted) != 1 || result.Resisted[0] != (Resisted{SkillID: 254, SkillLevel: 1}) {
-			t.Fatalf("Resisted = %+v, want one level-1 failed-roll report", result.Resisted)
-		}
-		return
+	target := &spoilFakeTarget{level: 100, pool: &item.SpoilPool{}}
+	result, ok := registry.UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
+	if !ok || target.pool.IsSpoiled() {
+		t.Fatalf("UseResult() handled = %t, spoiled = %t; want failed SPOIL", ok, target.pool.IsSpoiled())
 	}
-	t.Fatal("SPOIL never failed in 10 attempts")
+	if len(caster.resisted) != 1 || caster.resisted[0] != (Resisted{SkillID: 254, SkillLevel: 1}) || len(result.Resisted) != 0 {
+		t.Fatalf("direct resists = %+v, deferred resists = %+v; want one direct level-1 report", caster.resisted, result.Resisted)
+	}
 }
 
 func TestSpoilAlreadySpoiledIsSkipped(t *testing.T) {

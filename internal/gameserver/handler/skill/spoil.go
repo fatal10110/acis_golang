@@ -17,16 +17,20 @@ type weaponGradePenalized interface {
 	WeaponGradePenalty() bool
 }
 
-type spoilHandler struct{}
+type spoilHandler struct{ roll func(int) int }
 
 func (spoilHandler) Types() []string { return []string{"SPOIL"} }
 
 // Use marks every live, unspoiled target as spoiled by the caster when the
 // magic-resist roll succeeds.
-func (spoilHandler) Use(cast Cast) {
+func (h spoilHandler) Use(cast Cast) {
 	caster, ok := cast.Caster.(magicCaster)
 	if !ok {
 		return
+	}
+	roll := rnd.Get
+	if h.roll != nil {
+		roll = h.roll
 	}
 	penalty := false
 	if p, ok := cast.Caster.(weaponGradePenalized); ok {
@@ -47,7 +51,7 @@ func (spoilHandler) Use(cast Cast) {
 		}
 
 		rate := formulas.MagicSuccessRate(target.Level(), caster.Level(), cast.Skill.MagicLevel, cast.Skill.LevelDepend, penalty)
-		if formulas.MagicSucceeds(rate, rnd.Get(10000)) {
+		if formulas.MagicSucceeds(rate, roll(10000)) {
 			// Another spoiler can mark the pool between the check above
 			// and here; losing that race reads as the pool already spoiled.
 			marked := pool.Mark(caster.ObjectID())
@@ -58,8 +62,8 @@ func (spoilHandler) Use(cast Cast) {
 					notify.NotifySpoilAlready()
 				}
 			}
-		} else if _, ok := asPlayer(cast.Caster); ok {
-			appendResisted(cast.resisted, target, cast.Skill, 1, false)
+		} else if notify, ok := asPlayer(cast.Caster); ok {
+			notify.NotifyResistedSkill(actorName(target), cast.Skill.ID, 1)
 		}
 	}
 }
