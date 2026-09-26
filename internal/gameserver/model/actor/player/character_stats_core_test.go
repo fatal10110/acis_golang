@@ -1131,6 +1131,47 @@ func TestApplyDeathExpKarmaLossKarmaPositive(t *testing.T) {
 	if len(lossNotified) != 1 || lossNotified[0] != [2]int64{400, 0} {
 		t.Fatalf("exp-loss notifications = %v, want [[400 0]]", lossNotified)
 	}
+	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 1 {
+		t.Fatalf("relation broadcasts = %d, want 1", broadcasts)
+	}
+}
+
+// TestUpdateKarmaLossFromKillExp matches updateKarmaLoss and setKarma
+// (Player.java:2749-2757, 1067-1087) for kill exp: karma drops by
+// floor(exp / karmaModifier / 15), announced once with UserInfo and a
+// relation broadcast; a loss that floors to zero changes and announces
+// nothing, and neither does a karma-free character.
+func TestUpdateKarmaLossFromKillExp(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	rec := recordEvents(c)
+
+	// karmaLost = int(29/2.0/15) = 0.
+	c.UpdateKarmaLoss(c.levelTable, 29)
+	if c.KarmaPoints != 100 || len(rec.Events()) != 0 {
+		t.Fatalf("sub-1 loss: karma = %d, events = %v; want 100 and none", c.KarmaPoints, rec.Events())
+	}
+
+	// karmaLost = int(600/2.0/15) = 20.
+	c.UpdateKarmaLoss(c.levelTable, 600)
+	if c.KarmaPoints != 80 {
+		t.Fatalf("KarmaPoints = %d, want 80", c.KarmaPoints)
+	}
+	if got := event.Of[event.KarmaChanged](rec); len(got) != 1 || got[0].Karma != 80 {
+		t.Fatalf("karma-change notifications = %v, want [80]", got)
+	}
+	if n := event.Count[event.UserInfoChanged](rec); n != 1 {
+		t.Fatalf("UserInfo updates = %d, want 1", n)
+	}
+	if n := event.Count[event.RelationChanged](rec); n != 1 {
+		t.Fatalf("relation broadcasts = %d, want 1", n)
+	}
+
+	c.KarmaPoints = 0
+	before := len(rec.Events())
+	c.UpdateKarmaLoss(c.levelTable, 600)
+	if c.KarmaPoints != 0 || len(rec.Events()) != before {
+		t.Fatalf("karma-free: karma = %d, events %d → %d; want 0 and unchanged", c.KarmaPoints, before, len(rec.Events()))
+	}
 }
 
 // TestApplyDeathExpKarmaLossKarmaZeroSkipsRateAndKarmaLoss matches the
@@ -1142,6 +1183,7 @@ func TestApplyDeathExpKarmaLossKarmaZeroSkipsRateAndKarmaLoss(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.KarmaPoints = 0
 	killer := &Character{ID: 2}
+	rec := recordEvents(c)
 
 	c.applyDeathExpKarmaLoss(killer)
 
@@ -1151,6 +1193,9 @@ func TestApplyDeathExpKarmaLossKarmaZeroSkipsRateAndKarmaLoss(t *testing.T) {
 	}
 	if c.KarmaPoints != 0 {
 		t.Fatalf("KarmaPoints after karma-free death = %d, want 0", c.KarmaPoints)
+	}
+	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 0 {
+		t.Fatalf("relation broadcasts after karma-free death = %d, want 0", broadcasts)
 	}
 }
 
