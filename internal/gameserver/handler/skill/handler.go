@@ -253,6 +253,30 @@ type ManaDrain struct {
 	MP         int32
 }
 
+// DamageSource selects the damage feedback family: a player's own, or a
+// pet's or servitor's, which reaches the summon's owner.
+type DamageSource uint8
+
+const (
+	DamageByPlayer DamageSource = iota
+	DamageByPet
+	DamageByServitor
+)
+
+// Damage reports a skill hit's damage to the attacking side. RecipientID is
+// the attacking player, or the owner of the attacking summon.
+type Damage struct {
+	RecipientID  int32
+	Source       DamageSource
+	Amount       int32
+	MagicCrit    bool
+	PhysicalCrit bool
+	// Blocked marks an invulnerable target; Petrified marks one that is
+	// also paralyzed.
+	Blocked   bool
+	Petrified bool
+}
+
 // AttackFailedMessage and ManaDamageMissedMessage mark messages without data.
 type AttackFailedMessage struct{}
 type ManaDamageMissedMessage struct{}
@@ -261,8 +285,6 @@ type OpponentMPReducedMessage struct{ MP int32 }
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {
 	// Messages retains the order in which handler messages were produced.
-	// Skill damage messages are not ported yet; #2557 must record them here
-	// at their per-target position when they are added.
 	Messages       []any
 	messages       *[]any
 	AttackFailed   int
@@ -503,9 +525,10 @@ func formulaCasterOf(a Actor) creature.FormulaActor {
 }
 
 var (
-	_ Player   = (*player.Character)(nil)
-	_ NPC      = (*npc.Hostile)(nil)
-	_ Creature = (*player.Character)(nil)
-	_ Creature = (*npc.Hostile)(nil)
-	_ Summon   = (*summon.Actor)(nil)
+	_ Player       = (*player.Character)(nil)
+	_ NPC          = (*npc.Hostile)(nil)
+	_ Creature     = (*player.Character)(nil)
+	_ Creature     = (*npc.Hostile)(nil)
+	_ Summon       = (*summon.Actor)(nil)
+	_ damageSummon = (*summon.Actor)(nil)
 )

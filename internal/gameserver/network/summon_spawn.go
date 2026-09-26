@@ -540,6 +540,8 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// the caster-addressed halves (S1_DODGES_ATTACK,
 	// S1_PERFORMING_COUNTERATTACK) still correctly stay dropped since the
 	// summon itself is never resolvable as a livePlayer (issue #2353).
+	// Damage feedback already names the owner as its recipient and is
+	// forwarded unchanged.
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {

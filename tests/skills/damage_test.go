@@ -299,7 +299,8 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	})
 	drainUntilQuiet(t, vc)
 
-	found := false
+	// Mdam reports the damage before the effect resist.
+	found, damaged := false, false
 	for i := 0; i < 50 && !found; i++ {
 		frame = c.ReadWithTimeout(time.Second)
 		if frame == nil {
@@ -309,8 +310,16 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 			continue
 		}
 		r := wireReader(frame[1:])
-		if id := r.ReadInt32(); id != int32(serverpackets.SystemMessageS1ResistedYourS2) {
+		id := r.ReadInt32()
+		if id == int32(serverpackets.SystemMessageYouDidS1Dmg) {
+			damaged = true
 			continue
+		}
+		if id != int32(serverpackets.SystemMessageS1ResistedYourS2) {
+			continue
+		}
+		if !damaged {
+			t.Fatal("resisted message arrived before the damage message")
 		}
 		found = true
 		if params := r.ReadInt32(); params != 2 {
