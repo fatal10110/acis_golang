@@ -154,6 +154,46 @@ func TestOwnRegionCrossingTargetClearReachesOldNeighborhood(t *testing.T) {
 	}
 }
 
+// TestLogoutTargetClearReachesNeighborhoodBeforeDeleteObject pins the
+// logout half: a player leaving the world with a monster selected clears it
+// while still in its region (Player.cleanup's abortAll(true) runs before
+// decayMe), so a watcher sharing its neighborhood receives the leaver's
+// TargetUnselected, and before the leaver's DeleteObject.
+func TestLogoutTargetClearReachesNeighborhoodBeforeDeleteObject(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	watcher := placeWatcher(t, srv, "watch", "Watch", location.Location{X: playerOrigin.X - 2048, Y: playerOrigin.Y, Z: playerOrigin.Z})
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, watcher)
+
+	c.Send(encodeLogout())
+
+	unselected := false
+	for {
+		frame := mustRead(t, watcher, "leaver's DeleteObject")
+		if len(frame) < 5 || wireReader(frame[1:]).ReadInt32() != objID {
+			continue
+		}
+		if frame[0] == serverpackets.OpcodeTargetUnselected {
+			unselected = true
+		}
+		if frame[0] == serverpackets.OpcodeDeleteObject {
+			break
+		}
+	}
+	if !unselected {
+		t.Fatal("watcher got the leaver's DeleteObject without its TargetUnselected first")
+	}
+}
+
 // placeWatcher logs a player in on account and teleports it to at.
 func placeWatcher(t *testing.T, srv *gameservertest.Server, account, name string, at location.Location) *scriptedClient {
 	t.Helper()
