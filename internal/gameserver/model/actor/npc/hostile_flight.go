@@ -1,9 +1,11 @@
 package npc
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // FlyTo broadcasts a forced-flight animation without changing server position.
@@ -15,10 +17,11 @@ func (h *Hostile) FlyTo(dest location.Location, flight modelskill.Flight) {
 // grounds target unless it lies in water, announces the jump to the NPC's
 // current observers, then leaves and re-enters the world grid so every
 // observer around either end forgets and rediscovers it; the NPC in turn
-// drops the threat of every creature around its old position. A teleport that
-// starts while another is in progress is dropped. A teleport clears the
-// geo-path fail streak: the next pathfinding attempt is from a new cell, not
-// a continuation of the stall that triggered recovery.
+// drops the threat of every creature around its old position, and every
+// hostile around that position drops the NPC's (DropThreatAround). A
+// teleport that starts while another is in progress is dropped. A teleport
+// clears the geo-path fail streak: the next pathfinding attempt is from a
+// new cell, not a continuation of the stall that triggered recovery.
 func (h *Hostile) TeleportTo(target location.Location) {
 	if h.Live != nil {
 		if !h.SetTeleporting(true) {
@@ -40,6 +43,7 @@ func (h *Hostile) TeleportTo(target location.Location) {
 			threats.Remove(threat.Attacker)
 		}
 	}
+	DropThreatAround(h.world, h)
 	if h.Live != nil {
 		h.Move().SetPosition(target)
 	}
@@ -48,6 +52,26 @@ func (h *Hostile) TeleportTo(target location.Location) {
 	}
 	h.SetTeleporting(false)
 	h.ResetGeoPathFailCount()
+}
+
+// DropThreatAround removes subject's threat entry (damage and hate) from
+// every hostile NPC in the region neighborhood around subject's current
+// position. A teleport calls it before subject leaves that position: every
+// hostile around it forgets subject, even one that still sees it after the
+// jump. Spell hate and queued attack desires are left alone; the next
+// combat-memory refresh drops attack desires whose threat is gone.
+func DropThreatAround(w *world.State, subject interface {
+	world.Tracked
+	attackable.Combatant
+}) {
+	if w == nil {
+		return
+	}
+	w.ForEachKnown(subject, func(o world.Tracked) {
+		if h, ok := o.(*Hostile); ok {
+			h.brain.Threats().Remove(subject)
+		}
+	})
 }
 
 // SetWaterZone installs the query TeleportTo uses to keep a destination

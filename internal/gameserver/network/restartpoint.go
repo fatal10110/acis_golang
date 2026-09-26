@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -86,6 +87,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// controller.go's stopInternal fires onStopAck on every call
 	// regardless of whether a cast was in flight).
 	live.Stop()
+	// Every hostile around the old position forgets live, dropping its
+	// threat even when the destination is still in that hostile's sight.
+	npc.DropThreatAround(l.world, live)
 	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
 	l.updateLivePlayerPosition(live, target, live.CurrentHeading())
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -110,6 +114,9 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 		return
 	}
 	destination := live.CurrentLocation()
+	// The summon's jump is a teleport of its own: hostiles around its old
+	// position forget it too.
+	npc.DropThreatAround(l.world, actor)
 	actor.SyncPosition(destination)
 	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
 }
