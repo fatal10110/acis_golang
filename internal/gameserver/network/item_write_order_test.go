@@ -2,12 +2,11 @@ package network
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
-
-	"sync/atomic"
 
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -68,7 +67,8 @@ func TestQueuedItemWriteCannotRevertAnOwnershipTransfer(t *testing.T) {
 
 func persistedItemOwner(t *testing.T, store interface {
 	ListByOwner(context.Context, int32) ([]*item.Instance, error)
-}, ownerID, objectID int32) int32 {
+}, ownerID, objectID int32,
+) int32 {
 	t.Helper()
 	instances, err := store.ListByOwner(context.Background(), ownerID)
 	if err != nil {
@@ -85,7 +85,8 @@ func persistedItemOwner(t *testing.T, store interface {
 
 func persistedObjectIDs(t *testing.T, store interface {
 	ListByOwner(context.Context, int32) ([]*item.Instance, error)
-}, ownerID int32) []int32 {
+}, ownerID int32,
+) []int32 {
 	t.Helper()
 	instances, err := store.ListByOwner(context.Background(), ownerID)
 	if err != nil {

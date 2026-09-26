@@ -490,7 +490,7 @@ func TestGameServerLinkRegistrationGates(t *testing.T) {
 			name:            "mismatched key fails when no alternate id is free",
 			allowNewServers: true,
 			acceptAlternate: true,
-			seed:            map[int][]byte{1: otherHexID, 2: []byte{0xaa}},
+			seed:            map[int][]byte{1: otherHexID, 2: {0xaa}},
 			wantReason:      link.ReasonNoFreeID,
 		},
 	}

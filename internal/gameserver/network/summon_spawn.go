@@ -385,7 +385,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
-
 }
 
 // SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its
@@ -636,6 +635,7 @@ type inertSummonMoveController struct{}
 func (inertSummonMoveController) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
+
 func (inertSummonMoveController) MoveToLocation(location.Location) (bool, error) { return false, nil }
 func (inertSummonMoveController) CanMoveTo(location.Location) bool               { return true }
 func (inertSummonMoveController) MoveHome(location.Location) error               { return nil }

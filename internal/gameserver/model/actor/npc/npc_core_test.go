@@ -623,8 +623,14 @@ func TestHostileLethalableExcludesReferenceExceptions(t *testing.T) {
 		want bool
 	}{
 		{id: 1, want: true},
-		{id: 22215}, {id: 22216}, {id: 22217}, {id: 35062},
-		{id: 35410}, {id: 35368}, {id: 35375}, {id: 35629},
+		{id: 22215},
+		{id: 22216},
+		{id: 22217},
+		{id: 35062},
+		{id: 35410},
+		{id: 35368},
+		{id: 35375},
+		{id: 35629},
 	} {
 		t.Run("npc", func(t *testing.T) {
 			h := newCombatHostile(t, 1, &Template{ID: tt.id, Type: "Monster", HPMax: 100})
@@ -646,8 +652,10 @@ func goldenHostileScenarios(t testing.TB) map[string]float64 {
 	out := make(map[string]float64)
 
 	tpl := func() *Template {
-		return &Template{ID: 1, Type: "Monster", Level: 20, STR: 40, CON: 21, DEX: 30, INT: 20, WIT: 43, MEN: 20,
-			PAtk: 100, PDef: 50, MAtk: 64, MDef: 40, HPMax: 500, MPMax: 200}
+		return &Template{
+			ID: 1, Type: "Monster", Level: 20, STR: 40, CON: 21, DEX: 30, INT: 20, WIT: 43, MEN: 20,
+			PAtk: 100, PDef: 50, MAtk: 64, MDef: 40, HPMax: 500, MPMax: 200,
+		}
 	}
 
 	{

@@ -420,7 +420,8 @@ func (c *writeFailBlockingReadConn) Close() error {
 	return nil
 }
 
-func (c *writeFailBlockingReadConn) LocalAddr() net.Addr              { return linkTestAddr("local") }
+func (c *writeFailBlockingReadConn) LocalAddr() net.Addr { return linkTestAddr("local") }
+
 func (c *writeFailBlockingReadConn) RemoteAddr() net.Addr             { return linkTestAddr("remote") }
 func (c *writeFailBlockingReadConn) SetDeadline(time.Time) error      { return nil }
 func (c *writeFailBlockingReadConn) SetReadDeadline(time.Time) error  { return nil }

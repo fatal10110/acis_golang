@@ -104,11 +104,14 @@ func (a *orderedSkillActor) TestCursesOnSkillSee(modelskill.Definition, []skillt
 	return false
 }
 func (a *orderedSkillActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
-func (a *orderedSkillActor) EffectList() *effect.List                                 { return a.effects }
-func (a *orderedSkillActor) CounterSkillPhysical() float64                            { return a.counter }
+func (a *orderedSkillActor) EffectList() *effect.List { return a.effects }
+
+func (a *orderedSkillActor) CounterSkillPhysical() float64 { return a.counter }
+
 func (a *orderedSkillActor) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
 	return a.blow, true
 }
+
 func (a *orderedSkillActor) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}, true
 }
@@ -127,10 +130,14 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
 			link := &GameClientLink{world: state}
 			caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
-			target := &orderedSkillActor{id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
-				blow: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}}
-			def := modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
-				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}}
+			target := &orderedSkillActor{
+				id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
+				blow: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1},
+			}
+			def := modelskill.Definition{
+				ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
+				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+			}
 			skills := handlerskill.NewDefaultRegistry()
 			var result actorcast.EffectResult
 			if cubic {

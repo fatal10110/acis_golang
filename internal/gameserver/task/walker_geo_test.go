@@ -70,6 +70,7 @@ func (s *walkerCtlSelf) AddGeoPathFailCount() {
 	s.failCount++
 	s.adds++
 }
+
 func (s *walkerCtlSelf) TeleportTo(loc location.Location) {
 	s.SyncPosition(loc)
 }

@@ -1013,6 +1013,7 @@ func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, leve
 	}
 	s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = cp
 }
+
 func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
 	live.stopAttack = gcl.stopLiveAutoAttack
 	live.link = gcl
@@ -1352,27 +1353,65 @@ func TestLivePlayerDetachDropsSessionOnlyEvents(t *testing.T) {
 // or dropping one must be a deliberate edit here.
 func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 	sessionOnlyEvents := []event.Event{
-		event.Attack{}, event.BowDrawn{}, event.Died{}, event.HerbConsumed{},
-		event.RegenMax{}, event.EffectRemovedLackHP{}, event.EffectRemovedLackMP{},
-		event.RelaxHPFull{}, event.Restored{}, event.EffectEnded{}, event.SpoilResult{},
-		event.ServitorVanished{}, event.ShieldBlocked{}, event.AttackFailed{},
-		event.SkillResisted{}, event.MagicResisted{}, event.UserInfoChanged{},
-		event.PvPFlagged{}, event.RelationChanged{}, event.LevelChanged{},
-		event.WeightPenaltyChanged{}, event.VitalsChanged{},
+		event.Attack{},
+		event.BowDrawn{},
+		event.Died{},
+		event.HerbConsumed{},
+		event.RegenMax{},
+		event.EffectRemovedLackHP{},
+		event.EffectRemovedLackMP{},
+		event.RelaxHPFull{},
+		event.Restored{},
+		event.EffectEnded{},
+		event.SpoilResult{},
+		event.ServitorVanished{},
+		event.ShieldBlocked{},
+		event.AttackFailed{},
+		event.SkillResisted{},
+		event.MagicResisted{},
+		event.UserInfoChanged{},
+		event.PvPFlagged{},
+		event.RelationChanged{},
+		event.LevelChanged{},
+		event.WeightPenaltyChanged{},
+		event.VitalsChanged{},
 	}
 	// Hooks detach left wired: these must keep flowing.
 	stillDelivered := []event.Event{
-		event.Move{}, event.Stopped{}, event.AutoAttackStopped{},
-		event.StanceChanged{}, event.FakeDeathRevived{}, event.EffectIconsChanged{},
-		event.AbnormalEffectChanged{}, event.MagicSkillUse{}, event.Flight{},
-		event.PositionCorrected{}, event.ExpSPGained{}, event.ExpSPLost{},
-		event.KarmaChanged{}, event.LeveledUp{}, event.ShortBuff{}, event.OverHit{},
-		event.ChargeMessage{}, event.ChargesChanged{}, event.GradePenaltyChanged{},
-		event.DeathPenaltyChanged{}, event.AttackRequested{}, event.Retargeted{},
-		event.SummonConfirmRequested{}, event.TeleportRequested{}, event.Relocated{},
-		event.PetSummonRequested{}, event.ServitorSummonRequested{},
-		event.AttackStarted{}, event.AttackFinished{}, event.Arrived{},
-		event.MoveBlocked{}, event.CastAborted{}, event.CastStopAck{}, event.CastFinished{},
+		event.Move{},
+		event.Stopped{},
+		event.AutoAttackStopped{},
+		event.StanceChanged{},
+		event.FakeDeathRevived{},
+		event.EffectIconsChanged{},
+		event.AbnormalEffectChanged{},
+		event.MagicSkillUse{},
+		event.Flight{},
+		event.PositionCorrected{},
+		event.ExpSPGained{},
+		event.ExpSPLost{},
+		event.KarmaChanged{},
+		event.LeveledUp{},
+		event.ShortBuff{},
+		event.OverHit{},
+		event.ChargeMessage{},
+		event.ChargesChanged{},
+		event.GradePenaltyChanged{},
+		event.DeathPenaltyChanged{},
+		event.AttackRequested{},
+		event.Retargeted{},
+		event.SummonConfirmRequested{},
+		event.TeleportRequested{},
+		event.Relocated{},
+		event.PetSummonRequested{},
+		event.ServitorSummonRequested{},
+		event.AttackStarted{},
+		event.AttackFinished{},
+		event.Arrived{},
+		event.MoveBlocked{},
+		event.CastAborted{},
+		event.CastStopAck{},
+		event.CastFinished{},
 	}
 	for _, ev := range sessionOnlyEvents {
 		if !sessionOnly(ev) {

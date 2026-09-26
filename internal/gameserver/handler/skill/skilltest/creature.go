@@ -26,12 +26,15 @@ func (Creature) BlessedSpiritshotCharged() bool { return false }
 func (Creature) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
+
 func (Creature) EffectSuccessInput(creature.FormulaActor, modelskill.Definition, modelskill.EffectTemplate, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{}, false
 }
+
 func (Creature) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
 	return formulas.SkillReflectInput{}
 }
+
 func (Creature) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
 	return formulas.ShieldFailed
 }
@@ -49,21 +52,27 @@ func (Creature) AttackTarget(world.Tracked)                 {}
 // Damage and resource surface: the neutral creature takes no damage, rolls
 // no formula input and holds no resources.
 func (Creature) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {}
+
 func (Creature) PhysicalSkillInput(creature.FormulaActor, modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return formulas.PhysicalSkillInput{}, false
 }
+
 func (Creature) MagicDamageInput(creature.FormulaActor, modelskill.Definition, bool) (formulas.MagicDamageInput, bool) {
 	return formulas.MagicDamageInput{}, false
 }
+
 func (Creature) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
 	return formulas.BlowInput{}, false
 }
+
 func (Creature) ManaDamageInput(creature.FormulaActor, modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return formulas.ManaDamageInput{}, false
 }
+
 func (Creature) LethalInput(creature.FormulaActor, modelskill.Definition) (formulas.LethalInput, bool) {
 	return formulas.LethalInput{}, false
 }
+
 func (Creature) ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition) {
 }
 func (Creature) CounterSkillPhysical() float64 { return 0 }

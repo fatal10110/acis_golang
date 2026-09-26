@@ -265,8 +265,10 @@ func TestTerritoryLiteralWithoutGeometryStaysUsable(t *testing.T) {
 // outside, so the assertion fails if the ray-cast path comes back.
 func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
 	nodes := []Node{
-		{X: 122400, Y: -69800}, {X: 122400, Y: -70000},
-		{X: 122600, Y: -69800}, {X: 122600, Y: -70000},
+		{X: 122400, Y: -69800},
+		{X: 122400, Y: -70000},
+		{X: 122600, Y: -69800},
+		{X: 122600, Y: -70000},
 	}
 	set := commons.NewStatSet()
 	set.Set("name", "godard01_npc2315_04")
@@ -290,8 +292,10 @@ func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
 	}
 
 	ring, err := geometry.NewPolygon([]geometry.Point{
-		{X: 122400, Y: -69800}, {X: 122400, Y: -70000},
-		{X: 122600, Y: -69800}, {X: 122600, Y: -70000},
+		{X: 122400, Y: -69800},
+		{X: 122400, Y: -70000},
+		{X: 122600, Y: -69800},
+		{X: 122600, Y: -70000},
 	})
 	if err != nil {
 		t.Fatalf("NewPolygon() error = %v", err)

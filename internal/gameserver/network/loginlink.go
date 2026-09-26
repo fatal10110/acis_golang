@@ -115,7 +115,6 @@ type LoginLink struct {
 // goroutine starts dispatching further inbound messages to handlers until
 // the connection closes.
 func DialLoginLink(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, log zerolog.Logger) (*LoginLink, error) {
-
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "tcp", address)
 	if err != nil {
@@ -353,7 +352,6 @@ func (l *LoginLink) Close() error {
 // ends and dials again after retryDelay. A failed dial or handshake is
 // logged and retried the same way. onLink may be nil.
 func Maintain(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log zerolog.Logger) {
-
 	for ctx.Err() == nil {
 		l, err := DialLoginLink(ctx, address, auth, handlers, log)
 		if err != nil {

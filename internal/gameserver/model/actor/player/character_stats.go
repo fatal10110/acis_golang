@@ -118,18 +118,23 @@ var _ stat.PlayerActor = characterStatActor{}
 func (a characterStatActor) STR() int {
 	return int(a.c.calcStat(stat.StatSTR, a.c.baseAttribute(stat.StatSTR)))
 }
+
 func (a characterStatActor) CON() int {
 	return int(a.c.calcStat(stat.StatCON, a.c.baseAttribute(stat.StatCON)))
 }
+
 func (a characterStatActor) DEX() int {
 	return int(a.c.calcStat(stat.StatDEX, a.c.baseAttribute(stat.StatDEX)))
 }
+
 func (a characterStatActor) INT() int {
 	return int(a.c.calcStat(stat.StatINT, a.c.baseAttribute(stat.StatINT)))
 }
+
 func (a characterStatActor) WIT() int {
 	return int(a.c.calcStat(stat.StatWIT, a.c.baseAttribute(stat.StatWIT)))
 }
+
 func (a characterStatActor) MEN() int {
 	return int(a.c.calcStat(stat.StatMEN, a.c.baseAttribute(stat.StatMEN)))
 }

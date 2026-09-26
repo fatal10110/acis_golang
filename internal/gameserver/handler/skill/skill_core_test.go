@@ -1784,9 +1784,11 @@ func (t *skillTarget) CharacterName() string { return t.name }
 func (t *skillTarget) NotifyHPRestored(name string, amount int, other bool) {
 	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "hp", name, amount, other
 }
+
 func (t *skillTarget) NotifyMPRestored(name string, amount int, other bool) {
 	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "mp", name, amount, other
 }
+
 func (t *skillTarget) NotifyCPRestored(name string, amount int, other bool) {
 	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "cp", name, amount, other
 }
@@ -2559,8 +2561,10 @@ func TestBlowReportsResistBeforeCounter(t *testing.T) {
 	}}
 	result, ok := NewDefaultRegistry().UseResult(Cast{
 		Caster: &skillTarget{hp: 2000},
-		Skill: modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", CastRange: 40, CanBeReflected: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Skill: modelskill.Definition{
+			ID: 7, Level: 20, SkillType: "BLOW", CastRange: 40, CanBeReflected: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+		},
 		Targets: []Actor{target},
 	})
 	if !ok || len(result.Messages) != 2 {
@@ -2577,14 +2581,18 @@ func TestBlowReportsResistBeforeCounter(t *testing.T) {
 func TestPdamReportsTargetsInOrder(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{hp: 2000}
-	damage := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 60,
-		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+	damage := formulas.PhysicalSkillInput{
+		AttackPower: 100, SkillPower: 50, Defence: 60,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+	}
 
 	dodger := &skillTarget{physicalInput: formulas.PhysicalSkillInput{Evaded: true}, physicalOK: true}
 	counter := &counteringSkillTarget{skillTarget: &skillTarget{hp: 2000, physicalInput: damage, physicalOK: true}}
-	result, _ := registry.UseResult(Cast{Caster: caster,
+	result, _ := registry.UseResult(Cast{
+		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "PDAM", CastRange: 40, CanBeReflected: true},
-		Targets: []Actor{dodger, counter}})
+		Targets: []Actor{dodger, counter},
+	})
 	if len(result.Messages) != 2 {
 		t.Fatalf("dodge/counter messages = %#v", result.Messages)
 	}
@@ -2596,11 +2604,15 @@ func TestPdamReportsTargetsInOrder(t *testing.T) {
 	}
 
 	failed := &skillTarget{physicalInput: formulas.PhysicalSkillInput{}, physicalOK: true}
-	lethal := &skillTarget{hp: 2000, physicalInput: damage, physicalOK: true,
-		lethalInput: formulas.LethalInput{AttackerLevel: 40, TargetLevel: 40, LethalMul: 1}, lethalOK: true}
-	result, _ = registry.UseResult(Cast{Caster: caster,
+	lethal := &skillTarget{
+		hp: 2000, physicalInput: damage, physicalOK: true,
+		lethalInput: formulas.LethalInput{AttackerLevel: 40, TargetLevel: 40, LethalMul: 1}, lethalOK: true,
+	}
+	result, _ = registry.UseResult(Cast{
+		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "PDAM", LethalChance2: 100},
-		Targets: []Actor{failed, lethal}})
+		Targets: []Actor{failed, lethal},
+	})
 	if len(result.Messages) != 2 {
 		t.Fatalf("failed/lethal messages = %#v", result.Messages)
 	}
@@ -2614,13 +2626,17 @@ func TestPdamReportsTargetsInOrder(t *testing.T) {
 
 func TestManadamReportsMissBeforeLaterResist(t *testing.T) {
 	missed := &skillTarget{manaInput: formulas.ManaDamageInput{Affected: false}, manaOK: true}
-	resisted := &skillTarget{mp: 100, effects: newTestList(nil), skillSuccessOK: true,
+	resisted := &skillTarget{
+		mp: 100, effects: newTestList(nil), skillSuccessOK: true,
 		skillSuccessChance: chanceOf(0),
 		manaInput:          formulas.ManaDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 100, VulnMul: 1, Affected: true},
-		manaOK:             true}
-	result, _ := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{},
+		manaOK:             true,
+	}
+	result, _ := NewDefaultRegistry().UseResult(Cast{
+		Caster:  &skillTarget{},
 		Skill:   modelskill.Definition{ID: 7, Level: 1, SkillType: "MANADAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []Actor{missed, resisted}})
+		Targets: []Actor{missed, resisted},
+	})
 	if len(result.Messages) < 2 {
 		t.Fatalf("messages = %#v, want miss before resist", result.Messages)
 	}
@@ -3309,6 +3325,7 @@ func (c *spoilFakeCaster) InParty() bool { return c.inParty }
 func (c *spoilFakeCaster) DistributeItem(itemID, count int32) {
 	c.distItem, c.distCnt = itemID, count
 }
+
 func (c *spoilFakeCaster) NotifySpoilAlready() {
 	c.alreadyNotices++
 	c.notices = append(c.notices, "already")
@@ -3621,6 +3638,7 @@ func (c *chestFake) DeleteMe()                       { c.deleted = true }
 func (c *chestFake) AddAttackDesire(attacker attackable.Combatant, weight float64) {
 	c.desireAdded = true
 }
+
 func (c *chestFake) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
 	c.hateAdded = true
 }

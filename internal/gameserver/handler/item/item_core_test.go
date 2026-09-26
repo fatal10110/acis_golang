@@ -241,6 +241,7 @@ func (f *fakeBeastShotCharger) Dead() bool { return f.dead }
 func (f *fakeBeastShotCharger) ChargedShot(kind modelitem.ShotKind) bool {
 	return f.charged[kind]
 }
+
 func (f *fakeBeastShotCharger) SetChargedShot(kind modelitem.ShotKind, charged bool) {
 	f.setCalled[kind] = charged
 	f.charged[kind] = charged
@@ -910,6 +911,7 @@ func (f *fakeCaster) SkillDisabled(key int32) bool { return f.disabled != nil &&
 func (f *fakeCaster) DisableSkill(key int32, d time.Duration) {
 	f.disableCalls++
 }
+
 func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duration) {
 	f.reuseCalls++
 }

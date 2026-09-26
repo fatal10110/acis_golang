@@ -35,12 +35,15 @@ func (a *attackStanceFakeActor) ObjectID() int32 { return a.id }
 func (a *attackStanceFakeActor) Owner() AttackStanceActor {
 	return a.owner
 }
+
 func (a *attackStanceFakeActor) Summon() AttackStanceActor {
 	return a.summon
 }
+
 func (a *attackStanceFakeActor) Cubics() []AttackStanceCubic {
 	return a.cubics
 }
+
 func (a *attackStanceFakeActor) SetInCombat(inCombat bool) bool {
 	changed := a.inCombat != inCombat
 	a.inCombat = inCombat

@@ -97,8 +97,12 @@ func TestNewDoorObjectBowtiePolygonBlocksTouchingCell(t *testing.T) {
 		Kind:     door.KindDoor,
 		Position: location.Location{X: 16, Y: 16, Z: 0},
 		Coordinates: []location.Point{
-			{X: 0, Y: 0}, {X: 32, Y: 0}, {X: 16, Y: 16},
-			{X: 32, Y: 32}, {X: 0, Y: 32}, {X: 16, Y: 16},
+			{X: 0, Y: 0},
+			{X: 32, Y: 0},
+			{X: 16, Y: 16},
+			{X: 32, Y: 32},
+			{X: 0, Y: 32},
+			{X: 16, Y: 16},
 		},
 		Height: 80,
 	}
