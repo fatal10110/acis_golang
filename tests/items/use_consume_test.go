@@ -209,6 +209,47 @@ func TestUseEscapeScrollRunsAICastAndConsumes(t *testing.T) {
 	}
 }
 
+func TestItemCastLethalHPConsumeHasNoStatusAfterDie(t *testing.T) {
+	t.Parallel()
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
+		ID: 2013, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "DUMMY", HitTime: 1500, StaticHitTime: true, HPConsume: 10,
+	}}), gamesql.NewCharacterSkillStore(db))
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(skills),
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, 736, 1)
+	startInWorld(t, c)
+	c.Send(encodeUseItem(scroll, false))
+	assertMagicSkillUseSelf(t, c.Read(), objID, 2013, 1, 1500, 0)
+	srv.DamagePlayerHP(t, objID, srv.PlayerCurrentHP(t, objID)-10)
+	srv.AdvanceUntil(t, "lethal item-cast HP cost", func() bool { return srv.PlayerDead(t, objID) })
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			t.Fatal("item-cast death sent no Die")
+		}
+		if frame[0] == serverpackets.OpcodeDie && wire.NewReader(frame[1:]).ReadInt32() == objID {
+			break
+		}
+		if i == 99 {
+			t.Fatal("item-cast death sequence did not reach Die")
+		}
+	}
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wire.NewReader(frame[1:]).ReadInt32() == objID {
+			t.Fatal("item cast sent self StatusUpdate after Die")
+		}
+	}
+}
+
 func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,

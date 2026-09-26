@@ -3,6 +3,7 @@ package skills
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -860,6 +861,80 @@ func skillCase(skillID int32) string {
 	return fmt.Sprintf("skill-%d", skillID)
 }
 
+func TestNonlethalHPConsumeSendsOneStatus(t *testing.T) {
+	t.Parallel()
+	const skillID = 293
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, StaticHitTime: true, HPConsume: 1, SkillType: "DUMMY",
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	beforeHP := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 0, objID)
+	srv.AdvanceUntil(t, "nonlethal HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
+	statuses := 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeDie {
+			t.Fatal("nonlethal HP cost sent Die")
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			statuses++
+		}
+	}
+	if statuses != 1 {
+		t.Fatalf("self StatusUpdate count = %d, want 1", statuses)
+	}
+}
+
+func TestNonlethalToggleHPConsumeSendsOneStatus(t *testing.T) {
+	t.Parallel()
+	const skillID = 294
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			HPConsume: 1, SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	beforeHP := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle ack")
+	srv.AdvanceUntil(t, "toggle HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
+	statuses := 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeDie {
+			t.Fatal("nonlethal toggle HP cost sent Die")
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			statuses++
+		}
+	}
+	if statuses != 1 {
+		t.Fatalf("self StatusUpdate count = %d, want 1", statuses)
+	}
+}
+
 // TestExactlyLethalHPConsumeKillsCaster drives a real cast whose HP cost
 // ends up exactly equal to the caster's remaining HP when the hit timer
 // fires. The pre-cast gate rejects a cast at HP <= HPConsume, so the state
@@ -940,14 +1015,33 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
 		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
 	}
-	// The abort reaches the client before the death does: Die stops the cast
-	// before it broadcasts, so MagicSkillCanceled is always ahead of Die in
-	// the stream. Reading them in sequence pins that order.
-	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
-		t.Fatal("no MagicSkillCanceled: the death did not abort the in-flight cast")
+	// HP consumption updates status before doDie, which updates it again;
+	// aborting the cast precedes Playable.doDie's final status and Die.
+	var order []string
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			t.Fatalf("HP-cost death sequence stopped after %v", order)
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeStatusUpdate:
+			if wireReader(frame[1:]).ReadInt32() == objID {
+				order = append(order, "status")
+			}
+		case serverpackets.OpcodeMagicSkillCanceled:
+			order = append(order, "cancel")
+		case serverpackets.OpcodeDie:
+			if wireReader(frame[1:]).ReadInt32() == objID {
+				order = append(order, "die")
+			}
+		}
+		if len(order) > 0 && order[len(order)-1] == "die" {
+			break
+		}
 	}
-	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
-		t.Fatal("no Die broadcast after the exactly-lethal HP cost")
+	want := []string{"status", "status", "cancel", "status", "die"}
+	if !slices.Equal(order, want) {
+		t.Fatalf("HP-cost death sequence = %v, want %v", order, want)
 	}
 	// The hit runs to completion despite the death it just caused: the
 	// charge grant sits after the cost in the same hit step, and the death
@@ -973,6 +1067,15 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	srv.AdvanceUntil(t, "self effect on the dead caster", func() bool { return len(holder.EffectList().All()) > 0 })
 	if held := holder.EffectList().All(); len(held) != 1 || !held[0].Template.Self {
 		t.Fatalf("dead caster holds %+v, want only the skill's self effect", held)
+	}
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			t.Fatal("self StatusUpdate sent after Die")
+		}
 	}
 }
 

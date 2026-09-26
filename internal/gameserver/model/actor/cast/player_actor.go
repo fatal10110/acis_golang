@@ -101,7 +101,12 @@ func (a PlayerActor) ReduceHP(amount int) {
 	if a.Character == nil || amount <= 0 {
 		return
 	}
-	if a.Character.ReduceCurrentHP(amount) {
+	if a.Character.Dead() {
+		return
+	}
+	dead := a.Character.ReduceCurrentHP(amount)
+	if dead {
+		a.Character.BroadcastStatus()
 		a.Character.Die(a.Character)
 	}
 }

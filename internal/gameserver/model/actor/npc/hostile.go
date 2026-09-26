@@ -837,7 +837,7 @@ func (h *Hostile) MarkDead() bool {
 	return true
 }
 
-// Die runs this NPC's death sequence: the shared once-only dead-state
+// Die runs this NPC's death sequence: the once-only dead-state
 // transition, then its reward hook. rewards may be nil — the drop and
 // experience/SP systems land separately and plug in here once ready. It
 // reports whether the death was newly applied by this call.
@@ -847,9 +847,14 @@ func (h *Hostile) MarkDead() bool {
 // interval) — Hostile does not hold a reference to that task, so the
 // scheduling stays at the orchestration layer that owns it.
 func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bool {
-	if !creature.Die(h, killer, rewards) {
+	if !h.MarkDead() {
 		return false
 	}
+	h.BroadcastStatus()
+	if rewards != nil {
+		rewards.CalculateRewards(killer)
+	}
+	h.BroadcastStatus()
 	h.clearAttackers()
 	h.BroadcastDie()
 	return true

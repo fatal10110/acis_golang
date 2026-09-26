@@ -81,11 +81,13 @@ func (c *Character) Revive(fraction float64) bool {
 // and every observer, so the corpse-fall animation plays live instead of
 // only on a later dead reconnect.
 func (c *Character) Die(killer attackable.Combatant) bool {
-	if !creature.Die(c, killer, nil) {
+	if !c.MarkDead() {
 		return false
 	}
+	c.BroadcastStatus()
 	c.StopCast()
 	c.clearEffectsOnDeath()
+	c.BroadcastStatus()
 	c.ClearCharges()
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.awardKillerPKKarma(killer)
