@@ -258,10 +258,11 @@ func readOverHitThenExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int
 }
 
 // TestKarmaKillNPCLowersKarma walks a karma player's solo kill: the reward's
-// exp lowers karma by floor(exp / karmaModifier / 15) — 26 for 1000 exp at
+// exp lowers karma by floor(exp / karmaModifier / 15) — 27 for 1024 exp at
 // the datapack's level-5 modifier (bounded Java probe of
 // Formulas.calculateKarmaLost) — announced before the exp/SP gain and
-// persisted at logout.
+// persisted at logout. The rewards are powers of two so the damage-share
+// scaling (reward * damage / totalDamage) stays exact for any damage roll.
 func TestKarmaKillNPCLowersKarma(t *testing.T) {
 	t.Parallel()
 	table, err := playermodel.NewLevelTable(map[int]playermodel.Level{
@@ -285,7 +286,7 @@ func TestKarmaKillNPCLowersKarma(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
 	startInWorld(t, c)
-	hostile := spawnRewardedNPC(t, srv, 1000, 25)
+	hostile := spawnRewardedNPC(t, srv, 1024, 32)
 	drainUntilQuiet(t, c)
 
 	targetHostile(t, c, hostile.ObjectID())
@@ -295,13 +296,13 @@ func TestKarmaKillNPCLowersKarma(t *testing.T) {
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
-	assertKarmaChangeFrames(t, c, objID, 214)
+	assertKarmaChangeFrames(t, c, objID, 213)
 	assertFrameOpcode(t, mustRead(t, c, "karma UserInfo"), serverpackets.OpcodeUserInfo, "karma UserInfo")
-	readExpSpGain(t, c, 1000, 25)
+	readExpSpGain(t, c, 1024, 32)
 	drainUntilQuiet(t, c)
 
 	logoutPersisted(t, srv, c)
-	if ch, err := srv.Chars.Get(context.Background(), objID); err != nil || ch.KarmaPoints != 214 || ch.Exp != 2500 {
-		t.Fatalf("persisted character = %+v, %v; want karma 214 and exp 2500", ch, err)
+	if ch, err := srv.Chars.Get(context.Background(), objID); err != nil || ch.KarmaPoints != 213 || ch.Exp != 2524 {
+		t.Fatalf("persisted character = %+v, %v; want karma 213 and exp 2524", ch, err)
 	}
 }

@@ -23,7 +23,8 @@ import (
 //     arena/olympiad state those branches matter for isn't tracked on
 //     Character yet (#1302, #217, #215);
 //   - the mutual-clan-war halving of percentLost (Player.java:2906,
-//     `atWar`) — clan-war state isn't tracked yet (#149);
+//     `atWar`) — clan-war state isn't tracked yet (#149).
+//
 // The siege-zone halving (Player.java:2906) and the festival-participant
 // halving are wired: InSiegeZone and FestivalParticipant are live
 // accessors (FestivalParticipant is a permanent false stub pending #223, so
