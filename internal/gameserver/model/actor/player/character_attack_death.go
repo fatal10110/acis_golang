@@ -50,23 +50,29 @@ func (c *Character) AlikeDead() bool {
 	return c.Dead() || c.FakeDead()
 }
 
-// MarkDead transitions this player into its dead state.
+// MarkDead clears HP and transitions this player into its dead state.
 func (c *Character) MarkDead() bool {
-	return c.dead.CompareAndSwap(false, true)
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
+	if c.dead.Load() {
+		return false
+	}
+	c.curHP = 0
+	c.dead.Store(true)
+	return true
 }
 
 // Revive clears this player's dead state and restores HP to fraction of
 // calculated max HP. It reports whether the player was dead and is now
 // revived; a call on a living player is a no-op.
 func (c *Character) Revive(fraction float64) bool {
+	maxHP := c.ResourceValues().MaxHP
+	c.vitalsMu.Lock()
+	defer c.vitalsMu.Unlock()
 	if !c.dead.CompareAndSwap(true, false) {
 		return false
 	}
-
-	maxHP := c.ResourceValues().MaxHP
-	c.vitalsMu.Lock()
 	c.curHP = maxHP * fraction
-	c.vitalsMu.Unlock()
 	return true
 }
 

@@ -175,6 +175,11 @@ func disableReflectable(cast Cast, target Creature) {
 	}
 	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
 	if !ok || !succeeded {
+		if ok {
+			if _, player := asPlayer(cast.Caster); player {
+				appendResisted(cast.resisted, effected, cast.Skill, 1, false)
+			}
+		}
 		return
 	}
 	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
@@ -191,6 +196,11 @@ func disableMute(cast Cast, target Creature) {
 	}
 	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
 	if !ok || !succeeded {
+		if ok {
+			if _, player := asPlayer(cast.Caster); player {
+				appendResisted(cast.resisted, effected, cast.Skill, 1, false)
+			}
+		}
 		return
 	}
 	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))

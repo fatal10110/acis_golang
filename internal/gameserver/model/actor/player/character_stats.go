@@ -453,13 +453,12 @@ func (c *Character) ReduceMP(amount float64) float64 {
 // ReduceHP, ReduceHPByDOT, and TakeDamage all call it under vitalsMu, after
 // applyNonConsumptionDamageEffects's sleep/immobile-stop, stand-up, and
 // stun-break side effects (PlayerStatus.java:118-134), which run first in
-// the reference. Already-dead is a no-op, matching the prior curHP<=0
-// guards.
+// the reference. Already-dead is a no-op, matching PlayerStatus.reduceHp.
 func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) (dead bool) {
 	if amount < 0 {
 		amount = 0
 	}
-	if c.curHP <= 0 {
+	if c.Dead() {
 		return false
 	}
 	if !ignoreCP && attacker != nil && attacker != attackable.Combatant(c) {
@@ -487,7 +486,7 @@ func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skil
 	rawDamage := amount
 
 	c.vitalsMu.Lock()
-	if c.curHP <= 0 {
+	if c.Dead() {
 		c.vitalsMu.Unlock()
 		return
 	}
@@ -497,7 +496,7 @@ func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skil
 	// (136-193), both of which run before the actual HP subtraction.
 	c.applyNonConsumptionDamageEffects(false)
 	c.vitalsMu.Lock()
-	if c.curHP <= 0 {
+	if c.Dead() {
 		c.vitalsMu.Unlock()
 		return
 	}
@@ -529,14 +528,14 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 		return
 	}
 	c.vitalsMu.Lock()
-	if c.curHP <= 0 {
+	if c.Dead() {
 		c.vitalsMu.Unlock()
 		return
 	}
 	c.vitalsMu.Unlock()
 	c.applyNonConsumptionDamageEffects(isDOT)
 	c.vitalsMu.Lock()
-	if c.curHP <= 0 {
+	if c.Dead() {
 		c.vitalsMu.Unlock()
 		return
 	}
