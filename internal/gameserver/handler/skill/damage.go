@@ -82,8 +82,9 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		applyPdamEffects(cast, obj, in.Shield, &result)
 		damage := formulas.PhysicalSkillDamage(in)
 		if damage > 0 {
-			if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), &result) {
+			if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
+				recordDamage(&result, cast.Caster, target, int(damage), false, false)
 			}
 			applyLethalHit(cast, target, &result)
 		} else {
@@ -137,8 +138,9 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		if damage <= 0 {
 			continue
 		}
-		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), &result) {
+		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
+			recordDamage(&result, cast.Caster, target, int(damage), false, false)
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -202,6 +204,9 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
+			// MDAM reports the damage before applying it, unlike the
+			// physical handlers.
+			recordDamage(&result, cast.Caster, target, damage, in.MagicCrit, false)
 			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 			applyMdamEffects(cast, obj, in.BlessedSoulShot, in.Shield, &result)
 		}
@@ -295,9 +300,11 @@ func (blowHandler) UseResult(cast Cast) Result {
 				damage *= 2
 			}
 			if damage > 0 {
-				countered := applyPhysicalSkillCounter(cast, target, float64(damage), counter, &result)
+				// A blow always reports itself as a physical critical.
+				countered := applyPhysicalSkillCounter(cast, target, float64(damage), counter, true, &result)
 				if !countered {
 					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+					recordDamage(&result, cast.Caster, target, damage, false, true)
 				}
 			}
 			if caster, ok := cast.Caster.(shotCharger); ok {
@@ -312,12 +319,12 @@ func (blowHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float64, result *Result) bool {
+// applyPhysicalSkillCounter turns a countered physical skill back onto its
+// caster: the counter notices, the caster's HP loss, then the countering
+// target's damage feedback, which carries the skill's physical-critical flag.
+func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float64, pcrit bool, result *Result) bool {
 	if !counterSkillReflects(cast.Skill, counter) {
 		return false
-	}
-	if cast.Caster != nil {
-		cast.Caster.ReduceHP(damage*counter/100, target, cast.Skill)
 	}
 	if result != nil {
 		result.Counterattacks = append(result.Counterattacks, Counterattack{
@@ -328,7 +335,47 @@ func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float
 		})
 		result.record(result.Counterattacks[len(result.Counterattacks)-1])
 	}
+	if cast.Caster != nil {
+		damage *= counter / 100
+		cast.Caster.ReduceHP(damage, target, cast.Skill)
+		recordDamage(result, target, cast.Caster, int(damage), false, pcrit)
+	}
 	return true
+}
+
+type damageSummon interface {
+	OwnerID() int32
+	IsPet() bool
+}
+
+// recordDamage records attacker's damage feedback against target at its
+// position among the cast's other messages. Only a player or a summon
+// reports damage, and a summon stays silent against its own owner.
+func recordDamage(result *Result, attacker, target Actor, amount int, mcrit, pcrit bool) {
+	if result == nil || attacker == nil || target == nil {
+		return
+	}
+	m := Damage{Amount: int32(amount), MagicCrit: mcrit, PhysicalCrit: pcrit}
+	switch attacker.Kind() {
+	case actor.KindPlayer:
+		m.RecipientID = attacker.ObjectID()
+	case actor.KindSummon:
+		s, ok := attacker.(damageSummon)
+		if !ok || s.OwnerID() == 0 || s.OwnerID() == target.ObjectID() {
+			return
+		}
+		m.RecipientID, m.Source = s.OwnerID(), DamageByServitor
+		if s.IsPet() {
+			m.Source = DamageByPet
+		}
+	default:
+		return
+	}
+	if c, ok := asCreature(target); ok && c.Invul() {
+		m.Blocked = true
+		m.Petrified = c.Paralyzed()
+	}
+	result.record(m)
 }
 
 func counterattackObjectID(obj Actor) int32 {

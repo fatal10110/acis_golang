@@ -3715,3 +3715,169 @@ func newTestList(owner effect.StatOwner) *effect.List {
 }
 
 func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// guardedSkillTarget overrides the invulnerable/paralyzed state the damage
+// feedback reads.
+type guardedSkillTarget struct {
+	*skillTarget
+	invul, paralyzed bool
+}
+
+func (t *guardedSkillTarget) Invul() bool     { return t.invul }
+func (t *guardedSkillTarget) Paralyzed() bool { return t.paralyzed }
+
+type summonSkillCaster struct {
+	*skillTarget
+	owner int32
+	pet   bool
+}
+
+func (*summonSkillCaster) Kind() actor.Kind { return actor.KindSummon }
+func (s *summonSkillCaster) OwnerID() int32 { return s.owner }
+func (s *summonSkillCaster) IsPet() bool    { return s.pet }
+
+func damageMessages(t *testing.T, messages []any) []Damage {
+	t.Helper()
+	var out []Damage
+	for _, m := range messages {
+		if d, ok := m.(Damage); ok {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// TestMdamReportsDamageBeforeEachTargetsResist pins Mdam.java's per-target
+// order: the damage message, then that target's effect resist, then the
+// next target's damage. The first target's rolled magic critical is carried
+// even though its effect resisted.
+func TestMdamReportsDamageBeforeEachTargetsResist(t *testing.T) {
+	in := formulas.MagicDamageInput{MAtk: 400, MDef: 100, SkillPower: 50, PvPMul: 1, ElementalMul: 1}
+	crit := in
+	crit.MagicCrit = true
+	resister := &skillTarget{fakeActor: fakeActor{objectID: 2}, hp: 5000, name: "A", effects: newTestList(nil),
+		skillSuccessOK: true, skillSuccessChance: chanceOf(0), magicInput: crit, magicOK: true}
+	hit := &skillTarget{fakeActor: fakeActor{objectID: 3}, hp: 5000, name: "B", magicInput: in, magicOK: true}
+	caster := &skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true}
+
+	result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster,
+		Skill:   modelskill.Definition{ID: 7, Level: 3, SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []Actor{resister, hit}})
+
+	if len(result.Messages) != 3 {
+		t.Fatalf("messages = %#v, want damage, resist, damage", result.Messages)
+	}
+	first, ok := result.Messages[0].(Damage)
+	if !ok || first != (Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - resister.hp), MagicCrit: true}) {
+		t.Fatalf("first message = %#v, want A's critical damage", result.Messages[0])
+	}
+	if r, ok := result.Messages[1].(Resisted); !ok || r.TargetName != "A" {
+		t.Fatalf("second message = %#v, want A's resist", result.Messages[1])
+	}
+	second, ok := result.Messages[2].(Damage)
+	if !ok || second != (Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - hit.hp)}) {
+		t.Fatalf("third message = %#v, want B's damage", result.Messages[2])
+	}
+}
+
+// TestPhysicalSkillsReportDamageAfterTheHit covers PDAM's plain feedback
+// and BLOW's, which always reports a physical critical.
+func TestPhysicalSkillsReportDamageAfterTheHit(t *testing.T) {
+	pdam := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 60,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+	blow := formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}
+	for _, tc := range []struct {
+		skillType string
+		pcrit     bool
+	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
+		t.Run(tc.skillType, func(t *testing.T) {
+			target := &skillTarget{fakeActor: fakeActor{objectID: 2}, hp: 5000,
+				physicalInput: pdam, physicalOK: true, blowInput: blow, blowOK: true}
+			result, _ := NewDefaultRegistry().UseResult(Cast{
+				Caster:  &skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true},
+				Skill:   modelskill.Definition{SkillType: tc.skillType},
+				Targets: []Actor{target}})
+			got := damageMessages(t, result.Messages)
+			want := Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - target.hp), PhysicalCrit: tc.pcrit}
+			if len(got) != 1 || got[0] != want || want.Amount <= 0 {
+				t.Fatalf("damage messages = %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+// TestCounteredSkillReportsCounterDamageToTheDefender pins the counter
+// branch: the countering player hears about the damage it dealt back, after
+// the counter notices, with BLOW's physical-critical flag.
+func TestCounteredSkillReportsCounterDamageToTheDefender(t *testing.T) {
+	pdam := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 60,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+	blow := formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}
+	for _, tc := range []struct {
+		skillType string
+		pcrit     bool
+	}{{"PDAM", false}, {"CHARGEDAM", false}, {"BLOW", true}} {
+		t.Run(tc.skillType, func(t *testing.T) {
+			caster := &skillTarget{fakeActor: fakeActor{objectID: 1}, hp: 5000, isPlayer: true}
+			defender := &counteringSkillTarget{skillTarget: &skillTarget{fakeActor: fakeActor{objectID: 2}, hp: 5000, isPlayer: true,
+				physicalInput: pdam, physicalOK: true, blowInput: blow, blowOK: true}}
+			result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster,
+				Skill:   modelskill.Definition{SkillType: tc.skillType, CastRange: 40, CanBeReflected: true},
+				Targets: []Actor{defender}})
+			if len(result.Messages) != 2 {
+				t.Fatalf("messages = %#v, want counter then damage", result.Messages)
+			}
+			if _, ok := result.Messages[0].(Counterattack); !ok {
+				t.Fatalf("first message = %T, want Counterattack", result.Messages[0])
+			}
+			want := Damage{RecipientID: 2, Source: DamageByPlayer, Amount: int32(5000 - caster.hp), PhysicalCrit: tc.pcrit}
+			if got, ok := result.Messages[1].(Damage); !ok || got != want || want.Amount <= 0 || defender.hp != 5000 {
+				t.Fatalf("second message = %#v, want %#v with the defender untouched", result.Messages[1], want)
+			}
+		})
+	}
+}
+
+func TestSkillDamageFeedbackRecipientAndBlockedTarget(t *testing.T) {
+	pdam := formulas.PhysicalSkillInput{AttackPower: 100, SkillPower: 50, Defence: 60,
+		RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1}
+	player := &skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true}
+	for _, tc := range []struct {
+		name     string
+		caster   Actor
+		targetID int32
+		invul    bool
+		para     bool
+		want     []Damage
+	}{
+		{"pet", &summonSkillCaster{skillTarget: &skillTarget{}, owner: 9, pet: true}, 2, false, false,
+			[]Damage{{RecipientID: 9, Source: DamageByPet}}},
+		{"servitor", &summonSkillCaster{skillTarget: &skillTarget{}, owner: 9}, 2, false, false,
+			[]Damage{{RecipientID: 9, Source: DamageByServitor}}},
+		{"summon against its owner", &summonSkillCaster{skillTarget: &skillTarget{}, owner: 9, pet: true}, 9, false, false, nil},
+		{"ownerless summon", &summonSkillCaster{skillTarget: &skillTarget{}}, 2, false, false, nil},
+		{"npc", &skillTarget{}, 2, false, false, nil},
+		{"invulnerable", player, 2, true, false, []Damage{{RecipientID: 1, Blocked: true}}},
+		{"petrified", player, 2, true, true, []Damage{{RecipientID: 1, Blocked: true, Petrified: true}}},
+		{"paralyzed only", player, 2, false, true, []Damage{{RecipientID: 1}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			target := &guardedSkillTarget{skillTarget: &skillTarget{fakeActor: fakeActor{objectID: tc.targetID}, hp: 5000,
+				physicalInput: pdam, physicalOK: true}, invul: tc.invul, paralyzed: tc.para}
+			result, _ := NewDefaultRegistry().UseResult(Cast{Caster: tc.caster.(Creature),
+				Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []Actor{target}})
+			got := damageMessages(t, result.Messages)
+			for i := range tc.want {
+				tc.want[i].Amount = int32(5000 - target.hp)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("damage messages = %#v, want %#v", got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("damage message %d = %#v, want %#v", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}

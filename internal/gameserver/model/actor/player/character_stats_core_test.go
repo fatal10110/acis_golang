@@ -3215,6 +3215,9 @@ func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
 					}
 					return tt.second
 				}
+				if n == 1000 {
+					return 0 // magic critical
+				}
 				return 9999
 			})
 			in, ok := target.MagicDamageInput(caster, modelskill.Definition{Power: 40, SkillType: "MDAM"}, !tt.off)
@@ -3227,8 +3230,10 @@ func TestCharacterMagicDamageInputFailureOutcomes(t *testing.T) {
 			if rolls != tt.wantRolls {
 				t.Fatalf("magic-success rolls = %d, want %d", rolls, tt.wantRolls)
 			}
-			if in.MagicCrit {
-				t.Fatal("MagicCrit = true, want false after a resist outcome")
+			// The rolled critical survives a resist: the damage formula
+			// skips it, but the caster's damage feedback still reports it.
+			if !in.MagicCrit {
+				t.Fatal("MagicCrit = false, want the rolled critical kept")
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package network
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
@@ -279,4 +280,133 @@ func TestFusionTargetClearsOnlyTheChannelThatSetIt(t *testing.T) {
 	if live.fusesTarget(second) {
 		t.Fatal("fusesTarget(second) = true after its own channel cleared it, want false")
 	}
+}
+
+// assertSystemMessageNumberFrame checks a one-number SystemMessage such as
+// YOU_DID_S1_DMG.
+func assertSystemMessageNumberFrame(t *testing.T, frame []byte, messageID int, number int32) {
+	t.Helper()
+	assertSystemMessageIDFrame(t, frame, messageID)
+	r := wire.NewReader(frame[5:])
+	if params, typ, got := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); params != 1 || typ != serverpackets.SystemMessageParamNumber || got != number {
+		t.Fatalf("SystemMessage %d params=%d type=%d number=%d, want 1 number %d", messageID, params, typ, got, number)
+	}
+	if err := r.Err(); err != nil || r.Remaining() != 0 {
+		t.Fatalf("read SystemMessage %d: err=%v remaining=%d", messageID, err, r.Remaining())
+	}
+}
+
+// TestSkillDamageFrames pins the Player/Summon/Servitor damage feedback
+// system message ids, their order, and the damage parameter.
+func TestSkillDamageFrames(t *testing.T) {
+	type frame struct {
+		id     int
+		number int32
+		plain  bool
+	}
+	plain := func(id int) frame { return frame{id: id, plain: true} }
+	for _, tc := range []struct {
+		name string
+		m    handlerskill.Damage
+		want []frame
+	}{
+		{"player", handlerskill.Damage{Amount: 120}, []frame{{id: 35, number: 120}}},
+		{"player physical critical", handlerskill.Damage{Amount: 120, PhysicalCrit: true}, []frame{plain(44), {id: 35, number: 120}}},
+		{"player magic critical", handlerskill.Damage{Amount: 120, MagicCrit: true}, []frame{plain(1280), {id: 35, number: 120}}},
+		{"player both criticals", handlerskill.Damage{Amount: 120, PhysicalCrit: true, MagicCrit: true}, []frame{plain(44), plain(1280), {id: 35, number: 120}}},
+		{"player blocked", handlerskill.Damage{Amount: 120, PhysicalCrit: true, Blocked: true}, []frame{plain(44), plain(1996)}},
+		{"player petrified", handlerskill.Damage{Amount: 120, Blocked: true, Petrified: true}, []frame{plain(1432)}},
+		{"pet", handlerskill.Damage{Source: handlerskill.DamageByPet, Amount: 77}, []frame{{id: 1015, number: 77}}},
+		{"pet critical", handlerskill.Damage{Source: handlerskill.DamageByPet, Amount: 77, PhysicalCrit: true, MagicCrit: true}, []frame{plain(1017), {id: 1015, number: 77}}},
+		{"pet blocked", handlerskill.Damage{Source: handlerskill.DamageByPet, Amount: 77, Blocked: true}, []frame{plain(1996)}},
+		{"servitor", handlerskill.Damage{Source: handlerskill.DamageByServitor, Amount: 55}, []frame{{id: 1026, number: 55}}},
+		{"servitor critical", handlerskill.Damage{Source: handlerskill.DamageByServitor, Amount: 55, MagicCrit: true}, []frame{plain(1028), {id: 1026, number: 55}}},
+		{"servitor petrified", handlerskill.Damage{Source: handlerskill.DamageByServitor, Amount: 55, Blocked: true, Petrified: true}, []frame{plain(1432)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			frames := &testsupport.FrameCapture{}
+			state := world.New()
+			state.AddPlayer(newTestLivePlayer(t, 9, frames))
+			bystander := &testsupport.FrameCapture{}
+			state.AddPlayer(newTestLivePlayer(t, 1, bystander))
+			tc.m.RecipientID = 9
+			(&GameClientLink{world: state}).sendSkillHandlerResult(nil, actorcast.EffectResult{Messages: []any{tc.m}})
+			got := frames.Frames()
+			if len(got) != len(tc.want) {
+				t.Fatalf("frame count = %d, want %d", len(got), len(tc.want))
+			}
+			for i, want := range tc.want {
+				if want.plain {
+					assertSystemMessageIDFrame(t, got[i], want.id)
+					if len(got[i]) != 9 {
+						t.Fatalf("frame %d length = %d, want a parameterless SystemMessage", i, len(got[i]))
+					}
+					continue
+				}
+				assertSystemMessageNumberFrame(t, got[i], want.id, want.number)
+			}
+			if n := len(bystander.Frames()); n != 0 {
+				t.Fatalf("non-recipient frames = %d, want 0", n)
+			}
+		})
+	}
+}
+
+type mdamOrderActor struct {
+	orderedSkillActor
+	hp    float64
+	magic formulas.MagicDamageInput
+	// unrollable leaves the effect roll unresolved, so the target neither
+	// takes the effect nor reports a resist.
+	unrollable bool
+}
+
+func (a *mdamOrderActor) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	if a.unrollable {
+		return formulas.SkillSuccessInput{}, false
+	}
+	return a.orderedSkillActor.SkillSuccessInput(caster, def, bss, shield)
+}
+
+func (a *mdamOrderActor) MagicDamageInput(creature.FormulaActor, modelskill.Definition, bool) (formulas.MagicDamageInput, bool) {
+	return a.magic, true
+}
+func (a *mdamOrderActor) ReduceHP(v float64, _ attackable.Combatant, _ modelskill.Definition) {
+	a.hp -= v
+}
+
+// TestMdamDamageResistDamageFrameOrder casts MDAM over two targets where the
+// first resists the effect roll: the caster reads A's damage, A's resist,
+// then B's damage, as Mdam.java sends them inline.
+func TestMdamDamageResistDamageFrameOrder(t *testing.T) {
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	state := world.New()
+	state.AddPlayer(live)
+	link := &GameClientLink{world: state}
+	in := formulas.MagicDamageInput{MAtk: 400, MDef: 100, SkillPower: 50, PvPMul: 1, ElementalMul: 1}
+	resister := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 2, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in}
+	hit := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 3, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in, unrollable: true}
+	caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
+
+	result, ok := handlerskill.NewDefaultRegistry().UseResult(handlerskill.Cast{Caster: caster,
+		Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
+		Targets: []handlerskill.Actor{resister, hit}})
+	if !ok {
+		t.Fatal("MDAM was not handled")
+	}
+	link.sendSkillHandlerResult(live, actorcast.EffectResult{Messages: result.Messages})
+
+	got := frames.Frames()
+	if len(got) != 3 {
+		t.Fatalf("caster frame count = %d, want damage, resist, damage: %#v", len(got), result.Messages)
+	}
+	damageA, damageB := int32(5000-resister.hp), int32(5000-hit.hp)
+	if damageA <= 0 || damageB <= 0 {
+		t.Fatalf("damage = %d, %d, want both targets hit", damageA, damageB)
+	}
+	assertSystemMessageNumberFrame(t, got[0], serverpackets.SystemMessageYouDidS1Dmg, damageA)
+	// Mdam adds the skill by id only, so the resist carries level 1.
+	assertSystemMessageStringSkillNameFrame(t, got[1], serverpackets.SystemMessageS1ResistedYourS2, "Target", 7, 1)
+	assertSystemMessageNumberFrame(t, got[2], serverpackets.SystemMessageYouDidS1Dmg, damageB)
 }

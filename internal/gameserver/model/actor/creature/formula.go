@@ -234,10 +234,10 @@ func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaAc
 	if !first && isPlayer {
 		second = formulas.MagicSucceeds(rate, attacker.Roll(10000))
 	}
+	// MagicCrit keeps the raw roll: MagicDamage already skips the crit
+	// multiplier on a resist, while the caster's damage feedback still
+	// reports the rolled critical.
 	in.Failure = formulas.MagicFailureOutcome(true, first, isPlayer, second, target.Level()-attacker.Level())
-	if in.Failure != formulas.MagicFailureNone {
-		in.MagicCrit = false
-	}
 }
 
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.

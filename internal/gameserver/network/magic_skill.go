@@ -614,6 +614,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if attacker, online := l.livePlayerByID(m.AttackerID); online {
 				attacker.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
 			}
+		case skillhandler.Damage:
+			if recipient, online := l.livePlayerByID(m.RecipientID); online {
+				sendSkillDamage(recipient, m)
+			}
 		case skillhandler.Resisted:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))
@@ -643,6 +647,41 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 				live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, m.MP))
 			}
 		}
+	}
+}
+
+// sendSkillDamage sends a skill hit's damage feedback: a player sees each
+// critical kind it rolled, a summon's owner sees one summon critical, then
+// either the blocked notice or the damage dealt.
+func sendSkillDamage(recipient *livePlayer, m skillhandler.Damage) {
+	crit := m.PhysicalCrit || m.MagicCrit
+	dealt := serverpackets.SystemMessageYouDidS1Dmg
+	switch m.Source {
+	case skillhandler.DamageByPlayer:
+		if m.PhysicalCrit {
+			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHit))
+		}
+		if m.MagicCrit {
+			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitMagic))
+		}
+	case skillhandler.DamageByPet:
+		dealt = serverpackets.SystemMessagePetHitForS1Damage
+		if crit {
+			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitByPet))
+		}
+	case skillhandler.DamageByServitor:
+		dealt = serverpackets.SystemMessageSummonGaveDamageS1
+		if crit {
+			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitBySummonedMob))
+		}
+	}
+	switch {
+	case m.Petrified:
+		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOpponentPetrified))
+	case m.Blocked:
+		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackWasBlocked))
+	default:
+		recipient.SendFrame(serverpackets.FrameSystemMessageNumber(dealt, m.Amount))
 	}
 }
 
