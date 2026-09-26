@@ -567,8 +567,8 @@ func sendLiveStatus(live *livePlayer) {
 }
 
 // updateLiveAbnormalEffect sends live's own session its current active
-// abnormal-effect icon list. Unlike broadcastLiveStatus, this packet only
-// ever goes to the effected player's own client, matching the reference's
+// abnormal-effect icon list. Like sendLiveStatus, this packet only ever goes
+// to the effected player's own client, matching the reference's
 // AbnormalStatusUpdate.
 func (l *GameClientLink) updateLiveAbnormalEffect(live *livePlayer) {
 	if live == nil {
