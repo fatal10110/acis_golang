@@ -403,6 +403,7 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
 // that kills the caster sends its own packets from inside that consume.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+	beforeVitals := live.Vitals()
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,
@@ -433,6 +434,9 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	}
 
 	if activated {
+		if def.HPConsume > 0 && !live.Character.Dead() {
+			sendMagicStatusUpdate(live, beforeVitals)
+		}
 		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
 		l.sendSkillHandlerResult(live, result)
 		l.syncCubicTargets(live, result, def)

@@ -105,8 +105,8 @@ func (a PlayerActor) ReduceHP(amount int) {
 		return
 	}
 	dead := a.Character.ReduceCurrentHP(amount)
-	a.Character.BroadcastStatus()
 	if dead {
+		a.Character.BroadcastStatus()
 		a.Character.Die(a.Character)
 	}
 }

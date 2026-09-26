@@ -861,6 +861,80 @@ func skillCase(skillID int32) string {
 	return fmt.Sprintf("skill-%d", skillID)
 }
 
+func TestNonlethalHPConsumeSendsOneStatus(t *testing.T) {
+	t.Parallel()
+	const skillID = 293
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, StaticHitTime: true, HPConsume: 1, SkillType: "DUMMY",
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	beforeHP := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 0, objID)
+	srv.AdvanceUntil(t, "nonlethal HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
+	statuses := 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeDie {
+			t.Fatal("nonlethal HP cost sent Die")
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			statuses++
+		}
+	}
+	if statuses != 1 {
+		t.Fatalf("self StatusUpdate count = %d, want 1", statuses)
+	}
+}
+
+func TestNonlethalToggleHPConsumeSendsOneStatus(t *testing.T) {
+	t.Parallel()
+	const skillID = 294
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Caster", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationToggle, Target: modelskill.TargetSelf,
+			HPConsume: 1, SkillType: "BUFF", Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+	beforeHP := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle ack")
+	srv.AdvanceUntil(t, "toggle HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
+	statuses := 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeDie {
+			t.Fatal("nonlethal toggle HP cost sent Die")
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			statuses++
+		}
+	}
+	if statuses != 1 {
+		t.Fatalf("self StatusUpdate count = %d, want 1", statuses)
+	}
+}
+
 // TestExactlyLethalHPConsumeKillsCaster drives a real cast whose HP cost
 // ends up exactly equal to the caster's remaining HP when the hit timer
 // fires. The pre-cast gate rejects a cast at HP <= HPConsume, so the state

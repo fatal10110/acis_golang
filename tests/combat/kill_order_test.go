@@ -2,6 +2,8 @@ package combat
 
 import (
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -9,6 +11,101 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
+
+type countedRewards struct{ calls atomic.Int32 }
+
+func (r *countedRewards) CalculateRewards(attackable.Combatant) { r.calls.Add(1) }
+
+func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, c)
+	rewards := &countedRewards{}
+	var winners atomic.Int32
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if hostile.Die(nil, rewards) {
+				winners.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if hostile.Die(nil, rewards) || winners.Load() != 1 || rewards.calls.Load() != 1 {
+		t.Fatalf("Die results: winners=%d rewards=%d; repeat must be false", winners.Load(), rewards.calls.Load())
+	}
+	statuses, dies := 0, 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			break
+		}
+		if len(frame) < 5 {
+			continue
+		}
+		if wireReader(frame[1:]).ReadInt32() != hostile.ObjectID() {
+			continue
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeStatusUpdate:
+			statuses++
+		case serverpackets.OpcodeDie:
+			dies++
+		}
+	}
+	if statuses != 2 || dies != 1 {
+		t.Fatalf("death frames: StatusUpdate=%d Die=%d, want 2 and 1", statuses, dies)
+	}
+}
+
+func TestPlayerNonlethalSkillDamageSendsSelfStatus(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world")
+	}
+	player := obj.(interface {
+		CurrentHP() int
+		SetCP(float64)
+		SetSpawnProtection(bool)
+		ReduceHP(float64, attackable.Combatant, modelskill.Definition)
+	})
+	player.SetSpawnProtection(false)
+	player.SetCP(0)
+	beforeHP := player.CurrentHP()
+	player.ReduceHP(1, nil, modelskill.Definition{})
+	if got := player.CurrentHP(); got != beforeHP-1 {
+		t.Fatalf("HP = %d, want %d", got, beforeHP-1)
+	}
+	statuses := 0
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			break
+		}
+		if len(frame) < 5 {
+			continue
+		}
+		if frame[0] == serverpackets.OpcodeDie {
+			t.Fatal("nonlethal skill damage sent Die")
+		}
+		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
+			statuses++
+		}
+	}
+	if statuses != 1 {
+		t.Fatalf("self StatusUpdate count = %d, want 1", statuses)
+	}
+}
 
 // TestLethalHitOrdersStatusRewardDie pins what the killer's client sees when
 // its skill kills a monster, in the reference's order: the monster's zero-HP
