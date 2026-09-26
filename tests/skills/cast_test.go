@@ -3,6 +3,7 @@ package skills
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -940,14 +941,33 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	if got := srv.PlayerCurrentHP(t, objID); got != 0 {
 		t.Fatalf("caster HP after an exactly-lethal cost = %d, want 0", got)
 	}
-	// The abort reaches the client before the death does: Die stops the cast
-	// before it broadcasts, so MagicSkillCanceled is always ahead of Die in
-	// the stream. Reading them in sequence pins that order.
-	if !readsOpcode(t, c, serverpackets.OpcodeMagicSkillCanceled) {
-		t.Fatal("no MagicSkillCanceled: the death did not abort the in-flight cast")
+	// HP consumption updates status before doDie, which updates it again;
+	// aborting the cast precedes Playable.doDie's final status and Die.
+	var order []string
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			t.Fatalf("HP-cost death sequence stopped after %v", order)
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeStatusUpdate:
+			if wireReader(frame[1:]).ReadInt32() == objID {
+				order = append(order, "status")
+			}
+		case serverpackets.OpcodeMagicSkillCanceled:
+			order = append(order, "cancel")
+		case serverpackets.OpcodeDie:
+			if wireReader(frame[1:]).ReadInt32() == objID {
+				order = append(order, "die")
+			}
+		}
+		if len(order) > 0 && order[len(order)-1] == "die" {
+			break
+		}
 	}
-	if !readsOpcode(t, c, serverpackets.OpcodeDie) {
-		t.Fatal("no Die broadcast after the exactly-lethal HP cost")
+	want := []string{"status", "status", "cancel", "status", "die"}
+	if !slices.Equal(order, want) {
+		t.Fatalf("HP-cost death sequence = %v, want %v", order, want)
 	}
 	// The hit runs to completion despite the death it just caused: the
 	// charge grant sits after the cost in the same hit step, and the death

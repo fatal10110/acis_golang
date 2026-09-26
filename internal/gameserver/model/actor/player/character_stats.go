@@ -502,6 +502,7 @@ func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skil
 	}
 	dead := c.absorbCPThenReduceHP(amount, attacker, skill.DirectHPDamage)
 	c.vitalsMu.Unlock()
+	c.BroadcastStatus()
 	// calcCastBreak always runs on the raw pre-absorption damage in the
 	// reference (Formulas.java:725 callers pass the skill's computed
 	// damage, never a CP-reduced remainder), so breakCastOnDamage must
