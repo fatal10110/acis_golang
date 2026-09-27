@@ -2,7 +2,6 @@ package combat
 
 import (
 	"context"
-	"math"
 	"testing"
 
 	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -97,7 +96,8 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
 	startInWorld(t, c)
-	hostile := spawnRewardedNPC(t, srv, 5000, 25)
+	// Powers of two keep the full reward exact through random damage sharing.
+	hostile := spawnRewardedNPC(t, srv, 4096, 32)
 	drainUntilQuiet(t, c)
 
 	targetHostile(t, c, hostile.ObjectID())
@@ -108,10 +108,7 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
-	wantExp, wantSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
-	if wantExp <= 0 || wantSp <= 0 {
-		t.Fatalf("oracle reward = %d exp / %d sp, want positive amounts", wantExp, wantSp)
-	}
+	wantExp, wantSp := int64(4096), 32
 	readExpSpGain(t, c, wantExp, wantSp)
 
 	// Logout persists the character; the reward must survive the round-trip.
@@ -142,7 +139,7 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
 	startInWorld(t, c)
-	hostile := spawnRewardedNPC(t, srv, 5000, 25)
+	hostile := spawnRewardedNPC(t, srv, 4096, 32)
 	drainUntilQuiet(t, c)
 
 	targetHostile(t, c, hostile.ObjectID())
@@ -197,7 +194,7 @@ func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
 	startInWorld(t, c)
-	hostile := spawnRewardedNPC(t, srv, 5000, 25)
+	hostile := spawnRewardedNPC(t, srv, 4096, 32)
 	drainUntilQuiet(t, c)
 
 	targetHostile(t, c, hostile.ObjectID())
@@ -208,12 +205,7 @@ func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
 
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
-	baseExp, baseSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
-	if baseExp <= 0 || baseSp <= 0 {
-		t.Fatalf("oracle base reward = %d exp / %d sp, want positive amounts", baseExp, baseSp)
-	}
-	wantExp := baseExp + int64(math.Round(0.25*float64(baseExp)))
-	readOverHitThenExpSpGain(t, c, wantExp, baseSp)
+	readOverHitThenExpSpGain(t, c, 5120, 32)
 }
 
 func readOverHitThenExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {

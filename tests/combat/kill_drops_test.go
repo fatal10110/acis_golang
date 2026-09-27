@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -208,7 +207,7 @@ func TestFakeDeadAttackerKeepsKillExp(t *testing.T) {
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
-	monster := spawnRewardedNPC(t, srv, 5000, 25)
+	monster := spawnRewardedNPC(t, srv, 4096, 32)
 	guard := srv.SpawnHostileNPCKindAt(t, "Guard", location.Location{X: hostileX + 40, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
 	obj, ok := srv.State.Player(objID)
@@ -238,8 +237,7 @@ func TestFakeDeadAttackerKeepsKillExp(t *testing.T) {
 
 	// The guard is no reward entry, so the player's damage is the whole
 	// total and earns the full share.
-	wantExp, wantSp := playermodel.KillRewardExpAndSp(5000, 25, 1, 1, 5-1)
-	readExpSpGain(t, c, wantExp, wantSp)
+	readExpSpGain(t, c, 4096, 32)
 }
 
 // TestKillWithoutPlayerReceiverDropsNothing covers every death no player
