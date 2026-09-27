@@ -373,7 +373,9 @@ func (c *Character) levelTableValue(values []float64, fallback float64) float64 
 	return values[idx]
 }
 
-// AddHP restores HP, clamped to MaxHP, and returns the applied amount.
+// AddHP restores HP, clamped to MaxHP, and returns the applied amount. A
+// dead character gains nothing: the check shares vitalsMu with MarkDead, so a
+// caller's earlier liveness check cannot race a death into a corpse heal.
 // Callers that change HP outside a client request broadcast the resulting
 // status themselves; the cast and item paths already send their own batched
 // StatusUpdate at the call site.
@@ -384,7 +386,7 @@ func (c *Character) AddHP(amount float64) float64 {
 	maxHP := c.MaxHPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.curHP >= maxHP {
+	if c.dead.Load() || c.curHP >= maxHP {
 		return 0
 	}
 	if c.curHP+amount > maxHP {
@@ -574,11 +576,15 @@ func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	}
 }
 
-// SetHP sets current HP, clamped to [0, MaxHP].
+// SetHP sets current HP, clamped to [0, MaxHP]. It has no effect on a dead
+// character; Revive is the only way back to positive HP.
 func (c *Character) SetHP(value float64) {
 	maxHP := c.MaxHPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
+	if c.dead.Load() {
+		return
+	}
 	if value < 0 {
 		value = 0
 	}
