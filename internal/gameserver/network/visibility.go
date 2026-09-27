@@ -124,16 +124,8 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 
 func (p *livePlayer) Forget(obj world.Tracked) {
 	if o, ok := obj.(*summon.Actor); ok {
-		// A summon's removal signal to its owner is always PetDelete
-		// (Summon.java's doUnsummon sends it unconditionally before
-		// decayMe(), regardless of why the summon is leaving), not the
-		// generic DeleteObject other Tracked kinds get. Non-owners received
-		// SummonInfo, so they receive the corresponding DeleteObject below.
 		if o.OwnerID() == p.ObjectID() {
 			p.petSightings.Add(1)
-			p.sendVisibilityFrame(serverpackets.FramePetDelete(o.SummonType(), o.ObjectID()))
-			p.forgetTarget(obj)
-			return
 		}
 	}
 	p.forgetTarget(obj)
@@ -149,7 +141,7 @@ func (p *livePlayer) Forget(obj world.Tracked) {
 
 // forgetTarget clears a selection that left the known list, with the same
 // answer as a cancelled selection. It runs before the object's DeleteObject;
-// the owner's own summon clears after its PetDelete instead.
+// an unsummoned owner's selection clears after its explicit PetDelete.
 func (p *livePlayer) forgetTarget(obj world.Tracked) {
 	if p.link != nil && p.ClearTargetIf(obj) {
 		p.link.announceTargetCleared(p, obj)

@@ -160,6 +160,10 @@ func (s *summonSink) Emit(ev event.Event) {
 			s.runCleanup(s.brain.AbortAll)
 		}
 		s.runCleanup(func() { l.releasePet(actor) })
+	case event.SummonRemoved:
+		if owner, ok := liveSummonOwner(actor); ok {
+			owner.SendFrame(serverpackets.FramePetDelete(actor.SummonType(), actor.ObjectID()))
+		}
 	case event.Despawned:
 		s.runDespawn()
 	}

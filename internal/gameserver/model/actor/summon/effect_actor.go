@@ -35,6 +35,22 @@ func (a *Actor) AbortAll(resetTarget bool) {
 	}
 }
 
+// AbortForTeleport stops current actions without starting a new follow walk
+// from the old position. Following resumes after the new position is set.
+func (a *Actor) AbortForTeleport() {
+	if a.brain != nil {
+		a.brain.AbortAll()
+	}
+	a.idle()
+	a.SetTarget(nil)
+}
+
+// OnTeleported restores owner following after the summon rejoins the world.
+func (a *Actor) OnTeleported() {
+	a.followOff.Store(false)
+	a.TryToIdle()
+}
+
 // StopMove stops the summon's movement.
 func (a *Actor) StopMove() {
 	if a.brain != nil {
