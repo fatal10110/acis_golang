@@ -40,10 +40,15 @@ const autosaveSaveTimeout = 5 * time.Second
 // the player's own queue, but a summon-friend cast teleports the player from
 // the caster's queue (TeleportRequested → teleportLivePlayer), and logout
 // removes it from the zones on the detach path.
+//
+// offGrid is set from a teleport's grid leave until the Appearing rejoin.
+// The player holds no zone in between, so position updates must not enter
+// any.
 type liveZoneActor struct {
-	mu    sync.Mutex
-	live  *livePlayer
-	flags zone.Flags
+	mu      sync.Mutex
+	live    *livePlayer
+	flags   zone.Flags
+	offGrid bool
 }
 
 func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() }
@@ -85,27 +90,54 @@ func resolveFixedRes(data *admin.Data, accessLevel int) bool {
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.offGrid {
+		return
+	}
 	ix.Revalidate(a)
-	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
-	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
-	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
-	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
+	a.syncFlags()
 }
 
 func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.offGrid {
+		return
+	}
 	ix.RevalidateMove(a, previous)
-	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
-	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
-	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
-	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
+	a.syncFlags()
 }
 
 func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
+	a.syncFlags()
+}
+
+// leave takes the player off the grid for a teleport: it exits every zone
+// of the region containing (x, y), its position before the jump, and
+// enters none until rejoin.
+func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.offGrid = true
+	ix.RemoveFrom(a, x, y)
+	a.syncFlags()
+}
+
+// rejoin puts the player back on the grid once its client has appeared,
+// entering the zones at its current position, and reports whether it is
+// now in water.
+func (a *liveZoneActor) rejoin(ix *zone.Index) (inWater bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.offGrid = false
+	ix.Revalidate(a)
+	a.syncFlags()
+	return a.flags.Has(zone.FlagWater)
+}
+
+func (a *liveZoneActor) syncFlags() {
 	a.live.SetInPvPZone(a.flags.Has(zone.FlagPvP))
 	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
@@ -312,6 +344,11 @@ func (l *GameClientLink) wireWaterZones() {
 				return
 			}
 			l.broadcastCharacterInfo(live)
+			if live.Teleporting() {
+				// A teleport's zone leave keeps the breath countdown
+				// running; the Appearing rejoin settles it.
+				return
+			}
 			if swimming {
 				breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
 				l.water.Add(live, breath)
@@ -325,6 +362,28 @@ func (l *GameClientLink) wireWaterZones() {
 func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {
 	if l.zones != nil && live != nil && live.zoneActor != nil {
 		live.zoneActor.revalidateMove(l.zones, previous)
+	}
+}
+
+// leaveZones exits live from every zone around its current position as a
+// teleport takes it off the grid; until rejoinZones, movement enters none.
+func (l *GameClientLink) leaveZones(live *livePlayer) {
+	if l.zones == nil || live.zoneActor == nil {
+		return
+	}
+	position := live.CurrentLocation()
+	live.zoneActor.leave(l.zones, position.X, position.Y)
+}
+
+// rejoinZones enters live into the zones at its teleport destination once
+// its client has appeared, and stops the breath countdown a teleport out of
+// the water left running.
+func (l *GameClientLink) rejoinZones(live *livePlayer) {
+	if l.zones == nil || live.zoneActor == nil {
+		return
+	}
+	if !live.zoneActor.rejoin(l.zones) && l.water != nil {
+		l.water.Remove(live)
 	}
 }
 

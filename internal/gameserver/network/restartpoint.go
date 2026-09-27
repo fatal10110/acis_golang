@@ -68,10 +68,11 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // teleportLivePlayer relocates live to a scattered, ground-height-snapped
 // point near target, cancelling any attack/combat in progress. It broadcasts
 // the discontinuous-position packet to live's own session and every
-// observer, then takes live off the grid: everything around the old position
-// forgets live and live forgets it, even what the destination still sees.
-// live rejoins the grid at the destination once its client reports it
-// appeared (completeLivePlayerTeleport).
+// observer, then takes live off the grid: it exits every zone around the old
+// position, everything around the old position forgets live and live forgets
+// it, even what the destination still sees. live rejoins the grid and enters
+// the destination's zones once its client reports it appeared
+// (completeLivePlayerTeleport).
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
@@ -103,6 +104,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameTeleportToLocation(live.ObjectID(), target, false)
 	})
+	// Zone exits come first: a water exit's appearance update still reaches
+	// the old neighborhood.
+	l.leaveZones(live)
 	if l.world != nil {
 		// Forgetting a selected object clears the selection. Do it while
 		// the old neighborhood still sees live, so its observers get the
@@ -124,12 +128,14 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	if !live.SetTeleporting(false) {
 		return
 	}
+	if l.world != nil {
+		l.world.Rejoin(live)
+	}
+	l.rejoinZones(live)
+	l.activateSpawnProtection(live)
 	if l.world == nil {
-		l.activateSpawnProtection(live)
 		return
 	}
-	l.world.Rejoin(live)
-	l.activateSpawnProtection(live)
 	active, ok := l.world.Summon(live.ObjectID())
 	if !ok {
 		return

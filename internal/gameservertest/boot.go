@@ -75,6 +75,7 @@ type options struct {
 	karmaPlayerCanTeleport bool
 	restarts               *restart.Table
 	zones                  *zone.Index
+	water                  bool
 	attackStance           *task.AttackStance
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
@@ -158,6 +159,13 @@ func WithRestartPoints(table *restart.Table) Option {
 // no zone flags are raised on enter world or movement).
 func WithZones(index *zone.Index) Option {
 	return func(o *options) { o.zones = index }
+}
+
+// WithWater wires the drowning tracker into the link, so water-zone entry
+// and exit start and stop the breath countdown. Its one-second tick is not
+// started: breath gauges are sent, drowning damage is not.
+func WithWater() Option {
+	return func(o *options) { o.water = true }
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -1169,6 +1177,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Log:              o.log,
+	}
+	if o.water {
+		water, err := task.NewWater(effects, time.Now)
+		if err != nil {
+			t.Fatalf("new water: %v", err)
+		}
+		gclConfig.Water = water
 	}
 	if o.slowStores > 0 {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
