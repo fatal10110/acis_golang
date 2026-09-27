@@ -116,6 +116,11 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		}
 		l.world.Leave(live)
 	}
+	// Off the grid the player is in no water, so the breath countdown stops
+	// here, after the old neighborhood is forgotten.
+	if l.water != nil {
+		l.water.Remove(live)
+	}
 	l.updateLivePlayerPosition(live, target, heading)
 }
 

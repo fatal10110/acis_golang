@@ -3,6 +3,7 @@ package character
 import (
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -175,7 +176,13 @@ func TestTeleportIntoPeaceZoneEntersAtAppearing(t *testing.T) {
 	peace.assert(t, "after Appearing", 1, 0, true)
 }
 
-func bootInWater(t *testing.T) (*gameservertest.Server, *player.Character, int32) {
+// waterClock is the drowning tracker's clock, advanced by hand.
+type waterClock struct{ nanos atomic.Int64 }
+
+func (c *waterClock) now() time.Time          { return time.Unix(0, c.nanos.Load()) }
+func (c *waterClock) advance(d time.Duration) { c.nanos.Add(int64(d)) }
+
+func bootInWater(t *testing.T) (*gameservertest.Server, *player.Character, int32, *waterClock) {
 	t.Helper()
 	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
 	if err != nil {
@@ -183,53 +190,105 @@ func bootInWater(t *testing.T) (*gameservertest.Server, *player.Character, int32
 	}
 	zones := zone.NewIndex()
 	zones.Add(zone.NewWater(1, form))
-	return bootInZones(t, zones, gameservertest.WithWater())
+	clock := &waterClock{}
+	clock.nanos.Store(time.Now().UnixNano())
+	srv, character, objID := bootInZones(t, zones, gameservertest.WithWater(clock.now))
+	return srv, character, objID, clock
 }
 
-// TestTeleportOutOfWaterStopsBreathAtAppearing pins where the breath
-// countdown stops for a teleport out of the water. The water zone's onExit
-// runs at the teleport (WaterZone.onExit → broadcastUserInfo), but the
-// drowning task is only updated by Player.revalidateZone
-// (Player.java:843-852), which returns early off the grid. It runs at
-// Appearing, which removes the player from the task (SetupGauge 0) before
-// Appearing's own UserInfo.
-func TestTeleportOutOfWaterStopsBreathAtAppearing(t *testing.T) {
-	srv, character, objID := bootInWater(t)
+func gaugeTime(t *testing.T, frame []byte) int32 {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // color
+	return r.ReadInt32()
+}
+
+func drownIndex(frames [][]byte) int {
+	for i, f := range frames {
+		if f[0] == serverpackets.OpcodeSystemMessage && wire.NewReader(f[1:]).ReadInt32() == int32(serverpackets.SystemMessageDrownDamage) {
+			return i
+		}
+	}
+	return -1
+}
+
+// TestTeleportOutOfWaterStopsBreathAtTeleport pins where the breath
+// countdown stops for a teleport out of the water. Creature.teleportTo →
+// setRegion(null) (Creature.java:415) → Creature.setRegion
+// (Creature.java:1773-1790) runs WaterZone.onExit, which drops the swim
+// move type and broadcasts UserInfo (WaterZone.java:44-49), then clears the
+// known list, then calls revalidateZone(true). Player.revalidateZone
+// (Player.java:843-852) goes on to the water block after the base method
+// returns early off the grid: isInWater() is now false, so
+// WaterTaskManager.remove sends SetupGauge(0) at the teleport. A player
+// already drowning takes no drowning damage while off the grid, and
+// Appearing at a dry destination sends no gauge.
+func TestTeleportOutOfWaterStopsBreathAtTeleport(t *testing.T) {
+	srv, character, objID, clock := bootInWater(t)
 	x, y, z := srv.PlayerPosition(t, objID)
+
+	// Past the breath limit: every tick drowns.
+	clock.advance(time.Hour)
+	srv.Water.Tick()
+	if drownIndex(readUntilQuiet(srv.Client)) < 0 {
+		t.Fatal("no drowning damage past the breath limit")
+	}
 
 	character.TeleportTo(x+5_000, y, z, 0)
 	frames := readUntilQuiet(srv.Client)
-	if i := firstOpcode(frames, serverpackets.OpcodeSetupGauge); i >= 0 {
-		t.Fatalf("breath gauge sent at the teleport (frame %d), want it kept until Appearing", i)
+	user := firstOpcode(frames, serverpackets.OpcodeUserInfo)
+	gauge := firstOpcode(frames, serverpackets.OpcodeSetupGauge)
+	if user < 0 || gauge < user {
+		t.Fatalf("teleport frames: UserInfo at %d, SetupGauge at %d, want the water-exit UserInfo then SetupGauge", user, gauge)
 	}
-	if firstOpcode(frames, serverpackets.OpcodeUserInfo) < 0 {
-		t.Fatal("water exit at the teleport sent no UserInfo")
+	if got := gaugeTime(t, frames[gauge]); got != 0 {
+		t.Fatalf("SetupGauge time at the teleport = %d, want 0", got)
+	}
+
+	// Off the grid, before Appearing: no drowning.
+	srv.Water.Tick()
+	if i := drownIndex(readUntilQuiet(srv.Client)); i >= 0 {
+		t.Fatal("drowning damage while off the grid after a teleport out of the water")
 	}
 
 	frames = appear(t, srv.Client)
-	gauge := firstOpcode(frames, serverpackets.OpcodeSetupGauge)
-	if gauge < 0 {
-		t.Fatal("breath gauge not cleared at Appearing")
-	}
-	r := wire.NewReader(frames[gauge][1:])
-	r.ReadInt32() // color
-	if got := r.ReadInt32(); got != 0 {
-		t.Fatalf("SetupGauge time at Appearing = %d, want 0", got)
+	if i := firstOpcode(frames, serverpackets.OpcodeSetupGauge); i >= 0 {
+		t.Fatalf("breath gauge sent at Appearing (frame %d), want none at a dry destination", i)
 	}
 }
 
-// TestTeleportWithinWaterKeepsBreath: the water zone is exited and entered
-// again, but the drowning task keeps the original countdown (the task's
-// add ignores a player it already tracks), so no new gauge is sent.
-func TestTeleportWithinWaterKeepsBreath(t *testing.T) {
-	srv, character, objID := bootInWater(t)
+// TestTeleportWithinWaterRestartsBreath: the teleport's water exit stops the
+// countdown (SetupGauge 0). At Appearing, Creature.onTeleported →
+// setRegion(region) → revalidateZone(true) enters the water again
+// (WaterZone.onEnter broadcasts UserInfo), and WaterTaskManager.add finds
+// the player untracked, so a fresh countdown starts with a full gauge
+// before Appearing's own UserInfo answer.
+func TestTeleportWithinWaterRestartsBreath(t *testing.T) {
+	srv, character, objID, _ := bootInWater(t)
 	x, y, z := srv.PlayerPosition(t, objID)
 
 	character.TeleportTo(x+300, y, z, 0)
 	frames := readUntilQuiet(srv.Client)
-	frames = append(frames, appear(t, srv.Client)...)
-	frames = append(frames, readUntilQuiet(srv.Client)...)
-	if i := firstOpcode(frames, serverpackets.OpcodeSetupGauge); i >= 0 {
-		t.Fatalf("breath gauge sent for a teleport within the water (frame %d), want the countdown kept", i)
+	gauge := firstOpcode(frames, serverpackets.OpcodeSetupGauge)
+	if gauge < 0 || gaugeTime(t, frames[gauge]) != 0 {
+		t.Fatalf("teleport sent no SetupGauge(0) among %d frames", len(frames))
+	}
+
+	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	frames = readUntilQuiet(srv.Client)
+	enter := firstOpcode(frames, serverpackets.OpcodeUserInfo)
+	gauge = firstOpcode(frames, serverpackets.OpcodeSetupGauge)
+	if enter < 0 || gauge < enter {
+		t.Fatalf("Appearing frames: UserInfo at %d, SetupGauge at %d, want the water-enter UserInfo then SetupGauge", enter, gauge)
+	}
+	if got := gaugeTime(t, frames[gauge]); got <= 0 {
+		t.Fatalf("SetupGauge time at Appearing = %d, want a fresh full breath", got)
+	}
+	answered := false
+	for _, f := range frames[gauge+1:] {
+		answered = answered || f[0] == serverpackets.OpcodeUserInfo
+	}
+	if !answered {
+		t.Fatal("no UserInfo answer to Appearing after the fresh breath gauge")
 	}
 }

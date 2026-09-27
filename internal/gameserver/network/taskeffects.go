@@ -126,15 +126,13 @@ func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
 }
 
 // rejoin puts the player back on the grid once its client has appeared,
-// entering the zones at its current position, and reports whether it is
-// now in water.
-func (a *liveZoneActor) rejoin(ix *zone.Index) (inWater bool) {
+// entering the zones at its current position.
+func (a *liveZoneActor) rejoin(ix *zone.Index) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.offGrid = false
 	ix.Revalidate(a)
 	a.syncFlags()
-	return a.flags.Has(zone.FlagWater)
 }
 
 func (a *liveZoneActor) syncFlags() {
@@ -345,8 +343,8 @@ func (l *GameClientLink) wireWaterZones() {
 			}
 			l.broadcastCharacterInfo(live)
 			if live.Teleporting() {
-				// A teleport's zone leave keeps the breath countdown
-				// running; the Appearing rejoin settles it.
+				// The teleport stops the breath countdown itself, once
+				// the old neighborhood has been forgotten.
 				return
 			}
 			if swimming {
@@ -376,15 +374,13 @@ func (l *GameClientLink) leaveZones(live *livePlayer) {
 }
 
 // rejoinZones enters live into the zones at its teleport destination once
-// its client has appeared, and stops the breath countdown a teleport out of
-// the water left running.
+// its client has appeared; a water destination starts a fresh breath
+// countdown.
 func (l *GameClientLink) rejoinZones(live *livePlayer) {
 	if l.zones == nil || live.zoneActor == nil {
 		return
 	}
-	if !live.zoneActor.rejoin(l.zones) && l.water != nil {
-		l.water.Remove(live)
-	}
+	live.zoneActor.rejoin(l.zones)
 }
 
 func (e *TaskEffects) deliver(actorID int32, frame wire.Frame) {
