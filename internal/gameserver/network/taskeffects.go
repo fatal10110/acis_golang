@@ -23,9 +23,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var _ task.WaterEffects = (*TaskEffects)(nil)
-var _ task.ShadowItemEffects = (*TaskEffects)(nil)
-var _ task.AutosaveEffects = (*TaskEffects)(nil)
+var (
+	_ task.WaterEffects      = (*TaskEffects)(nil)
+	_ task.ShadowItemEffects = (*TaskEffects)(nil)
+	_ task.AutosaveEffects   = (*TaskEffects)(nil)
+)
 
 // autosaveSaveTimeout bounds one periodic full-stat save; unrelated to and
 // independent from the disconnect-time save budget.

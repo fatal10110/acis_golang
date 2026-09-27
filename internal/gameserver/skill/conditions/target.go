@@ -7,8 +7,10 @@ import "slices"
 // (keyed by its static door id). door.Object already exposes DoorID();
 // giving a world NPC instance a matching NpcID accessor is the world/NPC
 // package's call to make once it wires targets through this engine.
-type npcTarget interface{ NpcID() int }
-type doorTarget interface{ DoorID() int }
+type (
+	npcTarget  interface{ NpcID() int }
+	doorTarget interface{ DoorID() int }
+)
 
 // raceTarget is an NPC target's template race ordinal, as
 // TargetRaceID needs it.

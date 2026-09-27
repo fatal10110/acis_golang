@@ -10,8 +10,12 @@ import (
 // the raw vertex ring disagrees at the shared vertex.
 func TestTriangulatedPolygonContainsSelfTouchingVertex(t *testing.T) {
 	points := []Point{
-		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 5, Y: 5},
-		{X: 10, Y: 10}, {X: 0, Y: 10}, {X: 5, Y: 5},
+		{X: 0, Y: 0},
+		{X: 10, Y: 0},
+		{X: 5, Y: 5},
+		{X: 10, Y: 10},
+		{X: 0, Y: 10},
+		{X: 5, Y: 5},
 	}
 	poly, err := NewTriangulatedPolygon(points)
 	if err != nil {
@@ -35,8 +39,12 @@ func TestTriangulatedPolygonContainsConcaveNotch(t *testing.T) {
 	// L-shaped concave polygon; (7,7) falls in the notch cut out of the
 	// bounding box and must be classified outside.
 	poly, err := NewTriangulatedPolygon([]Point{
-		{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 4},
-		{X: 4, Y: 4}, {X: 4, Y: 10}, {X: 0, Y: 10},
+		{X: 0, Y: 0},
+		{X: 10, Y: 0},
+		{X: 10, Y: 4},
+		{X: 4, Y: 4},
+		{X: 4, Y: 10},
+		{X: 0, Y: 10},
 	})
 	if err != nil {
 		t.Fatalf("NewTriangulatedPolygon() error = %v", err)
@@ -129,8 +137,10 @@ func TestTriangulatedPolygonMatchesShippedTerritories(t *testing.T) {
 			// this probe sits ~50 units clear of every edge.
 			name: "godard01_npc2315_04",
 			points: []Point{
-				{X: 122400, Y: -69800}, {X: 122400, Y: -70000},
-				{X: 122600, Y: -69800}, {X: 122600, Y: -70000},
+				{X: 122400, Y: -69800},
+				{X: 122400, Y: -70000},
+				{X: 122600, Y: -69800},
+				{X: 122600, Y: -70000},
 			},
 			x: 122500, y: -69850,
 		},
@@ -139,9 +149,12 @@ func TestTriangulatedPolygonMatchesShippedTerritories(t *testing.T) {
 			// whose last vertex folds back across the shape.
 			name: "giran17_tb2322_03",
 			points: []Point{
-				{X: 117904, Y: 136448}, {X: 103108, Y: 135076},
-				{X: 105008, Y: 134864}, {X: 107884, Y: 138588},
-				{X: 116032, Y: 139908}, {X: 104556, Y: 139632},
+				{X: 117904, Y: 136448},
+				{X: 103108, Y: 135076},
+				{X: 105008, Y: 134864},
+				{X: 107884, Y: 138588},
+				{X: 116032, Y: 139908},
+				{X: 104556, Y: 139632},
 			},
 			x: 106500, y: 137000,
 		},

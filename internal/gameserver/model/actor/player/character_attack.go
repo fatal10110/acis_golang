@@ -638,5 +638,7 @@ func (c *Character) RandomDamageSpread() int {
 	return int(weapon.tmpl.Weapon.RandomDamage)
 }
 
-var _ attack.PlayerActor = (*Character)(nil)
-var _ move.Actor = (*Character)(nil)
+var (
+	_ attack.PlayerActor = (*Character)(nil)
+	_ move.Actor         = (*Character)(nil)
+)

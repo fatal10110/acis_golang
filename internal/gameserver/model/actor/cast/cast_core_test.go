@@ -1052,9 +1052,11 @@ func (f *fakeCastCreature) AlikeDead() bool                                 { re
 func (f *fakeCastCreature) AttackableBy(skilltarget.Actor) bool             { return true }
 func (f *fakeCastCreature) AttackableWithoutForceBy(skilltarget.Actor) bool { return true }
 
-var _ attackable.Combatant = (*fakeCastCreature)(nil)
-var _ skilltarget.Actor = (*fakeCastCreature)(nil)
-var _ Target = (*fakeCastCreature)(nil)
+var (
+	_ attackable.Combatant = (*fakeCastCreature)(nil)
+	_ skilltarget.Actor    = (*fakeCastCreature)(nil)
+	_ Target               = (*fakeCastCreature)(nil)
+)
 
 type skillUseCall struct {
 	targetID                  int32
@@ -1655,8 +1657,10 @@ type nonCreatureSelection struct {
 func (s *nonCreatureSelection) ObjectID() int32     { return s.id }
 func (*nonCreatureSelection) Kind() modelactor.Kind { return modelactor.KindStatic }
 
-var _ world.Tracked = (*nonCreatureSelection)(nil)
-var _ Target = (*nonCreatureSelection)(nil)
+var (
+	_ world.Tracked = (*nonCreatureSelection)(nil)
+	_ Target        = (*nonCreatureSelection)(nil)
+)
 
 // TestApplyEffectsRejectsNonCreatureSelection pins the quirk #1502 preserves:
 // typing Selected to world.Tracked doesn't tighten what TargetOne admits at

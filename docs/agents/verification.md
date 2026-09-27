@@ -55,7 +55,7 @@ Before claiming completion of a source-code change, require no output from the f
 successful completion of every repository gate:
 
 ```bash
-find acis_golang -name '*.go' -type f -exec gofmt -l {} +
+(cd acis_golang && golangci-lint fmt --diff)
 rtk go -C acis_golang vet ./...
 rtk go -C acis_golang build ./...
 rtk go -C acis_golang test -race ./...
@@ -138,9 +138,10 @@ An issue whose acceptance criteria name real datapack content is not verified un
 is observed passing locally.
 
 The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
-`golangci-lint` is not currently installed or configured as a repository gate. Run
-`rtk err golangci-lint run` only when the task or CI requires it and the binary is available;
-otherwise report it as unavailable, never as passed.
+Formatting is gofumpt, configured in `.golangci.yml`; `golangci-lint fmt` applies it. CI runs
+`golangci-lint run` with `only-new-issues`, so a change must not add findings: run
+`(cd acis_golang && rtk err golangci-lint run --new-from-rev=origin/main)` before completion. If the
+binary is unavailable, report it as unavailable, never as passed.
 
 If an external integration service is unavailable, run all independent gates and report the exact
 blocked test; do not convert the missing service into a passing result.

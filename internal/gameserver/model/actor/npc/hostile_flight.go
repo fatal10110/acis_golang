@@ -63,7 +63,8 @@ func (h *Hostile) TeleportTo(target location.Location) {
 func DropThreatAround(w *world.State, subject interface {
 	world.Tracked
 	attackable.Combatant
-}) {
+},
+) {
 	if w == nil {
 		return
 	}

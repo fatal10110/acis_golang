@@ -363,6 +363,7 @@ func (a *timingPlayer) MP() int                   { return 1 }
 func (a *timingPlayer) ConsumeBowShot() {
 	a.events = append(a.events, "consume")
 }
+
 func (a *timingPlayer) NotifyBowDraw(gaugeMs int) {
 	a.drawMs = gaugeMs
 	a.events = append(a.events, "draw")
@@ -405,6 +406,7 @@ func (a *timingActor) ForEachKnownCombatantInRadius(radius int, fn func(attackab
 		}
 	}
 }
+
 func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	a.events = append(a.events, "hit")
 	return Hit{Target: t, Damage: 1}

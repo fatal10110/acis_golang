@@ -1,0 +1,37 @@
+version: "2"
+
+linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  settings:
+    staticcheck:
+      checks:
+        - all
+        # Upstream defaults: package/identifier doc and naming style.
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        # Quickfix refactor suggestions (De Morgan, tagged switch, dropping
+        # embedded field selectors), not defects.
+        - -QF*
+  exclusions:
+    generated: lax
+    presets:
+      # Unchecked Close/Flush/print errors: best-effort cleanup and CLI output.
+      - std-error-handling
+      - common-false-positives
+    rules:
+      # Tests drive ticks, AI and deadlines for side effects; a failure shows
+      # up in the assertions that follow.
+      - path: _test\.go
+        linters: [errcheck]
+      # Blowfish is mandated by the client wire protocol.
+      - text: "SA1019: golang.org/x/crypto/blowfish is deprecated"
+        linters: [staticcheck]
+
+formatters:
+  enable:
+    - gofumpt

@@ -34,6 +34,7 @@ func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y
 func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }
 func (s *playerFollowSelf) SetHeading(int)                     {}
 func (s *playerFollowSelf) SyncPosition(pos location.Location) { s.x, s.y, s.z = pos.X, pos.Y, pos.Z }
+
 func (s *playerFollowSelf) BroadcastMove(ev event.Move) {
 	s.moves = append(s.moves, ev)
 }

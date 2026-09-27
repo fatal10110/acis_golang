@@ -2718,9 +2718,11 @@ func (f *confusionFake) StopMove()       {}
 func (f *confusionFake) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
 	return f.candidate, f.candidate != nil
 }
+
 func (f *confusionFake) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
 	f.addDamageHateCalls++
 }
+
 func (f *confusionFake) AddAttackDesire(attacker attackable.Combatant, hate float64) {
 	f.addAttackDesireN++
 	f.addAttackDesireHate = hate
@@ -2788,22 +2790,23 @@ var (
 	_ SummonActor = (*liveEffectTarget)(nil)
 )
 
-func (t *liveEffectTarget) IncreaseCharges(int, int) bool                          { return false }
-func (t *liveEffectTarget) WeaponGradePenalty() bool                               { return false }
-func (t *liveEffectTarget) ReduceDeathPenaltyLevel() int                           { return 0 }
-func (t *liveEffectTarget) Sit() bool                                              { return false }
-func (t *liveEffectTarget) StartFakeDeath() bool                                   { return false }
-func (t *liveEffectTarget) StopFakeDeath() bool                                    { return false }
-func (t *liveEffectTarget) BroadcastStatus()                                       {}
-func (t *liveEffectTarget) SendRegenMax(int32, int32, float64)                     {}
-func (t *liveEffectTarget) NotifyHPRestored(string, int, bool)                     {}
-func (t *liveEffectTarget) NotifyMPRestored(string, int, bool)                     {}
-func (t *liveEffectTarget) NotifySpoilAlready()                                    {}
-func (t *liveEffectTarget) NotifySpoilSuccess()                                    {}
-func (t *liveEffectTarget) AddDamageHate(attackable.Combatant, float64, float64)   {}
-func (t *liveEffectTarget) AddAttackDesire(attackable.Combatant, float64)          {}
-func (t *liveEffectTarget) MonsterKind() bool                                      { return false }
-func (t *liveEffectTarget) RandomNearbyMonster(int) (attackable.Combatant, bool)   { return nil, false }
+func (t *liveEffectTarget) IncreaseCharges(int, int) bool                        { return false }
+func (t *liveEffectTarget) WeaponGradePenalty() bool                             { return false }
+func (t *liveEffectTarget) ReduceDeathPenaltyLevel() int                         { return 0 }
+func (t *liveEffectTarget) Sit() bool                                            { return false }
+func (t *liveEffectTarget) StartFakeDeath() bool                                 { return false }
+func (t *liveEffectTarget) StopFakeDeath() bool                                  { return false }
+func (t *liveEffectTarget) BroadcastStatus()                                     {}
+func (t *liveEffectTarget) SendRegenMax(int32, int32, float64)                   {}
+func (t *liveEffectTarget) NotifyHPRestored(string, int, bool)                   {}
+func (t *liveEffectTarget) NotifyMPRestored(string, int, bool)                   {}
+func (t *liveEffectTarget) NotifySpoilAlready()                                  {}
+func (t *liveEffectTarget) NotifySpoilSuccess()                                  {}
+func (t *liveEffectTarget) AddDamageHate(attackable.Combatant, float64, float64) {}
+func (t *liveEffectTarget) AddAttackDesire(attackable.Combatant, float64)        {}
+func (t *liveEffectTarget) MonsterKind() bool                                    { return false }
+func (t *liveEffectTarget) RandomNearbyMonster(int) (attackable.Combatant, bool) { return nil, false }
+
 func (t *liveEffectTarget) RandomNearbyCombatant(int) (attackable.Combatant, bool) { return nil, false }
 func (t *liveEffectTarget) RandomizeHate() bool                                    { return false }
 func (t *liveEffectTarget) StopMostHatedTarget()                                   {}

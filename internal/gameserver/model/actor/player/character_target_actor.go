@@ -14,6 +14,7 @@ var _ skilltarget.Actor = (*Character)(nil)
 // every method below is the neutral answer target resolution already gives
 // a player without that state.
 func (c *Character) Summon() (skilltarget.Actor, bool) { return nil, false }
+
 func (c *Character) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
 	return true
 }

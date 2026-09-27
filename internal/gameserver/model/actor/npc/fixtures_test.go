@@ -30,6 +30,7 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	}
 	return h
 }
+
 func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackController) *Hostile {
 	t.Helper()
 	hostile, err := NewHostile(&Instance{
@@ -141,6 +142,7 @@ func (a *hostileAttack) AttackingNow() bool   { return false }
 func (a *hostileAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
+
 func (a *hostileAttack) DoAttack(target attackable.Combatant) {
 	a.target = target
 }

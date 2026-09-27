@@ -58,8 +58,10 @@ func (r *locatedRef) OffensiveFollowLead() bool {
 	return ok && actor.OffensiveFollowLead()
 }
 
-type creatureActorRef struct{ attack.CreatureActor }
-type statOwnerRef struct{ effect.StatOwner }
+type (
+	creatureActorRef struct{ attack.CreatureActor }
+	statOwnerRef     struct{ effect.StatOwner }
+)
 
 // walkerActorRef adapts a live Hostile plus its movement controller to
 // task.WalkerActor. Hostile's own promoted Position() returns (x, y, z int)

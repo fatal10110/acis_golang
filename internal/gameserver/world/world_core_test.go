@@ -763,6 +763,7 @@ func (*teleportObserver) Kind() actor.Kind  { return actor.KindNPC }
 func (o *teleportObserver) Discover(obj Tracked) {
 	o.log.add(fmt.Sprintf("%d discover %d", o.id, obj.ObjectID()))
 }
+
 func (o *teleportObserver) Forget(obj Tracked) {
 	o.log.add(fmt.Sprintf("%d forget %d", o.id, obj.ObjectID()))
 }

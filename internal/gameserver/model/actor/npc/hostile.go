@@ -694,8 +694,10 @@ func (h *Hostile) NpcID() int {
 	return h.Instance.Template.ID
 }
 
-var _ creature.RaidCurseTarget = (*Hostile)(nil)
-var _ creature.RaidCurseSkillRaid = (*Hostile)(nil)
+var (
+	_ creature.RaidCurseTarget    = (*Hostile)(nil)
+	_ creature.RaidCurseSkillRaid = (*Hostile)(nil)
+)
 
 // StopHateList drops target from the skill-cast hate table.
 func (h *Hostile) StopHateList(attacker attackable.Combatant) {

@@ -26,6 +26,7 @@ func (a SummonActor) MP() int {
 	}
 	return int(a.Summon.MPValue())
 }
+
 func (a SummonActor) HP() int {
 	if a.Summon == nil {
 		return 0
@@ -39,17 +40,21 @@ func (a SummonActor) ReduceMP(n int) {
 		a.Summon.ReduceMP(float64(n))
 	}
 }
+
 func (a SummonActor) ReduceHP(n int) {
 	if a.Summon != nil {
 		a.Summon.ConsumeHP(float64(n))
 	}
 }
+
 func (a SummonActor) SkillDisabled(k int32) bool { return a.Summon != nil && a.Summon.SkillDisabled(k) }
+
 func (a SummonActor) DisableSkill(k int32, d time.Duration) {
 	if a.Summon != nil {
 		a.Summon.DisableSkill(k, d)
 	}
 }
+
 func (a SummonActor) AddSkillReuse(r modelskill.Ref, k int32, d time.Duration) {
 	if a.Summon != nil {
 		a.Summon.AddSkillReuse(r, k, d)
@@ -58,6 +63,7 @@ func (a SummonActor) AddSkillReuse(r modelskill.Ref, k int32, d time.Duration) {
 func (SummonActor) MagicMuted() bool          { return false }
 func (SummonActor) PhysicalMuted() bool       { return false }
 func (a SummonActor) SpiritshotCharged() bool { return a.Summon != nil && a.Summon.SpiritshotCharged() }
+
 func (a SummonActor) BlessedSpiritshotCharged() bool {
 	return a.Summon != nil && a.Summon.BlessedSpiritshotCharged()
 }

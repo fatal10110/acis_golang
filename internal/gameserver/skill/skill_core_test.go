@@ -735,10 +735,13 @@ func (s *recordingSkillLevelStore) DeleteKnownSkill(_ context.Context, _ int32, 
 
 func newLevelingPersistence(store *recordingSkillLevelStore) *Persistence {
 	table := modelskill.NewTable([]modelskill.Definition{
-		{ID: 3, Level: 1}, {ID: 3, Level: 2}, {ID: 3, Level: 3},
+		{ID: 3, Level: 1},
+		{ID: 3, Level: 2},
+		{ID: 3, Level: 3},
 		{ID: 194, Level: 1},
 		{ID: 239, Level: 1},
-		{ID: 249, Level: 1}, {ID: 249, Level: 2},
+		{ID: 249, Level: 1},
+		{ID: 249, Level: 2},
 	})
 	return NewPersistence(nil, table, store)
 }
