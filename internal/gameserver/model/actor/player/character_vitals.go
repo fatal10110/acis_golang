@@ -141,6 +141,10 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	}
 }
 
+// refillResources installs new base maxima and fills current HP/MP/CP to
+// the calculated maxima. A dead character takes the new maxima but keeps its
+// current values: a level gained while dead must not raise the corpse. The
+// check shares vitalsMu with MarkDead.
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
 	currentHP, currentMP, currentCP := maxHP, maxMP, maxCP
 	if c.template() != nil {
@@ -150,9 +154,11 @@ func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.maxHP, c.curHP = maxHP, currentHP
-	c.maxMP, c.curMP = maxMP, currentMP
-	c.maxCP, c.curCP = maxCP, currentCP
+	c.maxHP, c.maxMP, c.maxCP = maxHP, maxMP, maxCP
+	if c.dead.Load() {
+		return
+	}
+	c.curHP, c.curMP, c.curCP = currentHP, currentMP, currentCP
 }
 
 // ChangesTo reports which resources differ in next.

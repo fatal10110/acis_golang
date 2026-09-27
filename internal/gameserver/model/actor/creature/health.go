@@ -48,14 +48,17 @@ func (h *Health) SetCurrent(v float64) {
 	*h.current = v
 }
 
-// Add restores non-negative hit points up to max and returns the applied amount.
+// Add restores non-negative hit points up to max and returns the applied
+// amount. Like SetCurrent it leaves a dead actor at zero: a lethal Damage
+// zeroes HP under the same lock, so a heal checked against a living actor
+// cannot land after the killing blow.
 func (h *Health) Add(amount, max float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.current == nil || *h.current >= max {
+	if h.current == nil || *h.current <= 0 || *h.current >= max {
 		return 0
 	}
 	if *h.current+amount > max {

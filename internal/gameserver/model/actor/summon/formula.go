@@ -428,7 +428,8 @@ func (a *Actor) MaxMPValue() float64 {
 	return a.calcStat(stat.MaxMP, a.combatStats().MaxMP)
 }
 
-// SetHP sets current HP, clamped to [0, MaxHP].
+// SetHP sets current HP, clamped to [0, MaxHP]. It has no effect on a dead
+// summon.
 func (a *Actor) SetHP(value float64) {
 	maxHP := a.MaxHPValue()
 	if value < 0 {
@@ -439,10 +440,14 @@ func (a *Actor) SetHP(value float64) {
 	}
 	a.vitals.mu.Lock()
 	defer a.vitals.mu.Unlock()
+	if a.dead {
+		return
+	}
 	a.vitals.hp = value
 }
 
-// AddHP restores HP, clamped to MaxHP, and returns the applied amount.
+// AddHP restores HP, clamped to MaxHP, and returns the applied amount. A dead
+// summon gains nothing; the check shares vitals.mu with the lethal drainHP.
 func (a *Actor) AddHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
@@ -450,7 +455,7 @@ func (a *Actor) AddHP(amount float64) float64 {
 	maxHP := a.MaxHPValue()
 	a.vitals.mu.Lock()
 	defer a.vitals.mu.Unlock()
-	if a.vitals.hp >= maxHP {
+	if a.dead || a.vitals.hp >= maxHP {
 		return 0
 	}
 	if a.vitals.hp+amount > maxHP {

@@ -30,7 +30,6 @@ func TestDirectDeathClearsHP(t *testing.T) {
 		Die(attackable.Combatant) bool
 		CurrentHP() int
 		CurrentCP() int
-		SetHP(float64)
 		SetCP(float64)
 		SetSpawnProtection(bool)
 		ReduceCurrentHP(int) bool
@@ -45,8 +44,7 @@ func TestDirectDeathClearsHP(t *testing.T) {
 	if got := player.CurrentHP(); got != 0 {
 		t.Fatalf("dead player HP = %d, want 0", got)
 	}
-	player.SetHP(10) // Simulate a stale positive HP value while dead.
-	if player.ReduceCurrentHP(1) || player.CurrentHP() != 10 {
+	if player.ReduceCurrentHP(1) || player.CurrentHP() != 0 {
 		t.Fatal("dead player paid an HP cost")
 	}
 	beforeCP := player.CurrentCP()
@@ -54,12 +52,12 @@ func TestDirectDeathClearsHP(t *testing.T) {
 		t.Fatal("fixture player has no CP to protect")
 	}
 	player.ReduceHP(1, attacker, modelskill.Definition{})
-	if hp, cp := player.CurrentHP(), player.CurrentCP(); hp != 10 || cp != beforeCP {
-		t.Fatalf("skill damage changed dead player's HP/CP to %d/%d, want 10/%d", hp, cp, beforeCP)
+	if hp, cp := player.CurrentHP(), player.CurrentCP(); hp != 0 || cp != beforeCP {
+		t.Fatalf("skill damage changed dead player's HP/CP to %d/%d, want 0/%d", hp, cp, beforeCP)
 	}
 	player.ReduceHPByDOT(1, dotAttacker, true)
-	if hp, cp := player.CurrentHP(), player.CurrentCP(); hp != 10 || cp != beforeCP {
-		t.Fatalf("DOT changed dead player's HP/CP to %d/%d, want 10/%d", hp, cp, beforeCP)
+	if hp, cp := player.CurrentHP(), player.CurrentCP(); hp != 0 || cp != beforeCP {
+		t.Fatalf("DOT changed dead player's HP/CP to %d/%d, want 0/%d", hp, cp, beforeCP)
 	}
 
 	npc := srv.SpawnHostileNPC(t)
