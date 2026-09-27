@@ -30,7 +30,7 @@ func (p *livePlayer) BroadcastFrame(frame wire.Frame) bool {
 // attached. Every other event keeps reaching observers after detach.
 func sessionOnly(ev event.Event) bool {
 	switch ev.(type) {
-	case event.Attack, event.BowDrawn, event.Died, event.HerbConsumed,
+	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed,
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
 		event.RelaxHPFull, event.Restored, event.EffectEnded, event.SpoilResult,
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed,
@@ -98,10 +98,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.FakeDeathRevived:
 		l.broadcastLiveRevive(live)
 	case event.Died:
+		l.broadcastLiveDie(live)
+	case event.DeathSettled:
 		if l.water != nil {
 			l.water.Remove(live)
 		}
-		l.broadcastLiveDie(live)
 	case event.VitalsChanged:
 		sendLiveStatus(live)
 	case event.EffectIconsChanged:

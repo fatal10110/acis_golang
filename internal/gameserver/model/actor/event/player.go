@@ -38,6 +38,11 @@ type StanceChanged struct{ Stance Stance }
 // FakeDeathRevived reports a character standing up out of fake death.
 type FakeDeathRevived struct{}
 
+// DeathSettled reports that a character's death sequence has applied every
+// cost that follows its Died: killer credit, charges, experience/karma loss,
+// and the death-penalty level.
+type DeathSettled struct{}
+
 // EffectIconsChanged reports that the character's active-effect icon list
 // changed.
 type EffectIconsChanged struct{}
@@ -219,6 +224,7 @@ func (ActionsStopRequested) event()   {}
 func (BowDrawn) event()               {}
 func (StanceChanged) event()          {}
 func (FakeDeathRevived) event()       {}
+func (DeathSettled) event()           {}
 func (EffectIconsChanged) event()     {}
 func (PositionCorrected) event()      {}
 func (WeightPenaltyChanged) event()   {}

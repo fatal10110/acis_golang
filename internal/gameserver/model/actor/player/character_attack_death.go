@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
@@ -77,9 +78,12 @@ func (c *Character) Revive(fraction float64) bool {
 }
 
 // Die runs this player's death sequence: the once-only dead-state
-// transition, then the death packet broadcast to this player's own session
-// and every observer, so the corpse-fall animation plays live instead of
-// only on a later dead reconnect.
+// transition and zero-HP status, then the death packet broadcast to this
+// player's own session and every observer, so the corpse-fall animation
+// plays live and reaches clients before any death side effect's updates.
+// The killer's PK/PvP credit follows, then this player's own costs: charges,
+// the experience/karma loss, and last the death-penalty level, whose karma
+// gate reads the karma left after that loss.
 func (c *Character) Die(killer attackable.Combatant) bool {
 	if !c.MarkDead() {
 		return false
@@ -88,12 +92,13 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.StopCast()
 	c.clearEffectsOnDeath()
 	c.BroadcastStatus()
-	c.ClearCharges()
-	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
+	c.BroadcastDie()
 	c.awardKillerPKKarma(killer)
 	c.awardKillerPvPKill(killer)
+	c.ClearCharges()
 	c.applyDeathExpKarmaLoss(killer)
-	c.BroadcastDie()
+	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
+	c.emit(event.DeathSettled{})
 	return true
 }
 

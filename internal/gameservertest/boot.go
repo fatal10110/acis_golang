@@ -75,6 +75,7 @@ type options struct {
 	karmaPlayerCanTeleport bool
 	restarts               *restart.Table
 	zones                  *zone.Index
+	water                  bool
 	attackStance           *task.AttackStance
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
@@ -158,6 +159,13 @@ func WithRestartPoints(table *restart.Table) Option {
 // no zone flags are raised on enter world or movement).
 func WithZones(index *zone.Index) Option {
 	return func(o *options) { o.zones = index }
+}
+
+// WithWater wires the breath task into the link, so a player entering a
+// WithZones water zone gets its breath gauge (default: off). The drowning
+// ticker is not started.
+func WithWater() Option {
+	return func(o *options) { o.water = true }
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -1034,6 +1042,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("new shadow items: %v", err)
 	}
+	var water *task.Water
+	if o.water {
+		if water, err = task.NewWater(effects, time.Now); err != nil {
+			t.Fatalf("new water: %v", err)
+		}
+	}
 	templates := Templates(t)
 	itemTemplates := o.itemTemplates
 	if itemTemplates == nil {
@@ -1164,6 +1178,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
+		Water:            water,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		SkillEnchantRoll: o.skillEnchantRoll,
