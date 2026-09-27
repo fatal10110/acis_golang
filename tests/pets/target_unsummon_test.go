@@ -39,6 +39,11 @@ func TestReturnCommandClearsSelectedPetAfterPetDelete(t *testing.T) {
 	if got := owner.Target(); got != nil {
 		t.Fatalf("Target() = %d after the pet left, want none", got.ObjectID())
 	}
+	deleted := mustRead(t, h.client, "pet DeleteObject")
+	assertFrameOpcode(t, deleted, serverpackets.OpcodeDeleteObject, "pet DeleteObject")
+	if id := wire.NewReader(deleted[1:]).ReadInt32(); id != pet.ObjectID() {
+		t.Fatalf("DeleteObject id = %d, want pet %d", id, pet.ObjectID())
+	}
 	drainUntilQuiet(t, h.client)
 }
 
