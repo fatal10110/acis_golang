@@ -82,8 +82,9 @@ func (c *Character) Revive(fraction float64) bool {
 // player's own session and every observer, so the corpse-fall animation
 // plays live and reaches clients before any death side effect's updates.
 // The killer's PK/PvP credit follows, then this player's own costs: charges,
-// the experience/karma loss, and last the death-penalty level, whose karma
-// gate reads the karma left after that loss.
+// the experience/karma loss, the stop of every fusion channel on this player,
+// and last the death-penalty level, whose karma gate reads the karma left
+// after that loss.
 func (c *Character) Die(killer attackable.Combatant) bool {
 	if !c.MarkDead() {
 		return false
@@ -97,6 +98,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.awardKillerPvPKill(killer)
 	c.ClearCharges()
 	c.applyDeathExpKarmaLoss(killer)
+	c.emit(event.FusionCastersStopRequested{})
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})
 	return true

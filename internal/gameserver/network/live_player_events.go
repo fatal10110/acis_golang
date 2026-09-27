@@ -99,6 +99,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveRevive(live)
 	case event.Died:
 		l.broadcastLiveDie(live)
+	case event.FusionCastersStopRequested:
+		l.abortFusionTargeting(live)
 	case event.DeathSettled:
 		if l.water != nil {
 			l.water.Remove(live)

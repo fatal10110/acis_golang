@@ -38,6 +38,12 @@ type StanceChanged struct{ Stance Stance }
 // FakeDeathRevived reports a character standing up out of fake death.
 type FakeDeathRevived struct{}
 
+// FusionCastersStopRequested asks that every other character channelling a
+// fusion skill on this character stop its cast.
+type FusionCastersStopRequested struct{}
+
+func (FusionCastersStopRequested) event() {}
+
 // DeathSettled reports that a character's death sequence has applied every
 // cost that follows its Died: killer credit, charges, experience/karma loss,
 // and the death-penalty level.

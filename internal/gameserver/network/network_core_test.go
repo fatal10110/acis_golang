@@ -1108,6 +1108,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.CastAborted{},
 		event.CastStopAck{},
 		event.CastFinished{},
+		event.FusionCastersStopRequested{},
 	}
 	for _, ev := range sessionOnlyEvents {
 		if !sessionOnly(ev) {

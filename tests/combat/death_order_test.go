@@ -252,3 +252,86 @@ func TestMonsterKillDeathPenaltyFollowsKarmaLoss(t *testing.T) {
 		})
 	}
 }
+
+// fusionSkillDefs is a single-target FUSION channel (hit time 15s) and the
+// Fusion buff it triggers on its target.
+func fusionSkillDefs() []modelskill.Definition {
+	return []modelskill.Definition{
+		{
+			ID: 426, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			CastRange: 400, HitTime: 15_000, ReuseDelay: 30_000, StaticHitTime: true, StaticReuse: true,
+			Magic: true, SkillType: "FUSION", TriggeredID: 5104, TriggeredLevel: 1,
+		},
+		{
+			ID: 5104, Level: 1, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Fusion", Time: 600}},
+		},
+	}
+}
+
+// TestFusionCastersStopBetweenDeathCostsAndPenalty pins where a monster-killed
+// player's death stops another player's fusion channel on it: after Die and
+// the karma loss, before the death-penalty level.
+func TestFusionCastersStopBetweenDeathCostsAndPenalty(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSeed(seedExperiencedCharacter(1500, 240)),
+		gameservertest.WithSkills(combatPersistence(t, fusionSkillDefs())),
+		gameservertest.WithLevels(deathLossTable(t)),
+		gameservertest.WithAllowDelevel(true),
+		gameservertest.WithRateKarmaExpLost(1.0),
+	)
+	c := srv.Client
+	victimID := srv.SoleObjectID(t)
+	startInWorld(t, c)
+
+	casterChar := srv.SeedCharacterFor(t, "caster", "Caster", 5, 0)
+	seedKnownSkill(t, srv, casterChar.ID, 426, 1)
+	caster := srv.DialClient(t, "caster", 1)
+	startInWorld(t, caster)
+	hostile := srv.SpawnHostileNPC(t)
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, c)
+
+	selectPlayerTarget(t, caster, victimID)
+	caster.Send(encodeRequestMagicSkillUse(426, false, false))
+	readUntil(t, caster, serverpackets.OpcodeMagicSkillUse, "fusion MagicSkillUse")
+	drainUntilQuiet(t, caster)
+	drainUntilQuiet(t, c)
+
+	obj, ok := srv.State.Player(victimID)
+	if !ok {
+		t.Fatal("victim missing from world state")
+	}
+	victim := obj.(interface {
+		CurrentHP() int
+		SetCP(float64)
+		SetSpawnProtection(bool)
+		ReduceHP(float64, attackable.Combatant, modelskill.Definition)
+	})
+	victim.SetSpawnProtection(false)
+	victim.SetCP(0)
+	victim.ReduceHP(float64(victim.CurrentHP()), hostile, modelskill.Definition{})
+	srv.Settle(t)
+
+	frames := readQuiet(c)
+	die := indexOf(frames, 0, serverpackets.OpcodeDie, victimID)
+	if die < 0 {
+		t.Fatal("victim never received its own Die")
+	}
+	karma := indexOfSystemMessage(frames, die+1, serverpackets.SystemMessageYourKarmaHasBeenChangedToS1)
+	if karma < 0 {
+		t.Fatal("karma-loss message never followed Die")
+	}
+	if early := indexOf(frames[:karma], 0, serverpackets.OpcodeMagicSkillCanceled, casterChar.ID); early >= 0 {
+		t.Fatalf("fusion cancel at frame %d preceded the karma loss at %d", early, karma)
+	}
+	canceled := indexOf(frames, karma+1, serverpackets.OpcodeMagicSkillCanceled, casterChar.ID)
+	if canceled < 0 {
+		t.Fatal("fusion cancel never followed the karma loss")
+	}
+	if penalty := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageDeathPenaltyLevelS1Added); penalty < canceled {
+		t.Fatalf("death-penalty message at frame %d, want it after the fusion cancel at %d", penalty, canceled)
+	}
+}
