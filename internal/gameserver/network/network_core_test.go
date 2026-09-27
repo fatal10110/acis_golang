@@ -743,8 +743,6 @@ func skillTable(defs ...modelskill.Definition) *modelskill.Table {
 	return modelskill.NewTable(defs)
 }
 
-// TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList pins what the level
-
 // ---- from decode_client_packet_test.go ----
 // TestDecodeClientPacketClassifiesShortPacketVsValidationErrors proves
 // decodeClientPacket only routes wire.ErrShortPacket-class decode errors

@@ -422,16 +422,9 @@ func (p *livePlayer) enterPickupLock() uint64 {
 // already replaced this lock with its own — so a delayed unlock can never
 // clear a fresher lock's state or its own paralysis mid-way through.
 //
-// Paralyzed is cleared before pickupLocked, not after: liveItemOpsAllowed
-// (the pickup gate) reads Paralyzed via a separate mutex (stateMu) than
-// pickupLockActive reads pickupLocked (pickupMu), so a concurrent click can
-// observe the two writes independently. Clearing pickupLocked first would
-// open a window where a click reads Paralyzed()==true (still blocked) and
-// then pickupLockActive()==false (not deferrable) — blocked but undeferrable,
-// so it gets discarded instead of re-deferred. Clearing Paralyzed first
-// means any click that still observes it true also still observes the lock
-// active, and any click that observes Paralyzed already false takes the
-// normal (non-blocked) path instead of consulting the lock at all.
+// Paralyzed and pickupLocked are cleared together under pickupMu, the
+// section livePickupBlockedDeferrable reads both in, so a click never sees
+// one cleared without the other.
 func (p *livePlayer) exitPickupLock(gen uint64) bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
