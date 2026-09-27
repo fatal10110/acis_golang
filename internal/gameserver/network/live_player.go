@@ -165,7 +165,7 @@ type itemAICastIntention struct {
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
-	if p.visibilitySend == nil {
+	if p.visibilitySend == nil || (p.Character != nil && p.SessionDetached()) {
 		frame.Release()
 		return false
 	}
