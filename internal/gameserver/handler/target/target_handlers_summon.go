@@ -40,7 +40,7 @@ func (h areaSummonHandler) Targets(caster, target Actor, skill *modelskill.Defin
 		return nil
 	}
 	var out []Actor
-	areaHandler{known: h.known}.forEachAreaTarget(caster, target, skillRadius(skill), nil, func(creature Actor) {
+	areaHandler(h).forEachAreaTarget(caster, target, skillRadius(skill), nil, func(creature Actor) {
 		out = append(out, creature)
 	})
 	return out

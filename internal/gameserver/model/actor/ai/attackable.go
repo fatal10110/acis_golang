@@ -720,7 +720,7 @@ func (a *Attackable) promoteNext() {
 	default:
 		return
 	}
-	next := intention{}
+	var next intention
 	switch desire.Kind {
 	case IntentionAttack:
 		next = intention{kind: IntentionAttack, target: desire.FinalTarget}

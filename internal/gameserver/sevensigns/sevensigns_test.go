@@ -9,15 +9,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func mustPeriod(t *testing.T, name string) Period {
-	t.Helper()
-	p, err := ParsePeriod(name)
-	if err != nil {
-		t.Fatalf("ParsePeriod(%q): %v", name, err)
-	}
-	return p
-}
-
 func TestPeriodStringAndParseRoundTrip(t *testing.T) {
 	for _, p := range []Period{Recruiting, Competition, Results, SealValidation} {
 		got, err := ParsePeriod(p.String())

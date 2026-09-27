@@ -1384,7 +1384,6 @@ func TestFreight_ValidateCapacity_ScopedToVisibleItems(t *testing.T) {
 type recordingPersister struct {
 	ids       []int32
 	states    []item.InstanceState
-	closed    bool
 	onPersist func(*item.Instance)
 }
 

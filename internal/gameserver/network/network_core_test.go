@@ -15,10 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -30,7 +27,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -367,18 +363,6 @@ func encodeUnknownExtendedOpcode() []byte {
 	return w.Bytes()
 }
 
-func encodeRequestCursedWeaponList() []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
-	w.WriteUint16(clientpackets.OpcodeRequestCursedWeaponList)
-	return w.Bytes()
-}
-
-func encodeRequestCursedWeaponLocation() []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
-	w.WriteUint16(clientpackets.OpcodeRequestCursedWeaponLocation)
-	return w.Bytes()
-}
-
 func encodeRequestAutoSoulShot(itemID, typ int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)
@@ -391,54 +375,6 @@ func encodeUseItem(objectID int32, ctrl bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeUseItem)
 	w.WriteInt32(objectID)
 	w.WriteInt32(wire.BoolInt32(ctrl))
-	return w.Bytes()
-}
-
-func encodeRequestEnchantItem(objectID int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestEnchantItem)
-	w.WriteInt32(objectID)
-	return w.Bytes()
-}
-
-func encodeRequestAcquireSkillInfo(skillID, level, skillType int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAcquireSkillInfo)
-	w.WriteInt32(skillID)
-	w.WriteInt32(level)
-	w.WriteInt32(skillType)
-	return w.Bytes()
-}
-
-func encodeRequestAcquireSkill(skillID, level, skillType int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestAcquireSkill)
-	w.WriteInt32(skillID)
-	w.WriteInt32(level)
-	w.WriteInt32(skillType)
-	return w.Bytes()
-}
-
-func encodeRequestPackageSendableItemList(objectID int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPackageItemList)
-	w.WriteInt32(objectID)
-	return w.Bytes()
-}
-
-func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
-	w.WriteInt32(skillID)
-	w.WriteInt32(wire.BoolInt32(ctrl))
-	w.WriteUint8(wire.BoolByte(shift))
-	return w.Bytes()
-}
-
-func encodeRequestExMagicSkillUseGround(x, y, z, skillID int32, ctrl, shift bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
-	w.WriteUint16(clientpackets.OpcodeRequestExMagicSkillUseGround)
-	w.WriteInt32(x)
-	w.WriteInt32(y)
-	w.WriteInt32(z)
-	w.WriteInt32(skillID)
-	w.WriteInt32(wire.BoolInt32(ctrl))
-	w.WriteUint8(wire.BoolByte(shift))
 	return w.Bytes()
 }
 
@@ -462,117 +398,8 @@ func encodeRequestActionUse(actionID int32, ctrl, shift bool) []byte {
 	return w.Bytes()
 }
 
-func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
-	w.WriteInt32(int32(target.X))
-	w.WriteInt32(int32(target.Y))
-	w.WriteInt32(int32(target.Z))
-	w.WriteInt32(int32(origin.X))
-	w.WriteInt32(int32(origin.Y))
-	w.WriteInt32(int32(origin.Z))
-	w.WriteInt32(moveMovement)
-	return w.Bytes()
-}
-
-func encodeValidatePosition(at location.Location, heading int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeValidatePosition)
-	w.WriteInt32(int32(at.X))
-	w.WriteInt32(int32(at.Y))
-	w.WriteInt32(int32(at.Z))
-	w.WriteInt32(heading)
-	w.WriteInt32(0)
-	return w.Bytes()
-}
-
-func encodeCannotMoveAnymore(at location.Location, heading int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeCannotMoveAnymore)
-	w.WriteInt32(int32(at.X))
-	w.WriteInt32(int32(at.Y))
-	w.WriteInt32(int32(at.Z))
-	w.WriteInt32(heading)
-	return w.Bytes()
-}
-
-func encodeStartRotating(degree, side int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeStartRotating)
-	w.WriteInt32(degree)
-	w.WriteInt32(side)
-	return w.Bytes()
-}
-
-func encodeFinishRotating(degree, side int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeFinishRotating)
-	w.WriteInt32(degree)
-	w.WriteInt32(side)
-	return w.Bytes()
-}
-
-func encodeAction(objectID int32, origin location.Location, shift bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
-	w.WriteInt32(objectID)
-	w.WriteInt32(int32(origin.X))
-	w.WriteInt32(int32(origin.Y))
-	w.WriteInt32(int32(origin.Z))
-	w.WriteUint8(wire.BoolByte(shift))
-	return w.Bytes()
-}
-
-func encodeRequestDropItem(objectID, count int32, at location.Location) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
-	w.WriteInt32(objectID)
-	w.WriteInt32(count)
-	w.WriteInt32(int32(at.X))
-	w.WriteInt32(int32(at.Y))
-	w.WriteInt32(int32(at.Z))
-	return w.Bytes()
-}
-
-func encodeRequestDestroyItem(objectID, count int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDestroyItem)
-	w.WriteInt32(objectID)
-	w.WriteInt32(count)
-	return w.Bytes()
-}
-
-func encodeRequestCrystallizeItem(objectID, count int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCrystallizeItem)
-	w.WriteInt32(objectID)
-	w.WriteInt32(count)
-	return w.Bytes()
-}
-
-func encodeRequestShortCutReg(typ, slot, id, characterType int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestShortCutReg)
-	w.WriteInt32(typ)
-	w.WriteInt32(slot)
-	w.WriteInt32(id)
-	w.WriteInt32(characterType)
-	return w.Bytes()
-}
-
-func encodeRequestShortCutDel(slot int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestShortCutDel)
-	w.WriteInt32(slot)
-	return w.Bytes()
-}
-
-func encodeSendTimeCheck(requestID, responseID int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeSendTimeCheck)
-	w.WriteInt32(requestID)
-	w.WriteInt32(responseID)
-	return w.Bytes()
-}
-
 func encodeSingleOpcode(opcode byte) []byte {
 	return wire.NewPacketWriter(opcode).Bytes()
-}
-
-func encodeDlgAnswer(messageID, answer, requesterID int32) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeDlgAnswer)
-	w.WriteInt32(messageID)
-	w.WriteInt32(answer)
-	w.WriteInt32(requesterID)
-	return w.Bytes()
 }
 
 // ---- from dispatch_testdata_test.go ----
@@ -914,137 +741,6 @@ func BenchmarkSessionSendUserInfoFrame(b *testing.B) {
 // ---- from skill_domain_fixtures_test.go ----
 func skillTable(defs ...modelskill.Definition) *modelskill.Table {
 	return modelskill.NewTable(defs)
-}
-
-type memorySkillSaveStore struct {
-	mu      sync.Mutex
-	rows    map[skillSaveKey][]effect.SaveRow
-	known   map[skillSaveKey]player.SkillLevels
-	deleted int
-}
-
-type skillSaveKey struct {
-	charObjID  int32
-	classIndex int32
-}
-
-func newMemorySkillSaveStore() *memorySkillSaveStore {
-	return &memorySkillSaveStore{rows: make(map[skillSaveKey][]effect.SaveRow), known: make(map[skillSaveKey]player.SkillLevels)}
-}
-
-func (s *memorySkillSaveStore) Replace(_ context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = append([]effect.SaveRow(nil), rows...)
-	return nil
-}
-
-func (s *memorySkillSaveStore) ListByCharacter(_ context.Context, charObjID int32, classIndex int32) ([]effect.SaveRow, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.rowsForLocked(charObjID, classIndex), nil
-}
-
-func (s *memorySkillSaveStore) DeleteByCharacter(_ context.Context, charObjID int32, classIndex int32) (int64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := skillSaveKey{charObjID: charObjID, classIndex: classIndex}
-	n := int64(len(s.rows[key]))
-	delete(s.rows, key)
-	s.deleted++
-	return n, nil
-}
-
-func (s *memorySkillSaveStore) seed(charObjID int32, classIndex int32, rows []effect.SaveRow) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = append([]effect.SaveRow(nil), rows...)
-}
-
-func (s *memorySkillSaveStore) rowsFor(charObjID int32, classIndex int32) []effect.SaveRow {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.rowsForLocked(charObjID, classIndex)
-}
-
-func (s *memorySkillSaveStore) rowsForLocked(charObjID int32, classIndex int32) []effect.SaveRow {
-	return append([]effect.SaveRow(nil), s.rows[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]...)
-}
-
-func (s *memorySkillSaveStore) ListKnownSkills(_ context.Context, charObjID int32, classIndex int32) (player.SkillLevels, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	levels := s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]
-	out := make(player.SkillLevels, len(levels))
-	for id, level := range levels {
-		out[id] = level
-	}
-	return out, nil
-}
-
-func (s *memorySkillSaveStore) SetKnownSkill(_ context.Context, charObjID int32, classIndex int32, skillID int, level int) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	key := skillSaveKey{charObjID: charObjID, classIndex: classIndex}
-	if s.known[key] == nil {
-		s.known[key] = make(player.SkillLevels)
-	}
-	s.known[key][skillID] = level
-	return nil
-}
-
-func (s *memorySkillSaveStore) knownFor(charObjID int32, classIndex int32) player.SkillLevels {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	levels := s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}]
-	out := make(player.SkillLevels, len(levels))
-	for id, level := range levels {
-		out[id] = level
-	}
-	return out
-}
-
-func (s *memorySkillSaveStore) seedKnown(charObjID int32, classIndex int32, levels player.SkillLevels) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	cp := make(player.SkillLevels, len(levels))
-	for id, level := range levels {
-		cp[id] = level
-	}
-	s.known[skillSaveKey{charObjID: charObjID, classIndex: classIndex}] = cp
-}
-
-func wireLiveAttackHooks(gcl *GameClientLink, live *livePlayer) {
-	live.stopAttack = gcl.stopLiveAutoAttack
-	live.link = gcl
-	live.Character.Attach(live.Live, live)
-	// Rebuild the controllers over the production player sink, so attack
-	// start/finish and arrival run the same arms attachLivePlayer wires.
-	moveCtl, err := move.NewController(live.Move(), live.Character, live)
-	if err != nil {
-		panic(err)
-	}
-	live.move = moveCtl
-	live.attack = attack.NewPlayer(live.Character, live)
-	live.combat = ai.NewPlayerAttack(live.Character, live.move, live.attack)
-}
-
-// TestAttackLiveTargetRejectsOutOfControl pins AttackRequest.java:31's
-// isOutOfControl() reject (Creature.java:652-655): a teleporting,
-// immobile-until-attacked, stunned, sleeping, paralyzed, afraid, confused, or
-// levelRefreshTable is a three-level table, so RealMaxLevel is 2 and a single
-// level-up from 1 is legal.
-func levelRefreshTable(t *testing.T) *player.LevelTable {
-	t.Helper()
-	table, err := player.NewLevelTable(map[int]player.Level{
-		1: {RequiredExpToLevelUp: 0},
-		2: {RequiredExpToLevelUp: 68},
-		3: {RequiredExpToLevelUp: 363},
-	})
-	if err != nil {
-		t.Fatalf("build level table: %v", err)
-	}
-	return table
 }
 
 // TestRefreshLiveLevelSkillsReconcilesAndSendsSkillList pins what the level

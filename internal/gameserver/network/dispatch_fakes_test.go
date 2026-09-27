@@ -8,14 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // --- fake character/item stores: Roster's own persistence seam, no DB needed ---
@@ -171,13 +167,6 @@ func (s *fakeCharStore) SetOffline(_ context.Context, id int32, lastAccess int64
 	return nil
 }
 
-func (s *fakeCharStore) lastOffline(id int32) (int64, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	v, ok := s.offline[id]
-	return v, ok
-}
-
 // Purge drops the character row only: this fake owns no item or shortcut
 // state to cascade into.
 func (s *fakeCharStore) Purge(_ context.Context, id int32) (bool, error) {
@@ -186,12 +175,6 @@ func (s *fakeCharStore) Purge(_ context.Context, id int32) (bool, error) {
 	_, ok := s.byID[id]
 	delete(s.byID, id)
 	return ok, nil
-}
-
-func (s *fakeCharStore) deleteAt(id int32) int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.byID[id].DeleteAt
 }
 
 func (s *fakeCharStore) soleObjectID(t *testing.T) int32 {
@@ -216,17 +199,6 @@ func (s *fakeCharStore) savedPosition(t *testing.T, id int32) savedPosition {
 		t.Fatalf("character %d position was not saved", id)
 	}
 	return pos
-}
-
-func (s *fakeCharStore) updateCharacter(t *testing.T, id int32, update func(*player.Character)) {
-	t.Helper()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ch, ok := s.byID[id]
-	if !ok {
-		t.Fatalf("character %d missing", id)
-	}
-	update(ch)
 }
 
 type fakeItemStore struct {
@@ -372,18 +344,6 @@ func (s *fakeShortcutStore) DeleteByOwner(_ context.Context, ownerID int32) erro
 	return nil
 }
 
-func (s *fakeShortcutStore) seed(ownerID int32, shortcuts ...shortcut.Shortcut) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.byOwner[ownerID] = append([]shortcut.Shortcut(nil), shortcuts...)
-}
-
-func (s *fakeShortcutStore) shortcuts(ownerID int32) []shortcut.Shortcut {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return append([]shortcut.Shortcut(nil), s.byOwner[ownerID]...)
-}
-
 type sequentialIDs struct{ next int32 }
 
 func (s *sequentialIDs) NextID() (int32, error) {
@@ -403,93 +363,3 @@ func (testGeo) Walkable(int, int, int) bool                                 { re
 func (testGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
-
-type attackStanceRecorder struct {
-	actors []task.AttackStanceActor
-}
-
-func (r *attackStanceRecorder) Add(actor task.AttackStanceActor) {
-	r.actors = append(r.actors, actor)
-}
-
-func (r *attackStanceRecorder) Remove(actor task.AttackStanceActor) bool {
-	for i, a := range r.actors {
-		if a != nil && actor != nil && a.ObjectID() == actor.ObjectID() {
-			r.actors = append(r.actors[:i], r.actors[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-func (r *attackStanceRecorder) InAttackStance(actor task.AttackStanceActor) bool {
-	for _, a := range r.actors {
-		if a != nil && actor != nil && a.ObjectID() == actor.ObjectID() {
-			return true
-		}
-	}
-	return false
-}
-
-type recordedGroundDrop struct {
-	ground *grounditem.Item
-	opts   task.DropOptions
-}
-
-type recordingGroundDropper struct {
-	drops []recordedGroundDrop
-}
-
-func (r *recordingGroundDropper) Drop(ground *grounditem.Item, opts task.DropOptions) {
-	r.drops = append(r.drops, recordedGroundDrop{ground: ground, opts: opts})
-}
-
-func (r *recordingGroundDropper) Remove(*grounditem.Item) {}
-
-type visibleGroundItem struct {
-	world.Presence
-	id        int32
-	itemID    int32
-	count     int
-	stackable bool
-	dropperID int32
-}
-
-func (g *visibleGroundItem) ObjectID() int32  { return g.id }
-func (*visibleGroundItem) Kind() actor.Kind   { return actor.KindItem }
-func (g *visibleGroundItem) ItemID() int32    { return g.itemID }
-func (g *visibleGroundItem) Count() int       { return g.count }
-func (g *visibleGroundItem) Stackable() bool  { return g.stackable }
-func (g *visibleGroundItem) DropperID() int32 { return g.dropperID }
-
-type visibleDoor struct {
-	world.Presence
-	id     int32
-	doorID int
-}
-
-func (d *visibleDoor) ObjectID() int32 { return d.id }
-func (*visibleDoor) Kind() actor.Kind  { return actor.KindDoor }
-func (d *visibleDoor) DoorID() int     { return d.doorID }
-func (d *visibleDoor) Opened() bool    { return false }
-func (d *visibleDoor) MaxHP() int      { return 100 }
-func (d *visibleDoor) HP() int         { return 100 }
-func (d *visibleDoor) Damage() int     { return 0 }
-
-type visibleStaticObject struct {
-	world.Presence
-	id       int32
-	staticID int
-}
-
-func (o *visibleStaticObject) ObjectID() int32     { return o.id }
-func (*visibleStaticObject) Kind() actor.Kind      { return actor.KindStatic }
-func (o *visibleStaticObject) StaticObjectID() int { return o.staticID }
-
-type invisibleTracked struct {
-	world.Presence
-	id int32
-}
-
-func (o *invisibleTracked) ObjectID() int32 { return o.id }
-func (*invisibleTracked) Kind() actor.Kind  { return actor.KindStatic }

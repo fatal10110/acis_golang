@@ -105,14 +105,6 @@ func encodeAnswerTradeRequest(response int32) []byte {
 	return w.Bytes()
 }
 
-func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
-	w.WriteInt32(skillID)
-	w.WriteInt32(wire.BoolInt32(ctrl))
-	w.WriteUint8(wire.BoolByte(shift))
-	return w.Bytes()
-}
-
 func encodeRequestPackageSendableItemList(objectID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPackageItemList)
 	w.WriteInt32(objectID)

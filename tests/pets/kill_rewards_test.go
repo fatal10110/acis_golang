@@ -279,7 +279,7 @@ func TestRewardRangeMeasuresTheAttackersBody(t *testing.T) {
 				t.Fatal("monster does not know the owner and pet")
 			}
 
-			var attacker attackable.Combatant = owner
+			attacker := owner
 			if tc.byPet {
 				attacker = pet
 			}

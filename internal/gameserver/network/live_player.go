@@ -405,16 +405,6 @@ func (p *livePlayer) clearParkedApproaches() {
 	p.takeDeferredMagicSkill()
 }
 
-// pickupLockActive has no production caller: livePickupBlockedDeferrable
-// reads pickupLocked directly under its own pickupMu section instead. Kept
-// for the generation-primitive regression tests, which check lock state
-// independently of that section.
-func (p *livePlayer) pickupLockActive() bool {
-	p.pickupMu.Lock()
-	defer p.pickupMu.Unlock()
-	return p.pickupLocked
-}
-
 // enterPickupLock starts a new pickup-paralysis lock, invalidating any lock
 // still owned by an earlier, not-yet-fired unlock, and reports the
 // generation the matching exitPickupLock must present to be honored.
@@ -463,14 +453,6 @@ func (p *livePlayer) clearFusionTarget(id int32) {
 
 func (p *livePlayer) fusesTarget(id int32) bool {
 	return p.fusionTargetID.Load() == id
-}
-
-func (p *livePlayer) attackController() *attack.Controller {
-	if p.attack == nil {
-		p.attack = attack.NewPlayer(p.Character, nil)
-		p.attack.SetQueue(p.Queue())
-	}
-	return p.attack
 }
 
 // castController returns live's cast controller, building it on first use

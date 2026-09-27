@@ -684,16 +684,6 @@ func TestSeedRecastDoesNotExtendDeadline(t *testing.T) {
 	}
 }
 
-// ---- from helpers_test.go ----
-// namedActor is a minimal participant with a fixed String() so tests that
-// only need a filler Effector/Effected (not a specific capability) get a
-// stable %v representation instead of a struct address.
-type namedActor string
-
-func (namedActor) ObjectID() int32  { return 0 }
-func (namedActor) Dead() bool       { return false }
-func (n namedActor) String() string { return string(n) }
-
 type liveEffectTarget struct {
 	neutralActor
 	world.Presence

@@ -164,19 +164,3 @@ func newLinkedSQLGameClient(t *testing.T, skills *skillstate.Persistence, seed f
 	t.Helper()
 	return newLinkedSQLGameClientFull(t, skills, nil, nil, modelskill.BookPolicy{}, nil, true, seed, wantChars)
 }
-
-func newLinkedSQLGameClientWithShortcuts(t *testing.T) (*testsupport.ScriptedClient, *gamesql.CharacterStore, *gamesql.ShortcutStore, *gamesql.CharacterSkillStore) {
-	t.Helper()
-	c, chars, _, shortcuts, knownSkills, _ := newLinkedSQLGameClient(t, nil, nil, 0)
-	return c, chars, shortcuts, knownSkills
-}
-
-// newLinkedSQLGameClientWithKarmaPlayerCanTeleport is newLinkedSQLGameClient
-// with an explicit KarmaPlayerCanTeleport value, for the karma-teleport
-// rejection tests (mirrors the retired fake-store
-// newLinkedGameClientWithKarmaPlayerCanTeleport).
-func newLinkedSQLGameClientWithKarmaPlayerCanTeleport(t *testing.T, karmaPlayerCanTeleport bool, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
-	t.Helper()
-	c, chars, items, _, _, state = newLinkedSQLGameClientFull(t, skills, nil, nil, modelskill.BookPolicy{}, nil, karmaPlayerCanTeleport, seed, wantChars)
-	return c, chars, items, state
-}

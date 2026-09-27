@@ -40,8 +40,6 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 			nx += dir.signumX
 			step = dir.dirX
 		} else {
-			checkY = gridY + dir.offsetY
-			checkX = min(max(int(float64(ox)+float64(checkY-oy)/m), gridX), gridX+block.CellSize-1)
 			gridY += dir.stepY
 			ny += dir.signumY
 		}

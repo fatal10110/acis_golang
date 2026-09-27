@@ -415,18 +415,6 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	}
 }
 
-type attackFailedNotifier interface {
-	NotifyAttackFailed()
-}
-
-type resistedSkillNotifier interface {
-	NotifyResistedSkill(targetName string, skillID modelskill.ID, level int)
-}
-
-type resistedMagicNotifier interface {
-	NotifyResistedMagic(attackerName string)
-}
-
 // deliverMagicFailure sends the caster/target resist system messages a
 // magic-damage failure produces, for paths that do not return a skill
 // handler Result (signet ticks).

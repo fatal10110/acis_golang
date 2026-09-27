@@ -117,12 +117,6 @@ func (r *frameReader) readByte() byte {
 	return b
 }
 
-func (r *frameReader) readUint16() uint16 {
-	v := binary.LittleEndian.Uint16(r.buf[r.pos:])
-	r.pos += 2
-	return v
-}
-
 func (r *frameReader) readInt32() int32 {
 	v := int32(binary.LittleEndian.Uint32(r.buf[r.pos:]))
 	r.pos += 4

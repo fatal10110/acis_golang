@@ -2,6 +2,7 @@ package datadiff
 
 import (
 	"bytes"
+	"math"
 	"reflect"
 	"sort"
 	"strings"
@@ -386,7 +387,7 @@ func TestFormatFloat(t *testing.T) {
 		{1.1, "1.1"},
 		{1.123456, "1.123456"},
 		{-1.5, "-1.5"},
-		{-0.0, "0"},
+		{math.Copysign(0, -1), "0"},
 		{0.05, "0.05"},
 		{132.6, "132.6"},
 		// A value whose 7th decimal digit sits exactly on a rounding tie: a

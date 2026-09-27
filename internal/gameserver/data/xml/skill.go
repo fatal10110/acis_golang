@@ -358,7 +358,7 @@ func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []
 			attachCond = clause
 			continue
 		}
-		fnEl := funcElement{XMLName: n.XMLName, Attrs: n.Attrs, Children: n.Children}
+		fnEl := funcElement(n)
 		fn, err := sl.funcTemplate(n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex)
 		if err != nil {
 			return err

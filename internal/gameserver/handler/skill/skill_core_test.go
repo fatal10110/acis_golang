@@ -14,7 +14,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
@@ -579,18 +578,6 @@ func (f *continuousFake) SetTarget(target world.Tracked) {
 
 func (f *continuousFake) AttackTarget(target world.Tracked) {
 	f.attackTargetCalls = append(f.attackTargetCalls, target)
-}
-
-// addContinuousEffect seeds target's list with one effect of the given effect
-// type, used to pre-arm BLOCK_BUFF / BLOCK_BUFF immunity.
-func addContinuousEffect(t *testing.T, target *continuousFake, effectType string) {
-	t.Helper()
-	e, err := effect.New(effect.Skill{}, modelskill.EffectTemplate{Name: "Buff", Time: 600, EffectType: effectType})
-	if err != nil {
-		t.Fatalf("effect.New() error: %v", err)
-	}
-	e.Effected = target
-	target.list.Add(e)
 }
 
 func buffEffect() []modelskill.EffectTemplate {
@@ -1735,8 +1722,8 @@ type skillTarget struct {
 	lethalOutcomes []formulas.LethalOutcome
 
 	effects *effect.List
-	shots   []modelitem.ShotKind
-	charged map[modelitem.ShotKind]bool
+	shots   []item.ShotKind
+	charged map[item.ShotKind]bool
 
 	castBreakDamage []float64
 
@@ -1870,11 +1857,11 @@ func (t *skillTarget) ReduceHP(v float64, attacker attackable.Combatant, skill m
 	t.hp -= v
 }
 
-func (t *skillTarget) SetChargedShot(kind modelitem.ShotKind, _ bool) {
+func (t *skillTarget) SetChargedShot(kind item.ShotKind, _ bool) {
 	t.shots = append(t.shots, kind)
 }
 
-func (t *skillTarget) ChargedShot(kind modelitem.ShotKind) bool { return t.charged[kind] }
+func (t *skillTarget) ChargedShot(kind item.ShotKind) bool { return t.charged[kind] }
 
 func (t *skillTarget) PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
@@ -2806,10 +2793,10 @@ func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
 	}
 
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "PDAM"}, Targets: []Actor{target}})
-	caster.charged = map[modelitem.ShotKind]bool{modelitem.ShotBlessedSpirit: true}
+	caster.charged = map[item.ShotKind]bool{item.ShotBlessedSpirit: true}
 	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "MDAM"}, Targets: []Actor{target}})
 
-	if got, want := caster.shots, []modelitem.ShotKind{modelitem.ShotSoul, modelitem.ShotBlessedSpirit}; !slices.Equal(got, want) {
+	if got, want := caster.shots, []item.ShotKind{item.ShotSoul, item.ShotBlessedSpirit}; !slices.Equal(got, want) {
 		t.Fatalf("discharged shots = %v, want %v", got, want)
 	}
 }

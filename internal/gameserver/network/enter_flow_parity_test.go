@@ -78,19 +78,6 @@ func (r *rawClient) read() []byte {
 	return payload
 }
 
-func (r *rawClient) expectNoFrame() {
-	r.t.Helper()
-	r.conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-	if payload, err := wire.ReadFrame(r.conn); err == nil {
-		if r.cipher != nil {
-			r.cipher.Decrypt(payload)
-		}
-		r.t.Fatalf("unexpected frame: %x", payload)
-	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
-		r.t.Fatalf("read frame: %v", err)
-	}
-}
-
 // TestAuthLoginAcceptedBeforeProtocolVersion pins the CONNECTED-state
 // dispatch width: both 0x00 (SendProtocolVersion) and 0x08 (AuthLogin) are
 // accepted unconditionally before any version exchange, so an AuthLogin

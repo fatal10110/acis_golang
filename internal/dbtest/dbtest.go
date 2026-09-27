@@ -67,7 +67,7 @@ func Drop(name string) {
 		return
 	}
 	defer root.Close()
-	root.Exec("DROP DATABASE IF EXISTS `" + name + "`")
+	_, _ = root.Exec("DROP DATABASE IF EXISTS `" + name + "`")
 }
 
 // NewDB creates a fresh database, applies schemaStmts, and returns a pool

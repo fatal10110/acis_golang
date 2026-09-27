@@ -59,7 +59,6 @@ func TestOnlineFlagTracksGamePresence(t *testing.T) {
 // every save: playtime must never silently reset to zero or stand still.
 func TestOnlineTimeAccruesAcrossSessions(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
-	c := srv.Client
 	objID := srv.SoleObjectID(t)
 
 	const restoredPlaytime = 3600
@@ -69,7 +68,7 @@ func TestOnlineTimeAccruesAcrossSessions(t *testing.T) {
 
 	// A fresh connection re-loads the char list, so the seeded base is what
 	// the entering session restores.
-	c = srv.DialClient(t, srv.Account(), 1)
+	c := srv.DialClient(t, srv.Account(), 1)
 
 	c.Send(encodeRequestGameStart(0))
 	c.Read() // SSQInfo

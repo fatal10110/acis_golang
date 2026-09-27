@@ -581,7 +581,7 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 	}
 	registered := 0
 	for _, o := range s.Objects() {
-		if _, ok := o.(Tracked); ok && o.(Tracked).presence().currentRegion() != nil {
+		if o.presence().currentRegion() != nil {
 			registered++
 		}
 	}

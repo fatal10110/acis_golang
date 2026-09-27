@@ -55,20 +55,6 @@ func assertStaticSystemMessageFrame(t *testing.T, frame []byte, messageID int) {
 	}
 }
 
-func assertChooseInventoryItemFrame(t *testing.T, frame []byte, itemID int32) {
-	t.Helper()
-	if len(frame) != 5 || frame[0] != serverpackets.OpcodeChooseInventoryItem {
-		t.Fatalf("ChooseInventoryItem frame = %x", frame)
-	}
-	r := wire.NewReader(frame[1:])
-	if got := r.ReadInt32(); got != itemID {
-		t.Fatalf("ChooseInventoryItem item id = %d, want %d", got, itemID)
-	}
-	if err := r.Err(); err != nil {
-		t.Fatalf("read ChooseInventoryItem: %v", err)
-	}
-}
-
 func assertEnchantResultFrame(t *testing.T, frame []byte, result serverpackets.EnchantResult) {
 	t.Helper()
 	if len(frame) != 5 || frame[0] != serverpackets.OpcodeEnchantResult {

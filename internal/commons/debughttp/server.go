@@ -40,7 +40,9 @@ func Listen(addr string) (*http.Server, error) {
 		return nil, err
 	}
 	srv := &http.Server{ReadHeaderTimeout: 5 * time.Second}
-	go srv.Serve(ln)
+	// Serve returns http.ErrServerClosed after Shutdown; the debug listener
+	// is best-effort and has no caller to report a failure to.
+	go func() { _ = srv.Serve(ln) }()
 	return srv, nil
 }
 

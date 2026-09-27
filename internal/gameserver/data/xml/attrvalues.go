@@ -99,27 +99,6 @@ func (a *attrValues) int32(key string) int32 {
 	return int32(n)
 }
 
-// intArray returns the value at key as the ";"-separated list of ints its
-// raw text spells, recording an error if key is absent or any element fails
-// to parse.
-func (a *attrValues) intArray(key string) []int {
-	raw := a.str(key)
-	if a.err != nil {
-		return nil
-	}
-	parts := strings.Split(raw, ";")
-	out := make([]int, len(parts))
-	for i, p := range parts {
-		n, err := strconv.Atoi(p)
-		if err != nil {
-			a.fail(fmt.Errorf("attribute %q: %w", key, err))
-			return nil
-		}
-		out[i] = n
-	}
-	return out
-}
-
 // boolDefault returns the value at key as a bool, or def if key is absent.
 // Any spelling other than a case-insensitive "true" reads as false rather
 // than an error: the shipped data files write booleans as "true"/"false",

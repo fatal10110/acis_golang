@@ -20,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -1639,7 +1638,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	rec := recordEvents(c)
 	before := c.HP()
 
-	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "DamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
 	}
@@ -1668,7 +1667,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	}
 	rec := recordEvents(c)
 	before := c.MPValue()
-	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
 	}

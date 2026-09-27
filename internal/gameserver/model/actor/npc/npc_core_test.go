@@ -21,7 +21,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -35,7 +34,7 @@ func TestHostileMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{
 		ID:     1,
 		Type:   "Monster",
-		Skills: map[int]int{int(modelskill.DivineInspirationSkillID): 3},
+		Skills: map[int]int{int(skill.DivineInspirationSkillID): 3},
 	})
 
 	if got := hostile.MaxBuffCount(); got != 23 {
@@ -195,7 +194,7 @@ func TestHostileReduceHPStopsSleepAndImmobileUntilAttackedEffects(t *testing.T) 
 	addHostileEffect(t, hostile, "Sleep")
 	addHostileEffect(t, hostile, "ImmobileUntilAttacked")
 
-	hostile.ReduceHP(10, nil, modelskill.Definition{})
+	hostile.ReduceHP(10, nil, skill.Definition{})
 
 	if hostile.Sleeping() {
 		t.Fatal("Sleeping() = true after ReduceHP, want the sleep effect stopped")
@@ -307,7 +306,7 @@ func TestHostileReduceHPBreaksStunOnOneInTenRollForNonDOTDamage(t *testing.T) {
 			addHostileEffect(t, hostile, "Stun")
 			hostile.SetRollSource(func(int) int { return tt.roll })
 
-			hostile.ReduceHP(10, nil, modelskill.Definition{})
+			hostile.ReduceHP(10, nil, skill.Definition{})
 
 			if got := hostile.Stunned(); got != tt.wantAfter {
 				t.Fatalf("Stunned() = %v, want %v", got, tt.wantAfter)
@@ -420,7 +419,7 @@ func TestMeleeAttackerOutranksDOTOnlyAttacker(t *testing.T) {
 	melee := &hostileTarget{id: 2, playable: true}
 	dotCaster := &hostileTarget{id: 3, playable: true}
 
-	h.ReduceHP(300, melee, modelskill.Definition{})
+	h.ReduceHP(300, melee, skill.Definition{})
 	for i := 0; i < 3; i++ {
 		h.ReduceHPByDOT(4, dotCaster, true)
 	}
@@ -445,7 +444,7 @@ func TestAggressionNotificationScalesLikeCombatHate(t *testing.T) {
 	dd := &hostileTarget{id: 2, playable: true}
 	tank := &hostileTarget{id: 3, playable: true}
 
-	h.ReduceHP(300, dd, modelskill.Definition{})
+	h.ReduceHP(300, dd, skill.Definition{})
 	h.NotifyAggression(tank, 500)
 
 	most, ok := h.AI().Threats().MostHated()
@@ -514,7 +513,7 @@ func TestManaDamageOverTimeEffectTargetsHostile(t *testing.T) {
 func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 12, MAtk: 200})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 10, MEN: 40, MDef: 50})
-	def := modelskill.Definition{BaseLandRate: 50, EffectType: "ROOT", Magic: true, LevelDepend: 1}
+	def := skill.Definition{BaseLandRate: 50, EffectType: "ROOT", Magic: true, LevelDepend: 1}
 
 	without, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
 	if !ok {
@@ -541,7 +540,7 @@ func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testin
 
 func TestHostileInactiveRegionStopsAllEffects(t *testing.T) {
 	hostile := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster"})
-	hostile.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Template: modelskill.EffectTemplate{Name: "test"}})
+	hostile.EffectList().Add(&effect.Effect{Skill: effect.Skill{ID: 1}, Template: skill.EffectTemplate{Name: "test"}})
 	clock := driveHostile(hostile)
 
 	hostile.OnInactiveRegion()
@@ -555,7 +554,7 @@ func TestHostileInactiveRegionStopsAllEffects(t *testing.T) {
 func TestHostileSkillSuccessInputAllowsIgnoreResistsWithoutCasterStats(t *testing.T) {
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
 
-	in, ok := target.SkillSuccessInput(nil, modelskill.Definition{
+	in, ok := target.SkillSuccessInput(nil, skill.Definition{
 		BaseLandRate:  100,
 		IgnoreResists: true,
 	}, false, formulas.ShieldPerfect)
@@ -579,9 +578,9 @@ func (deniedLethalCaster) CanGiveDamage() bool { return false }
 func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
-	skill := modelskill.Definition{LethalChance1: 30, LethalChance2: 10, MagicLevel: 40}
+	def := skill.Definition{LethalChance1: 30, LethalChance2: 10, MagicLevel: 40}
 
-	in, ok := target.LethalInput(caster, skill)
+	in, ok := target.LethalInput(caster, def)
 	if !ok {
 		t.Fatal("LethalInput() ok = false")
 	}
@@ -591,13 +590,13 @@ func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 
 	hp := target.MaxHPValue()
 	target.SetHP(hp)
-	target.ApplyLethalOutcome(formulas.LethalHalf, caster, skill)
+	target.ApplyLethalOutcome(formulas.LethalHalf, caster, def)
 	if got := target.HP(); got != hp/2 {
 		t.Fatalf("half lethal HP = %v, want %v", got, hp/2)
 	}
 
 	target.SetHP(hp)
-	target.ApplyLethalOutcome(formulas.LethalFull, caster, skill)
+	target.ApplyLethalOutcome(formulas.LethalFull, caster, def)
 	if got := target.HP(); got != 1 {
 		t.Fatalf("full lethal HP = %v, want 1", got)
 	}
@@ -606,13 +605,13 @@ func TestHostileLethalSurfaceBuildsInputAndAppliesOutcomes(t *testing.T) {
 func TestHostileLethalInputRejectsGuardedDamage(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 40, HPMax: 500})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 45, HPMax: 500})
-	skill := modelskill.Definition{LethalChance1: 30}
+	def := skill.Definition{LethalChance1: 30}
 	target.SetInvul(true)
-	if _, ok := target.LethalInput(caster, skill); ok {
+	if _, ok := target.LethalInput(caster, def); ok {
 		t.Fatal("LethalInput accepted an invulnerable hostile")
 	}
 	target.SetInvul(false)
-	if _, ok := target.LethalInput(deniedLethalCaster{caster}, skill); ok {
+	if _, ok := target.LethalInput(deniedLethalCaster{caster}, def); ok {
 		t.Fatal("LethalInput accepted an attacker without damage permission")
 	}
 }
@@ -1578,14 +1577,14 @@ func TestNewHostileAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	passive := modelskill.Ref{ID: 99, Level: 1}
-	table := modelskill.NewTable([]modelskill.Definition{{
+	passive := skill.Ref{ID: 99, Level: 1}
+	table := skill.NewTable([]skill.Definition{{
 		ID:         passive.ID,
 		Level:      passive.Level,
-		Activation: modelskill.ActivationActive,
-		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+		Activation: skill.ActivationActive,
+		Funcs:      []skill.FuncTemplate{{Op: skill.FuncAdd, Stat: "maxHp", Value: 250}},
 	}})
-	tpl := &Template{ID: 9001, Type: "Monster", Level: 20, HPMax: 1000, CON: 40, Passives: []modelskill.Ref{passive}}
+	tpl := &Template{ID: 9001, Type: "Monster", Level: 20, HPMax: 1000, CON: 40, Passives: []skill.Ref{passive}}
 	got, err := NewHostile(&Instance{ObjectID: 2, Template: tpl, Kind: "Monster"}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
 	if err != nil {
 		t.Fatal(err)
@@ -1601,11 +1600,11 @@ func TestNewHostileAppliesTemplatePassivesBeforeHPSeed(t *testing.T) {
 }
 
 func TestNewHostileRejectsFolkEvenWithTemplatePassives(t *testing.T) {
-	table := modelskill.NewTable([]modelskill.Definition{{
+	table := skill.NewTable([]skill.Definition{{
 		ID:         99,
 		Level:      1,
-		Activation: modelskill.ActivationActive,
-		Funcs:      []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 250}},
+		Activation: skill.ActivationActive,
+		Funcs:      []skill.FuncTemplate{{Op: skill.FuncAdd, Stat: "maxHp", Value: 250}},
 	}})
 	_, err := NewHostile(&Instance{
 		ObjectID: 1,
@@ -1613,7 +1612,7 @@ func TestNewHostileRejectsFolkEvenWithTemplatePassives(t *testing.T) {
 			ID:       3001,
 			Type:     "Folk",
 			HPMax:    1000,
-			Passives: []modelskill.Ref{{ID: 99, Level: 1}},
+			Passives: []skill.Ref{{ID: 99, Level: 1}},
 		},
 	}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
 	if err == nil {
@@ -1622,10 +1621,10 @@ func TestNewHostileRejectsFolkEvenWithTemplatePassives(t *testing.T) {
 }
 
 func TestNewHostileFailsOnTemplatePassiveBuildError(t *testing.T) {
-	table := modelskill.NewTable([]modelskill.Definition{{
+	table := skill.NewTable([]skill.Definition{{
 		ID:    99,
 		Level: 1,
-		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "notAStat", Value: 1}},
+		Funcs: []skill.FuncTemplate{{Op: skill.FuncAdd, Stat: "notAStat", Value: 1}},
 	}})
 	_, err := NewHostile(&Instance{
 		ObjectID: 1,
@@ -1633,7 +1632,7 @@ func TestNewHostileFailsOnTemplatePassiveBuildError(t *testing.T) {
 			ID:       9001,
 			Type:     "Monster",
 			HPMax:    1000,
-			Passives: []modelskill.Ref{{ID: 99, Level: 1}},
+			Passives: []skill.Ref{{ID: 99, Level: 1}},
 		},
 		Kind: "Monster",
 	}, newHostileLive(t), &hostileMove{}, &hostileAttack{}, table)
@@ -1697,7 +1696,7 @@ func TestMinionAssistsWhenMasterReduceHP(t *testing.T) {
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
-	master.ReduceHP(40, attacker, modelskill.Definition{})
+	master.ReduceHP(40, attacker, skill.Definition{})
 
 	d, ok := minion.AI().Desires().Peek()
 	if !ok || d.Kind != ai.IntentionAttack || d.FinalTarget != attacker {
