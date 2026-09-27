@@ -285,11 +285,6 @@ func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persiste
 	return c, chars, items, state
 }
 
-func newLinkedGameClientWithShortcuts(t *testing.T) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
-	t.Helper()
-	return newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, nil, 0)
-}
-
 func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, shortcutSeed, nil, modelskill.BookPolicy{}, nil, seed, wantChars)
@@ -351,6 +346,7 @@ func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name s
 	}
 	return ch.ID
 }
+
 func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture, delivery ...itemcontainer.Delivery) *livePlayer {
 	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)

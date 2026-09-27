@@ -106,10 +106,13 @@ func (a *orderedSkillActor) TestCursesOnSkillSee(modelskill.Definition, []skillt
 }
 func (a *orderedSkillActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 func (a *orderedSkillActor) EffectList() *effect.List                                 { return a.effects }
-func (a *orderedSkillActor) CounterSkillPhysical() float64                            { return a.counter }
+
+func (a *orderedSkillActor) CounterSkillPhysical() float64 { return a.counter }
+
 func (a *orderedSkillActor) BlowInput(creature.FormulaActor, modelskill.Definition) (formulas.BlowInput, bool) {
 	return a.blow, true
 }
+
 func (a *orderedSkillActor) SkillSuccessInput(creature.FormulaActor, modelskill.Definition, bool, formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 0}, true
 }
@@ -128,10 +131,14 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 			state.AddPlayer(newTestLivePlayer(t, 2, &testsupport.FrameCapture{}))
 			link := &GameClientLink{world: state}
 			caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
-			target := &orderedSkillActor{id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
-				blow: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1}}
-			def := modelskill.Definition{ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
-				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}}
+			target := &orderedSkillActor{
+				id: 2, kind: actor.KindPlayer, effects: effect.NewList(nil), counter: 100,
+				blow: formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1},
+			}
+			def := modelskill.Definition{
+				ID: 7, Level: 20, SkillType: "BLOW", Target: modelskill.TargetOne, Offensive: true,
+				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
+			}
 			skills := handlerskill.NewDefaultRegistry()
 			var result actorcast.EffectResult
 			if cubic {
@@ -364,6 +371,7 @@ func (a *mdamOrderActor) SkillSuccessInput(caster creature.FormulaActor, def mod
 func (a *mdamOrderActor) MagicDamageInput(creature.FormulaActor, modelskill.Definition, bool) (formulas.MagicDamageInput, bool) {
 	return a.magic, true
 }
+
 func (a *mdamOrderActor) ReduceHP(v float64, _ attackable.Combatant, _ modelskill.Definition) {
 	a.hp -= v
 }
@@ -382,9 +390,11 @@ func TestMdamDamageResistDamageFrameOrder(t *testing.T) {
 	hit := &mdamOrderActor{orderedSkillActor: orderedSkillActor{id: 3, kind: actor.KindNPC, effects: effect.NewList(nil)}, hp: 5000, magic: in, unrollable: true}
 	caster := &orderedSkillActor{id: 1, kind: actor.KindPlayer}
 
-	result, ok := handlerskill.NewDefaultRegistry().UseResult(handlerskill.Cast{Caster: caster,
+	result, ok := handlerskill.NewDefaultRegistry().UseResult(handlerskill.Cast{
+		Caster:  caster,
 		Skill:   modelskill.Definition{ID: 7, Level: 20, SkillType: "MDAM", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}},
-		Targets: []handlerskill.Actor{resister, hit}})
+		Targets: []handlerskill.Actor{resister, hit},
+	})
 	if !ok {
 		t.Fatal("MDAM was not handled")
 	}

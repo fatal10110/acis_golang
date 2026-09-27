@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -17,11 +16,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// zeroRoll always returns 0, pinning MakeAttackHit's hit/crit/damage-spread
-// rolls to a deterministic outcome: with any positive hit rate and
-// critical rate, a roll of 0 always hits and always crits.
-func zeroRoll(int) int { return 0 }
-
 func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	t.Helper()
 	h, err := NewHostile(&Instance{ObjectID: id, Template: tpl, Kind: "Monster"}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
@@ -30,6 +24,7 @@ func newCombatHostile(t testing.TB, id int32, tpl *Template) *Hostile {
 	}
 	return h
 }
+
 func newTestHostile(t *testing.T, move ai.MoveController, strike ai.AttackController) *Hostile {
 	t.Helper()
 	hostile, err := NewHostile(&Instance{
@@ -141,6 +136,7 @@ func (a *hostileAttack) AttackingNow() bool   { return false }
 func (a *hostileAttack) CanAttack(attackable.Combatant) bool {
 	return a.canAttack
 }
+
 func (a *hostileAttack) DoAttack(target attackable.Combatant) {
 	a.target = target
 }
@@ -165,26 +161,6 @@ func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effec
 	hostile.EffectList().Add(e)
 	return e
 }
-
-type frameReceiver struct {
-	world.Presence
-	trackedID int32
-	frames    [][]byte
-}
-
-func (f *frameReceiver) ObjectID() int32 { return f.trackedID }
-func (*frameReceiver) Kind() actor.Kind  { return actor.KindNPC }
-
-func (f *frameReceiver) SendFrame(frame wire.Frame) bool {
-	defer frame.Release()
-	raw := frame.Bytes()
-	payload := make([]byte, len(raw)-2)
-	copy(payload, raw[2:])
-	f.frames = append(f.frames, payload)
-	return true
-}
-
-func (f *frameReceiver) BroadcastFrame(frame wire.Frame) bool { return f.SendFrame(frame) }
 
 // idleQueue is a queue on a virtual clock no test advances: timers armed on
 // it never fire.

@@ -65,16 +65,6 @@ jobs:
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
           restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
 
-      - name: Format
-        if: matrix.shard.name == 'rest'
-        run: |
-          out="$(gofmt -l cmd internal ops tests)"
-          if [ -n "$out" ]; then
-            echo "gofmt needs to be run on:"
-            echo "$out"
-            exit 1
-          fi
-
       - name: Build
         if: matrix.shard.name == 'rest'
         run: go build ./...
@@ -119,11 +109,28 @@ jobs:
             ~/go/pkg/mod
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
 
+  # Runs the linters and the gofumpt formatter from .golangci.yml.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.14
+
   # The ruleset requires a single check named "go"; it passes only when
-  # every shard does.
+  # every shard and the lint job do.
   go:
     if: always()
-    needs: test
+    needs: [test, lint]
     runs-on: ubuntu-latest
     steps:
-      - run: '[ "${{ needs.test.result }}" = success ]'
+      - run: '[ "${{ needs.test.result }}" = success ] && [ "${{ needs.lint.result }}" = success ]'

@@ -257,26 +257,3 @@ func assertSystemMessageNumber(t *testing.T, frame []byte, messageID int, values
 		t.Fatalf("read SystemMessage: %v", err)
 	}
 }
-
-// assertSystemMessageStringFrame asserts a SystemMessage carrying a single
-// text parameter with the given contents.
-func assertSystemMessageStringFrame(t *testing.T, frame []byte, messageID int, text string) {
-	t.Helper()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "SystemMessage")
-	r := wireReader(frame[1:])
-	if id := r.ReadInt32(); id != int32(messageID) {
-		t.Fatalf("SystemMessage id = %d, want %d", id, messageID)
-	}
-	if params := r.ReadInt32(); params != 1 {
-		t.Fatalf("SystemMessage params = %d, want 1", params)
-	}
-	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
-		t.Fatalf("SystemMessage param type = %d, want string", typ)
-	}
-	if got := r.ReadString(); got != text {
-		t.Fatalf("SystemMessage text = %q, want %q", got, text)
-	}
-	if err := r.Err(); err != nil {
-		t.Fatalf("read SystemMessage: %v", err)
-	}
-}

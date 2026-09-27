@@ -28,6 +28,7 @@ func (a HostileActor) MP() int {
 	}
 	return int(a.Hostile.MPValue())
 }
+
 func (a HostileActor) HP() int {
 	if a.Hostile == nil {
 		return 0
@@ -44,9 +45,11 @@ func (a HostileActor) HP() int {
 func (a HostileActor) MPInitialCost(def modelskill.Definition) int {
 	return a.scaleMP(def, def.MPInitialConsume)
 }
+
 func (a HostileActor) MPCost(def modelskill.Definition) int {
 	return a.scaleMP(def, def.MPConsume)
 }
+
 func (a HostileActor) scaleMP(def modelskill.Definition, mp int) int {
 	if a.Hostile == nil {
 		return mp
@@ -57,24 +60,29 @@ func (a HostileActor) scaleMP(def modelskill.Definition, mp int) int {
 	}
 	return int(a.Hostile.CalcStat(rate, float64(mp)))
 }
+
 func (a HostileActor) ReduceMP(n int) {
 	if a.Hostile != nil {
 		a.Hostile.ReduceMP(float64(n))
 	}
 }
+
 func (a HostileActor) ReduceHP(n int) {
 	if a.Hostile != nil {
 		a.Hostile.ConsumeHP(float64(n))
 	}
 }
+
 func (a HostileActor) SkillDisabled(k int32) bool {
 	return a.Hostile != nil && a.Hostile.SkillDisabled(k)
 }
+
 func (a HostileActor) DisableSkill(k int32, d time.Duration) {
 	if a.Hostile != nil {
 		a.Hostile.DisableSkill(k, d)
 	}
 }
+
 func (a HostileActor) AddSkillReuse(r modelskill.Ref, k int32, d time.Duration) {
 	if a.Hostile != nil {
 		a.Hostile.AddSkillReuse(r, k, d)
@@ -85,6 +93,7 @@ func (HostileActor) PhysicalMuted() bool { return false }
 func (a HostileActor) SpiritshotCharged() bool {
 	return a.Hostile != nil && a.Hostile.SpiritshotCharged()
 }
+
 func (a HostileActor) BlessedSpiritshotCharged() bool {
 	return a.Hostile != nil && a.Hostile.BlessedSpiritshotCharged()
 }

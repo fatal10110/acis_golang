@@ -30,8 +30,10 @@ func (n *Npcs) pickSpawnPosition(maker *spawn.Maker, entry spawn.Entry) (spawn.P
 	return randomTerritoryPosition(maker, n.geo)
 }
 
-const territorySpawnAttempts = 10
-const territoryPointAttempts = 64
+const (
+	territorySpawnAttempts = 10
+	territoryPointAttempts = 64
+)
 
 // randomTerritoryPosition matches Java's SpawnManager.findTerritory (merges
 // a maker's ";"-delimited territory list into one Territory: minZ/maxZ are

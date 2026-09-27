@@ -547,6 +547,7 @@ func (a *fakeActor) AlikeDead() bool     { return a.alikeDead }
 func (a *fakeActor) DenyAIAction() bool {
 	return a.denyAction
 }
+
 func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	known, ok := a.known[target.ObjectID()]
 	return !ok || known
@@ -562,6 +563,7 @@ func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
+
 func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target
@@ -631,10 +633,12 @@ func (a *recordingAttack) CanAttack(target attackable.Combatant) bool {
 	}
 	return a.canAttack
 }
+
 func (a *recordingAttack) DoAttack(target attackable.Combatant) {
 	a.doAttackCalls++
 	a.target = target
 }
+
 func (a *recordingAttack) Stop() {
 	a.stopCalls++
 	a.attackingNow = false

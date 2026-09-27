@@ -71,8 +71,12 @@ func TestAppendAndVerifyChecksum(t *testing.T) {
 // already sits on a Blowfish block boundary.
 func TestPaddedSize(t *testing.T) {
 	tests := []struct{ in, want int }{
-		{0, 8}, {1, 8}, {7, 8},
-		{8, 16}, {9, 16}, {15, 16},
+		{0, 8},
+		{1, 8},
+		{7, 8},
+		{8, 16},
+		{9, 16},
+		{15, 16},
 		{16, 24},
 	}
 	for _, tt := range tests {

@@ -108,38 +108,6 @@ func targetHostile(t *testing.T, c *scriptedClient, hostileID int32) int32 {
 	return maxHP
 }
 
-// assertTargetHPStatus asserts a StatusUpdate reporting the target's MAX_HP
-// and a CUR_HP strictly below it — the visible proof a swing landed.
-func assertTargetHPStatus(t *testing.T, frame []byte, objectID, maxHP int32) {
-	t.Helper()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeStatusUpdate, "target StatusUpdate")
-	r := wireReader(frame[1:])
-	if got := r.ReadInt32(); got != objectID {
-		t.Fatalf("StatusUpdate object id = %d, want %d", got, objectID)
-	}
-	count := r.ReadInt32()
-	var sawCur bool
-	curHP := int32(-1)
-	for i := int32(0); i < count; i++ {
-		typ, val := r.ReadInt32(), r.ReadInt32()
-		switch typ {
-		case int32(serverpackets.StatusMaxHP):
-			if val != maxHP {
-				t.Fatalf("StatusUpdate MAX_HP = %d, want %d", val, maxHP)
-			}
-		case int32(serverpackets.StatusCurrentHP):
-			sawCur = true
-			curHP = val
-		}
-	}
-	if !sawCur || curHP >= maxHP {
-		t.Fatalf("StatusUpdate current HP = %d, want less than max HP %d after a landed hit", curHP, maxHP)
-	}
-	if err := r.Err(); err != nil {
-		t.Fatalf("read StatusUpdate: %v", err)
-	}
-}
-
 // assertAutoAttackStart asserts the next frame is AutoAttackStart naming the
 // given attacker.
 func assertAutoAttackStart(t *testing.T, c *scriptedClient, attackerID int32) {

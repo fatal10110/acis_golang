@@ -33,8 +33,10 @@ func enterAfterRestart(t *testing.T, srv *gameservertest.Server) {
 	drainUntilQuiet(t, c)
 }
 
-const townRestartX = 200
-const townRestartY = 400
+const (
+	townRestartX = 200
+	townRestartY = 400
+)
 
 // readProtectionMessage scans frames until a string-parameter SystemMessage
 // arrives and returns its text.

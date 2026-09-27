@@ -85,7 +85,7 @@ func TestAutosaveSyncsCollarEnchantToPetLevel(t *testing.T) {
 		t.Fatalf("pet level = %d, want %d", actor.Level(), wolfLevel)
 	}
 
-	h.srv.TickAutosave()
+	h.srv.TickAutosave(t)
 
 	h.assertCollarEnchantedTo(t, wolfLevel)
 }

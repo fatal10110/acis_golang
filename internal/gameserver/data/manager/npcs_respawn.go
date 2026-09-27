@@ -74,7 +74,7 @@ func (n *Npcs) Respawn(key string) {
 		return
 	}
 	if slot.masterID != 0 {
-		obj, ok := n.state.Object(slot.masterID)
+		obj, _ := n.state.Object(slot.masterID)
 		master, ok := obj.(*npc.Hostile)
 		if !ok || master.Dead() {
 			n.mu.Lock()

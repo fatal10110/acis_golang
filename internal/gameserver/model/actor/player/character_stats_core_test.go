@@ -20,7 +20,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -940,8 +939,10 @@ func TestCharacterIncreaseChargesNotifiesForceMessageBeforeStatus(t *testing.T) 
 
 	events := rec.Events()
 	want := []event.Event{
-		event.ChargeMessage{Charges: 2}, event.ChargesChanged{},
-		event.ChargeMessage{Charges: 5, Maxed: true}, event.ChargesChanged{},
+		event.ChargeMessage{Charges: 2},
+		event.ChargesChanged{},
+		event.ChargeMessage{Charges: 5, Maxed: true},
+		event.ChargesChanged{},
 		event.ChargeMessage{Charges: 5, Maxed: true},
 	}
 	if !reflect.DeepEqual(events, want) {
@@ -1637,7 +1638,7 @@ func TestDamageOverTimeEffectTargetsCharacterAndBroadcastsStatus(t *testing.T) {
 	rec := recordEvents(c)
 	before := c.HP()
 
-	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "DamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
 	}
@@ -1666,7 +1667,7 @@ func TestManaDamageOverTimeEffectTargetsCharacter(t *testing.T) {
 	}
 	rec := recordEvents(c)
 	before := c.MPValue()
-	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "ManaDamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
 	}
@@ -3553,8 +3554,10 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 	{
 		tmpl := combatTemplate()
 		items := item.NewTable([]*item.Template{
-			{ID: 50, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalS,
-				Weapon: &item.WeaponDetail{Type: item.WeaponSword}},
+			{
+				ID: 50, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalS,
+				Weapon: &item.WeaponDetail{Type: item.WeaponSword},
+			},
 		})
 		inst := &item.Instance{ObjectID: 900, TemplateID: 50, Location: item.LocationPaperdoll, LocationData: 0, EnchantLevel: 7}
 		c := liveCharacter(6, tmpl, items, inst)
@@ -3940,7 +3943,7 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	if want := 0.9420817669172932; !closeFloat(in.MAtkModifier, want) {
 		t.Fatalf("MAtkModifier = %v, want %v", in.MAtkModifier, want)
 	}
-	if want := 1 + 0.01*(float64(def.MagicLevel+def.LevelDepend-target.CharLevel)); !closeFloat(in.LevelModifier, want) {
+	if want := 1 + 0.01*float64(def.MagicLevel+def.LevelDepend-target.CharLevel); !closeFloat(in.LevelModifier, want) {
 		t.Fatalf("LevelModifier = %v, want %v", in.LevelModifier, want)
 	}
 }

@@ -349,6 +349,7 @@ func (n *curseNPC) AggroHate(c attackable.Combatant) float64 {
 	}
 	return n.hate[c.ObjectID()]
 }
+
 func (n *curseNPC) StopAggroHate(attacker attackable.Combatant) {
 	n.hateStops++
 	n.stopped = attacker

@@ -326,7 +326,6 @@ func (c *Controller) Stop() {
 	c.inHitAnimation = false
 	c.bowCooling = false
 	c.mu.Unlock()
-
 }
 
 func (c *Controller) makeHit(target attackable.Combatant, split bool) Hit {

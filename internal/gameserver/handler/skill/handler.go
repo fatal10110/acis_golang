@@ -278,9 +278,11 @@ type Damage struct {
 }
 
 // AttackFailedMessage and ManaDamageMissedMessage mark messages without data.
-type AttackFailedMessage struct{}
-type ManaDamageMissedMessage struct{}
-type OpponentMPReducedMessage struct{ MP int32 }
+type (
+	AttackFailedMessage      struct{}
+	ManaDamageMissedMessage  struct{}
+	OpponentMPReducedMessage struct{ MP int32 }
+)
 
 // Result reports player-visible outcomes produced while a skill handler ran.
 type Result struct {

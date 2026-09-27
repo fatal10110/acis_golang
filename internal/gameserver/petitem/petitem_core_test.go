@@ -387,9 +387,11 @@ func TestGetFromPetLeavesEquipmentUntouchedOnFailedTransfer(t *testing.T) {
 // side effect on a Summon effector (Item.java:455-459).
 func TestUseItemRejectsConditionFailureOnUnequippedItem(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
-		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+		{
+			ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
 			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
-			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}},
+		},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})
@@ -409,9 +411,11 @@ func TestUseItemRejectsConditionFailureOnUnequippedItem(t *testing.T) {
 // of the same gate: a pet meeting the level condition still equips normally.
 func TestUseItemAllowsConditionSuccessOnUnequippedItem(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
-		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+		{
+			ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
 			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
-			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}},
+		},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 50})
@@ -430,9 +434,11 @@ func TestUseItemAllowsConditionSuccessOnUnequippedItem(t *testing.T) {
 // condition (e.g. the pet fell below the level requirement) still unequips.
 func TestUseItemConditionGateSkipsAlreadyEquippedItem(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
-		{ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+		{
+			ID: 21, Kind: item.KindWeapon, Slot: item.SlotWolf, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
 			Weapon:        &item.WeaponDetail{Type: item.WeaponPet},
-			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}},
+		},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	// The pet is under-level from the start (unlike the equip case, level
@@ -455,9 +461,11 @@ func TestUseItemConditionGateSkipsAlreadyEquippedItem(t *testing.T) {
 // template's failed <cond> must reject before UseConsumable dispatch.
 func TestUseItemConditionGateAppliesToConsumableDispatch(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
-		{ID: 1061, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
+		{
+			ID: 1061, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1,
 			EtcItem:       &item.EtcItemDetail{Type: item.EtcItemPotion, Handler: "ItemSkills"},
-			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}}},
+			UseConditions: []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": "50"}}}},
+		},
 	})
 	petInv := itemcontainer.NewPetInventory(2, templates)
 	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv, Level: 10})

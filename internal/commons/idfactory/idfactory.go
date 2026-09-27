@@ -124,7 +124,6 @@ type Allocator struct {
 // cleanup beats not booting at all, while an id-scan error still fails
 // loudly rather than booting with a partial id set.
 func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error) {
-
 	a := &Allocator{
 		used:  make(map[int32]struct{}),
 		first: FirstObjectID,

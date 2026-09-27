@@ -14,7 +14,6 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -22,44 +21,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
-
-func petTestTemplates() *item.Table {
-	return item.NewTable([]*item.Template{
-		{
-			ID:          item.AdenaID,
-			Name:        "Adena",
-			Kind:        item.KindEtcItem,
-			Duration:    -1,
-			Stackable:   true,
-			Dropable:    true,
-			Tradable:    true,
-			Destroyable: true,
-			EtcItem:     &item.EtcItemDetail{},
-		},
-		{
-			ID:          2375,
-			Name:        "Wolf Tooth",
-			Kind:        item.KindWeapon,
-			Slot:        item.SlotWolf,
-			Duration:    -1,
-			Dropable:    true,
-			Tradable:    true,
-			Destroyable: true,
-			Weapon:      &item.WeaponDetail{Type: item.WeaponPet},
-		},
-		{
-			ID:          9000,
-			Name:        "Forbidden",
-			Kind:        item.KindEtcItem,
-			Duration:    -1,
-			Stackable:   true,
-			Dropable:    false,
-			Tradable:    true,
-			Destroyable: true,
-			EtcItem:     &item.EtcItemDetail{},
-		},
-	})
-}
 
 func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *testsupport.FrameCapture, *testsupport.FrameCapture, *livePlayer, *livePlayer) {
 	t.Helper()

@@ -79,10 +79,13 @@ type UserInfoSnapshot struct {
 	SpawnProtectedTeam bool
 }
 
-// EncodeUserInfo builds the UserInfo packet payload for an unframed send.
+// EncodeUserInfo builds the UserInfo packet payload for an unframed send,
+// or nil when s cannot be encoded.
 func EncodeUserInfo(s UserInfoSnapshot) []byte {
 	w := wire.NewPacketWriter(OpcodeUserInfo)
-	writeUserInfo(w, s)
+	if err := writeUserInfo(w, s); err != nil {
+		return nil
+	}
 	return w.Bytes()
 }
 

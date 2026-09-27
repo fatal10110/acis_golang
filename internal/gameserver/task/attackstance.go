@@ -84,7 +84,8 @@ func NewAttackStance(effects AttackStanceEffects, now func() time.Time) (*Attack
 // Start launches the fixed one-second combat-stance task.
 func (a *AttackStance) Start(log zerolog.Logger) *scheduler.Ticker {
 	a.log = log
-	return scheduler.Start(AttackStanceTick, func() { a.Tick() }, log)
+	// Tick already logs its only error, ErrReentrantTick.
+	return scheduler.Start(AttackStanceTick, func() { _ = a.Tick() }, log)
 }
 
 // Add refreshes actor's combat stance timeout.

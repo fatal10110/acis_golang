@@ -1,6 +1,10 @@
 GO ?= go
 
-.PHONY: test test-unit test-internal test-one test-race test-db-up test-db-down
+.PHONY: hooks test test-unit test-internal test-one test-race test-db-up test-db-down
+
+# Enable the formatting and lint pre-commit hook for this clone.
+hooks:
+	git config core.hooksPath .githooks
 
 # Full test run: core + behavior suites. Behavior suites read/write a single
 # shared MariaDB instance (see docker-compose.test.yml, internal/dbtest) and

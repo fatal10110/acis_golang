@@ -581,7 +581,7 @@ func TestConcurrentPlacementsKeepGridConsistent(t *testing.T) {
 	}
 	registered := 0
 	for _, o := range s.Objects() {
-		if _, ok := o.(Tracked); ok && o.(Tracked).presence().currentRegion() != nil {
+		if o.presence().currentRegion() != nil {
 			registered++
 		}
 	}
@@ -763,6 +763,7 @@ func (*teleportObserver) Kind() actor.Kind  { return actor.KindNPC }
 func (o *teleportObserver) Discover(obj Tracked) {
 	o.log.add(fmt.Sprintf("%d discover %d", o.id, obj.ObjectID()))
 }
+
 func (o *teleportObserver) Forget(obj Tracked) {
 	o.log.add(fmt.Sprintf("%d forget %d", o.id, obj.ObjectID()))
 }

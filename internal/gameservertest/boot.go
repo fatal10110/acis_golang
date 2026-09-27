@@ -824,9 +824,10 @@ func (s *Server) Shutdown(tb testing.TB) {
 // and runs one production sweep. Boot does not start the autosave ticker,
 // so tests that need the periodic save path call this instead of waiting
 // AutosaveInitialDelay.
-func (s *Server) TickAutosave() {
+func (s *Server) TickAutosave(tb testing.TB) {
+	tb.Helper()
 	s.QueueAutosave()
-	s.flushPersistence()
+	s.FlushPersistence(tb)
 }
 
 // QueueAutosave is TickAutosave without waiting for the sweep's queued
@@ -1242,7 +1243,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	})
 	sendObserver := new(atomic.Pointer[func(payload []byte)])
 	frames := new(traffic)
-	go network.Serve(ctx, ln, func(ctx context.Context, conn *network.Conn) {
+	serve := func(ctx context.Context, conn *network.Conn) {
 		sent, closed := frames.track(conn)
 		defer closed()
 		conn.ObserveSends(func(payload []byte) {
@@ -1261,7 +1262,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			handlers.Unlock()
 		}()
 		gcl.Handle(ctx, conn)
-	}, zerolog.Nop())
+	}
+	// Serve returns once cleanup cancels ctx; nothing waits on its error.
+	go func() { _ = network.Serve(ctx, ln, serve, zerolog.Nop()) }()
 
 	for _, spec := range o.characters {
 		tmpl, ok := templates.Get(0)
@@ -1393,7 +1396,8 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	go gsLink.Serve(ctx, ln)
+	// Serve returns once cleanup cancels ctx; nothing waits on its error.
+	go func() { _ = gsLink.Serve(ctx, ln) }()
 
 	return ln.Addr().String(), servers, sessions
 }

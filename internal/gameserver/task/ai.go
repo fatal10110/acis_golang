@@ -54,7 +54,8 @@ func NewAI(state *world.State, log zerolog.Logger) *AI {
 
 // Start launches the fixed one-second AI task.
 func (a *AI) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(AITick, func() { a.Tick() }, log)
+	// Tick already logs its only error, ErrReentrantTick.
+	return scheduler.Start(AITick, func() { _ = a.Tick() }, log)
 }
 
 // Add registers actor for recurring AI ticks.

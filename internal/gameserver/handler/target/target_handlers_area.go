@@ -69,7 +69,7 @@ func (h frontAreaHandler) Targets(caster, target Actor, skill *modelskill.Defini
 		return nil
 	}
 	out := []Actor{target}
-	areaHandler{known: h.known}.forEachAreaTarget(caster, target, skillRadius(skill), func(creature Actor) bool {
+	areaHandler(h).forEachAreaTarget(caster, target, skillRadius(skill), func(creature Actor) bool {
 		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
 	}, func(creature Actor) {
 		out = append(out, creature)
@@ -85,7 +85,7 @@ func (frontAreaHandler) FinalTarget(caster, target Actor, _ *modelskill.Definiti
 }
 
 func (h frontAreaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
-	return areaHandler{known: h.known}.CanCast(caster, target, skill, ctrl)
+	return areaHandler(h).CanCast(caster, target, skill, ctrl)
 }
 
 type auraHandler struct {
@@ -132,7 +132,7 @@ type frontAuraHandler struct {
 func (frontAuraHandler) Target() modelskill.Target { return modelskill.TargetFrontAura }
 
 func (h frontAuraHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
-	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Actor) bool {
+	return auraHandler(h).collect(caster, skillRadius(skill), func(creature Actor) bool {
 		return creatureOrientedLocation(caster).IsInFrontOf(creatureLocation(creature))
 	}, areaCanAffect)
 }
@@ -152,7 +152,7 @@ type behindAuraHandler struct {
 func (behindAuraHandler) Target() modelskill.Target { return modelskill.TargetBehindAura }
 
 func (h behindAuraHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
-	return auraHandler{known: h.known}.collect(caster, skillRadius(skill), func(creature Actor) bool {
+	return auraHandler(h).collect(caster, skillRadius(skill), func(creature Actor) bool {
 		return creatureOrientedLocation(caster).IsBehind(creatureLocation(creature))
 	}, areaCanAffect)
 }

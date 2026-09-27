@@ -395,13 +395,6 @@ type coolTimeEntry struct {
 	RemainingSeconds int32
 }
 
-// readSkillCoolTimeEntries asserts the next frame is SkillCoolTime and
-// returns its decoded rows in wire order.
-func readSkillCoolTimeEntries(t *testing.T, c *testsupport.ScriptedClient) []coolTimeEntry {
-	t.Helper()
-	return readSkillCoolTimeEntriesFromFrame(t, c.Read())
-}
-
 func readSkillCoolTimeEntriesFromFrame(t *testing.T, frame []byte) []coolTimeEntry {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeSkillCoolTime, "SkillCoolTime")

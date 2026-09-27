@@ -37,10 +37,6 @@ func encodeEnterWorld() []byte {
 	return wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes()
 }
 
-func encodeSingleOpcode(opcode byte) []byte {
-	return wire.NewPacketWriter(opcode).Bytes()
-}
-
 func encodeTradeRequest(objectID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeTradeRequest)
 	w.WriteInt32(objectID)

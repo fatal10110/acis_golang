@@ -1,0 +1,31 @@
+#!/bin/sh
+# Formats staged Go files and lints the change with .golangci.yml.
+# Enable once per clone: make hooks. Skip for one commit: git commit --no-verify.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+[ -n "$files" ] || exit 0
+
+if ! command -v golangci-lint >/dev/null 2>&1; then
+	echo "pre-commit: golangci-lint not found; install v2 or commit with --no-verify" >&2
+	exit 1
+fi
+
+# Formatting a partially staged file would stage its unstaged hunks too, so
+# those are only checked.
+partial=$(git diff --name-only -- $files)
+full=$(printf '%s\n' $files | grep -vxF "$partial" || true)
+if [ -n "$partial" ] && ! golangci-lint fmt --diff $partial; then
+	echo "pre-commit: partially staged files need formatting: golangci-lint fmt, then re-stage" >&2
+	exit 1
+fi
+if [ -n "$full" ]; then
+	golangci-lint fmt $full
+	git add -u -- $full
+fi
+
+# Fast scope: new findings in the touched packages. It misses findings a
+# change causes elsewhere (e.g. code left unused); the full CI run catches those.
+pkgs=$(printf './%s\n' $(dirname $files) | sort -u)
+golangci-lint run --new-from-rev=HEAD $pkgs

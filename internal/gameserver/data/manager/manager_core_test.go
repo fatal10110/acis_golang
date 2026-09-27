@@ -51,6 +51,7 @@ func (f fakeGeo) Height(x, y, z int) int16                { return int16(z) }
 func (f fakeGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+
 func (f fakeGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	if f.validAt != nil {
 		return f.validAt(ox, oy, oz, tx, ty, tz)
@@ -415,6 +416,7 @@ func (g constGeoZ) Height(int, int, int) int16                { return g.z }
 func (constGeoZ) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+
 func (constGeoZ) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
@@ -511,6 +513,7 @@ func (halfWalkableGeo) Height(_, _, z int) int16                  { return int16
 func (halfWalkableGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
+
 func (halfWalkableGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

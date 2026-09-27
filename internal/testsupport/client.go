@@ -87,11 +87,13 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 		d = frameInFlight
 	}
 	var first [1]byte
-	f.conn.SetReadDeadline(time.Now().Add(d))
+	// A deadline that cannot be set means the conn is closed; the read
+	// reports that, and mid-frame it must surface as a cut-off frame.
+	_ = f.conn.SetReadDeadline(time.Now().Add(d))
 	if _, err := io.ReadFull(f.conn, first[:]); err != nil {
 		return nil, err
 	}
-	f.conn.SetReadDeadline(time.Now().Add(frameInFlight))
+	_ = f.conn.SetReadDeadline(time.Now().Add(frameInFlight))
 	payload, err := wire.ReadFrame(io.MultiReader(bytes.NewReader(first[:]), f.conn))
 	if err != nil {
 		// Formatted, not wrapped: a caller that tolerates a timeout must

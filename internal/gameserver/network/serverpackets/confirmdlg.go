@@ -15,8 +15,10 @@ const OpcodeConfirmDlg = 0xed
 // SystemMessageId.java:13579) and the id DlgAnswer's response echoes back.
 const ConfirmDlgSummonFriendRequest int32 = 1842
 
-const confirmDlgTypeText = 0
-const confirmDlgTypeZoneName = 7
+const (
+	confirmDlgTypeText     = 0
+	confirmDlgTypeZoneName = 7
+)
 
 // FrameConfirmDlgSummonFriendRequest builds skill 1403's summon-confirm
 // dialog: messageId, the caster's name (TYPE_TEXT), the caster's position

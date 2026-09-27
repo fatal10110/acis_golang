@@ -11,9 +11,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-const attackHateDecay = 6.6
-const castDesireDecay = 66000
-const nothingDesireDecay = 0.5
+const (
+	attackHateDecay    = 6.6
+	castDesireDecay    = 66000
+	nothingDesireDecay = 0.5
+)
 
 // attackDesireRange is the 3D distance past which a queued ATTACK desire
 // is dropped when the actor can still choose a new intention.
@@ -718,7 +720,7 @@ func (a *Attackable) promoteNext() {
 	default:
 		return
 	}
-	next := intention{}
+	var next intention
 	switch desire.Kind {
 	case IntentionAttack:
 		next = intention{kind: IntentionAttack, target: desire.FinalTarget}

@@ -99,7 +99,7 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 		}
 		retryDelay = 0
 		if tcp, ok := conn.(*net.TCPConn); ok {
-			tcp.SetNoDelay(true)
+			_ = tcp.SetNoDelay(true) // best-effort latency tuning
 		}
 		connsMu.Lock()
 		conns[conn] = struct{}{}

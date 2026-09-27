@@ -52,7 +52,7 @@ func TestList_AddOrRefresh_EvictsOldestPastCap(t *testing.T) {
 	maxSlots := 1 // isFull is size > maxSlots, so a 2nd add before this cap doesn't evict
 
 	l.AddOrRefresh(Storm, false, maxSlots)
-	refreshed, evicted, didEvict := l.AddOrRefresh(Vampiric, false, maxSlots)
+	refreshed, _, didEvict := l.AddOrRefresh(Vampiric, false, maxSlots)
 	if refreshed || didEvict {
 		t.Fatalf("2nd add at size 1 > maxSlots 1 is false: refreshed=%v didEvict=%v, want false,false", refreshed, didEvict)
 	}
@@ -62,7 +62,7 @@ func TestList_AddOrRefresh_EvictsOldestPastCap(t *testing.T) {
 
 	// Now size (2) > maxSlots (1): the next add evicts the oldest entry
 	// (Storm) before admitting the new one.
-	refreshed, evicted, didEvict = l.AddOrRefresh(Life, false, maxSlots)
+	refreshed, evicted, didEvict := l.AddOrRefresh(Life, false, maxSlots)
 	if refreshed || !didEvict || evicted != Storm {
 		t.Fatalf("3rd add: refreshed=%v didEvict=%v evicted=%v, want false,true,Storm", refreshed, didEvict, evicted)
 	}

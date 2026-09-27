@@ -15,8 +15,10 @@ const (
 	OpcodeRequestAllyCrest = 0x88
 )
 
-const requestCrestIDSize = 4
-const requestExPledgeCrestLargeSize = 6
+const (
+	requestCrestIDSize            = 4
+	requestExPledgeCrestLargeSize = 6
+)
 
 // RequestPledgeCrest asks the server to send the small pledge crest data for
 // a crest id.

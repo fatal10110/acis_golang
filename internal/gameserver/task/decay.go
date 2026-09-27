@@ -64,7 +64,8 @@ func NewDecay(effects DecayEffects, now func() time.Time) (*Decay, error) {
 // Start launches the fixed one-second corpse-decay task.
 func (d *Decay) Start(log zerolog.Logger) *scheduler.Ticker {
 	d.log = log
-	return scheduler.Start(DecayTick, func() { d.Tick() }, log)
+	// Tick already logs its only error, ErrReentrantTick.
+	return scheduler.Start(DecayTick, func() { _ = d.Tick() }, log)
 }
 
 // Add schedules actor's corpse for removal after interval elapses,
