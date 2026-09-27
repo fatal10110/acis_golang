@@ -35,7 +35,11 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 				t.Fatalf("CurrentIntention() = %v, want wander", got)
 			}
-			drainUntilQuiet(t, c)
+			assertChangeMoveType(t, mustRead(t, c, "wander walk stance"), hostile.ObjectID(), false)
+			assertFrameOpcode(t, mustRead(t, c, "wander move"), serverpackets.OpcodeMoveToLocation, "wander move")
+			if !hostile.IsMoving() {
+				t.Fatal("IsMoving() = false before return home")
+			}
 
 			hostile.SetXYZ(home.X, home.Y+500, home.Z)
 			for range tc.geoFailures {
@@ -69,10 +73,9 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			// Even at the slowest 60-unit walk and largest random roll, the
 			// delayed backwards step is due before five seconds.
 			srv.Advance(t, 5*time.Second)
-			frame := c.ReadWithTimeout(300 * time.Millisecond)
 			if tc.wantRecheck {
-				assertFrameOpcode(t, frame, serverpackets.OpcodeMoveToLocation, "wander recheck")
-			} else if frame != nil {
+				assertFrameOpcode(t, mustRead(t, c, "wander recheck"), serverpackets.OpcodeMoveToLocation, "wander recheck")
+			} else if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frame[0])
 			}
 		})
