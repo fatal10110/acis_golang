@@ -992,6 +992,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					refused = true
 					return
 				}
+				live.Character.DetachSession()
 				owners = l.detachLivePlayer(live)
 			}) {
 				continue

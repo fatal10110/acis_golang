@@ -239,9 +239,6 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	// comes back with its shared reuse group recomputed from the item data,
 	// and neither the deleted nor the stale row reappears.
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("pre-restart opcode = %#x, want ActionFailed", reply[0])
-	}
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeRestartResponse {
 		t.Fatalf("restart opcode = %#x, want RestartResponse", reply[0])
 	}

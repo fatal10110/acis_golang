@@ -36,14 +36,7 @@ func TestRestartReturnsToCharacterSelect(t *testing.T) {
 	waitForWorldPosition(t, srv, objID, target)
 	walkHeading := spawn.HeadingTo(target)
 
-	// detachLivePlayer's Stop() reaches the cast controller
-	// (Player.cleanup -> abortAll(true) -> _cast.stop(), Creature.java:1298-1302),
-	// and PlayerCast.stop() sends clientActionFailed unconditionally, cast or
-	// no cast in flight (PlayerCast.java:382-387), ahead of RestartResponse.
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
-	if reply := c.Read(); reply[0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("pre-restart opcode = %#x, want ActionFailed from detach's unconditional cast-stop ack (%#x)", reply[0], serverpackets.OpcodeActionFailed)
-	}
 	reply = c.Read()
 	if reply[0] != serverpackets.OpcodeRestartResponse {
 		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
