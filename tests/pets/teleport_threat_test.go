@@ -20,10 +20,7 @@ func TestOwnerTeleportRejoinsSummonForNearbyWatcher(t *testing.T) {
 	drainUntilQuiet(t, watcher)
 	drainUntilQuiet(t, h.client)
 	h.client.Send(encodeRequestActionUse(15, false))
-	h.srv.Settle(t)
-	if pet.FollowActive() {
-		t.Fatal("pet still following after toggle-off command")
-	}
+	h.srv.AdvanceUntil(t, "pet follow toggled off", func() bool { return !pet.FollowActive() })
 	drainUntilQuiet(t, watcher)
 	drainUntilQuiet(t, h.client)
 
