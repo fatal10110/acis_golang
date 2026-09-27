@@ -18,7 +18,12 @@ type ExpGained struct{ Exp int64 }
 // inventory -- is settled before anyone is told it is gone.
 type Unsummoning struct{}
 
+// SummonRemoved reports that the owner's active summon slot was cleared,
+// before the summon leaves the world.
+type SummonRemoved struct{}
+
 func (OwnerInfoChanged) event() {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
 func (Unsummoning) event()      {}
+func (SummonRemoved) event()    {}

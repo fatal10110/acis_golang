@@ -54,12 +54,12 @@ func TestOwnerPetItemListDroppedWhenPetUnsummonedFirst(t *testing.T) {
 		pet.Unsummon()
 	})
 	h.srv.Settle(t)
-	requireNoPetItemListAfterPetDelete(t, drainFrames(t, h.client))
+	requireNoPetItemListAfter(t, drainFrames(t, h.client), serverpackets.OpcodePetDelete)
 }
 
 // TestOwnerPetItemListDroppedWhenPetLeftViewFirst discovers the pet and moves
 // it back out of the owner's view in one owner-queue task: the posted
-// PetItemList must neither follow the PetDelete nor drain the pet's pending
+// PetItemList must neither follow DeleteObject nor drain the pet's pending
 // inventory updates.
 func TestOwnerPetItemListDroppedWhenPetLeftViewFirst(t *testing.T) {
 	t.Parallel()
@@ -72,10 +72,17 @@ func TestOwnerPetItemListDroppedWhenPetLeftViewFirst(t *testing.T) {
 		pet.SyncPosition(away)
 	})
 	h.srv.Settle(t)
-	requireNoPetItemListAfterPetDelete(t, drainFrames(t, h.client))
+	requireNoPetItemListAfter(t, drainFrames(t, h.client), serverpackets.OpcodeDeleteObject)
 	if !pet.PetInventory().HasUpdates() {
 		t.Fatal("a dropped PetItemList drained the pet's pending inventory updates")
 	}
+}
+
+func TestUnsummonSendsPetDeleteWhenOwnerCannotSeePet(t *testing.T) {
+	t.Parallel()
+	h, pet, _, _ := bootOwnerPetOutOfView(t)
+	pet.Unsummon()
+	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete for out-of-view pet")
 }
 
 // bootOwnerPetOutOfView spawns the owner's wolf holding 5 food, then moves it
@@ -93,27 +100,27 @@ func bootOwnerPetOutOfView(t *testing.T) (*petWorld, *summon.Actor, *sim.Queue, 
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	away := location.Location{X: x + 20000, Y: y, Z: z}
 	queue.Post(func() { pet.SyncPosition(away) })
-	readUntilOpcode(t, h.client, serverpackets.OpcodePetDelete, "PetDelete as the pet leaves view")
+	readUntilOpcode(t, h.client, serverpackets.OpcodeDeleteObject, "DeleteObject as the pet leaves view")
 	drainUntilQuiet(t, h.client)
 	return h, pet, queue, location.Location{X: x, Y: y, Z: z}
 }
 
-// requireNoPetItemListAfterPetDelete fails unless frames hold a PetDelete
+// requireNoPetItemListAfter fails unless frames hold the departure packet
 // and no PetItemList after it.
-func requireNoPetItemListAfterPetDelete(t *testing.T, frames [][]byte) {
+func requireNoPetItemListAfter(t *testing.T, frames [][]byte, departure byte) {
 	t.Helper()
 	deleted := false
 	for _, frame := range frames {
 		switch frame[0] {
-		case serverpackets.OpcodePetDelete:
+		case departure:
 			deleted = true
 		case serverpackets.OpcodePetItemList:
 			if deleted {
-				t.Fatalf("frames = opcodes %x, PetItemList after PetDelete", frameOpcodes(frames))
+				t.Fatalf("frames = opcodes %x, PetItemList after %x", frameOpcodes(frames), departure)
 			}
 		}
 	}
 	if !deleted {
-		t.Fatalf("frames = opcodes %x, want a PetDelete", frameOpcodes(frames))
+		t.Fatalf("frames = opcodes %x, want %x", frameOpcodes(frames), departure)
 	}
 }

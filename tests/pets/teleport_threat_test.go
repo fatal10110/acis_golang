@@ -3,11 +3,100 @@ package pets
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
+
+func TestOwnerTeleportRejoinsSummonForNearbyWatcher(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	h.srv.SeedCharacterFor(t, "watcher", "Watcher", 1, 0)
+	watcher := h.srv.DialClient(t, "watcher", 1)
+	startInWorld(t, watcher)
+	drainUntilQuiet(t, watcher)
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeRequestActionUse(15, false))
+	h.srv.Settle(t)
+	if pet.FollowActive() {
+		t.Fatal("pet still following after toggle-off command")
+	}
+	drainUntilQuiet(t, watcher)
+	drainUntilQuiet(t, h.client)
+
+	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner missing from world")
+	}
+	owner, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("owner = %T, want online character", obj)
+	}
+	owner.TeleportTo(x+300, y, z, 0)
+	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
+	drainUntilQuiet(t, watcher)
+	drainUntilQuiet(t, h.client)
+	if _, err := pet.Move().MoveToLocation(location.Location{X: x + 1000, Y: y, Z: z}); err != nil {
+		t.Fatalf("start pet move: %v", err)
+	}
+	if !pet.Move().Moving() {
+		t.Fatal("pet is not moving before Appearing")
+	}
+
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	ownerFrames := readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "pet teleport")
+	h.srv.Settle(t)
+	ownerFrames = append(ownerFrames, drainFrames(t, h.client)...)
+	frames := drainFrames(t, watcher)
+	var got []byte
+	for _, frame := range frames {
+		if len(frame) < 5 {
+			continue
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeStopMove, serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeTeleportToLocation, serverpackets.OpcodeDeleteObject, serverpackets.OpcodeNPCInfo:
+			if wire.NewReader(frame[1:]).ReadInt32() == pet.ObjectID() {
+				got = append(got, frame[0])
+			}
+		}
+	}
+	want := []byte{serverpackets.OpcodeStopMove, serverpackets.OpcodeTeleportToLocation, serverpackets.OpcodeDeleteObject, serverpackets.OpcodeNPCInfo}
+	if string(got) != string(want) {
+		t.Fatalf("watcher pet frames = %x, want %x; all frames %x", got, want, frameOpcodes(frames))
+	}
+	got = nil
+	for _, frame := range ownerFrames {
+		if len(frame) < 5 {
+			continue
+		}
+		switch frame[0] {
+		case serverpackets.OpcodePetDelete:
+			if wire.NewReader(frame[5:]).ReadInt32() == pet.ObjectID() {
+				t.Fatal("owner got PetDelete during teleport")
+			}
+		case serverpackets.OpcodeStopMove, serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeTeleportToLocation, serverpackets.OpcodeDeleteObject:
+			if wire.NewReader(frame[1:]).ReadInt32() == pet.ObjectID() {
+				got = append(got, frame[0])
+			}
+		case serverpackets.OpcodePetInfo:
+			if wire.NewReader(frame[5:]).ReadInt32() == pet.ObjectID() {
+				got = append(got, frame[0])
+			}
+		}
+	}
+	// The owner's own rejoin rediscovers the pet before the pet teleports.
+	want = []byte{serverpackets.OpcodePetInfo, serverpackets.OpcodeStopMove, serverpackets.OpcodeTeleportToLocation, serverpackets.OpcodeDeleteObject, serverpackets.OpcodePetInfo}
+	if string(got) != string(want) {
+		t.Fatalf("owner pet frames = %x, want %x; all frames %x", got, want, frameOpcodes(ownerFrames))
+	}
+	if !pet.FollowActive() {
+		t.Fatal("pet did not resume owner following after teleport")
+	}
+}
 
 // TestOwnerTeleportDropsSummonThreatInNearbyHostiles pins the summon's own
 // teleport at the end of its owner's: the Appearing that completes the
