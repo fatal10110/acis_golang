@@ -125,8 +125,6 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.14
-          # Pre-existing findings are not a gate; anything a change adds is.
-          only-new-issues: true
 
   # The ruleset requires a single check named "go"; it passes only when
   # every shard and the lint job do.

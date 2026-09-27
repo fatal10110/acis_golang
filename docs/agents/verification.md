@@ -139,9 +139,9 @@ is observed passing locally.
 
 The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
 Formatting is gofumpt, configured in `.golangci.yml`; `golangci-lint fmt` applies it. CI runs
-`golangci-lint run` with `only-new-issues`, so a change must not add findings: run
-`(cd acis_golang && rtk err golangci-lint run --new-from-rev=origin/main)` before completion. If the
-binary is unavailable, report it as unavailable, never as passed.
+`golangci-lint run` over the whole tree, which must stay at 0 issues: run
+`(cd acis_golang && rtk err golangci-lint run)` before completion. If the binary is unavailable,
+report it as unavailable, never as passed.
 
 If an external integration service is unavailable, run all independent gates and report the exact
 blocked test; do not convert the missing service into a passing result.

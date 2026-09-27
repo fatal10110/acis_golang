@@ -25,6 +25,7 @@ if [ -n "$full" ]; then
 	git add -u -- $full
 fi
 
-# Pre-existing findings are not a gate (matches CI only-new-issues).
+# Fast scope: new findings in the touched packages. It misses findings a
+# change causes elsewhere (e.g. code left unused); the full CI run catches those.
 pkgs=$(printf './%s\n' $(dirname $files) | sort -u)
 golangci-lint run --new-from-rev=HEAD $pkgs
