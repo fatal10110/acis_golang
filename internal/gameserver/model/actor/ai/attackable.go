@@ -86,6 +86,13 @@ type AttackController interface {
 	Stop()
 }
 
+// hitAnimationReporter is the optional AttackController capability that
+// reports the local hit animation window. While it is open, no new desire is
+// promoted.
+type hitAnimationReporter interface {
+	InHitAnimation() bool
+}
+
 // CastController controls skill-cast requests emitted by the AI loop,
 // mirroring AttackController's role for AI-initiated skill casts. A nil
 // CastController on an Attackable makes IntentionCast a no-op, matching an
@@ -141,16 +148,22 @@ type intention struct {
 // can raise hate while the loop reads target selection. mu guards
 // current/next/step: the AI task posts Think and Tick to the NPC's queue,
 // where the movement and attack hooks also run, but the first attack desire
-// against an actor with no most-hated target calls Think from the
+// against an actor with no most-hated target calls RunAI from the
 // attacker's queue (thinkIfNoMostHated) so the reaction does not wait for
-// the next tick. Entry points must serialize against each other.
+// the next tick. Entry points must serialize against each other. A cast's
+// end reaches ClearCurrentDesire synchronously from the cast controller, so
+// code holding mu stops the cast controller only while no cast is in
+// flight: the idle aborts and every intention step first check castingNow.
 type Attackable struct {
-	actor   AttackableActor
-	move    MoveController
-	attack  AttackController
-	threats *attackable.ThreatTable
-	hates   *attackable.HateTable
-	desires *DesireQueue
+	actor  AttackableActor
+	move   MoveController
+	attack AttackController
+	// hitAnimation is attack's hit-animation report, nil when attack does
+	// not track one.
+	hitAnimation hitAnimationReporter
+	threats      *attackable.ThreatTable
+	hates        *attackable.HateTable
+	desires      *DesireQueue
 
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor).
@@ -209,6 +222,7 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
 	}
+	a.hitAnimation, _ = attack.(hitAnimationReporter)
 	a.threats = attackable.NewThreatTable(actor, func() time.Time { return a.now() })
 	return a
 }
@@ -458,7 +472,7 @@ func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.C
 	if hadMostHated || attacker == nil || !a.actor.Knows(attacker) {
 		return
 	}
-	_ = a.Think()
+	_ = a.RunAI()
 }
 
 // RandomizeHate ports the AI side of AggroList.randomizeAttack(), driving
@@ -613,12 +627,35 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 	return a.next.kind, a.next.target, true
 }
 
-// Think advances the current intention once. Event-driven callers (arrival,
-// attack-finished, first hate) use this path: it does not run empty-queue
-// idle abort. A non-nil return reports that an intention step ran but a
-// broadcast within it failed; the intention itself still advanced.
+// thinkMode selects which entry point a think pass serves.
+type thinkMode uint8
+
+const (
+	// thinkContinue continues the current intention after arrival or a bow
+	// reuse ending; it never idles on an empty queue.
+	thinkContinue thinkMode = iota
+	// thinkEvent re-runs desire selection on an event: a swing finishing,
+	// the hit animation ending, a bow shot, a completed cast or a first
+	// attack desire.
+	thinkEvent
+	// thinkTick is the periodic AI cycle.
+	thinkTick
+)
+
+// Think advances the current intention once, for arrival and a bow's reuse
+// ending: it does not run empty-queue idle abort. A non-nil return reports
+// that an intention step ran but a broadcast within it failed; the intention
+// itself still advanced.
 func (a *Attackable) Think() error {
-	return a.think(false)
+	return a.think(thinkContinue)
+}
+
+// RunAI re-runs desire selection on an event. After the first periodic
+// cycle, a controllable actor that is not casting, has an empty desire
+// queue and is not idle aborts everything and goes idle; otherwise it
+// advances like Think.
+func (a *Attackable) RunAI() error {
+	return a.think(thinkEvent)
 }
 
 // TickThink is the periodic AI cycle. Empty-queue idle abort runs after
@@ -626,7 +663,16 @@ func (a *Attackable) Think() error {
 // same cycle. Promotion itself also waits for that first cycle unless an
 // ATTACK desire is already queued, and is skipped while a cast is in flight.
 func (a *Attackable) TickThink() error {
-	return a.think(true)
+	return a.think(thinkTick)
+}
+
+// ClearCurrentDesire drops the queued desire matching the current intention,
+// leaving the intention itself in place. A finished or aborted cast calls it
+// so its CAST desire is not picked again.
+func (a *Attackable) ClearCurrentDesire() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.clearCurrentDesire()
 }
 
 func (a *Attackable) castingNow() bool {
@@ -644,13 +690,17 @@ func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
 	return a.lifeTime > 0 || instantRun
 }
 
-func (a *Attackable) think(updateTick bool) error {
+func (a *Attackable) think(mode thinkMode) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	updateTick := mode == thinkTick
 	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
 	a.refreshCombatMemory()
 	a.pruneDesires()
+	if mode == thinkEvent && a.idleOnEmptyQueue() {
+		return nil
+	}
 	a.dropCurrentIfUnqueued()
 	canPromote := a.canPromote(updateTick, instantRun)
 	if updateTick {
@@ -707,7 +757,34 @@ func (a *Attackable) think(updateTick bool) error {
 	return nil
 }
 
+// idleOnEmptyQueue runs the event-driven empty-queue idle: once the first
+// periodic cycle has run, a controllable actor that is not casting, has no
+// queued desire and is not already idle aborts everything and goes idle.
+// It reports whether it did; the idle then takes no further step this pass.
+func (a *Attackable) idleOnEmptyQueue() bool {
+	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.actor.DenyAIAction() || a.castingNow() {
+		return false
+	}
+	if _, ok := a.desires.Peek(); ok {
+		return false
+	}
+	a.thinkIdle()
+	a.queueIdleFollow()
+	if _, ok := a.desires.Peek(); !ok {
+		a.queueIdleWander()
+	}
+	return true
+}
+
+// inHitAnimation reports whether the attack's hit animation window is open.
+func (a *Attackable) inHitAnimation() bool {
+	return a.hitAnimation != nil && a.hitAnimation.InHitAnimation()
+}
+
 func (a *Attackable) promoteNext() {
+	if a.inHitAnimation() {
+		return
+	}
 	desire, ok := a.desires.Peek()
 	if !ok {
 		return

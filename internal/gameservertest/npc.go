@@ -130,12 +130,16 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 }
 
 // castCanceledBroadcast closes an aborted fixture AI cast with its cancel
-// animation, as production's hostile controller sink does.
+// animation and hands every cast end to the AI, as production's hostile
+// controller sink does.
 type castCanceledBroadcast struct{ hostile *npc.Hostile }
 
 func (c castCanceledBroadcast) Emit(ev event.Event) {
-	if _, ok := ev.(event.CastAborted); ok {
+	switch e := ev.(type) {
+	case event.CastAborted:
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
+	case event.CastFinished:
+		_ = c.hostile.CastFinished(e.Interrupted)
 	}
 }
 
@@ -376,7 +380,7 @@ type movingHostileControl struct {
 }
 
 func (c *movingHostileControl) Emit(ev event.Event) {
-	switch ev.(type) {
+	switch e := ev.(type) {
 	case event.Arrived:
 		c.hostile.SyncPosition(c.move.Position())
 		c.hostile.AI().Arrived()
@@ -386,13 +390,25 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		c.hostile.AI().ArrivedBlocked()
 		c.server.think(c.hostile)
 	case event.AttackFinished:
-		c.server.think(c.hostile)
+		if e.BowReuse {
+			c.server.think(c.hostile)
+			return
+		}
+		c.server.runAI(c.hostile)
+	case event.AttackRethink:
+		c.server.runAI(c.hostile)
 	}
 }
 
 func (s *Server) think(hostile *npc.Hostile) {
 	if err := hostile.Think(); err != nil {
 		s.log.Warn().Err(err).Msg("ai: hostile think")
+	}
+}
+
+func (s *Server) runAI(hostile *npc.Hostile) {
+	if err := hostile.RunAI(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: hostile run")
 	}
 }
 

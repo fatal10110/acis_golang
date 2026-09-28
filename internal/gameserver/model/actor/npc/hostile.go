@@ -738,6 +738,27 @@ func (h *Hostile) Think() error {
 	return h.brain.Think()
 }
 
+// RunAI re-runs the hostile AI's desire selection on an event: a swing
+// finishing, the hit animation ending, a bow shot landing or a completed
+// cast. Unlike Think it idles an actor whose desire queue ran empty.
+func (h *Hostile) RunAI() error {
+	if !h.canRunAI() {
+		return nil
+	}
+	return h.brain.RunAI()
+}
+
+// CastFinished ends the AI's hold on a cast that completed or was aborted:
+// the desire that drove it is dropped, and only a completed cast re-runs
+// desire selection.
+func (h *Hostile) CastFinished(interrupted bool) error {
+	h.brain.ClearCurrentDesire()
+	if interrupted {
+		return nil
+	}
+	return h.RunAI()
+}
+
 // TickThink runs one periodic AI cycle, including empty-queue idle abort
 // after the first cycle.
 func (h *Hostile) TickThink() error {

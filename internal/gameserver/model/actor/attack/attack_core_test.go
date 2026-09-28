@@ -57,7 +57,7 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	// Each hit arms the next step only once it has landed, so a hit whose
 	// task runs late on a busy queue delays the rest of the attack with it.
 	target.onDamage = func() {
-		if got, want := armedTimers(ctrl), 1+target.hits; got != want {
+		if got, want := armedTimers(ctrl), target.hits; got != want {
 			t.Fatalf("timers armed while hit %d lands = %d, want %d", target.hits, got, want)
 		}
 	}
@@ -211,8 +211,8 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	primary.onDamage = func() {
 		// One timer for the whole pole group; completion is armed only
 		// after the group has landed.
-		if got := armedTimers(ctrl); got != 2 {
-			t.Fatalf("timers armed while the pole group lands = %d, want 2 (hit animation, one pole group)", got)
+		if got := armedTimers(ctrl); got != 1 {
+			t.Fatalf("timers armed while the pole group lands = %d, want 1 (one pole group)", got)
 		}
 		actor.dead = true
 		ctrl.Stop()

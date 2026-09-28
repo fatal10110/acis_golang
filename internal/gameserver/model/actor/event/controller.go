@@ -22,8 +22,15 @@ type CastStopAck struct{}
 type AttackStarted struct{}
 
 // AttackFinished reports an attack animation finishing; the actor is free to
-// act again.
-type AttackFinished struct{}
+// act again. BowReuse marks the finish of a bow's reuse delay rather than of
+// a swing.
+type AttackFinished struct{ BowReuse bool }
+
+// AttackRethink reports a hostile NPC's attack reaching a point where its AI
+// re-runs desire selection: the hit animation ending or a bow shot landing.
+// A finished swing reports AttackFinished instead. Only NPC attack
+// controllers emit it.
+type AttackRethink struct{}
 
 // Arrived reports that movement a controller started reached its
 // destination.
@@ -38,5 +45,6 @@ func (CastFinished) event()   {}
 func (CastStopAck) event()    {}
 func (AttackStarted) event()  {}
 func (AttackFinished) event() {}
+func (AttackRethink) event()  {}
 func (Arrived) event()        {}
 func (MoveBlocked) event()    {}
