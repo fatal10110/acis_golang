@@ -142,6 +142,8 @@ type SummonActor interface {
 	OwnerObject() (world.Tracked, bool)
 	TryToAttack(world.Tracked)
 	TryToFollow(world.Tracked)
+	// Think wakes the summon's AI to continue its current intention.
+	Think() error
 }
 
 func asPlayer(a Actor) (PlayerActor, bool) {

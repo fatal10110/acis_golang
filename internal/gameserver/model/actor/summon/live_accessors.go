@@ -567,6 +567,16 @@ func (a *Actor) TryToIdle() {
 	a.brain.FollowInstead(a.owner)
 }
 
+// Think wakes the attached AI to continue its current intention, as an
+// ending sleep, root or paralysis does. The AI logs its own broadcast
+// errors, so this never returns one.
+func (a *Actor) Think() error {
+	if a.brain != nil {
+		a.brain.Think()
+	}
+	return nil
+}
+
 // idle cancels the attached AI's current intention without falling back to
 // following the owner.
 func (a *Actor) idle() {

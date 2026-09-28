@@ -57,10 +57,13 @@ func thinkAndRefreshExit(e *Effect) {
 	refresh(e.Effected)
 }
 
-// think wakes an NPC target's AI; other kinds have no AI loop to wake.
+// think wakes an NPC or summon target's AI; other kinds have no AI loop to
+// wake here.
 func think(target Actor) {
 	if npc, ok := asNPC(target); ok {
 		_ = npc.Think()
+	} else if summon, ok := asSummon(target); ok {
+		_ = summon.Think()
 	}
 }
 
