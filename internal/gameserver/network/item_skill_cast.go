@@ -117,7 +117,8 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 			return nil, true, false
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
-			sendCorpseCastFailure(live, started.Definition)
+			// No final target, or a handler that reports its failure only
+			// as a bool: the request is dropped with ActionFailed alone.
 			sendMagicActionFailed(live)
 			return nil, true, false
 		}

@@ -17,10 +17,18 @@ const (
 	CastRejectCantAttackPeaceZone
 	CastRejectTargetInPeaceZone
 	CastRejectCannotUseSkill
+	// Corpse-mob failures: harvest on a non-monster corpse, a corpse past
+	// half its decay time that is neither seeded nor spoiled, and sweep on a
+	// non-monster corpse.
+	CastRejectHarvestNotMonster
+	CastRejectCorpseTooOld
+	CastRejectSweepNotMonster
 )
 
 // CastRejectionFor classifies the target-handler failures for which the
 // reference sends a system message. Other failed target checks remain silent.
+// A nil target always classifies as CastRejectNone: a missing target is
+// dropped before the cast stops the caster, not rejected after it.
 func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	switch targetType {
 	case modelskill.TargetAura, modelskill.TargetFrontAura:
@@ -43,6 +51,16 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 			return CastRejectNone
 		}
 		return unlockableCastRejection(target)
+	case modelskill.TargetUndead:
+		if target == nil {
+			return CastRejectNone
+		}
+		return undeadCastRejection(target)
+	case modelskill.TargetCorpseMob, modelskill.TargetAreaCorpseMob:
+		if target == nil {
+			return CastRejectNone
+		}
+		return corpseMobCastRejection(target, skill)
 	case modelskill.TargetCorpsePlayer:
 		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
@@ -54,6 +72,19 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 func holyCastRejection(target Actor) CastRejection {
 	if !target.Holy() {
 		return CastRejectInvalidTarget
+	}
+	return CastRejectNone
+}
+
+// undeadCastRejection splits the UNDEAD target check: a target that is not
+// a living monster or servitor is an invalid target, while a living one that
+// is not undead refuses the skill by name.
+func undeadCastRejection(target Actor) CastRejection {
+	if target.Dead() || !undeadTargetKind(target) {
+		return CastRejectInvalidTarget
+	}
+	if !target.Undead() {
+		return CastRejectCannotUseSkill
 	}
 	return CastRejectNone
 }
