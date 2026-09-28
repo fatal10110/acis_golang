@@ -93,6 +93,7 @@ func encodeMoveBackwardToLocation(target, origin location.Location, moveMovement
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
+	compass := gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -122,7 +123,8 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		}
 		frames = append(frames, frame)
 	}
-	return frames
+	// Preserve the established burst indices used by other flow tests.
+	return append(frames, compass)
 }
 
 func assertStatusAttrs(t *testing.T, frame []byte, objectID int32, attrs []serverpackets.StatusAttribute) {

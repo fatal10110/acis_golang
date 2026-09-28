@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -142,6 +143,7 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 	}
 
 	c.Send(encodeEnterWorld())
+	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -225,6 +227,7 @@ func readEnterWorldBurstWithRestoredBuff(t *testing.T, c *testsupport.ScriptedCl
 
 func readFrameSequence(t *testing.T, c *testsupport.ScriptedClient, want []byte) [][]byte {
 	t.Helper()
+	gameservertest.ReadInitialCompass(t, c)
 	frames := make([][]byte, 0, len(want))
 	for i, opcode := range want {
 		frame := c.Read()

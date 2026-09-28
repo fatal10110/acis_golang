@@ -45,10 +45,14 @@ const autosaveSaveTimeout = 5 * time.Second
 // The player holds no zone in between, so position updates must not enter
 // any.
 type liveZoneActor struct {
-	mu      sync.Mutex
-	live    *livePlayer
-	flags   zone.Flags
-	offGrid bool
+	// deliveryMu keeps compass sends in the same order as zone transitions.
+	// mu protects the zone state and is released before sending a frame.
+	deliveryMu  sync.Mutex
+	mu          sync.Mutex
+	live        *livePlayer
+	flags       zone.Flags
+	offGrid     bool
+	lastCompass int32
 }
 
 func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() }
@@ -88,26 +92,42 @@ func resolveFixedRes(data *admin.Data, accessLevel int) bool {
 }
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if a.offGrid {
+		a.mu.Unlock()
 		return
 	}
-	ix.Revalidate(a)
+	if ix != nil {
+		ix.Revalidate(a)
+	}
 	a.syncFlags()
+	code, changed, flagPvP := a.compassUpdate()
+	a.mu.Unlock()
+	a.sendCompass(code, changed, flagPvP)
 }
 
 func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if a.offGrid {
+		a.mu.Unlock()
 		return
 	}
-	ix.RevalidateMove(a, previous)
+	if ix != nil {
+		ix.RevalidateMove(a, previous)
+	}
 	a.syncFlags()
+	code, changed, flagPvP := a.compassUpdate()
+	a.mu.Unlock()
+	a.sendCompass(code, changed, flagPvP)
 }
 
 func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
@@ -118,21 +138,31 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 // of the region containing (x, y), its position before the jump, and
 // enters none until rejoin.
 func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.offGrid = true
-	ix.RemoveFrom(a, x, y)
+	if ix != nil {
+		ix.RemoveFrom(a, x, y)
+	}
 	a.syncFlags()
 }
 
 // rejoin puts the player back on the grid once its client has appeared,
 // entering the zones at its current position.
 func (a *liveZoneActor) rejoin(ix *zone.Index) {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.offGrid = false
-	ix.Revalidate(a)
+	if ix != nil {
+		ix.Revalidate(a)
+	}
 	a.syncFlags()
+	code, changed, flagPvP := a.compassUpdate()
+	a.mu.Unlock()
+	a.sendCompass(code, changed, flagPvP)
 }
 
 func (a *liveZoneActor) syncFlags() {
@@ -140,6 +170,44 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
+}
+
+func (a *liveZoneActor) compassUpdate() (code int32, changed, flagPvP bool) {
+	switch {
+	case a.flags.Has(zone.FlagSiege):
+		code = serverpackets.CompassSiegeZone
+	case a.flags.Has(zone.FlagPvP):
+		code = serverpackets.CompassPvPZone
+	case a.flags.Has(zone.FlagPeace):
+		code = serverpackets.CompassPeaceZone
+	default:
+		code = serverpackets.CompassGeneralZone
+	}
+	if code == a.lastCompass {
+		return code, false, false
+	}
+	flagPvP = a.lastCompass == serverpackets.CompassSiegeZone && code == serverpackets.CompassGeneralZone
+	a.lastCompass = code
+	return code, true, flagPvP
+}
+
+func (a *liveZoneActor) sendCompass(code int32, changed, flagPvP bool) {
+	if !changed {
+		return
+	}
+	if flagPvP {
+		a.live.Character.UpdatePvPStatus()
+	}
+	a.live.SendFrame(serverpackets.FrameExSetCompassZoneCode(code))
+}
+
+func (a *liveZoneActor) sendCurrentCompass() {
+	a.deliveryMu.Lock()
+	defer a.deliveryMu.Unlock()
+	a.mu.Lock()
+	code, changed, flagPvP := a.compassUpdate()
+	a.mu.Unlock()
+	a.sendCompass(code, changed, flagPvP)
 }
 
 // TaskEffects routes periodic task effects to their current live player.
@@ -358,7 +426,7 @@ func (l *GameClientLink) wireWaterZones() {
 }
 
 func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {
-	if l.zones != nil && live != nil && live.zoneActor != nil {
+	if live != nil && live.zoneActor != nil {
 		live.zoneActor.revalidateMove(l.zones, previous)
 	}
 }
@@ -366,7 +434,7 @@ func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Loc
 // leaveZones exits live from every zone around its current position as a
 // teleport takes it off the grid; until rejoinZones, movement enters none.
 func (l *GameClientLink) leaveZones(live *livePlayer) {
-	if l.zones == nil || live.zoneActor == nil {
+	if live.zoneActor == nil {
 		return
 	}
 	position := live.CurrentLocation()
@@ -377,7 +445,7 @@ func (l *GameClientLink) leaveZones(live *livePlayer) {
 // its client has appeared; a water destination starts a fresh breath
 // countdown.
 func (l *GameClientLink) rejoinZones(live *livePlayer) {
-	if l.zones == nil || live.zoneActor == nil {
+	if live.zoneActor == nil {
 		return
 	}
 	live.zoneActor.rejoin(l.zones)

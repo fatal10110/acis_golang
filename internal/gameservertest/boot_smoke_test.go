@@ -35,6 +35,7 @@ func encodeEnterWorld() []byte {
 // burst.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
+	ReadInitialCompass(t, c)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,

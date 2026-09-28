@@ -11,6 +11,9 @@ import (
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient, wantDie bool) [][]byte {
 	t.Helper()
+	if compass, want := c.Read(), []byte{0xfe, 0x32, 0, 0x0f, 0, 0, 0}; !bytes.Equal(compass, want) {
+		t.Fatalf("EnterWorld compass = %x, want %x", compass, want)
+	}
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,

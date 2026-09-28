@@ -400,6 +400,7 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
+	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeStatusUpdate)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,

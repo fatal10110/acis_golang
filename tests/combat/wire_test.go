@@ -122,6 +122,7 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 // interleave whenever someone is already in the shared spawn region.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
+	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,

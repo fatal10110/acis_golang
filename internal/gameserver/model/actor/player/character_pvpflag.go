@@ -38,6 +38,13 @@ func (c *Character) flagPvP(useFlaggedDuration bool) {
 	c.emit(event.PvPFlagged{UseFlaggedDuration: useFlaggedDuration})
 }
 
+// UpdatePvPStatus starts the normal PvP flag window outside a PvP zone.
+func (c *Character) UpdatePvPStatus() {
+	if !c.InPvPZone() {
+		c.flagPvP(false)
+	}
+}
+
 // NotePvPAttack records one resolved physical attack against target.
 func (c *Character) NotePvPAttack(target attackable.Combatant) {
 	if victim := pvpTargetPlayer(target); victim != nil {

@@ -1166,6 +1166,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Positions:        positions,
 		PlayerClock:      playerClock,
 		GameClock:        task.NewGameClock(time.Now),
+		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,

@@ -307,7 +307,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)
-		if l.zones != nil && live.zoneActor != nil {
+		if live.zoneActor != nil {
 			live.zoneActor.revalidate(l.zones)
 		}
 	}

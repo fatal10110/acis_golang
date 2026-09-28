@@ -49,6 +49,7 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 		observer.Read()
 		observer.Send(encodeEnterWorld())
 		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "ground-sitting player CharInfo")
+		gameservertest.ReadInitialCompass(t, observer)
 		mustReadOpcode(t, observer, serverpackets.OpcodeSendMacroList, "ground-sitting player enter-world burst")
 	})
 }
