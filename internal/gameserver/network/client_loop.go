@@ -566,7 +566,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				// to resolve, and locks its own input until Attack or
 				// ActionFailed answers it.
 				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-				l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+				l.handleTargetAction(ctx, live, req.ObjectID, selected, false, req.Shift)
 			})
 
 		case clientpackets.OpcodeAttackRequest:
@@ -581,8 +581,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() {
+				// A forced attack is an attack request on the object already
+				// selected; on any other object it only selects it.
 				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
-				l.handleTargetAction(ctx, live, req.ObjectID, selected, req.Shift)
+				l.handleTargetAction(ctx, live, req.ObjectID, selected, selected, req.Shift)
 			})
 
 		case clientpackets.OpcodeLogout:

@@ -4,7 +4,9 @@ import (
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 var _ skilltarget.Actor = (*Actor)(nil)
@@ -41,11 +43,36 @@ func (a *Actor) CorpseTime() time.Duration            { return 0 }
 func (a *Actor) Spoiled() bool                        { return false }
 func (a *Actor) Seeded() bool                         { return false }
 
-// AttackableBy reports false: summon attack rules and the summon death
-// sequence are not modeled yet, so auto-attacks and area skills never pick a
-// summon as a target.
-func (a *Actor) AttackableBy(skilltarget.Actor) bool { return false }
+// AttackableBy reports whether attacker may attack a: a living summon is
+// attackable by anyone but itself, its owner included.
+//
+// The Olympiad, Blessing of Protection and cursed-weapon exemptions are not
+// applied: that state is not tracked yet, the same as for a player target.
+func (a *Actor) AttackableBy(attacker skilltarget.Actor) bool {
+	return !a.Dead() && !sameObject(attacker, a)
+}
 
-// AttackableWithoutForceBy reports false: summon attack rules are not modeled
-// yet.
-func (a *Actor) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }
+// AttackableWithoutForceBy reports whether caster may attack a without a
+// forced attack: never by its owner or the owner's own summon, otherwise
+// only while the owner has karma or a PvP flag.
+//
+// The Olympiad, duel, arena, party, clan, alliance and siege-side rules are
+// not applied: that state is not tracked yet, the same as for a player
+// target. Summons have no PvP-zone membership yet (#2623).
+func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
+	if caster == nil || a.owner == nil || actingPlayerID(caster) == a.owner.ObjectID() {
+		return false
+	}
+	return a.Karma() > 0 || a.PvPFlagState() != task.PvPFlagNone
+}
+
+// actingPlayerID is the object id of the player acting through c: c itself,
+// or the owner of a summon.
+func actingPlayerID(c skilltarget.Actor) int32 {
+	if c.Kind() == actor.KindSummon {
+		if owner, ok := c.Owner(); ok && owner != nil {
+			return owner.ObjectID()
+		}
+	}
+	return c.ObjectID()
+}

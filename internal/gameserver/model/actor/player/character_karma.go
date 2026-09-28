@@ -12,22 +12,23 @@ import (
 // Formulas.calculateKarmaGain's default branch.
 const pkKillKarmaPlateau = 14400
 
-// calculatePKKillKarmaGain returns the karma a PK kill awards the killer,
-// keyed off the killer's PK-kill count after this kill has incremented it
-// (so the first PK uses pkKills == 1). Gain ramps linearly below 100
-// kills, ramps more slowly from 100 up to 180, then plateaus at
-// pkKillKarmaPlateau — matching Formulas.calculateKarmaGain(pkCount,
-// isSummon=false); the isSummon halving branch doesn't apply here since
-// this path only handles a player killing another player.
-func calculatePKKillKarmaGain(pkKills int) int {
+// calculateKarmaGain returns the karma a PK kill awards the killer, keyed
+// off pkCount. Gain ramps linearly below 100 kills, ramps more slowly from
+// 100 up to 180, then plateaus at pkKillKarmaPlateau. Killing a summon
+// awards about a quarter of that, with pkCount's two low bits added before
+// the division.
+func calculateKarmaGain(pkCount int, summon bool) int {
+	result := pkKillKarmaPlateau
 	switch {
-	case pkKills < 100:
-		return int((((float64(pkKills-1) * 0.5) + 1) * 60) * 4)
-	case pkKills < 180:
-		return int((((float64(pkKills+1) * 0.125) + 37.5) * 60) * 4)
-	default:
-		return pkKillKarmaPlateau
+	case pkCount < 100:
+		result = int((((float64(pkCount-1) * 0.5) + 1) * 60) * 4)
+	case pkCount < 180:
+		result = int((((float64(pkCount+1) * 0.125) + 37.5) * 60) * 4)
 	}
+	if summon {
+		result = ((pkCount & 3) + result) >> 2
+	}
+	return result
 }
 
 // awardKillerPKKarma grants killer PK-kill karma when c (the victim who
@@ -46,18 +47,48 @@ func calculatePKKillKarmaGain(pkKills int) int {
 // reproduces the innocent-victim and already-flagged-victim gates; the
 // others stay dormant until their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
-	pk := killerPlayer(killer)
+	pk := actingCharacter(killer)
 	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	pk.progressionMu.Lock()
 	pk.PKKills++
-	pk.KarmaPoints += calculatePKKillKarmaGain(pk.PKKills)
+	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, false)
 	karma := pk.KarmaPoints
 	pk.progressionMu.Unlock()
-	pk.notifyKarmaChanged(karma)
-	pk.UpdateUserInfo()
-	pk.BroadcastRelations()
+	pk.publishPKKarma(karma)
+}
+
+// AwardSummonKillKarma grants killer PK karma for killing c's summon when c
+// has no karma and no PvP flag, and the kill is not inside a PvP zone for
+// both players. A summon kill never counts as a PK kill: the gain uses the
+// killer's current PK count at the summon rate, and a PvP point is never
+// awarded for it. Killing one's own summon awards nothing.
+//
+// The duel and clan-war exemptions are not applied: that state is not
+// tracked yet, the same as for a player kill (#1301). Neither kill resets
+// the killer's PvP flag or rechecks its equipment yet (#2622).
+func (c *Character) AwardSummonKillKarma(killer attackable.Combatant) {
+	pk := actingCharacter(killer)
+	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
+		return
+	}
+	if pk.InPvPZone() && c.InPvPZone() {
+		return
+	}
+	pk.progressionMu.Lock()
+	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, true)
+	karma := pk.KarmaPoints
+	pk.progressionMu.Unlock()
+	pk.publishPKKarma(karma)
+}
+
+// publishPKKarma reports c's karma after a PK gain to its own client and its
+// observers.
+func (c *Character) publishPKKarma(karma int) {
+	c.notifyKarmaChanged(karma)
+	c.UpdateUserInfo()
+	c.BroadcastRelations()
 }
 
 // awardKillerPvPKill grants the killer a PvP-kill point for an actively
@@ -71,7 +102,7 @@ func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 // allows an at-war clan kill. That state is not tracked on Character yet;
 // it remains owned by the clan subsystem.
 func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
-	pk := killerPlayer(killer)
+	pk := actingCharacter(killer)
 	if pk == nil || pk == c {
 		return
 	}
@@ -93,15 +124,18 @@ func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
 	pk.UpdateUserInfo()
 }
 
-func killerPlayer(killer attackable.Combatant) *Character {
-	if killer == nil {
+// actingCharacter resolves the player acting through c: c itself, or a
+// summon's owner. A live wrapper embedding *Character resolves to its
+// model, which is how a summon's owner is held.
+func actingCharacter(c attackable.Combatant) *Character {
+	if c != nil && c.Kind() == actor.KindSummon {
+		c, _ = c.Owner()
+	}
+	holder, ok := c.(interface{ PlayerCharacter() *Character })
+	if !ok {
 		return nil
 	}
-	if killer.Kind() == actor.KindSummon {
-		killer, _ = killer.Owner()
-	}
-	pk, _ := killer.(*Character)
-	return pk
+	return holder.PlayerCharacter()
 }
 
 func (c *Character) notifyKarmaChanged(karma int) {

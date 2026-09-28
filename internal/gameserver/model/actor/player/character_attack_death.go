@@ -4,7 +4,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TakeDamage applies physical damage, broadcasts the resulting HP to nearby
@@ -91,7 +90,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	}
 	c.BroadcastStatus()
 	c.StopCast()
-	c.clearEffectsOnDeath()
+	c.EffectList().StopOnDeath()
 	c.BroadcastStatus()
 	c.BroadcastDie()
 	c.awardKillerPKKarma(killer)
@@ -102,30 +101,4 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})
 	return true
-}
-
-func (c *Character) clearEffectsOnDeath() {
-	list := c.EffectList()
-	if list == nil {
-		return
-	}
-	has := func(want effect.Type) bool {
-		for _, e := range list.All() {
-			if e.Type == want {
-				return true
-			}
-		}
-		return false
-	}
-	if has(effect.TypePhoenixBless) {
-		list.StopByType(effect.TypeCharmOfLuck)
-		list.StopByType(effect.TypeNoblesseBless)
-		return
-	}
-	if has(effect.TypeNoblesseBless) {
-		list.StopByType(effect.TypeNoblesseBless)
-		list.StopByType(effect.TypeCharmOfLuck)
-		return
-	}
-	list.StopAllExceptThoseThatLastThroughDeath()
 }
