@@ -1,7 +1,6 @@
 package skill
 
 import (
-	"reflect"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -492,18 +491,20 @@ func alikeDead(a Actor) bool {
 	return a.Dead()
 }
 
+// sameObject reports whether a and b are the same world object. Identity is
+// the object id: every live world object owns a unique non-zero id, so two
+// Go values carrying the same id (an actor and a wrapper around it, say) are
+// one object, and two values with different ids are distinct even when they
+// are equal Go values. An actor with id 0 has not been placed in the world
+// and has no identity to share, so it is the same object as nothing — not
+// even itself. Two nil actors are the same (absent) object; nil and a
+// non-nil actor never are.
 func sameObject(a, b Actor) bool {
 	if a == nil || b == nil {
-		return a == b
+		return a == nil && b == nil
 	}
-
-	ta := reflect.TypeOf(a)
-	tb := reflect.TypeOf(b)
-	if ta != tb || !ta.Comparable() {
-		return false
-	}
-
-	return a == b
+	id := a.ObjectID()
+	return id != 0 && id == b.ObjectID()
 }
 
 // cursed reports whether a wields a cursed weapon; only a player can.
