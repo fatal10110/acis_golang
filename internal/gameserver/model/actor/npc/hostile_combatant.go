@@ -17,9 +17,15 @@ func (h *Hostile) FakeDeath() bool { return false }
 // RecentFakeDeath reports false: NPCs never feign death.
 func (h *Hostile) RecentFakeDeath() bool { return false }
 
-// InPeaceZone reports false: NPC peace-zone membership is not tracked, so an
-// NPC is never shielded by one.
-func (h *Hostile) InPeaceZone() bool { return false }
+// InPeaceZone reports whether the NPC's current position lies in a zone that
+// raises the peace flag for an NPC. The NPC is not a zone occupant yet, so
+// the zones are probed by position instead of read from a flag ledger.
+func (h *Hostile) InPeaceZone() bool {
+	if h.inPeace == nil {
+		return false
+	}
+	return h.inPeace(h.location())
+}
 
 // SpawnProtected reports false: spawn protection is a player state.
 func (h *Hostile) SpawnProtected() bool { return false }
@@ -28,8 +34,12 @@ func (h *Hostile) SpawnProtected() bool { return false }
 // and NPCs have none.
 func (h *Hostile) CanGiveDamage() bool { return true }
 
-// Guard reports false: town-guard classification is not modeled yet.
-func (h *Hostile) Guard() bool { return false }
+// Guard reports whether this NPC is a town Guard or a SiegeGuard. A helpful
+// skill cast on a guard does not PvP-flag the caster.
+func (h *Hostile) Guard() bool {
+	kind := hostileKind(h.Instance)
+	return kind == "Guard" || kind == "SiegeGuard"
+}
 
 // Owner reports no owner: NPCs are not summons.
 func (h *Hostile) Owner() (attackable.Combatant, bool) { return nil, false }

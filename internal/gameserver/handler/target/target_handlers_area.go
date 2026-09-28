@@ -103,7 +103,7 @@ func (auraHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Actor 
 }
 
 func (auraHandler) CanCast(caster, _ Actor, skill *modelskill.Definition, _ bool) bool {
-	return skill == nil || !skill.Offensive || !caster.InPeaceZone()
+	return skill == nil || !skill.Offensive || !playableInPeaceZone(caster)
 }
 
 func (h auraHandler) collect(caster Actor, radius int, keep func(Actor) bool, canAffect func(Actor, Actor) bool) []Actor {
@@ -142,7 +142,7 @@ func (frontAuraHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) A
 }
 
 func (frontAuraHandler) CanCast(caster, _ Actor, skill *modelskill.Definition, _ bool) bool {
-	return skill == nil || !skill.Offensive || !caster.InPeaceZone()
+	return skill == nil || !skill.Offensive || !playableInPeaceZone(caster)
 }
 
 type behindAuraHandler struct {
@@ -162,7 +162,7 @@ func (behindAuraHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) 
 }
 
 func (behindAuraHandler) CanCast(caster, _ Actor, _ *modelskill.Definition, _ bool) bool {
-	return !caster.InPeaceZone()
+	return !playableInPeaceZone(caster)
 }
 
 type auraUndeadHandler struct {
@@ -192,5 +192,5 @@ func (auraUndeadHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) 
 }
 
 func (auraUndeadHandler) CanCast(caster, _ Actor, skill *modelskill.Definition, _ bool) bool {
-	return skill == nil || !skill.Offensive || !caster.InPeaceZone()
+	return skill == nil || !skill.Offensive || !playableInPeaceZone(caster)
 }

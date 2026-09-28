@@ -151,6 +151,32 @@ func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange i
 	return false
 }
 
+// NPCInPeaceZone reports whether an NPC standing at (x, y, z) holds the
+// peace flag the zones around it raise for a non-playable occupant: a Peace
+// zone always does, and a peaceful Town does unless its combat rule disables
+// peace townwide. A derby track pacifies playables only, so it never counts
+// here. A nil index, a server booted without zones, holds none.
+func (ix *Index) NPCInPeaceZone(x, y, z int) bool {
+	if ix == nil {
+		return false
+	}
+	for _, k := range ix.At(x, y) {
+		switch v := k.(type) {
+		case *Peace:
+		case *Town:
+			if !v.Peaceful || v.CombatRule == 2 {
+				continue
+			}
+		default:
+			continue
+		}
+		if k.Core().ContainsPoint(x, y, z) {
+			return true
+		}
+	}
+	return false
+}
+
 // peaceCapable reports whether k is one of the zone kinds that can suspend
 // hostilities: an explicit Peace zone, a monster-race derby track, or a
 // town whose data marks it peaceful.

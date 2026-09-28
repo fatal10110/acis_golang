@@ -180,6 +180,9 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			_, ok := zone.FindAt[*zone.Water](zones, at.X, at.Y, at.Z)
 			return ok
 		})
+		hostile.SetPeaceZone(func(at location.Location) bool {
+			return zones.NPCInPeaceZone(at.X, at.Y, at.Z)
+		})
 	}
 
 	locRef.Actor = hostile
