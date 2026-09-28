@@ -396,6 +396,9 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"undead pet", modelskill.TargetUndead, caster, &targetActor{id: 15, kind: actor.KindSummon, owner: caster, undead: true, pet: true}, nil, CastRejectInvalidTarget},
 		{"undead player", modelskill.TargetUndead, caster, &targetActor{id: 16, kind: actor.KindPlayer}, nil, CastRejectInvalidTarget},
 		{"undead nil", modelskill.TargetUndead, caster, nil, nil, CastRejectNone},
+		{"summon living", modelskill.TargetSummon, caster, &targetActor{id: 17, kind: actor.KindSummon, owner: caster}, nil, CastRejectNone},
+		{"summon dead", modelskill.TargetSummon, caster, &targetActor{id: 18, kind: actor.KindSummon, owner: caster, dead: true}, nil, CastRejectInvalidTarget},
+		{"summon nil", modelskill.TargetSummon, caster, nil, nil, CastRejectNone},
 		{"corpse mob nil", modelskill.TargetCorpseMob, caster, nil, nil, CastRejectNone},
 		{"area corpse mob nil", modelskill.TargetAreaCorpseMob, caster, nil, nil, CastRejectNone},
 	}

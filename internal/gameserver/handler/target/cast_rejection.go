@@ -41,6 +41,11 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetSummon:
+		// The final target is the caster's summon; a dead one is invalid.
+		if target != nil && target.Dead() {
+			return CastRejectInvalidTarget
+		}
 	case modelskill.TargetHoly:
 		if target == nil {
 			return CastRejectNone
