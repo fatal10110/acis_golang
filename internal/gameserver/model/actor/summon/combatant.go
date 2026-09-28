@@ -52,9 +52,18 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 	return a.owner, true
 }
 
-// CanSeeTarget reports true: the launch-phase line-of-sight gate is not wired
-// for summon casts yet, so it never aborts one.
-func (a *Actor) CanSeeTarget(skilltarget.Actor) bool { return true }
+// CanSeeTarget reports whether t is visible to this summon for the cast
+// pipeline's launch-phase line-of-sight gate: the same geodata query as
+// CanSee, keyed to t's own eye height, or permissive when no query is
+// attached.
+func (a *Actor) CanSeeTarget(t skilltarget.Actor) bool {
+	if a.los == nil {
+		return true
+	}
+	ox, oy, oz := a.Position()
+	tx, ty, tz := t.Position()
+	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, t.CollisionHeight())
+}
 
 // ShieldDefense reports ShieldFailed: summons carry no shield.
 func (a *Actor) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
@@ -63,14 +72,6 @@ func (a *Actor) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool
 
 // RaceMultiplier reports 1: only NPC races scale damage.
 func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
-
-// BroadcastSkillUse does nothing: summon AI casts do not announce themselves
-// to observers yet.
-func (a *Actor) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) {}
-
-// BroadcastSkillLaunched does nothing: summon AI casts do not announce
-// themselves to observers yet.
-func (a *Actor) BroadcastSkillLaunched(int32, int32, []int32) {}
 
 // NotePvPSkillTargets does nothing: PvP flagging tracks the owning player.
 func (a *Actor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}

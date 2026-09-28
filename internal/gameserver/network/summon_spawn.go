@@ -505,7 +505,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
 	brain.SetLogger(l.log)
-	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, sink)
 	castController.SetQueue(queue)
 	aiController := &actorcast.AIController{
 		Controller:  castController,
@@ -515,6 +515,13 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		// Every summon removal aborts first, so a hit reaching a summon
 		// that has left the world lost a race with that abort.
 		HitNeedsPresence: true,
+		// A summon's launch-gate message reaches its owner, the only
+		// client a summon sends to.
+		OnLaunchAbort: func(reason actorcast.LaunchAbortReason) {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				sendLaunchAbort(owner, reason)
+			}
+		},
 	}
 	// Summon.sendPacket forwards every packet to the owner (base
 	// Creature.sendPacket is a no-op), but Java only calls sendPacket

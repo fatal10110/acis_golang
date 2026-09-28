@@ -131,6 +131,19 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
 		})
+	case event.SkillLaunched:
+		l.broadcastSummon(actor, func() wire.Frame {
+			return frames.SkillLaunched(actor.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
+		})
+	case event.CastAborted:
+		// The cancel animation goes to every observer; an interrupt also
+		// tells the owner, since a summon's own messages reach its owner.
+		l.broadcastSummon(actor, func() wire.Frame { return frames.SkillCanceled(actor.ObjectID()) })
+		if e.Interrupted {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
+			}
+		}
 	case event.AutoAttackStopped:
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
 	case event.StatusChanged:
