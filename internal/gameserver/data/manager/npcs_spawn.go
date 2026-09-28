@@ -198,6 +198,11 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	if master != nil {
 		hostile.SetMaster(master)
 		master.AddMinion(hostile)
+		// MinionSpawn.doSpawn: a Monster-family private of a raid boss
+		// joins the raid (no lethal strikes, raid curse, see-through).
+		if master.RaidBoss() && hostile.MonsterKind() {
+			hostile.SetRaidRelated(true)
+		}
 	}
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)

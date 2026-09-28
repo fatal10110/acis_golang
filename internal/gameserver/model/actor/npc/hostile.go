@@ -255,6 +255,9 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		spiritshotRate:     spiritshotRate,
 	}
 	h.maxBuffsAmount.Store(maxBuffCount)
+	// RaidBoss.java/GrandBoss.java call setRaidRelated() in their
+	// constructors; minions are marked at spawn (see SetRaidRelated).
+	h.raidRelated.Store(h.RaidBoss())
 	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(!inst.WalkMode)
 	h.brain = ai.NewAttackable(h, movement, attack)
@@ -829,14 +832,26 @@ func (h *Hostile) SiegeGuard() bool {
 // RaidRelated reports whether this NPC is tied to a raid encounter (a raid
 // boss or one of its minions). A raid-related NPC sees through silent
 // movement in AutoAttackTargetValid regardless of its template's own
-// concealment-detection setting. False until SetRaidRelated marks it.
+// concealment-detection setting, and can't be struck by a lethal hit.
 func (h *Hostile) RaidRelated() bool {
 	return h.raidRelated.Load()
 }
 
 // SetRaidRelated marks or clears this NPC's raid-encounter association.
+// Raid and grand bosses start marked; a Monster-family private spawned for a
+// raid boss master is marked by the spawner (MinionSpawn.doSpawn).
 func (h *Hostile) SetRaidRelated(v bool) {
 	h.raidRelated.Store(v)
+}
+
+// RaidBoss reports whether this NPC is a raid or grand boss itself (Java
+// isRaidBoss), as opposed to RaidRelated, which also covers its minions.
+func (h *Hostile) RaidBoss() bool {
+	switch hostileKind(h.Instance) {
+	case "RaidBoss", "GrandBoss":
+		return true
+	}
+	return false
 }
 
 // AlikeDead reports whether this NPC should be ignored as a live target.
