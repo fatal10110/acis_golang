@@ -119,6 +119,14 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.Stop(actor.ObjectID(), location.Location{X: x, Y: y, Z: z}, actor.Heading())
 		})
+	case event.Flight:
+		x, y, z := actor.Position()
+		at := location.Location{X: x, Y: y, Z: z}
+		l.broadcastSummon(actor, func() wire.Frame { return frames.FlyTo(actor.ObjectID(), e.Dest, at, e.Flight) })
+	case event.PositionCorrected:
+		x, y, z := actor.Position()
+		at, heading := location.Location{X: x, Y: y, Z: z}, actor.Heading()
+		l.broadcastSummon(actor, func() wire.Frame { return frames.ValidateLocation(actor.ObjectID(), at, heading) })
 	case event.MagicSkillUse:
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)

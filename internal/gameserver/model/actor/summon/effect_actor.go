@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -100,20 +101,29 @@ func (a *Actor) AddChanceTrigger(*effect.Effect) {}
 // RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (a *Actor) RemoveChanceTrigger(*effect.Effect) {}
 
-// ValidLocation returns the destination unchanged: summons are never knocked
-// back, so no geodata correction applies.
-func (a *Actor) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
-	return location.Location{X: tx, Y: ty, Z: tz}
+// ValidLocation resolves a knockback destination against this summon's
+// movement geodata, the same correction a player's landing gets.
+func (a *Actor) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	return a.movement.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
-// FlyTo does nothing: summons are never knocked back.
-func (a *Actor) FlyTo(location.Location, modelskill.Flight) {}
+// FlyTo broadcasts a forced-flight animation without changing server position.
+func (a *Actor) FlyTo(dest location.Location, flight modelskill.Flight) {
+	a.emit(event.Flight{Dest: dest, Flight: flight})
+}
 
-// SetXYZ does nothing: summons are never knocked back.
-func (a *Actor) SetXYZ(int, int, int) {}
+// SetXYZ moves the summon immediately and reseeds its ordinary movement
+// state so the next move starts from the forced landing.
+func (a *Actor) SetXYZ(x, y, z int) {
+	position := location.Location{X: x, Y: y, Z: z}
+	a.movement.SetPosition(position)
+	a.SyncPosition(position)
+}
 
-// BroadcastPosition does nothing: summons are never knocked back.
-func (a *Actor) BroadcastPosition() {}
+// BroadcastPosition sends the forced-location correction after a flight lands.
+func (a *Actor) BroadcastPosition() {
+	a.emit(event.PositionCorrected{})
+}
 
 // UpdateEffectIcons refreshes the summon's effect icons.
 func (a *Actor) UpdateEffectIcons() { a.UpdateAbnormalEffect() }
