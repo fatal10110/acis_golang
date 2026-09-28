@@ -3,6 +3,7 @@ package itemcontainer
 import (
 	"errors"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -407,6 +408,54 @@ func TestInventory_DestroyAllItems_RaceWithAdd(t *testing.T) {
 	inv.DestroyAllItems()
 	if inv.Size() != 0 {
 		t.Fatalf("Size() = %d after a final DestroyAllItems, want 0", inv.Size())
+	}
+}
+
+// TestInventory_DestroyAllItems_RaceWithAddAndEquip races an Add-then-equip
+// loop against DestroyAllItems and then checks that the survivors' equip
+// state is consistent: an item still held and recorded at a paperdoll
+// position must be that position's occupant. Clearing the
+// item map and the paperdoll in separate critical sections let an item
+// added and equipped between them survive in the map while its slot was
+// wiped, leaving it equipped by location but absent from the paperdoll.
+// The interleaving is timing-dependent, so this is a stress check rather
+// than a deterministic reproduction.
+func TestInventory_DestroyAllItems_RaceWithAddAndEquip(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+	tmpl, _ := templates.Get(2)
+	inv := NewPlayerInventory(0x10000001, templates)
+
+	var orphans atomic.Int64
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for id := int32(0x20000001); id < 0x20000001+20000; id++ {
+			inst := inv.AddNew(2, 1, id)
+			inv.EquipItem(inst, tmpl)
+			// Only this goroutine equips, so once inst has left the right
+			// hand only DestroyAllItems can have moved it, and that call
+			// must also have taken it out of the item map. Reading the slot
+			// first keeps a destroy that lands between these reads from
+			// looking like a violation.
+			if inv.ItemAt(RHand) != inst && inv.ItemByObjectID(id) == inst && inst.Snapshot().Location == item.LocationPaperdoll {
+				orphans.Add(1)
+			}
+		}
+	}()
+
+	for destroying := true; destroying; {
+		select {
+		case <-done:
+			destroying = false
+		default:
+			inv.DestroyAllItems()
+		}
+	}
+
+	if n := orphans.Load(); n > 0 {
+		t.Errorf("%d items were left held and located in the paperdoll after DestroyAllItems cleared their slot", n)
 	}
 }
 

@@ -318,26 +318,25 @@ func (inv *Inventory) DestroyAll(inst *item.Instance) *item.Instance {
 // Container's version deletes straight from the item map, leaving destroyed
 // instances behind in the paperdoll and queuing nothing.
 //
-// The snapshot-and-delete runs under Container.mu, the same lock Add takes,
-// so an Add racing this call either lands before the snapshot (and is
-// destroyed with everything else) or blocks until after it (and survives as
-// a fresh item, not one this call missed) — never silently outliving a call
-// that ran concurrently with it.
+// The item-map sweep and the paperdoll clear run in one critical section
+// under Container.mu then inv.mu (the order Restore and exchange take), so
+// an Add or equip racing this call either lands before it (and is destroyed
+// and unequipped with everything else) or blocks until after it (and
+// survives as a fresh, consistently equipped item). Clearing the two in
+// separate sections would let an item added and equipped between them keep
+// its paperdoll location while losing its slot.
 func (inv *Inventory) DestroyAllItems() {
 	inv.Container.mu.Lock()
+	inv.mu.Lock()
 	instances := make([]*item.Instance, 0, len(inv.Container.items))
 	for objectID, inst := range inv.Container.items {
 		delete(inv.Container.items, objectID)
 		instances = append(instances, inst)
 	}
-	inv.Container.mu.Unlock()
-
-	inv.mu.Lock()
-	for i := range inv.paperdoll {
-		inv.paperdoll[i] = nil
-	}
+	clear(inv.paperdoll[:])
 	inv.wornMask = 0
 	inv.mu.Unlock()
+	inv.Container.mu.Unlock()
 
 	for _, inst := range instances {
 		st := inst.Snapshot()
