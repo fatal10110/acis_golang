@@ -24,12 +24,13 @@ func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
 // reviving it outright — both need the request/response dialog flow, which
 // isn't wired yet, so a revivable target here is revived immediately.
 func (resurrectHandler) Use(cast Cast) {
-	caster, ok := cast.Caster.(reviveCaster)
-	if !ok {
-		return
+	if caster, ok := cast.Caster.(reviveCaster); ok {
+		reviveTargets(cast, formulas.RevivePower(caster.WITBonus(), float64(cast.Skill.Power)))
 	}
+	dischargeSpiritshot(cast)
+}
 
-	percent := formulas.RevivePower(caster.WITBonus(), float64(cast.Skill.Power))
+func reviveTargets(cast Cast, percent float64) {
 	for _, obj := range cast.Targets {
 		target, ok := asPlayer(obj)
 		if !ok {

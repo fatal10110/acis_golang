@@ -53,13 +53,23 @@ func (c *Character) ProgressionValues() Progression {
 	}
 }
 
-// AddExpAndSp adds exp and sp to c independently — either amount is
+// AddExpAndSp adds exp and sp to c through its configured level table and
+// runtime template, as AddExpAndSpWith does; a character configured without
+// a level table takes only the SP.
+func (c *Character) AddExpAndSp(exp int64, sp int) {
+	c.stateMu.RLock()
+	table := c.levelTable
+	c.stateMu.RUnlock()
+	c.RewardExpAndSp(table, exp, sp)
+}
+
+// AddExpAndSpWith adds exp and sp to c independently — either amount is
 // ignored if negative — resyncing c.CharLevel from the resulting experience
 // via table and, on a level increase, refilling HP, MP and CP to the full
 // amount tmpl's per-level tables define for the new level. tmpl may be
 // nil, in which case a level increase still updates c.CharLevel and c.Exp but
 // leaves HP/MP/CP untouched. It reports whether the level increased.
-func (c *Character) AddExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
+func (c *Character) AddExpAndSpWith(table *LevelTable, tmpl *Template, exp int64, sp int) bool {
 	return c.addExpAndSp(table, tmpl, exp, sp)
 }
 
@@ -122,7 +132,7 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 	c.addSp(sp)
 	changed := c.SP != beforeSP
 	c.progressionMu.Unlock()
-	// Same deliberate divergence as AddExpAndSp: no packet when the add
+	// Same deliberate divergence as AddExpAndSpWith: no packet when the add
 	// changed nothing.
 	if changed {
 		c.UpdateUserInfo()
@@ -183,7 +193,7 @@ func (c *Character) addSp(delta int) {
 }
 
 // RemoveExpAndSp removes exp and sp from c independently — either amount
-// is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSp
+// is ignored unless positive — resyncing c.CharLevel the same way AddExpAndSpWith
 // does. A level drop never refills HP/MP/CP, matching AddLevel.
 func (c *Character) RemoveExpAndSp(table *LevelTable, tmpl *Template, exp int64, sp int) {
 	// The experience comes off first and a level change's hooks run before

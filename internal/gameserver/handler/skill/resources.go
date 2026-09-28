@@ -2,6 +2,8 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 )
 
 type restoredResource uint8
@@ -12,9 +14,16 @@ const (
 	restoredCP
 )
 
+// expSPTarget is a creature that gains experience and SP: a player, or a
+// pet. Any other creature ignores a grant.
 type expSPTarget interface {
-	AddExpAndSP(exp, sp int)
+	AddExpAndSp(exp int64, sp int)
 }
+
+var (
+	_ expSPTarget = (*player.Character)(nil)
+	_ expSPTarget = (*summon.Actor)(nil)
+)
 
 type realDamageTarget interface {
 	Actor
@@ -31,18 +40,21 @@ func (healHandler) Use(cast Cast) {
 	if cast.Caster == nil {
 		return
 	}
-	amount, ok := cast.Caster.HealAmount(cast.Skill)
-	if !ok {
-		return
-	}
-
-	for _, obj := range cast.Targets {
-		target, ok := asEffected(obj)
-		if !ok || !target.CanBeHealed() {
-			continue
+	if amount, ok := cast.Caster.HealAmount(cast.Skill); ok {
+		for _, obj := range cast.Targets {
+			target, ok := asEffected(obj)
+			if !ok || !target.CanBeHealed() {
+				continue
+			}
+			restored := target.AddHP(amount * target.HealEffectiveness() / 100)
+			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 		}
-		restored := target.AddHP(amount * target.HealEffectiveness() / 100)
-		notifyRestored(obj, cast.Caster, restored, restoredHP, false)
+	}
+	// A static heal and a potion leave the caster's spiritshot charged.
+	// HealAmount does not yet apply the spiritshot heal bonus (HealSps
+	// correction and M.Atk multiplier); tracked in #2647.
+	if skillTypeKey(cast.Skill.SkillType) != "HEAL_STATIC" && !cast.Skill.Potion {
+		dischargeSpiritshot(cast)
 	}
 }
 
@@ -91,6 +103,9 @@ func (manaHealHandler) Use(cast Cast) {
 		}
 		restored := target.AddMP(mp)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
+	}
+	if !cast.Skill.Potion {
+		dischargeSpiritshot(cast)
 	}
 }
 
@@ -155,6 +170,8 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 			target.SetCP(target.CP() - float64(damage))
 		}
 	}
+	// Spent even when no target was accepted.
+	dischargeSoulshot(cast)
 }
 
 type balanceLifeHandler struct{}
@@ -196,10 +213,8 @@ func (giveSPHandler) Types() []string { return []string{"GIVE_SP"} }
 func (giveSPHandler) Use(cast Cast) {
 	sp := int(cast.Skill.Power)
 	for _, obj := range cast.Targets {
-		// Exp and SP gain needs the level table this handler has no access
-		// to, so no live actor reports it yet; see #2362.
 		if target, ok := obj.(expSPTarget); ok {
-			target.AddExpAndSP(0, sp)
+			target.AddExpAndSp(0, sp)
 		}
 	}
 }
