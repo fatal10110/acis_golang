@@ -350,6 +350,16 @@ func NewTable(templates []*Template) *Table {
 	return &Table{commons.NewLookup(templates, func(tpl *Template) int { return tpl.ID })}
 }
 
+// CollisionBody returns npcID's template collision radius and height, or
+// false when no such template is loaded.
+func (t *Table) CollisionBody(npcID int32) (radius, height float64, ok bool) {
+	tpl, ok := t.Get(int(npcID))
+	if !ok {
+		return 0, 0, false
+	}
+	return tpl.CollisionRadius, tpl.CollisionHeight, true
+}
+
 // GetByName returns the first template whose name matches name
 // case-insensitively, or false if none does.
 func (t *Table) GetByName(name string) (*Template, bool) {

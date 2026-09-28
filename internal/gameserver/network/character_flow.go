@@ -606,6 +606,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	if l.zones != nil {
 		rt.Zones = l.zones
 	}
+	if l.npcs != nil {
+		rt.Mounts = l.npcs
+	}
 	c.Configure(rt)
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
