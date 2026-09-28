@@ -19,14 +19,7 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 
 	switch ctx.Command {
 	case CommandToggleFollow:
-		if a.followOff.Load() {
-			a.followOff.Store(false)
-			a.setIntent(IntentFollowOwner)
-			a.TryToFollow(a.owner)
-		} else {
-			a.followOff.Store(true)
-			a.idle()
-		}
+		a.setFollowStatus(a.followOff.Load())
 	case CommandAttack:
 		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature && ctx.TargetAttackable {
@@ -39,7 +32,7 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 			a.setIntent(IntentInteractTarget)
 		}
 	case CommandStop:
-		a.idle()
+		a.TryToIdle()
 	case CommandReturnPet, CommandUnsummonServitor:
 		a.idle()
 		a.despawn(ctx.World)

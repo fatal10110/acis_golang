@@ -1836,3 +1836,4 @@ func (followTarget) Kind() actor.Kind { return actor.KindNPC }
 func (followTarget) Heading() int { return 0 }
 
 func (*playerFollowSelf) OwnsOffensiveFollowTicker() bool { return false }
+func (*playerFollowSelf) MovementDisabled() bool          { return false }

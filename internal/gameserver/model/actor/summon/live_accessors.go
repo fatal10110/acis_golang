@@ -414,17 +414,33 @@ func (a *Actor) Immobilized() bool {
 	return a.immobilized
 }
 
-// SetImmobilized sets or clears this summon's movement-lock flag. It reports
-// whether the flag actually changed. It does not yet save/restore follow
-// mode the way Summon.setIsImmobilized's override does — not yet ported,
-// see fatal10110/acis_golang#2319.
+// SetImmobilized sets or clears this summon's movement-lock flag and reports
+// whether the flag actually changed. Setting it drops a following summon out
+// of follow mode, idling it; clearing it restores the follow mode the summon
+// had when the lock was set, whatever the owner toggled in between.
+//
+// Effect hooks call this from the applying actor's queue or the effect
+// list's expiry tick. Every value it touches has its own guard (stateMu,
+// the atomic followOff, the AI loop's mutex), and the follow change runs
+// after stateMu is released because it takes stateMu itself.
 func (a *Actor) SetImmobilized(v bool) bool {
 	a.stateMu.Lock()
-	defer a.stateMu.Unlock()
 	if a.immobilized == v {
+		a.stateMu.Unlock()
 		return false
 	}
 	a.immobilized = v
+	if v {
+		a.followBeforeImmobilized = !a.followOff.Load()
+	}
+	following := a.followBeforeImmobilized
+	a.stateMu.Unlock()
+
+	if !v {
+		a.setFollowStatus(following)
+	} else if following {
+		a.setFollowStatus(false)
+	}
 	return true
 }
 
@@ -564,9 +580,9 @@ func (a *Actor) TryToFollow(target world.Tracked) {
 	a.brain.TryToFollow(combatant)
 }
 
-// TryToIdle sends the summon idle the way an effect or an interrupted
-// action does: a summon that follows its owner goes back to following it,
-// and picks the walk up again once it can move.
+// TryToIdle sends the summon idle the way an effect, an interrupted action
+// or the owner's Stop command does: a summon that follows its owner goes back
+// to following it, and picks the walk up again once it can move.
 func (a *Actor) TryToIdle() {
 	if a.followOff.Load() || a.owner == nil || a.brain == nil {
 		a.idle()
@@ -584,6 +600,18 @@ func (a *Actor) Think() error {
 		a.brain.Think()
 	}
 	return nil
+}
+
+// setFollowStatus turns following the owner on or off. On, the summon heads
+// back to its owner; off, it goes idle where it stands.
+func (a *Actor) setFollowStatus(follow bool) {
+	a.followOff.Store(!follow)
+	if !follow {
+		a.idle()
+		return
+	}
+	a.setIntent(IntentFollowOwner)
+	a.TryToFollow(a.owner)
 }
 
 // idle cancels the attached AI's current intention without falling back to
