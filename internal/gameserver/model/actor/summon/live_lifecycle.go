@@ -58,9 +58,9 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 }
 
 // TickServitor advances a servitor's live lifetime and consumes owner
-// upkeep when a checkpoint is crossed.
+// upkeep when a checkpoint is crossed. A dead servitor's lifetime stops.
 func (a *Actor) TickServitor(state *world.State) TickResult {
-	if a == nil || a.isPet {
+	if a == nil || a.isPet || a.Dead() {
 		return TickResult{}
 	}
 
@@ -83,7 +83,7 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 		result.Unsummoned = true
 		return result
 	}
-	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 || a.Dead() {
+	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 {
 		return result
 	}
 	if a.ownerInventory == nil || a.ownerInventory.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
@@ -103,9 +103,10 @@ func (a *Actor) StartServitorTicks(period time.Duration, state *world.State, log
 }
 
 // TickPet advances a pet's live food gauge and consumes food from its own
-// inventory when the auto-feed threshold is crossed.
+// inventory when the auto-feed threshold is crossed. A dead pet is not fed:
+// its gauge and food stay as they were until it is revived.
 func (a *Actor) TickPet(state *world.State) PetTickResult {
-	if a == nil || !a.isPet {
+	if a == nil || !a.isPet || a.Dead() {
 		return PetTickResult{}
 	}
 

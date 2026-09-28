@@ -15,6 +15,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -53,6 +54,10 @@ type Owner interface {
 	InCombat() bool
 	// ServitorVanished tells the owner its servitor was erased.
 	ServitorVanished()
+	// PvPFlagState is the owner's PvP flag, which its summon carries too.
+	PvPFlagState() task.PvPFlagState
+	// AwardSummonKillKarma credits killer for killing the owner's summon.
+	AwardSummonKillKarma(killer attackable.Combatant)
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.

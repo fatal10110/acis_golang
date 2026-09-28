@@ -121,8 +121,12 @@ func FindAtXY[T Kind](ix *Index, x, y int) (T, bool) {
 // containing (regionX, regionY) — the caster's own region, not necessarily
 // the region containing (x, y, z), matching the reference's region-only
 // zone lookup. It samples the center point and the four axis-aligned range
-// offsets, mirroring the reference's diamond sample.
+// offsets, mirroring the reference's diamond sample. A nil index, a server
+// booted without zones, holds none.
 func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool {
+	if ix == nil {
+		return false
+	}
 	zones := ix.At(regionX, regionY)
 	if len(zones) == 0 {
 		return false

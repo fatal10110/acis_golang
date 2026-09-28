@@ -79,6 +79,7 @@ type options struct {
 	waterNow               func() time.Time
 	disallowWater          bool
 	attackStance           *task.AttackStance
+	pvpFlags               *task.PvPFlags
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -184,6 +185,12 @@ func WithAllowWater(allowed bool) Option {
 // (default: nil, so stance is neither tracked nor consulted).
 func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
+}
+
+// WithPvPFlags supplies the PvP-flag tracker wired into the link (default:
+// nil, so a resolved attack flags nobody).
+func WithPvPFlags(flags *task.PvPFlags) Option {
+	return func(o *options) { o.pvpFlags = flags }
 }
 
 // WithAttackStanceTracker substitutes the combat-stance tracker the link
@@ -1226,6 +1233,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.AttackStance = o.attackStanceTracker
 	} else if attackStance != nil {
 		gclConfig.AttackStance = attackStance
+	}
+	if o.pvpFlags != nil {
+		gclConfig.PvPFlags = o.pvpFlags
 	}
 	if ai != nil {
 		gclConfig.AI = ai

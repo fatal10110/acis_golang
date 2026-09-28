@@ -40,7 +40,7 @@ func (c *Character) flagPvP(useFlaggedDuration bool) {
 
 // NotePvPAttack records one resolved physical attack against target.
 func (c *Character) NotePvPAttack(target attackable.Combatant) {
-	if victim := pvpTargetPlayer(target); victim != nil {
+	if victim := actingCharacter(target); victim != nil {
 		victim.notePvPHitFromAttacker(c)
 	}
 }
@@ -62,21 +62,13 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 	if c.InPvPZone() {
 		return false
 	}
-	if victim := pvpTargetPlayer(target); victim != nil {
+	if victim := actingCharacter(target); victim != nil {
 		return victim != c && (victim.PvPFlagState() != task.PvPFlagNone || victim.Karma() > 0)
 	}
 	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
 		return false
 	}
 	return target.Kind() == actor.KindNPC && !target.Guard()
-}
-
-func pvpTargetPlayer(target attackable.Combatant) *Character {
-	if target != nil && target.Kind() == actor.KindSummon {
-		target, _ = target.Owner()
-	}
-	player, _ := target.(*Character)
-	return player
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a

@@ -119,6 +119,8 @@ const (
 	SystemMessageItemCantBeEquippedForOlympiad     = 1507
 	SystemMessageItemUnavailableForOlympiad        = 1508
 	SystemMessageBlessedEnchantFailed              = 1517
+	SystemMessageResurrectPetWithin20Minutes       = 1519 // no parameter
+	SystemMessageServitorPassedAway                = 1520 // no parameter
 	SystemMessageServitorHasVanished               = 1521 // no parameter
 	SystemMessageAttentionS1PickedUpS2             = 1533
 	SystemMessageAttentionS1PickedUpS2S3           = 1534

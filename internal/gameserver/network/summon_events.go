@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -143,6 +144,14 @@ func (s *summonSink) Emit(ev event.Event) {
 			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, e.AttackerName, e.Damage))
+	case event.Died:
+		// Observers see the summon fall, then its own combat stance end. The
+		// stance is its owner's: the owner stays in combat and keeps its own
+		// stance icon.
+		l.broadcastSummon(actor, func() wire.Frame { return frames.Die(actor.ObjectID(), false) })
+		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
+	case event.DeathSettled:
+		l.notifyOwnerOfSummonDeath(actor)
 	case event.AttackFinished:
 		s.brain.Think()
 	case event.Arrived:
@@ -167,6 +176,26 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.Despawned:
 		s.runDespawn()
 	}
+}
+
+// notifyOwnerOfSummonDeath closes a summon's death for its owner: the
+// owner's summon auto-shots are turned off, then the owner reads the death
+// message for a servitor or a pet.
+func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
+	owner, ok := liveSummonOwner(actor)
+	if !ok {
+		return
+	}
+	for _, itemID := range item.SummonShotIDs() {
+		if owner.AutoSoulShotEnabled(itemID) {
+			l.disableAutoShot(owner, itemID)
+		}
+	}
+	message := serverpackets.SystemMessageServitorPassedAway
+	if actor.IsPet() {
+		message = serverpackets.SystemMessageResurrectPetWithin20Minutes
+	}
+	owner.SendFrame(serverpackets.FrameSystemMessage(message))
 }
 
 // releasePet settles a pet on its way out of the world, whatever took it out:

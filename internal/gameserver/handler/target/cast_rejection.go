@@ -122,9 +122,7 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		if !caster.CanCastOnPlayable(target, skill, ctrl, true) {
 			return CastRejectInvalidTarget
 		}
-		// Summon attack rules are not modeled yet, so offensive casts on a
-		// summon skip the attackability gate rather than being rejected.
-		if target.Kind() != actor.KindSummon && (!target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(caster))) {
+		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(caster)) {
 			return CastRejectInvalidTarget
 		}
 		if caster.OlympiadMode() && !caster.OlympiadStarted() {

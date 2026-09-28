@@ -6,10 +6,25 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
-// Karma reports 0: a summon carries no karma of its own.
-func (a *Actor) Karma() int { return 0 }
+// Karma reports the owner's karma: a summon carries none of its own.
+func (a *Actor) Karma() int {
+	if a.owner == nil {
+		return 0
+	}
+	return a.owner.Karma()
+}
+
+// PvPFlagState reports the owner's PvP flag: a summon carries none of its
+// own.
+func (a *Actor) PvPFlagState() task.PvPFlagState {
+	if a.owner == nil {
+		return task.PvPFlagNone
+	}
+	return a.owner.PvPFlagState()
+}
 
 // FakeDeath reports false: summons never feign death.
 func (a *Actor) FakeDeath() bool { return false }
@@ -48,10 +63,6 @@ func (a *Actor) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool
 
 // RaceMultiplier reports 1: only NPC races scale damage.
 func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
-
-// TakeDamage reports false and applies nothing: auto-attack damage against
-// summons is not wired yet.
-func (a *Actor) TakeDamage(int, attackable.Combatant) bool { return false }
 
 // BroadcastSkillUse does nothing: summon AI casts do not announce themselves
 // to observers yet.
