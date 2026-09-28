@@ -70,6 +70,22 @@ func (t Triangle) Size() int64 {
 // Area is the triangle's 2D area, which is its Size.
 func (t Triangle) Area() float64 { return float64(t.Size()) }
 
+// PointAt maps a pair of unit draws in [0, 1) to a point inside the
+// triangle: A + ba*(B-A) + ca*(C-A), folding (ba, ca) back across the BC
+// edge when their sum exceeds 1 so the result is uniform over the triangle.
+// Each product is rounded before the sum (the explicit conversions block
+// fused multiply-add) and the offset truncates toward zero, so the same
+// draws always land on the same integer point.
+func (t Triangle) PointAt(ba, ca float64) Point {
+	if ba+ca > 1 {
+		ba = 1 - ba
+		ca = 1 - ca
+	}
+	dx := float64(ba*float64(t.bax)) + float64(ca*float64(t.cax))
+	dy := float64(ba*float64(t.bay)) + float64(ca*float64(t.cay))
+	return Point{X: int(t.ax) + int(dx), Y: int(t.ay) + int(dy)}
+}
+
 // Center is the integer centroid of the three vertices: (Ax+Bx+Cx)/3,
 // (Ay+By+Cy)/3, truncating toward zero.
 func (t Triangle) Center() Point {

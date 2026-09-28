@@ -312,3 +312,208 @@ func TestTerritoryContainsUsesTriangulationNotRayCasting(t *testing.T) {
 		t.Errorf("literal territory Contains2D(%d, %d) = false, want true", x, y)
 	}
 }
+
+// ---- territory-random sampling ----
+
+func mustTriangle(t *testing.T, a, b, c geometry.Point) geometry.Triangle {
+	t.Helper()
+	tri, err := geometry.NewTriangle(a, b, c)
+	if err != nil {
+		t.Fatalf("NewTriangle: %v", err)
+	}
+	return tri
+}
+
+// TestPickTriangleWalksCumulativeSizes pins Territory.getRandomLocation's
+// triangle pick: rand = Rnd.get(size) and each triangle's size is
+// subtracted in order until rand drops below zero. Sizes are 50, 5000, 50.
+func TestPickTriangleWalksCumulativeSizes(t *testing.T) {
+	first := mustTriangle(t, geometry.Point{X: 0, Y: 0}, geometry.Point{X: 10, Y: 0}, geometry.Point{X: 0, Y: 10})
+	big := mustTriangle(t, geometry.Point{X: 0, Y: 0}, geometry.Point{X: 100, Y: 0}, geometry.Point{X: 0, Y: 100})
+	last := mustTriangle(t, geometry.Point{X: 900, Y: 900}, geometry.Point{X: 910, Y: 900}, geometry.Point{X: 900, Y: 910})
+	triangles := []geometry.Triangle{first, big, last}
+
+	for _, tt := range []struct {
+		roll int64
+		want geometry.Triangle
+	}{
+		{0, first}, {49, first}, {50, big}, {5049, big}, {5050, last}, {5099, last},
+	} {
+		if got := pickTriangle(triangles, tt.roll); got.Center() != tt.want.Center() {
+			t.Errorf("pickTriangle(roll=%d) center = %+v, want %+v", tt.roll, got.Center(), tt.want.Center())
+		}
+	}
+}
+
+type flatTerrain struct {
+	z        int16
+	walkable func(x, y int) bool
+}
+
+func (g flatTerrain) Height(int, int, int) int16 { return g.z }
+func (g flatTerrain) Walkable(x, y, _ int) bool {
+	return g.walkable == nil || g.walkable(x, y)
+}
+
+func triangleTerritory(name string, minZ, maxZ int, nodes ...Node) *Territory {
+	return &Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes}
+}
+
+// TestMakerRandomLocationDrawsFromMergedTerritory checks the sampler shared
+// by territory spawn and out-of-territory wander: every draw lands in a
+// member footprint, Z comes from geodata inside the merged range, and a
+// member four times larger receives about four times the draws.
+func TestMakerRandomLocationDrawsFromMergedTerritory(t *testing.T) {
+	small := triangleTerritory("small", 0, 10, Node{X: 0, Y: 0}, Node{X: 100, Y: 0}, Node{X: 0, Y: 100})
+	large := triangleTerritory("large", 90, 200, Node{X: 5000, Y: 0}, Node{X: 5200, Y: 0}, Node{X: 5000, Y: 200})
+	maker := &Maker{Territories: []*Territory{small, large}}
+
+	const trials = 5000
+	inLarge := 0
+	for i := 0; i < trials; i++ {
+		loc, ok := maker.RandomLocation(flatTerrain{z: 150}, false)
+		if !ok {
+			t.Fatalf("RandomLocation ok = false")
+		}
+		if !maker.Contains(loc) {
+			t.Fatalf("RandomLocation = %+v, outside the merged territory", loc)
+		}
+		if large.Contains2D(loc.X, loc.Y) {
+			inLarge++
+		}
+	}
+	// Sizes 5000 and 20000: the large member's expected share is 0.8.
+	if frac := float64(inLarge) / trials; frac < 0.75 || frac > 0.85 {
+		t.Fatalf("large member share = %.3f, want about 0.8", frac)
+	}
+}
+
+// TestMakerRandomLocationBannedOnlyWhenAsked: spawn placement avoids the
+// merged banned territory, the out-of-territory wander draw does not.
+func TestMakerRandomLocationBannedOnlyWhenAsked(t *testing.T) {
+	maker := &Maker{
+		Territories: []*Territory{
+			triangleTerritory("in_ban", 0, 1000, Node{X: 0, Y: 0}, Node{X: 100, Y: 0}, Node{X: 0, Y: 100}),
+			triangleTerritory("open", 0, 1000, Node{X: 1000, Y: 0}, Node{X: 1100, Y: 0}, Node{X: 1000, Y: 100}),
+		},
+		BannedTerritories: []*Territory{
+			triangleTerritory("ban_a", 0, 100, Node{X: 0, Y: 0}, Node{X: 100, Y: 0}, Node{X: 0, Y: 100}),
+			triangleTerritory("ban_b", 500, 600, Node{X: 5000, Y: 5000}, Node{X: 5100, Y: 5000}, Node{X: 5000, Y: 5100}),
+		},
+	}
+	geo := flatTerrain{z: 550}
+
+	sawBanned := false
+	for i := 0; i < 500; i++ {
+		loc, ok := maker.RandomLocation(geo, true)
+		if !ok || maker.ContainsBanned(loc) {
+			t.Fatalf("RandomLocation(excludeBanned) = %+v, %v; want an unbanned point", loc, ok)
+		}
+		if loc, _ := maker.RandomLocation(geo, false); maker.ContainsBanned(loc) {
+			sawBanned = true
+		}
+	}
+	if !sawBanned {
+		t.Fatal("RandomLocation without excludeBanned never drew in the banned half")
+	}
+}
+
+// TestMakerRandomLocationKeepsLastDrawAfterTenFailures: with every draw
+// out of Z range the sampler gives up after ten failures and returns the
+// last draw rather than nothing.
+func TestMakerRandomLocationKeepsLastDrawAfterTenFailures(t *testing.T) {
+	maker := &Maker{Territories: []*Territory{
+		triangleTerritory("t", 0, 10, Node{X: 0, Y: 0}, Node{X: 100, Y: 0}, Node{X: 0, Y: 100}),
+	}}
+	loc, ok := maker.RandomLocation(flatTerrain{z: 999}, true)
+	if !ok || loc.Z != 999 || !maker.Territories[0].Contains2D(loc.X, loc.Y) {
+		t.Fatalf("RandomLocation = %+v, %v; want the last in-footprint draw at z 999", loc, ok)
+	}
+
+	calls := 0
+	maker.RandomLocation(flatTerrain{z: 5, walkable: func(int, int) bool { calls++; return false }}, false)
+	if calls != 10 {
+		t.Fatalf("Walkable calls = %d, want 10", calls)
+	}
+}
+
+// scriptedTerrain answers Height from heights in call order, repeating the
+// last entry once they run out, and counts the calls.
+type scriptedTerrain struct {
+	heights  []int16
+	walkable bool
+	calls    int
+}
+
+func (g *scriptedTerrain) Height(int, int, int) int16 {
+	i := min(g.calls, len(g.heights)-1)
+	g.calls++
+	return g.heights[i]
+}
+func (g *scriptedTerrain) Walkable(int, int, int) bool { return g.walkable }
+
+// fullyBannedMaker has one territory whose footprint is also its banned
+// territory; the banned Z range 0..100 covers only the lower part of the
+// territory's 0..1000.
+func fullyBannedMaker() *Maker {
+	nodes := []Node{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 0, Y: 100}}
+	return &Maker{
+		Territories:       []*Territory{triangleTerritory("t", 0, 1000, nodes...)},
+		BannedTerritories: []*Territory{triangleTerritory("ban", 0, 100, nodes...)},
+	}
+}
+
+// TestMakerRandomLocationStopsAtDrawLimitWhenFullyBanned: banned redraws
+// spend no attempts, so with every draw banned only randomLocationDrawLimit
+// ends the loop. The call returns after exactly that many draws and places
+// nothing rather than a point inside the banned territory.
+func TestMakerRandomLocationStopsAtDrawLimitWhenFullyBanned(t *testing.T) {
+	maker := fullyBannedMaker()
+	geo := &scriptedTerrain{heights: []int16{50}, walkable: true}
+
+	done := make(chan struct{})
+	var loc location.Location
+	var ok bool
+	go func() {
+		defer close(done)
+		loc, ok = maker.RandomLocation(geo, true)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("RandomLocation did not return for a fully banned territory")
+	}
+
+	if ok {
+		t.Fatalf("RandomLocation = %+v, ok = true; want no location once every draw is banned", loc)
+	}
+	if geo.calls != randomLocationDrawLimit {
+		t.Fatalf("Height calls = %d, want %d (the draw limit)", geo.calls, randomLocationDrawLimit)
+	}
+}
+
+// TestMakerRandomLocationDrawLimitKeepsLastUnbannedDraw: when the draw
+// limit ends the loop after some draws failed only on walkability, the
+// fallback is the last of those, never a later banned draw.
+func TestMakerRandomLocationDrawLimitKeepsLastUnbannedDraw(t *testing.T) {
+	maker := fullyBannedMaker()
+	// Draws 1 and 2 land above the banned Z range and fail on walkability;
+	// every later draw is banned.
+	geo := &scriptedTerrain{heights: []int16{500, 600, 50}, walkable: false}
+
+	loc, ok := maker.RandomLocation(geo, true)
+	if !ok || loc.Z != 600 || maker.ContainsBanned(loc) {
+		t.Fatalf("RandomLocation = %+v, %v; want the second draw (z 600), outside the banned territory", loc, ok)
+	}
+	if geo.calls != randomLocationDrawLimit {
+		t.Fatalf("Height calls = %d, want %d (the draw limit)", geo.calls, randomLocationDrawLimit)
+	}
+}
+
+func TestMakerRandomLocationWithoutTerritory(t *testing.T) {
+	for _, maker := range []*Maker{nil, {}} {
+		if _, ok := maker.RandomLocation(flatTerrain{}, true); ok {
+			t.Fatalf("RandomLocation on %+v ok = true, want false", maker)
+		}
+	}
+}
