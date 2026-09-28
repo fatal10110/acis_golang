@@ -173,7 +173,6 @@ func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Loc
 // observer, so the corpse-fall animation plays immediately instead of only
 // on a later dead reconnect.
 func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
-	l.abortFusionTargeting(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameDie(live.ObjectID(), l.dieOptions(live.Character))
 	})

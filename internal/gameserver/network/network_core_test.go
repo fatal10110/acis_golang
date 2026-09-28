@@ -998,6 +998,7 @@ func TestLivePlayerDetachDropsSessionOnlyEvents(t *testing.T) {
 	}{
 		{"attack", event.Attack{AttackerID: 1, Hits: []event.AttackHit{{TargetID: 2}}}},
 		{"died", event.Died{}},
+		{"death settled", event.DeathSettled{}},
 		{"pvp flagged", event.PvPFlagged{}},
 		{"relation changed", event.RelationChanged{}},
 		{"weight penalty changed", event.WeightPenaltyChanged{}},
@@ -1050,6 +1051,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.Attack{},
 		event.BowDrawn{},
 		event.Died{},
+		event.DeathSettled{},
 		event.HerbConsumed{},
 		event.RegenMax{},
 		event.EffectRemovedLackHP{},
@@ -1106,6 +1108,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.CastAborted{},
 		event.CastStopAck{},
 		event.CastFinished{},
+		event.FusionCastersStopRequested{},
 	}
 	for _, ev := range sessionOnlyEvents {
 		if !sessionOnly(ev) {
