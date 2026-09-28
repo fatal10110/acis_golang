@@ -316,11 +316,16 @@ var fearHalvedDurationPlayableSkillIDs = map[modelskill.ID]bool{
 // contributes to every effect instance it applies, shared by a live cast's
 // applyEffects and a relog restore's effect replay.
 func SkillFromDefinition(def modelskill.Definition) Skill {
+	var stackType string
+	if len(def.Effects) > 0 {
+		stackType = def.Effects[0].StackType
+	}
 	return Skill{
 		ID:                  def.ID,
 		Level:               def.Level,
 		Name:                def.Name,
 		SkillType:           def.SkillType,
+		StackType:           stackType,
 		Debuff:              def.Debuff,
 		Toggle:              def.Activation == modelskill.ActivationToggle,
 		KillByDOT:           def.KillByDOT,

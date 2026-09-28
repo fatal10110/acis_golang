@@ -209,12 +209,16 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 }
 
 // signetEffectMeta builds the effect metadata a signet-family effect
-// carries, shared by every kind this skill applies.
+// carries, shared by every kind this skill applies. StackType follows
+// effect.SkillFromDefinition: the first main effect template's stack type,
+// empty when the skill has none (a SIGNET_CASTTIME skill carries only self
+// templates).
 func signetEffectMeta(def modelskill.Definition) effect.Skill {
 	return effect.Skill{
 		ID:         def.ID,
 		Level:      def.Level,
 		SkillType:  def.SkillType,
+		StackType:  effect.SkillFromDefinition(def).StackType,
 		Debuff:     def.Debuff,
 		EffectType: def.EffectType,
 	}
