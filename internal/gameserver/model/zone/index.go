@@ -164,7 +164,7 @@ func (ix *Index) NPCInPeaceZone(x, y, z int) bool {
 		switch v := k.(type) {
 		case *Peace:
 		case *Town:
-			if !v.Peaceful || v.CombatRule == 2 {
+			if !v.raisesPeace() {
 				continue
 			}
 		default:

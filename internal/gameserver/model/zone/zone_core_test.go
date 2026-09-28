@@ -200,3 +200,55 @@ func TestCuboidNormalizesCorners(t *testing.T) {
 		}
 	}
 }
+
+// TestNPCInPeaceZone pins which zones pacify an NPC standing at a point: a
+// Peace zone always, a peaceful Town unless its combat rule disables peace
+// (rule 1 only exempts siege players), never a non-peaceful Town, and never a
+// derby track, which pacifies playables only. The z bound and a nil index
+// hold no peace.
+func TestNPCInPeaceZone(t *testing.T) {
+	cuboid := func(x int) Form {
+		t.Helper()
+		f, err := NewCuboid(x, x+1000, 0, 1000, -100, 100)
+		if err != nil {
+			t.Fatalf("NewCuboid: %v", err)
+		}
+		return f
+	}
+	town := func(id, x int, peaceful bool, rule int) *Town {
+		return &Town{Zone: newZone(id, cuboid(x)), Peaceful: peaceful, CombatRule: rule}
+	}
+	ix := NewIndex()
+	ix.Add(NewPeace(1, cuboid(0)))
+	ix.Add(town(2, 2000, true, 0))
+	ix.Add(town(3, 4000, false, 0))
+	ix.Add(town(4, 6000, true, 2))
+	ix.Add(town(5, 8000, true, 1))
+	ix.Add(NewDerbyTrack(6, cuboid(10000)))
+
+	cases := []struct {
+		name    string
+		x, y, z int
+		want    bool
+	}{
+		{"peace zone", 500, 500, 0, true},
+		{"peaceful town", 2500, 500, 0, true},
+		{"non-peaceful town", 4500, 500, 0, false},
+		{"town with combat rule 2", 6500, 500, 0, false},
+		{"town with combat rule 1", 8500, 500, 0, true},
+		{"derby track", 10500, 500, 0, false},
+		{"above peaceful town z bound", 2500, 500, 101, false},
+		{"above peace zone z bound", 500, 500, 101, false},
+		{"outside every zone", 12500, 500, 0, false},
+	}
+	for _, tc := range cases {
+		if got := ix.NPCInPeaceZone(tc.x, tc.y, tc.z); got != tc.want {
+			t.Errorf("%s: NPCInPeaceZone(%d, %d, %d) = %v, want %v", tc.name, tc.x, tc.y, tc.z, got, tc.want)
+		}
+	}
+
+	var nilIndex *Index
+	if nilIndex.NPCInPeaceZone(500, 500, 0) {
+		t.Error("nil index: NPCInPeaceZone = true, want false")
+	}
+}

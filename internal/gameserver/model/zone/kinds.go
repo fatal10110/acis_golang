@@ -418,11 +418,15 @@ func (z *Town) enter(a Actor) {
 	if z.CombatRule == 1 && a.Class() == ClassPlayer && z.InSiege != nil && z.InSiege(a) {
 		return
 	}
-	if z.Peaceful && z.CombatRule != 2 {
+	if z.raisesPeace() {
 		a.ZoneFlags().Set(FlagPeace, true)
 	}
 	a.ZoneFlags().Set(FlagTown, true)
 }
+
+// raisesPeace reports whether entering the town sets the peace flag: the
+// town must be peaceful and its combat rule must not disable peace townwide.
+func (z *Town) raisesPeace() bool { return z.Peaceful && z.CombatRule != 2 }
 
 func (z *Town) exit(a Actor) {
 	if z.Peaceful {
