@@ -286,10 +286,3 @@ func (l *List) exit(e *Effect, pending *[]func()) {
 	appendThunk(pending, e.stopTaskThunk())
 	l.remove(e, pending)
 }
-
-// doesStack reports whether e's stack type already has a buff member among
-// the current stack group, mirroring the check that exempts stacking buffs
-// from buff-slot cap eviction. Only called from the non-debuff insertion
-// path, it looks at buff members exclusively — a debuff sharing the same
-// stack-type string (the shared l.stacks map holds both families) doesn't
-// count.

@@ -265,14 +265,31 @@ func (l *List) active() []*Effect {
 	return effects
 }
 
-// ActiveBySkillID returns the applied Level of the first currently active
-// effect owned by skill id, and whether one was found. This is the
-// getFirstEffect(skillId) lookup ConditionElementSeed/ConditionForceBuff-
-// style consumers need for live seed-charge power and Force-buff level.
+// ActiveBySkillID returns the applied Level of the effect owned by skill id
+// that condition and seed/force lookups read, and whether one is held. An
+// active match wins; otherwise a held, stacked-out match is returned. Buffs
+// are searched first and debuffs only when no buff matched at all, and
+// among several held matches in one list the last one wins.
 func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
-	for _, e := range l.active() {
-		if int(e.Skill.ID) == id {
-			return e.Level, true
+	if l == nil {
+		return 0, false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	var held *Effect
+	for _, effects := range [2][]*Effect{l.buffs, l.debuffs} {
+		for _, e := range effects {
+			if e == nil || int(e.Skill.ID) != id {
+				continue
+			}
+			if e.inUse {
+				return e.Level, true
+			}
+			held = e
+		}
+		if held != nil {
+			return held.Level, true
 		}
 	}
 	return 0, false

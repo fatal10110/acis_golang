@@ -2,6 +2,7 @@ package skills
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -329,4 +330,71 @@ func logout(t *testing.T, c *testsupport.ScriptedClient) {
 		t.Fatalf("logout reply opcode = %#x, want LeaveWorld", reply[0])
 	}
 	c.ExpectClosed()
+}
+
+// TestStackedOutBuffPersistsAndRestoresBehindStronger pins that logout saves
+// every held effect, not only the active one: with cancel-lesser off, the
+// weaker same-stack buff stays held behind the stronger one, is written to
+// character_skills_save ahead of it (buff_index follows the held-list
+// order), and after relog is held again behind the restored stronger buff.
+func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithCancelLesserEffect(false),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			stackedBuffDef(201, 1, 30), stackedBuffDef(202, 2, 30),
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 201, 1)
+	seedKnownSkill(t, srv, objID, 202, 1)
+	startInWorld(t, c)
+
+	castSlotBuff(t, c, objID, 201)
+	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+		t.Fatalf("icons after stronger stacked buff = %v, want only active [202]", icons)
+	}
+
+	logout(t, c)
+
+	rows, err := srv.DB.QueryContext(context.Background(),
+		`SELECT skill_id, restore_type, buff_index FROM character_skills_save WHERE char_obj_id = ? ORDER BY buff_index`, objID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	type saveRow struct{ skillID, restoreType, buffIndex int }
+	var got []saveRow
+	for rows.Next() {
+		var r saveRow
+		if err := rows.Scan(&r.skillID, &r.restoreType, &r.buffIndex); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, r)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	want := []saveRow{{201, 0, 1}, {202, 0, 2}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("character_skills_save rows = %+v, want held lesser saved first %+v", got, want)
+	}
+
+	relogin := srv.DialClient(t, "player1", 1)
+	relogin.Send(encodeRequestGameStart(0))
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	relogin.Send(encodeEnterWorld())
+	if icons := buffSlotIDs(drainCollectingAbnormal(t, relogin)); !slices.Equal(icons, []int32{202}) {
+		t.Fatalf("icons after relog = %v, want only restored stronger [202]", icons)
+	}
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
+		t.Fatalf("held effects after relog = %v, want lesser held again [201 202]", ids)
+	}
 }

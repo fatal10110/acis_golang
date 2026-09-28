@@ -1234,8 +1234,9 @@ func (o eventOwner) NotifyEffectAborted(skillID modelskill.ID, level int) {
 func newEffect(name string, id modelskill.ID, stackType string, stackOrder float64, debuff bool) *Effect {
 	e := &Effect{
 		Skill: Skill{
-			ID:     id,
-			Debuff: debuff,
+			ID:        id,
+			StackType: stackType,
+			Debuff:    debuff,
 		},
 		Template: modelskill.EffectTemplate{
 			Name:       name,

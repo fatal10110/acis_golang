@@ -159,6 +159,39 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 	})
 }
 
+// TestSkillStackTypeComesFromFirstShippedTemplate pins, against the shipped
+// XML, the stack type the buff-cap guard reads for skills whose effect
+// templates carry different stack types: it is the first template's, in
+// document order, for every effect the skill applies.
+func TestSkillStackTypeComesFromFirstShippedTemplate(t *testing.T) {
+	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
+	}
+	for _, tc := range []struct {
+		id     skill.ID
+		first  string
+		second string
+	}{
+		{396, "hero_buff", "abnormal_debuff_invincibility"},
+		{1411, "abnormal_buff_invincibility", "abnormal_debuff_invincibility"},
+		{4471, "pa_up", "pd_up"},
+		{5145, "multi_debuff", "abnormal_buff_invincibility"},
+	} {
+		def, ok := table.Get(tc.id, 1)
+		if !ok {
+			t.Fatalf("skill %d level 1 missing", tc.id)
+		}
+		if len(def.Effects) != 2 || def.Effects[1].StackType != tc.second {
+			t.Fatalf("skill %d effects = %+v, want two templates, second %q", tc.id, def.Effects, tc.second)
+		}
+		if got := effect.SkillFromDefinition(def).StackType; got != tc.first {
+			t.Fatalf("SkillFromDefinition(skill %d).StackType = %q, want first template's %q", tc.id, got, tc.first)
+		}
+	}
+}
+
 func TestLoadSkillDefinitions(t *testing.T) {
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 

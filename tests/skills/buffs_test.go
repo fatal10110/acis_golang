@@ -587,3 +587,99 @@ func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
 		t.Fatalf("held effects after weaker same-stack cast = %v, want unrelated buff kept [304 305 306]", ids)
 	}
 }
+
+// TestMultiTemplateSkillAtCapUsesFirstTemplateStackType pins the buff-cap
+// guard for a skill whose effect templates carry different stack types,
+// shaped like Heroic Berserker (396: hero_buff, then
+// abnormal_debuff_invincibility). Every effect of the skill takes its
+// stack type from the first template, so once the first effect lands the
+// second one also counts as stacking and evicts nothing.
+func TestMultiTemplateSkillAtCapUsesFirstTemplateStackType(t *testing.T) {
+	t.Parallel()
+	otherHero := slotBuffDef(402)
+	otherHero.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "hero_buff", StackOrder: 1}}
+	berserker := slotBuffDef(403)
+	berserker.Effects = []modelskill.EffectTemplate{
+		{Name: "Buff", Time: 60, Icon: true, StackType: "hero_buff", StackOrder: 2},
+		{Name: "Buff", Time: 60, Icon: true, StackType: "abnormal_debuff_invincibility", StackOrder: 3},
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithMaxBuffsAmount(2),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			slotBuffDef(401), otherHero, berserker,
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 401, 1)
+	seedKnownSkill(t, srv, objID, 402, 1)
+	seedKnownSkill(t, srv, objID, 403, 1)
+	startInWorld(t, c)
+
+	castSlotBuff(t, c, objID, 401)
+	castSlotBuff(t, c, objID, 402)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{401, 402}) {
+		t.Fatalf("held effects at cap = %v, want [401 402]", ids)
+	}
+
+	// The hero_buff effect cancels 402 through its stack group; the second
+	// effect's own stack type is new, but the skill's first template says
+	// hero_buff, which is now held, so 401 must survive the cap check.
+	castSlotBuff(t, c, objID, 403)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{401, 403, 403}) {
+		t.Fatalf("held effects after multi-template cast at cap = %v, want unrelated buff kept [401 403 403]", ids)
+	}
+}
+
+// TestHeldStackedEffectAnswersSkillIDLookup pins the skill-id effect lookup
+// that seed, force and active-effect conditions read: an active match wins,
+// and a stacked-out effect still held in the list answers when nothing
+// active matches.
+func TestHeldStackedEffectAnswersSkillIDLookup(t *testing.T) {
+	t.Parallel()
+	weak := stackedBuffDef(201, 1, 30)
+	strong := stackedBuffDef(202, 2, 30)
+	strong.Level = 3
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithCancelLesserEffect(false),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{weak, strong})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 201, 1)
+	seedKnownSkill(t, srv, objID, 202, 3)
+	startInWorld(t, c)
+
+	castSlotBuff(t, c, objID, 201)
+	c.Send(encodeRequestMagicSkillUse(202, false, false))
+	drainUntilQuiet(t, c)
+	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
+		t.Fatalf("held effects with cancel-lesser off = %v, want queued lesser [201 202]", ids)
+	}
+
+	list := liveEffectList(t, srv, objID)
+	if level, ok := list.ActiveBySkillID(201); !ok || level != 1 {
+		t.Fatalf("ActiveBySkillID(201) for held stacked-out effect = (%d, %v), want (1, true)", level, ok)
+	}
+	if level, ok := list.ActiveBySkillID(202); !ok || level != 3 {
+		t.Fatalf("ActiveBySkillID(202) for active effect = (%d, %v), want (3, true)", level, ok)
+	}
+	if _, ok := list.ActiveBySkillID(203); ok {
+		t.Fatal("ActiveBySkillID(203) found an effect that was never applied")
+	}
+}
+
+func liveEffectList(t *testing.T, srv *gameservertest.Server, objID int32) *effect.List {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	holder, ok := obj.(interface{ EffectList() *effect.List })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no EffectList", objID, obj)
+	}
+	return holder.EffectList()
+}

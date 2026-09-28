@@ -38,7 +38,12 @@ type Skill struct {
 	Name string
 	// SkillType is the raw datapack skill-type tag (e.g. "BUFF", "REFLECT").
 	// It drives the buff-slot family used by the list's cap enforcement.
-	SkillType      string
+	SkillType string
+	// StackType is the stack type of the skill's first effect template, or
+	// empty when the skill has no effect templates. The buff-slot cap guard
+	// reads it instead of each landing effect's own stack type, so every
+	// effect of a multi-template skill makes the same eviction decision.
+	StackType      string
 	Debuff         bool
 	Toggle         bool
 	KillByDOT      bool
