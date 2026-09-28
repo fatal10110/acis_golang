@@ -47,13 +47,8 @@ func bootSummoner(t *testing.T, seeds ...seedItem) *petWorld {
 			MPConsume: catMPConsume, ItemConsumeID: catConsumeItemID, ItemConsumeCount: 1,
 		},
 	}), gamesql.NewCharacterSkillStore(db))
-	cat := &npc.Template{
-		ID: catNPCID, TemplateID: catNPCID, Type: "Servitor", Name: "Kat the Cat", Level: 20,
-		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60,
-		CollisionRadius: 8, CollisionHeight: 20,
-	}
 	srv := bootPets(t,
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), cat})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), catTemplate()})),
 		gameservertest.WithSkills(skills))
 	ownerID := srv.SoleObjectID(t)
 	for _, id := range []int{longCastSkillID, summonCatSkillID} {

@@ -10,9 +10,11 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -227,6 +229,158 @@ func TestFearOnPlayerFleesOnceThenRefuses(t *testing.T) {
 	}
 	if got := fear.Remaining(); got != 4 {
 		t.Fatalf("Remaining() = %d after one tick, want 4", got)
+	}
+}
+
+// TestFearOnRootedMonsterRunsInPlace pins fear landing on a rooted monster:
+// the flee still switches it to run stance, but no walk starts, on landing or
+// on a tick, and the fear is held for its count.
+func TestFearOnRootedMonsterRunsInPlace(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+	// An idle wander puts the monster in walk stance first.
+	tickThinkWander(t, hostile)
+	drainUntilQuiet(t, c)
+	landEffect(t, hostile, "Root")
+	drainUntilQuiet(t, c)
+	if !hostile.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false after Root landed, want true")
+	}
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	caster, ok := obj.(effect.Actor)
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is not an effect actor", objID, obj)
+	}
+	before := hostile.Move().Position()
+
+	fear := landFear(t, caster, hostile, curseFearSkillID, 3)
+	var ran bool
+	for _, frame := range readFramesUntilQuiet(c) {
+		switch frame[0] {
+		case serverpackets.OpcodeChangeMoveType:
+			assertChangeMoveType(t, frame, hostile.ObjectID(), true)
+			ran = true
+		case serverpackets.OpcodeMoveToLocation:
+			if id, _, _ := moveToLocationCoords(t, frame); id == hostile.ObjectID() {
+				t.Fatal("fear landing walked a rooted monster, want it kept in place")
+			}
+		}
+	}
+	if !ran {
+		t.Fatal("fear landing sent no run-stance ChangeMoveType for the rooted monster")
+	}
+	if !hostile.Afraid() || !fear.InUse() {
+		t.Fatalf("Afraid() = %v, fear in use = %v on a rooted monster, want the fear held", hostile.Afraid(), fear.InUse())
+	}
+
+	srv.Advance(t, 2*time.Second)
+	srv.TickEffects()
+	for _, frame := range readFramesUntilQuiet(c) {
+		if frame[0] != serverpackets.OpcodeMoveToLocation {
+			continue
+		}
+		if id, _, _ := moveToLocationCoords(t, frame); id == hostile.ObjectID() {
+			t.Fatal("tick flee walked a rooted monster, want it kept in place")
+		}
+	}
+	if got := hostile.Move().Position(); got.X != before.X || got.Y != before.Y {
+		t.Fatalf("rooted monster at %+v after fear, want %+v", got, before)
+	}
+	if got := fear.Remaining(); got != 2 {
+		t.Fatalf("Remaining() = %d after one tick, want 2", got)
+	}
+}
+
+// encodeRequestChangeMoveType builds the client's run/walk toggle request.
+func encodeRequestChangeMoveType(run bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestChangeMoveType)
+	w.WriteInt32(wire.BoolInt32(run))
+	return w.Bytes()
+}
+
+// TestFearOnRootedPlayerIsRefusedInPlace pins fear landing on a rooted,
+// walking player: the flee switches it to run stance, then the move request
+// finds it unable to move, so it goes idle and is answered ActionFailed with
+// no walk. The fear is still held.
+func TestFearOnRootedPlayerIsRefusedInPlace(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+	c.Send(encodeRequestChangeMoveType(false))
+	assertChangeMoveType(t, mustRead(t, c, "walk ChangeMoveType"), objID, false)
+	drainUntilQuiet(t, c)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	player, ok := obj.(interface {
+		effectHolder
+		IsMoving() bool
+		MovementDisabled() bool
+	})
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is not an effect holder", objID, obj)
+	}
+	landEffect(t, player, "Root")
+	drainUntilQuiet(t, c)
+	if !player.MovementDisabled() {
+		t.Fatal("MovementDisabled() = false after Root landed, want true")
+	}
+	before := location.Location{}
+	before.X, before.Y, before.Z = player.Position()
+
+	fear := landFear(t, hostile, player, curseFearSkillID, 10)
+	runAt, refusedAt := -1, -1
+	for i, frame := range readFramesUntilQuiet(c) {
+		switch frame[0] {
+		case serverpackets.OpcodeChangeMoveType:
+			assertChangeMoveType(t, frame, objID, true)
+			runAt = i
+		case serverpackets.OpcodeActionFailed:
+			if runAt >= 0 && refusedAt < 0 {
+				refusedAt = i
+			}
+		case serverpackets.OpcodeMoveToLocation:
+			if id, _, _ := moveToLocationCoords(t, frame); id == objID {
+				t.Fatal("fear landing walked a rooted player, want the move refused")
+			}
+		}
+	}
+	if runAt < 0 {
+		t.Fatal("fear landing sent no run-stance ChangeMoveType for the walking player")
+	}
+	if refusedAt < 0 {
+		t.Fatal("fear landing sent no ActionFailed after the run stance, want the refused move answered")
+	}
+	if player.IsMoving() {
+		t.Fatal("IsMoving() = true for a rooted player after fear, want it standing")
+	}
+	x, y, _ := player.Position()
+	if x != before.X || y != before.Y {
+		t.Fatalf("rooted player at (%d,%d) after fear, want (%d,%d)", x, y, before.X, before.Y)
+	}
+	if !player.Afraid() || !fear.InUse() {
+		t.Fatalf("Afraid() = %v, fear in use = %v on a rooted player, want the fear held", player.Afraid(), fear.InUse())
 	}
 }
 
