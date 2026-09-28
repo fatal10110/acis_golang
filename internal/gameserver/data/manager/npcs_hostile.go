@@ -219,10 +219,11 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 }
 
 // hostileControl reacts to a live hostile NPC's controller events: it
-// re-evaluates the AI loop as soon as a chase leg completes or a swing
-// finishes, rather than waiting for the next fixed AI tick — otherwise a
-// hostile NPC only closes distance on, or re-attacks, its target once per
-// task.AITick — and closes an aborted AI cast with its cancel animation.
+// re-evaluates the AI loop as soon as a chase leg completes, a swing or its
+// hit animation finishes, or a cast ends, rather than waiting for the next
+// fixed AI tick — otherwise a hostile NPC only closes distance on, or
+// re-attacks, its target once per task.AITick — and closes an aborted AI
+// cast with its cancel animation.
 // newLiveHostile fills it before the NPC is published.
 type hostileControl struct {
 	hostile   *npc.Hostile
@@ -235,7 +236,7 @@ type hostileControl struct {
 
 // Emit maps one controller event to the NPC's AI and broadcasts.
 func (c *hostileControl) Emit(ev event.Event) {
-	switch ev.(type) {
+	switch e := ev.(type) {
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
@@ -257,7 +258,19 @@ func (c *hostileControl) Emit(ev event.Event) {
 		c.hostile.AI().ArrivedBlocked()
 		c.think()
 	case event.AttackFinished:
-		c.think()
+		// A swing finishing re-runs desire selection; a bow's reuse ending
+		// only continues the current intention.
+		if e.BowReuse {
+			c.think()
+			return
+		}
+		c.runAI()
+	case event.AttackRethink:
+		c.runAI()
+	case event.CastFinished:
+		if err := c.hostile.CastFinished(e.Interrupted); err != nil {
+			c.log.Warn().Err(err).Msg("ai: hostile cast finished")
+		}
 	case event.CastAborted:
 		// Every AI cast abort path (Launch revalidation failure,
 		// insufficient MP/HP at Hit, a damage-break interrupt) routes
@@ -272,6 +285,12 @@ func (c *hostileControl) Emit(ev event.Event) {
 func (c *hostileControl) think() {
 	if err := c.hostile.Think(); err != nil {
 		c.log.Warn().Err(err).Msg("ai: hostile think")
+	}
+}
+
+func (c *hostileControl) runAI() {
+	if err := c.hostile.RunAI(); err != nil {
+		c.log.Warn().Err(err).Msg("ai: hostile run")
 	}
 }
 

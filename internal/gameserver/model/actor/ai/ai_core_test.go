@@ -1408,6 +1408,52 @@ func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
 	}
 }
 
+// hitAnimationAttack is a recordingAttack that reports a hit animation
+// window.
+type hitAnimationAttack struct {
+	recordingAttack
+	inHitAnimation bool
+}
+
+func (a *hitAnimationAttack) InHitAnimation() bool { return a.inHitAnimation }
+
+// TestAttackableAIHoldsPromotionInsideHitAnimation pins NpcAI.runAI's hit
+// animation gate: a queued desire is not taken up while the attack
+// controller reports its hit animation window open, and is taken up by the
+// next pass once the window closes.
+func TestAttackableAIHoldsPromotionInsideHitAnimation(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	move := &recordingMove{}
+	strike := &hitAnimationAttack{inHitAnimation: true}
+	brain := NewAttackable(owner, move, strike)
+	dest := location.Location{X: 300}
+	unmoved := location.Location{X: -1, Y: -1, Z: -1}
+	move.home = unmoved
+
+	brain.AddMoveToDesire(dest, 1_000_000)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() inside the hit animation error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() inside the hit animation = %v, want %v", got, IntentionIdle)
+	}
+	if move.home != unmoved {
+		t.Fatalf("MoveHome destination inside the hit animation = %#v, want no move", move.home)
+	}
+
+	strike.inHitAnimation = false
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() after the hit animation error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after the hit animation = %v, want %v", got, IntentionMoveTo)
+	}
+	if move.home != dest {
+		t.Fatalf("MoveHome destination after the hit animation = %#v, want %#v", move.home, dest)
+	}
+}
+
 func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
