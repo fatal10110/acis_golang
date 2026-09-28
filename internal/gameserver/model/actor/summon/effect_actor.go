@@ -17,6 +17,12 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 	return a.owner, true
 }
 
+// BroadcastStatus republishes the summon's vitals to its owner's pet window
+// and to observers; see UpdateStatus.
+func (a *Actor) BroadcastStatus() {
+	a.UpdateStatus()
+}
+
 // AbortAll stops the summon's movement, attack and cast and sends it idle
 // (see TryToIdle), then clears its target when resetTarget is set. None of
 // it is client-visible beyond the stop broadcasts the controllers already

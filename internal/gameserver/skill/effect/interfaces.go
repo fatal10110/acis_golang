@@ -51,6 +51,10 @@ type Actor interface {
 	HealEffectiveness() float64
 	// RechargeMP adjusts a base MP-restore amount by the recharge rate.
 	RechargeMP(base float64) float64
+	// BroadcastStatus republishes the actor's current vitals to whoever
+	// follows them: a player's own bars, a summon's owner pet window and
+	// observers, an NPC's targeters.
+	BroadcastStatus()
 
 	AbortAll(force bool)
 	StopMove()
@@ -102,7 +106,6 @@ type PlayerActor interface {
 	MarkRecentFakeDeath()
 	HPFull() bool
 
-	BroadcastStatus()
 	BroadcastAbnormalEffect()
 	SendRegenMax(count, period int32, hpRegen float64)
 	NotifyEffectRemovedDueLackHP(*Effect)

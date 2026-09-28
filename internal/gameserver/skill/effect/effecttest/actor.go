@@ -36,6 +36,7 @@ func (Actor) AddMP(float64) float64                      { return 0 }
 func (Actor) HealProficiency() float64                   { return 0 }
 func (Actor) HealEffectiveness() float64                 { return 100 }
 func (Actor) RechargeMP(base float64) float64            { return base }
+func (Actor) BroadcastStatus()                           {}
 func (Actor) AbortAll(bool)                              {}
 func (Actor) StopMove()                                  {}
 func (Actor) TryToIdle()                                 {}
