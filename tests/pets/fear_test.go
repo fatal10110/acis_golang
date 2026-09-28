@@ -177,10 +177,10 @@ const (
 	summonGolemSkillID = 13
 )
 
-// bootServitorOwner brings the owner in with one servitor skill that calls
+// bootFearServitor brings the owner in with one servitor skill that calls
 // tmpl, casts it, waits for the servitor to reach world state, and spawns
 // the fixture monster.
-func bootServitorOwner(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld, *summon.Actor, *npc.Hostile) {
+func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld, *summon.Actor, *npc.Hostile) {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
@@ -241,7 +241,7 @@ func catTemplate() *npc.Template {
 // no effect and runs nowhere; a Bluff is refused the same way.
 func TestSiegeSummonRejectsFearAndBluff(t *testing.T) {
 	t.Parallel()
-	h, golem, hostile := bootServitorOwner(t, siegeGolemTemplate(), summonGolemSkillID)
+	h, golem, hostile := bootFearServitor(t, siegeGolemTemplate(), summonGolemSkillID)
 	fear := landPetFear(t, golem, hostile, 1092, 6, 2)
 	if golem.Afraid() || fear.InUse() {
 		t.Errorf("siege golem Afraid() = %v, fear in use = %v, want the fear refused", golem.Afraid(), fear.InUse())
@@ -268,7 +268,7 @@ func TestSiegeSummonRejectsFearAndBluff(t *testing.T) {
 // landing on it is held.
 func TestOrdinaryServitorTakesBluff(t *testing.T) {
 	t.Parallel()
-	_, cat, hostile := bootServitorOwner(t, catTemplate(), summonCatSkillID)
+	_, cat, hostile := bootFearServitor(t, catTemplate(), summonCatSkillID)
 	if cat.SiegeSummon() || cat.FearImmune() || cat.BluffExempt() {
 		t.Fatalf("servitor SiegeSummon/FearImmune/BluffExempt = %v/%v/%v, want all false",
 			cat.SiegeSummon(), cat.FearImmune(), cat.BluffExempt())
