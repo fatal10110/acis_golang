@@ -27,6 +27,8 @@ type AI interface {
 	TryToAttack(attackable.Combatant) bool
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
+	// Think continues the current intention once.
+	Think()
 	TryToCast(target attackable.Combatant, ref modelskill.Ref) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()
