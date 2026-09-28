@@ -75,6 +75,8 @@ type options struct {
 	karmaPlayerCanTeleport bool
 	restarts               *restart.Table
 	zones                  *zone.Index
+	water                  bool
+	waterNow               func() time.Time
 	attackStance           *task.AttackStance
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
@@ -158,6 +160,17 @@ func WithRestartPoints(table *restart.Table) Option {
 // no zone flags are raised on enter world or movement).
 func WithZones(index *zone.Index) Option {
 	return func(o *options) { o.zones = index }
+}
+
+// WithWater wires the drowning tracker into the link, reading breath
+// deadlines from now (nil means time.Now), so water-zone entry and exit
+// start and stop the breath countdown. Its one-second tick is not started;
+// a test drives drowning through Server.Water.Tick.
+func WithWater(now func() time.Time) Option {
+	return func(o *options) {
+		o.water = true
+		o.waterNow = now
+	}
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -382,6 +395,7 @@ type Server struct {
 	AttackStance     *task.AttackStance
 	Effects          *task.Effects
 	AI               *task.AI
+	Water            *task.Water // set by WithWater; nil otherwise
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -1170,6 +1184,15 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Levels:           levels,
 		Log:              o.log,
 	}
+	var water *task.Water
+	if o.water {
+		var err error
+		water, err = task.NewWater(effects, o.waterNow)
+		if err != nil {
+			t.Fatalf("new water: %v", err)
+		}
+		gclConfig.Water = water
+	}
 	if o.slowStores > 0 {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
 		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
@@ -1329,6 +1352,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		castEffects:      gcl.HostileCastEffects(),
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		AI:               ai,
+		Water:            water,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,
