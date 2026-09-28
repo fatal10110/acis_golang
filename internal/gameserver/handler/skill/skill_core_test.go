@@ -681,8 +681,15 @@ type fakeCubicSummoner struct {
 	servitor     modelskill.Definition
 }
 
+// newFakeCubicSummoner returns a summoner with its own world object id, so a
+// mass cast can tell the caster from the other recipients.
 func newFakeCubicSummoner(nextAdded bool) *fakeCubicSummoner {
-	return &fakeCubicSummoner{added: map[cubic.ID]bool{}, givenByOther: map[cubic.ID]bool{}, nextAdded: nextAdded}
+	return &fakeCubicSummoner{
+		fakeActor:    fakeActor{objectID: nextFakeObjectID()},
+		added:        map[cubic.ID]bool{},
+		givenByOther: map[cubic.ID]bool{},
+		nextAdded:    nextAdded,
+	}
 }
 
 func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, added bool) {
