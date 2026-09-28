@@ -67,9 +67,10 @@ type Actor interface {
 	SetInvul(bool) bool
 	Afraid() bool
 	FearImmune() bool
-	// FleeFrom starts fleeing from effector and reports whether the actor
-	// is able to.
-	FleeFrom(effector Actor, distance int) bool
+	// FleeFrom runs the actor distance units directly away from effector,
+	// as far as the actor's own movement rules let it. A nil or self
+	// effector, or a distance under 10, does nothing.
+	FleeFrom(effector Actor, distance int)
 	// BluffExempt reports whether the actor ignores facing-redirect effects.
 	BluffExempt() bool
 

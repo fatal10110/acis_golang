@@ -325,8 +325,9 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 				t.Fatalf("RejectsIfAffected = %v, want %v", e.RejectsIfAffected, tt.wantRejects)
 			}
 			e.Effected = &deadTarget{}
-			if e.ActionTime() {
-				t.Fatal("non-periodic action hook continued")
+			// Fear keeps its full count whatever each flee does.
+			if got, want := e.ActionTime(), tt.wantType == TypeFear; got != want {
+				t.Fatalf("ActionTime() = %v, want %v", got, want)
 			}
 		})
 	}
@@ -789,9 +790,8 @@ func (t *liveEffectTarget) FearImmune() bool { return t.fearImmune }
 
 func (t *liveEffectTarget) Playable() bool { return t.playable }
 
-func (t *liveEffectTarget) FleeFrom(effector Actor, distance int) bool {
+func (t *liveEffectTarget) FleeFrom(effector Actor, distance int) {
 	t.events = append(t.events, fmt.Sprintf("flee:%v:%d", effector, distance))
-	return true
 }
 
 func (t *liveEffectTarget) StopEffects(typ Type) {

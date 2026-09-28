@@ -3,6 +3,8 @@ package effect
 import (
 	"slices"
 	"time"
+
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func (l *List) Tick() {
@@ -114,6 +116,19 @@ func (l *List) StopByType(t Type) {
 	}
 	for _, e := range l.All() {
 		if e.Type == t {
+			l.Remove(e)
+		}
+	}
+}
+
+// StopBySkillID removes every held effect the given skill applied, running
+// each removed instance's exit hook, matching Creature.stopSkillEffects(int).
+func (l *List) StopBySkillID(id modelskill.ID) {
+	if l == nil {
+		return
+	}
+	for _, e := range l.All() {
+		if e.Skill.ID == id {
 			l.Remove(e)
 		}
 	}

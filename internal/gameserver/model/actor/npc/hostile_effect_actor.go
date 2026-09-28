@@ -28,21 +28,35 @@ func (h *Hostile) ClearTarget() {}
 // StopAttack stops the NPC's attack cycle; its intentions stay.
 func (h *Hostile) StopAttack() { h.brain.StopAttack() }
 
-// FearImmune reports false: fear immunity is not modeled yet.
+// FearImmune reports false: only folk, siege flags and siege summons shrug
+// off fear, and none of them is a hostile NPC.
 func (h *Hostile) FearImmune() bool { return false }
 
-// FleeFrom reports false: fleeing movement is not modeled yet.
-func (h *Hostile) FleeFrom(effect.Actor, int) bool { return false }
+// FleeFrom runs the NPC distance units directly away from effector, in run
+// stance, on every call. The walk is geodata-routed from the NPC's current
+// position; an NPC that cannot move keeps its place. It bypasses the think
+// loop, which a fear already keeps from acting.
+func (h *Hostile) FleeFrom(effector effect.Actor, distance int) {
+	if effector == nil || effector.ObjectID() == h.ObjectID() || distance < 10 {
+		return
+	}
+	h.ForceRunStance()
+	if h.MovementDisabled() {
+		return
+	}
+	fromX, fromY, _ := effector.Position()
+	_, _ = h.move.MoveToLocation(h.Move().Position().FleeFrom(fromX, fromY, distance))
+}
 
-// BluffExempt reports false: no NPC kind is exempt from bluff yet.
+// BluffExempt reports false: the kinds bluff skips are folk, siege summons
+// and raid-related NPCs, and the bluff hook checks the last itself.
 func (h *Hostile) BluffExempt() bool { return false }
 
-// StopEffects does nothing yet: stopping effects by type is not wired.
-func (h *Hostile) StopEffects(effect.Type) {}
+// StopEffects removes every effect of type t the NPC holds.
+func (h *Hostile) StopEffects(t effect.Type) { h.EffectList().StopByType(t) }
 
-// StopSkillEffectsByID does nothing yet: stopping effects by skill is not
-// wired.
-func (h *Hostile) StopSkillEffectsByID(modelskill.ID) {}
+// StopSkillEffectsByID removes every effect skill id applied to the NPC.
+func (h *Hostile) StopSkillEffectsByID(id modelskill.ID) { h.EffectList().StopBySkillID(id) }
 
 // AddChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (h *Hostile) AddChanceTrigger(*effect.Effect) {}

@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -34,6 +35,9 @@ type AI interface {
 	AbortAll()
 	// FollowInstead makes following target the current intention.
 	FollowInstead(attackable.Combatant)
+	// TryToMoveTo makes walking to dest the current intention and starts
+	// the walk.
+	TryToMoveTo(dest location.Location) bool
 	StopMove()
 	StopAttack()
 	// AttackingNow reports whether this summon's own attack cycle is

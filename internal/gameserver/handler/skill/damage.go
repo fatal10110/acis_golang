@@ -633,10 +633,8 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			result.record(OpponentMPReducedMessage{MP: int32(mp)})
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
-		// (pre-clamp) damage is positive, after the drain. No production
-		// actor implements a StopEffects(Type) method, so this goes
-		// through the same effect-list removal path stopEffectsBySkillID
-		// uses rather than a type assertion that only test fakes satisfy.
+		// (pre-clamp) damage is positive, after the drain, through the
+		// same effect-list removal path stopEffectsBySkillID uses.
 		if rawDamage > 0 {
 			if elt, ok := effective.(effect.Actor); ok {
 				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {

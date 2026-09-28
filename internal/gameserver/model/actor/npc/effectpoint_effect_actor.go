@@ -43,7 +43,7 @@ func (ep *EffectPoint) SetImmobilized(bool) bool                   { return fals
 func (ep *EffectPoint) SetInvul(bool) bool                         { return false }
 func (ep *EffectPoint) Afraid() bool                               { return false }
 func (ep *EffectPoint) FearImmune() bool                           { return false }
-func (ep *EffectPoint) FleeFrom(effect.Actor, int) bool            { return false }
+func (ep *EffectPoint) FleeFrom(effect.Actor, int)                 {}
 func (ep *EffectPoint) BluffExempt() bool                          { return false }
 func (ep *EffectPoint) FlyTo(location.Location, modelskill.Flight) {}
 func (ep *EffectPoint) SetXYZ(int, int, int)                       {}

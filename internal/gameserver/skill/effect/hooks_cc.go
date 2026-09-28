@@ -26,24 +26,36 @@ func sleepStart(e *Effect) bool {
 	return true
 }
 
+// fearFleeDistance is how far a feared creature runs from its effector on
+// every flee.
+const fearFleeDistance = 500
+
+// fearStart keeps the fear once the target has been sent fleeing, whether or
+// not that first flee could move it. The already-afraid check reads started
+// effects only: this effect is already held, and its own flag must not
+// reject it.
 func fearStart(e *Effect) bool {
-	if isPlayable(e.Effected) && fearHalvedDurationPlayableSkillIDs[e.Skill.ID] {
-		e.Template.Count /= 2
-	}
-	if e.Effected.FearImmune() || e.Effected.Afraid() {
+	if e.Effected.FearImmune() {
 		return false
 	}
 	if isPlayable(e.Effected) && fearSkippedPlayableSkillIDs[e.Skill.ID] {
 		return false
 	}
+	if e.Effected.EffectList().StartedAffected(FlagFear) {
+		return false
+	}
 
 	e.Effected.AbortAll(false)
 	refresh(e.Effected)
-	return fearAction(e)
+	fearAction(e)
+	return true
 }
 
+// fearAction sends the target fleeing again on every tick; the fear lasts its
+// full count whatever the flee does.
 func fearAction(e *Effect) bool {
-	return e.Effected.FleeFrom(e.Effector, 500)
+	e.Effected.FleeFrom(e.Effector, fearFleeDistance)
+	return true
 }
 
 func fearExit(e *Effect) {
