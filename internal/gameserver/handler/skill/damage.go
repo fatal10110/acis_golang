@@ -18,6 +18,30 @@ type chargedShotUser interface {
 	ChargedShot(modelitem.ShotKind) bool
 }
 
+// dischargeSoulshot spends the caster's soulshot at the end of a cast. The
+// charge flag written is the skill's static-reuse flag, so a static-reuse
+// skill leaves the shot marked charged.
+func dischargeSoulshot(cast Cast) {
+	if caster, ok := cast.Caster.(shotCharger); ok {
+		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
+	}
+}
+
+// dischargeSpiritshot spends the caster's blessed spiritshot when one is
+// charged, otherwise its plain spiritshot, writing the static-reuse flag
+// the way dischargeSoulshot does.
+func dischargeSpiritshot(cast Cast) {
+	caster, ok := cast.Caster.(chargedShotUser)
+	if !ok {
+		return
+	}
+	kind := modelitem.ShotSpirit
+	if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
+		kind = modelitem.ShotBlessedSpirit
+	}
+	caster.SetChargedShot(kind, cast.Skill.StaticReuse)
+}
+
 // skillReflected rolls whether obj reflects cast's skill back at the
 // caster. Only a creature can reflect.
 func skillReflected(cast Cast, obj Actor) bool {
@@ -118,9 +142,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(shotCharger); ok {
-		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-	}
+	dischargeSoulshot(cast)
 	return result
 }
 
@@ -169,9 +191,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(shotCharger); ok {
-		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-	}
+	dischargeSoulshot(cast)
 	return result
 }
 
@@ -235,13 +255,7 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(chargedShotUser); ok {
-		kind := modelitem.ShotSpirit
-		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
-			kind = modelitem.ShotBlessedSpirit
-		}
-		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
-	}
+	dischargeSpiritshot(cast)
 	return result
 }
 
@@ -324,9 +338,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 					recordDamage(&result, cast.Caster, target, damage, false, true)
 				}
 			}
-			if caster, ok := cast.Caster.(shotCharger); ok {
-				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-			}
+			dischargeSoulshot(cast)
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
 		// outside the landing gate — a missed blow can still proc it.
@@ -634,13 +646,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(chargedShotUser); ok {
-		kind := modelitem.ShotSpirit
-		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
-			kind = modelitem.ShotBlessedSpirit
-		}
-		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
-	}
+	dischargeSpiritshot(cast)
 	return result
 }
 

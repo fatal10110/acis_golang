@@ -359,6 +359,16 @@ func ItemTemplates() *item.Table {
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
 		},
 		{
+			ID:             5593,
+			Name:           "SP Scroll: Low Grade",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2167, Level: 1}},
+		},
+		{
 			// Synthetic two-skill ItemSkills template. Three shipped
 			// ItemSkills templates carry multiple attached skills
 			// (8612/8613/8614), but every one of their skills is isPotion,

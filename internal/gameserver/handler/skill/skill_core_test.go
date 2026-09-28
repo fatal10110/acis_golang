@@ -1730,7 +1730,9 @@ type skillTarget struct {
 
 	effects *effect.List
 	shots   []item.ShotKind
-	charged map[item.ShotKind]bool
+	// shotFlags parallels shots with the charged flag each write carried.
+	shotFlags []bool
+	charged   map[item.ShotKind]bool
 
 	castBreakDamage []float64
 
@@ -1871,7 +1873,7 @@ func (t *skillTarget) SetCP(v float64) {
 	t.cp = v
 }
 
-func (t *skillTarget) AddExpAndSP(exp, sp int) { t.sp += sp }
+func (t *skillTarget) AddExpAndSp(_ int64, sp int) { t.sp += sp }
 
 func (t *skillTarget) Die(killer attackable.Combatant) {
 	t.dead = true
@@ -1882,8 +1884,9 @@ func (t *skillTarget) ReduceHP(v float64, attacker attackable.Combatant, skill m
 	t.hp -= v
 }
 
-func (t *skillTarget) SetChargedShot(kind item.ShotKind, _ bool) {
+func (t *skillTarget) SetChargedShot(kind item.ShotKind, charged bool) {
 	t.shots = append(t.shots, kind)
+	t.shotFlags = append(t.shotFlags, charged)
 }
 
 func (t *skillTarget) ChargedShot(kind item.ShotKind) bool { return t.charged[kind] }
@@ -2823,6 +2826,149 @@ func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
 
 	if got, want := caster.shots, []item.ShotKind{item.ShotSoul, item.ShotBlessedSpirit}; !slices.Equal(got, want) {
 		t.Fatalf("discharged shots = %v, want %v", got, want)
+	}
+}
+
+// TestNonDamageHandlersDischargeChargedShots pins the shot each non-damage
+// handler spends after its target loop, and the static-reuse flag it writes
+// back: CPDAMPERCENT spends the soulshot; HEAL, MANAHEAL, RESURRECT and the
+// CANCEL family spend the blessed spiritshot when one is charged, otherwise
+// the plain spiritshot. A static heal and a potion leave the shot alone.
+func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
+	healTarget := func() *skillTarget { return &skillTarget{hp: 10, maxHP: 100, mp: 10, maxMP: 100, recharge: 1} }
+	tests := []struct {
+		name      string
+		skill     modelskill.Definition
+		blessed   bool
+		healOK    bool
+		targets   func() []Actor
+		wantShots []item.ShotKind
+	}{
+		{
+			name:      "cpdampercent with no targets",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "cpdampercent skips a non-player target",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{cp: 100, maxCP: 100}} },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "cpdampercent static reuse",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50, StaticReuse: true},
+			targets:   func() []Actor { return []Actor{&skillTarget{isPlayer: true, cp: 100, maxCP: 100}} },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "heal plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "heal blessed spiritshot static reuse",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20, StaticReuse: true},
+			blessed:   true,
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "heal without a resolvable amount",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:    "heal static keeps shot",
+			skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
+			blessed: true,
+			healOK:  true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:    "heal potion keeps shot",
+			skill:   modelskill.Definition{SkillType: "HEAL", Power: 20, Potion: true},
+			healOK:  true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:      "manaheal plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "MANAHEAL", Power: 20},
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "manarecharge blessed spiritshot",
+			skill:     modelskill.Definition{SkillType: "MANARECHARGE", Power: 20, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:    "manaheal potion keeps shot",
+			skill:   modelskill.Definition{SkillType: "MANAHEAL", Power: 20, Potion: true},
+			blessed: true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:      "resurrect by a caster without revive power",
+			skill:     modelskill.Definition{SkillType: "RESURRECT", Power: 20},
+			blessed:   true,
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "cancel with no targets",
+			skill:     modelskill.Definition{SkillType: "CANCEL", Power: 20},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "mage bane skips a dead target",
+			skill:     modelskill.Definition{SkillType: "MAGE_BANE", Power: 20, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{dead: true}} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "warrior bane with no targets",
+			skill:     modelskill.Definition{SkillType: "WARRIOR_BANE", Power: 20},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caster := &skillTarget{
+				healAmount: 10, healOK: tt.healOK,
+				charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: tt.blessed, item.ShotSpirit: !tt.blessed, item.ShotSoul: true},
+			}
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets()})
+			if !slices.Equal(caster.shots, tt.wantShots) {
+				t.Fatalf("discharged shots = %v, want %v", caster.shots, tt.wantShots)
+			}
+			for i, flag := range caster.shotFlags {
+				if flag != tt.skill.StaticReuse {
+					t.Fatalf("shot write %d charged = %v, want static-reuse flag %v", i, flag, tt.skill.StaticReuse)
+				}
+			}
+		})
+	}
+}
+
+// TestCpDamPercentAlikeDeadCasterKeepsSoulshot pins the one early exit that
+// precedes the soulshot discharge.
+func TestCpDamPercentAlikeDeadCasterKeepsSoulshot(t *testing.T) {
+	caster := &skillTarget{alikeDead: true}
+	NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50}})
+	if len(caster.shots) != 0 {
+		t.Fatalf("discharged shots = %v, want none from an alike-dead caster", caster.shots)
 	}
 }
 
