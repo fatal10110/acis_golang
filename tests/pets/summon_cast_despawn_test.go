@@ -41,8 +41,9 @@ func bootWolfStriker(t *testing.T) (*petWorld, *summon.Actor, *npc.Hostile) {
 	return bootWolfStrikerWith(t, wolfStrike())
 }
 
-// bootWolfStrikerWith is bootWolfStriker with a caller-tuned strike.
-func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition) (*petWorld, *summon.Actor, *npc.Hostile) {
+// bootWolfStrikerWith is bootWolfStriker with a caller-tuned strike and any
+// extra boot options.
+func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition, extra ...gameservertest.Option) (*petWorld, *summon.Actor, *npc.Hostile) {
 	t.Helper()
 	wolf := wolfTemplate()
 	wolf.Skills = map[int]int{wolfStrikeSkill: 1}
@@ -54,10 +55,10 @@ func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition) (*petWorld,
 		},
 		strike,
 	}), gamesql.NewCharacterSkillStore(db))
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+	h := bootOwnerWithCollarOpts(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf, treeTemplate()})),
 		gameservertest.WithSkills(skills),
-	})
+	}, extra...))
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, h.client)
