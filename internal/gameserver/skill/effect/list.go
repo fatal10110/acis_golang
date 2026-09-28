@@ -265,9 +265,10 @@ func (l *List) active() []*Effect {
 	return effects
 }
 
-// ActiveBySkillID returns the applied Level of the effect owned by skill id
-// that condition and seed/force lookups read, and whether one is held. An
-// active match wins; otherwise a held, stacked-out match is returned. Buffs
+// ActiveBySkillID returns the applied Level of the first effect owned by
+// skill id that condition and seed/force lookups read, and whether any such
+// effect exists. Despite the name it is not active-only: an in-use match
+// wins, otherwise a held, stacked-out match is returned. Buffs
 // are searched first and debuffs only when no buff matched at all, and
 // among several held matches in one list the last one wins.
 func (l *List) ActiveBySkillID(id int) (level int, ok bool) {

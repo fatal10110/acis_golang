@@ -575,3 +575,24 @@ func TestSignetOutlivesItsCastersQueue(t *testing.T) {
 		t.Fatal("effect point's queue still accepts work after despawn")
 	}
 }
+
+func TestSignetEffectMetaCarriesFirstTemplateStackType(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 1323, Level: 1, SkillType: "SIGNET",
+		Effects: []modelskill.EffectTemplate{
+			{Name: "Signet", StackType: "signet_a"},
+			{Name: "Signet", StackType: "signet_b"},
+		},
+	}
+	if got := signetEffectMeta(def).StackType; got != "signet_a" {
+		t.Fatalf("signet meta StackType = %q, want %q (first main template)", got, "signet_a")
+	}
+
+	casttime := modelskill.Definition{
+		ID: 1419, Level: 1, SkillType: "SIGNET_CASTTIME",
+		SelfEffects: []modelskill.EffectTemplate{{Name: "SignetMDam", Self: true, StackType: "self_only"}},
+	}
+	if got := signetEffectMeta(casttime).StackType; got != "" {
+		t.Fatalf("self-only signet meta StackType = %q, want empty (no main templates)", got)
+	}
+}

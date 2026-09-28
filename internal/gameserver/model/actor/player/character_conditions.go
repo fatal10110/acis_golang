@@ -94,9 +94,10 @@ func (a characterStatActor) IsInFrontOf(other conditions.Actor) bool {
 }
 
 // ActiveSkillLevel satisfies conditions.Actor, reusing the same
-// active-effect lookup as ActiveEffectLevel: this codebase tracks a known
-// passive/toggle skill's contribution only while its effect is active, so
-// the two concepts share one source of truth.
+// first-effect lookup as ActiveEffectLevel: this codebase tracks a known
+// passive/toggle skill's contribution through its effect, so the two
+// concepts share one source of truth. The lookup prefers an in-use effect
+// but also answers for a held (stacked-out) one.
 func (a characterStatActor) ActiveSkillLevel(id int) (int, bool) {
 	if a.c.Live == nil {
 		return 0, false
