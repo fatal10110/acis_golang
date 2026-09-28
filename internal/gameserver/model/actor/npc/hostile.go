@@ -634,18 +634,16 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 
 // RandomNearbyCombatant returns a random other attackable NPC known within
 // radius units, excluding chests, or ok false if none exist or this NPC
-// has no world placement yet. The reference confusion effect also
-// considers nearby playable actors as candidates; no playable actor in
-// this port exposes itself to this search yet, so only other attackable
-// NPCs are ever found here. The search is unwidened by collision radius:
-// EffectConfusion.java:43 filters candidates by plain distance2D, not
-// MathUtil.checkIfInRange's body-to-body widening.
+// has no world placement yet. Distance is measured point to point on the
+// horizontal plane: height differences are ignored and collision radii do
+// not widen the search. Nearby playable actors are not candidates yet
+// (#2642).
 func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
 	if h.world == nil {
 		return nil, false
 	}
 	var candidates []attackable.Combatant
-	h.world.ForEachKnownInPlainRadius(h, radius, func(obj world.Tracked) {
+	h.world.ForEachKnownIn2DRadius(h, radius, func(obj world.Tracked) {
 		other, ok := obj.(*Hostile)
 		if !ok || other.chestKind() {
 			return
