@@ -191,10 +191,12 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 // TestInterruptOnDamageImmuneOverridesFusion pins the first guard of
 // Formulas.calcCastBreak (Formulas.java:728-729): a raid-related or
 // invulnerable caster is never broken, ahead of the fusion rule that would
-// otherwise break any hit. Invulnerable players are pinned end to end by
-// tests/skills TestDamageCastBreakRules; raid-related immunity has no damage
-// path forwarding a non-player caster's hits to its cast yet (#2650), so it
-// is held here at the controller.
+// otherwise break any hit. This is the only test that holds the guard
+// itself: tests/skills TestDamageCastBreakRules pins the invulnerable
+// player's end-to-end outcome, but the player damage path returns on invul
+// before the cast break is consulted, so it passes without this guard; and
+// raid-related immunity has no damage path forwarding a non-player caster's
+// hits to its cast yet (#2650).
 func TestInterruptOnDamageImmuneOverridesFusion(t *testing.T) {
 	clock := newCastClock()
 	ctrl := NewController(scalingActor(), nil)

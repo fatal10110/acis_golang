@@ -19,17 +19,18 @@ import (
 const edgeSkillID = 1854
 
 // bootEdgeCaster boots the fixture player knowing def and enters the world.
-// The scenarios read frame times off the harness's driven clock, so they
-// require it.
-func bootEdgeCaster(t *testing.T, def modelskill.Definition) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+// A scenario that reads exact frame offsets off the harness's driven clock
+// passes needsDrivenClock and is skipped on the real-pool executor, where
+// those offsets are wall-clock jitter.
+func bootEdgeCaster(t *testing.T, def modelskill.Definition, needsDrivenClock bool) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
 	)
-	if !srv.DrivesClock() {
-		t.Fatal("cast edge-case scenarios need the driven clock")
+	if needsDrivenClock && !srv.DrivesClock() {
+		t.Skip("exact cast phase timing needs the driven clock")
 	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
@@ -104,7 +105,7 @@ func TestCastScaledHitTimeFloorsAtFiveHundred(t *testing.T) {
 				ID: edgeSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				Magic: true, HitTime: tt.configured, MPConsume: 3, SkillType: "DUMMY",
 			}
-			srv, c, objID := bootEdgeCaster(t, def)
+			srv, c, objID := bootEdgeCaster(t, def, false)
 			onPlayerQueue(t, srv, objID, func(pc *player.Character) {
 				pc.AddStatFuncs([]effect.Mod{{Stat: stat.MagicAttackSpeed, Op: effect.OpSet, Value: setSpeed}})
 				if got := pc.MagicAttackSpeed(); got != castSpeed {
@@ -154,7 +155,7 @@ func TestCastAtOrBelow410CollapsesPhases(t *testing.T) {
 				ID: edgeSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				Magic: true, HitTime: tt.hitTime, CoolTime: 1000, StaticHitTime: true, MPConsume: 3, SkillType: "DUMMY",
 			}
-			_, c, _ := bootEdgeCaster(t, def)
+			_, c, _ := bootEdgeCaster(t, def, true)
 
 			c.Send(encodeRequestMagicSkillUse(edgeSkillID, false, false))
 			if hit := readMagicSkillUseHitTime(t, c, 1); hit != int32(tt.hitTime) {
@@ -226,7 +227,10 @@ func watchCast(t *testing.T, c *testsupport.ScriptedClient, until time.Time) cas
 
 // TestDamageCastBreakRules drives a real NPC auto-attack into a player
 // mid-cast and pins Formulas.calcCastBreak (Formulas.java:725-750): an
-// invulnerable caster is never broken; a FUSION cast breaks on any hit
+// invulnerable caster is never broken (end to end this outcome is held by
+// the damage path's own invul early return, PlayerStatus.java:103-116, ahead
+// of the cast break; the controller's immune guard itself is pinned by the
+// controller-level TestInterruptOnDamageImmuneOverridesFusion); a FUSION cast breaks on any hit
 // before the magic-only rule and without the break roll, so even a physical
 // fusion skill under a roll no ordinary cast can fail is interrupted; any
 // other physical cast is never broken; a magic cast breaks when the roll
@@ -264,7 +268,7 @@ func TestDamageCastBreakRules(t *testing.T) {
 			if tt.skillType == "FUSION" {
 				def.Target, def.CastRange = modelskill.TargetOne, 900
 			}
-			srv, c, objID := bootEdgeCaster(t, def)
+			srv, c, objID := bootEdgeCaster(t, def, true)
 			attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
 			drainUntilQuiet(t, c)
 			if tt.skillType == "FUSION" {
