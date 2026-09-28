@@ -3,6 +3,7 @@ package skills
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 // SkillList reports it, and no save row lingers.
 func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 	t.Parallel()
-	srv, c, objID := bootLearner(t, generalLearnOpts(t, 50)...)
+	srv, c, objID := bootLearner(t, append(generalLearnOpts(t, 50), gameservertest.WithCapturedLog())...)
 	startInWorld(t, c)
 
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
@@ -29,7 +30,7 @@ func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
 
-	logout(t, c)
+	logout(t, srv, c)
 
 	relogin := srv.DialClient(t, "player1", 1)
 	frames := startInWorld(t, relogin)
@@ -47,6 +48,7 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: 1204, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -65,7 +67,7 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 	drainUntilQuiet(t, c)
 
-	logout(t, c)
+	logout(t, srv, c)
 
 	var rows int
 	if err := srv.DB.QueryRowContext(context.Background(),
@@ -100,7 +102,7 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	}
 	drainUntilQuiet(t, relogin)
 
-	logout(t, relogin)
+	logout(t, srv, relogin)
 	rows2 := 0
 	if err := srv.DB.QueryRowContext(context.Background(),
 		"SELECT COUNT(*) FROM character_skills_save WHERE char_obj_id = ? AND skill_id = 1204 AND skill_level = 2", objID).Scan(&rows2); err != nil {
@@ -127,6 +129,7 @@ func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithStoreSkillCooltime(false),
 		gameservertest.WithSkills(skillPersistence(t, defs)),
 	)
@@ -147,7 +150,7 @@ func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
 		t.Fatalf("character_skills_save rows after disabled autosave = %d, want 0", count)
 	}
-	logout(t, c)
+	logout(t, srv, c)
 	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
 		t.Fatalf("character_skills_save rows after disabled logout = %d, want 0", count)
 	}
@@ -175,6 +178,7 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithSkills(skillPersistence(t, defs)),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
@@ -186,7 +190,7 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
 	drainUntilQuiet(t, c)
 
-	logout(t, c)
+	logout(t, srv, c)
 
 	relogin := srv.DialClient(t, "player1", 1)
 	relogin.Send(encodeRequestGameStart(0))
@@ -218,6 +222,7 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 
 	srv2 := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithSkills(skillPersistence(t, defs)),
 	)
 	if got := srv2.SoleObjectID(t); got != objID {
@@ -254,6 +259,7 @@ func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: skillID, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -281,7 +287,7 @@ func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 
-	logout(t, c)
+	logout(t, srv, c)
 	count, restoreType := skillSaveRow(t, srv, objID, skillID, level)
 	if count != 1 || restoreType != 0 {
 		t.Fatalf("character_skills_save after logout = count %d restore_type %d, want 1 effect row", count, restoreType)
@@ -304,10 +310,71 @@ func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
 	}
 	drainUntilQuiet(t, relogin)
 
-	logout(t, relogin)
+	logout(t, srv, relogin)
 	count, restoreType = skillSaveRow(t, srv, objID, skillID, level)
 	if count != 1 || restoreType != 1 {
 		t.Fatalf("character_skills_save after second logout = count %d restore_type %d, want 1 reuse-only row", count, restoreType)
+	}
+}
+
+// TestReloginWaitsForQueuedSkillSave drops a buffed character's connection
+// while its persistence lane is backed up, so the detach's
+// character_skills_save write is still queued, then selects the character
+// again on a new connection. Selection must wait for that write before the
+// character loads: the relogged character gets its buff and reuse back
+// instead of restoring from rows the write has not landed yet.
+func TestReloginWaitsForQueuedSkillSave(t *testing.T) {
+	t.Parallel()
+	const skillID, level = 1204, 2
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: skillID, Level: level, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+				HitTime: 500, ReuseDelay: 45_000, StaticHitTime: true, StaticReuse: true,
+				MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+				Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 30}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, level)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
+	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	drainUntilQuiet(t, c)
+
+	release := srv.HoldPersistenceLane(t, objID)
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	srv.AdvanceUntil(t, "player left world", func() bool {
+		_, ok := srv.State.Player(objID)
+		return !ok
+	})
+	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
+		t.Fatalf("character_skills_save rows while the lane is held = %d, want 0 (the detach save is still queued)", count)
+	}
+
+	relogin := srv.DialClient(t, "player1", 1)
+	relogin.Send(encodeRequestGameStart(0))
+	// Selection is parked on the held lane.
+	relogin.ExpectNoFrame()
+	release()
+	assertFrameOpcode(t, relogin.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
+	assertFrameOpcode(t, relogin.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
+	relogin.Send(encodeEnterWorld())
+	frames := readEnterWorldBurstWithRestoredBuff(t, relogin)
+	if frame := frames[3]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("restored-buff frame opcode = %#x, want AbnormalStatusUpdate", frame[0])
+	}
+	coolTimes := readSkillCoolTimeEntriesFromFrame(t, frames[len(frames)-2])
+	if len(coolTimes) != 1 || coolTimes[0].SkillID != skillID || coolTimes[0].Level != level ||
+		coolTimes[0].RemainingSeconds <= 0 || coolTimes[0].RemainingSeconds > 45 {
+		t.Fatalf("restored SkillCoolTime = %+v, want one skill %d level %d row with a positive remainder", coolTimes, skillID, level)
 	}
 }
 
@@ -321,15 +388,25 @@ func skillSaveRow(t *testing.T, srv *gameservertest.Server, objID, skillID, leve
 	return count, restoreType
 }
 
-// logout sends the logout request and consumes its reply sequence: the
-// LeaveWorld ack, then a closed connection with nothing in between.
-func logout(t *testing.T, c *testsupport.ScriptedClient) {
+// logout sends the logout request, consumes its reply sequence (the
+// LeaveWorld ack, then a closed connection with nothing in between) and waits
+// until every save the detach queued has run, so a row read after it sees
+// what logout wrote. srv must boot WithCapturedLog: a detach save the server
+// logged as failed fails here with the store's error, instead of surfacing
+// later as a row that is simply missing.
+func logout(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Send(encodeLogout())
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeLeaveWorld {
 		t.Fatalf("logout reply opcode = %#x, want LeaveWorld", reply[0])
 	}
 	c.ExpectClosed()
+	srv.FlushPersistence(t)
+	for _, line := range strings.Split(srv.LogText(), "\n") {
+		if strings.Contains(line, `"message":"save player `) {
+			t.Fatalf("logout save failed: %s", line)
+		}
+	}
 }
 
 // TestStackedOutBuffPersistsAndRestoresBehindStronger pins that logout saves
@@ -342,6 +419,7 @@ func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
 		gameservertest.WithCancelLesserEffect(false),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			stackedBuffDef(201, 1, 30), stackedBuffDef(202, 2, 30),
@@ -357,7 +435,7 @@ func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
 		t.Fatalf("icons after stronger stacked buff = %v, want only active [202]", icons)
 	}
 
-	logout(t, c)
+	logout(t, srv, c)
 
 	rows, err := srv.DB.QueryContext(context.Background(),
 		`SELECT skill_id, restore_type, buff_index FROM character_skills_save WHERE char_obj_id = ? ORDER BY buff_index`, objID)
