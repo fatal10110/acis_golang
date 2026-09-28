@@ -127,6 +127,10 @@ const TwoSkillScrollID int32 = 9700
 // UnlockableKeyID is a non-potion ItemSkills fixture for target-validation tests.
 const UnlockableKeyID int32 = 9701
 
+// FormalWearID is the full-body formal dress (bodypart alldress) that forbids
+// item and skill use while worn.
+const FormalWearID int32 = 6408
+
 // ItemTemplates builds the item catalog shared by the behavior suites: adena,
 // potions, shots, a weapon, crystals, enchant scrolls, escape scrolls, quest
 // and summon items.
@@ -315,6 +319,16 @@ func ItemTemplates() *item.Table {
 			Destroyable: true,
 			Depositable: true,
 			Armor:       &item.ArmorDetail{Type: item.ArmorMagic},
+		},
+		{
+			ID:            FormalWearID,
+			Name:          "Formal Wear",
+			Kind:          item.KindArmor,
+			Slot:          item.SlotAllDress,
+			Duration:      -1,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			Armor:         &item.ArmorDetail{Type: item.ArmorNone},
 		},
 		{
 			ID:             1060,

@@ -270,6 +270,15 @@ func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
 // disabled, and per-skill reuse. Callers that stop a walk for a long hit
 // time must run this first so those rejections leave movement alone.
 func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) error {
+	if err := c.canAttemptShared(target, def); err != nil {
+		return err
+	}
+	return c.groundTargetGate(def)
+}
+
+// canAttemptShared is the part of the pre-attempt gate every caster runs
+// before any caster-specific rule.
+func (c *Controller) canAttemptShared(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -282,10 +291,14 @@ func (c *Controller) CanAttemptCast(target Target, def modelskill.Definition) er
 	if c.actor.SkillDisabled(ReuseKey(def)) {
 		return ErrSkillDisabled
 	}
-	if def.Target == modelskill.TargetGround {
-		if c.actor.GroundTargetUnset() {
-			return ErrGroundTargetUnset
-		}
+	return nil
+}
+
+// groundTargetGate refuses a ground-targeted skill before a signet point is
+// set.
+func (c *Controller) groundTargetGate(def modelskill.Definition) error {
+	if def.Target == modelskill.TargetGround && c.actor.GroundTargetUnset() {
+		return ErrGroundTargetUnset
 	}
 	return nil
 }

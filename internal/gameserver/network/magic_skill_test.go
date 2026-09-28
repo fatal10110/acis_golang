@@ -248,11 +248,6 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 0 {
 		t.Fatalf("silent rejection opcodes = %x, want none", got)
 	}
-	testsupport.ResetCapture(frames)
-	l.rejectMagicCast(live, modelskill.Definition{HitTime: 500}, locked)
-	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeMoveToPawn {
-		t.Fatalf("silent rejection opcodes = %x, want [MoveToPawn]", got)
-	}
 }
 
 // TestFusionTargetClearsOnlyTheChannelThatSetIt pins the clear-if-still-mine

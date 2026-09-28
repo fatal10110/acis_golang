@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -46,26 +45,23 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 		drainUntilQuiet(t, patient)
 
 		x, y, z := srv.PlayerPosition(t, patientID)
-		casterX, casterY, casterZ := srv.PlayerPosition(t, srv.SoleObjectID(t))
 		caster.Send(encodeAction(patientID, int32(x), int32(y), int32(z), false))
 		drainUntilQuiet(t, caster)
 		drainUntilQuiet(t, patient)
+		headingBefore := playerHeading(t, srv, srv.SoleObjectID(t))
 
+		// A player's failed target condition answers with its reason alone:
+		// no heading toward the target and no MoveToPawn to anyone.
 		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageInvalidTarget)
-		assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-player self rotation")
-		assertFrameOpcode(t, patient.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-player observer rotation")
-		casterState, ok := srv.State.Player(srv.SoleObjectID(t))
-		if !ok {
-			t.Fatal("caster state missing")
+		if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("living corpse-player rejection extra caster frame = %#x, want none", extra[0])
 		}
-		heading, ok := casterState.(interface{ CurrentHeading() int })
-		if !ok {
-			t.Fatalf("caster state %T does not expose CurrentHeading", casterState)
+		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("living corpse-player rejection observer frame = %#x, want none", extra[0])
 		}
-		wantHeading := location.Location{X: casterX, Y: casterY, Z: casterZ}.HeadingTo(location.Location{X: x, Y: y, Z: z})
-		if got := heading.CurrentHeading(); got != wantHeading {
-			t.Fatalf("caster heading after rejected cast = %d, want %d", got, wantHeading)
+		if got := playerHeading(t, srv, srv.SoleObjectID(t)); got != headingBefore {
+			t.Fatalf("caster heading after rejected cast = %d, want unchanged %d", got, headingBefore)
 		}
 	})
 
@@ -90,10 +86,11 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 
 		caster.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageNotEnoughMP)
-		assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToPawn, "low MP corpse-player self rotation")
-		assertFrameOpcode(t, patient.Read(), serverpackets.OpcodeMoveToPawn, "low MP corpse-player observer rotation")
 		if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("low MP corpse-player rejection extra frame = %#x, want no ActionFailed", extra[0])
+			t.Fatalf("low MP corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", extra[0])
+		}
+		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("low MP corpse-player rejection observer frame = %#x, want none", extra[0])
 		}
 	})
 
@@ -109,9 +106,8 @@ func TestCorpsePlayerCastRejections(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePlayerSkillID, false, false))
 		assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePlayerSkillID, 1)
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "dead non-playable corpse-player rotation")
 		if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("dead non-playable corpse-player rejection extra frame = %#x, want no ActionFailed", extra[0])
+			t.Fatalf("dead non-playable corpse-player rejection extra frame = %#x, want no ActionFailed or MoveToPawn", extra[0])
 		}
 	})
 

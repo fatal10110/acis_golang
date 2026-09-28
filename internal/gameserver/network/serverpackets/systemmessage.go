@@ -107,12 +107,14 @@ const (
 	SystemMessageYouCannotSummonInCombat           = 578
 	SystemMessageNotCallPetFromThisLocation        = 604
 	SystemMessageNoMoreSkillsToLearn               = 750
+	SystemMessageObserversCannotParticipate        = 781
 	SystemMessagePetCannotUseItem                  = 972
 	SystemMessagePetPutOnS1                        = 1024
 	SystemMessagePetTookOffS1                      = 1025
 	SystemMessageItemCrystallized                  = 1258
 	SystemMessageUseOfItemWillBeAuto               = 1433
 	SystemMessageAutoUseOfItemCancelled            = 1434
+	SystemMessageOnlyFishingSkillsNow              = 1448
 	SystemMessageCannotDoWhileFishing              = 1471
 	SystemMessageItemCantBeEquippedForOlympiad     = 1507
 	SystemMessageItemUnavailableForOlympiad        = 1508
@@ -123,6 +125,7 @@ const (
 	SystemMessageAttentionS1PetPickedUpS2          = 1535
 	SystemMessageAttentionS1PetPickedUpS2S3        = 1536
 	SystemMessageItemsUnavailableForStore          = 1578
+	SystemMessageCannotUseSkillsWithFormalWear     = 1604
 	SystemMessageNoServitorCannotAutomateUse       = 1676
 	SystemMessageCannotEnchantWhileStore           = 1688
 	SystemMessageExchangeHasEnded                  = 1266

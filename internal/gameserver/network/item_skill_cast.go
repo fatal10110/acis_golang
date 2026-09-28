@@ -106,14 +106,12 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		},
 	})
 	if err != nil {
-		if started.CanCastFailure && magicCastFailureMovesToPawn(err) {
+		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)
-			l.rejectMagicCast(live, started.Definition, started.Target)
 			return nil, true, false
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Rejection != skilltarget.CastRejectNone {
 			sendTargetCastRejection(live, started.Rejection, started.Definition)
-			l.rejectMagicCast(live, started.Definition, started.Target)
 			return nil, true, false
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
