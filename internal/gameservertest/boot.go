@@ -77,6 +77,7 @@ type options struct {
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
+	disallowWater          bool
 	attackStance           *task.AttackStance
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
@@ -171,6 +172,12 @@ func WithWater(now func() time.Time) Option {
 		o.water = true
 		o.waterNow = now
 	}
+}
+
+// WithAllowWater sets the AllowWater server option (default true); false
+// keeps water zones swimming but never starts a breath countdown.
+func WithAllowWater(allowed bool) Option {
+	return func(o *options) { o.disallowWater = !allowed }
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -1175,7 +1182,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

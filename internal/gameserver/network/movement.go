@@ -92,8 +92,14 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	// drifted beyond a second's worth of movement gets the server position
 	// back, while a report within the threshold changes nothing. The walk
 	// simulation owns the position, so a valid report is never adopted.
+	// Ground movement measures the drift in 2D; a swimming or flying
+	// player moves in 3D, so its height drift counts too.
 	current := live.CurrentLocation()
-	if current.Distance2D(reported) > liveMoveSpeed(live) {
+	drift := current.Distance2D(reported)
+	if liveSwimming(live) || live.Flying() {
+		drift = current.Distance3D(reported)
+	}
+	if drift > liveMoveSpeed(live) {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
 	}
 }
@@ -102,7 +108,7 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	if live == nil || live.template == nil {
 		return 0
 	}
-	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater) {
+	if liveSwimming(live) {
 		return live.SwimSpeed()
 	}
 	if live.Running() {
@@ -111,11 +117,16 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	return live.WalkSpeed()
 }
 
+// liveSwimming reports whether live stands inside a water zone.
+func liveSwimming(live *livePlayer) bool {
+	return live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater)
+}
+
 func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	if !live.SetRunning(run) {
 		return
 	}
-	swimming := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater)
+	swimming := liveSwimming(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
 	})
