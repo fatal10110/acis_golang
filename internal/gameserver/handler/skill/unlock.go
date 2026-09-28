@@ -13,10 +13,12 @@ const regularUnlockKeySkillID = 2065
 
 // DoorUnlockUnableMessage reports a door the cast skill can never unlock.
 // DoorUnlockFailedMessage reports an unlock attempt on a door that failed
-// or found the door already open.
+// or found the door already open. UnlockInvalidTargetMessage reports an
+// unlock cast whose target is neither a door nor a chest.
 type (
-	DoorUnlockUnableMessage struct{}
-	DoorUnlockFailedMessage struct{}
+	DoorUnlockUnableMessage    struct{}
+	DoorUnlockFailedMessage    struct{}
+	UnlockInvalidTargetMessage struct{}
 )
 
 // doorTarget is a spawned door. Open changes its state through the door's
@@ -49,8 +51,9 @@ func (unlockHandler) Types() []string {
 }
 
 // Use opens a door or chest target for a player caster. The UNLOCKABLE
-// target type admits only an unlockable door or a chest, so no other
-// target reaches here.
+// target type admits only an unlockable door or a chest, but an unlock
+// skill with a ONE target (the event chest key) can land on any actor;
+// such a cast is answered as an invalid target.
 func (unlockHandler) Use(cast Cast) {
 	if len(cast.Targets) == 0 {
 		return
@@ -66,7 +69,9 @@ func (unlockHandler) Use(cast Cast) {
 	}
 	if chest, ok := target.(chestTarget); ok && chest.Unlockable() {
 		useOnChest(cast, chest)
+		return
 	}
+	cast.record(UnlockInvalidTargetMessage{})
 }
 
 func useOnDoor(cast Cast, target doorTarget) {

@@ -293,3 +293,54 @@ func TestUnlockSkillOnMimicChestLeavesItStanding(t *testing.T) {
 		t.Fatal("mimic chest left the world")
 	}
 }
+
+// An unlock skill with a ONE target (the event chest key, skill 2322) is
+// not held to the UNLOCKABLE target check, so it can land on a player,
+// including the caster; the reference handler answers a target that is
+// neither a door nor a chest with INVALID_TARGET.
+func TestUnlockSkillOnPlayerReportsInvalidTarget(t *testing.T) {
+	t.Parallel()
+	def := unlockSkill(2322, "UNLOCK_SPECIAL", unlockSkillLevel, 100)
+	def.Target = modelskill.TargetOne
+	srv, objID := bootUnlock(t, def)
+	selectTarget(t, srv.Client, objID)
+
+	frames := castUnlock(t, srv.Client, objID, def, objID)
+
+	assertOneSystemMessage(t, frames, serverpackets.SystemMessageInvalidTarget)
+}
+
+// A chest an earlier attempt already claimed answers a later unlock with
+// nothing: no roll, no death, no removal, no hate.
+func TestUnlockSkillOnClaimedChestDoesNothing(t *testing.T) {
+	t.Parallel()
+	def := unlockSkill(27, "UNLOCK", 11, 0)
+	srv, objID := bootUnlock(t, def)
+	chest := srv.SpawnHostileNPCTemplateAt(t, chestTemplate(18265, 1), location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, srv.Client)
+	if !chest.ClaimInteraction() {
+		t.Fatal("first ClaimInteraction() = false")
+	}
+	selectTarget(t, srv.Client, chest.ObjectID())
+
+	frames := castUnlock(t, srv.Client, objID, def, chest.ObjectID())
+
+	if chest.Dead() {
+		t.Fatal("claimed chest opened by a second unlock")
+	}
+	if got := framesWith(frames, serverpackets.OpcodeDie, chest.ObjectID()); len(got) != 0 {
+		t.Fatalf("chest Die frames = %d, want none", len(got))
+	}
+	if got := framesWith(frames, serverpackets.OpcodeDeleteObject, chest.ObjectID()); len(got) != 0 {
+		t.Fatalf("chest DeleteObject frames = %d, want none", len(got))
+	}
+	if _, ok := srv.State.Object(chest.ObjectID()); !ok {
+		t.Fatal("claimed chest left the world")
+	}
+	if threats := chest.AI().Threats().Snapshot(); len(threats) != 0 {
+		t.Fatalf("chest threats = %v, want none", threats)
+	}
+	if ids := systemMessageIDs(frames); len(ids) != 0 {
+		t.Fatalf("system messages = %v, want none", ids)
+	}
+}
