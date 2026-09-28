@@ -406,7 +406,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	// Built here, not lazily: every client goroutine shares this link.
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
-	link.wireWaterZones()
 	return link, nil
 }
 

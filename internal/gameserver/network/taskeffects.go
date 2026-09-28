@@ -24,6 +24,7 @@ import (
 )
 
 var (
+	_ zone.Swimmer           = (*liveZoneActor)(nil)
 	_ task.WaterEffects      = (*TaskEffects)(nil)
 	_ task.ShadowItemEffects = (*TaskEffects)(nil)
 	_ task.AutosaveEffects   = (*TaskEffects)(nil)
@@ -320,41 +321,27 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 	})
 }
 
-func (l *GameClientLink) wireWaterZones() {
-	if l.zones == nil || l.water == nil || !l.playerConfig.AllowWater {
+// SwimStateChanged is the player's reaction to crossing a water zone
+// boundary: its appearance is rebroadcast (swim stance and speed), and with
+// AllowWater its breath countdown starts or stops.
+func (a *liveZoneActor) SwimStateChanged(swimming bool) {
+	live := a.live
+	l := live.link
+	if l == nil {
 		return
 	}
-	for _, kind := range l.zones.All() {
-		water, ok := kind.(*zone.Water)
-		if !ok {
-			continue
-		}
-		water.SwimStateChanged = func(actor zone.Actor, swimming bool) {
-			if actor.Class() != zone.ClassPlayer || l.world == nil {
-				return
-			}
-			obj, ok := l.world.Player(actor.ObjectID())
-			if !ok {
-				return
-			}
-			live, ok := obj.(*livePlayer)
-			if !ok {
-				return
-			}
-			l.broadcastCharacterInfo(live)
-			if live.Teleporting() {
-				// The teleport stops the breath countdown itself, once
-				// the old neighborhood has been forgotten.
-				return
-			}
-			if swimming {
-				breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
-				l.water.Add(live, breath)
-				return
-			}
-			l.water.Remove(live)
-		}
+	l.broadcastCharacterInfo(live)
+	if l.water == nil || !l.playerConfig.AllowWater || live.Teleporting() {
+		// A teleport stops the breath countdown itself, once the old
+		// neighborhood has been forgotten.
+		return
 	}
+	if swimming {
+		breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
+		l.water.Add(live, breath)
+		return
+	}
+	l.water.Remove(live)
 }
 
 func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {
