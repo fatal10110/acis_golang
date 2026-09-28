@@ -415,9 +415,12 @@ func (a *Actor) Immobilized() bool {
 }
 
 // SetImmobilized sets or clears this summon's movement-lock flag and reports
-// whether the flag actually changed. Setting it drops a following summon out
-// of follow mode, idling it; clearing it restores the follow mode the summon
-// had when the lock was set, whatever the owner toggled in between.
+// whether the flag actually changed. Every set, including one while the lock
+// is already held, records the current follow mode and drops a following
+// summon out of follow mode, idling it; every clear restores the follow mode
+// the last set recorded, whatever the owner toggled in between. Before any
+// set has run, a clear restores following. Two stacked locks therefore end
+// in the follow mode the summon had when the second one landed.
 //
 // Effect hooks call this from the applying actor's queue or the effect
 // list's expiry tick. Every value it touches has its own guard (stateMu,
@@ -425,15 +428,12 @@ func (a *Actor) Immobilized() bool {
 // after stateMu is released because it takes stateMu itself.
 func (a *Actor) SetImmobilized(v bool) bool {
 	a.stateMu.Lock()
-	if a.immobilized == v {
-		a.stateMu.Unlock()
-		return false
-	}
+	changed := a.immobilized != v
 	a.immobilized = v
 	if v {
-		a.followBeforeImmobilized = !a.followOff.Load()
+		a.unfollowBeforeImmobilized = a.followOff.Load()
 	}
-	following := a.followBeforeImmobilized
+	following := !a.unfollowBeforeImmobilized
 	a.stateMu.Unlock()
 
 	if !v {
@@ -441,7 +441,7 @@ func (a *Actor) SetImmobilized(v bool) bool {
 	} else if following {
 		a.setFollowStatus(false)
 	}
-	return true
+	return changed
 }
 
 // Teleporting reports whether this summon is in a teleport transition.

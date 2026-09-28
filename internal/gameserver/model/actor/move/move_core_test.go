@@ -17,8 +17,9 @@ import (
 
 // ---- from controller_3d_follow_test.go ----
 type playerFollowSelf struct {
-	x, y, z int
-	moves   []event.Move
+	x, y, z  int
+	moves    []event.Move
+	disabled bool
 }
 
 type tickerOwnedFollowSelf struct{ playerFollowSelf }
@@ -1836,4 +1837,4 @@ func (followTarget) Kind() actor.Kind { return actor.KindNPC }
 func (followTarget) Heading() int { return 0 }
 
 func (*playerFollowSelf) OwnsOffensiveFollowTicker() bool { return false }
-func (*playerFollowSelf) MovementDisabled() bool          { return false }
+func (s *playerFollowSelf) MovementDisabled() bool        { return s.disabled }

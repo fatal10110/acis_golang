@@ -462,6 +462,42 @@ func TestSummonAttackDisabledMatchesReferenceTerms(t *testing.T) {
 	})
 }
 
+// TestSummonImmobilizedRecordsFollowModeOnEveryCall checks that every set of
+// the movement lock records the follow mode and every clear restores it, even
+// when the flag does not change, and that a clear with no set before it
+// restores following.
+func TestSummonImmobilizedRecordsFollowModeOnEveryCall(t *testing.T) {
+	s := mustServitor(t, ServitorConfig{ObjectID: 1})
+	if !s.SetImmobilized(true) {
+		t.Fatal("first SetImmobilized(true) = false, want the flag changed")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the first lock = on, want off")
+	}
+	if s.SetImmobilized(true) {
+		t.Fatal("second SetImmobilized(true) = true, want unchanged")
+	}
+	if !s.SetImmobilized(false) {
+		t.Fatal("first SetImmobilized(false) = false, want the flag changed")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the clear = on, want off as the second lock recorded it")
+	}
+	if s.SetImmobilized(false) {
+		t.Fatal("second SetImmobilized(false) = true, want unchanged")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the second clear = on, want off")
+	}
+
+	fresh := mustServitor(t, ServitorConfig{ObjectID: 2})
+	fresh.setFollowStatus(false)
+	fresh.SetImmobilized(false)
+	if !fresh.FollowActive() {
+		t.Fatal("a clear with no lock before it left follow off, want following restored")
+	}
+}
+
 func TestSummonImmobilizedIsIndependentOfRooted(t *testing.T) {
 	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
 

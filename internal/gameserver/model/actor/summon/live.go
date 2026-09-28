@@ -176,11 +176,12 @@ type Actor struct {
 	// on this summon retargets or idles it from that actor's queue.
 	stateMu                             sync.RWMutex
 	paralyzed, teleporting, immobilized bool
-	// followBeforeImmobilized is whether the summon was following its owner
-	// when its movement lock was last set; clearing the lock restores it.
-	followBeforeImmobilized bool
-	intent                  Intent
-	target                  world.Tracked
+	// unfollowBeforeImmobilized is whether the summon had follow mode off
+	// when its movement lock was last set; clearing the lock restores that
+	// mode. Its zero value restores following, the default before any set.
+	unfollowBeforeImmobilized bool
+	intent                    Intent
+	target                    world.Tracked
 
 	abnormalEffect  atomic.Int32
 	ownerDiscovered atomic.Bool

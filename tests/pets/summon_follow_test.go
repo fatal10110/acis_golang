@@ -38,9 +38,16 @@ func (h *petWorld) ownerEffector(t *testing.T) effect.Actor {
 // pet's queue, waits for its start hook, and returns it for removal.
 func landPetEffect(t *testing.T, petActor *summon.Actor, effector effect.Actor, name string) *effect.Effect {
 	t.Helper()
-	e, err := effect.New(effect.Skill{ID: 1299, Level: 1}, modelskill.EffectTemplate{Name: name, Time: 30})
+	return landPetSkillEffect(t, petActor, effector, 1299, modelskill.EffectTemplate{Name: name, Time: 30})
+}
+
+// landPetSkillEffect applies tmpl as skill skillID's effect from effector to
+// the pet on the pet's queue, waits for its start hook, and returns it.
+func landPetSkillEffect(t *testing.T, petActor *summon.Actor, effector effect.Actor, skillID modelskill.ID, tmpl modelskill.EffectTemplate) *effect.Effect {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: skillID, Level: 1}, tmpl)
 	if err != nil {
-		t.Fatalf("effect.New(%s): %v", name, err)
+		t.Fatalf("effect.New(%s): %v", tmpl.Name, err)
 	}
 	e.Effector, e.Effected = effector, petActor
 	runOnPetQueue(t, petActor, func() { petActor.EffectList().Add(e) })
@@ -206,6 +213,44 @@ func TestImmobilizedPetRestoresFollowModeFromBeforeTheBuff(t *testing.T) {
 		t.Fatalf("pet intent after the buff = %v, want idle (follow was off when it landed)", got)
 	}
 	h.requirePetStaysPut(t, petActor, "pet whose follow mode was off before the buff")
+	drainUntilQuiet(t, h.client)
+}
+
+// TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock lands the
+// owner's Servitor Empowerment (ImobilePetBuff) on a following pet, then has
+// the pet use Wild Defense (ImobileBuff on itself) while it holds. The first
+// lock drops follow mode; the second records that follow mode is already off.
+// Ending either buff restores that recorded mode, so the pet stays idle and
+// does not walk after its owner, and ending the other one keeps it off.
+func TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock(t *testing.T) {
+	t.Parallel()
+	h, petActor := bootFollowingPet(t)
+
+	empowerment := landPetSkillEffect(t, petActor, h.ownerEffector(t), 1299,
+		modelskill.EffectTemplate{Name: "ImobilePetBuff", Time: 30, StackType: "pd_up_special", StackOrder: 1})
+	wildDefense := landPetSkillEffect(t, petActor, petActor, 4711,
+		modelskill.EffectTemplate{Name: "ImobileBuff", Time: 30, StackType: "ultimate_buff", StackOrder: 1})
+	if got := len(petActor.EffectList().All()); got != 2 {
+		t.Fatalf("pet carries %d effects, want both immobilizing buffs", got)
+	}
+	if got := petActor.Intent(); got != summon.IntentIdle {
+		t.Fatalf("pet intent under both buffs = %v, want idle", got)
+	}
+
+	removePetEffect(t, petActor, empowerment)
+	if petActor.FollowActive() {
+		t.Fatal("follow mode after the first buff ended = on, want off (the second lock recorded it off)")
+	}
+	if got := petActor.Intent(); got != summon.IntentIdle {
+		t.Fatalf("pet intent after the first buff ended = %v, want idle", got)
+	}
+	h.requirePetStaysPut(t, petActor, "pet after the first of two stacked buffs ended")
+
+	removePetEffect(t, petActor, wildDefense)
+	if petActor.FollowActive() {
+		t.Fatal("follow mode after both buffs ended = on, want off")
+	}
+	h.requirePetStaysPut(t, petActor, "pet after both stacked buffs ended")
 	drainUntilQuiet(t, h.client)
 }
 
