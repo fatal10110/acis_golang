@@ -49,7 +49,7 @@ func TestCursesOnAttackExistingPetrifyDoesNotBlock(t *testing.T) {
 	target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 	skills := raidCurseSkills()
 	def, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurse2SkillID, Level: 1})
-	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
+	effect.Apply(target, attacker, effect.SkillFromDefinition(def), def.Effects)
 
 	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
@@ -126,7 +126,7 @@ func TestCursesOnAttackExistingPetrifyStillAppliesAntiStrider(t *testing.T) {
 	target := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 	skills := raidCurseSkills()
 	def, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurse2SkillID, Level: 1})
-	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
+	effect.Apply(target, attacker, effect.SkillFromDefinition(def), def.Effects)
 
 	rec := &event.Recorder{}
 	blocked := TestCursesOnAttack(RaidCurseInput{
@@ -210,7 +210,7 @@ func TestCursesOnSkillSeeExistingEffectsAndDisabledDoNotAbort(t *testing.T) {
 	caster := newCursePlayable(t, 80)
 	raid := &curseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 	def, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurse2SkillID, Level: 1})
-	effect.Apply(caster.EffectList(), raid, caster, effect.SkillFromDefinition(def), def.Effects)
+	effect.Apply(raid, caster, effect.SkillFromDefinition(def), def.Effects)
 
 	if TestCursesOnSkillSee(RaidCurseSkillInput{
 		Caster:    caster,
@@ -226,7 +226,7 @@ func TestCursesOnSkillSeeExistingEffectsAndDisabledDoNotAbort(t *testing.T) {
 	silenced := newCursePlayable(t, 80)
 	silenced.id = 4
 	silence, _ := skills.Definition(modelskill.Ref{ID: modelskill.RaidCurseSkillID, Level: 1})
-	effect.Apply(silenced.EffectList(), raid, silenced, effect.SkillFromDefinition(silence), silence.Effects)
+	effect.Apply(raid, silenced, effect.SkillFromDefinition(silence), silence.Effects)
 	raid.hate = map[int32]float64{3: 10}
 	if TestCursesOnSkillSee(RaidCurseSkillInput{
 		Caster:  silenced,

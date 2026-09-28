@@ -2,9 +2,6 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -49,14 +46,7 @@ func landEffects(effector effect.Actor, effected Actor, def modelskill.Definitio
 	if !ok {
 		return 0
 	}
-	if !withinEffectRange(effector, target, def.EffectRange) {
-		return 0
-	}
-	if offensiveEffectApplyBlocked(effector, target, def) {
-		return 0
-	}
-	list := target.EffectList()
-	if list == nil {
+	if !effect.Lands(effector, target, def) || target.EffectList() == nil {
 		return 0
 	}
 
@@ -85,49 +75,9 @@ func landEffects(effector effect.Actor, effected Actor, def modelskill.Definitio
 		if err != nil {
 			continue
 		}
-		owner := list
-		if e.SelfTarget {
-			if effector == nil || effector.EffectList() == nil {
-				continue
-			}
-			owner = effector.EffectList()
-		}
-		e.Effector = effector
-		e.Effected = target
-		owner.Add(e)
+		effect.Attach(e, effector, target)
 	}
 	return resisted
-}
-
-// withinEffectRange mirrors L2Skill.getEffects' landing-time 3D radius
-// check. Actors without a modeled position stay permissive like other
-// optional handler capabilities.
-func withinEffectRange(effector, effected effect.Actor, effectRange int) bool {
-	if effectRange <= 0 || effector == nil || effector.ObjectID() == effected.ObjectID() {
-		return true
-	}
-	ax, ay, az := effector.Position()
-	bx, by, bz := effected.Position()
-	return location.Location{X: ax, Y: ay, Z: az}.Distance3D(location.Location{X: bx, Y: by, Z: bz}) < float64(effectRange)
-}
-
-// offensiveEffectApplyBlocked is the landing-time refuse for offensive and
-// debuff skills aimed at someone else: target invulnerability, or a caster
-// not permitted to deal damage. Self-applies skip both.
-func offensiveEffectApplyBlocked(effector, effected effect.Actor, def modelskill.Definition) bool {
-	if !def.Offensive && !def.Debuff {
-		return false
-	}
-	if effector != nil && effected != nil && effector.ObjectID() == effected.ObjectID() {
-		return false
-	}
-	if c, ok := effected.(Creature); ok && c.Invul() {
-		return true
-	}
-	// Every combatant is consulted, formula caster or not; only a
-	// non-combatant effector is treated as sourceless and never blocked.
-	cb, _ := effector.(attackable.Combatant)
-	return !creature.CanDealDamage(cb)
 }
 
 // stopEffectsBySkillID removes every active effect in list owned by the

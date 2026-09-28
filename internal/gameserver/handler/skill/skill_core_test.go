@@ -1733,6 +1733,23 @@ type skillTarget struct {
 	noticeName   string
 	noticeAmount int
 	noticeOther  bool
+
+	// reflects makes every reflectable skill bounce off this target.
+	reflects bool
+	// resistNotices records the S1_RESISTED_YOUR_S2 notices sent to this
+	// actor directly rather than through a cast Result.
+	resistNotices []Resisted
+}
+
+func (t *skillTarget) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
+	if !t.reflects {
+		return formulas.SkillReflectInput{}
+	}
+	return formulas.SkillReflectInput{CanBeReflected: true, Magic: true, ReflectChance: 100}
+}
+
+func (t *skillTarget) NotifyResistedSkill(name string, id modelskill.ID, level int) {
+	t.resistNotices = append(t.resistNotices, Resisted{TargetName: name, SkillID: id, SkillLevel: level})
 }
 
 func (t *skillTarget) BreakCastOnDamage(damage float64) {
@@ -3892,4 +3909,127 @@ func TestSkillDamageFeedbackRecipientAndBlockedTarget(t *testing.T) {
 			}
 		})
 	}
+}
+
+// reflectedDamageCase is one damage handler whose reflect branch swaps the
+// effect participants: the reflecting target becomes the effector and the
+// caster the effected, as Pdam/Mdam/Blow/L2SkillChargeDmg's
+// getEffects(targetCreature, creature) does.
+type reflectedDamageCase struct {
+	skillType string
+	reflector func() *skillTarget
+}
+
+func reflectedDamageCases() []reflectedDamageCase {
+	target := func() *skillTarget {
+		return &skillTarget{
+			fakeActor: fakeActor{objectID: 2}, hp: 5000, isPlayer: true, name: "Reflector",
+			effects: newTestList(nil), reflects: true, skillSuccessOK: true,
+			physicalInput: formulas.PhysicalSkillInput{
+				AttackPower: 100, SkillPower: 50, Defence: 60,
+				RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+			},
+			physicalOK: true,
+			magicInput: formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1},
+			magicOK:    true,
+			blowInput:  formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1},
+			blowOK:     true,
+		}
+	}
+	return []reflectedDamageCase{{"PDAM", target}, {"MDAM", target}, {"BLOW", target}, {"CHARGEDAM", target}}
+}
+
+func reflectCaster() *skillTarget {
+	return &skillTarget{
+		fakeActor: fakeActor{objectID: 1}, hp: 5000, isPlayer: true, name: "Caster",
+		effects: newTestList(nil), skillSuccessOK: true,
+	}
+}
+
+// TestReflectedDamageSkillSwapsEffectorAndEffected pins the reflect swap on
+// every damage handler: a self-target kind (StunSelf, skill 81's effect) is
+// hosted by the reflecting target, an ordinary kind lands on the caster, and
+// both name the reflector as effector and the caster as effected. The
+// caster's own landing roll is forced to fail: a reflected landing rolls
+// none.
+func TestReflectedDamageSkillSwapsEffectorAndEffected(t *testing.T) {
+	for _, tc := range reflectedDamageCases() {
+		t.Run(tc.skillType, func(t *testing.T) {
+			caster := reflectCaster()
+			caster.skillSuccessChance = chanceOf(0)
+			reflector := tc.reflector()
+			NewDefaultRegistry().UseResult(Cast{
+				Caster: caster,
+				Skill: modelskill.Definition{
+					ID: 81, Level: 1, SkillType: tc.skillType, CanBeReflected: true, Offensive: true,
+					Effects: []modelskill.EffectTemplate{{Name: "StunSelf", Time: 9}, {Name: "Debuff", Time: 9}},
+				},
+				Targets: []Actor{reflector},
+			})
+
+			held := reflector.effects.All()
+			if len(held) != 1 || held[0].Type != effect.TypeStunSelf || held[0].Effector != effect.Actor(reflector) || held[0].Effected != effect.Actor(caster) {
+				t.Fatalf("reflector-held effects = %+v, want one StunSelf with effector reflector and effected caster", held)
+			}
+			landed := caster.effects.All()
+			if len(landed) != 1 || landed[0].Type != effect.TypeDebuff || landed[0].Effector != effect.Actor(reflector) || landed[0].Effected != effect.Actor(caster) {
+				t.Fatalf("caster-held effects = %+v, want one Debuff with effector reflector and effected caster", landed)
+			}
+		})
+	}
+}
+
+// TestReflectedDamageSkillReportsResistToTheReflector pins who hears a
+// reflected template's landing resist: the reflector, as the effects'
+// effector, naming the caster at the cast level — never the caster.
+func TestReflectedDamageSkillReportsResistToTheReflector(t *testing.T) {
+	for _, tc := range reflectedDamageCases() {
+		t.Run(tc.skillType, func(t *testing.T) {
+			caster := reflectCaster()
+			reflector := tc.reflector()
+			result, _ := NewDefaultRegistry().UseResult(Cast{
+				Caster: caster,
+				Skill: modelskill.Definition{
+					ID: 7, Level: 20, SkillType: tc.skillType, CanBeReflected: true,
+					Effects: resistedIconTemplate,
+				},
+				Targets: []Actor{reflector},
+			})
+			if len(result.Resisted) != 0 {
+				t.Fatalf("caster-facing Resisted = %+v, want none", result.Resisted)
+			}
+			want := []Resisted{{TargetName: "Caster", SkillID: 7, SkillLevel: 20}}
+			if !slices.Equal(reflector.resistNotices, want) {
+				t.Fatalf("reflector resist notices = %+v, want %+v", reflector.resistNotices, want)
+			}
+		})
+	}
+}
+
+// TestReflectedDamageSkillGatesOnTheSwappedPair pins the landing gates on
+// the swapped pair: an invulnerable caster refuses the reflected offensive
+// effects, and a perfect shield block of the original strike does not stop
+// them.
+func TestReflectedDamageSkillGatesOnTheSwappedPair(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 7, Level: 1, SkillType: "PDAM", CanBeReflected: true, Offensive: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 9}},
+	}
+	t.Run("invulnerable caster", func(t *testing.T) {
+		caster := &guardedSkillTarget{skillTarget: reflectCaster(), invul: true}
+		reflector := reflectedDamageCases()[0].reflector()
+		NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{reflector}})
+		if got := caster.effects.All(); len(got) != 0 {
+			t.Fatalf("invulnerable caster effects = %+v, want none", got)
+		}
+	})
+	t.Run("perfect shield", func(t *testing.T) {
+		caster := reflectCaster()
+		reflector := reflectedDamageCases()[0].reflector()
+		reflector.physicalInput.Shield = formulas.ShieldPerfect
+		NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{reflector}})
+		if got := caster.effects.All(); len(got) != 1 || got[0].Effector != effect.Actor(reflector) {
+			t.Fatalf("caster effects = %+v, want the reflected Debuff despite the perfect block", got)
+		}
+	})
 }
