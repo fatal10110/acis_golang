@@ -7,9 +7,9 @@ import (
 
 var _ skilltarget.Actor = (*Hostile)(nil)
 
-// NPCs hold no ground point, summon, party, clan, duel or Olympiad state, are
-// never artifacts, folk or pets, and their clan-group tags are not modeled
-// yet: every method below is the neutral answer target resolution already
+// NPCs hold no ground point, summon, party, clan, duel or Olympiad state.
+// Every Hostile kind is combat-capable, so none is a folk NPC, an artifact
+// or a pet: every method below is the neutral answer target resolution
 // gives an NPC.
 func (h *Hostile) CanSeePoint(int, int, int) bool    { return true }
 func (h *Hostile) GroundTarget() (x, y, z int)       { return 0, 0, 0 }
@@ -28,7 +28,10 @@ func (h *Hostile) DuelID() int32                        { return 0 }
 func (h *Hostile) DuelTeam() int                        { return 0 }
 func (h *Hostile) MageClass() bool                      { return false }
 func (h *Hostile) OlympiadStarted() bool                { return false }
-func (h *Hostile) ClanGroups() []string                 { return nil }
 func (h *Hostile) Folk() bool                           { return false }
 func (h *Hostile) Holy() bool                           { return false }
 func (h *Hostile) IsPet() bool                          { return false }
+
+// ClanGroups are the template's clan tags, which CLAN-targeted skills match
+// between NPCs.
+func (h *Hostile) ClanGroups() []string { return h.Instance.Template.Clans }
