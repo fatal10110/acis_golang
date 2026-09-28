@@ -51,6 +51,8 @@ func (healHandler) Use(cast Cast) {
 		}
 	}
 	// A static heal and a potion leave the caster's spiritshot charged.
+	// HealAmount does not yet apply the spiritshot heal bonus (HealSps
+	// correction and M.Atk multiplier); tracked in #2647.
 	if skillTypeKey(cast.Skill.SkillType) != "HEAL_STATIC" && !cast.Skill.Potion {
 		dischargeSpiritshot(cast)
 	}
