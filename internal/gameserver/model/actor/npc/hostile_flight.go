@@ -82,6 +82,12 @@ func (h *Hostile) SetWaterZone(inWater func(location.Location) bool) {
 	h.inWater = inWater
 }
 
+// SetPeaceZone installs the query InPeaceZone asks about the NPC's current
+// position. It must be set before the NPC is published.
+func (h *Hostile) SetPeaceZone(inPeace func(location.Location) bool) {
+	h.inPeace = inPeace
+}
+
 // SetXYZ moves the NPC immediately and reseeds its ordinary movement state.
 func (h *Hostile) SetXYZ(x, y, z int) {
 	position := location.Location{X: x, Y: y, Z: z}

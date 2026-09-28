@@ -102,6 +102,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
+	s.installPeaceZone(hostile)
 	hostile.Attach(npc.Runtime{
 		World: s.State,
 		Items: s.itemTable,
@@ -355,6 +356,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
+	s.installPeaceZone(hostile)
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
@@ -443,3 +445,14 @@ func (parkedAttack) AttackingNow() bool                  { return false }
 func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
 func (parkedAttack) DoAttack(attackable.Combatant)       {}
 func (parkedAttack) Stop()                               {}
+
+// installPeaceZone gives a fixture NPC the peace-zone query boot installs on
+// every live NPC, when the suite supplied zones through WithZones.
+func (s *Server) installPeaceZone(hostile *npc.Hostile) {
+	if s.zones == nil {
+		return
+	}
+	hostile.SetPeaceZone(func(at location.Location) bool {
+		return s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
+	})
+}

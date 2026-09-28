@@ -441,11 +441,13 @@ type Server struct {
 	castEffects actorcast.EffectHandlers
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
-	queues         *queues
-	traffic        *traffic
-	heldLanes      [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
-	log            zerolog.Logger
-	sendObserver   *atomic.Pointer[func(payload []byte)]
+	// zones is the zone index WithZones supplied; nil when none was.
+	zones        *zone.Index
+	queues       *queues
+	traffic      *traffic
+	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
+	log          zerolog.Logger
+	sendObserver *atomic.Pointer[func(payload []byte)]
 
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
@@ -1384,6 +1386,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
 		maxGeoPathFail:   o.maxGeoPathFailCount,
+		zones:            o.zones,
 		AI:               ai,
 		Water:            water,
 		account:          o.account,

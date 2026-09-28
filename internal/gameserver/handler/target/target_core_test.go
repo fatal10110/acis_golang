@@ -361,6 +361,19 @@ func TestAuraHandlersRejectPeaceZoneCastsLikeJava(t *testing.T) {
 	}
 }
 
+// TestAuraHandlersLetNPCCastInPeaceZone: the aura peace refusal is a cast
+// condition only playable casters are held to, so an NPC standing in a
+// peace zone still casts an offensive aura.
+func TestAuraHandlersLetNPCCastInPeaceZone(t *testing.T) {
+	caster := &targetActor{id: 1, kind: actor.KindNPC, peace: true}
+	registry := NewRegistry(knownList{caster})
+	for _, target := range []modelskill.Target{modelskill.TargetAura, modelskill.TargetFrontAura, modelskill.TargetBehindAura, modelskill.TargetAuraUndead} {
+		if !mustHandler(t, registry, target).CanCast(caster, nil, &modelskill.Definition{Offensive: true}, false) {
+			t.Fatalf("%s CanCast for an NPC in a peace zone = false, want true", target)
+		}
+	}
+}
+
 func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	caster := &targetActor{id: 1, kind: actor.KindPlayer, peace: true}
 	offensive := &modelskill.Definition{Offensive: true}

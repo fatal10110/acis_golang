@@ -105,6 +105,10 @@ type Hostile struct {
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
 	inWater func(location.Location) bool
+	// inPeace reports whether an NPC standing at a location holds the peace
+	// zone flag; nil means no location does. Set before the NPC is
+	// published.
+	inPeace func(location.Location) bool
 
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
