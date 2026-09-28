@@ -1857,6 +1857,7 @@ func (t *skillTarget) ReduceMP(v float64) float64 {
 }
 
 func (t *skillTarget) RechargeMP(v float64) float64 { return v * t.recharge }
+func (t *skillTarget) BroadcastStatus()             {}
 
 func (t *skillTarget) CP() float64         { return t.cp }
 func (t *skillTarget) MaxCPValue() float64 { return t.maxCP }

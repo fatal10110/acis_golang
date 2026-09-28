@@ -33,6 +33,7 @@ func (ep *EffectPoint) AddMP(float64) float64                      { return 0 }
 func (ep *EffectPoint) HealProficiency() float64                   { return 0 }
 func (ep *EffectPoint) HealEffectiveness() float64                 { return 100 }
 func (ep *EffectPoint) RechargeMP(base float64) float64            { return base }
+func (ep *EffectPoint) BroadcastStatus()                           {}
 func (ep *EffectPoint) AbortAll(bool)                              {}
 func (ep *EffectPoint) StopMove()                                  {}
 func (ep *EffectPoint) TryToIdle()                                 {}
