@@ -85,5 +85,5 @@ func (undeadHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) Acto
 }
 
 func (undeadHandler) CanCast(_, target Actor, _ *modelskill.Definition, _ bool) bool {
-	return validUndeadSingleTarget(target)
+	return target != nil && undeadCastRejection(target) == CastRejectNone
 }

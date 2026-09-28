@@ -385,6 +385,18 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, kind: actor.KindPlayer, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
 		{"corpse pet dead pet", modelskill.TargetCorpsePet, caster, &targetActor{id: 6, kind: actor.KindPlayer, dead: true, owner: caster, pet: true}, nil, CastRejectNone},
 		{"corpse pet nil", modelskill.TargetCorpsePet, caster, nil, nil, CastRejectNone},
+		{"undead living undead monster", modelskill.TargetUndead, caster, &targetActor{id: 8, kind: actor.KindNPC, monster: true, undead: true}, nil, CastRejectNone},
+		{"undead living undead servitor", modelskill.TargetUndead, caster, &targetActor{id: 9, kind: actor.KindSummon, owner: caster, undead: true}, nil, CastRejectNone},
+		{"undead living non-undead monster", modelskill.TargetUndead, caster, &targetActor{id: 10, kind: actor.KindNPC, monster: true}, &modelskill.Definition{ID: 1400, Level: 1}, CastRejectCannotUseSkill},
+		{"undead living non-undead servitor", modelskill.TargetUndead, caster, &targetActor{id: 11, kind: actor.KindSummon, owner: caster}, nil, CastRejectCannotUseSkill},
+		{"undead dead undead monster", modelskill.TargetUndead, caster, &targetActor{id: 12, kind: actor.KindNPC, monster: true, undead: true, dead: true}, nil, CastRejectInvalidTarget},
+		{"undead dead non-undead monster", modelskill.TargetUndead, caster, &targetActor{id: 13, kind: actor.KindNPC, monster: true, dead: true}, nil, CastRejectInvalidTarget},
+		{"undead non-monster npc", modelskill.TargetUndead, caster, &targetActor{id: 14, kind: actor.KindNPC, undead: true}, nil, CastRejectInvalidTarget},
+		{"undead pet", modelskill.TargetUndead, caster, &targetActor{id: 15, kind: actor.KindSummon, owner: caster, undead: true, pet: true}, nil, CastRejectInvalidTarget},
+		{"undead player", modelskill.TargetUndead, caster, &targetActor{id: 16, kind: actor.KindPlayer}, nil, CastRejectInvalidTarget},
+		{"undead nil", modelskill.TargetUndead, caster, nil, nil, CastRejectNone},
+		{"corpse mob nil", modelskill.TargetCorpseMob, caster, nil, nil, CastRejectNone},
+		{"area corpse mob nil", modelskill.TargetAreaCorpseMob, caster, nil, nil, CastRejectNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -454,19 +466,19 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		target  *targetActor
 		skill   *modelskill.Definition
 		want    bool
-		failure CorpseCastFailure
+		failure CastRejection
 	}{
-		{"no corpse", &targetActor{id: 2, kind: actor.KindNPC}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
-		{"playable corpse", &targetActor{id: 3, kind: actor.KindPlayer, corpse: true}, &modelskill.Definition{}, false, CorpseCastInvalidTarget},
-		{"mob corpse, default skill", &targetActor{id: 4, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"harvest on monster corpse", &targetActor{id: 5, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CorpseCastAllowed},
-		{"harvest on attackable guard corpse", &targetActor{id: 6, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CorpseCastHarvestNotMonster},
-		{"sweep on monster corpse", &targetActor{id: 7, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CorpseCastAllowed},
-		{"sweep on attackable guard corpse", &targetActor{id: 8, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CorpseCastSweepNotMonster},
-		{"fresh mob corpse", &targetActor{id: 10, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"too old mob corpse", &targetActor{id: 11, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CorpseCastTooOld},
-		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
-		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true, CorpseCastAllowed},
+		{"no corpse", &targetActor{id: 2, kind: actor.KindNPC}, &modelskill.Definition{}, false, CastRejectInvalidTarget},
+		{"playable corpse", &targetActor{id: 3, kind: actor.KindPlayer, corpse: true}, &modelskill.Definition{}, false, CastRejectInvalidTarget},
+		{"mob corpse, default skill", &targetActor{id: 4, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{}, true, CastRejectNone},
+		{"harvest on monster corpse", &targetActor{id: 5, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CastRejectNone},
+		{"harvest on attackable guard corpse", &targetActor{id: 6, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CastRejectHarvestNotMonster},
+		{"sweep on monster corpse", &targetActor{id: 7, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CastRejectNone},
+		{"sweep on attackable guard corpse", &targetActor{id: 8, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CastRejectSweepNotMonster},
+		{"fresh mob corpse", &targetActor{id: 10, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CastRejectNone},
+		{"too old mob corpse", &targetActor{id: 11, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CastRejectCorpseTooOld},
+		{"spoiled old mob corpse bypasses age cutoff", &targetActor{id: 12, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, spoiled: true}, &modelskill.Definition{}, true, CastRejectNone},
+		{"seeded old mob corpse bypasses age cutoff", &targetActor{id: 13, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second, seeded: true}, &modelskill.Definition{}, true, CastRejectNone},
 	}
 
 	for _, tt := range tests {
@@ -474,8 +486,10 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 			if got := handler.CanCast(caster, tt.target, tt.skill, false); got != tt.want {
 				t.Fatalf("CanCast = %v, want %v", got, tt.want)
 			}
-			if got := CorpseCastFailureFor(tt.target, tt.skill); got != tt.failure {
-				t.Fatalf("CorpseCastFailureFor = %v, want %v", got, tt.failure)
+			for _, targetType := range []modelskill.Target{modelskill.TargetCorpseMob, modelskill.TargetAreaCorpseMob} {
+				if got := CastRejectionFor(targetType, caster, tt.target, tt.skill, false); got != tt.failure {
+					t.Fatalf("CastRejectionFor(%v) = %v, want %v", targetType, got, tt.failure)
+				}
 			}
 		})
 	}

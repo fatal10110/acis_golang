@@ -67,39 +67,28 @@ func (areaCorpseMobHandler) CanCast(_, target Actor, skill *modelskill.Definitio
 	return corpseMobCanCast(target, skill)
 }
 
-// CorpseCastFailure identifies why a corpse-mob cast cannot start.
-type CorpseCastFailure uint8
-
-const (
-	CorpseCastAllowed CorpseCastFailure = iota
-	CorpseCastInvalidTarget
-	CorpseCastHarvestNotMonster
-	CorpseCastTooOld
-	CorpseCastSweepNotMonster
-)
-
 func corpseMobCanCast(target Actor, skill *modelskill.Definition) bool {
-	return CorpseCastFailureFor(target, skill) == CorpseCastAllowed
+	return target != nil && corpseMobCastRejection(target, skill) == CastRejectNone
 }
 
-// CorpseCastFailureFor applies the shared corpse-mob eligibility rule.
-func CorpseCastFailureFor(target Actor, skill *modelskill.Definition) CorpseCastFailure {
-	if target == nil || !target.HasCorpse() || isPlayable(target) {
-		return CorpseCastInvalidTarget
+// corpseMobCastRejection applies the shared corpse-mob eligibility rule.
+func corpseMobCastRejection(target Actor, skill *modelskill.Definition) CastRejection {
+	if !target.HasCorpse() || isPlayable(target) {
+		return CastRejectInvalidTarget
 	}
 	if skill != nil && skill.SkillType == "HARVEST" {
 		if !target.MonsterKind() {
-			return CorpseCastHarvestNotMonster
+			return CastRejectHarvestNotMonster
 		}
-		return CorpseCastAllowed
+		return CastRejectNone
 	}
 	if isAttackable(target) && corpseTooOld(target) && !corpseAgeBypass(target) {
-		return CorpseCastTooOld
+		return CastRejectCorpseTooOld
 	}
 	if skill != nil && skill.SkillType == "SWEEP" && !target.MonsterKind() {
-		return CorpseCastSweepNotMonster
+		return CastRejectSweepNotMonster
 	}
-	return CorpseCastAllowed
+	return CastRejectNone
 }
 
 type corpsePlayerHandler struct{}
