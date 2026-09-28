@@ -646,6 +646,14 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 			}
+		case skillhandler.DoorUnlockUnableMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUnableToUnlockDoor))
+			}
+		case skillhandler.DoorUnlockFailedMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToUnlockDoor))
+			}
 		case skillhandler.MagicResist:
 			target, online := l.livePlayerByID(m.TargetID)
 			if !online {

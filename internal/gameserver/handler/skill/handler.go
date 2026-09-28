@@ -186,6 +186,14 @@ type Cast struct {
 	messages *[]any
 }
 
+// record appends a caster-visible message to the dispatching registry's
+// result; a cast used outside a registry drops it.
+func (c Cast) record(message any) {
+	if c.messages != nil {
+		*c.messages = append(*c.messages, message)
+	}
+}
+
 func (c Cast) reportResisted(target Actor, def modelskill.Definition, count int) {
 	appendResistedCount(c.resisted, target, def, count)
 }

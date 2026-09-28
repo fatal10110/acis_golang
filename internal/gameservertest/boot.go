@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -111,6 +112,7 @@ type options struct {
 	itemTemplates          *item.Table
 	productionTickers      bool
 	realPool               bool
+	doors                  []*door.Template
 }
 
 type characterSpec struct {
@@ -416,7 +418,8 @@ type Server struct {
 	AttackStance     *task.AttackStance
 	Effects          *task.Effects
 	AI               *task.AI
-	Water            *task.Water // set by WithWater; nil otherwise
+	Water            *task.Water               // set by WithWater; nil otherwise
+	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -1075,6 +1078,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		itemTemplates = ItemTemplates()
 	}
 	ids := &sequentialIDs{next: 100}
+	var worldObjects *gamemanager.WorldObjects
+	if len(o.doors) > 0 {
+		worldObjects = bootDoors(t, o.doors, ids, state)
+	}
 	levels := o.levels
 	if levels == nil {
 		synthetic := make(map[int]player.Level, 85)
@@ -1357,6 +1364,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	srv := &Server{
 		Client:           c,
 		State:            state,
+		WorldObjects:     worldObjects,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,

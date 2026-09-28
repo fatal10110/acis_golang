@@ -70,6 +70,11 @@ type Hostile struct {
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
 	rewards creature.Rewarder
+	// remover takes this NPC out of the world for DeleteMe; nil despawns it
+	// with no respawn. Installed by Attach.
+	remover Remover
+	// interacted latches the first unlock attempt on a chest.
+	interacted atomic.Bool
 
 	// deathMu guards dead and decayed. The killing hit latches death
 	// (TakeDamage → Die → MarkDead) on the attacker's queue.
@@ -331,6 +336,7 @@ type Runtime struct {
 	Items   *item.Table
 	Rewards creature.Rewarder
 	Sink    event.Sink
+	Remover Remover
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -344,6 +350,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.log = rt.Log
 	h.rewards = rt.Rewards
 	h.sink = rt.Sink
+	h.remover = rt.Remover
 	if rt.Items == nil || h.Instance.Template.RightHand == 0 {
 		return
 	}

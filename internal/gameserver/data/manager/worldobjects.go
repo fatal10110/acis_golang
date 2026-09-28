@@ -194,6 +194,7 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	if w.newSink != nil {
 		obj.Attach(w.newSink(obj))
 	}
+	obj.SetOwner(w)
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
