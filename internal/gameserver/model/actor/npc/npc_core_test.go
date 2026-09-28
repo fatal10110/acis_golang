@@ -2312,3 +2312,38 @@ func (overhitActor) Position() (x, y, z int) { return 0, 0, 0 }
 func (overhitSummon) Heading() int { return 0 }
 
 func (overhitSummon) Position() (x, y, z int) { return 0, 0, 0 }
+
+// A confused NPC picks its new target among neighbours within a horizontal
+// point distance of 1000: a monster on a ledge far above but 900 across is a
+// candidate, one 1001 across on the same floor is not, even though its body
+// would reach under a collision-widened 3D check.
+func TestRandomNearbyCombatantMeasuresHorizontalPointDistance(t *testing.T) {
+	tpl := &Template{ID: 9001, Type: "Monster", CollisionRadius: 40}
+	tests := []struct {
+		name    string
+		x, y, z int
+		wantHit bool
+	}{
+		{"900 across, 700 above", 900, 0, 700, true},
+		{"diagonal 1000 across, 3000 below", 600, 800, -3000, true},
+		{"1001 across, same floor", 1001, 0, 0, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := world.New()
+			confused := newCombatHostile(t, 1, tpl)
+			other := newCombatHostile(t, 2, tpl)
+			w.Spawn(confused, 0, 0, 0, 0)
+			w.Spawn(other, tc.x, tc.y, tc.z, 0)
+			confused.Attach(Runtime{World: w})
+
+			got, ok := confused.RandomNearbyCombatant(1000)
+			if ok != tc.wantHit {
+				t.Fatalf("RandomNearbyCombatant(1000) ok = %v, want %v", ok, tc.wantHit)
+			}
+			if ok && got.ObjectID() != other.ObjectID() {
+				t.Fatalf("RandomNearbyCombatant(1000) = object %d, want %d", got.ObjectID(), other.ObjectID())
+			}
+		})
+	}
+}
