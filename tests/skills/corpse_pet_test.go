@@ -2,6 +2,7 @@ package skills
 
 import (
 	"testing"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -33,7 +34,8 @@ func bootCorpsePetCaster(t *testing.T) *gameservertest.Server {
 // TestCorpsePetCastRejectsLivingAndDeadNonPet drives RequestMagicSkillUse
 // for Blessed Scroll of Resurrection: Pet (skill 2179): a living target
 // gets INVALID_TARGET, and a dead non-pet gets S1_CANNOT_BE_USED carrying
-// that skill's name, then the actor's MoveToPawn rotation.
+// that skill's name, with no MoveToPawn rotation: a player's
+// failed target condition answers with its reason alone.
 func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 	t.Parallel()
 	t.Run("living target", func(t *testing.T) {
@@ -46,7 +48,9 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		c.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "living corpse-pet rotation")
+		if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("living corpse-pet rejection extra opcode = %#x, want no MoveToPawn", extra[0])
+		}
 	})
 
 	t.Run("dead non-pet", func(t *testing.T) {
@@ -68,6 +72,11 @@ func TestCorpsePetCastRejectsLivingAndDeadNonPet(t *testing.T) {
 
 		healer.Send(encodeRequestMagicSkillUse(corpsePetSkillID, false, false))
 		assertSystemMessageSkillFrame(t, healer.Read(), serverpackets.SystemMessageS1CannotBeUsed, corpsePetSkillID, 1)
-		assertFrameOpcode(t, healer.Read(), serverpackets.OpcodeMoveToPawn, "dead non-pet corpse-pet rotation")
+		if extra := healer.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("dead non-pet corpse-pet rejection extra opcode = %#x, want no MoveToPawn", extra[0])
+		}
+		if extra := patient.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+			t.Fatalf("dead non-pet corpse-pet rejection observer opcode = %#x, want none", extra[0])
+		}
 	})
 }

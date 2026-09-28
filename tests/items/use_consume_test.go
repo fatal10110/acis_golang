@@ -268,7 +268,6 @@ func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "select StatusUpdate")
 	c.Send(encodeUseItem(key, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "unlockable key rejection rotation")
 	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 		t.Fatalf("unlockable key rejection extra opcode = %#x, want none", frame[0])
 	}
