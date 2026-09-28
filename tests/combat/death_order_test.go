@@ -184,7 +184,7 @@ func TestMonsterKillDeathPenaltyFollowsKarmaLoss(t *testing.T) {
 			srv := gameservertest.Boot(t,
 				gameservertest.WithWantChars(1),
 				gameservertest.WithZones(zones),
-				gameservertest.WithWater(),
+				gameservertest.WithWater(nil),
 				gameservertest.WithSeed(seedExperiencedCharacter(1500, tc.karma)),
 				gameservertest.WithLevels(deathLossTable(t)),
 				gameservertest.WithAllowDelevel(true),
