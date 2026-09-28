@@ -232,6 +232,51 @@ func TestHostileMovementDisabledTracksCrowdControl(t *testing.T) {
 	}
 }
 
+// TestHostileAttackDisabledMatchesReferenceTerms pins the NPC attack gate to
+// the reference's creature union (Creature.isAttackingDisabled minus flying,
+// which an NPC never is): stun, immobile-until-attacked, sleep, paralysis,
+// fear and death disable attacking; root and teleport gate movement only.
+func TestHostileAttackDisabledMatchesReferenceTerms(t *testing.T) {
+	effects := []struct {
+		name     string
+		disables bool
+	}{
+		{"Stun", true},
+		{"ImmobileUntilAttacked", true},
+		{"Sleep", true},
+		{"Paralyze", true},
+		{"Fear", true},
+		{"Root", false},
+	}
+	for _, tt := range effects {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			if h.AttackDisabled() {
+				t.Fatal("AttackDisabled() = true with no effect active")
+			}
+			e := addHostileEffect(t, h, tt.name)
+			if got := h.AttackDisabled(); got != tt.disables {
+				t.Fatalf("AttackDisabled() = %v with %s active, want %v", got, tt.name, tt.disables)
+			}
+			h.EffectList().Remove(e)
+			if h.AttackDisabled() {
+				t.Fatalf("AttackDisabled() = true after %s was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("teleporting", func(t *testing.T) {
+		h := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+		h.SetTeleporting(true)
+		if !h.MovementDisabled() {
+			t.Fatal("MovementDisabled() = false while teleporting")
+		}
+		if h.AttackDisabled() {
+			t.Fatal("AttackDisabled() = true while only teleporting")
+		}
+	})
+}
+
 // TestHostileReduceHPByDOTLeavesEffectsAloneOnRealDOTTick mirrors the
 // !isDOT gate on CreatureStatus.reduceHp's whole SLEEP/IMMOBILE/STUN block:
 // NpcStatus has no PlayerStatus-style override, so a real DOT tick

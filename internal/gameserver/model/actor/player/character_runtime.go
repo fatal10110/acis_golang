@@ -21,6 +21,12 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
+// MountBodies resolves a mount NPC template's collision footprint, which
+// replaces a mounted player's own body for reach and line of sight.
+type MountBodies interface {
+	CollisionBody(npcID int32) (radius, height float64, ok bool)
+}
+
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
@@ -162,6 +168,7 @@ type Runtime struct {
 	World  *world.State
 	LOS    LineOfSight
 	Zones  PeaceZoneQuery
+	Mounts MountBodies
 	Skills skillDefinitions
 	Levels *LevelTable
 	Log    zerolog.Logger
@@ -175,6 +182,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.world = rt.World
 	c.los = rt.LOS
 	c.zones = rt.Zones
+	c.mounts = rt.Mounts
 	c.skillDefs = rt.Skills
 	c.levelTable = rt.Levels
 	c.log = rt.Log

@@ -14,11 +14,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// AttackDisabled reports whether this NPC is unable to start an attack. No
-// abnormal-effect system (petrify, fear, attack-block) is wired to a live
-// NPC yet, so death is the only disabling condition modeled so far.
+// AttackDisabled reports whether this NPC is unable to start an attack:
+// dead, or held by stun, sleep, paralysis, fear, or an immobile-until-attacked
+// effect. NPCs never fly. Teleporting gates movement, not attacking.
+// The per-NPC core-AI-disabled flag (box chests, Halisha chests) is not
+// modeled yet (#2624).
 func (h *Hostile) AttackDisabled() bool {
-	return h.Dead()
+	return h.AlikeDead() || h.Stunned() || h.ImmobileUntilAttacked() ||
+		h.Sleeping() || h.Paralyzed() || h.Afraid()
 }
 
 // MovementDisabled reports whether this NPC is unable to move: a

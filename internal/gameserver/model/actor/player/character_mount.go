@@ -48,3 +48,15 @@ func (c *Character) MountObjectID() int32 {
 func (c *Character) Mounted() bool {
 	return c.MountNPCID() != 0
 }
+
+// mountBody returns the active mount's collision footprint, or false when
+// not mounted or when no mount lookup is attached (e.g. in tests).
+func (c *Character) mountBody() (radius, height float64, ok bool) {
+	c.stateMu.RLock()
+	npcID, mounts := c.mountNPCID, c.mounts
+	c.stateMu.RUnlock()
+	if npcID == 0 || mounts == nil {
+		return 0, 0, false
+	}
+	return mounts.CollisionBody(npcID)
+}

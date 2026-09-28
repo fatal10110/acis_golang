@@ -14,7 +14,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (a *Actor) AttackDisabled() bool { return a.DenyAIAction() }
+// AttackDisabled reports whether this summon cannot start a physical attack:
+// dead, paralyzed, or held by stun, sleep, fear, or an immobile-until-attacked
+// effect. Unlike DenyAIAction, teleporting does not disable attacking; it
+// gates movement instead.
+func (a *Actor) AttackDisabled() bool {
+	if a.AlikeDead() || a.Paralyzed() {
+		return true
+	}
+	if a.effects == nil {
+		return false
+	}
+	return a.effects.IsAffected(effect.FlagStunned | effect.FlagMeditating | effect.FlagSleep | effect.FlagFear)
+}
 
 // MovementDisabled reports whether this summon cannot move. Fear is not
 // included: it is an out-of-control state, not a movement lock. Sit/stand

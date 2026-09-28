@@ -725,6 +725,114 @@ func TestCharacterMovementDisabledTracksImmobilityNotFear(t *testing.T) {
 	}
 }
 
+// TestCharacterAttackDisabledMatchesReferenceTerms pins the attack gate to
+// the reference's seven-term union (Creature.isAttackingDisabled:
+// flying, stunned, immobile-until-attacked, sleeping, paralyzed, alike-dead,
+// afraid). Rooted, teleporting, immobilized and sitting gate movement only
+// and must leave attacking enabled.
+func TestCharacterAttackDisabledMatchesReferenceTerms(t *testing.T) {
+	effects := []struct {
+		name     string
+		disables bool
+	}{
+		{"Stun", true},
+		{"ImmobileUntilAttacked", true},
+		{"Sleep", true},
+		{"Paralyze", true},
+		{"Fear", true},
+		{"FakeDeath", true},
+		{"Root", false},
+	}
+	for _, tt := range effects {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Character{ID: 1}
+			attachTestLive(t, c)
+			if c.AttackDisabled() {
+				t.Fatal("AttackDisabled() = true with no effect active")
+			}
+			e := addCharacterEffect(t, c, tt.name)
+			if got := c.AttackDisabled(); got != tt.disables {
+				t.Fatalf("AttackDisabled() = %v with %s active, want %v", got, tt.name, tt.disables)
+			}
+			c.EffectList().Remove(e)
+			if c.AttackDisabled() {
+				t.Fatalf("AttackDisabled() = true after %s was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("flying", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetFlying(true)
+		if !c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = false while flying")
+		}
+	})
+
+	t.Run("dead", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.MarkDead()
+		if !c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = false while dead")
+		}
+	})
+
+	t.Run("movement-only states", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetTeleporting(true)
+		c.SetImmobilized(true)
+		c.SetStanding(false)
+		if !c.MovementDisabled() {
+			t.Fatal("MovementDisabled() = false while teleporting, immobilized and sitting")
+		}
+		if c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = true while only teleporting, immobilized and sitting")
+		}
+	})
+}
+
+// mountBodyTable is a one-mount NPC template lookup.
+type mountBodyTable struct {
+	npcID          int32
+	radius, height float64
+}
+
+func (m mountBodyTable) CollisionBody(npcID int32) (float64, float64, bool) {
+	if npcID != m.npcID {
+		return 0, 0, false
+	}
+	return m.radius, m.height, true
+}
+
+// TestCharacterCollisionBodyFollowsMount pins Player.getCollisionRadius /
+// getCollisionHeight: while mounted the mount NPC template's footprint
+// (wyvern 12621: radius 60, height 80 in the shipped npc data) replaces the
+// class template's.
+func TestCharacterCollisionBodyFollowsMount(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.Configure(Runtime{Mounts: mountBodyTable{npcID: 12621, radius: 60, height: 80}})
+
+	if got, want := c.CollisionRadius(), 9.0; got != want {
+		t.Fatalf("unmounted CollisionRadius() = %v, want %v", got, want)
+	}
+	if got, want := c.CollisionHeight(), 23.0; got != want {
+		t.Fatalf("unmounted CollisionHeight() = %v, want %v", got, want)
+	}
+
+	if !c.Mount(12621, 77) {
+		t.Fatal("Mount() = false, want true")
+	}
+	if got, want := c.CollisionRadius(), 60.0; got != want {
+		t.Fatalf("mounted CollisionRadius() = %v, want %v", got, want)
+	}
+	if got, want := c.CollisionHeight(), 80.0; got != want {
+		t.Fatalf("mounted CollisionHeight() = %v, want %v", got, want)
+	}
+}
+
 func TestCharacterThrowUpEffectActivatesAndMovesToLanding(t *testing.T) {
 	effector := &Character{ID: 1}
 	effector.SetLastKnownPosition(location.Location{X: 100, Y: 0, Z: 0}, 0)

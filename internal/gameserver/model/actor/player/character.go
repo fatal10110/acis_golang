@@ -116,6 +116,7 @@ type Character struct {
 	world                    *world.State
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
+	mounts                   MountBodies
 	insidePvPZone            atomic.Bool
 	insidePeaceZone          atomic.Bool
 	insideSiegeZone          atomic.Bool
