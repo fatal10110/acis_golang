@@ -437,6 +437,79 @@ func TestMakerRandomLocationKeepsLastDrawAfterTenFailures(t *testing.T) {
 	}
 }
 
+// scriptedTerrain answers Height from heights in call order, repeating the
+// last entry once they run out, and counts the calls.
+type scriptedTerrain struct {
+	heights  []int16
+	walkable bool
+	calls    int
+}
+
+func (g *scriptedTerrain) Height(int, int, int) int16 {
+	i := min(g.calls, len(g.heights)-1)
+	g.calls++
+	return g.heights[i]
+}
+func (g *scriptedTerrain) Walkable(int, int, int) bool { return g.walkable }
+
+// fullyBannedMaker has one territory whose footprint is also its banned
+// territory; the banned Z range 0..100 covers only the lower part of the
+// territory's 0..1000.
+func fullyBannedMaker() *Maker {
+	nodes := []Node{{X: 0, Y: 0}, {X: 100, Y: 0}, {X: 0, Y: 100}}
+	return &Maker{
+		Territories:       []*Territory{triangleTerritory("t", 0, 1000, nodes...)},
+		BannedTerritories: []*Territory{triangleTerritory("ban", 0, 100, nodes...)},
+	}
+}
+
+// TestMakerRandomLocationStopsAtDrawLimitWhenFullyBanned: banned redraws
+// spend no attempts, so with every draw banned only randomLocationDrawLimit
+// ends the loop. The call returns after exactly that many draws and places
+// nothing rather than a point inside the banned territory.
+func TestMakerRandomLocationStopsAtDrawLimitWhenFullyBanned(t *testing.T) {
+	maker := fullyBannedMaker()
+	geo := &scriptedTerrain{heights: []int16{50}, walkable: true}
+
+	done := make(chan struct{})
+	var loc location.Location
+	var ok bool
+	go func() {
+		defer close(done)
+		loc, ok = maker.RandomLocation(geo, true)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("RandomLocation did not return for a fully banned territory")
+	}
+
+	if ok {
+		t.Fatalf("RandomLocation = %+v, ok = true; want no location once every draw is banned", loc)
+	}
+	if geo.calls != randomLocationDrawLimit {
+		t.Fatalf("Height calls = %d, want %d (the draw limit)", geo.calls, randomLocationDrawLimit)
+	}
+}
+
+// TestMakerRandomLocationDrawLimitKeepsLastUnbannedDraw: when the draw
+// limit ends the loop after some draws failed only on walkability, the
+// fallback is the last of those, never a later banned draw.
+func TestMakerRandomLocationDrawLimitKeepsLastUnbannedDraw(t *testing.T) {
+	maker := fullyBannedMaker()
+	// Draws 1 and 2 land above the banned Z range and fail on walkability;
+	// every later draw is banned.
+	geo := &scriptedTerrain{heights: []int16{500, 600, 50}, walkable: false}
+
+	loc, ok := maker.RandomLocation(geo, true)
+	if !ok || loc.Z != 600 || maker.ContainsBanned(loc) {
+		t.Fatalf("RandomLocation = %+v, %v; want the second draw (z 600), outside the banned territory", loc, ok)
+	}
+	if geo.calls != randomLocationDrawLimit {
+		t.Fatalf("Height calls = %d, want %d (the draw limit)", geo.calls, randomLocationDrawLimit)
+	}
+}
+
 func TestMakerRandomLocationWithoutTerritory(t *testing.T) {
 	for _, maker := range []*Maker{nil, {}} {
 		if _, ok := maker.RandomLocation(flatTerrain{}, true); ok {

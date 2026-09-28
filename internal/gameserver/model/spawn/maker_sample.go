@@ -20,7 +20,9 @@ const randomLocationAttempts = 10
 // randomLocationDrawLimit caps every draw, including those rejected for
 // landing in the banned territory, which do not spend the attempt budget.
 // It only bites when nearly the whole territory is banned, where an
-// uncapped loop would never end.
+// uncapped loop would never end. A banned draw is never the fallback: the
+// capped call returns the last draw that failed only on Z or walkability,
+// or nothing when every draw was banned.
 const randomLocationDrawLimit = 10000
 
 // RandomLocation draws a point in this maker's merged territory: a triangle
@@ -30,7 +32,9 @@ const randomLocationDrawLimit = 10000
 // whose point is not walkable counts against the attempt budget; with
 // excludeBanned, a draw inside the merged banned territory is redrawn
 // without counting. Once the budget runs out the last draw is returned
-// as-is. ok is false only when the territory has no drawable area.
+// as-is. ok is false when the territory has no drawable area, or when the
+// draw limit ends the loop before any draw landed outside the banned
+// territory.
 func (m *Maker) RandomLocation(geo Terrain, excludeBanned bool) (loc location.Location, ok bool) {
 	if m == nil {
 		return location.Location{}, false
@@ -50,11 +54,11 @@ func (m *Maker) RandomLocation(geo Terrain, excludeBanned bool) (loc location.Lo
 	for draw := 0; failed < randomLocationAttempts && draw < randomLocationDrawLimit; draw++ {
 		tri := pickTriangle(triangles, int64(rnd.Get(int(total))))
 		pt := tri.PointAt(rnd.GetFloat(1), rnd.GetFloat(1))
-		loc = location.Location{X: pt.X, Y: pt.Y, Z: int(geo.Height(pt.X, pt.Y, avgZ))}
-		ok = true
-		if excludeBanned && m.ContainsBanned(loc) {
+		candidate := location.Location{X: pt.X, Y: pt.Y, Z: int(geo.Height(pt.X, pt.Y, avgZ))}
+		if excludeBanned && m.ContainsBanned(candidate) {
 			continue
 		}
+		loc, ok = candidate, true
 		if loc.Z < minZ || loc.Z > maxZ || !geo.Walkable(loc.X, loc.Y, loc.Z) {
 			failed++
 			continue

@@ -506,7 +506,8 @@ func squareTerritory(minX, minY, maxX, maxY int) *spawn.Territory {
 
 // TestRandomTerritoryPosition_RetriesUnwalkablePoints regression-tests #1716:
 // a candidate point that fails the walkability check must be retried within
-// the existing territorySpawnAttempts budget rather than accepted outright.
+// the sampler's 10-attempt budget (spawn.randomLocationAttempts, the
+// reference's MAX_ITERATIONS) rather than accepted outright.
 // The unwalkable band covers only a fifth of the territory's width, so the
 // 10-attempt budget finds a walkable point with overwhelming probability;
 // this asserts every returned placement over many runs lands on the
