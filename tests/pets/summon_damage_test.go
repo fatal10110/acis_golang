@@ -52,6 +52,19 @@ func runOn(t *testing.T, q *sim.Queue, fn func()) {
 	<-done
 }
 
+// landEveryHit makes every auto-attack of player id hit: the swings these
+// scenarios drive must land, and an unlucky run of misses would say
+// nothing about the rules under test.
+func landEveryHit(t *testing.T, srv *gameservertest.Server, id int32) {
+	t.Helper()
+	obj, ok := srv.State.Player(id)
+	if !ok {
+		t.Fatalf("player %d not in world", id)
+	}
+	player := obj.(interface{ SetRollSource(func(int) int) })
+	runOn(t, srv.PlayerQueue(t, id), func() { player.SetRollSource(func(int) int { return 0 }) })
+}
+
 // addPetEffect lands a debuff named name on pet from pet itself.
 func addPetEffect(t *testing.T, pet *summon.Actor, name string) {
 	t.Helper()
@@ -247,6 +260,7 @@ func TestOtherPlayerNeedsForceToAttackAPet(t *testing.T) {
 	})
 	pet, _ := h.spawnWolf(t)
 	other := h.joinSecondPlayer(t, "Hitter")
+	landEveryHit(t, h.srv, other.id)
 	x, y, z := pet.Position()
 
 	other.client.Send(encodeAction(pet.ObjectID(), int32(x), int32(y), int32(z), false))
@@ -287,6 +301,7 @@ func TestForcedAttackWakesASleepingPet(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 	other := h.joinSecondPlayer(t, "Hitter")
+	landEveryHit(t, h.srv, other.id)
 	addPetEffect(t, pet, "Sleep")
 	x, y, z := pet.Position()
 
@@ -307,6 +322,7 @@ func TestFlaggedOwnersPetIsAttackedWithoutForce(t *testing.T) {
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
 	other := h.joinSecondPlayer(t, "Hitter")
+	landEveryHit(t, h.srv, other.id)
 	owner, _ := h.srv.State.Player(h.ownerID)
 	owner.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
 	drainUntilQuiet(t, other.client)
@@ -374,6 +390,7 @@ func TestOwnerForcedAttackHitsItsOwnPet(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
+	landEveryHit(t, h.srv, h.ownerID)
 	x, y, z := pet.Position()
 	h.client.Send(encodeAction(pet.ObjectID(), int32(x), int32(y), int32(z), false))
 	drainUntilQuiet(t, h.client)

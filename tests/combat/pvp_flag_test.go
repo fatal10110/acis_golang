@@ -27,12 +27,22 @@ func TestForcedAttackOnAPlayerFlagsTheAttacker(t *testing.T) {
 	drainUntilQuiet(t, vc)
 	drainUntilQuiet(t, c)
 
-	selectPlayerTarget(t, c, victim.ID)
-	c.Send(encodeAttackRequest(victim.ID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	obj, ok := srv.State.Player(attackerID)
 	if !ok {
 		t.Fatal("attacker missing from world state")
 	}
+	// Every swing hits, so the scenario never waits on a lucky roll.
+	done := make(chan struct{})
+	if !srv.PlayerQueue(t, attackerID).Post(func() {
+		defer close(done)
+		obj.(interface{ SetRollSource(func(int) int) }).SetRollSource(func(int) int { return 0 })
+	}) {
+		t.Fatal("attacker queue closed")
+	}
+	<-done
+
+	selectPlayerTarget(t, c, victim.ID)
+	c.Send(encodeAttackRequest(victim.ID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	attacker := obj.(interface{ PvPFlagState() task.PvPFlagState })
 	srv.AdvanceUntil(t, "attacker PvP-flagged by its attack", func() bool {
 		return attacker.PvPFlagState() != task.PvPFlagNone
