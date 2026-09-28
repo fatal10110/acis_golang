@@ -3,7 +3,6 @@ package effect
 import (
 	"math"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -235,12 +234,12 @@ func immobilizePetBuffExit(e *Effect) {
 // the target is pushed further along the effector-to-effected line. Z is
 // left at the effected's current height even after the X/Y geo correction
 // below — the reference implementation never corrects Z for this effect,
-// a known approximation preserved here rather than fixed. Summons cannot be
-// knocked back yet: they have no flight movement.
+// a known approximation preserved here rather than fixed. Every creature
+// kind, summons included, takes the same flight.
 func throwUpStart(e *Effect) bool {
 	e.Effected.AbortAll(false)
 
-	if e.Effector == nil || e.Effected.Kind() == actor.KindSummon {
+	if e.Effector == nil {
 		return false
 	}
 	sx, sy, sz := e.Effector.Position()
@@ -276,9 +275,6 @@ func throwUpStart(e *Effect) bool {
 // syncs it to observers.
 func throwUpExit(e *Effect) {
 	refresh(e.Effected)
-	if e.Effected.Kind() == actor.KindSummon {
-		return
-	}
 	e.Effected.SetXYZ(e.landing.X, e.landing.Y, e.landing.Z)
 	e.Effected.BroadcastPosition()
 }

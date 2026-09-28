@@ -535,6 +535,44 @@ func TestNewCreatureMoveAcceptsZeroSpeed(t *testing.T) {
 	}
 }
 
+// TestCreatureMoveValidLocationWithoutGeoReturnsDestination pins the
+// fallback for a movement never initialized with geodata (a summon spawned
+// while the server runs without geodata): the destination comes back
+// unchanged, as the reference's getValidLocation does over a region with no
+// geodata, and the call does not panic.
+func TestCreatureMoveValidLocationWithoutGeoReturnsDestination(t *testing.T) {
+	var m CreatureMove
+
+	got := m.ValidLocation(1, 2, 3, 10, 20, 30)
+
+	if want := (location.Location{X: 10, Y: 20, Z: 30}); got != want {
+		t.Fatalf("ValidLocation() = %+v, want destination %+v", got, want)
+	}
+}
+
+// TestCreatureMoveValidLocationDelegatesToGeo pins that an initialized
+// movement resolves the destination through its own geodata.
+func TestCreatureMoveValidLocationDelegatesToGeo(t *testing.T) {
+	geo := &recordingGeo{validLocation: location.Location{X: 7, Y: 8, Z: 9}}
+	m, err := NewCreatureMove(location.Location{X: 1, Y: 2, Z: 3}, 100, geo)
+	if err != nil {
+		t.Fatalf("NewCreatureMove() error = %v", err)
+	}
+
+	got := m.ValidLocation(1, 2, 3, 10, 20, 30)
+
+	if want := (location.Location{X: 7, Y: 8, Z: 9}); got != want {
+		t.Fatalf("ValidLocation() = %+v, want geodata answer %+v", got, want)
+	}
+	wantCall := validLocationCall{
+		origin: location.Location{X: 1, Y: 2, Z: 3},
+		target: location.Location{X: 10, Y: 20, Z: 30},
+	}
+	if len(geo.validLocationCalls) != 1 || geo.validLocationCalls[0] != wantCall {
+		t.Fatalf("ValidLocation calls = %+v, want [%+v]", geo.validLocationCalls, wantCall)
+	}
+}
+
 // ---- from creature_fakes_test.go ----
 type geoCall struct {
 	origin, target location.Location
