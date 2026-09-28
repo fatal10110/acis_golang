@@ -198,6 +198,9 @@ func logoutPersisted(t *testing.T, srv *gameservertest.Server, c *scriptedClient
 
 func assertFrameOpcode(t *testing.T, frame []byte, want byte, what string) {
 	t.Helper()
+	if len(frame) == 0 {
+		t.Fatalf("%s frame never arrived", what)
+	}
 	if frame[0] != want {
 		t.Fatalf("%s opcode = %#x, want %#x", what, frame[0], want)
 	}
