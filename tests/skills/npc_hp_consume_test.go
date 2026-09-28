@@ -2,6 +2,7 @@ package skills
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -52,6 +53,46 @@ func onNPCQueue(t *testing.T, hostile *npc.Hostile, fn func()) {
 		t.Fatal("post to npc queue: queue closed")
 	}
 	<-done
+}
+
+func TestCastingNPCDeathCancelsBeforeFinalStatusAndDie(t *testing.T) {
+	t.Parallel()
+	srv, hostile, cast := bootNPCCostCaster(t)
+	c := srv.Client
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	cast()
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "NPC MagicSkillUse")
+	onNPCQueue(t, hostile, func() {
+		if !hostile.Die(nil, nil) {
+			t.Error("first death rejected")
+		}
+	})
+
+	zeroHP := []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentHP, Value: 0}}
+	assertStatusAttrs(t, c.Read(), hostile.ObjectID(), zeroHP)
+	canceled := c.Read()
+	assertFrameOpcode(t, canceled, serverpackets.OpcodeMagicSkillCanceled, "NPC MagicSkillCanceled")
+	if got := wireReader(canceled[1:]).ReadInt32(); got != hostile.ObjectID() {
+		t.Fatalf("canceled cast owner = %d, want %d", got, hostile.ObjectID())
+	}
+	assertStatusAttrs(t, c.Read(), hostile.ObjectID(), zeroHP)
+	died := c.Read()
+	assertFrameOpcode(t, died, serverpackets.OpcodeDie, "NPC Die")
+	if got := wireReader(died[1:]).ReadInt32(); got != hostile.ObjectID() {
+		t.Fatalf("dead NPC = %d, want %d", got, hostile.ObjectID())
+	}
+
+	onNPCQueue(t, hostile, func() {
+		if hostile.Die(nil, nil) {
+			t.Error("repeated death succeeded")
+		}
+	})
+	srv.Advance(t, time.Second)
+	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+		t.Fatalf("frame after repeated death or canceled cast = %#x", frame[0])
+	}
 }
 
 // TestNPCHPCostDoesNotWakeOrAggroCaster pins that a monster paying its own

@@ -858,6 +858,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 		return false
 	}
 	h.BroadcastStatus()
+	h.AbortAll(true)
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}
