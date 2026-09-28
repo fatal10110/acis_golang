@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -65,8 +66,9 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 	return l.restarts.NearestLocation(live.CurrentLocation(), live.Race, live.Karma())
 }
 
-// teleportLivePlayer relocates live to a scattered, ground-height-snapped
-// point near target, cancelling any attack/combat in progress. It broadcasts
+// teleportLivePlayer relocates live to a scattered point near target, snapped
+// to ground height unless live is flying or the point is inside water,
+// cancelling any attack/combat in progress. It broadcasts
 // the discontinuous-position packet to live's own session and every
 // observer, then takes live off the grid: it exits every zone around the old
 // position, everything around the old position forgets live and live forgets
@@ -97,7 +99,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// Every hostile around the old position forgets live, dropping its
 	// threat even when the destination is still in that hostile's sight.
 	npc.DropThreatAround(l.world, live)
-	target = move.RandomNearbyLocation(l.geo, target, randomOffset)
+	target = move.RandomNearbyLocation(l.geo, target, randomOffset, func(at location.Location) bool {
+		return live.Flying() || l.inWater(at)
+	})
 	// Off the grid the heading falls back to the saved one; keep the live
 	// facing across the jump.
 	heading := live.CurrentHeading()
@@ -122,6 +126,16 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		l.water.Remove(live)
 	}
 	l.updateLivePlayerPosition(live, target, heading)
+}
+
+// inWater reports whether at lies inside a water zone, where a creature
+// swims at its own height instead of standing on the ground below.
+func (l *GameClientLink) inWater(at location.Location) bool {
+	if l.zones == nil {
+		return false
+	}
+	_, ok := zone.FindAt[*zone.Water](l.zones, at.X, at.Y, at.Z)
+	return ok
 }
 
 func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
