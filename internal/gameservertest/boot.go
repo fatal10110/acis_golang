@@ -65,6 +65,7 @@ type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
+	petNameLookupErr       error
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -1227,6 +1228,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
 		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
 		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
+	}
+	if o.petNameLookupErr != nil {
+		if o.slowStores > 0 {
+			t.Fatal("gameservertest: WithPetNameLookupError cannot be combined with WithSlowStores")
+		}
+		gclConfig.PetStore = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat

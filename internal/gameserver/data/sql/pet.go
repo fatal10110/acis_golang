@@ -21,18 +21,21 @@ func NewPetStore(db *sql.DB) *PetStore {
 
 // Get returns the saved state for the pet whose collar is itemObjectID, or
 // (State{}, false, nil) if no row exists yet for it — the case for a pet
-// summoned for the first time from a freshly bought collar.
+// summoned for the first time from a freshly bought collar. A NULL name is an
+// unnamed pet and reads back as an empty Name.
 func (s *PetStore) Get(ctx context.Context, itemObjectID int32) (pet.State, bool, error) {
 	var st pet.State
+	var name sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		`SELECT name, level, curHp, curMp, exp, sp, fed FROM pets WHERE item_obj_id = ?`, itemObjectID,
-	).Scan(&st.Name, &st.Level, &st.CurHP, &st.CurMP, &st.Exp, &st.SP, &st.Fed)
+	).Scan(&name, &st.Level, &st.CurHP, &st.CurMP, &st.Exp, &st.SP, &st.Fed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return pet.State{}, false, nil
 	}
 	if err != nil {
 		return pet.State{}, false, fmt.Errorf("get pet %d: %w", itemObjectID, err)
 	}
+	st.Name = name.String
 	return st, true, nil
 }
 
@@ -51,11 +54,13 @@ func (s *PetStore) NameTaken(ctx context.Context, name string) (bool, error) {
 }
 
 // Save inserts or updates the row for the pet whose collar is itemObjectID.
+// An unnamed pet (empty Name) is stored as NULL.
 func (s *PetStore) Save(ctx context.Context, itemObjectID int32, st pet.State) error {
+	name := sql.NullString{String: st.Name, Valid: st.Name != ""}
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pets (name, level, curHp, curMp, exp, sp, fed, item_obj_id) VALUES (?,?,?,?,?,?,?,?)
 		 ON DUPLICATE KEY UPDATE name=VALUES(name), level=VALUES(level), curHp=VALUES(curHp), curMp=VALUES(curMp), exp=VALUES(exp), sp=VALUES(sp), fed=VALUES(fed)`,
-		st.Name, st.Level, st.CurHP, st.CurMP, st.Exp, st.SP, st.Fed, itemObjectID,
+		name, st.Level, st.CurHP, st.CurMP, st.Exp, st.SP, st.Fed, itemObjectID,
 	)
 	if err != nil {
 		return fmt.Errorf("save pet %d: %w", itemObjectID, err)

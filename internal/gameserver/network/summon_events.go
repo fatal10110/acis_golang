@@ -146,6 +146,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		}
 	case event.AutoAttackStopped:
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
+	case event.SocialAction:
+		l.broadcastSummon(actor, func() wire.Frame { return frames.SocialAction(actor.ObjectID(), e.ID) })
 	case event.StatusChanged:
 		l.broadcastSummonStatus(actor)
 	case event.OwnerInfoChanged:

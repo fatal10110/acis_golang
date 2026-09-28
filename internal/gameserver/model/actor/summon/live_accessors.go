@@ -252,8 +252,14 @@ func (a *Actor) SP() int {
 	return a.sp
 }
 
+// socialActionLevelUp is the level-up animation a pet plays for everyone
+// around it when its level increases.
+const socialActionLevelUp = 15
+
 // AddExpAndSp grants a pet its raw kill-reward share. Experience uses the
-// pet-specific configured rate; SP is deliberately unscaled.
+// pet-specific configured rate; SP is deliberately unscaled. A level increase
+// refreshes the owner, restores vitals and broadcasts the level-up animation
+// before the owner is told the exp earned.
 func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	if a == nil || !a.isPet {
 		return
@@ -269,6 +275,9 @@ func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 		a.SyncControlItemEnchant()
 	}
 	a.UpdateStatus()
+	if leveled {
+		a.emit(event.SocialAction{ID: socialActionLevelUp})
+	}
 	a.emit(event.ExpGained{Exp: expGain})
 }
 
