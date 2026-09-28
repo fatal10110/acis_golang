@@ -349,3 +349,36 @@ func TestTriangleArea(t *testing.T) {
 		t.Errorf("Area() = %v, want 50", got)
 	}
 }
+
+// TestTrianglePointAtMatchesReferenceFold pins Triangle.getRandomLocation:
+// x = Ax + (int)(ba*BAx + ca*CAx), same for y, after folding (ba, ca) to
+// (1-ba, 1-ca) when ba+ca > 1. Expected values were computed in IEEE-754
+// double arithmetic with truncation toward zero, independently of the Go
+// code; the folded rows land one short of the "exact" value because
+// 1-0.8 and 1-0.9 are not exact in binary, and the negative row truncates
+// -3.5 to -3, not -4.
+func TestTrianglePointAtMatchesReferenceFold(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b, c Point
+		ba, ca  float64
+		want    Point
+	}{
+		{"inside", Point{0, 0}, Point{100, 0}, Point{0, 100}, 0.25, 0.5, Point{25, 50}},
+		{"folded", Point{0, 0}, Point{100, 0}, Point{0, 100}, 0.8, 0.6, Point{19, 40}},
+		{"folded both axes", Point{0, 0}, Point{100, 0}, Point{0, 100}, 0.7, 0.9, Point{30, 9}},
+		{"sum exactly one is not folded", Point{1000, -2000}, Point{1300, -2000}, Point{1000, -1700}, 0.5, 0.5, Point{1150, -1850}},
+		{"negative truncates toward zero", Point{0, 0}, Point{-10, 0}, Point{0, -10}, 0.35, 0, Point{-3, 0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tri, err := NewTriangle(tt.a, tt.b, tt.c)
+			if err != nil {
+				t.Fatalf("NewTriangle: %v", err)
+			}
+			if got := tri.PointAt(tt.ba, tt.ca); got != tt.want {
+				t.Fatalf("PointAt(%v, %v) = %+v, want %+v", tt.ba, tt.ca, got, tt.want)
+			}
+		})
+	}
+}

@@ -422,39 +422,6 @@ func (constGeoZ) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 }
 func (constGeoZ) Walkable(int, int, int) bool { return true }
 
-func TestMergedZRangeIsMinOfMinsMaxOfMaxes(t *testing.T) {
-	territories := []*spawn.Territory{
-		{Name: "a", MinZ: -100, MaxZ: 50, Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}},
-		{Name: "b", MinZ: 20, MaxZ: 300, Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}},
-	}
-
-	minZ, maxZ := mergedZRange(territories)
-	if minZ != -100 || maxZ != 300 {
-		t.Fatalf("mergedZRange() = (%d,%d), want (-100,300)", minZ, maxZ)
-	}
-}
-
-func TestWeightedTerritoryPickFavorsLargerArea(t *testing.T) {
-	big := &spawn.Territory{Name: "big", Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 1000, Y: 0}, {X: 0, Y: 1000}}} // area 500000
-	small := &spawn.Territory{Name: "small", Nodes: []spawn.Node{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 0, Y: 10}}} // area 50
-	territories := []*spawn.Territory{big, small}
-
-	const trials = 5000
-	bigCount := 0
-	for i := 0; i < trials; i++ {
-		if weightedTerritoryPick(territories) == big {
-			bigCount++
-		}
-	}
-
-	// big is ~10000x small's area, so it should dominate selection; a loose
-	// 90% floor distinguishes this from the old uniform 50/50 pick without
-	// making the test flaky.
-	if frac := float64(bigCount) / trials; frac < 0.90 {
-		t.Fatalf("weightedTerritoryPick picked big %.3f of the time, want >0.90 (old uniform pick would give ~0.5)", frac)
-	}
-}
-
 // TestRandomTerritoryPositionUsesMergedZRangeNotSubTerritoryOwnRange
 // reproduces PR 552 review finding 1: a multi-territory maker's spawn-time
 // Z check must validate against the merged min-of-mins/max-of-maxes Z range
@@ -580,8 +547,75 @@ func TestRandomTerritoryPosition_FallsBackWhenNeverWalkable(t *testing.T) {
 	if pos.Location.X < 0 || pos.Location.X > 100 {
 		t.Fatalf("fallback position X=%d outside territory bounds", pos.Location.X)
 	}
-	if geo.walkableCalls != territorySpawnAttempts {
-		t.Fatalf("walkableCalls = %d, want %d (one per attempt, all exhausted)", geo.walkableCalls, territorySpawnAttempts)
+	// Territory.getRandomLocation's MAX_ITERATIONS: ten failed draws, then
+	// the last one is kept.
+	if geo.walkableCalls != 10 {
+		t.Fatalf("walkableCalls = %d, want 10 (one per attempt, all exhausted)", geo.walkableCalls)
+	}
+}
+
+func triangleTerritory(name string, minZ, maxZ int, nodes ...spawn.Node) *spawn.Territory {
+	return &spawn.Territory{Name: name, MinZ: minZ, MaxZ: maxZ, Nodes: nodes}
+}
+
+// TestRandomTerritoryPositionBansByMergedBannedZ covers #2160: the banned
+// territory is merged like the spawn territory (min-of-mins / max-of-maxes
+// Z, union of footprints). Banned A spans z 0..100 and banned B z 500..600,
+// so a draw in A's footprint at z 550 is banned even though 550 is outside
+// A's own range.
+func TestRandomTerritoryPositionBansByMergedBannedZ(t *testing.T) {
+	bannedA := triangleTerritory("ban_a", 0, 100, spawn.Node{X: 0, Y: 0}, spawn.Node{X: 100, Y: 0}, spawn.Node{X: 0, Y: 100})
+	bannedB := triangleTerritory("ban_b", 500, 600, spawn.Node{X: 5000, Y: 5000}, spawn.Node{X: 5100, Y: 5000}, spawn.Node{X: 5000, Y: 5100})
+	maker := &spawn.Maker{
+		Territories: []*spawn.Territory{
+			// Same footprint as banned A, plus an equal-size open triangle.
+			triangleTerritory("in_ban", 0, 1000, spawn.Node{X: 0, Y: 0}, spawn.Node{X: 100, Y: 0}, spawn.Node{X: 0, Y: 100}),
+			triangleTerritory("open", 0, 1000, spawn.Node{X: 1000, Y: 0}, spawn.Node{X: 1100, Y: 0}, spawn.Node{X: 1000, Y: 100}),
+		},
+		BannedTerritories: []*spawn.Territory{bannedA, bannedB},
+	}
+	probe := location.Location{X: 10, Y: 10, Z: 550}
+	if !maker.ContainsBanned(probe) {
+		t.Fatalf("ContainsBanned(%+v) = false, want true under the merged banned Z range", probe)
+	}
+	if bannedA.Contains(probe.X, probe.Y, probe.Z) || bannedB.Contains(probe.X, probe.Y, probe.Z) {
+		t.Fatalf("probe %+v is inside a single banned member; it must only be banned by the merge", probe)
+	}
+
+	geo := constGeoZ{550}
+	for i := 0; i < 500; i++ {
+		pos, ok := randomTerritoryPosition(maker, geo)
+		if !ok {
+			t.Fatalf("run %d: randomTerritoryPosition ok = false", i)
+		}
+		if pos.Location.X < 1000 {
+			t.Fatalf("run %d: placed at %+v inside the merged banned territory", i, pos.Location)
+		}
+	}
+}
+
+// TestRandomTerritoryPositionBannedDrawsSpendNoAttempts matches
+// Territory.getRandomLocation(banned): a banned draw is redrawn without
+// counting against the ten Z/geodata failures, so an all-unwalkable
+// territory still reaches exactly ten Walkable checks before falling back.
+func TestRandomTerritoryPositionBannedDrawsSpendNoAttempts(t *testing.T) {
+	maker := &spawn.Maker{
+		Territories: []*spawn.Territory{
+			triangleTerritory("in_ban", -100, 100, spawn.Node{X: 0, Y: 0}, spawn.Node{X: 100, Y: 0}, spawn.Node{X: 0, Y: 100}),
+			triangleTerritory("open", -100, 100, spawn.Node{X: 1000, Y: 0}, spawn.Node{X: 1100, Y: 0}, spawn.Node{X: 1000, Y: 100}),
+		},
+		BannedTerritories: []*spawn.Territory{
+			triangleTerritory("ban", -100, 100, spawn.Node{X: 0, Y: 0}, spawn.Node{X: 100, Y: 0}, spawn.Node{X: 0, Y: 100}),
+		},
+	}
+	for i := 0; i < 50; i++ {
+		geo := &halfWalkableGeo{unwalkableMaxX: 1 << 20}
+		if _, ok := randomTerritoryPosition(maker, geo); !ok {
+			t.Fatalf("run %d: randomTerritoryPosition ok = false, want fallback position", i)
+		}
+		if geo.walkableCalls != 10 {
+			t.Fatalf("run %d: walkableCalls = %d, want 10 (banned draws must not spend attempts)", i, geo.walkableCalls)
+		}
 	}
 }
 
