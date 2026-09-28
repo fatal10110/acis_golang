@@ -108,6 +108,8 @@ type Actor struct {
 	lifetime LifetimeState
 	dead     bool
 	disabled bool
+	// corpseTime is how long a servitor's corpse lasts; see DecayDelay.
+	corpseTime time.Duration
 	// despawnOnce runs the one despawn that takes this summon out of the
 	// world; see despawn. Nothing it runs may despawn this summon again.
 	despawnOnce sync.Once
@@ -336,7 +338,10 @@ type ServitorConfig struct {
 	ItemConsumeCount int
 	// ExpPenalty is the share of kill exp this servitor withholds from its
 	// owner, from the summoning skill.
-	ExpPenalty     float32
+	ExpPenalty float32
+	// CorpseTime is how long this servitor's corpse lasts before it decays,
+	// from its npc template.
+	CorpseTime     time.Duration
 	Roll           func(int) int
 	Stats          CombatStats
 	MaxBuffsAmount int
@@ -370,6 +375,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		itemConsumeID:    cfg.ItemConsumeID,
 		itemConsumeCount: cfg.ItemConsumeCount,
 		expPenalty:       cfg.ExpPenalty,
+		corpseTime:       cfg.CorpseTime,
 		roll:             defaultRoll(cfg.Roll),
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,

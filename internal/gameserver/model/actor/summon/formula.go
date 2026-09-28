@@ -446,6 +446,15 @@ func (a *Actor) SetHP(value float64) {
 	a.vitals.hp = value
 }
 
+// RestoreDead marks a pet restored from a save below creature.DeathHP as
+// dead. Nothing killed it here, so no death sequence runs: it simply comes
+// back as the corpse it was saved as, and stays one until revived.
+func (a *Actor) RestoreDead() {
+	a.vitals.mu.Lock()
+	a.dead = true
+	a.vitals.mu.Unlock()
+}
+
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount. A dead
 // summon gains nothing; the check shares vitals.mu with the lethal drainHP.
 func (a *Actor) AddHP(amount float64) float64 {

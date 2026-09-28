@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -152,6 +153,11 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
 	case event.DeathSettled:
 		l.notifyOwnerOfSummonDeath(actor)
+		if l.decay != nil {
+			l.decay.Add(actor, actor.DecayDelay())
+		}
+	case event.PetCorpseDecayed:
+		l.destroyDecayedPet(actor)
 	case event.AttackFinished:
 		s.brain.Think()
 	case event.Arrived:
@@ -198,6 +204,38 @@ func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
 	owner.SendFrame(serverpackets.FrameSystemMessage(message))
 }
 
+// petRowDeleter deletes a pet's saved row. The production pet store has it;
+// a store without it keeps the row.
+type petRowDeleter interface {
+	DeleteByItemObjectID(ctx context.Context, itemObjectID int32) error
+}
+
+// destroyDecayedPet ends a pet whose corpse decayed: its owner loses the
+// collar and the pets row is deleted. The pet has already left the world
+// through the same settle as any other departure (releasePet), so its items
+// are already back with its owner and its row was saved; the delete is queued
+// on the collar's persistence lane, behind that save.
+func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
+	itemObjectID := actor.ControlItemID()
+	if owner, ok := liveSummonOwner(actor); ok {
+		if inv := owner.Inventory(); inv != nil {
+			inv.DestroyByObjectID(itemObjectID, 1)
+		}
+	}
+	store, ok := l.petStore.(petRowDeleter)
+	if !ok || l.persist == nil {
+		return
+	}
+	log := l.log
+	l.persist.Enqueue(itemObjectID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := store.DeleteByItemObjectID(ctx, itemObjectID); err != nil {
+			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("delete decayed pet")
+		}
+	})
+}
+
 // releasePet settles a pet on its way out of the world, whatever took it out:
 // its items go back to its owner, its row and collar are saved, and its
 // container is then flushed and unregistered, since nothing else will ever
@@ -206,7 +244,8 @@ func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
-// arrives with its owner's logout or after dying mid-despawn. Its container
+// arrives with its owner's logout, its corpse's decay, or after dying
+// mid-despawn. Its container
 // is keyed by an object id no later summon reuses, so items left in it would
 // be lost for good, and skipping the row would restore it alive from an
 // older save.

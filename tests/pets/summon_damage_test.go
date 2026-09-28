@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -334,6 +335,99 @@ func TestOwnerSecondClickOnItsPetOpensTheStatusWindow(t *testing.T) {
 	if countOpcode(frames, serverpackets.OpcodePetStatusShow) != 1 || countOpcode(frames, serverpackets.OpcodeAttack) != 0 {
 		t.Fatalf("owner second click on its pet = %x, want PetStatusShow and no attack", frameOpcodes(frames))
 	}
+}
+
+// TestSummonKillInsidePvPZoneAwardsNoKarma kills an unflagged owner's pet
+// with the killer and the owner both inside an arena: a kill inside a PvP
+// zone never earns karma.
+func TestSummonKillInsidePvPZoneAwardsNoKarma(t *testing.T) {
+	t.Parallel()
+	form, err := zone.NewCuboid(-100_000, 100_000, -100_000, 100_000, -10_000, 10_000)
+	if err != nil {
+		t.Fatalf("arena form: %v", err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewArena(1, form))
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithZones(zones)})
+	pet, _ := h.spawnWolf(t)
+	killer := h.joinSecondPlayer(t, "Killer")
+	owner, _ := h.srv.State.Player(h.ownerID)
+	for name, p := range map[string]any{"owner": owner, "killer": killer.actor} {
+		if !p.(interface{ InPvPZone() bool }).InPvPZone() {
+			t.Fatalf("%s is not inside the arena", name)
+		}
+	}
+
+	runOn(t, killer.queue, func() { pet.ReduceHP(pet.HP()+100, killer.actor, modelskill.Definition{}) })
+	if !pet.Dead() {
+		t.Fatal("pet alive after a lethal hit")
+	}
+	if karma := killer.actor.Karma(); karma != 0 {
+		t.Fatalf("killer karma = %d, want 0 for a summon kill inside a PvP zone", karma)
+	}
+}
+
+// TestOwnerForcedAttackHitsItsOwnPet has the owner select its own pet and
+// send an attack request on it: forcing, the owner attacks its own pet
+// instead of opening its status window.
+func TestOwnerForcedAttackHitsItsOwnPet(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	x, y, z := pet.Position()
+	h.client.Send(encodeAction(pet.ObjectID(), int32(x), int32(y), int32(z), false))
+	drainUntilQuiet(t, h.client)
+
+	full := pet.HP()
+	h.client.Send(encodeAttackRequest(pet.ObjectID(), int32(x), int32(y), int32(z), false))
+	h.srv.AdvanceUntil(t, "owner's forced attack landing on its pet", func() bool { return pet.HP() < full })
+	if frames := drainFrames(t, h.client); countOpcode(frames, serverpackets.OpcodePetStatusShow) != 0 {
+		t.Fatal("owner's forced attack opened the pet status window")
+	}
+}
+
+// TestPetNpcInfoMarksItAttackableForOtherViewers checks the attackable flag
+// of the NpcInfo another player gets for a pet: set while the pet's owner is
+// PvP-flagged, both when the pet appears and when its status is republished,
+// and cleared once the owner's flag is gone.
+func TestPetNpcInfoMarksItAttackableForOtherViewers(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	other := h.joinSecondPlayer(t, "Viewer")
+	owner, _ := h.srv.State.Player(h.ownerID)
+	flagged := owner.(interface{ UpdatePvPFlag(task.PvPFlagState) })
+	flagged.UpdatePvPFlag(task.PvPFlagOn)
+	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, other.client)
+
+	pet, _ := h.spawnWolf(t)
+	if got, ok := petNpcInfoAttackable(drainFrames(t, other.client), pet.ObjectID()); !ok || !got {
+		t.Fatalf("NpcInfo on a flagged owner's pet appearing: seen %v attackable %v, want attackable", ok, got)
+	}
+
+	flagged.UpdatePvPFlag(task.PvPFlagNone)
+	drainUntilQuiet(t, other.client)
+	runOn(t, pet.Queue(), pet.UpdateStatus)
+	if got, ok := petNpcInfoAttackable(drainFrames(t, other.client), pet.ObjectID()); !ok || got {
+		t.Fatalf("NpcInfo on an unflagged owner's pet: seen %v attackable %v, want not attackable", ok, got)
+	}
+}
+
+// petNpcInfoAttackable reads the attackable flag of the last NpcInfo for
+// petID among frames.
+func petNpcInfoAttackable(frames [][]byte, petID int32) (attackable, seen bool) {
+	for _, frame := range frames {
+		if frame[0] != serverpackets.OpcodeNPCInfo {
+			continue
+		}
+		r := wire.NewReader(frame[1:])
+		if r.ReadInt32() != petID {
+			continue
+		}
+		r.ReadInt32() // template id
+		attackable, seen = r.ReadInt32() == 1, true
+	}
+	return attackable, seen
 }
 
 func encodeAttackRequest(objectID int32, x, y, z int32, shift bool) []byte {

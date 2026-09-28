@@ -171,19 +171,21 @@ func (a *Actor) Unsummon() {
 // LeaveWithOwner despawns this summon, dead or alive, because its owner is
 // leaving the world. Summons are tracked under the owner's persistent object
 // id, so a corpse left behind would still hold that owner's summon slot on
-// the next login; nothing else would ever take it out until summon corpses
-// decay (#2439).
+// the next login. A corpse's pending decay is dropped with it, since the
+// summon is no longer its owner's (#2439 owns the logout rule for corpses).
 func (a *Actor) LeaveWithOwner() {
 	a.despawn(nil)
 }
 
-func (a *Actor) despawn(state *world.State) {
+// despawn takes a out of the world and reports whether this call did so.
+func (a *Actor) despawn(state *world.State) bool {
 	if state == nil {
 		state = a.world
 	}
 	if state == nil {
-		return
+		return false
 	}
+	ran := false
 	// Only the first caller despawns, and a concurrent one returns only once
 	// it has finished. An owner's command, a hostile Erase, a signet and the
 	// owner's logout can each reach here on their own goroutines: a second
@@ -192,6 +194,7 @@ func (a *Actor) despawn(state *world.State) {
 	// would flush the owner's inventory while the pet's items were still
 	// moving into it.
 	a.despawnOnce.Do(func() {
+		ran = true
 		// Unsummoning aborts in-flight actions and settles a pet, while
 		// observers still know this summon.
 		a.emit(event.Unsummoning{})
@@ -205,6 +208,7 @@ func (a *Actor) despawn(state *world.State) {
 		a.EffectList().Untrack()
 		a.emit(event.Despawned{})
 	})
+	return ran
 }
 
 func (a *Actor) resolveRequest(ctx CommandContext) Request {

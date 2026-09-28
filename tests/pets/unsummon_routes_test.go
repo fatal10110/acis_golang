@@ -124,7 +124,8 @@ func TestHostileUnsummonLeavesDeadPetAlone(t *testing.T) {
 // TestRestartWithDeadPetReturnsItemsAndKeepsItDead covers a dead pet leaving
 // with its owner: its container is keyed by an object id no later summon
 // reuses, so its items must come back to the owner, and its row must record
-// the death rather than leave an older, living save to restore from.
+// the death rather than leave an older, living save to restore from. Called
+// out again after the relog, the pet comes back dead.
 func TestRestartWithDeadPetReturnsItemsAndKeepsItDead(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithReuseDelays(0, 0)},
@@ -147,6 +148,18 @@ func TestRestartWithDeadPetReturnsItemsAndKeepsItDead(t *testing.T) {
 	again, _ := h.spawnWolf(t)
 	if got := again.HP(); got != 0 {
 		t.Fatalf("resummoned pet HP = %v, want the dead pet's 0", got)
+	}
+	// It comes back as the corpse it left as, not alive at 0 HP: nothing
+	// heals it, and the owner cannot send it back to try again.
+	if !again.Dead() {
+		t.Fatal("resummoned pet is alive, want the dead pet restored dead")
+	}
+	if healed := again.AddHP(50); healed != 0 || again.HP() != 0 {
+		t.Fatalf("restored dead pet healed %v to %v HP, want no heal", healed, again.HP())
+	}
+	again.Unsummon()
+	if got, ok := h.srv.State.Summon(h.ownerID); !ok || got.ObjectID() != again.ObjectID() {
+		t.Fatal("restored dead pet was unsummoned, want its corpse kept")
 	}
 }
 

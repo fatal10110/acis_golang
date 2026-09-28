@@ -80,6 +80,7 @@ type options struct {
 	disallowWater          bool
 	attackStance           *task.AttackStance
 	pvpFlags               *task.PvPFlags
+	decay                  *task.Decay
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -191,6 +192,12 @@ func WithAttackStance(tracker *task.AttackStance) Option {
 // nil, so a resolved attack flags nobody).
 func WithPvPFlags(flags *task.PvPFlags) Option {
 	return func(o *options) { o.pvpFlags = flags }
+}
+
+// WithDecay supplies the corpse-decay task wired into the link (default:
+// nil, so a dead summon's corpse never decays).
+func WithDecay(decay *task.Decay) Option {
+	return func(o *options) { o.decay = decay }
 }
 
 // WithAttackStanceTracker substitutes the combat-stance tracker the link
@@ -1237,6 +1244,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.pvpFlags != nil {
 		gclConfig.PvPFlags = o.pvpFlags
 	}
+	gclConfig.Decay = o.decay
 	if ai != nil {
 		gclConfig.AI = ai
 	}

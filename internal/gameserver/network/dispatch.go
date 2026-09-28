@@ -174,14 +174,17 @@ type GameClientLink struct {
 	attackStance  AttackStanceTracker
 	ai            AIRegistry
 	pvpFlags      *task.PvPFlags
-	effects       effect.Env
-	positions     *task.PositionUpdates
-	playerClock   *task.PlayerClock
-	gameClock     *task.GameClock
-	sevenSigns    *sevensigns.State
-	water         *task.Water
-	shadowItems   *task.ShadowItems
-	autosave      *task.Autosave
+	// decay removes a dead summon's corpse at its deadline; nil leaves
+	// summon corpses in the world.
+	decay       *task.Decay
+	effects     effect.Env
+	positions   *task.PositionUpdates
+	playerClock *task.PlayerClock
+	gameClock   *task.GameClock
+	sevenSigns  *sevensigns.State
+	water       *task.Water
+	shadowItems *task.ShadowItems
+	autosave    *task.Autosave
 	// inventoryUpdates batches InventoryUpdate packets for inventory
 	// changes the server makes on its own, outside a client request.
 	inventoryUpdates *task.InventoryUpdates
@@ -274,9 +277,11 @@ type GameClientLinkConfig struct {
 	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
-	Effects       effect.Env // Activity required: without it no effect expires
-	Positions     *task.PositionUpdates
-	PlayerClock   *task.PlayerClock
+	// Decay removes a dead summon's corpse once its decay delay has passed.
+	Decay       *task.Decay
+	Effects     effect.Env // Activity required: without it no effect expires
+	Positions   *task.PositionUpdates
+	PlayerClock *task.PlayerClock
 	// GameClock is the server's in-game clock; CharSelected reports its
 	// current minute of day. Nil is tolerated (tests) and reports 0.
 	GameClock *task.GameClock
@@ -362,6 +367,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		attackStance:  cfg.AttackStance,
 		ai:            cfg.AI,
 		pvpFlags:      cfg.PvPFlags,
+		decay:         cfg.Decay,
 		effects:       cfg.Effects,
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
