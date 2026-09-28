@@ -188,6 +188,33 @@ func TestScheduleCancelsPendingTimersOnInterruptOnDamage(t *testing.T) {
 	}
 }
 
+// TestInterruptOnDamageImmuneOverridesFusion pins the first guard of
+// Formulas.calcCastBreak (Formulas.java:728-729): a raid-related or
+// invulnerable caster is never broken, ahead of the fusion rule that would
+// otherwise break any hit. Invulnerable players are pinned end to end by
+// tests/skills TestDamageCastBreakRules; raid-related immunity has no damage
+// path forwarding a non-player caster's hits to its cast yet (#2650), so it
+// is held here at the controller.
+func TestInterruptOnDamageImmuneOverridesFusion(t *testing.T) {
+	clock := newCastClock()
+	ctrl := NewController(scalingActor(), nil)
+	ctrl.SetQueue(clock.q)
+	now := time.Unix(1000, 0)
+
+	def := scalingDef
+	def.SkillType = "FUSION"
+	if _, err := ctrl.Start(now, testTarget{}, def); err != nil {
+		t.Fatalf("Start() error: %v", err)
+	}
+
+	if ctrl.InterruptOnDamage(now.Add(50*time.Millisecond), DamageInterrupt{Damage: 1e9, MEN: 30, Roll: 0, Immune: true, Fusion: true}) {
+		t.Fatal("InterruptOnDamage() = true for an immune caster, want never broken")
+	}
+	if !ctrl.CastingNow() {
+		t.Fatal("CastingNow() = false after an immune hit, want the cast untouched")
+	}
+}
+
 // TestScheduleStartedAfterInterruptDoesNotFireStaleTimer covers the seq
 // guard directly: a timer captured for one cast must not act on a later,
 // unrelated cast that reused the same Controller.
