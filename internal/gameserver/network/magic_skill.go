@@ -112,7 +112,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
-			sendCorpseCastFailure(live, started.Definition)
+			// No final target, or a handler that reports its failure only
+			// as a bool: the request is dropped with ActionFailed alone.
 			sendMagicActionFailed(live)
 			return
 		}
@@ -235,21 +236,6 @@ func (l *GameClientLink) rejectMagicCast(live *livePlayer, def modelskill.Defini
 	})
 }
 
-func sendCorpseCastFailure(live *livePlayer, def modelskill.Definition) {
-	if live == nil || (def.Target != modelskill.TargetCorpseMob && def.Target != modelskill.TargetAreaCorpseMob) {
-		return
-	}
-	target, _ := live.Target().(skilltarget.Actor)
-	switch skilltarget.CorpseCastFailureFor(target, &def) {
-	case skilltarget.CorpseCastHarvestNotMonster:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
-	case skilltarget.CorpseCastTooOld:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
-	case skilltarget.CorpseCastSweepNotMonster:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
-	}
-}
-
 var errGroundCastRejected = errors.New("ground cast rejected")
 
 func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def modelskill.Definition) func() error {
@@ -312,6 +298,10 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 		return nil, skilltarget.CastRejectNone
 	}
 	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
+	// A classified rejection keeps finalTarget so the cast stops the caster
+	// and checks costs before reporting it. Target conditions are classified
+	// here, before any cast-start line-of-sight check; line of sight is only
+	// revalidated at launch.
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
@@ -339,6 +329,12 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetInPeacezone))
 	case skilltarget.CastRejectCannotUseSkill:
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case skilltarget.CastRejectHarvestNotMonster:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
+	case skilltarget.CastRejectCorpseTooOld:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
+	case skilltarget.CastRejectSweepNotMonster:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
 	}
 }
 

@@ -42,10 +42,9 @@ func auraCanAffect(caster, creature Actor) bool {
 	return caster.Folk() && isPlayable(creature)
 }
 
-func validUndeadSingleTarget(creature Actor) bool {
-	if creature == nil || creature.Dead() || !creature.Undead() {
-		return false
-	}
+// undeadTargetKind reports a monster or a servitor: the only creatures the
+// UNDEAD single-target check accepts.
+func undeadTargetKind(creature Actor) bool {
 	if isAttackable(creature) {
 		return creature.MonsterKind()
 	}

@@ -197,6 +197,10 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 		{"one invalid", skilltarget.CastRejectInvalidTarget, modelskill.Definition{}, serverpackets.SystemMessageInvalidTarget},
 		{"one target in peace", skilltarget.CastRejectTargetInPeaceZone, modelskill.Definition{}, serverpackets.SystemMessageTargetInPeacezone},
 		{"corpse pet non-pet", skilltarget.CastRejectCannotUseSkill, modelskill.Definition{ID: 2179, Level: 1}, serverpackets.SystemMessageS1CannotBeUsed},
+		{"undead living non-undead", skilltarget.CastRejectCannotUseSkill, modelskill.Definition{ID: 1400, Level: 1}, serverpackets.SystemMessageS1CannotBeUsed},
+		{"corpse mob harvest non-monster", skilltarget.CastRejectHarvestNotMonster, modelskill.Definition{}, serverpackets.SystemMessageHarvestFailedSeedNotSown},
+		{"corpse mob too old", skilltarget.CastRejectCorpseTooOld, modelskill.Definition{}, serverpackets.SystemMessageCorpseTooOldSkillNotUsed},
+		{"corpse mob sweep non-monster", skilltarget.CastRejectSweepNotMonster, modelskill.Definition{}, serverpackets.SystemMessageSweeperFailedTargetNotSpoiled},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)
