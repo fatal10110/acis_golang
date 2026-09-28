@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -24,6 +25,14 @@ const hitAnimationTail = 300 * time.Millisecond
 // at once. It returns the monster and its swing's attack time.
 func startHostileSwing(t *testing.T, atkSpd int) (*gameservertest.Server, *npc.Hostile, time.Duration) {
 	t.Helper()
+	srv, hostile, _, attackTime := startHostileAttack(t, atkSpd, 0)
+	return srv, hostile, attackTime
+}
+
+// startHostileAttack is startHostileSwing for a monster holding the
+// rightHand item (0 for none). It also returns the player it attacks.
+func startHostileAttack(t *testing.T, atkSpd, rightHand int) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, time.Duration) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -37,6 +46,7 @@ func startHostileSwing(t *testing.T, atkSpd int) (*gameservertest.Server, *npc.H
 	tmpl := gameservertest.MovingHostileTemplate("Monster")
 	tmpl.AtkSpd = float64(atkSpd)
 	tmpl.PAtk = 0.25
+	tmpl.RightHand = rightHand
 	at := location.Location{X: x + 20, Y: y, Z: z}
 	hostile := srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
 	drainUntilQuiet(t, c)
@@ -53,7 +63,7 @@ func startHostileSwing(t *testing.T, atkSpd int) (*gameservertest.Server, *npc.H
 		t.Fatalf("CurrentIntention() after promoting the attack desire = %v, want %v", got, ai.IntentionAttack)
 	}
 	readUntil(t, c, serverpackets.OpcodeAttack, "monster Attack")
-	return srv, hostile, time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
+	return srv, hostile, victim, time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
 }
 
 // decayAttackDesire runs one hate-decay step: the weak attack desire drops
@@ -94,16 +104,16 @@ func TestHitAnimationEndIdlesHostileWithNoDesireMidSwing(t *testing.T) {
 	assertChangeMoveType(t, walk[len(walk)-1], hostile.ObjectID(), false)
 }
 
-// TestHitAnimationHoldsHostileDesirePromotion pins NpcAI.runAI's hit
-// animation gate: a fast monster whose swing finishes inside its own hit
-// animation leaves its attack but does not take up its next desire until the
-// hit animation ends.
-func TestHitAnimationHoldsHostileDesirePromotion(t *testing.T) {
+// TestSwingFinishPromotesHostileDesireBeforeHitAnimationTimer pins
+// CreatureAttack.onFinishedAttack: a fast monster whose swing finishes before
+// its hit animation's 300ms timer closes the window as the swing finishes,
+// so the runAI(false) that follows takes up its next desire right then.
+func TestSwingFinishPromotesHostileDesireBeforeHitAnimationTimer(t *testing.T) {
 	t.Parallel()
-	srv, hostile, attackTime := startHostileSwing(t, 1000)
+	srv, hostile, attackTime := startHostileSwing(t, 2000)
 	hitAnimationEnd := attackTime/2 + hitAnimationTail
-	if hitAnimationEnd <= attackTime {
-		t.Fatalf("setup: hit animation ends at %v, want after the swing finishes at %v", hitAnimationEnd, attackTime)
+	if hitAnimationEnd <= attackTime+50*time.Millisecond {
+		t.Fatalf("setup: hit animation ends at %v, want well after the swing finishes at %v", hitAnimationEnd, attackTime)
 	}
 	decayAttackDesire(t, hostile)
 	x, y, z := hostile.Position()
@@ -111,13 +121,78 @@ func TestHitAnimationHoldsHostileDesirePromotion(t *testing.T) {
 		t.Fatal("AddMoveToDesire() = false, want the walk queued")
 	}
 
-	srv.Advance(t, attackTime+(hitAnimationEnd-attackTime)/2)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the swing finished inside the hit animation = %v, want %v", got, ai.IntentionIdle)
+	srv.Advance(t, attackTime-10*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() before the swing finished = %v, want %v", got, ai.IntentionAttack)
 	}
-	srv.Advance(t, hitAnimationEnd-attackTime)
+	srv.Advance(t, 20*time.Millisecond)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
-		t.Fatalf("CurrentIntention() once the hit animation ended = %v, want %v", got, ai.IntentionMoveTo)
+		t.Fatalf("CurrentIntention() once the swing finished inside the hit animation = %v, want %v", got, ai.IntentionMoveTo)
 	}
 	readUntil(t, srv.Client, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
+}
+
+// bowItemID is the test item table's bow; its 1500ms reuse delay outlasts
+// the hit animation.
+const bowItemID = 14
+
+// TestBowShotIdlesHostileWithNoDesire pins NpcAI.runAI(false) run from
+// CreatureAttack.onFinishedAttackBow: a bow monster whose last desire decayed
+// while it drew idles as its arrow lands, broadcasting its walk stance then
+// rather than 300ms later, and the abort cancels its bow reuse so it can
+// shoot again at once.
+func TestBowShotIdlesHostileWithNoDesire(t *testing.T) {
+	t.Parallel()
+	srv, hostile, victim, attackTime := startHostileAttack(t, 300, bowItemID)
+	if got := hostile.AttackType(); got != item.WeaponBow {
+		t.Fatalf("setup: AttackType() = %v, want bow", got)
+	}
+	decayAttackDesire(t, hostile)
+
+	srv.Advance(t, attackTime-10*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() while drawing = %v, want %v", got, ai.IntentionAttack)
+	}
+	srv.Advance(t, 20*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() once the arrow landed = %v, want %v", got, ai.IntentionIdle)
+	}
+	walk := readUntil(t, srv.Client, serverpackets.OpcodeChangeMoveType, "idle walk stance")
+	assertChangeMoveType(t, walk[len(walk)-1], hostile.ObjectID(), false)
+
+	// Still inside the shot's reuse delay: a fresh attack desire fires again
+	// only if the idle abort cleared the bow cooldown.
+	hostile.AddAttackDesire(victim, 1000)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "second bow Attack inside the cancelled reuse")
+}
+
+// TestBowReuseEndContinuesHostileWithoutIdle pins
+// AttackableAI.onEvtBowAttackReuse: a bow's reuse ending only THINKs, so a
+// monster whose last desire decayed during the reuse delay does not run
+// runAI's empty-queue idle abort then.
+func TestBowReuseEndContinuesHostileWithoutIdle(t *testing.T) {
+	t.Parallel()
+	srv, hostile, _, attackTime := startHostileAttack(t, 300, bowItemID)
+	reuse := 1500 * time.Millisecond * 345 / time.Duration(hostile.AttackSpeed())
+
+	srv.Advance(t, attackTime+hitAnimationTail+10*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the shot's hit animation = %v, want %v", got, ai.IntentionAttack)
+	}
+	decayAttackDesire(t, hostile)
+	drainUntilQuiet(t, srv.Client)
+
+	srv.Advance(t, reuse-hitAnimationTail)
+	for {
+		frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeChangeMoveType {
+			t.Fatal("ChangeMoveType at the bow reuse end, want no idle abort")
+		}
+	}
 }

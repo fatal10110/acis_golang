@@ -491,7 +491,9 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 		return
 	}
 
+	// A finished shot closes the hit animation before the AI re-runs.
 	c.attacking = false
+	c.inHitAnimation = false
 
 	if reuse > 0 {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
@@ -513,14 +515,17 @@ func (c *Controller) finishAttack(seq uint64) {
 		c.mu.Unlock()
 		return
 	}
+	// A finished swing closes the hit animation before the AI re-runs.
 	c.attacking = false
+	c.inHitAnimation = false
 	c.mu.Unlock()
 
 	c.emit(event.AttackFinished{})
 }
 
-// endHitAnimation closes the hit animation window. It is not tied to one
-// swing: a swing started inside the window has its flag cleared with it.
+// endHitAnimation closes the hit animation window 300ms after the first hit
+// group lands, unless the swing finished or stopped first. It is not tied to
+// one swing: a swing started inside the window has its flag cleared with it.
 func (c *Controller) endHitAnimation() {
 	c.mu.Lock()
 	c.inHitAnimation = false

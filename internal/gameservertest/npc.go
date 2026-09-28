@@ -361,6 +361,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	control.hostile, control.move = hostile, moveCtl
 	hostile.Attach(npc.Runtime{
 		World: s.State,
+		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
 		Sink: network.HostileSinks(s.State)(hostile),

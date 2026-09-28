@@ -729,8 +729,9 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// Think runs one hostile AI decision cycle (event-driven: arrival, swing
-// finished, first hate). Empty-queue idle abort belongs on TickThink.
+// Think continues the hostile AI's current intention after arrival or a
+// bow's reuse ending. It never idles on an empty desire queue: RunAI and
+// TickThink do.
 func (h *Hostile) Think() error {
 	if !h.canRunAI() {
 		return nil

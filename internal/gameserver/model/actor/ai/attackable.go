@@ -465,9 +465,10 @@ func (a *Attackable) thinkFollow() error {
 	return nil
 }
 
-// thinkIfNoMostHated runs the AI loop immediately for a first attack
-// desire. Think drops unknown attackers, so an unseen target keeps its
-// queued desire for a later tick instead of being wiped here.
+// thinkIfNoMostHated re-runs desire selection (RunAI) immediately for a
+// first attack desire. An attacker the actor does not know is skipped
+// because the attack step drops unknown targets, so an unseen target keeps
+// its queued desire for a later tick instead of being wiped here.
 func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.Combatant) {
 	if hadMostHated || attacker == nil || !a.actor.Knows(attacker) {
 		return
