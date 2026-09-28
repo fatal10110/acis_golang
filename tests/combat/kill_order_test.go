@@ -5,8 +5,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -63,6 +65,64 @@ func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
 	}
 	if statuses != 2 || dies != 1 {
 		t.Fatalf("death frames: StatusUpdate=%d Die=%d, want 2 and 1", statuses, dies)
+	}
+}
+
+func TestMovingHostileDeathStopsBeforeFinalStatusAndDie(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	tickThinkWander(t, hostile)
+	assertFrameOpcode(t, mustRead(t, c, "ChangeMoveType"), serverpackets.OpcodeChangeMoveType, "ChangeMoveType")
+	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
+	if !hostile.IsMoving() {
+		t.Fatal("NPC did not start moving")
+	}
+	dead := make(chan bool, 1)
+	if !hostile.Queue().Post(func() { dead <- hostile.Die(nil, nil) }) {
+		t.Fatal("post NPC death: queue closed")
+	}
+	if !<-dead {
+		t.Fatal("first NPC death rejected")
+	}
+
+	for _, opcode := range []byte{
+		serverpackets.OpcodeStatusUpdate,
+		serverpackets.OpcodeStopMove,
+		serverpackets.OpcodeStatusUpdate,
+		serverpackets.OpcodeDie,
+	} {
+		frame := mustRead(t, c, "NPC death frame")
+		assertFrameOpcode(t, frame, opcode, "NPC death frame")
+		r := wireReader(frame[1:])
+		if id := r.ReadInt32(); id != hostile.ObjectID() {
+			t.Fatalf("death frame object = %d, want %d", id, hostile.ObjectID())
+		}
+		if opcode == serverpackets.OpcodeStatusUpdate {
+			if count := r.ReadInt32(); count != 1 {
+				t.Fatalf("death StatusUpdate has %d attributes, want 1", count)
+			}
+			if kind, hp := r.ReadInt32(), r.ReadInt32(); kind != int32(serverpackets.StatusCurrentHP) || hp != 0 {
+				t.Fatalf("death StatusUpdate attribute = (%d, %d), want CUR_HP=0", kind, hp)
+			}
+		}
+		if err := r.Err(); err != nil {
+			t.Fatalf("decode death frame: %v", err)
+		}
+	}
+	if hostile.IsMoving() {
+		t.Fatal("dead NPC is still moving")
+	}
+	srv.Advance(t, time.Second)
+	if frame := c.ReadWithTimeout(readQuietWindow); frame != nil {
+		t.Fatalf("frame after movement stopped on death = %#x", frame[0])
 	}
 }
 
