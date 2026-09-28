@@ -84,6 +84,8 @@ const (
 	SystemMessageLearnedSkill                      = 277
 	SystemMessageNotEnoughSPToLearnSkill           = 278
 	SystemMessageSelectItemToEnchant               = 303
+	SystemMessageUnableToUnlockDoor                = 319
+	SystemMessageFailedToUnlockDoor                = 320
 	SystemMessageForceIncreasedToS1                = 323
 	SystemMessageForceMaxLevelReached              = 324
 	SystemMessageNotEnoughItems                    = 351

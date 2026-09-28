@@ -187,7 +187,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		mp = hostile.CurrentMP()
 	}
 	hostile.SetCurrentMP(mp)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: n.rewarderFor(hostile, tmpl)}
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: n.rewarderFor(hostile, tmpl), Remover: n}
 	if los, ok := n.geo.(npc.LineOfSight); ok {
 		rt.LOS = los
 	}

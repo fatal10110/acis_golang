@@ -48,6 +48,16 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	return func() { n.scheduleRespawn(slot, delay) }
 }
 
+// Remove takes h out of the world at once, with no corpse and no decay
+// wait, and arms its spawn slot's respawn exactly as a decayed corpse does.
+// It runs on h's own queue (npc.Hostile.DeleteMe posts it there).
+func (n *Npcs) Remove(h *npc.Hostile) {
+	if n.decay != nil {
+		n.decay.Cancel(h)
+	}
+	h.Decay(n.state, n.RespawnHook(h.ObjectID()))
+}
+
 func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 	now := n.now()
 	if slot.dbName != "" {
