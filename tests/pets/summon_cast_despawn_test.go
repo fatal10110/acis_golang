@@ -45,6 +45,13 @@ func bootWolfStriker(t *testing.T) (*petWorld, *summon.Actor, *npc.Hostile) {
 // extra boot options.
 func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition, extra ...gameservertest.Option) (*petWorld, *summon.Actor, *npc.Hostile) {
 	t.Helper()
+	return bootWolfStrikerSeeded(t, strike, nil, extra...)
+}
+
+// bootWolfStrikerSeeded is bootWolfStrikerWith with seeds added to the
+// owner's inventory before it enters the world.
+func bootWolfStrikerSeeded(t *testing.T, strike modelskill.Definition, seeds []seedItem, extra ...gameservertest.Option) (*petWorld, *summon.Actor, *npc.Hostile) {
+	t.Helper()
 	wolf := wolfTemplate()
 	wolf.Skills = map[int]int{wolfStrikeSkill: 1}
 	db := sqltest.SharedDB(t)
@@ -58,7 +65,7 @@ func bootWolfStrikerWith(t *testing.T, strike modelskill.Definition, extra ...ga
 	h := bootOwnerWithCollarOpts(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf, treeTemplate()})),
 		gameservertest.WithSkills(skills),
-	}, extra...))
+	}, extra...), seeds...)
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, h.client)

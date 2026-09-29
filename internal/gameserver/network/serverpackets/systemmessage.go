@@ -102,6 +102,10 @@ const (
 	SystemMessageForceIncreasedToS1                = 323
 	SystemMessageForceMaxLevelReached              = 324
 	SystemMessageNotEnoughItems                    = 351
+	SystemMessageS2S1Disappeared                   = 301 // item-name then item-number parameter
+	SystemMessageS1Disappeared                     = 302 // item-name parameter
+	SystemMessageYouNotEnoughAdena                 = 279
+	SystemMessageS1DisappearedAdena                = 672 // number parameter
 	SystemMessageInappropriateEnchantCondition     = 355
 	SystemMessageOverHit                           = 361 // no parameter
 	SystemMessageEnchantScrollCancelled            = 423

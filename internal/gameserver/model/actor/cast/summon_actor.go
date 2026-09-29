@@ -68,8 +68,19 @@ func (a SummonActor) BlessedSpiritshotCharged() bool {
 	return a.Summon != nil && a.Summon.BlessedSpiritshotCharged()
 }
 func (SummonActor) SkillMastery(modelskill.Definition) bool { return false }
-func (SummonActor) ItemCount(int) int                       { return 0 }
-func (SummonActor) ConsumeItem(int, int) bool               { return false }
+
+// ItemCount reads the owner's inventory: a summon's skill item cost is
+// checked against the stack its owner carries.
+func (a SummonActor) ItemCount(itemID int) int {
+	if a.Summon == nil {
+		return 0
+	}
+	return a.Summon.OwnerItemCount(int32(itemID))
+}
+
+// ConsumeItem takes nothing and reports success: a summon's cast only checks
+// its owner's stack and has no consume step of its own.
+func (SummonActor) ConsumeItem(int, int) bool { return true }
 
 // SummonActor casters hold no cubics, ground signet, skill lock or charges.
 func (SummonActor) CubicListFull() bool           { return false }

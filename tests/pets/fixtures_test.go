@@ -570,6 +570,22 @@ func assertSystemMessageID(t *testing.T, frame []byte, messageID int) {
 	}
 }
 
+// assertSystemMessageItem asserts a SystemMessage with one item-name param.
+func assertSystemMessageItem(t *testing.T, frame []byte, messageID int, itemID int32) {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "SystemMessage")
+	r := wire.NewReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(messageID) {
+		t.Fatalf("system message id = %d, want %d", id, messageID)
+	}
+	if params := r.ReadInt32(); params != 1 {
+		t.Fatalf("param count = %d, want 1", params)
+	}
+	if typ, got := r.ReadInt32(), r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName || got != itemID {
+		t.Fatalf("param = type %d item %d, want item name %d", typ, got, itemID)
+	}
+}
+
 // assertSystemMessageText asserts a SystemMessage with one text param.
 func assertSystemMessageText(t *testing.T, frame []byte, messageID int, text string) {
 	t.Helper()

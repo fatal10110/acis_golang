@@ -144,6 +144,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			false,
 		)
 	})
+	sendSkillItemCharge(live, def, plan.ItemCharge)
 
 	targetIDs := []int32{target.ObjectID()}
 	controller.Schedule(plan, actorcast.Hooks{

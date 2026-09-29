@@ -86,8 +86,9 @@ func assertOnlyFrame(t *testing.T, c *testsupport.ScriptedClient, messageID int,
 
 // TestPetScrollRevivesOwnDeadPet: the owner's scroll on its own dead pet
 // casts 2179 as an ordinary skill (MagicSkillUse, USE_S1, gauge, with no
-// shared-reuse packet), the skill's consume item takes the scroll, and the
-// pet stands up once the 15 s cast lands.
+// shared-reuse packet), the skill's consume item takes the scroll and names
+// it in S1_DISAPPEARED (PlayerCast.java:177-185), and the pet stands up once
+// the 15 s cast lands.
 func TestPetScrollRevivesOwnDeadPet(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithSkills(petScrollTable(t))},
@@ -107,6 +108,7 @@ func TestPetScrollRevivesOwnDeadPet(t *testing.T) {
 	}
 	assertSystemMessageSkill(t, mustRead(t, h.client, "USE_S1"), serverpackets.SystemMessageUseS1, petScrollSkillID, 1)
 	assertFrameOpcode(t, mustRead(t, h.client, "SetupGauge"), serverpackets.OpcodeSetupGauge, "SetupGauge")
+	assertSystemMessageItem(t, mustRead(t, h.client, "S1_DISAPPEARED"), serverpackets.SystemMessageS1Disappeared, gameservertest.PetResurrectionScrollID)
 	if got := liveItemCount(t, h.srv, h.ownerID, gameservertest.PetResurrectionScrollID); got != 1 {
 		t.Fatalf("scrolls after the cast started = %d, want 1", got)
 	}
