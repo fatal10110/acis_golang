@@ -587,15 +587,65 @@ func (a *Actor) TryToFollow(target world.Tracked) {
 }
 
 // TryToIdle sends the summon idle the way an effect, an interrupted action
-// or the owner's Stop command does: a summon that follows its owner goes back
-// to following it, and picks the walk up again once it can move.
+// or the owner's Stop command does. A summon that could not take AI actions
+// before the effect in progress (if any) landed keeps its intentions. One
+// mid-swing or mid-cast only drops what it had queued: the swing or cast
+// ending then goes on as it would with nothing queued. The owner is told
+// nothing either way.
 func (a *Actor) TryToIdle() {
-	if a.followOff.Load() || a.owner == nil || a.brain == nil {
+	if a.aiDeniedBeforeEffect() {
+		return
+	}
+	if a.brain != nil && a.brain.WaitOutIdle() {
+		return
+	}
+	a.goIdle()
+}
+
+// goIdle makes the summon idle at once: one that follows its owner goes
+// back to following it, and picks the walk up again once it can move.
+func (a *Actor) goIdle() {
+	follow := a.idleFollow()
+	if follow == nil || a.brain == nil {
 		a.idle()
 		return
 	}
 	a.setIntent(IntentFollowOwner)
-	a.brain.FollowInstead(a.owner)
+	a.brain.FollowInstead(follow)
+}
+
+// idleFollow is who an idle summon follows: its owner while follow is on,
+// otherwise nil.
+func (a *Actor) idleFollow() attackable.Combatant {
+	if a.followOff.Load() || a.owner == nil {
+		return nil
+	}
+	return a.owner
+}
+
+// FinishedAttack moves the attached AI on once a swing ends.
+func (a *Actor) FinishedAttack() {
+	if a.brain != nil {
+		a.brain.FinishedAttack()
+	}
+}
+
+// FinishedCasting moves the attached AI on once a cast completes: to the
+// queued intention, back to the attack the cast replaced, or else idle. The
+// AI applies the idle itself, in the same critical section that decides it.
+func (a *Actor) FinishedCasting() {
+	if a.brain == nil {
+		return
+	}
+	follow := a.idleFollow()
+	if !a.brain.FinishedCasting(follow) {
+		return
+	}
+	if follow != nil {
+		a.setIntent(IntentFollowOwner)
+	} else {
+		a.setIntent(IntentIdle)
+	}
 }
 
 // Think wakes the attached AI to continue its current intention, as an

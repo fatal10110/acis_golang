@@ -18,6 +18,15 @@ type VitalsChanged struct{}
 // requested the stop landed.
 type ActionsStopRequested struct{ ClearTarget, Move, Attack, Cast, AIDenied bool }
 
+// IdleRequested asks for the character to be sent idle, the way an effect
+// that disables it does. AIDenied reports that the character was already
+// unable to take AI actions before that effect landed.
+type IdleRequested struct{ AIDenied bool }
+
+// ThinkRequested asks for the character's current intention to be
+// re-evaluated once.
+type ThinkRequested struct{}
+
 // BowDrawn reports that a bow shot started drawing; GaugeMs covers the attack
 // time plus reuse.
 type BowDrawn struct{ GaugeMs int }
@@ -241,6 +250,8 @@ type ChargesChanged struct{}
 
 func (VitalsChanged) event()          {}
 func (ActionsStopRequested) event()   {}
+func (IdleRequested) event()          {}
+func (ThinkRequested) event()         {}
 func (BowDrawn) event()               {}
 func (StanceChanged) event()          {}
 func (FakeDeathRevived) event()       {}

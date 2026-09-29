@@ -31,10 +31,6 @@ func (a *Actor) BroadcastStatus() {
 // (see TryToIdle), then clears its target when resetTarget is set. None of
 // it is client-visible beyond the stop broadcasts the controllers already
 // send.
-//
-// ponytail: the idle is unconditional. An actor already disabled before the
-// interrupting effect keeps its intention instead, but no command can give a
-// disabled summon a new intention, so it already holds the one this sets.
 func (a *Actor) AbortAll(resetTarget bool) {
 	if a.brain != nil {
 		a.brain.AbortAll()
@@ -58,7 +54,7 @@ func (a *Actor) AbortForTeleport() {
 // OnTeleported restores owner following after the summon rejoins the world.
 func (a *Actor) OnTeleported() {
 	a.followOff.Store(false)
-	a.TryToIdle()
+	a.goIdle()
 }
 
 // StopMove stops the summon's movement.

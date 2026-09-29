@@ -269,6 +269,14 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 	case event.ActionsStopRequested:
 		l.stopLiveActions(live, e)
+	case event.IdleRequested:
+		live.tryToIdle(e.AIDenied)
+	case event.ThinkRequested:
+		// Only the attack intention re-evaluates on a think; nothing else a
+		// player holds acts on one.
+		if live.combat != nil {
+			live.combat.Think()
+		}
 	case event.CastAborted:
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:

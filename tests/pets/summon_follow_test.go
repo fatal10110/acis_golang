@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -254,21 +255,26 @@ func TestStackedImmobilizingBuffsRestoreFollowModeFromTheLastLock(t *testing.T) 
 	drainUntilQuiet(t, h.client)
 }
 
-// TestPetStopAfterAttackFollowsOwner sends the pet at a monster and presses
-// Stop. The pet drops the attack and goes back to following its owner, and
-// walks after the owner when the owner moves away, instead of standing idle
-// until follow is toggled.
+// TestPetStopAfterAttackFollowsOwner sends the pet at a distant monster and
+// presses Stop while it is still running at it. The pet drops the attack and
+// goes back to following its owner, and walks after the owner when the owner
+// moves away, instead of standing idle until follow is toggled.
 func TestPetStopAfterAttackFollowsOwner(t *testing.T) {
 	t.Parallel()
 	h, petActor := bootFollowingPet(t)
-	hostile := h.srv.SpawnHostileNPC(t)
+	hostile := h.srv.SpawnHostileNPCAt(t, location.Location{X: 600, Y: 20, Z: 30})
+	drainUntilQuiet(t, h.client)
 
-	h.client.Send(encodeAction(hostile.ObjectID(), hostileX, hostileY, hostileZ, false))
+	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
+	h.client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestActionUse(petAttackAction, false))
 	h.handled(t)
 	if got := petActor.Intent(); got != summon.IntentAttackTarget {
 		t.Fatalf("pet intent while attacking = %v, want attack-target", got)
+	}
+	if petActor.IsAttackingNow() {
+		t.Fatal("pet swung before Stop, want it still running at the monster")
 	}
 
 	h.client.Send(encodeRequestActionUse(petStopAction, false))

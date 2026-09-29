@@ -495,8 +495,16 @@ func (c *Character) BroadcastSkillLaunched(skillID, level int32, targetIDs []int
 	c.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
 }
 
-// TryToIdle is the player attack stop hook. AI idle state is not modeled yet.
-func (c *Character) TryToIdle() {}
+// TryToIdle asks c's controller to send it idle, as a stun does. The
+// request carries whether c could take AI actions before the effect in
+// progress landed: one that could not keeps its intentions.
+func (c *Character) TryToIdle() {
+	c.emit(event.IdleRequested{AIDenied: c.aiDeniedBeforeEffect()})
+}
+
+// WakeAI asks c's controller to re-evaluate its current intention once, as
+// the end of a meditation does.
+func (c *Character) WakeAI() { c.emit(event.ThinkRequested{}) }
 
 // CheckAndEquipArrows ensures a bow user has matching arrows equipped.
 func (c *Character) CheckAndEquipArrows() bool {

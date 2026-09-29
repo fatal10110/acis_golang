@@ -54,11 +54,14 @@ type Summon struct {
 	cast   SummonCastController
 	log    zerolog.Logger
 
-	// mu guards current and next. A Betray effect turns the summon on its
-	// owner (TryToAttack) from the caster's queue.
+	// mu guards current, next and previous. A Betray effect turns the
+	// summon on its owner (TryToAttack) from the caster's queue.
 	mu      sync.Mutex
 	current intention
 	next    intention
+	// previous is the intention current last replaced; a finished cast
+	// resumes it when it was an attack.
+	previous intention
 }
 
 // NewSummon builds an idle summon AI loop.
@@ -117,7 +120,7 @@ func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 		s.next = intention{kind: IntentionAttack, target: target}
 		return true
 	}
-	s.current = intention{kind: IntentionAttack, target: target}
+	s.setCurrentLocked(intention{kind: IntentionAttack, target: target})
 	accepted, err := s.thinkAttackLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -137,7 +140,7 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 		s.next = intention{kind: IntentionFollow, target: target}
 		return true
 	}
-	s.current = intention{kind: IntentionFollow, target: target}
+	s.setCurrentLocked(intention{kind: IntentionFollow, target: target})
 	accepted, err := s.thinkFollowLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -162,7 +165,7 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool
 		s.next = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl}
 		return true
 	}
-	s.current = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl}
+	s.setCurrentLocked(intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl})
 	accepted, err := s.thinkCastLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -174,9 +177,26 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool
 func (s *Summon) TryToIdle() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.current = intention{kind: IntentionIdle}
-	s.next = intention{}
+	s.idleLocked()
+}
+
+func (s *Summon) idleLocked() {
+	s.setCurrentLocked(intention{kind: IntentionIdle})
 	s.move.Stop()
+}
+
+// WaitOutIdle reports whether an idle request has to wait for the summon's
+// swing or cast to end, and if so drops the queued intention: the idle
+// takes its place, which leaves nothing queued, so the swing or cast ending
+// carries on as it would with nothing queued.
+func (s *Summon) WaitOutIdle() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.attack.AttackingNow() && (s.cast == nil || !s.cast.CastingNow()) {
+		return false
+	}
+	s.next = intention{}
+	return true
 }
 
 // FollowInstead makes following target the current intention, dropping any
@@ -185,8 +205,11 @@ func (s *Summon) TryToIdle() {
 func (s *Summon) FollowInstead(target attackable.Combatant) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.current = intention{kind: IntentionFollow, target: target}
-	s.next = intention{}
+	s.followInsteadLocked(target)
+}
+
+func (s *Summon) followInsteadLocked(target attackable.Combatant) {
+	s.setCurrentLocked(intention{kind: IntentionFollow, target: target})
 	if _, err := s.thinkFollowLocked(); err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
@@ -199,8 +222,7 @@ func (s *Summon) FollowInstead(target attackable.Combatant) {
 func (s *Summon) TryToMoveTo(dest location.Location) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.current = intention{kind: IntentionMoveTo, loc: dest}
-	s.next = intention{}
+	s.setCurrentLocked(intention{kind: IntentionMoveTo, loc: dest})
 	accepted, err := s.move.MoveToLocation(dest)
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -300,7 +322,73 @@ func (s *Summon) Think() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.promoteNextLocked()
+	if s.current.kind == IntentionIdle && !s.busyLocked() {
+		s.runNextLocked()
+	}
+	s.thinkLocked()
+}
+
+// FinishedAttack runs the queued intention once a swing ends, replacing the
+// attack; with none queued, the current intention carries on.
+//
+// ponytail: with none queued, a target the summon cannot keep attacking
+// (an unflagged player outside duel, Olympiad and PVP zones) should send it
+// idle instead; not modeled yet (#2700).
+func (s *Summon) FinishedAttack() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.runNextLocked()
+	s.thinkLocked()
+}
+
+// FinishedCasting runs the queued intention once a cast ends. With none
+// queued, it resumes the attack the cast replaced, or else goes idle and
+// reports true: following follow when it is non-nil (as FollowInstead),
+// otherwise standing still (as TryToIdle). The idle is decided and applied
+// under one hold of mu, so a Betray TryToAttack from the caster's queue lands
+// either before it (and is resumed as the attack) or after it (and replaces
+// the idle), never between the two.
+func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.runNextLocked() {
+		s.thinkLocked()
+		return false
+	}
+	if s.current.kind != IntentionIdle {
+		return false
+	}
+	if s.previous.kind == IntentionAttack {
+		s.setCurrentLocked(s.previous)
+		s.thinkLocked()
+		return false
+	}
+	if follow != nil {
+		s.followInsteadLocked(follow)
+	} else {
+		s.idleLocked()
+	}
+	return true
+}
+
+// runNextLocked makes the queued intention current, if there is one.
+func (s *Summon) runNextLocked() bool {
+	if s.next.kind == IntentionIdle {
+		return false
+	}
+	s.setCurrentLocked(s.next)
+	return true
+}
+
+// setCurrentLocked makes in the current intention, remembering the one it
+// replaces and dropping the queued one.
+func (s *Summon) setCurrentLocked(in intention) {
+	s.previous = s.current
+	s.current = in
+	s.next = intention{}
+}
+
+func (s *Summon) thinkLocked() {
 	var err error
 	switch s.current.kind {
 	case IntentionAttack:
@@ -313,14 +401,6 @@ func (s *Summon) Think() {
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
-}
-
-func (s *Summon) promoteNextLocked() {
-	if s.current.kind != IntentionIdle || s.next.kind == IntentionIdle {
-		return
-	}
-	s.current = s.next
-	s.next = intention{}
 }
 
 func (s *Summon) thinkAttackLocked() (bool, error) {

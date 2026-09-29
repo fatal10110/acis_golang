@@ -112,8 +112,8 @@ func TestControllerStopIsSilent(t *testing.T) {
 	actor := &timingPlayer{}
 	NewPlayer(actor, nil).Stop()
 
-	if actor.idles != 0 || actor.actionFailed != 0 {
-		t.Fatalf("Stop() notifications = idle %d, ActionFailed %d; want 0, 0", actor.idles, actor.actionFailed)
+	if actor.actionFailed != 0 {
+		t.Fatalf("Stop() ActionFailed notifications = %d, want 0", actor.actionFailed)
 	}
 }
 
@@ -338,7 +338,6 @@ type timingActor struct {
 
 type timingPlayer struct {
 	timingActor
-	idles        int
 	actionFailed int
 	drawMs       int
 }
@@ -356,7 +355,6 @@ func (a *curseTimingPlayer) TestCursesOnAttack(attackable.Combatant) bool {
 }
 
 func (a *timingPlayer) InPeaceZone() bool         { return false }
-func (a *timingPlayer) TryToIdle()                { a.idles++ }
 func (a *timingPlayer) CheckAndEquipArrows() bool { return true }
 func (a *timingPlayer) WeaponMPConsume() int      { return 0 }
 func (a *timingPlayer) MP() int                   { return 1 }
@@ -853,7 +851,6 @@ type timingSummon struct {
 }
 
 func (a *timingSummon) InPeaceZone() bool                            { return false }
-func (a *timingSummon) TryToIdle()                                   {}
 func (a *timingSummon) TestCursesOnAttack(attackable.Combatant) bool { return false }
 func (a *timingSummon) Owner() (attackable.Combatant, bool) {
 	return a.owner, a.owner != nil

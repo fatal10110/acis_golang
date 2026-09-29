@@ -89,6 +89,8 @@ type PlayerActor interface {
 	CurrentTarget() world.Tracked
 	SetTarget(world.Tracked)
 	TryToAttack(world.Tracked)
+	// WakeAI re-evaluates the player's current intention once.
+	WakeAI()
 	StopCharmOfLuck(*Effect)
 	StopPhoenixBlessing(*Effect)
 	WeaponGradePenalty() bool
