@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -299,6 +300,132 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 	appendResistedCount(result, elt, cast.Skill, applyEffectsWithLanding(cast.Caster, elt, cast.Skill, cast.Skill.Effects, shield, bss))
 }
 
+// drainHandler resolves DRAIN: magic damage whose caster regains part of
+// the HP it drains. magicFailures is the server's MagicFailures switch.
+type drainHandler struct{ magicFailures bool }
+
+func (drainHandler) Types() []string { return []string{"DRAIN"} }
+
+func (h drainHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+// earlyCastBreaker is a target whose damage-driven cast-break roll can run
+// ahead of its HP loss. DRAIN rolls the break, reports the damage and lands
+// its effects before the target takes the HP.
+type earlyCastBreaker interface {
+	BreakCastOnDamage(damage float64)
+	ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
+}
+
+func (h drainHandler) UseResult(cast Cast) Result {
+	result := Result{messages: cast.messages}
+	// The caster regains HP, so a sourceless cast has nothing to drain into.
+	if cast.Caster == nil || alikeDead(cast.Caster) {
+		return result
+	}
+	corpseMob := cast.Skill.Target == modelskill.TargetCorpseMob
+	for _, obj := range cast.Targets {
+		target, ok := asCreature(obj)
+		if !ok || (alikeDead(target) && !corpseMob) {
+			continue
+		}
+		// Only the caster itself gets past its own invulnerability.
+		if !sameObject(cast.Caster, target) && target.Invul() {
+			continue
+		}
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
+		if !ok {
+			continue
+		}
+		if in.Shield != formulas.ShieldPerfect {
+			reportMagicFailure(cast, target, in.Failure, &result)
+		}
+		damage := int(formulas.MagicDamage(in))
+		if damage <= 0 {
+			continue
+		}
+		if cast.Caster.AddHP(drainAbsorb(cast, target, damage)) > 0 && cast.Caster.Kind() == actor.KindPlayer {
+			result.record(CasterVitalsChanged{})
+		}
+		// A corpse drain only feeds the caster.
+		if target.Dead() && corpseMob {
+			continue
+		}
+		breaker, breakFirst := target.(earlyCastBreaker)
+		if breakFirst {
+			breaker.BreakCastOnDamage(float64(damage))
+		}
+		recordDamage(&result, cast.Caster, target, damage, in.MagicCrit, false)
+		if !corpseMob {
+			applyDrainEffects(cast, obj, in.Shield, in.BlessedSoulShot, &result)
+		}
+		if breakFirst {
+			breaker.ReduceHPWithoutCastBreak(float64(damage), cast.Caster, cast.Skill)
+		} else {
+			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+		}
+	}
+	applySelfEffects(cast, cast.Skill)
+	dischargeSpiritshot(cast)
+	return result
+}
+
+// drainAbsorb is the HP the caster regains from damage dealt to target:
+// AbsorbAbs plus AbsorbPart of the drained HP, in single precision. A
+// playable caster drains only what gets past a player target's CP; any
+// other drain is capped at the target's current HP. Both pools count in
+// whole points.
+func drainAbsorb(cast Cast, target Creature, damage int) float64 {
+	targetCP := 0
+	if p, ok := asPlayer(target); ok {
+		targetCP = int(p.CP())
+	}
+	targetHP := int(target.HP())
+	var drained int
+	switch {
+	case cast.Caster.Kind().Playable() && targetCP > 0:
+		drained = max(damage-targetCP, 0)
+	case damage > targetHP:
+		drained = targetHP
+	default:
+		drained = damage
+	}
+	// The explicit conversion rounds the product before the sum, so the
+	// two steps are never fused into one.
+	part := float32(cast.Skill.AbsorbPart * float32(drained))
+	return float64(float32(cast.Skill.AbsorbAbs) + part)
+}
+
+// applyDrainEffects lands a DRAIN skill's target effect list after its
+// damage report. BLOCK_DEBUFF does not stop it. A reflecting target lands
+// it back on the caster as its effector (see landReflected); otherwise a
+// skill-level landing roll on the strike's shield and blessed-spiritshot
+// state gates it, and the effects land with neither.
+func applyDrainEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, bss bool, result *Result) {
+	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	elt, ok := obj.(effect.Actor)
+	if !ok {
+		return
+	}
+	if skillReflected(cast, obj) {
+		landReflected(cast, elt)
+		return
+	}
+	stopEffectsBySkillID(elt.EffectList(), cast.Skill.ID)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, elt, cast.Skill, bss, shield)
+	if !ok {
+		return
+	}
+	if !succeeded {
+		appendResisted(result, elt, cast.Skill, 1, true) // id-only addSkillName overload: level 1
+		return
+	}
+	appendResistedCount(result, elt, cast.Skill, applyEffectsWithLanding(cast.Caster, elt, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false))
+}
+
 type blowHandler struct{}
 
 func (blowHandler) Types() []string { return []string{"BLOW"} }
@@ -436,8 +563,13 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 	if result == nil || failure == formulas.MagicFailureNone {
 		return
 	}
+	drain := skillTypeKey(cast.Skill.SkillType) == "DRAIN"
 	switch failure {
 	case formulas.MagicFailureHalf:
+		if drain {
+			result.record(DrainHalfSucceededMessage{})
+			break
+		}
 		result.AttackFailed++
 		result.record(AttackFailedMessage{})
 	case formulas.MagicFailureFull:
@@ -450,6 +582,7 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 		result.MagicResists = append(result.MagicResists, MagicResist{
 			TargetID:     target.ObjectID(),
 			AttackerName: actorName(cast.Caster),
+			Drain:        drain,
 		})
 		result.record(result.MagicResists[len(result.MagicResists)-1])
 	}

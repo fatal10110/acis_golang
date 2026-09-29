@@ -487,6 +487,18 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
 func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition) {
+	c.reduceSkillHP(amount, attacker, skill, true)
+}
+
+// ReduceHPWithoutCastBreak is ReduceHP for a hit whose cast-break roll the
+// caller already ran through BreakCastOnDamage, ahead of other per-hit work
+// that must come between the two: DRAIN rolls the break, then lands its
+// effects, and only then takes the HP.
+func (c *Character) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, skill modelskill.Definition) {
+	c.reduceSkillHP(amount, attacker, skill, false)
+}
+
+func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition, breakCast bool) {
 	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -514,7 +526,9 @@ func (c *Character) ReduceHP(amount float64, attacker attackable.Combatant, skil
 	// reference (Formulas.java:725 callers pass the skill's computed
 	// damage, never a CP-reduced remainder), so breakCastOnDamage must
 	// too.
-	c.breakCastOnDamage(rawDamage)
+	if breakCast {
+		c.breakCastOnDamage(rawDamage)
+	}
 	if dead {
 		c.Die(attacker)
 	}

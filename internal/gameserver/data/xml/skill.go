@@ -564,6 +564,9 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 
 		Feed: a.intDefault("feed", 0),
 
+		AbsorbPart: a.float32Default("absorbPart", 0),
+		AbsorbAbs:  a.intDefault("absorbAbs", 0),
+
 		CanBeReflected:   a.boolDefault("canBeReflected", true),
 		CanBeDispelled:   a.boolDefault("canBeDispeled", true),
 		ClanSkill:        a.boolDefault("isClanSkill", false),

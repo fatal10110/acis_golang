@@ -55,6 +55,8 @@ const (
 	SystemMessageCannotUseQuestItems               = 148
 	SystemMessageCannotPickupOrUseItemTrading      = 149
 	SystemMessageS1IsBusyTryLater                  = 153
+	SystemMessageDrainHalfSuccessful               = 156
+	SystemMessageResistedS1Drain                   = 157
 	SystemMessageAttackFailed                      = 158
 	SystemMessageResistedS1Magic                   = 159
 	SystemMessageS1ResistedYourS2                  = 139
