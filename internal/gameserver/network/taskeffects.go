@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
@@ -411,6 +412,31 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	l.water.Remove(live)
+}
+
+func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {
+	a, ok := actor.(*liveZoneActor)
+	if !ok {
+		return
+	}
+	live := a.live
+	dest, radius := boss.OustLoc, 0
+	if dest.X == 0 || dest.Y == 0 || dest.Z == 0 {
+		var found bool
+		dest, found = l.restartDestination(live)
+		if !found {
+			l.log.Warn().Int32("object_id", live.ObjectID()).Msg("boss zone: no town restart point resolved")
+			return
+		}
+		radius = restartTeleportOffset
+	}
+	// Zone entry may hold both the zone and teleport locks. Post to the
+	// player's queue so the teleport starts after the callback returns.
+	postLive(live, func() {
+		if !live.detached() {
+			live.Emit(event.TeleportRequested{X: dest.X, Y: dest.Y, Z: dest.Z, Radius: radius})
+		}
+	})
 }
 
 func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {

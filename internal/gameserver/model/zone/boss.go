@@ -16,12 +16,12 @@ type Boss struct {
 	// InvadeWindow is how long a permitted player may (re-)enter; zero
 	// disables all entry policing.
 	InvadeWindow time.Duration
-	// OustLoc is where rejected players land; the zero value means the
-	// player's town respawn instead.
+	// OustLoc is where rejected players land; a zero coordinate selects
+	// the player's town respawn instead.
 	OustLoc location.Location
 
 	// Eject teleports a rejected player out (to OustLoc when set, town
-	// respawn otherwise); nil until the teleport system wires it.
+	// respawn otherwise).
 	Eject func(a Actor)
 	// Unsummon dismisses a summon whose owner has no entry permission;
 	// nil until the summon system wires it.
