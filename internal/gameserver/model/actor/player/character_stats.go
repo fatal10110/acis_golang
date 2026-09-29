@@ -478,7 +478,7 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 		return hitOutcome{}
 	}
 	hit := hitOutcome{applied: true}
-	if !ignoreCP && attacker != nil && attacker != attackable.Combatant(c) && attacker.Kind().Playable() {
+	if !ignoreCP && c.hitByOther(attacker) && attacker.Kind().Playable() {
 		hit.cpOnly = c.curCP >= amount
 		drained := math.Min(c.curCP, amount)
 		c.curCP -= drained
@@ -492,6 +492,14 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 	return hit
 }
 
+// hitByOther reports whether attacker is a creature other than c. It
+// compares object ids, not interface values: a caller may hand in a wrapper
+// that embeds c (drowning passes the session's live player as its own
+// attacker), and that is still c attacking itself.
+func (c *Character) hitByOther(attacker attackable.Combatant) bool {
+	return attacker != nil && attacker.ObjectID() != c.ObjectID()
+}
+
 // sendHitFeedback sends the damaged character what one applied hit owes
 // it: its status and, for a hit of at least one point another creature
 // dealt outside a damage-over-time tick, S1_GAVE_YOU_S2_DMG naming the
@@ -503,7 +511,7 @@ func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatan
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
-	if full := int(amount); full > 0 && !isDOT && attacker != nil && attacker != attackable.Combatant(c) {
+	if full := int(amount); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
 	}
 	if !hit.cpOnly {
