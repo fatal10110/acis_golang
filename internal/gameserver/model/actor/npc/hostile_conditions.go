@@ -15,6 +15,14 @@ import (
 // not error. See #1509.
 var _ conditions.Actor = hostileStatActor{}
 
+// ConditionActor is h's view for skill and item condition tests.
+func (h *Hostile) ConditionActor() conditions.Actor {
+	if h == nil {
+		return nil
+	}
+	return hostileStatActor{h: h}
+}
+
 // HPRatio satisfies conditions.Actor.
 func (a hostileStatActor) HPRatio() float64 {
 	max := a.h.MaxHPValue()
@@ -90,10 +98,19 @@ func (a hostileStatActor) IsInFrontOf(other conditions.Actor) bool {
 	return facing.IsInFrontOf(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }
 
-// ActiveSkillLevel satisfies conditions.Actor.
+// ActiveSkillLevel satisfies conditions.Actor from this NPC's template
+// skills; passives and race markers are not in that map, and an active
+// effect of the skill does not count.
 func (a hostileStatActor) ActiveSkillLevel(id int) (int, bool) {
-	return a.h.EffectList().ActiveBySkillID(id)
+	level, ok := a.h.Instance.Template.Skills[id]
+	return level, ok
 }
+
+// NpcID is the template id a target npcId condition matches.
+func (a hostileStatActor) NpcID() int { return a.h.NpcID() }
+
+// RaceOrdinal is the template race a target race_id condition matches.
+func (a hostileStatActor) RaceOrdinal() int { return int(a.h.Instance.Template.Race) }
 
 // ActiveEffectLevel satisfies conditions.Actor.
 func (a hostileStatActor) ActiveEffectLevel(effectID int) (int, bool) {

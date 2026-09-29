@@ -16,7 +16,23 @@ import (
 var (
 	_ conditions.Actor       = characterStatActor{}
 	_ conditions.PlayerActor = characterStatActor{}
+	_ conditions.SeedActor   = characterStatActor{}
+	_ conditions.ForceActor  = characterStatActor{}
 )
+
+// ConditionActor is c's view for skill and item condition tests.
+func (c *Character) ConditionActor() conditions.Actor {
+	if c == nil {
+		return nil
+	}
+	return characterStatActor{c: c}
+}
+
+// SeedPower satisfies conditions.SeedActor.
+func (a characterStatActor) SeedPower(effectID int) int { return a.c.SeedPower(effectID) }
+
+// ForceLevel satisfies conditions.ForceActor.
+func (a characterStatActor) ForceLevel(skillID int) (int, bool) { return a.c.ForceLevel(skillID) }
 
 // HPRatio satisfies conditions.Actor.
 func (a characterStatActor) HPRatio() float64 {
@@ -93,16 +109,11 @@ func (a characterStatActor) IsInFrontOf(other conditions.Actor) bool {
 	return facing.IsInFrontOf(location.Location{X: a.X(), Y: a.Y(), Z: a.Z()})
 }
 
-// ActiveSkillLevel satisfies conditions.Actor, reusing the same
-// first-effect lookup as ActiveEffectLevel: this codebase tracks a known
-// passive/toggle skill's contribution through its effect, so the two
-// concepts share one source of truth. The lookup prefers an in-use effect
-// but also answers for a held (stacked-out) one.
+// ActiveSkillLevel satisfies conditions.Actor from c's learned skills; an
+// active effect of the skill does not count.
 func (a characterStatActor) ActiveSkillLevel(id int) (int, bool) {
-	if a.c.Live == nil {
-		return 0, false
-	}
-	return a.c.EffectList().ActiveBySkillID(id)
+	level := a.c.SkillLevel(id)
+	return level, level > 0
 }
 
 // ActiveEffectLevel satisfies conditions.Actor.
@@ -171,10 +182,8 @@ func (a characterStatActor) InventorySize() int {
 	return a.c.inventory.Size()
 }
 
-// InventoryLimit satisfies conditions.PlayerActor. Always 0: inventory slot
-// capacity isn't exposed as a limit query yet (tracked in #1507), and no
-// shipped stat func's condition needs it.
-func (a characterStatActor) InventoryLimit() int { return 0 }
+// InventoryLimit satisfies conditions.PlayerActor.
+func (a characterStatActor) InventoryLimit() int { return a.c.InventoryLimit() }
 
 // IsHero satisfies conditions.PlayerActor.
 func (a characterStatActor) IsHero() bool { return a.c.IsHero() }
