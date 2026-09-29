@@ -346,7 +346,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	hostile.SetXYZ(strayPoint.X, strayPoint.Y, strayPoint.Z)
 
 	// Simulate the AI loop deciding this NPC must leash home — the same
-	// call hostile.Think() makes via returnHomeOutsideDriftRange.
+	// call the AI loop makes via returnHomeOutsideDriftRange.
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true (strayPoint is outside the maker polygon)")
 	}

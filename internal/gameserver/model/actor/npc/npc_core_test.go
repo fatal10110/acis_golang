@@ -1241,10 +1241,10 @@ func TestReturnHomeDriftRangeIsStrict2D(t *testing.T) {
 			if tc.wantHome {
 				if tc.kind == "SiegeGuard" {
 					if movement.home != (location.Location{}) {
-						t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+						t.Fatalf("MoveHome destination = %#v, want no walk until RunAI", movement.home)
 					}
-					if err := hostile.Think(); err != nil {
-						t.Fatalf("Think() error: %v", err)
+					if err := hostile.RunAI(); err != nil {
+						t.Fatalf("RunAI() error: %v", err)
 					}
 				}
 				if movement.home != home {
@@ -1274,10 +1274,10 @@ func TestSiegeGuardReturnHomeBypassesTerritoryGate(t *testing.T) {
 		t.Fatal("ReturnHome() = false, want SiegeGuard to return outside its 20-unit drift range")
 	}
 	if movement.home != (location.Location{}) {
-		t.Fatalf("MoveHome destination = %#v, want no walk until Think", movement.home)
+		t.Fatalf("MoveHome destination = %#v, want no walk until RunAI", movement.home)
 	}
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := movement.home; got != hostile.Instance.Home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", got, hostile.Instance.Home)
@@ -1437,8 +1437,8 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	clock := driveHostile(hostile)
 	hostile.SetHeading(0)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if movement.home != (location.Location{X: 100, Y: 0, Z: 0}) {
 		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
@@ -1521,8 +1521,8 @@ func TestReturnHomeWanderRecheckSkippedWhileRooted(t *testing.T) {
 	clock := driveHostile(hostile)
 	hostile.SetHeading(0)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	addHostileEffect(t, hostile, "Root")
 
@@ -1597,8 +1597,8 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	clock := driveHostile(hostile)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionWander, Timer: 5, Weight: 5})
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 
 	// (1500+roll)*100/WalkSpeed = 750 ms at WalkSpeed 200.

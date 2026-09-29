@@ -314,8 +314,10 @@ func (a *Attackable) Hates() *attackable.HateTable {
 
 // Desires returns the queue of weighted candidate intentions. Attack threat
 // populates it automatically; a Cast desire is queued by whatever decides
-// this actor should cast a skill (e.g. a monster AI script), and Think
-// promotes whichever queued desire currently outweighs the rest.
+// this actor should cast a skill (e.g. a monster AI script), and the next
+// RunAI / TickThink desire selection (promoteAndStep) promotes whichever
+// queued desire currently outweighs the rest. Think only continues the
+// current intention and never takes a queued desire up.
 func (a *Attackable) Desires() *DesireQueue {
 	return a.desires
 }
@@ -664,8 +666,9 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 type thinkMode uint8
 
 const (
-	// thinkContinue continues the current intention after arrival or a bow
-	// reuse ending; it never idles on an empty queue.
+	// thinkContinue continues the current intention after arrival, a bow
+	// reuse ending or a control effect ending; it never selects a desire
+	// and never idles on an empty queue.
 	thinkContinue thinkMode = iota
 	// thinkEvent re-runs desire selection on an event: a swing finishing,
 	// the hit animation ending, a bow shot, a completed cast or a first
@@ -675,8 +678,10 @@ const (
 	thinkTick
 )
 
-// Think advances the current intention once, for arrival and a bow's reuse
-// ending: it does not run empty-queue idle abort. A non-nil return reports
+// Think advances the current intention once, for arrival, a bow's reuse
+// ending and a control effect ending. It never selects a queued desire,
+// even from idle, follow or wander, and does not run empty-queue idle
+// abort: RunAI and TickThink do both. A non-nil return reports
 // that an intention step ran but a broadcast within it failed; the intention
 // itself still advanced.
 func (a *Attackable) Think() error {
@@ -686,7 +691,7 @@ func (a *Attackable) Think() error {
 // RunAI re-runs desire selection on an event. After the first periodic
 // cycle, a controllable actor that is not casting, has an empty desire
 // queue and is not idle aborts everything and goes idle; otherwise it
-// advances like Think.
+// makes the heaviest queued desire current and steps it.
 func (a *Attackable) RunAI() error {
 	return a.think(thinkEvent)
 }
@@ -766,7 +771,10 @@ func (a *Attackable) think(mode thinkMode) error {
 	if !canPromote {
 		return nil
 	}
-	err := a.promoteAndStep(mode != thinkContinue)
+	if mode == thinkContinue {
+		return a.continueCurrent()
+	}
+	err := a.promoteAndStep()
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
 			a.thinkIdle()
@@ -779,13 +787,35 @@ func (a *Attackable) think(mode thinkMode) error {
 	return err
 }
 
+// continueCurrent is Think's pass: one step of the current intention with
+// no desire selection, so a queued desire waits for the next RunAI or
+// TickThink. It neither takes nor updates the attack latch, leaves
+// lastDesire to desire selection, and does not re-select on a lost target.
+// Idle and wander take no step: idle here is what an arrival leaves of a
+// finished walk or wander, which does not think, and the continue pass has
+// no wander step.
+func (a *Attackable) continueCurrent() error {
+	switch a.current.kind {
+	case IntentionAttack:
+		_, err := a.thinkAttack()
+		return err
+	case IntentionCast:
+		_, err := a.thinkCast()
+		return err
+	case IntentionFollow:
+		return a.thinkFollow()
+	case IntentionMoveTo:
+		a.thinkMoveTo()
+	}
+	return nil
+}
+
 // promoteAndStep promotes the next desire and runs one step of the current
 // intention. A lost attack or cast target re-promotes at once, except for a
-// latched attack, which is the whole pass. useLatch is false for Think,
-// which neither takes nor updates the latch.
-func (a *Attackable) promoteAndStep(useLatch bool) error {
+// latched attack, which is the whole pass.
+func (a *Attackable) promoteAndStep() error {
 	for attempts := 0; attempts <= maxDesires; attempts++ {
-		latched := a.promoteNext(useLatch)
+		latched := a.promoteNext()
 		switch a.current.kind {
 		case IntentionAttack:
 			again, err := a.thinkAttack()
@@ -846,39 +876,29 @@ func (a *Attackable) hasLatch() bool {
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
-// and, with useLatch, updates the latch from it. It reports whether the
-// pick was the latched attack.
+// and updates the latch from it. It reports whether the pick was the
+// latched attack.
 //
-// Desire selection (useLatch) always makes the pick current, whatever the
-// current intention is, so a heavier attack on another target, a cast or a
-// walk takes over a running attack. Think (no useLatch) only continues the
-// current intention; it takes up a queued desire only from idle, follow or
-// wander. Replacing the intention with a different one drops any follow
-// task and the queued next intention the old one left behind.
-func (a *Attackable) promoteNext(useLatch bool) bool {
+// Desire selection always makes the pick current, whatever the current
+// intention is, so a heavier attack on another target, a cast or a walk
+// takes over a running attack. Replacing the intention with a different
+// one drops any follow task and the queued next intention the old one left
+// behind.
+func (a *Attackable) promoteNext() bool {
 	if a.inHitAnimation() {
 		return false
 	}
-	next, fromLatch, ok := a.nextToDo(useLatch)
+	next, fromLatch, ok := a.nextToDo()
 	if !ok {
 		return false
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
 		return false
 	}
-	if useLatch {
-		if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
-			a.latched = next
-		} else {
-			a.latched = intention{}
-		}
-	}
-	if !useLatch {
-		switch a.current.kind {
-		case IntentionIdle, IntentionFollow, IntentionWander:
-		default:
-			return false
-		}
+	if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
+		a.latched = next
+	} else {
+		a.latched = intention{}
 	}
 	if a.current.kind == IntentionWander {
 		a.wanderReady = time.Time{}
@@ -898,11 +918,11 @@ func (i intention) same(o intention) bool {
 	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc
 }
 
-// nextToDo returns the latched attack when useLatch and one is set, else
-// the heaviest queued desire as an intention. ok is false when there is
-// neither or the heaviest desire's kind is not promotable.
-func (a *Attackable) nextToDo(useLatch bool) (next intention, fromLatch, ok bool) {
-	if useLatch && a.hasLatch() {
+// nextToDo returns the latched attack when one is set, else the heaviest
+// queued desire as an intention. ok is false when there is neither or the
+// heaviest desire's kind is not promotable.
+func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
+	if a.hasLatch() {
 		return a.latched, true, true
 	}
 	desire, ok := a.desires.Peek()
@@ -1036,9 +1056,11 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports
-// whether Think's caller should immediately re-promote and continue (true)
-// or stop for this cycle (false); the second is any broadcast error from a
-// synchronous call this step made, only meaningful when the first is false.
+// whether RunAI / TickThink desire selection (promoteAndStep) should
+// immediately re-promote and continue (true) or stop for this cycle (false);
+// continueCurrent (Think) ignores it and never re-selects. The second is any
+// broadcast error from a synchronous call this step made, only meaningful
+// when the first is false.
 func (a *Attackable) thinkAttack() (bool, error) {
 	if a.actor.DenyAIAction() {
 		return false, nil

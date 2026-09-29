@@ -33,8 +33,8 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
 	}
 	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "start walk")
 

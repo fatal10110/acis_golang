@@ -55,8 +55,8 @@ func bootNPCDesireCasterWith(t *testing.T, magic bool) (*gameservertest.Server, 
 func thinkOnNPCQueue(t *testing.T, hostile *npc.Hostile) {
 	t.Helper()
 	onNPCQueue(t, hostile, func() {
-		if err := hostile.Think(); err != nil {
-			t.Errorf("Think() error: %v", err)
+		if err := hostile.RunAI(); err != nil {
+			t.Errorf("RunAI() error: %v", err)
 		}
 	})
 }
