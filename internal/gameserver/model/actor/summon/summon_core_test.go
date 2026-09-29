@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"os"
+	"reflect"
 	"sort"
 	"testing"
 
@@ -1513,3 +1514,153 @@ func TestSummonMakeAttackHitUsesTemplateCritRate(t *testing.T) {
 }
 
 func (*fakePlayerEffector) Kind() actor.Kind { return actor.KindPlayer }
+
+// ---- avoid-attack refusals ----
+// avoidOwner is an owner whose position and attack stance a test sets.
+type avoidOwner struct {
+	fakeSummonOwner
+	x, y, z  int
+	inCombat bool
+}
+
+func (o *avoidOwner) Position() (int, int, int) { return o.x, o.y, o.z }
+func (o *avoidOwner) InCombat() bool            { return o.inCombat }
+
+// stepAsideAI records every StepAside destination it is asked to walk to.
+type stepAsideAI struct {
+	thinkCountingAI
+	steps []location.Location
+}
+
+func (a *stepAsideAI) StepAside(dest location.Location) bool {
+	a.steps = append(a.steps, dest)
+	return true
+}
+
+const avoidRoll = 3
+
+// newAvoidFixture places a servitor at summonAt beside an in-combat owner
+// standing at (1000, 1000, 0), with a recording brain and sink and a fixed
+// step-aside roll.
+func newAvoidFixture(t *testing.T, summonAt location.Location) (*Actor, *avoidOwner, *stepAsideAI, *event.Recorder) {
+	t.Helper()
+	owner := &avoidOwner{fakeSummonOwner: fakeSummonOwner{id: 42}, x: 1000, y: 1000, z: 0, inCombat: true}
+	a := mustServitor(t, ServitorConfig{ObjectID: 7, Owner: owner})
+	if err := a.InitMovement(summonAt, 100, openGeo{}); err != nil {
+		t.Fatalf("InitMovement: %v", err)
+	}
+	SpawnBesideOwner(world.New(), a, owner, location.Location{X: summonAt.X - owner.x, Y: summonAt.Y - owner.y, Z: summonAt.Z - owner.z})
+	if x, y, z := a.Position(); (location.Location{X: x, Y: y, Z: z}) != summonAt {
+		t.Fatalf("summon at (%d, %d, %d), want %v", x, y, z, summonAt)
+	}
+	brain := &stepAsideAI{}
+	rec := &event.Recorder{}
+	a.Attach(Runtime{AI: brain, Sink: rec})
+	a.SetRollSource(func(int) int { return avoidRoll })
+	return a, owner, brain, rec
+}
+
+// TestSummonAvoidAttackRefusals pins each gate of SummonMove.avoidAttack
+// that keeps the summon where it is: the owner itself attacking, the owner
+// at 140 or more in 3D, the owner out of stance, and a summon that is
+// already moving or cannot move.
+func TestSummonAvoidAttackRefusals(t *testing.T) {
+	stranger := &fakeSummonOwner{id: 99}
+	wantStep := location.EquidistantPoint(1000, 1000, 0, avoidRadius, avoidPoints, avoidRoll)
+
+	tests := []struct {
+		name     string
+		summonAt location.Location
+		setup    func(t *testing.T, a *Actor, owner *avoidOwner)
+		wantStep bool
+	}{
+		{name: "stranger hit beside a fighting owner steps aside", summonAt: location.Location{X: 1100, Y: 1000}, wantStep: true},
+		{name: "just inside 140 in 3D steps aside", summonAt: location.Location{X: 1139, Y: 1000}, wantStep: true},
+		{name: "owner at exactly 140 stays", summonAt: location.Location{X: 1140, Y: 1000}},
+		{name: "owner within 140 in 2D but not in 3D stays", summonAt: location.Location{X: 1100, Y: 1000, Z: 100}},
+		{
+			name:     "owner out of attack stance stays",
+			summonAt: location.Location{X: 1100, Y: 1000},
+			setup:    func(_ *testing.T, _ *Actor, owner *avoidOwner) { owner.inCombat = false },
+		},
+		{
+			name:     "moving summon stays",
+			summonAt: location.Location{X: 1100, Y: 1000},
+			setup: func(t *testing.T, a *Actor, _ *avoidOwner) {
+				if _, err := a.Move().MoveToLocation(location.Location{X: 1500, Y: 1000}); err != nil {
+					t.Fatalf("MoveToLocation: %v", err)
+				}
+				if !a.IsMoving() {
+					t.Fatal("IsMoving() = false after an accepted walk, want true")
+				}
+			},
+		},
+		{
+			name:     "dead summon stays",
+			summonAt: location.Location{X: 1100, Y: 1000},
+			setup: func(_ *testing.T, a *Actor, _ *avoidOwner) {
+				a.vitals.mu.Lock()
+				a.dead = true
+				a.vitals.mu.Unlock()
+			},
+		},
+		{
+			name:     "immobilized summon stays",
+			summonAt: location.Location{X: 1100, Y: 1000},
+			setup: func(t *testing.T, a *Actor, _ *avoidOwner) {
+				a.SetImmobilized(true)
+				if !a.MovementDisabled() {
+					t.Fatal("MovementDisabled() = false while immobilized, want true")
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		for _, notify := range []string{"attacked", "evaded"} {
+			t.Run(tc.name+"/"+notify, func(t *testing.T) {
+				a, owner, brain, _ := newAvoidFixture(t, tc.summonAt)
+				if tc.setup != nil {
+					tc.setup(t, a, owner)
+				}
+				if notify == "attacked" {
+					a.NotifyAttacked(stranger)
+				} else {
+					a.NotifyEvaded(stranger)
+				}
+				if !tc.wantStep {
+					if len(brain.steps) != 0 {
+						t.Fatalf("StepAside calls = %v, want none", brain.steps)
+					}
+					return
+				}
+				if want := []location.Location{wantStep}; !reflect.DeepEqual(brain.steps, want) {
+					t.Fatalf("StepAside calls = %v, want %v", brain.steps, want)
+				}
+			})
+		}
+	}
+}
+
+// TestSummonAvoidAttackIgnoresOwnHitButOwnerStillEntersStance covers an
+// owner that ctrl-attacks its own summon: SummonMove.avoidAttack refuses to
+// step aside, while ATTACKED still puts the owner in attack stance.
+func TestSummonAvoidAttackIgnoresOwnHitButOwnerStillEntersStance(t *testing.T) {
+	a, owner, brain, rec := newAvoidFixture(t, location.Location{X: 1100, Y: 1000})
+
+	a.NotifyAttacked(owner)
+	if len(brain.steps) != 0 {
+		t.Fatalf("StepAside calls after the owner's hit = %v, want none", brain.steps)
+	}
+	if got := event.Of[event.Attacked](rec); len(got) != 1 || got[0].Attacker != owner {
+		t.Fatalf("Attacked events = %+v, want one naming the owner", got)
+	}
+
+	a.NotifyEvaded(owner)
+	if len(brain.steps) != 0 {
+		t.Fatalf("StepAside calls after the owner's miss = %v, want none", brain.steps)
+	}
+	if got := event.Count[event.Attacked](rec); got != 1 {
+		t.Fatalf("Attacked events after the owner's miss = %d, want still 1", got)
+	}
+}

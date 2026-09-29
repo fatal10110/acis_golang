@@ -80,33 +80,35 @@ func (h healHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-type healPercentHandler struct{}
+// healPercentHandler restores a percentage of each target's HP or MP after
+// the BUFF pass has landed the skill's effects and spent its spiritshot.
+type healPercentHandler struct {
+	buff continuousHandler
+}
 
 func (healPercentHandler) Types() []string { return []string{"HEAL_PERCENT", "MANAHEAL_PERCENT"} }
 
-func (healPercentHandler) Use(cast Cast) {
-	if skillTypeKey(cast.Skill.SkillType) == "HEAL_PERCENT" {
-		for _, obj := range cast.Targets {
-			applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
-			target, ok := asCreature(obj)
-			if !ok || !target.CanBeHealed() {
-				continue
-			}
-			restored := target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
-			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
-		}
-		return
-	}
+func (h healPercentHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
 
+func (h healPercentHandler) UseResult(cast Cast) Result {
+	result := h.buff.UseResult(cast)
+	isHP := skillTypeKey(cast.Skill.SkillType) == "HEAL_PERCENT"
 	for _, obj := range cast.Targets {
-		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
 		target, ok := asCreature(obj)
 		if !ok || !target.CanBeHealed() {
+			continue
+		}
+		if isHP {
+			restored := target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 			continue
 		}
 		restored := target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, false)
 	}
+	return result
 }
 
 type manaHealHandler struct{}
@@ -132,13 +134,22 @@ func (manaHealHandler) Use(cast Cast) {
 	}
 }
 
-type combatPointHealHandler struct{}
+// combatPointHealHandler restores a flat amount of each player target's CP
+// after the BUFF pass has landed the skill's effects and spent its
+// spiritshot.
+type combatPointHealHandler struct {
+	buff continuousHandler
+}
 
 func (combatPointHealHandler) Types() []string { return []string{"COMBATPOINTHEAL"} }
 
-func (combatPointHealHandler) Use(cast Cast) {
+func (h combatPointHealHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (h combatPointHealHandler) UseResult(cast Cast) Result {
+	result := h.buff.UseResult(cast)
 	for _, obj := range cast.Targets {
-		applyCastEffects(cast, obj, cast.Skill, cast.Skill.Effects)
 		target, ok := asPlayer(obj)
 		if !ok || target.Dead() || target.Invulnerable() {
 			continue
@@ -150,6 +161,7 @@ func (combatPointHealHandler) Use(cast Cast) {
 		target.SetCP(target.CP() + amount)
 		notifyRestored(obj, cast.Caster, amount, restoredCP, true)
 	}
+	return result
 }
 
 func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
@@ -177,9 +189,18 @@ type cpDamagePercentHandler struct{}
 
 func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
 
-func (cpDamagePercentHandler) Use(cast Cast) {
+func (h cpDamagePercentHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+// UseResult takes Power percent of each player target's CP. Per target the
+// cast break rolls first, the caster hears of the damage, the CP drops and
+// the target's status reports it, and last the target hears who dealt the
+// damage — all of it even for a target left with no CP to lose.
+func (cpDamagePercentHandler) UseResult(cast Cast) Result {
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := asPlayer(obj)
@@ -187,21 +208,37 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
-		// The cast-break roll runs before the CP reduction that follows it.
 		target.BreakCastOnDamage(float64(damage))
-		if damage > 0 {
-			target.SetCP(target.CP() - float64(damage))
+		recordDamage(&result, cast.Caster, target, damage, false, false)
+		target.SetCP(target.CP() - float64(damage))
+		if sameObject(cast.Caster, target) {
+			// A player caster's own status goes out in order among the
+			// cast's messages.
+			result.record(CasterVitalsChanged{})
+		} else {
+			target.BroadcastStatus()
 		}
+		result.record(DamageReceived{TargetID: target.ObjectID(), AttackerName: actorName(cast.Caster), Amount: int32(damage)})
 	}
 	// Spent even when no target was accepted.
 	dischargeSoulshot(cast)
+	return result
 }
 
-type balanceLifeHandler struct{}
+// balanceLifeHandler shares the living targets' pooled HP ratio after the
+// BUFF pass has landed the skill's effects and spent its spiritshot.
+type balanceLifeHandler struct {
+	buff continuousHandler
+}
 
 func (balanceLifeHandler) Types() []string { return []string{"BALANCE_LIFE"} }
 
-func (balanceLifeHandler) Use(cast Cast) {
+func (h balanceLifeHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (h balanceLifeHandler) UseResult(cast Cast) Result {
+	result := h.buff.UseResult(cast)
 	targets := make([]Creature, 0, len(cast.Targets))
 	var fullHP, currentHP float64
 	casterCursed := cursed(cast.Caster)
@@ -220,13 +257,14 @@ func (balanceLifeHandler) Use(cast Cast) {
 	}
 
 	if len(targets) == 0 || fullHP == 0 {
-		return
+		return result
 	}
 
 	ratio := currentHP / fullHP
 	for _, target := range targets {
 		target.SetHP(target.MaxHPValue() * ratio)
 	}
+	return result
 }
 
 type giveSPHandler struct{}

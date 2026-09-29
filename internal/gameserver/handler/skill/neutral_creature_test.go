@@ -41,6 +41,7 @@ func (neutralPlayer) NotifyCPRestored(string, int, bool)             {}
 func (neutralPlayer) NotifyAttackFailed()                            {}
 func (neutralPlayer) NotifyResistedSkill(string, modelskill.ID, int) {}
 func (neutralPlayer) NotifyResistedMagic(string)                     {}
+func (neutralPlayer) NotifySkillDamage(int, bool, bool, bool)        {}
 func (neutralPlayer) NotifySpoilAlready()                            {}
 func (neutralPlayer) NotifySpoilSuccess()                            {}
 func (neutralPlayer) Mounted() bool                                  { return false }

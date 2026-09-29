@@ -200,10 +200,9 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 			continue
 		}
 		applyChargeDamEffects(cast, obj, in.Shield, &result)
+		// Unlike PDAM, a hit that works out to no damage still goes through
+		// the counter or the damage path, reporting zero.
 		damage := formulas.PhysicalSkillDamage(in) * modifier
-		if damage <= 0 {
-			continue
-		}
 		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
 			recordDamage(&result, cast.Caster, target, int(damage), false, false)
@@ -614,6 +613,23 @@ func deliverMagicFailure(caster Creature, target Actor, def modelskill.Definitio
 	if n, ok := asPlayer(target); ok {
 		for _, r := range result.MagicResists {
 			n.NotifyResistedMagic(r.AttackerName)
+		}
+	}
+}
+
+// deliverDamage sends a player caster its damage feedback for a hit on
+// target at once, for paths that do not return a skill handler Result
+// (signet ticks).
+func deliverDamage(caster Creature, target Actor, amount int, mcrit bool) {
+	n, ok := asPlayer(caster)
+	if !ok {
+		return
+	}
+	var result Result
+	recordDamage(&result, caster, target, amount, mcrit, false)
+	for _, m := range result.Messages {
+		if d, ok := m.(Damage); ok {
+			n.NotifySkillDamage(int(d.Amount), d.MagicCrit, d.Blocked, d.Petrified)
 		}
 	}
 }

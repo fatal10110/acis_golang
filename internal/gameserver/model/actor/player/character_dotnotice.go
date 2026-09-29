@@ -86,3 +86,9 @@ func (c *Character) NotifyResistedSkill(targetName string, skillID modelskill.ID
 func (c *Character) NotifyResistedMagic(attackerName string) {
 	c.emit(event.MagicResisted{AttackerName: attackerName})
 }
+
+// NotifySkillDamage sends the damage feedback of a skill hit the character
+// dealt outside a cast's own handler result, such as a signet tick.
+func (c *Character) NotifySkillDamage(amount int, magicCrit, blocked, petrified bool) {
+	c.emit(event.SkillDamageDealt{Amount: amount, MagicCrit: magicCrit, Blocked: blocked, Petrified: petrified})
+}

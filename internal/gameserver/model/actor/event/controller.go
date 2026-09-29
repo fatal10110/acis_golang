@@ -61,6 +61,20 @@ type HitLanded struct {
 	Crit   bool
 }
 
+// AttackStanceRequested reports that the actor landed a damaging physical
+// hit: it enters its attack stance, or refreshes the one it holds. A summon's
+// stance is its owner's.
+type AttackStanceRequested struct{}
+
+// Attacked reports that a damaging physical hit or an offensive skill from
+// Attacker reached the actor: it enters its attack stance. A summon's stance
+// is its owner's.
+type Attacked struct{ Attacker attackable.Combatant }
+
+// Evaded reports that the actor evaded a physical auto-attack hit from
+// Attacker.
+type Evaded struct{ Attacker attackable.Combatant }
+
 // Arrived reports that movement a controller started reached its
 // destination.
 type Arrived struct{}
@@ -69,14 +83,17 @@ type Arrived struct{}
 // path. The receiver owes observers the stopped-cell correction.
 type MoveBlocked struct{}
 
-func (CastAborted) event()      {}
-func (CastFinished) event()     {}
-func (CastStopAck) event()      {}
-func (SkillMasteryProc) event() {}
-func (AttackStarted) event()    {}
-func (AttackFinished) event()   {}
-func (AttackRethink) event()    {}
-func (HitDealt) event()         {}
-func (HitLanded) event()        {}
-func (Arrived) event()          {}
-func (MoveBlocked) event()      {}
+func (CastAborted) event()           {}
+func (CastFinished) event()          {}
+func (CastStopAck) event()           {}
+func (SkillMasteryProc) event()      {}
+func (AttackStarted) event()         {}
+func (AttackFinished) event()        {}
+func (AttackRethink) event()         {}
+func (HitDealt) event()              {}
+func (HitLanded) event()             {}
+func (AttackStanceRequested) event() {}
+func (Attacked) event()              {}
+func (Evaded) event()                {}
+func (Arrived) event()               {}
+func (MoveBlocked) event()           {}

@@ -769,6 +769,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if recipient, online := l.livePlayerByID(m.RecipientID); online {
 				sendDamageMessage(recipient, m)
 			}
+		case skillhandler.DamageReceived:
+			if target, online := l.livePlayerByID(m.TargetID); online {
+				target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS1GaveYouS2Dmg, m.AttackerName, m.Amount))
+			}
 		case skillhandler.Resisted:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))

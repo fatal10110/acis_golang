@@ -18,6 +18,9 @@ import (
 // HP/CP change itself is dropped. A Playable attacker other than the actor
 // itself drains CP before HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
 // PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
+// The status and damage report of the hit go out before the cast-break
+// roll: an auto-attack rolls the break only once the hit has landed, and a
+// killing hit's death has already ended the cast.
 func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if c.AlikeDead() || c.Invul() {
 		return false
@@ -30,14 +33,29 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 		return false
 	}
 	c.vitalsMu.Lock()
-	newlyDead := c.absorbCPThenReduceHP(float64(dmg), attacker, false)
+	hit := c.absorbCPThenReduceHP(float64(dmg), attacker, false)
 	c.vitalsMu.Unlock()
-	c.breakCastOnDamage(float64(dmg))
-	c.BroadcastStatus()
-	if !newlyDead {
+	if !hit.applied {
 		return false
 	}
-	return c.Die(attacker)
+	c.sendHitFeedback(float64(dmg), attacker, hit, false)
+	if hit.dead {
+		return c.Die(attacker)
+	}
+	c.breakCastOnDamage(float64(dmg))
+	return false
+}
+
+// NotifyAttacked reports a damaging physical hit, or an offensive skill,
+// from attacker reaching this character: it enters its attack stance.
+func (c *Character) NotifyAttacked(attacker attackable.Combatant) {
+	c.emit(event.Attacked{Attacker: attacker})
+}
+
+// NotifyEvaded reports a physical hit from attacker that missed this
+// character, which is told whose attack it avoided.
+func (c *Character) NotifyEvaded(attacker attackable.Combatant) {
+	c.emit(event.Evaded{Attacker: attacker})
 }
 
 // Dead reports whether the player has died.

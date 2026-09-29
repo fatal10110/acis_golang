@@ -48,6 +48,9 @@ type AI interface {
 	// TryToMoveTo makes walking to dest the current intention and starts
 	// the walk.
 	TryToMoveTo(dest location.Location) bool
+	// StepAside walks to dest when the summon is idle or following,
+	// reporting whether the walk started.
+	StepAside(dest location.Location) bool
 	StopMove()
 	StopAttack()
 	// AttackingNow reports whether this summon's own attack cycle is

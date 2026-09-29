@@ -55,31 +55,36 @@ func (disablersHandler) Use(cast Cast) {
 			continue
 		}
 
+		// The shield block is rolled once per target, against the original
+		// target and ahead of any reflect swap, whichever type follows; the
+		// skill's own landing roll and its per-template landings reuse it.
+		land := landing{shield: resolveShieldDefense(cast.Caster, target, cast.Skill), bss: bsps}
+
 		switch skillType {
 		case "BETRAY":
-			disableWithSuccessCheck(cast, target)
+			disableWithSuccessCheck(cast, target, land)
 		case "FAKE_DEATH":
-			applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+			land.apply(cast, target)
 		case "ROOT", "STUN", "SLEEP", "PARALYZE":
-			disableReflectable(cast, target)
+			disableReflectable(cast, target, land)
 		case "MUTE":
-			disableMute(cast, target)
+			disableMute(cast, target, land)
 		case "CONFUSION":
-			disableConfusion(cast, target)
+			disableConfusion(cast, target, land)
 		case "AGGREDUCE":
-			disableAggReduce(cast, target)
+			disableAggReduce(cast, target, land)
 		case "AGGREDUCE_CHAR":
-			disableAggReduceChar(cast, target)
+			disableAggReduceChar(cast, target, land)
 		case "AGGREMOVE":
-			disableAggRemove(cast, target)
+			disableAggRemove(cast, target, land)
 		case "ERASE":
-			disableErase(cast, target)
+			disableErase(cast, target, land)
 		case "NEGATE":
-			disableNegate(cast, target)
+			disableNegate(cast, target, land)
 		case "CANCEL_DEBUFF":
 			disableCancelDebuff(cast, target)
 		case "AGGDAMAGE":
-			disableAggDamage(cast, target)
+			disableAggDamage(cast, target, land)
 		}
 	}
 
@@ -120,20 +125,39 @@ func checkSkillSuccessBSSWithShield(caster Creature, target Actor, def modelskil
 	return formulas.SkillSucceeds(rate, rnd.Get(100)), true
 }
 
+// landing is one Disablers target's resolved shield outcome and the cast's
+// blessed-spiritshot sample, shared by the skill's landing roll and every
+// per-template effect landing on that target.
+type landing struct {
+	shield formulas.ShieldDefense
+	bss    bool
+}
+
+// succeeds rolls cast's skill landing against effected with the resolved
+// inputs.
+func (l landing) succeeds(cast Cast, effected Creature) (succeeded, ok bool) {
+	return checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, l.bss, l.shield)
+}
+
+// apply lands cast's effect templates on effected with the resolved inputs.
+func (l landing) apply(cast Cast, effected Creature) {
+	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects, l.shield, l.bss)
+}
+
 // disableAggDamage applies an AGGDAMAGE skill's effects unconditionally (no
 // landing roll, no reflect, matching Disablers.java's AGGDAMAGE case) and,
 // for an attackable target that can also report its level, notifies its AI
 // of the caster's aggression at power/(targetLevel+7)*150.
-func disableAggDamage(cast Cast, target Creature) {
+func disableAggDamage(cast Cast, target Creature, land landing) {
 	if target.Attackable() {
 		power := int(float64(cast.Skill.Power) / float64(target.Level()+7) * 150)
 		target.NotifyAggression(cast.Caster, power)
 	}
-	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, target)
 }
 
-func disableErase(cast Cast, target Creature) {
-	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+func disableErase(cast Cast, target Creature, land landing) {
+	succeeded, ok := land.succeeds(cast, target)
 	if !ok || !succeeded {
 		return
 	}
@@ -160,27 +184,23 @@ func reflectTarget(cast Cast, target Creature) Creature {
 	return cast.Caster
 }
 
-func disableWithSuccessCheck(cast Cast, target Creature) {
-	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+func disableWithSuccessCheck(cast Cast, target Creature, land landing) {
+	succeeded, ok := land.succeeds(cast, target)
 	if !ok || !succeeded {
 		return
 	}
-	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, target)
 }
 
-// disableReflectable rolls the shield defense against the original target
-// before the reflect swap, matching Disablers.java:64 (calcShldUse against
-// targetCreature, once, ahead of the switch) and :80-83 (the reflect
-// reassignment happens after sDef is already fixed, and calcSkillSuccess
-// still consumes that pre-swap sDef even when the reflected cast now lands
-// on the caster).
-func disableReflectable(cast Cast, target Creature) {
-	shield := resolveShieldDefense(cast.Caster, target, cast.Skill)
+// disableReflectable keeps the shield outcome rolled against the original
+// target even when the reflect swap turns the cast back on the caster: both
+// the landing roll and the effects use that pre-swap outcome.
+func disableReflectable(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
+	succeeded, ok := land.succeeds(cast, effected)
 	if !ok || !succeeded {
 		if ok {
 			if _, player := asPlayer(cast.Caster); player {
@@ -189,19 +209,17 @@ func disableReflectable(cast Cast, target Creature) {
 		}
 		return
 	}
-	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, effected)
 }
 
-// disableMute rolls the shield defense against the original target before
-// the reflect swap; see disableReflectable's comment (Disablers.java:64,
-// :90-93 for the MUTE case specifically).
-func disableMute(cast Cast, target Creature) {
-	shield := resolveShieldDefense(cast.Caster, target, cast.Skill)
+// disableMute keeps the pre-swap shield outcome the way disableReflectable
+// does.
+func disableMute(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, blessedSpiritshotCharged(cast.Caster), shield)
+	succeeded, ok := land.succeeds(cast, effected)
 	if !ok || !succeeded {
 		if ok {
 			if _, player := asPlayer(cast.Caster); player {
@@ -211,19 +229,19 @@ func disableMute(cast Cast, target Creature) {
 		return
 	}
 	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))
-	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, effected)
 }
 
-func disableConfusion(cast Cast, target Creature) {
+func disableConfusion(cast Cast, target Creature, land landing) {
 	if !target.Attackable() {
 		return
 	}
-	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+	succeeded, ok := land.succeeds(cast, target)
 	if !ok || !succeeded {
 		return
 	}
 	stopSkillType(target.EffectList(), skillTypeKey(cast.Skill.SkillType))
-	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, target)
 }
 
 // disableAggReduce applies the skill's effects and, for a positive skill
@@ -231,19 +249,19 @@ func disableConfusion(cast Cast, target Creature) {
 // holds. The reference handler also covers a zero-or-negative power that
 // instead subtracts a generic AGGRESSION stat delta; that needs a stat
 // resolution this port has no generic model for yet, so it's skipped.
-func disableAggReduce(cast Cast, target Creature) {
+func disableAggReduce(cast Cast, target Creature, land landing) {
 	// Only an NPC holds the aggro tables this skill reduces.
 	if !target.Attackable() {
 		return
 	}
-	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, target)
 	if cast.Skill.Power > 0 {
 		target.ReduceAllAggroHate(float64(cast.Skill.Power))
 	}
 }
 
-func disableAggReduceChar(cast Cast, target Creature) {
-	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+func disableAggReduceChar(cast Cast, target Creature, land landing) {
+	succeeded, ok := land.succeeds(cast, target)
 	if !ok || !succeeded {
 		return
 	}
@@ -251,14 +269,14 @@ func disableAggReduceChar(cast Cast, target Creature) {
 		target.StopAggroHate(cast.Caster)
 		target.StopHateList(cast.Caster)
 	}
-	applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, target)
 }
 
-func disableAggRemove(cast Cast, target Creature) {
+func disableAggRemove(cast Cast, target Creature, land landing) {
 	if !target.Attackable() || target.RaidRelated() {
 		return
 	}
-	succeeded, ok := checkSkillSuccess(cast.Caster, target, cast.Skill)
+	succeeded, ok := land.succeeds(cast, target)
 	if !ok || !succeeded {
 		return
 	}
@@ -275,7 +293,7 @@ func disableAggRemove(cast Cast, target Creature) {
 // unconditional (NegateLevel == -1) negate-by-type list are ported; a
 // level-gated negate-by-type needs each active effect's abnormal level,
 // which isn't tracked on a live effect yet, so it's skipped.
-func disableNegate(cast Cast, target Creature) {
+func disableNegate(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
@@ -300,7 +318,7 @@ func disableNegate(cast Cast, target Creature) {
 		}
 	}
 
-	applyCastEffects(cast, effected, cast.Skill, cast.Skill.Effects)
+	land.apply(cast, effected)
 }
 
 func disableCancelDebuff(cast Cast, target Creature) {

@@ -139,6 +139,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		})
 	case event.HitLanded:
 		l.chance.AttackHit(actor, e.Target, e.Crit)
+	case event.AttackStanceRequested, event.Attacked:
+		l.startSummonAttackStance(actor)
 	case event.CastAborted:
 		// The cancel animation goes to every observer; an interrupt also
 		// tells the owner, since a summon's own messages reach its owner.

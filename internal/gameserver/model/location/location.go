@@ -64,6 +64,22 @@ func In2DRadius(ax, ay, bx, by, radius int) bool {
 	return (Location{X: ax, Y: ay}).In2DRadius(Location{X: bx, Y: by}, radius)
 }
 
+// EquidistantPoint returns point index of count points spaced evenly around
+// the circle of radius centered on (cx, cy), at height z. Point 0 lies on the
+// +X axis and the rest follow counterclockwise; each offset from the center
+// is truncated toward zero.
+func EquidistantPoint(cx, cy, z, radius, count, index int) Location {
+	if index == 0 {
+		return Location{X: cx + radius, Y: cy, Z: z}
+	}
+	angle := 2 * math.Pi / float64(count) * float64(index)
+	return Location{
+		X: cx + int(math.Cos(angle)*float64(radius)),
+		Y: cy + int(math.Sin(angle)*float64(radius)),
+		Z: z,
+	}
+}
+
 // headingScale converts a full-circle angle in degrees to the game's
 // heading range (65536 units per circle): 65536 / 360.
 const headingScale = 182.04444444444444
