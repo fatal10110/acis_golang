@@ -51,9 +51,14 @@ func (a *Actor) StopCast() {
 	a.TryToIdle()
 }
 
-// BreakCastOnDamage rolls whether a landed auto-attack hit of damage breaks
-// a's cast.
+// BreakCastOnDamage rolls whether a landed auto-attack hit, or a skill hit
+// whose handler rolls the break ahead of other per-hit work (then applying
+// the hit through ReduceHPWithoutCastBreak), of damage breaks a's cast. A
+// dead summon draws no roll.
 func (a *Actor) BreakCastOnDamage(damage float64) {
+	if a.Dead() {
+		return
+	}
 	a.breakCastOnDamage(damage)
 }
 

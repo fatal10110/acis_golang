@@ -21,9 +21,9 @@ func WeaponSkillLands(caster Creature, target Actor, def modelskill.Definition) 
 // outcome and no blessed spiritshot. No handler runs. The result reports
 // each icon effect target resisted.
 func LandCritSkill(caster Creature, target Actor, def modelskill.Definition, shield formulas.ShieldDefense) Result {
-	var messages []any
-	result := Result{messages: &messages}
-	cast := Cast{Caster: caster, Skill: def, Targets: []Actor{target}, resisted: &result, messages: &messages}
+	messages := &messageLog{}
+	result := Result{messages: messages}
+	cast := Cast{Caster: caster, Skill: def, Targets: []Actor{target}, resisted: &result, messages: messages}
 	if t, ok := asCreature(target); ok {
 		if e := firstEffectByID(t.EffectList(), def.ID); e != nil {
 			t.EffectList().Remove(e)
@@ -31,6 +31,6 @@ func LandCritSkill(caster Creature, target Actor, def modelskill.Definition, shi
 	}
 	applyCastEffects(cast, target, def, def.Effects, shield, false)
 	result.messages = nil
-	result.Messages = messages
+	result.Messages = messages.pending
 	return result
 }

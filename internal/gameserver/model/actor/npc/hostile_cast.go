@@ -59,9 +59,14 @@ func (h *Hostile) StopCast() {
 	}
 }
 
-// BreakCastOnDamage rolls whether a landed auto-attack hit of damage breaks
-// h's cast.
+// BreakCastOnDamage rolls whether a landed auto-attack hit, or a skill hit
+// whose handler rolls the break ahead of other per-hit work (then applying
+// the hit through ReduceHPWithoutCastBreak), of damage breaks h's cast. A
+// dead NPC draws no roll.
 func (h *Hostile) BreakCastOnDamage(damage float64) {
+	if h.AlikeDead() {
+		return
+	}
 	h.breakCastOnDamage(damage)
 }
 

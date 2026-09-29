@@ -563,18 +563,9 @@ func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ models
 	a.reduceHP(amount, attacker)
 }
 
-// BreakCastOnDamage rolls whether a skill hit of damage breaks a's cast,
-// for a skill handler that must roll it ahead of other per-hit work;
-// ReduceHPWithoutCastBreak then applies the hit.
-func (a *Actor) BreakCastOnDamage(damage float64) {
-	if a.Dead() {
-		return
-	}
-	a.breakCastOnDamage(damage)
-}
-
-// ReduceHPWithoutCastBreak is ReduceHP for a hit whose cast-break roll the
-// caller already ran through BreakCastOnDamage.
+// ReduceHPWithoutCastBreak is ReduceHP for a skill hit whose cast-break roll
+// the caller already ran through BreakCastOnDamage, ahead of other per-hit
+// work.
 func (a *Actor) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	a.reduceHP(amount, attacker)
 }
