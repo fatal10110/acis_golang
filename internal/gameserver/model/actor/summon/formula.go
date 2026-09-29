@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"math"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -420,8 +421,9 @@ func (a *Actor) HP() float64 {
 }
 
 // MaxHPValue returns maximum HP as a floating-point skill-resource value.
+// A maximum is a whole-point value; current HP keeps its fraction.
 func (a *Actor) MaxHPValue() float64 {
-	return a.calcStat(stat.MaxHP, a.combatStats().MaxHP)
+	return math.Trunc(a.calcStat(stat.MaxHP, a.combatStats().MaxHP))
 }
 
 // MPValue returns current MP as a floating-point skill-resource value.
@@ -431,9 +433,10 @@ func (a *Actor) MPValue() float64 {
 	return a.vitals.mp
 }
 
-// MaxMPValue returns maximum MP as a floating-point skill-resource value.
+// MaxMPValue returns maximum MP as a floating-point skill-resource value,
+// in whole points like MaxHPValue.
 func (a *Actor) MaxMPValue() float64 {
-	return a.calcStat(stat.MaxMP, a.combatStats().MaxMP)
+	return math.Trunc(a.calcStat(stat.MaxMP, a.combatStats().MaxMP))
 }
 
 // SetHP sets current HP, clamped to [0, MaxHP], and republishes a's vitals

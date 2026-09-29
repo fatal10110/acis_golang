@@ -20,8 +20,10 @@ func TestValidatePositionFallDamage(t *testing.T) {
 	if hp != 35 {
 		t.Fatalf("fixture player HP = %v, want 35", hp)
 	}
-	if maxHP := character.MaxHPValue(); maxHP < 36.799 || maxHP > 36.801 {
-		t.Fatalf("fixture maximum HP = %v, want 36.8", maxHP)
+	// The fixture's maximum HP calculates to 36.8; like the reference's
+	// int getMaxHp, the maximum is the truncated whole-point value.
+	if maxHP := character.MaxHPValue(); maxHP != 36 {
+		t.Fatalf("fixture maximum HP = %v, want 36 (36.8 truncated)", maxHP)
 	}
 
 	// The male human fighter's safe fall height is 250. The reference
@@ -35,8 +37,7 @@ func TestValidatePositionFallDamage(t *testing.T) {
 		}
 	}
 
-	// Java getMaxHp truncates 36.8 to 36 before calcFallDam:
-	// (int)(251 * 36 / 1000) = 9.
+	// calcFallDam on the whole-point maximum: (int)(251 * 36 / 1000) = 9.
 	frames := validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - 251})
 	if len(frames) != 2 || frames[0][0] != serverpackets.OpcodeStatusUpdate || frames[1][0] != serverpackets.OpcodeSystemMessage {
 		t.Fatalf("fall replies = %x, want StatusUpdate then SystemMessage", frames)

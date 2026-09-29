@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"math"
 	"math/rand"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -85,8 +86,9 @@ func (h *Hostile) HP() float64 {
 }
 
 // MaxHPValue returns maximum HP as a floating-point skill-resource value.
+// A maximum is a whole-point value; current HP keeps its fraction.
 func (h *Hostile) MaxHPValue() float64 {
-	return h.calcStat(stat.MaxHP, h.Instance.Template.HPMax)
+	return math.Trunc(h.calcStat(stat.MaxHP, h.Instance.Template.HPMax))
 }
 
 // RunSpeed returns this NPC's final run speed.
@@ -101,9 +103,10 @@ func (h *Hostile) MPValue() float64 {
 	return h.mp
 }
 
-// MaxMPValue returns maximum MP as a floating-point skill-resource value.
+// MaxMPValue returns maximum MP as a floating-point skill-resource value,
+// in whole points like MaxHPValue.
 func (h *Hostile) MaxMPValue() float64 {
-	return h.calcStat(stat.MaxMP, h.Instance.Template.MPMax)
+	return math.Trunc(h.calcStat(stat.MaxMP, h.Instance.Template.MPMax))
 }
 
 // SetHP sets current HP, clamped to [0, MaxHP], and offers the targeters'

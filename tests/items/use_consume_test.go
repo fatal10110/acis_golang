@@ -729,6 +729,74 @@ func TestUseManaPotionSendsStatusBeforeRestoredMessage(t *testing.T) {
 	}
 }
 
+// TestUseManaPotionOneRestoreBelowFullSendsOneStatus pins the whole-point MP
+// maximum on the potion path. Starting one restore below the displayed full
+// pool, the first restore fills it and the second finds it full: it applies
+// nothing and sends no StatusUpdate, so the potion reports exactly one. The
+// fixture's MP maximum calculates to a fraction above the displayed value; a
+// clamp against that fraction would let the second restore apply it and send
+// a second status.
+func TestUseManaPotionOneRestoreBelowFullSendsOneStatus(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 728, 3)
+	startInWorld(t, c)
+	// The login refill leaves the pool at its displayed maximum.
+	full := srv.PlayerCurrentMP(t, objID)
+	const restore = 20 // the fixture ManaHeal's value
+	if full <= restore {
+		t.Fatalf("fixture max MP %d leaves no room for one %d restore", full, restore)
+	}
+	srv.DrainPlayerMP(t, objID, full+1)
+	if got := srv.AddPlayerMP(t, objID, float64(full-restore)); got != float64(full-restore) {
+		t.Fatalf("placing MP at %d applied %v", full-restore, got)
+	}
+
+	c.Send(encodeUseItem(potion, false))
+	frames := collectUntilQuiet(t, c)
+	msgAt := -1
+	var statusAt []int
+	for i, f := range frames {
+		switch f[0] {
+		case serverpackets.OpcodeSystemMessage:
+			if msgAt < 0 && systemMessageID(t, f) == serverpackets.SystemMessageS1MPRestored {
+				msgAt = i
+			}
+		case serverpackets.OpcodeStatusUpdate:
+			if wire.NewReader(f[1:]).ReadInt32() == objID {
+				statusAt = append(statusAt, i)
+			}
+		}
+	}
+	if msgAt < 0 {
+		t.Fatal("S1_MP_RESTORED never arrived")
+	}
+	if len(statusAt) != 1 || statusAt[0] != msgAt-1 {
+		t.Fatalf("user StatusUpdates at frames %v, want exactly one at frame %d right before S1_MP_RESTORED", statusAt, msgAt-1)
+	}
+	msg := wire.NewReader(frames[msgAt][1:])
+	msg.ReadInt32()
+	msg.ReadInt32()
+	msg.ReadInt32()
+	if restored := msg.ReadInt32(); restored != restore {
+		t.Fatalf("S1_MP_RESTORED amount = %d, want %d", restored, restore)
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != full {
+		t.Fatalf("MP after the potion = %d, want the displayed max %d", got, full)
+	}
+	assertPlayerStatus(t, frames[statusAt[0]], []int32{
+		int32(serverpackets.StatusCurrentHP), int32(srv.PlayerCurrentHP(t, objID)),
+		int32(serverpackets.StatusCurrentMP), int32(full),
+		int32(serverpackets.StatusCurrentCP), int32(srv.PlayerCurrentCP(t, objID)),
+		int32(serverpackets.StatusMaxCP), int32(srv.PlayerMaxCP(t, objID)),
+	})
+}
+
 // assertPlayerStatus asserts frame is a StatusUpdate carrying exactly the
 // given type/value pairs in order.
 func assertPlayerStatus(t *testing.T, frame []byte, want []int32) {

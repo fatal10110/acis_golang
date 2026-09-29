@@ -851,6 +851,15 @@ func (s *Server) AddPlayerHP(tb testing.TB, objID int32, amount float64) float64
 	return healer.AddHP(amount)
 }
 
+// AddPlayerMP restores MP to the live player and reports the amount that
+// actually landed, so a suite can place MP at an exact value after draining
+// the pool.
+func (s *Server) AddPlayerMP(tb testing.TB, objID int32, amount float64) float64 {
+	tb.Helper()
+	restorer := s.onlineCharacter(tb, objID)
+	return restorer.AddMP(amount)
+}
+
 // PlayerCurrentHP reports the live player's current HP.
 func (s *Server) PlayerCurrentHP(tb testing.TB, objID int32) int {
 	tb.Helper()
