@@ -43,6 +43,7 @@ func (p *scrollPlayer) ReviveOffer() (bool, bool) { return p.offer, p.offerForPe
 func newScrollPlayer(dead bool) *scrollPlayer {
 	return &scrollPlayer{scrollTarget: scrollTarget{kind: actor.KindPlayer, dead: dead}}
 }
+
 func (p *scrollPlayer) withOffer(forPet bool) *scrollPlayer {
 	p.offer, p.offerForPet = true, forPet
 	return p
