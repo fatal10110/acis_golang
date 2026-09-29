@@ -1031,8 +1031,25 @@ func TestLoadInventorySlotsUsesPlayersProperties(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadInventorySlots() error = %v", err)
 	}
-	if got != (player.InventorySlots{NoDwarf: 90, Dwarf: 117}) {
+	if got != (player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}) {
 		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:90 Dwarf:117}", got)
+	}
+}
+
+// TestLoadInventorySlotsKeepsExplicitZero pins the reference's as-is read:
+// an explicit 0 is a 0-slot base, not the shipped default.
+func TestLoadInventorySlotsKeepsExplicitZero(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("MaximumSlotsForNoDwarf = 0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadInventorySlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadInventorySlots() error = %v", err)
+	}
+	if got != (player.InventorySlots{NoDwarf: 0, Dwarf: 100, Configured: true}) {
+		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:0 Dwarf:100 Configured:true}", got)
 	}
 }
 
@@ -1046,7 +1063,7 @@ func TestLoadInventorySlotsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadInventorySlots() error = %v", err)
 	}
-	if got != (player.InventorySlots{NoDwarf: 80, Dwarf: 100}) {
+	if got != player.DefaultInventorySlots {
 		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:80 Dwarf:100}", got)
 	}
 }

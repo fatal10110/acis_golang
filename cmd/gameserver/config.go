@@ -266,8 +266,9 @@ func loadInventorySlots(paths gameServerPaths) (player.InventorySlots, error) {
 	}
 	fields := config.NewFields(props, "inventory slots")
 	slots := player.InventorySlots{
-		NoDwarf: fields.Int("MaximumSlotsForNoDwarf", player.DefaultInventorySlots.NoDwarf),
-		Dwarf:   fields.Int("MaximumSlotsForDwarf", player.DefaultInventorySlots.Dwarf),
+		NoDwarf:    fields.Int("MaximumSlotsForNoDwarf", player.DefaultInventorySlots.NoDwarf),
+		Dwarf:      fields.Int("MaximumSlotsForDwarf", player.DefaultInventorySlots.Dwarf),
+		Configured: true,
 	}
 	if err := fields.Err(); err != nil {
 		return player.InventorySlots{}, err

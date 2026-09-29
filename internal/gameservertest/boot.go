@@ -286,7 +286,9 @@ func WithWeightLimitMultiplier(m float64) Option {
 // WithInventorySlots sets the players.properties MaximumSlotsForNoDwarf /
 // MaximumSlotsForDwarf base inventory slot counts (default 80/100).
 func WithInventorySlots(noDwarf, dwarf int) Option {
-	return func(o *options) { o.inventorySlots = player.InventorySlots{NoDwarf: noDwarf, Dwarf: dwarf} }
+	return func(o *options) {
+		o.inventorySlots = player.InventorySlots{NoDwarf: noDwarf, Dwarf: dwarf, Configured: true}
+	}
 }
 
 // WithMaxBuffsAmount sets the players.properties MaxBuffsAmount base

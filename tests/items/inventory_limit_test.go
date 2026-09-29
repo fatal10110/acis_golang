@@ -61,3 +61,95 @@ func TestPickupRefusedAtConfiguredInventoryLimit(t *testing.T) {
 		t.Fatalf("carried weapons after the refused pickup = %d, want 1", n)
 	}
 }
+
+// inventoryLimitArmorID is the catalog's chest armor, cloned with an
+// inventoryLimit bonus for the equip-toggle scenario.
+const inventoryLimitArmorID int32 = 40
+
+// TestEquipToggleResendsStorageLimitWhenInventoryLimitMoves pins the
+// storage-limit resend at the end of an equip toggle: putting on armor whose
+// inventoryLimit bonus raises the limit sends ExStorageMaxCount with the new
+// limit after the UserInfo refresh, taking it off sends the lowered limit
+// the same way, and toggling an item that leaves the limit alone sends none.
+func TestEquipToggleResendsStorageLimitWhenInventoryLimitMoves(t *testing.T) {
+	t.Parallel()
+	var templates []*item.Template
+	for _, tmpl := range gameservertest.ItemTemplates().All() {
+		if tmpl.ID == inventoryLimitArmorID {
+			clone := *tmpl
+			clone.Modifiers = append(append([]item.StatModifier(nil), tmpl.Modifiers...),
+				item.StatModifier{Op: item.FuncAdd, Stat: "inventoryLimit", Value: 5})
+			tmpl = &clone
+		}
+		templates = append(templates, tmpl)
+	}
+	srv := gameservertest.Boot(t,
+		gameservertest.WithItemTemplates(item.NewTable(templates)),
+		gameservertest.WithCharacter("Newbie", 1, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	armor := srv.GiveItem(t, objID, inventoryLimitArmorID, 1)
+	weapon := srv.GiveItem(t, objID, 30, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeUseItem(armor, false))
+	assertStorageLimitAfterUserInfo(t, collectUntilQuiet(t, c), 85)
+
+	c.Send(encodeUseItem(armor, false))
+	assertStorageLimitAfterUserInfo(t, collectUntilQuiet(t, c), 80)
+
+	for range 2 {
+		c.Send(encodeUseItem(weapon, false))
+		frames := collectUntilQuiet(t, c)
+		if storageLimitFrame(frames) >= 0 {
+			t.Fatal("toggling a weapon without an inventoryLimit bonus sent ExStorageMaxCount")
+		}
+		if userInfoFrame(frames) < 0 {
+			t.Fatal("weapon toggle sent no UserInfo refresh")
+		}
+	}
+}
+
+// assertStorageLimitAfterUserInfo requires exactly one ExStorageMaxCount in
+// frames, after the first UserInfo, reporting the wanted inventory limit.
+func assertStorageLimitAfterUserInfo(t *testing.T, frames [][]byte, want int32) {
+	t.Helper()
+	storage, userInfo := storageLimitFrame(frames), userInfoFrame(frames)
+	if storage < 0 || userInfo < 0 || storage < userInfo {
+		t.Fatalf("ExStorageMaxCount at frame %d, UserInfo at %d: want ExStorageMaxCount after UserInfo", storage, userInfo)
+	}
+	for _, f := range frames[storage+1:] {
+		if isStorageLimitFrame(f) {
+			t.Fatal("equip toggle sent a second ExStorageMaxCount")
+		}
+	}
+	r := wire.NewReader(frames[storage][3:])
+	if got := r.ReadInt32(); got != want {
+		t.Fatalf("ExStorageMaxCount inventory limit = %d, want %d", got, want)
+	}
+}
+
+func isStorageLimitFrame(f []byte) bool {
+	return len(f) >= 3 && f[0] == serverpackets.OpcodeExtended &&
+		wire.NewReader(f[1:]).ReadUint16() == serverpackets.OpcodeExStorageMaxCount
+}
+
+func storageLimitFrame(frames [][]byte) int {
+	for i, f := range frames {
+		if isStorageLimitFrame(f) {
+			return i
+		}
+	}
+	return -1
+}
+
+func userInfoFrame(frames [][]byte) int {
+	for i, f := range frames {
+		if f[0] == serverpackets.OpcodeUserInfo {
+			return i
+		}
+	}
+	return -1
+}
