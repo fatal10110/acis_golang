@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -33,7 +34,7 @@ func sessionOnly(ev event.Event) bool {
 	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed,
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
 		event.RelaxHPFull, event.Restored, event.EffectEnded, event.SpoilResult,
-		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed,
+		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
 		event.SkillResisted, event.MagicResisted, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged:
@@ -199,6 +200,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShieldDefenceSuccessful))
 	case event.AttackFailed:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+	case event.HitDealt:
+		if e.Miss {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+			return
+		}
+		sendDamageMessage(live, hitDamage(e, skillhandler.DamageByPlayer))
 	case event.SkillResisted:
 		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, e.TargetName, int32(e.SkillID), int32(e.Level)))
 	case event.MagicResisted:
@@ -266,6 +273,17 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 	case event.ServitorSummonRequested:
 		(&gameSummonSpawner{link: l, live: live}).SpawnServitor(live.Character, e.Skill)
+	}
+}
+
+// hitDamage is an auto-attack hit's damage feedback from source.
+func hitDamage(e event.HitDealt, source skillhandler.DamageSource) skillhandler.Damage {
+	return skillhandler.Damage{
+		Source:       source,
+		Amount:       int32(e.Damage),
+		PhysicalCrit: e.Crit,
+		Blocked:      e.Blocked,
+		Petrified:    e.Petrified,
 	}
 }
 

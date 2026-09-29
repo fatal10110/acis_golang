@@ -385,6 +385,10 @@ func (a *Actor) SSCount() int { return a.combatStats().SSCount }
 // SPSCount returns the beast spiritshot count this summon consumes per charge.
 func (a *Actor) SPSCount() int { return a.combatStats().SPSCount }
 
+// SetRollSource overrides Roll's random source for deterministic tests. Call
+// it on the summon's queue.
+func (a *Actor) SetRollSource(f func(int) int) { a.roll = f }
+
 // Roll draws a uniform random integer in [0, n) from a's combat random source.
 func (a *Actor) Roll(n int) int {
 	if n <= 0 {
