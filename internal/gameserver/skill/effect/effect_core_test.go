@@ -888,6 +888,10 @@ func (t *liveEffectTarget) StopPhoenixBlessing(*Effect) {
 	t.events = append(t.events, "stop-phoenix-bless")
 }
 
+func (t *liveEffectTarget) StopProtectionBlessing(*Effect) {
+	t.events = append(t.events, "stop-protection-bless")
+}
+
 func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
 	t.events = append(t.events, fmt.Sprintf("stop-skill:%d", id))
 }
@@ -2838,6 +2842,7 @@ func (playerStubs) TryToAttack(world.Tracked)            {}
 func (playerStubs) WakeAI()                              {}
 func (playerStubs) StopCharmOfLuck(*Effect)              {}
 func (playerStubs) StopPhoenixBlessing(*Effect)          {}
+func (playerStubs) StopProtectionBlessing(*Effect)       {}
 func (playerStubs) WeaponGradePenalty() bool             { return false }
 func (playerStubs) ReduceDeathPenaltyLevel() int         { return 0 }
 func (playerStubs) CastingNow() bool                     { return false }

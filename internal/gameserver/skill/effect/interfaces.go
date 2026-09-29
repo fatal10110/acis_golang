@@ -94,6 +94,7 @@ type PlayerActor interface {
 	WakeAI()
 	StopCharmOfLuck(*Effect)
 	StopPhoenixBlessing(*Effect)
+	StopProtectionBlessing(*Effect)
 	WeaponGradePenalty() bool
 	ReduceDeathPenaltyLevel() int
 
@@ -156,6 +157,10 @@ type SummonActor interface {
 	// see its appearance refreshed.
 	StopCharmOfLuck(*Effect)
 	StopPhoenixBlessing(*Effect)
+	// StopProtectionBlessing runs when a Blessing of Protection loses its
+	// stack group's head on the summon; observers see its appearance
+	// refreshed.
+	StopProtectionBlessing(*Effect)
 }
 
 // CasterActor is the cast surface of every kind that casts: players, NPCs

@@ -257,13 +257,15 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
-			l.addStatFuncs(e)
+			if !e.startRefused {
+				l.addStatFuncs(e)
+			}
 		} else {
 			onReject(e)
 		}
 		l.mu.Unlock()
 
-		if ok && announce && e.Template.Icon && l.owner != nil {
+		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
 		}
 	}
@@ -350,6 +352,6 @@ func retire(e *Effect, pending *[]func(), retiring *[]*Effect) {
 		return
 	}
 	appendThunk(pending, e.stopTaskThunk())
-	appendThunk(pending, e.beginExit())
+	appendThunk(pending, e.finishExit())
 	*retiring = append(*retiring, e)
 }
