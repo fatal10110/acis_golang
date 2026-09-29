@@ -292,7 +292,8 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrMagicMuted) ||
 		errors.Is(err, actorcast.ErrPhysicalMuted) ||
 		errors.Is(err, actorcast.ErrCubicListFull) ||
-		errors.Is(err, actorcast.ErrNotEnoughItems)
+		errors.Is(err, actorcast.ErrNotEnoughItems) ||
+		errors.As(err, new(*actorcast.ConditionError))
 }
 
 func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() {
@@ -610,7 +611,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	if live == nil {
 		return
 	}
+	var condErr *actorcast.ConditionError
 	switch {
+	case errors.As(err, &condErr):
+		sendSkillConditionFailure(live, condErr.Clause, def.ID)
 	case errors.Is(err, actorcast.ErrNotEnoughMP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughMP))
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
@@ -641,6 +645,23 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	}
+}
+
+// sendSkillConditionFailure sends the feedback a failed skill <cond> clause
+// configures: its system message, naming the skill at level 1 when the
+// clause asks for the name, or else its literal text, or nothing.
+func sendSkillConditionFailure(live *livePlayer, clause modelskill.ConditionClause, skillID modelskill.ID) {
+	if live == nil {
+		return
+	}
+	switch {
+	case clause.MessageID != 0 && clause.AddName:
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(clause.MessageID), int32(skillID), 1))
+	case clause.MessageID != 0:
+		live.SendFrame(serverpackets.FrameSystemMessage(int(clause.MessageID)))
+	case clause.Message != "":
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, clause.Message))
 	}
 }
 

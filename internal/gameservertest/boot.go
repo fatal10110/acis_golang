@@ -93,6 +93,7 @@ type options struct {
 	persistWait            time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
+	weightLimitMultiplier  float64
 	storeSkillCooltime     bool
 	cancelLesserEffect     bool
 	magicFailures          bool
@@ -258,6 +259,13 @@ func WithDeepBlueDropRules(enabled bool) Option {
 // positive (default 1).
 func WithRateKarmaExpLost(rate float64) Option {
 	return func(o *options) { o.rateKarmaExpLost = rate }
+}
+
+// WithWeightLimitMultiplier sets the players.properties WeightLimit
+// multiplier. The default 0 leaves every player without a weight limit, so
+// no weight penalty band is ever computed.
+func WithWeightLimitMultiplier(m float64) Option {
+	return func(o *options) { o.weightLimitMultiplier = m }
 }
 
 // WithMaxBuffsAmount sets the players.properties MaxBuffsAmount base
@@ -1216,7 +1224,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

@@ -311,7 +311,8 @@ func (c *Controller) groundTargetGate(def modelskill.Definition) error {
 }
 
 // CanCast validates the reusable pre-cast checks for target, reuse, current
-// MP/HP, mute state, and required skill items.
+// MP/HP, mute state, the skill's <cond> clauses (for a caster that evaluates
+// them), and required skill items.
 func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
@@ -337,6 +338,11 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		}
 	} else if c.actor.PhysicalMuted() {
 		return ErrPhysicalMuted
+	}
+	if gate, ok := c.actor.(conditionGate); ok {
+		if clause, ok := gate.SkillConditions(target, def); !ok {
+			return &ConditionError{Clause: clause}
+		}
 	}
 	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
 		if c.actor.CubicListFull() {

@@ -15,6 +15,14 @@ import (
 // not error. See #1509.
 var _ conditions.Actor = summonStatActor{}
 
+// ConditionActor is a's view for skill and item condition tests.
+func (a *Actor) ConditionActor() conditions.Actor {
+	if a == nil {
+		return nil
+	}
+	return summonStatActor{a: a}
+}
+
 // HPRatio satisfies conditions.Actor.
 func (s summonStatActor) HPRatio() float64 {
 	max := s.a.MaxHPValue()
@@ -90,9 +98,11 @@ func (s summonStatActor) IsInFrontOf(other conditions.Actor) bool {
 	return facing.IsInFrontOf(location.Location{X: s.X(), Y: s.Y(), Z: s.Z()})
 }
 
-// ActiveSkillLevel satisfies conditions.Actor.
+// ActiveSkillLevel satisfies conditions.Actor from this summon's template
+// skills (GetSkill); an active effect of the skill does not count.
 func (s summonStatActor) ActiveSkillLevel(id int) (int, bool) {
-	return s.a.EffectList().ActiveBySkillID(id)
+	ref, ok := s.a.GetSkill(id)
+	return int(ref.Level), ok
 }
 
 // ActiveEffectLevel satisfies conditions.Actor.
