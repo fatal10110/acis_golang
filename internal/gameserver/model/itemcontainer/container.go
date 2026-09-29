@@ -73,7 +73,7 @@ func cmpDesc(a, b int64) int {
 // means unlimited, matching the base behavior every container has until a
 // caller sets a real limit (pet config, clan config, ...) — this package
 // doesn't load config itself. A player inventory takes its live limit from
-// its owner instead (Inventory.SetSlotLimiter).
+// its owner instead (Inventory.SetLimiter).
 //
 // mu guards the membership map. Mutable item fields are guarded by
 // item.Instance once an instance is visible outside construction/restore code.
@@ -182,14 +182,6 @@ func (c *Container) itemsLocked() []*item.Instance {
 	}
 	sortContainerOrder(out)
 	return out
-}
-
-func (c *Container) forEach(fn func(*item.Instance)) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	for _, inst := range c.items {
-		fn(inst)
-	}
 }
 
 // HasItem reports whether the container holds any instance of templateID.

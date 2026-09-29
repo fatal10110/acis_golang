@@ -90,6 +90,7 @@ type options struct {
 	spawnProtection        time.Duration
 	allowDelevel           bool
 	deepBlueDropRules      bool
+	autoLoot               bool
 	rateKarmaExpLost       float64
 	characterSelectDelay   time.Duration
 	persistWait            time.Duration
@@ -269,6 +270,13 @@ func WithDeepBlueDropRules(enabled bool) Option {
 	return func(o *options) { o.deepBlueDropRules = enabled }
 }
 
+// WithAutoLoot sets the server.properties AutoLoot gate: whether a
+// non-raid kill's drops go straight into the killer's inventory instead of
+// onto the ground (default false).
+func WithAutoLoot(enabled bool) Option {
+	return func(o *options) { o.autoLoot = enabled }
+}
+
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
 // multiplier applied to the death exp-loss percentage while karma is
 // positive (default 1).
@@ -277,8 +285,9 @@ func WithRateKarmaExpLost(rate float64) Option {
 }
 
 // WithWeightLimitMultiplier sets the players.properties WeightLimit
-// multiplier. The default 0 leaves every player without a weight limit, so
-// no weight penalty band is ever computed.
+// multiplier (default 1, the shipped value). 0 leaves every player with a
+// weight limit of 0: no weight penalty band is ever computed, and no
+// weighted item can be received through a weight-checked path.
 func WithWeightLimitMultiplier(m float64) Option {
 	return func(o *options) { o.weightLimitMultiplier = m }
 }
@@ -470,6 +479,7 @@ type Server struct {
 	itemTable        *item.Table
 	levelTable       *player.LevelTable
 	deepBlueDrops    bool
+	autoLoot         bool
 	ids              *sequentialIDs
 	positions        *task.PositionUpdates
 	addr             net.Addr
@@ -695,13 +705,18 @@ func (s *Server) DisablePlayerItem(tb testing.TB, objID, objectID int32, delay t
 func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	tb.Helper()
 	holder := s.onlineCharacter(tb, objID)
-	holder.Inventory().SetSlotLimiter(fixedSlotLimit(limit))
+	holder.Inventory().SetLimiter(fixedSlotLimit{limit: limit, owner: holder})
 }
 
-// fixedSlotLimit is a slot limit that never changes.
-type fixedSlotLimit int
+// fixedSlotLimit is a slot limit that never changes; the weight limit stays
+// the owner's own.
+type fixedSlotLimit struct {
+	limit int
+	owner itemcontainer.Limiter
+}
 
-func (l fixedSlotLimit) InventoryLimit() int { return int(l) }
+func (l fixedSlotLimit) InventoryLimit() int { return l.limit }
+func (l fixedSlotLimit) WeightLimit() int    { return l.owner.WeightLimit() }
 
 // PlayerInventory returns the live player's inventory so suites can stage a
 // mutation from a queue task, where no client packet can reach: the
@@ -1061,6 +1076,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cancelLesserEffect:     true,
 		magicFailures:          true,
 		storeSkillCooltime:     true,
+		weightLimitMultiplier:  1,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -1444,6 +1460,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,
+		autoLoot:         o.autoLoot,
 		DB:               db,
 		Chars:            chars,
 		Items:            items,

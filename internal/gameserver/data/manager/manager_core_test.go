@@ -75,7 +75,11 @@ type lootKiller struct {
 	// refuseHerbs models a detached character: it still satisfies the
 	// receiver contract but has no consumer behind it.
 	refuseHerbs bool
+	// full models an inventory at its slot limit.
+	full bool
 }
+
+func (l *lootKiller) RewardItemFits(int32, int) bool { return !l.full }
 
 func (l *lootKiller) ConsumeHerb(itemID int32) bool {
 	if l.refuseHerbs {

@@ -29,7 +29,11 @@ type groundPlacer interface {
 	Drop(ground *grounditem.Item, opts task.DropOptions)
 }
 
+// rewardItemReceiver takes auto-looted items straight into its inventory.
+// RewardItemFits is the slot check an auto-loot must pass first; an item
+// that does not fit falls to the ground instead.
 type rewardItemReceiver interface {
+	RewardItemFits(itemID int32, count int) bool
 	AddRewardItem(itemID int32, count int, objectID int32) bool
 }
 
@@ -155,6 +159,9 @@ func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, c
 		return false
 	}
 	if _, ok := k.items.Get(itemID); !ok {
+		return false
+	}
+	if !receiver.RewardItemFits(itemID, count) {
 		return false
 	}
 	id, err := k.ids.NextID()
