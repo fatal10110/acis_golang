@@ -564,6 +564,8 @@ func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
 
+func (a *fakeActor) RefuseAttackTarget() {}
+
 func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
 	a.moveToPawnTo = target

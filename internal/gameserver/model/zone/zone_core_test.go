@@ -252,3 +252,91 @@ func TestNPCInPeaceZone(t *testing.T) {
 		t.Error("nil index: NPCInPeaceZone = true, want false")
 	}
 }
+
+type summonStub struct {
+	id    int32
+	at    location.Location
+	flags Flags
+}
+
+func (s *summonStub) ObjectID() int32             { return s.id }
+func (s *summonStub) Position() location.Location { return s.at }
+func (s *summonStub) ZoneFlags() *Flags           { return &s.flags }
+func (s *summonStub) Class() Class                { return ClassSummon }
+
+// TestSummonCombatZonesMatchesZoneEntry pins the position query summons read
+// against the flags the zone engine raises when a summon-class occupant
+// enters the same zones: PvP from an arena, an active siege or a running
+// stadium, cancelled by any peace hold; siege from an active siege only.
+func TestSummonCombatZonesMatchesZoneEntry(t *testing.T) {
+	cuboid := func(x int) Form {
+		t.Helper()
+		f, err := NewCuboid(x, x+1000, 0, 1000, -100, 100)
+		if err != nil {
+			t.Fatalf("NewCuboid: %v", err)
+		}
+		return f
+	}
+	running := true
+	stadium := NewOlympiad(7, cuboid(12000))
+	stadium.BattleStarted = func() bool { return running }
+	activeSiege := &Siege{Zone: newZone(3, cuboid(4000))}
+	activeSiege.SetActive(true)
+	peacefulSiege := &Siege{Zone: newZone(5, cuboid(8000))}
+	peacefulSiege.SetActive(true)
+
+	ix := NewIndex()
+	ix.Add(NewArena(1, cuboid(0)))
+	ix.Add(NewArena(2, cuboid(2000)))
+	ix.Add(NewPeace(20, cuboid(2000)))
+	ix.Add(activeSiege)
+	ix.Add(&Siege{Zone: newZone(4, cuboid(6000))})
+	ix.Add(peacefulSiege)
+	ix.Add(&Town{Zone: newZone(21, cuboid(8000)), Peaceful: true})
+	ix.Add(NewArena(6, cuboid(10000)))
+	ix.Add(&Town{Zone: newZone(22, cuboid(10000)), Peaceful: true, CombatRule: 2})
+	ix.Add(stadium)
+	ix.Add(NewArena(8, cuboid(14000)))
+	ix.Add(NewDerbyTrack(23, cuboid(14000)))
+
+	cases := []struct {
+		name       string
+		x          int
+		pvp, siege bool
+	}{
+		{"arena", 500, true, false},
+		{"arena under a peace zone", 2500, false, false},
+		{"active siege", 4500, true, true},
+		{"inactive siege", 6500, false, false},
+		{"active siege inside a peaceful town", 8500, false, true},
+		{"arena inside a town with combat rule 2", 10500, true, false},
+		{"stadium with a match running", 12500, true, false},
+		{"arena under a derby track", 14500, false, false},
+		{"outside every zone", 16500, false, false},
+	}
+	for i, tc := range cases {
+		s := &summonStub{id: int32(i + 1), at: location.Location{X: tc.x, Y: 500, Z: 0}}
+		ix.Revalidate(s)
+		if got := s.flags.Has(FlagPvP); got != tc.pvp {
+			t.Fatalf("%s: zone entry raised PvP %v, want %v", tc.name, got, tc.pvp)
+		}
+		if got := s.flags.Has(FlagSiege); got != tc.siege {
+			t.Fatalf("%s: zone entry raised siege %v, want %v", tc.name, got, tc.siege)
+		}
+		if pvp, siege := ix.SummonCombatZones(tc.x, 500, 0); pvp != tc.pvp || siege != tc.siege {
+			t.Errorf("%s: SummonCombatZones = pvp %v siege %v, want pvp %v siege %v", tc.name, pvp, siege, tc.pvp, tc.siege)
+		}
+	}
+
+	running = false
+	if pvp, _ := ix.SummonCombatZones(12500, 500, 0); pvp {
+		t.Error("stadium with no match running: SummonCombatZones pvp = true, want false")
+	}
+	if pvp, _ := ix.SummonCombatZones(500, 500, 101); pvp {
+		t.Error("above the arena z bound: SummonCombatZones pvp = true, want false")
+	}
+	var nilIndex *Index
+	if pvp, siege := nilIndex.SummonCombatZones(500, 500, 0); pvp || siege {
+		t.Error("nil index: SummonCombatZones reported a combat zone")
+	}
+}

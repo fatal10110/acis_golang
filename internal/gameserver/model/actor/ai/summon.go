@@ -28,6 +28,9 @@ type SummonActor interface {
 	PhysicalAttackRange() int
 	SetHeadingTo(attackable.Combatant)
 	BroadcastMoveToPawn(attackable.Combatant)
+	// RefuseAttackTarget tells the owner an attack target was refused
+	// (TARGET_IS_INCORRECT).
+	RefuseAttackTarget()
 }
 
 // SummonMoveController controls movement requests emitted by a summon AI.
@@ -109,6 +112,8 @@ func (s *Summon) NextIntention() (Intention, attackable.Combatant, bool) {
 }
 
 // TryToAttack sets target as the attack intention and evaluates it once.
+// Past the deny and busy checks, a target the playable attack gate refuses
+// is reported to the owner and leaves the current intention untouched.
 func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -119,6 +124,10 @@ func (s *Summon) TryToAttack(target attackable.Combatant) bool {
 	if s.busyLocked() {
 		s.next = intention{kind: IntentionAttack, target: target}
 		return true
+	}
+	if refusesPlayableTarget(s.actor, target) {
+		s.actor.RefuseAttackTarget()
+		return false
 	}
 	s.setCurrentLocked(intention{kind: IntentionAttack, target: target})
 	accepted, err := s.thinkAttackLocked()

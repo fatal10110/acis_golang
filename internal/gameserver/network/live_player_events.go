@@ -227,6 +227,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 			Source: skillhandler.DamageByPlayer, Amount: int32(e.Amount),
 			MagicCrit: e.MagicCrit, Blocked: e.Blocked, Petrified: e.Petrified,
 		})
+	case event.AttackTargetRefused:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 	case event.AttackRequested:
 		if e.Target != nil {
 			l.attackLiveTarget(live, e.Target)
