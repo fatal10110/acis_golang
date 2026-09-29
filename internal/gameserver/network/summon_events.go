@@ -198,7 +198,13 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.CorpseLeftBehind:
 		s.leaveCorpseBehind()
 	case event.AttackFinished:
-		s.brain.Think()
+		actor.FinishedAttack()
+	case event.CastFinished:
+		// ponytail: an interrupted cast moves the AI on the same way in the
+		// reference; not modeled yet (#2701).
+		if !e.Interrupted {
+			actor.FinishedCasting()
+		}
 	case event.Arrived:
 		actor.SyncPosition(s.move.Position())
 		if s.brain.Arrived() {

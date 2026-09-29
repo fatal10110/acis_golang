@@ -110,8 +110,8 @@ func TestSummonStrikeOnUnflaggedPlayerNeedsCtrl(t *testing.T) {
 
 // TestQueuedSummonStrikeKeepsCtrl commands the strike at an unflagged player
 // while the pet is still casting at the monster, so the command is queued as
-// the pet's next intention. When the first cast is over and the queued one
-// runs, it is judged with the CTRL flag the command carried.
+// the pet's next intention. The queued one runs as soon as the first cast is
+// over, judged with the CTRL flag the command carried.
 func TestQueuedSummonStrikeKeepsCtrl(t *testing.T) {
 	t.Parallel()
 	// No reuse, so the queued strike can be the same skill, and a hit time
@@ -147,10 +147,8 @@ func TestQueuedSummonStrikeKeepsCtrl(t *testing.T) {
 				t.Fatalf("strike commanded mid-cast was judged at once: opcodes %x", frameOpcodes(queued))
 			}
 
-			// The first cast ends, then the AI's next think runs the queued one.
+			// The first cast ends and runs the queued one.
 			h.srv.Advance(t, hitTime*time.Millisecond)
-			drainFrames(t, h.client)
-			h.think(t)
 			frames := drainFrames(t, h.client)
 			if tc.ctrl {
 				requireSummonStrikeStarted(t, frames, petActor, bystanderID)

@@ -67,7 +67,6 @@ type PlayableActor interface {
 	CreatureActor
 
 	InPeaceZone() bool
-	TryToIdle()
 	// TestCursesOnAttack applies the raid curse for attacking a raid-related
 	// target and reports whether it blocked the attack.
 	TestCursesOnAttack(attackable.Combatant) bool

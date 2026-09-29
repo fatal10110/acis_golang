@@ -28,8 +28,18 @@ type AI interface {
 	TryToAttack(attackable.Combatant) bool
 	TryToFollow(attackable.Combatant) bool
 	TryToIdle()
+	// WaitOutIdle reports whether an idle request has to wait for the
+	// summon's swing or cast to end, dropping the queued intention if so.
+	WaitOutIdle() bool
 	// Think continues the current intention once.
 	Think()
+	// FinishedAttack runs the queued intention, if any, once a swing ends,
+	// and otherwise continues the current one.
+	FinishedAttack()
+	// FinishedCasting runs the queued intention, or the attack the cast
+	// replaced, once a cast completes; it reports true when the summon
+	// should go idle instead.
+	FinishedCasting() bool
 	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()

@@ -101,9 +101,15 @@ func immobileUntilAttackedStart(e *Effect) bool {
 	return true
 }
 
+// immobileUntilAttackedExit wakes the effected's AI whatever its kind:
+// unlike root, sleep, paralysis and petrification, a player is not left out.
 func immobileUntilAttackedExit(e *Effect) {
 	e.Effected.StopSkillEffectsByID(e.Skill.ID)
-	think(e.Effected)
+	if player, ok := asPlayer(e.Effected); ok && isPlayer(e.Effected) {
+		player.WakeAI()
+	} else {
+		think(e.Effected)
+	}
 	refresh(e.Effected)
 }
 

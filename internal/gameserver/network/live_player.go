@@ -400,8 +400,11 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 // tryToIdle drops every intention p holds, active and queued, and stops its
 // movement (combat.Stop stops the shared move controller, whatever the walk
 // was for). A character that was already unable to act keeps its intentions
-// and only answers ActionFailed. One still casting answers ActionFailed too:
-// its idle waits on the cast, which every caller stops next.
+// and only answers ActionFailed. One still attacking or casting answers
+// ActionFailed too: its idle waits for the swing or cast to end. Dropping
+// the active intention now instead of after that end is not client-visible,
+// since every caller either stops the swing and cast next or leaves the
+// character unable to act on the intention it would have resumed.
 //
 // ponytail: the sit/stand transition also defers the idle in the same way;
 // not modeled, since no effect-driven stop reaches a player mid-transition
@@ -411,7 +414,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 		p.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	casting := p.CastingNow()
+	busy := p.CastingNow() || (p.attack != nil && p.attack.AttackingNow())
 	p.takePickup()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
@@ -420,7 +423,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	if p.combat != nil {
 		p.combat.Stop()
 	}
-	if casting {
+	if busy {
 		p.SendFrame(serverpackets.FrameActionFailed())
 	}
 }

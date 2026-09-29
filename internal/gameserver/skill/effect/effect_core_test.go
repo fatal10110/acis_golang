@@ -784,6 +784,8 @@ func (t *liveEffectTarget) Think() error {
 	return nil
 }
 
+func (t *liveEffectTarget) WakeAI() { t.events = append(t.events, "wake-player-ai") }
+
 func (t *liveEffectTarget) Afraid() bool { return t.afraid }
 
 func (t *liveEffectTarget) FearImmune() bool { return t.fearImmune }
@@ -2817,6 +2819,7 @@ func (playerStubs) IncreaseCharges(int, int) bool        { return false }
 func (playerStubs) CurrentTarget() world.Tracked         { return nil }
 func (playerStubs) SetTarget(world.Tracked)              {}
 func (playerStubs) TryToAttack(world.Tracked)            {}
+func (playerStubs) WakeAI()                              {}
 func (playerStubs) StopCharmOfLuck(*Effect)              {}
 func (playerStubs) StopPhoenixBlessing(*Effect)          {}
 func (playerStubs) WeaponGradePenalty() bool             { return false }
