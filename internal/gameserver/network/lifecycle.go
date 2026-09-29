@@ -109,11 +109,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
 	}
 	if l.world != nil {
-		// The summon leaves with its owner. Its despawn settles a pet -- items back to
-		// live, row and collar saved -- so that must happen before live's
-		// own inventory is flushed below, and before live is despawned and
-		// the pet inventory's notifier, which holds live, can no longer
-		// reach it.
+		// A living summon leaves with its owner; a corpse stays until it
+		// decays. Either way a pet is settled here -- items back to live,
+		// row and collar saved -- so that must happen before live's own
+		// inventory is flushed below, and before live is despawned and the
+		// pet inventory's notifier, which holds live, can no longer reach
+		// it.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
 			if s, ok := obj.(*summon.Actor); ok {
 				if inv := s.PetInventory(); inv != nil {

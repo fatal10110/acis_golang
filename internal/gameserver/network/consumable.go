@@ -95,12 +95,5 @@ func applyItemCastCharges(live *livePlayer, res itemhandler.UseResult) {
 }
 
 func sendItemSkillConditionFailure(live *livePlayer, res itemhandler.UseResult) {
-	if live == nil || res.Condition.MessageID <= 0 {
-		return
-	}
-	if res.Condition.AddName {
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(res.Condition.MessageID), int32(res.Skill.ID), int32(res.Skill.Level)))
-		return
-	}
-	live.SendFrame(serverpackets.FrameSystemMessage(int(res.Condition.MessageID)))
+	sendSkillConditionFailure(live, res.Condition, res.Skill.ID)
 }

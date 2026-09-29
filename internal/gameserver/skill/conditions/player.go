@@ -171,9 +171,9 @@ func (c PlayerState) Test(effector, effected Actor, skill Skill) bool {
 	case StateFlying:
 		return a.IsFlying() == c.Required
 	case StateBehind:
-		return a.IsBehind(effected) == c.Required
+		return effected != nil && a.IsBehind(effected) == c.Required
 	case StateFront:
-		return a.IsInFrontOf(effected) == c.Required
+		return effected != nil && a.IsInFrontOf(effected) == c.Required
 	case StateOlympiad:
 		if p, ok := asPlayer(effector); ok {
 			return p.IsInOlympiadMode() == c.Required
@@ -215,8 +215,9 @@ func (c ActiveEffectID) Test(effector, effected Actor, skill Skill) bool {
 	return ok && c.Level <= level
 }
 
-// ActiveSkillID requires the effector to currently know a skill of the
-// given id, at or above Level (Level == -1 matches any level).
+// ActiveSkillID requires the effector to know (have learned, or have from
+// its template) a skill of the given id, at or above Level (Level == -1
+// matches any level). An active effect of that skill does not count.
 type ActiveSkillID struct {
 	SkillID int
 	Level   int

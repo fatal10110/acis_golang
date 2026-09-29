@@ -255,8 +255,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// suite's "no pets row until a save point" assertions. Level/Name/
 	// Fed/HP/MP/Exp/SP are restored here because summon.Actor already
 	// exposes somewhere to put them. A row saved below creature.DeathHP
-	// restores the pet dead (below); summons have no HP/MP regeneration
-	// task yet (#2307), so there is none to keep from starting.
+	// restores the pet dead (below), which also keeps it from regenerating
+	// (Actor.TickRegen).
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
 	if hasSaved {
 		level = state.Level
@@ -341,6 +341,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 			SSCount: levelStats.SSCount, SPSCount: levelStats.SPSCount,
 			AttackRange: npcTmpl.BaseAttackRange, AttackSpeed: npcTmpl.AtkSpd,
 			CritRate: npcTmpl.CritRate,
+			HPRegen:  npcTmpl.HPRegen, MPRegen: npcTmpl.MPRegen,
 		},
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,
@@ -450,6 +451,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 			AttackRange:      npcTmpl.BaseAttackRange,
 			AttackSpeed:      npcTmpl.AtkSpd,
 			CritRate:         npcTmpl.CritRate,
+			HPRegen:          npcTmpl.HPRegen,
+			MPRegen:          npcTmpl.MPRegen,
 		},
 		Skills:    npcTmpl.Skills,
 		Passives:  npcTmpl.Passives,

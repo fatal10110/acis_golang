@@ -27,9 +27,16 @@ type SummonRemoved struct{}
 // pet's saved state with it.
 type PetCorpseDecayed struct{}
 
+// CorpseLeftBehind reports that a dead summon's owner left the world while
+// the corpse stays in it until it decays. Whatever the owner's session must
+// settle for the summon is settled now, while the owner is still in world
+// state.
+type CorpseLeftBehind struct{}
+
 func (OwnerInfoChanged) event() {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
 func (Unsummoning) event()      {}
 func (SummonRemoved) event()    {}
 func (PetCorpseDecayed) event() {}
+func (CorpseLeftBehind) event() {}

@@ -84,9 +84,10 @@ type Actor struct {
 	// zero-value until InitMovement wires real geodata/speed, so Move().Moving()
 	// stays false (not an error) for a summon with no movement controller.
 	movement move.CreatureMove
-	// queue is the owner's queue, which this summon's work runs on; set once
-	// before the summon is published.
-	queue *sim.Queue
+	// queue is the queue this summon's work runs on: its owner's, set once
+	// before the summon is published, and a queue of its own once its corpse
+	// outlives its owner's session (AdoptCorpseQueue).
+	queue atomic.Pointer[sim.Queue]
 
 	id             int32
 	owner          Owner
@@ -116,6 +117,12 @@ type Actor struct {
 	disabled bool
 	// corpseTime is how long a servitor's corpse lasts; see DecayDelay.
 	corpseTime time.Duration
+	// corpseDeadline is when this summon's corpse decays, zero while it has
+	// none; guarded by vitals.mu, with dead.
+	corpseDeadline time.Time
+	// ownerLeft is set once this summon's owner has left the world while it
+	// lay dead; see LeaveWithOwner.
+	ownerLeft atomic.Bool
 	// despawnOnce runs the one despawn that takes this summon out of the
 	// world; see despawn. Nothing it runs may despawn this summon again.
 	despawnOnce sync.Once

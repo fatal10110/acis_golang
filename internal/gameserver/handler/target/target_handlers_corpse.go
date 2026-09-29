@@ -71,9 +71,11 @@ func corpseMobCanCast(target Actor, skill *modelskill.Definition) bool {
 	return target != nil && corpseMobCastRejection(target, skill) == CastRejectNone
 }
 
-// corpseMobCastRejection applies the shared corpse-mob eligibility rule.
+// corpseMobCastRejection applies the shared corpse-mob eligibility rule. Any
+// corpse awaiting its decay qualifies except a pet's: an NPC's or a
+// servitor's. Players never have one.
 func corpseMobCastRejection(target Actor, skill *modelskill.Definition) CastRejection {
-	if !target.HasCorpse() || isPlayable(target) {
+	if !target.HasCorpse() || target.IsPet() {
 		return CastRejectInvalidTarget
 	}
 	if skill != nil && skill.SkillType == "HARVEST" {
@@ -82,7 +84,7 @@ func corpseMobCastRejection(target Actor, skill *modelskill.Definition) CastReje
 		}
 		return CastRejectNone
 	}
-	if isAttackable(target) && corpseTooOld(target) && !corpseAgeBypass(target) {
+	if corpseTooOld(target) && !corpseAgeBypass(target) {
 		return CastRejectCorpseTooOld
 	}
 	if skill != nil && skill.SkillType == "SWEEP" && !target.MonsterKind() {

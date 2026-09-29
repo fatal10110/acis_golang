@@ -24,46 +24,62 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
+	selected := live.Target()
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
+	castable := known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle)
 	if known {
 		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
 			sendMagicActionFailed(live)
 			return
 		}
-		if (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle) && !l.attemptMagicSkill(live, def) {
+		if castable && !l.attemptMagicSkill(live, def, selected) {
 			return
 		}
-		if def.Activation == modelskill.ActivationToggle {
-			l.handleToggleSkillUse(live, req)
-			return
-		}
-	}
-	// PlayableAI.tryToCast (aCis:297-317) stores the requested cast as the
-	// next intention while a swing is active; starting it here would consume
-	// cast resources and broadcast MagicSkillUse before that swing finishes.
-	// The pre-attempt gate above has already answered a request that would
-	// fail it, so only a castable request is queued.
-	if live.attack != nil && live.attack.AttackingNow() {
-		live.deferMagicSkill(req)
-		sendMagicActionFailed(live)
-		return
 	}
 	// A pets-row read still in flight stands in for a cast the caster is
 	// still in, whether or not its hold already ended. A servitor cast started
 	// there would pay its item and MP, only to lose the slot to the inbound
-	// pet at hit, so it is refused the way an already-casting caster is: an
-	// ActionFailed with no reason. The pre-attempt gate above still answers
-	// first, with its own reason, as it would for any caster.
-	if known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
+	// pet at hit, so it is refused, not queued, with an ActionFailed and no
+	// reason: queued, it would run once the pet has landed and pay for a
+	// cast refused at hit, until the servitor gate refuses it before any
+	// cost (#2513). The pre-attempt gate above still answers first, with its
+	// own reason, as it would for any caster.
+	restoringServitor := known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live)
+	// A request that passed the pre-attempt gate while a swing or another
+	// cast is in flight, toggle or not, becomes the next CAST intention and
+	// is answered with ActionFailed; the swing's or cast's end runs it.
+	// Starting it now would pay its costs and broadcast MagicSkillUse (or
+	// switch a toggle) before what is in flight has finished. It replaces an
+	// attack queued behind the same cast. itemAICastBusy is the wait
+	// predicate every cast request shares; the sit/stand transition and
+	// intention-order terms it still lacks are #2191.
+	if castable && !restoringServitor && itemAICastBusy(live) {
+		live.deferMagicSkill(req, selected)
+		if live.combat != nil {
+			live.combat.DropResumeAfterCast()
+		}
 		sendMagicActionFailed(live)
 		return
 	}
+	if restoringServitor {
+		sendMagicActionFailed(live)
+		return
+	}
+	l.castMagicSkill(live, req, def, known, selected)
+}
 
+// castMagicSkill starts a skill request that has cleared its request-time
+// gates, fresh or resumed, against selected.
+func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.RequestMagicSkillUse, def modelskill.Definition, known bool, selected world.Tracked) {
+	if known && def.Activation == modelskill.ActivationToggle {
+		l.handleToggleSkillUse(live, req, selected)
+		return
+	}
 	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	controller := l.castController(live)
 	// The pre-attempt gate above ran before this GROUND approach walk, so a
 	// recast still on cooldown never starts walking toward the signet.
-	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, def.CastRange) {
+	if def.Target == modelskill.TargetGround && l.walkToGroundCast(live, req, selected, def.CastRange) {
 		return
 	}
 
@@ -74,7 +90,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Controller:  controller,
 		Caster:      live.Character,
-		Selected:    live.Target(),
+		Selected:    selected,
 		SkillID:     int(req.SkillID),
 		Definitions: l.skills,
 		Ctrl:        req.CtrlPressed,
@@ -237,12 +253,12 @@ func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.Effec
 // dead caster and a request with no final target get a bare ActionFailed;
 // a gate failure gets its reason and ActionFailed. It reports whether the
 // request may go on.
-func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Definition) bool {
+func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Definition, selected world.Tracked) bool {
 	if live.Character.Dead() {
 		sendMagicActionFailed(live)
 		return false
 	}
-	target := l.magicSkillFinalTarget(live, def)
+	target := l.magicSkillFinalTarget(live, def, selected)
 	if target == nil {
 		sendMagicActionFailed(live)
 		return false
@@ -255,8 +271,8 @@ func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Defi
 }
 
 // magicSkillFinalTarget is the creature def would be cast on given the
-// caster's current selection, before any cast condition is checked.
-func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def modelskill.Definition) skilltarget.Actor {
+// caster's selection, before any cast condition is checked.
+func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def modelskill.Definition, selected world.Tracked) skilltarget.Actor {
 	if l.targets == nil {
 		return nil
 	}
@@ -264,8 +280,8 @@ func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def modelskill.
 	if !ok {
 		return nil
 	}
-	selected, _ := live.Target().(skilltarget.Actor)
-	return handler.FinalTarget(live.Character, selected, &def)
+	selectedActor, _ := selected.(skilltarget.Actor)
+	return handler.FinalTarget(live.Character, selectedActor, &def)
 }
 
 // magicCastFailureReasonOnly reports the cast-condition failures a player
@@ -276,7 +292,8 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrMagicMuted) ||
 		errors.Is(err, actorcast.ErrPhysicalMuted) ||
 		errors.Is(err, actorcast.ErrCubicListFull) ||
-		errors.Is(err, actorcast.ErrNotEnoughItems)
+		errors.Is(err, actorcast.ErrNotEnoughItems) ||
+		errors.As(err, new(*actorcast.ConditionError))
 }
 
 func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() {
@@ -311,7 +328,7 @@ func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def modelskill
 	}
 }
 
-func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.RequestMagicSkillUse, castRange int) bool {
+func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.RequestMagicSkillUse, selected world.Tracked, castRange int) bool {
 	x, y, z := live.GroundTarget()
 	sx, sy, sz := live.Position()
 	if location.In3DRange(sx, sy, sz, x, y, z, castRange) {
@@ -326,7 +343,7 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 		return true
 	}
 	live.clearParkedApproaches()
-	live.deferMagicSkill(req)
+	live.deferMagicSkill(req, selected)
 	accepted, err := live.move.MoveToLocation(location.Location{X: x, Y: y, Z: z})
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
@@ -387,13 +404,61 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 	}
 }
 
-func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) {
+// finishDeferredMagicSkill runs the skill request queued as the next CAST
+// intention, if any, and reports whether one was waiting.
+func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) bool {
 	if live == nil || live.detached() {
+		return false
+	}
+	queued := live.takeDeferredMagicSkill()
+	if queued == nil {
+		return false
+	}
+	l.resumeMagicSkill(live, *queued)
+	return true
+}
+
+// resumeMagicSkill re-evaluates a queued skill request once the swing, cast
+// or walk it waited on is over. Its client already had its ActionFailed when
+// it was queued, so it answers less than a fresh request does: ActionFailed
+// alone when the caster cannot act or is casting again, nothing when the
+// target is gone, and a pre-attempt gate failure's reason with no
+// ActionFailed. Past those it starts like a fresh request.
+func (l *GameClientLink) resumeMagicSkill(live *livePlayer, queued deferredMagicSkill) {
+	req := queued.req
+	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
+	if !known || (def.Activation != modelskill.ActivationActive && def.Activation != modelskill.ActivationToggle) {
 		return
 	}
-	if req := live.takeDeferredMagicSkill(); req != nil {
-		l.handleMagicSkillUse(live, *req)
+	if live.Character.Dead() || live.Teleporting() || live.Operating() || live.Character.ObserverMode() ||
+		live.Character.AllSkillsDisabled() || live.CastingNow() {
+		sendMagicActionFailed(live)
+		return
 	}
+	target := l.magicSkillFinalTarget(live, def, queued.selected)
+	if target == nil || l.magicTargetLost(live, target, def) {
+		return
+	}
+	if err := l.castController(live).CanPlayerAttemptCast(live.Character, target, def); err != nil {
+		sendMagicCastFailureReason(live, def, err)
+		return
+	}
+	if def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
+		sendMagicActionFailed(live)
+		return
+	}
+	l.castMagicSkill(live, req, def, true, queued.selected)
+}
+
+// magicTargetLost reports whether a queued skill's target has left the world
+// or the caster's surroundings. A summon-friend skill reaches a target
+// anywhere in the world.
+func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Actor, def modelskill.Definition) bool {
+	tracked, ok := target.(world.Tracked)
+	if !ok || l.resolveTarget(target.ObjectID()) == nil {
+		return true
+	}
+	return def.SkillType != "SUMMON_FRIEND" && !world.Knows(live, tracked)
 }
 
 func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
@@ -449,14 +514,14 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // ApplyToggle rather than sent on return, because the reference also
 // broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
 // that kills the caster sends its own packets from inside that consume.
-func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
+func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,
 		l.castController(live),
 		actorcast.PlayerToggleRequest{
 			Caster:      live.Character,
-			Selected:    live.Target(),
+			Selected:    selected,
 			SkillID:     int(req.SkillID),
 			Definitions: l.skills,
 		},
@@ -543,7 +608,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	if live == nil {
 		return
 	}
+	var condErr *actorcast.ConditionError
 	switch {
+	case errors.As(err, &condErr):
+		sendSkillConditionFailure(live, condErr.Clause, def.ID)
 	case errors.Is(err, actorcast.ErrNotEnoughMP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughMP))
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
@@ -574,6 +642,23 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	}
+}
+
+// sendSkillConditionFailure sends the feedback a failed skill <cond> clause
+// configures: its system message, naming the skill at level 1 when the
+// clause asks for the name, or else its literal text, or nothing.
+func sendSkillConditionFailure(live *livePlayer, clause modelskill.ConditionClause, skillID modelskill.ID) {
+	if live == nil {
+		return
+	}
+	switch {
+	case clause.MessageID != 0 && clause.AddName:
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(clause.MessageID), int32(skillID), 1))
+	case clause.MessageID != 0:
+		live.SendFrame(serverpackets.FrameSystemMessage(int(clause.MessageID)))
+	case clause.Message != "":
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, clause.Message))
 	}
 }
 

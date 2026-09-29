@@ -1,11 +1,6 @@
 package effect
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -19,14 +14,14 @@ import (
 func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause) (Condition, error) {
 	var conds []conditions.Condition
 	if attach != nil {
-		c, err := buildCondition(attach.Root)
+		c, err := conditions.Compile(attach.Root)
 		if err != nil {
 			return nil, err
 		}
 		conds = append(conds, c)
 	}
 	if direct != nil {
-		c, err := buildCondition(*direct)
+		c, err := conditions.Compile(*direct)
 		if err != nil {
 			return nil, err
 		}
@@ -61,107 +56,6 @@ func (g conditionGate) Test(effector stat.Actor) bool {
 	return g.cond.Test(actor, actor, nil)
 }
 
-// buildCondition converts one parsed skill.Condition node to a runnable
-// conditions.Condition, supporting exactly the tags the shipped datapack
-// uses on a stat func: using, player, and, or, not, game (see issue #1499).
-func buildCondition(node modelskill.Condition) (conditions.Condition, error) {
-	switch strings.ToLower(node.Kind) {
-	case "using":
-		mask := item.ParseWornKindMask(node.Attrs["kind"])
-		return conditions.UsingItemType{Mask: int(mask)}, nil
-	case "player":
-		return buildPlayerCondition(node.Attrs)
-	case "game":
-		return buildGameCondition(node.Attrs)
-	case "and":
-		return buildLogic(node.Children, true)
-	case "or":
-		return buildLogic(node.Children, false)
-	case "not":
-		if len(node.Children) != 1 {
-			return nil, fmt.Errorf("skill: not: want exactly one child condition, got %d", len(node.Children))
-		}
-		child, err := buildCondition(node.Children[0])
-		if err != nil {
-			return nil, err
-		}
-		return conditions.Not{Condition: child}, nil
-	default:
-		return nil, fmt.Errorf("skill: unsupported condition %q", node.Kind)
-	}
-}
-
-func buildLogic(children []modelskill.Condition, and bool) (conditions.Condition, error) {
-	if and {
-		g := &conditions.And{}
-		for _, ch := range children {
-			c, err := buildCondition(ch)
-			if err != nil {
-				return nil, err
-			}
-			g.Add(c)
-		}
-		return g, nil
-	}
-	g := &conditions.Or{}
-	for _, ch := range children {
-		c, err := buildCondition(ch)
-		if err != nil {
-			return nil, err
-		}
-		g.Add(c)
-	}
-	return g, nil
-}
-
-// buildPlayerCondition resolves one <player .../> element's single
-// attribute to the matching conditions.Condition. Only the attributes the
-// shipped datapack's stat funcs actually use are wired; an unrecognized
-// attribute is a load-time error rather than a silent no-op.
-func buildPlayerCondition(attrs map[string]string) (conditions.Condition, error) {
-	if v, ok := attrs["hp"]; ok {
-		pct, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, fmt.Errorf("skill: player hp: %w", err)
-		}
-		return conditions.Hp{Percent: pct}, nil
-	}
-	if v, ok := attrs["moving"]; ok {
-		return conditions.PlayerState{Check: conditions.StateMoving, Required: parseBool(v)}, nil
-	}
-	if v, ok := attrs["running"]; ok {
-		return conditions.PlayerState{Check: conditions.StateRunning, Required: parseBool(v)}, nil
-	}
-	if v, ok := attrs["resting"]; ok {
-		return conditions.PlayerState{Check: conditions.StateResting, Required: parseBool(v)}, nil
-	}
-	if v, ok := attrs["flying"]; ok {
-		return conditions.PlayerState{Check: conditions.StateFlying, Required: parseBool(v)}, nil
-	}
-	if v, ok := attrs["behind"]; ok {
-		return conditions.PlayerState{Check: conditions.StateBehind, Required: parseBool(v)}, nil
-	}
-	if v, ok := attrs["front"]; ok {
-		return conditions.PlayerState{Check: conditions.StateFront, Required: parseBool(v)}, nil
-	}
-	return nil, fmt.Errorf("skill: player: no recognized attribute in %v", attrs)
-}
-
-// buildGameCondition resolves one <game .../> element's single attribute.
-func buildGameCondition(attrs map[string]string) (conditions.Condition, error) {
-	if v, ok := attrs["night"]; ok {
-		return conditions.GameTime{Night: parseBool(v)}, nil
-	}
-	if v, ok := attrs["chance"]; ok {
-		pct, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, fmt.Errorf("skill: game chance: %w", err)
-		}
-		return conditions.GameChance{Percent: pct}, nil
-	}
-	return nil, fmt.Errorf("skill: game: no recognized attribute in %v", attrs)
-}
-
 // andCond combines two optional Condition gates, either of which
 // may be nil, into one that requires both (when both are set) or whichever
 // one is set (when only one is).
@@ -180,8 +74,4 @@ type bothCond struct{ a, b Condition }
 
 func (c bothCond) Test(effector stat.Actor) bool {
 	return c.a.Test(effector) && c.b.Test(effector)
-}
-
-func parseBool(v string) bool {
-	return strings.EqualFold(v, "true") || v == "1"
 }

@@ -18,7 +18,8 @@ type npcRegenActor interface {
 	TickRegen()
 }
 
-// NPCRegen runs periodic HP/MP regeneration for spawned attackable NPCs.
+// NPCRegen runs periodic HP/MP regeneration for every spawned actor that
+// regenerates: attackable NPCs, players and summons.
 //
 // scratch is a per-tick scan buffer reused across calls instead of
 // reallocated. tickGuard enforces the single-goroutine, one-call-at-a-time
@@ -45,8 +46,8 @@ func (r *NPCRegen) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(NPCRegenTick, r.Tick, log)
 }
 
-// Tick advances every spawned attackable NPC's HP/MP regeneration once, on
-// each NPC's queue. It
+// Tick advances every spawned regenerating actor's HP/MP regeneration once,
+// on each actor's queue. It
 // logs and returns without doing anything else if another Tick call is
 // already in flight.
 func (r *NPCRegen) Tick() {

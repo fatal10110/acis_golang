@@ -17,6 +17,7 @@ import (
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -916,7 +917,18 @@ func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duratio
 	f.reuseCalls++
 }
 func (f *fakeCaster) ShortBuffTaskSkillID() int32 { return f.shortBuffTaskSkillID }
-func (f *fakeCaster) Flying() bool                { return f.flying }
+func (f *fakeCaster) ConditionActor() conditions.Actor {
+	return flyingConditionView{flying: f.flying}
+}
+
+// flyingConditionView answers only the flying state these tests gate on;
+// any other condition read panics through the nil embedded Actor.
+type flyingConditionView struct {
+	conditions.Actor
+	flying bool
+}
+
+func (v flyingConditionView) IsFlying() bool { return v.flying }
 
 type fakeDefinitions struct {
 	def modelskill.Definition

@@ -39,6 +39,11 @@ func (s slowItemStore) Delete(ctx context.Context, objectID int32) error {
 	return s.ItemStore.Delete(ctx, objectID)
 }
 
+func (s slowItemStore) DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error) {
+	time.Sleep(s.delay)
+	return s.ItemStore.DeleteOwned(ctx, ownerID, objectID)
+}
+
 // Save and Update are the instance-taking forms of the two writes above.
 // Nothing in the link routes through them today, but they are part of the
 // embedded store's method set, so a caller that reached them would otherwise

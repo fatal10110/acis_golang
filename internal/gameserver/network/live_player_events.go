@@ -336,6 +336,11 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if l.finishDeferredItemAICast(live) {
 		return
 	}
+	// A queued skill request replaced the cast that just ended as the
+	// intention, whether it starts now or not.
+	if l.finishDeferredMagicSkill(live) {
+		return
+	}
 	if live.combat == nil {
 		return
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -50,6 +51,10 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		}
 	}()
 	for _, def := range defs {
+		if failed, ok := conditions.EvaluateSkill(def, live.Character, live.Target()); !ok {
+			sendSkillConditionFailure(live, failed, def.ID)
+			return true
+		}
 		if live.SkillDisabled(actorcast.ReuseKey(def)) {
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 			return true

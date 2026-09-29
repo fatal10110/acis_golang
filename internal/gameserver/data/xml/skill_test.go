@@ -159,6 +159,34 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 	})
 }
 
+// TestEveryShippedSkillConditionCompiles loads every shipped skill and
+// compiles each skill-level <cond> clause into its runnable condition: the
+// cast path evaluates these, and a clause that cannot compile would refuse
+// its skill outright. The shipped set covers player (Charges, level, hp, mp,
+// flying, riding, olympiad, weight, invSize, castle, clanHall, insidePoly,
+// active_skill_id_lvl, battle_force, spell_force, seed_*), target
+// (active_skill_id, hp_min_max, npcId, race_id) and using kind.
+func TestEveryShippedSkillConditionCompiles(t *testing.T) {
+	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
+	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions(%q) error: %v", dir, err)
+	}
+	skills := map[skill.ID]bool{}
+	for _, def := range table.All() {
+		for _, clause := range def.Conditions {
+			if _, err := conditions.Compile(clause.Root); err != nil {
+				t.Errorf("skill %d level %d %q: %v", def.ID, def.Level, def.Name, err)
+			}
+			skills[def.ID] = true
+		}
+	}
+	// 262 shipped <skill> elements carry a skill-level <cond>.
+	if len(skills) != 262 {
+		t.Fatalf("skills with a compiled <cond> = %d, want 262", len(skills))
+	}
+}
+
 // TestSkillStackTypeComesFromFirstShippedTemplate pins, against the shipped
 // XML, the stack type the buff-cap guard reads for skills whose effect
 // templates carry different stack types: it is the first template's, in
