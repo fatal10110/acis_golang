@@ -36,10 +36,10 @@ func reviveTargets(cast Cast, percent float64) {
 		if !ok {
 			continue
 		}
-		// Player.doRevive(double) restores exp before the HP/MP/CP revive
-		// (Player.java:6008-6012); RestoreExp self-guards on there being an
-		// actual death to restore from.
-		target.RestoreExp(percent)
-		target.Revive(percent)
+		// The hit reuses the launch-time targets without re-checking them,
+		// so a target may have gone back to town since. Only a player who
+		// is still dead gets the exp back and the revive
+		// (Player.reviveRequest's isDead gate, then doRevive(double)).
+		target.ReviveRestoringExp(percent, percent)
 	}
 }

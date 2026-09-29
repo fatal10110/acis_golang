@@ -3295,21 +3295,18 @@ type reviveFakeTarget struct {
 	world.Presence
 	neutralPlayer
 	fakeActor
-	percent float64
+	restoredPercent, percent float64
 }
 
-func (t *reviveFakeTarget) Revive(percent float64) bool { t.percent = percent; return true }
-func (*reviveFakeTarget) Kind() actor.Kind              { return actor.KindPlayer }
-
-// reviveFakeExpTarget additionally implements expRestorer, matching
-// player.Character, to verify Resurrect wires both calls.
-type reviveFakeExpTarget struct {
-	reviveFakeTarget
-	restoredPercent float64
+func (t *reviveFakeTarget) ReviveRestoringExp(restorePercent, percent float64) bool {
+	t.restoredPercent, t.percent = restorePercent, percent
+	return true
 }
+func (*reviveFakeTarget) Kind() actor.Kind { return actor.KindPlayer }
 
-func (t *reviveFakeExpTarget) RestoreExp(restorePercent float64) { t.restoredPercent = restorePercent }
-
+// TestResurrectRevivesEveryTarget matches Player.doRevive(double)
+// (Player.java:6008-6012): every player target gets its exp restore and its
+// revive at the caster's revive power.
 func TestResurrectRevivesEveryTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &reviveFakeCaster{wit: 1.5}
@@ -3325,33 +3322,10 @@ func TestResurrectRevivesEveryTarget(t *testing.T) {
 	}
 
 	want := formulas.RevivePower(1.5, 40)
-	if a.percent != want || b.percent != want {
-		t.Fatalf("revive percent = %v/%v, want %v", a.percent, b.percent, want)
-	}
-}
-
-// TestResurrectRestoresExpOnExpRestorerTargets matches
-// Player.doRevive(double) (Player.java:6008-6012): restoreExp runs with the
-// same revive-power percent as the HP revive.
-func TestResurrectRestoresExpOnExpRestorerTargets(t *testing.T) {
-	registry := NewDefaultRegistry()
-	caster := &reviveFakeCaster{wit: 1.5}
-	a := &reviveFakeExpTarget{}
-
-	if !registry.Use(Cast{
-		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "RESURRECT", Power: 40},
-		Targets: []Actor{a},
-	}) {
-		t.Fatal("Use() returned false for RESURRECT")
-	}
-
-	want := formulas.RevivePower(1.5, 40)
-	if a.percent != want {
-		t.Fatalf("revive percent = %v, want %v", a.percent, want)
-	}
-	if a.restoredPercent != want {
-		t.Fatalf("restored exp percent = %v, want %v", a.restoredPercent, want)
+	for i, target := range []*reviveFakeTarget{a, b} {
+		if target.percent != want || target.restoredPercent != want {
+			t.Fatalf("target %d revive/restore percent = %v/%v, want %v", i, target.percent, target.restoredPercent, want)
+		}
 	}
 }
 

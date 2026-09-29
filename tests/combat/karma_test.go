@@ -125,8 +125,7 @@ func TestPlayerKillGrantsPKKarma(t *testing.T) {
 	selectPlayerTarget(t, c, victim.ID)
 	// An innocent victim is only attackable with force (ctrl), matching the
 	// reference's isAttackableWithoutForce gate.
-	c.Send(encodeRequestMagicSkillUse(42, true, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, victim.ID)
+	castKillSkill(t, srv, c, objID, victim.ID, true)
 
 	// The killer's own client learns the new karma in the reference's order:
 	// SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) first — the first PK

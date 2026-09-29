@@ -90,6 +90,7 @@ func TestOffensiveSkillDrainsNPCHealth(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
@@ -768,6 +769,7 @@ func TestPdamOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T) {
 	beforeHP := hostile.CurrentHP()
 
 	c.Send(encodeRequestMagicSkillUse(42, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
 
 	srv.AdvanceUntil(t, "invulnerable NPC registers PDAM hate", func() bool {

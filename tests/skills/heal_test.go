@@ -68,8 +68,9 @@ func assertRestoredBy(t *testing.T, r *wire.Reader, healer string, amount int32)
 }
 
 // TestHealSelfCastRestoresDamagedCaster heals a damaged caster through a real
-// self-cast: the hit-time StatusUpdate reports both the restored HP — clamped
-// at the stat-computed max — and the charged MP.
+// self-cast: each MP payment reports its own StatusUpdate, and the hit's
+// trailing StatusUpdate reports the restored HP, clamped at the
+// stat-computed max.
 func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -92,12 +93,14 @@ func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 	before, maxHP := damageToHealHeadroom(t, srv, objID, 8)
 
 	c.Send(encodeRequestMagicSkillUse(1218, false, false))
+	assertCasterStatus(t, srv, c.Read(), objID, before, 28)
 	readCastStartFrames(t, c, objID, 1218, 1, 500, 60_000, objID)
+	// The final MP payment reports itself before the heal lands.
+	assertCasterStatus(t, srv, c.Read(), objID, before, 25)
 
 	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1HPRestored)), 8)
 	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentHP, Value: maxHP},
-		{Type: serverpackets.StatusCurrentMP, Value: srv.PlayerCurrentMP(t, objID)},
 	})
 	if hp := srv.PlayerCurrentHP(t, objID); hp != maxHP {
 		t.Fatalf("caster HP after heal = %d, want restored to computed max %d (was %d)", hp, maxHP, before)
