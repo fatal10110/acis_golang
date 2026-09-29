@@ -5,6 +5,7 @@ import (
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
 // deliverChanceCast runs one chance-triggered skill and delivers its result
@@ -29,8 +30,11 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply f
 	before := live.Vitals()
 	result := apply()
 	for _, message := range result.Messages {
-		if failed, ok := message.(actorcast.ChanceConditionFailed); ok {
-			sendSkillConditionFailure(live, failed.Clause, failed.Skill.ID)
+		switch m := message.(type) {
+		case actorcast.ChanceConditionFailed:
+			sendSkillConditionFailure(live, m.Clause, m.Skill.ID)
+		case actorcast.WeaponSkillActivated:
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasBeenActivated, int32(m.Skill.ID), int32(m.Skill.Level)))
 		}
 	}
 	l.sendSkillHandlerResult(live, result)

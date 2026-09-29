@@ -69,7 +69,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
 	case event.HitLanded:
-		l.chance.AttackHit(live.Character, e.Target, e.Crit)
+		l.chance.AttackHit(live.Character, e)
 	case event.Move:
 		l.broadcastLiveMoveEvent(live, e)
 	case event.Flight:

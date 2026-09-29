@@ -140,7 +140,7 @@ func (s *summonSink) Emit(ev event.Event) {
 			return frames.SkillLaunched(actor.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
 	case event.HitLanded:
-		l.chance.AttackHit(actor, e.Target, e.Crit)
+		l.chance.AttackHit(actor, e)
 	case event.AttackStanceRequested, event.Attacked:
 		l.startSummonAttackStance(actor)
 	case event.CastAborted:

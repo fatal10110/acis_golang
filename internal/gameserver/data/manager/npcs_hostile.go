@@ -257,7 +257,7 @@ type hostileControl struct {
 func (c *hostileControl) Emit(ev event.Event) {
 	switch e := ev.(type) {
 	case event.HitLanded:
-		c.chance.AttackHit(c.hostile, e.Target, e.Crit)
+		c.chance.AttackHit(c.hostile, e)
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks

@@ -7,7 +7,10 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -36,6 +39,13 @@ type ChanceProcs struct {
 type ChanceConditionFailed struct {
 	Skill  modelskill.Definition
 	Clause modelskill.ConditionClause
+}
+
+// WeaponSkillActivated is a weapon's on-magic skill about to run for a
+// player caster. Its message goes to that player before the skill's own
+// results.
+type WeaponSkillActivated struct {
+	Skill modelskill.Definition
 }
 
 // chanceEvents is the set of trigger events one proc point raises.
@@ -74,20 +84,31 @@ type chanceSkillHolder interface {
 	SkillLevels() player.SkillLevels
 }
 
-// AttackHit runs the procs of a physical hit that dealt damage: the
-// attacker's on-hit procs (and on-crit ones for a critical hit) against
-// target, then target's on-attacked procs against the attacker. Both run
-// on the attacker's queue, in the hit's own call, like the hit itself.
-func (p *ChanceProcs) AttackHit(attacker, target any, crit bool) {
+// AttackHit runs the procs of hit, a physical hit of attacker that dealt
+// damage: the attacker's on-hit procs (and on-crit ones for a critical hit)
+// against the target, its on-attacked procs against the target when the
+// target reflected part of the damage, then the target's on-attacked procs
+// against the attacker. A critical hit then casts the attacker's weapon
+// on-critical skill. All of it runs on the attacker's queue, in the hit's
+// own call, like the hit itself.
+func (p *ChanceProcs) AttackHit(attacker any, hit event.HitLanded) {
 	if p == nil {
 		return
 	}
-	hit := eventsOf(modelskill.TriggerOnHit)
-	if crit {
-		hit |= eventsOf(modelskill.TriggerOnCrit)
+	var target any = hit.Target
+	landed := eventsOf(modelskill.TriggerOnHit)
+	if hit.Crit {
+		landed |= eventsOf(modelskill.TriggerOnCrit)
 	}
-	p.fire(attacker, target, hit)
-	p.fire(target, attacker, eventsOf(modelskill.TriggerOnAttacked, modelskill.TriggerOnAttackedHit))
+	attacked := eventsOf(modelskill.TriggerOnAttacked, modelskill.TriggerOnAttackedHit)
+	p.fire(attacker, target, landed)
+	if hit.Reflected {
+		p.fire(attacker, target, attacked)
+	}
+	p.fire(target, attacker, attacked)
+	if hit.Crit {
+		p.weaponCritSkill(attacker, target)
+	}
 }
 
 // skillHit runs the procs of def landing on each of targets, before its
@@ -115,9 +136,110 @@ func (p *ChanceProcs) skillHit(caster any, targets []skilltarget.Actor, def mode
 		cast = eventsOf(modelskill.TriggerOnMagicGood)
 	}
 	for _, target := range targets {
+		if !target.Dead() {
+			p.weaponMagicSkill(caster, target, def)
+		}
 		p.fire(caster, target, cast)
 		p.fire(target, caster, taken)
 	}
+}
+
+// weaponCaster is a creature whose active weapon may carry skills it casts
+// on its own: on a critical hit, or on a skill it lands.
+type weaponCaster interface {
+	handlerskill.Creature
+	Roll(n int) int
+	// ActiveWeaponItem returns the weapon the creature attacks with, nil
+	// when it has none.
+	ActiveWeaponItem() *item.WeaponDetail
+}
+
+// weaponSkill returns the skill trigger of casterObj's weapon that pick
+// selects, resolved, when the weapon carries one whose skill exists.
+func (p *ChanceProcs) weaponSkill(casterObj any, pick func(*item.WeaponDetail) *item.SkillTrigger) (weaponCaster, *item.SkillTrigger, modelskill.Definition, bool) {
+	caster, ok := casterObj.(weaponCaster)
+	if !ok {
+		return nil, nil, modelskill.Definition{}, false
+	}
+	weapon := caster.ActiveWeaponItem()
+	if weapon == nil {
+		return nil, nil, modelskill.Definition{}, false
+	}
+	trigger := pick(weapon)
+	if trigger == nil {
+		return nil, nil, modelskill.Definition{}, false
+	}
+	def, ok := p.definition(int(trigger.Skill.ID), int(trigger.Skill.Level))
+	if !ok {
+		return nil, nil, modelskill.Definition{}, false
+	}
+	return caster, trigger, def, true
+}
+
+// weaponChance reports whether caster wins trigger's activation chance; a
+// trigger without one always activates.
+func weaponChance(caster weaponCaster, trigger *item.SkillTrigger) bool {
+	return trigger.Chance < 0 || caster.Roll(100) < int(trigger.Chance)
+}
+
+// weaponCritSkill casts the on-critical skill of attackerObj's weapon on
+// targetObj: it activates on its chance, must land on the target, and then
+// replaces the target's current effect of that skill with its own effects.
+// No handler runs and nothing is broadcast.
+func (p *ChanceProcs) weaponCritSkill(attackerObj, targetObj any) {
+	caster, trigger, def, ok := p.weaponSkill(attackerObj, func(w *item.WeaponDetail) *item.SkillTrigger { return w.OnCritSkill })
+	if !ok {
+		return
+	}
+	target, ok := targetObj.(handlerskill.Actor)
+	if !ok || !weaponChance(caster, trigger) {
+		return
+	}
+	shield, landed := handlerskill.WeaponSkillLands(caster, target, def)
+	if !landed {
+		return
+	}
+	p.deliver(caster, func() EffectResult {
+		return handlerEffectResult(handlerskill.LandCritSkill(caster, target, def, shield))
+	})
+}
+
+// weaponMagicSkill casts the on-magic skill of casterObj's weapon on
+// target as castDef lands there. Only a skill of the same offensive kind as
+// castDef sets it off, never a toggle or a potion; it activates on its
+// chance and, when offensive, must land on the target. A player caster is
+// told the skill activated, then the skill's handler runs on the target.
+func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, castDef modelskill.Definition) {
+	caster, trigger, def, ok := p.weaponSkill(casterObj, func(w *item.WeaponDetail) *item.SkillTrigger { return w.OnCastSkill })
+	if !ok || castDef.Offensive != def.Offensive {
+		return
+	}
+	if castDef.Activation == modelskill.ActivationToggle || castDef.Potion {
+		return
+	}
+	if !weaponChance(caster, trigger) {
+		return
+	}
+	if def.Offensive {
+		if _, landed := handlerskill.WeaponSkillLands(caster, target, def); !landed {
+			return
+		}
+	}
+	if caster.Kind() == actor.KindPlayer {
+		p.deliver(caster, func() EffectResult {
+			return EffectResult{Messages: []any{WeaponSkillActivated{Skill: def}}}
+		})
+	}
+	if p.Skills == nil {
+		return
+	}
+	p.deliver(caster, func() EffectResult {
+		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}})
+		if !ok {
+			return EffectResult{}
+		}
+		return handlerEffectResult(result)
+	})
 }
 
 // fire runs owner's procs whose trigger event is in events, each against

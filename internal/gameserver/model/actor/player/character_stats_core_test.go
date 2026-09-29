@@ -568,6 +568,10 @@ func TestTakeDamageForwardsDamageToCastController(t *testing.T) {
 	c.SetCastController(spy)
 
 	c.TakeDamage(15, nil)
+	if len(spy.damageCalls) != 0 {
+		t.Fatalf("TakeDamage InterruptCastOnDamage calls = %d, want 0: the attacker rolls the break", len(spy.damageCalls))
+	}
+	c.BreakCastOnDamage(15)
 
 	if len(spy.damageCalls) != 1 {
 		t.Fatalf("InterruptCastOnDamage calls = %d, want 1", len(spy.damageCalls))
@@ -579,11 +583,8 @@ func TestTakeDamageForwardsDamageToCastController(t *testing.T) {
 
 // TestTakeDamageForwardsZeroDamageToCastController pins
 // Formulas.calcCastBreak (Formulas.java:725-753), which has no damage
-// guard, and CreatureAttack.java:278's unconditional
-// Formulas.calcCastBreak(target, hitHolder._damage) call after a landed
-// physical auto-attack: a 0-damage hit (e.g. calcPhysicalAttackDamage
-// returning 0 at Formulas.java:392-396, or PDef-overkill) still rolls the
-// break chance, clamped to a 1% floor, instead of being skipped.
+// guard: a 0-damage break roll still rolls the break chance, clamped to a
+// 1% floor, instead of being skipped.
 func TestTakeDamageForwardsZeroDamageToCastController(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetHP(100)
@@ -591,7 +592,7 @@ func TestTakeDamageForwardsZeroDamageToCastController(t *testing.T) {
 	spy := &spyCastController{casting: true, magic: false}
 	c.SetCastController(spy)
 
-	c.TakeDamage(0, nil)
+	c.BreakCastOnDamage(0)
 
 	if len(spy.damageCalls) != 1 {
 		t.Fatalf("InterruptCastOnDamage calls = %d, want 1 (zero damage must still roll)", len(spy.damageCalls))

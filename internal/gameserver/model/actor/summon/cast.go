@@ -51,6 +51,12 @@ func (a *Actor) StopCast() {
 	a.TryToIdle()
 }
 
+// BreakCastOnDamage rolls whether a landed auto-attack hit of damage breaks
+// a's cast.
+func (a *Actor) BreakCastOnDamage(damage float64) {
+	a.breakCastOnDamage(damage)
+}
+
 // breakCastOnDamage rolls whether damage a takes breaks its cast, reading
 // MEN, ATTACK_CANCEL and the roll from a itself; a broken cast sends a idle.
 // An invulnerable summon is never broken, and a summon with no cast in

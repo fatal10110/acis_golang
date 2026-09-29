@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -335,6 +336,8 @@ type timingActor struct {
 	dead             bool
 	movementDisabled bool
 	outOfRange       bool
+	stats            map[stat.Stat]float64
+	level            int
 }
 
 type timingPlayer struct {
@@ -368,6 +371,7 @@ func (a *timingPlayer) NotifyBowDraw(gaugeMs int) {
 	a.events = append(a.events, "draw")
 }
 func (a *timingPlayer) ClearRecentFakeDeath() {}
+func (a *timingPlayer) BroadcastStatus()      { a.events = append(a.events, "status") }
 func (a *timingPlayer) ClientActionFailed()   { a.actionFailed++ }
 
 func (a *timingActor) ObjectID() int32                         { return 1 }
@@ -411,6 +415,23 @@ func (a *timingActor) MakeAttackHit(t attackable.Combatant, _ bool) Hit {
 	return Hit{Target: t, Damage: 1}
 }
 func (a *timingActor) ConsumeBowMP() { a.events = append(a.events, "mp") }
+func (a *timingActor) CalcStat(s stat.Stat, base float64) float64 {
+	if v, ok := a.stats[s]; ok {
+		return v
+	}
+	return base
+}
+
+func (a *timingActor) AddHP(amount float64) float64 {
+	a.events = append(a.events, fmt.Sprintf("absorb %g", amount))
+	return amount
+}
+
+func (a *timingActor) TakeDamage(damage int, attacker attackable.Combatant) bool {
+	a.events = append(a.events, fmt.Sprintf("reflected %d from %d", damage, attacker.ObjectID()))
+	return false
+}
+func (a *timingActor) Level() int { return a.level }
 func (a *timingActor) BroadcastAttack(snapshot event.Attack) {
 	a.snapshot = snapshot
 	a.broadcasts++
@@ -928,5 +949,150 @@ func TestControllerNotifiesHitTargets(t *testing.T) {
 	}
 	if !slices.Equal(log, want) {
 		t.Fatalf("hit order =\n%q\nwant\n%q", log, want)
+	}
+}
+
+// reflectTarget is a hit target carrying stats and a cast a hit may break.
+// It logs into the attacker's event log, so a test reads the order in which
+// both sides of a hit applied.
+type reflectTarget struct {
+	timingTarget
+	level  int
+	stats  map[stat.Stat]float64
+	maxHP  float64
+	events *[]string
+}
+
+func (t *reflectTarget) Level() int { return t.level }
+func (t *reflectTarget) CalcStat(s stat.Stat, base float64) float64 {
+	if v, ok := t.stats[s]; ok {
+		return v
+	}
+	return base
+}
+func (t *reflectTarget) MaxHPValue() float64 { return t.maxHP }
+func (t *reflectTarget) BreakCastOnDamage(damage float64) {
+	*t.events = append(*t.events, fmt.Sprintf("break %g", damage))
+}
+
+// hitLandedLog records the HitLanded events a hit reports into the
+// attacker's event log.
+type hitLandedLog struct{ events *[]string }
+
+func (s hitLandedLog) Emit(e event.Event) {
+	if e, ok := e.(event.HitLanded); ok {
+		*s.events = append(*s.events, fmt.Sprintf("landed reflected=%v", e.Reflected))
+	}
+}
+
+// TestControllerReflectAbsorbOrder pins CreatureAttack.doHit's damage steps
+// (CreatureAttack.java:243-289): the target takes the hit, the attacker
+// takes the reflected share (REFLECT_DAMAGE_PERCENT of the damage, capped at
+// the target's max HP), heals ABSORB_DAMAGE_PERCENT of the damage, the
+// target's cast-break roll runs, and only then do the procs run. A bow
+// neither reflects nor absorbs; an invulnerable target reflects nothing and
+// rolls no break; a raid-related target reflects nothing onto a player, or
+// a summon whose owner is, more than 8 levels above it, while an NPC, which
+// attacks for no player, is always reflected; a target the hit killed rolls
+// no break.
+func TestControllerReflectAbsorbOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		attacker    string // "player" (default), "summon" or "npc"
+		weapon      item.WeaponType
+		damage      int
+		reflect     float64
+		maxHP       float64
+		invul       bool
+		raid        bool
+		killed      bool
+		playerLevel int
+		ownerLevel  int
+		want        []string
+	}{
+		{
+			name: "melee", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "status", "break 99", "landed reflected=true"},
+		},
+		{
+			name: "reflect capped at max HP", weapon: item.WeaponSword, damage: 100, reflect: 50, maxHP: 40,
+			want: []string{"damage", "reflected 40 from 2", "absorb 30", "status", "break 100", "landed reflected=true"},
+		},
+		{
+			name: "bow", weapon: item.WeaponBow, damage: 99, reflect: 10, maxHP: 1000,
+			want: []string{"damage", "break 99", "landed reflected=false"},
+		},
+		{
+			name: "invulnerable target", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, invul: true,
+			want: []string{"damage", "absorb 29.7", "status", "landed reflected=false"},
+		},
+		{
+			name: "raid 8 levels below", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 28,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "status", "landed reflected=true"},
+		},
+		{
+			name: "raid 9 levels below", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 29,
+			want: []string{"damage", "absorb 29.7", "status", "landed reflected=false"},
+		},
+		{
+			name: "target killed by the hit", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, killed: true,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "status", "landed reflected=true"},
+		},
+		{
+			name: "summon, owner 8 levels above raid", attacker: "summon", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 70, ownerLevel: 28,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "landed reflected=true"},
+		},
+		{
+			name: "summon, owner 9 levels above raid", attacker: "summon", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 1, ownerLevel: 29,
+			want: []string{"damage", "absorb 29.7", "landed reflected=false"},
+		},
+		{
+			name: "npc on raid", attacker: "npc", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 80,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "landed reflected=true"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setup := func(a *timingActor) *[]string {
+				a.attackType = tc.weapon
+				a.level = tc.playerLevel
+				a.stats = map[stat.Stat]float64{stat.AbsorbDamagePercent: 30}
+				return &a.events
+			}
+			var (
+				ctrl   *Controller
+				events *[]string
+			)
+			switch tc.attacker {
+			case "summon":
+				actor := &timingSummon{owner: &timingActor{level: tc.ownerLevel}}
+				events = setup(&actor.timingActor)
+				ctrl = NewPlayable(actor, hitLandedLog{events: events})
+			case "npc":
+				actor := &timingActor{}
+				events = setup(actor)
+				ctrl = NewAttackable(actor, hitLandedLog{events: events})
+			default:
+				actor := &timingPlayer{}
+				events = setup(&actor.timingActor)
+				ctrl = NewPlayer(actor, hitLandedLog{events: events})
+			}
+			target := &reflectTarget{
+				timingTarget: timingTarget{id: 2, invul: tc.invul, raidRelated: tc.raid},
+				level:        20,
+				stats:        map[stat.Stat]float64{stat.ReflectDamagePercent: tc.reflect},
+				maxHP:        tc.maxHP,
+				events:       events,
+			}
+			target.onDamage = func() {
+				*events = append(*events, "damage")
+				target.dead = tc.killed
+			}
+
+			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage})
+
+			if !slices.Equal(*events, tc.want) {
+				t.Fatalf("hit steps =\n%q\nwant\n%q", *events, tc.want)
+			}
+		})
 	}
 }

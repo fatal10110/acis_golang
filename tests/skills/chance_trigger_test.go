@@ -50,6 +50,7 @@ const (
 	onOffensiveTriggered = 5166
 	mdamSkill            = 1177
 	toggleSkill          = 312
+	unlandableDebuff     = 1164
 )
 
 func chanceSkills() []modelskill.Definition {
@@ -114,6 +115,14 @@ func chanceSkills() []modelskill.Definition {
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
 			BaseLandRate: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "speed_down", StackOrder: 1}},
+		},
+		{
+			// unlandableDebuff lands at a fixed rate of 0, so its landing
+			// roll always loses.
+			ID: unlandableDebuff, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
+			BaseLandRate: 0, IgnoreResists: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "weakness", StackOrder: 1}},
 		},
 		{
 			ID: mdamSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,

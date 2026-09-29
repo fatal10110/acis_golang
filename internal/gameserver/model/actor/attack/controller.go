@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 const (
@@ -60,6 +61,12 @@ type CreatureActor interface {
 	MakeAttackHit(target attackable.Combatant, split bool) Hit
 	BroadcastAttack(event.Attack)
 	ConsumeBowMP()
+
+	// CalcStat reads the actor's stat s over base; a landed hit reads its
+	// damage absorption from it.
+	CalcStat(s stat.Stat, base float64) float64
+	// AddHP restores HP, clamped to max HP, and returns the applied amount.
+	AddHP(amount float64) float64
 }
 
 // PlayableActor is a creature controlled by a player or owned by one.
@@ -85,6 +92,9 @@ type PlayerActor interface {
 	ClientActionFailed()
 	// NotePvPAttack records a resolved physical hit for PvP flagging.
 	NotePvPAttack(attackable.Combatant)
+	// BroadcastStatus reports a change to the player's HP, MP or CP that its
+	// own writer left unreported.
+	BroadcastStatus()
 }
 
 // Hit is one precomputed physical attack result.
@@ -491,8 +501,99 @@ func (c *Controller) deliverHit(hit Hit) {
 	if reacts {
 		target.NotifyAttacked(c.actor)
 	}
+	reflected := c.reflectedDamage(hit)
 	hit.Target.TakeDamage(hit.Damage, c.actor)
-	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit})
+	if reflected > 0 {
+		c.actor.TakeDamage(reflected, hit.Target)
+	}
+	c.absorbDamage(hit)
+	breakTargetCast(hit)
+	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit, Reflected: reflected > 0})
+}
+
+// reflectingTarget is the target state a landed hit reads to size the
+// damage the target reflects back on its attacker.
+type reflectingTarget interface {
+	Invul() bool
+	CalcStat(s stat.Stat, base float64) float64
+	MaxHPValue() float64
+}
+
+// reflectedDamage returns the share of hit's damage its target reflects
+// back on the attacker, capped at the target's max HP, read before the
+// target takes the hit. A bow hit and a hit on an invulnerable target
+// reflect nothing, and neither does a raid-related target hit on behalf of
+// a player more than 8 levels above it.
+func (c *Controller) reflectedDamage(hit Hit) int {
+	if c.actor.AttackType() == item.WeaponBow {
+		return 0
+	}
+	target, ok := hit.Target.(reflectingTarget)
+	if !ok || target.Invul() {
+		return 0
+	}
+	if hit.Target.RaidRelated() {
+		if level, ok := c.actingPlayerLevel(); ok && level > hit.Target.Level()+8 {
+			return 0
+		}
+	}
+	percent := target.CalcStat(stat.ReflectDamagePercent, 0)
+	if percent <= 0 {
+		return 0
+	}
+	return min(int(percent/100*float64(hit.Damage)), int(target.MaxHPValue()))
+}
+
+// actingPlayerLevel returns the level of the player the actor attacks for:
+// the player itself, or a summon's owner. An NPC attacks for no player.
+func (c *Controller) actingPlayerLevel() (int, bool) {
+	if c.player != nil {
+		return c.actor.Level(), true
+	}
+	if c.playable == nil {
+		return 0, false
+	}
+	owner, ok := c.actor.Owner()
+	if !ok || owner == nil {
+		return 0, false
+	}
+	return owner.Level(), true
+}
+
+// absorbDamage heals the actor by its absorbed share of hit's damage; a bow
+// hit absorbs nothing. A player reports its own HP change here; NPCs and
+// summons report theirs from AddHP.
+func (c *Controller) absorbDamage(hit Hit) {
+	if c.actor.AttackType() == item.WeaponBow {
+		return
+	}
+	percent := c.actor.CalcStat(stat.AbsorbDamagePercent, 0)
+	if percent <= 0 {
+		return
+	}
+	if c.actor.AddHP(percent/100*float64(hit.Damage)) > 0 && c.player != nil {
+		c.player.BroadcastStatus()
+	}
+}
+
+// castBreakTarget is a hit target whose cast a landed hit may break.
+type castBreakTarget interface {
+	BreakCastOnDamage(damage float64)
+}
+
+// breakTargetCast rolls whether hit breaks its target's cast, once the
+// damage, the reflected damage and the absorbed HP have all applied. A
+// target the hit killed, a raid-related target and an invulnerable one
+// roll nothing.
+func breakTargetCast(hit Hit) {
+	target, ok := hit.Target.(castBreakTarget)
+	if !ok || hit.Target.AlikeDead() || hit.Target.RaidRelated() {
+		return
+	}
+	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
+		return
+	}
+	target.BreakCastOnDamage(float64(hit.Damage))
 }
 
 // attackedTarget is a hit target whose AI reacts to the hit: players and
