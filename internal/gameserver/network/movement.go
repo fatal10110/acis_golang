@@ -162,10 +162,13 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	if !live.SetRunning(run) {
 		return
 	}
-	swimming := liveSwimming(live)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
-	})
+	if liveMoveSpeed(live) != 0 {
+		swimming := liveSwimming(live)
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
+		})
+	}
+	l.broadcastCharacterInfo(live)
 }
 
 // changeLiveWaitType sits live down or stands it up and broadcasts the new
