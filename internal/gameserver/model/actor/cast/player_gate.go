@@ -25,20 +25,22 @@ var (
 )
 
 // CanPlayerAttemptCast is a live player's pre-attempt gate: the checks that
-// run on the raw request, before it is queued behind an in-flight swing,
-// walks toward its target, or stops for its hit time. An active skill runs
-// the shared CanAttemptCast checks and a toggle its own CanCastToggle
-// checks; the player-only rules follow, then the unset-signet and
-// siege-summon gates. Every skill request path of a player shares it.
+// run on the raw request, before it is queued behind an in-flight swing or
+// cast, walks toward its target, or stops for its hit time. An active skill
+// runs the shared skill checks and a toggle its own CanCastToggle checks;
+// the player-only rules follow, then the unset-signet and siege-summon
+// gates. An in-flight cast is not a failure here: the caller queues a
+// request that passes behind it. Every skill request path of a player
+// shares it.
 func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def modelskill.Definition) error {
-	if caster == nil {
+	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
 	var err error
 	if def.Activation == modelskill.ActivationToggle {
 		err = c.CanCastToggle(def)
 	} else {
-		err = c.canAttemptShared(target, def)
+		err = c.canAttemptSkill(def)
 	}
 	if err != nil {
 		return err

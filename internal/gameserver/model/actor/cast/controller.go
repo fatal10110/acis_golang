@@ -285,6 +285,13 @@ func (c *Controller) canAttemptShared(target Target, def modelskill.Definition) 
 	if c.CastingNow() {
 		return ErrAlreadyCasting
 	}
+	return c.canAttemptSkill(def)
+}
+
+// canAttemptSkill is the skill half of the pre-attempt gate: every skill
+// disabled, then def's own reuse. It leaves an in-flight cast to the caller,
+// which may queue the request behind it instead of refusing it.
+func (c *Controller) canAttemptSkill(def modelskill.Definition) error {
 	if c.actor.AllSkillsDisabled() {
 		return ErrAllSkillsDisabled
 	}
