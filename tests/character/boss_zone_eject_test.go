@@ -14,9 +14,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-func bossEjectZone(t *testing.T, oust location.Location) (*zone.Index, *zone.Boss) {
+func bossEjectZone(t *testing.T, oust location.Location, minX int) (*zone.Index, *zone.Boss) {
 	t.Helper()
-	form, err := zone.NewCuboid(100, 1000, -100, 100, -10_000, 10_000)
+	form, err := zone.NewCuboid(minX, 1000, -100, 100, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func assertEjectFrame(t *testing.T, frames [][]byte, objID int32, xMin, xMax int
 
 func TestBossZoneWalkInEjectsToOustLocation(t *testing.T) {
 	oust := location.Location{X: -500, Y: 20, Z: 30}
-	zones, _ := bossEjectZone(t, oust)
+	zones, _ := bossEjectZone(t, oust, 100)
 	srv, _, objID := bootInZones(t, zones)
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	srv.Client.Send(encodeMoveBackwardToLocation(location.Location{X: 300, Y: 20, Z: 30}, spawn, 1))
@@ -63,9 +63,29 @@ func TestBossZoneWalkInEjectsToOustLocation(t *testing.T) {
 	assertEjectFrame(t, readUntilQuiet(srv.Client), objID, oust.X, oust.X)
 }
 
+func TestBossZoneLoginEjectsAfterExpiredPermission(t *testing.T) {
+	oust := location.Location{X: -5000, Y: 20, Z: 30}
+	zones, boss := bossEjectZone(t, oust, -100)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithZones(zones),
+	)
+	objID := srv.SoleObjectID(t)
+	boss.AllowEntry(objID, -time.Second)
+	c := srv.Client
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	frames := append(readEnterWorldBurst(t, c), readUntilQuiet(c)...)
+	waitForWorldPosition(t, srv, objID, oust)
+	assertEjectFrame(t, frames, objID, oust.X, oust.X)
+}
+
 func TestBossZoneTeleportRejoinEjectsToTown(t *testing.T) {
 	// One zero coordinate selects the town fallback in BossZone.onEnter.
-	zones, boss := bossEjectZone(t, location.Location{X: 0, Y: 900, Z: 30})
+	zones, boss := bossEjectZone(t, location.Location{X: 0, Y: 900, Z: 30}, 100)
 	area, err := restart.NewArea([]location.Point{{X: 0, Y: -200}, {X: 1100, Y: -200}, {X: 1100, Y: 200}, {X: 0, Y: 200}}, -10_000, 10_000, map[player.Race]string{player.RaceHuman: "town"})
 	if err != nil {
 		t.Fatal(err)
