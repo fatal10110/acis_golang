@@ -20,11 +20,11 @@ func ActorOf(v any) Actor {
 }
 
 // EvaluateSkill reports the first of def's <cond> clauses that rejects the
-// caster/target pair, with the feedback that clause carries. caster and
-// target are live creatures (see ActorOf); a nil target fails every
-// target-side test. A clause that does not compile, or a caster with no
-// condition view, rejects rather than letting the cast through.
-func EvaluateSkill(def modelskill.Definition, caster, target any) (modelskill.ConditionClause, bool) {
+// caster/target pair, with the feedback that clause carries. target is
+// whatever the caster has selected (see ActorOf); a nil or non-creature
+// target fails every target-side test. A clause that does not compile, or a
+// nil caster, rejects rather than letting the cast through.
+func EvaluateSkill(def modelskill.Definition, caster Source, target any) (modelskill.ConditionClause, bool) {
 	if len(def.Conditions) == 0 {
 		return modelskill.ConditionClause{}, true
 	}
