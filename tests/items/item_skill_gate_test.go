@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -558,4 +559,44 @@ func onPlayerQueue(t *testing.T, srv *gameservertest.Server, objID int32, fn fun
 		t.Fatal("post to player queue: queue closed")
 	}
 	<-done
+}
+
+// TestUseItemSkillDuringFakeDeathGetUpIsRefused pins that a player getting
+// up out of fake death still plays dead until the get-up ends
+// (Player.stopFakeDeath keeps _isFakeDeath until its task,
+// Player.java:7035-7056), so an item used in it is refused by the use
+// gate's isAlikeDead() (UseItem.java:66): no cast and nothing consumed.
+func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
+	startInWorld(t, c)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		fake, err := effect.New(effect.Skill{ID: 60}, modelskill.EffectTemplate{Name: "FakeDeath"})
+		if err != nil {
+			t.Errorf("new fake-death effect: %v", err)
+			return
+		}
+		fake.Effector, fake.Effected = pc, pc
+		pc.EffectList().Add(fake)
+	})
+	srv.Advance(t, 3*time.Second)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestChangeWaitType(true))
+	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeChangeWaitType] != 1 {
+		t.Fatalf("fake-death stop ChangeWaitType count = %d, want 1", seen[serverpackets.OpcodeChangeWaitType])
+	}
+
+	c.Send(encodeUseItem(scroll, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item use while getting up")
+	srv.Advance(t, sitStandDelay)
+	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
+		t.Fatal("refused item cast started after the fake-death get-up")
+	}
+	assertItemCount(t, srv, objID, scroll, 3)
 }

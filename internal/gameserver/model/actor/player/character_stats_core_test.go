@@ -6438,3 +6438,55 @@ func attachIdleLive(t *testing.T, c *Character) *Character {
 	c.Live = live
 	return c
 }
+
+// TestMovementSpeedMultiplier pins CreatureStatus.getMovementSpeedMultiplier
+// (CreatureStatus.java:784-790) on land: the modified move speed over the
+// template run or walk speed the run mode picks. Unbuffed, it is the DEX
+// run-speed bonus (FuncMoveSpeed); an armor grade penalty scales it by 0.84
+// per level and a full weight penalty stops it (PlayerStatus.java:944-952).
+func TestMovementSpeedMultiplier(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.RunSpeed, tmpl.WalkSpeed = 120, 80
+	c := liveCharacter(1, tmpl, combatItems())
+	dex := float32(statbonus.DEXBonus[tmpl.DEX])
+	closeTo := func(got, want float32) bool { return math.Abs(float64(got-want)) < 1e-5 }
+
+	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
+		t.Fatalf("running multiplier = %v, want DEX bonus %v", got, dex)
+	}
+	c.SetRunning(false)
+	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
+		t.Fatalf("walking multiplier = %v, want DEX bonus %v", got, dex)
+	}
+	c.armorGradePenalty = 2
+	if got, want := c.MovementSpeedMultiplier(), dex*0.84*0.84; !closeTo(got, want) {
+		t.Fatalf("multiplier with armor penalty 2 = %v, want %v", got, want)
+	}
+	c.armorGradePenalty = 0
+	c.weightPenalty = 4
+	if got := c.MovementSpeedMultiplier(); got != 0 {
+		t.Fatalf("multiplier with full weight penalty = %v, want 0", got)
+	}
+}
+
+// TestFakeDeathDelay pins the fake-death transition times,
+// (int) (millis / multiplier) ms (Player.java:7029,7052): truncated, and a
+// zero multiplier's infinity saturating at Integer.MAX_VALUE.
+func TestFakeDeathDelay(t *testing.T) {
+	for _, tc := range []struct {
+		millis, mult float32
+		want         time.Duration
+	}{
+		{3000, 1, 3000 * time.Millisecond},
+		{2500, 1, 2500 * time.Millisecond},
+		{3000, 1.25, 2400 * time.Millisecond},
+		{2500, 0.84, 2976 * time.Millisecond},
+		{3000, 0.84, 3571 * time.Millisecond},
+		{2500, 3, 833 * time.Millisecond},
+		{3000, 0, math.MaxInt32 * time.Millisecond},
+	} {
+		if got := fakeDeathDelay(tc.millis, tc.mult); got != tc.want {
+			t.Errorf("fakeDeathDelay(%v, %v) = %v, want %v", tc.millis, tc.mult, got, tc.want)
+		}
+	}
+}

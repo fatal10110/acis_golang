@@ -358,8 +358,10 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	// The reference's thinkStand rejects only on real death (denyAiAction),
 	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
 	// removes the FAKE_DEATH effect, whose exit hook stands the player back
-	// up and broadcasts the revive visual (PlayerAI.java:490-501).
-	if stand && !live.Dead() && live.FakeDead() {
+	// up and broadcasts the revive visual (PlayerAI.java:490-501). Once the
+	// effect is gone the player is still getting up, and the request is
+	// refused below as a stand while not seated.
+	if stand && !live.Dead() && live.EffectList().IsAffected(effect.FlagFakeDeath) {
 		live.EffectList().StopByType(effect.TypeFakeDeath)
 		return
 	}

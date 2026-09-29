@@ -16,8 +16,9 @@ var (
 	ErrFishingSkillsOnly = errors.New("cast: only fishing skills while fishing")
 	// ErrObserverMode means the caster is spectating.
 	ErrObserverMode = errors.New("cast: observer mode")
-	// ErrSitting means the caster is seated, or playing dead and asked for
-	// anything but the fake-death toggle itself.
+	// ErrSitting means the caster is seated, or playing dead (the stand-up
+	// out of fake death included) and asked for anything but the fake-death
+	// toggle itself.
 	ErrSitting = errors.New("cast: sitting")
 	// ErrSiegeSummonUnavailable means a siege-summon skill was requested by a
 	// caster who is not an attacker of an active siege.
@@ -30,8 +31,9 @@ var (
 // runs the shared skill checks and a toggle its own CanCastToggle checks;
 // the player-only rules follow, then the unset-signet and siege-summon
 // gates. An in-flight cast is not a failure here: the caller queues a
-// request that passes behind it. Every skill request path of a player
-// shares it.
+// request that passes behind it. A caster still sitting down is not seated
+// yet: the request waits out the sit-down and is refused once it ends.
+// Every skill request path of a player shares it.
 func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Target, def modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
@@ -45,13 +47,12 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 	if err != nil {
 		return err
 	}
-	return c.playerAttemptRules(caster, def, !caster.Standing())
+	return c.playerAttemptRules(caster, def, caster.Seated())
 }
 
 // CanPlayerAttemptItemCast is the pre-attempt gate of an item-carried
-// skill. It differs from CanPlayerAttemptCast only in that a caster still
-// sitting down does not count as seated: the item waits out the sit-down
-// and is refused once it ends.
+// skill. It differs from CanPlayerAttemptCast only in that a toggle runs
+// the shared skill checks rather than CanCastToggle's.
 func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget

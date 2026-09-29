@@ -32,6 +32,10 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	if live == nil {
 		return
 	}
+	// A player still getting up out of fake death is left to finish: the
+	// reference would restart the stand-up and its revive broadcast, so a
+	// repeated request could hold fake death with no MP drain for as long
+	// as it keeps coming.
 	if live.FakeDead() {
 		live.EffectList().StopByType(effect.TypeFakeDeath)
 		return

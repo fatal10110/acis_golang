@@ -73,9 +73,13 @@ func onPlayerQueue(t *testing.T, srv *gameservertest.Server, objID int32, fn fun
 // packets, no MP spent, no cast in flight.
 func TestPlayerPreAttemptGateRejectsBeforeAnyCost(t *testing.T) {
 	t.Parallel()
+	// sit seats the player and lets the sit-down end: a player still
+	// sitting down is not seated yet.
 	sit := func(t *testing.T, srv *gameservertest.Server, _ int32) {
 		srv.Client.Send(encodeRequestActionUse(0, false, false))
 		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
+		srv.Advance(t, sitStandDelay)
+		drainUntilQuiet(t, srv.Client)
 	}
 	for _, tt := range []struct {
 		name    string

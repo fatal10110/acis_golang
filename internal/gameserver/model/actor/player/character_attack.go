@@ -355,6 +355,24 @@ func (c *Character) RunSpeed() float64 {
 	return c.calcStat(stat.RunSpeed, base)
 }
 
+// MovementSpeedMultiplier is the current move speed over the template's
+// run or walk speed, whichever the run mode picks, or 0 when that base is 0.
+// ponytail: land speeds only; water and swamp zones join it in #2771.
+func (c *Character) MovementSpeedMultiplier() float32 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 1
+	}
+	base, speed := int(tmpl.WalkSpeed), c.WalkSpeed
+	if c.Running() {
+		base, speed = int(tmpl.RunSpeed), c.RunSpeed
+	}
+	if base == 0 {
+		return 0
+	}
+	return float32(speed()) / float32(base)
+}
+
 // WalkSpeed returns the current walk speed.
 func (c *Character) WalkSpeed() float64 {
 	tmpl := c.template()
