@@ -39,9 +39,9 @@ type PetCorpseDecayed struct{}
 type CorpseLeftBehind struct{}
 
 // OwnerRelinked reports that a pet its owner left behind as a corpse, dead
-// or revived since, now answers to the owner's new session and its work runs on that session's queue: the
-// runtime moves the rest of the pet's work there and gives up the queue the
-// corpse had of its own.
+// or revived since, now answers to the owner's new session and its work
+// runs on that session's queue: the runtime moves the rest of the pet's
+// work there and gives up the queue the corpse had of its own.
 type OwnerRelinked struct{}
 
 // DecayCanceled reports that a summon's pending corpse decay, if any, is

@@ -265,14 +265,17 @@ func (s *summonSink) Emit(ev event.Event) {
 			// A corpse its owner left behind has not acted since its row was
 			// saved (leaveCorpseBehind); its items are all that is left to
 			// settle. One revived since is a living pet leaving the world
-			// (a signet's unsummon): it stops what it was doing and its row
-			// is saved again first, alive, with no owner in the world to
-			// lift the collar of.
+			// (a signet's unsummon): it stops what it was doing, and its row
+			// is saved again first, alive, with its owner's collar lifted
+			// to the level it regained.
 			if !actor.Dead() {
 				if s.brain != nil {
 					s.runCleanup(s.brain.AbortAll)
 				}
-				s.runCleanup(func() { l.savePet(actor, nil) })
+				s.runCleanup(func() {
+					l.savePet(actor, nil)
+					l.liftLeftPetCollar(actor)
+				})
 			}
 			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
@@ -361,11 +364,12 @@ func (s *summonSink) moveWorkTo(q *sim.Queue) {
 
 // reclaimPetCorpse hands the pet corpse live's character left behind, if
 // any, back to live, whether it is still a corpse or was revived meanwhile:
-// the pet answers to live from then on and its work runs on live's queue. It runs on live's queue, so a logout of live cannot
-// interleave with it, and takes over the corpse's own queue for the relink,
-// so none of the corpse's work (its decay) runs meanwhile. Taking it over
-// waits only for a drain already in progress; a job the queue accepted but
-// has not started runs after the relink. The corpse's own jobs (its decay,
+// the pet answers to live from then on and its work runs on live's queue.
+// It runs on live's queue, so a logout of live cannot interleave with it,
+// and takes over the corpse's own queue for the relink, so none of the
+// corpse's work (its decay) runs meanwhile. Taking it over waits only for
+// a drain already in progress; a job the queue accepted but has not started
+// runs after the relink. The corpse's own jobs (its decay,
 // through Decay.post; anything through summon.Actor.Post) check the queue
 // they run on first and move on to live's queue. A job posted there
 // directly does not: the AI sweep's think, and for a pet revived while live
@@ -437,6 +441,36 @@ func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 		}
 		l.transferPetInventory(actor, owner.Inventory())
 		l.flushItemPersistence(petInv)
+	})
+	if !posted {
+		offline()
+	}
+}
+
+// liftLeftPetCollar sets the collar of a pet revived while its owner was
+// away to the pet's level, as savePet does for an owner in the world: on
+// the owner's inventory when the owner has come back meanwhile, and on the
+// owner's saved collar row otherwise, since the departed session's inventory
+// no longer persists. It runs as settleLeftCorpseItems does.
+func (l *GameClientLink) liftLeftPetCollar(actor *summon.Actor) {
+	collarID, state, ok := actor.PetState()
+	if !ok {
+		return
+	}
+	ownerID := actor.OwnerID()
+	offline := func() { l.setOfflineItemEnchant(ownerID, collarID, state.Level) }
+	owner, ok := l.livePlayerByID(ownerID)
+	if !ok {
+		offline()
+		return
+	}
+	posted := postLive(owner, func() {
+		if owner.detached() {
+			offline()
+			return
+		}
+		inv := owner.Inventory()
+		inv.SetEnchantLevel(inv.ItemByObjectID(collarID), state.Level)
 	})
 	if !posted {
 		offline()
@@ -548,6 +582,22 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 		defer cancel()
 		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
+		}
+	})
+}
+
+// setOfflineItemEnchant sets the enchant of item row objectID, while
+// offline player ownerID still owns it, on that owner's persistence lane,
+// where the rest of the owner's item writes run.
+func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant int) {
+	if l.items == nil || l.persist == nil {
+		return
+	}
+	l.queueItemWrite(ownerID, l.itemWrites.Reserve(objectID), func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if _, err := l.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
+			l.log.Error().Err(err).Int32("object_id", objectID).Msg("set offline item enchant")
 		}
 	})
 }

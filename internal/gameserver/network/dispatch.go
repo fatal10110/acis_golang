@@ -51,6 +51,7 @@ type itemStore interface {
 	UpdateState(ctx context.Context, st item.InstanceState) error
 	Delete(ctx context.Context, objectID int32) error
 	DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error)
+	SetEnchantOwned(ctx context.Context, ownerID, objectID int32, enchant int) (bool, error)
 }
 
 type shortcutStore interface {

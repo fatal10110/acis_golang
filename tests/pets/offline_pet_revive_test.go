@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -235,6 +236,41 @@ func TestOfflineOwnersRevivedPetUnsummoned(t *testing.T) {
 	}
 	if inst := o.ownerInventory(t).ItemByTemplateID(item.AdenaID); inst == nil || inst.Snapshot().Count != 40 {
 		t.Fatal("returning owner does not hold its pet's 40 adena")
+	}
+	if got := o.liveCollarEnchant(t); got != wolfLevel {
+		t.Fatalf("collar enchant after the relog = %d, want the level %d the pet was saved at", got, wolfLevel)
+	}
+}
+
+// TestOfflineOwnersRevivedPetFights: a pet revived while its owner is away
+// runs, chases and swings on the queue of its own it got at the logout, not
+// on the departed session's closed one. A monster's aggression provokes it
+// (fireAggressionEvent calls AttackTarget), and it runs to a monster out of
+// its reach and lands a hit on it.
+func TestOfflineOwnersRevivedPetFights(t *testing.T) {
+	t.Parallel()
+	o := leaveWolfDead(t)
+	wolf := o.wolf
+	offlineQueue := wolf.Queue()
+	o.npcResurrects(t)
+	if wolf.Dead() {
+		t.Fatal("monster's resurrection left the offline owner's pet dead")
+	}
+	if wolf.Move().Queue() != offlineQueue {
+		t.Fatal("offline owner's revived pet moves on another queue than its own")
+	}
+
+	x, y, z := wolf.Position()
+	target := o.srv.SpawnHostileNPCAt(t, location.Location{X: x + 300, Y: y, Z: z})
+	runOn(t, offlineQueue, func() {
+		wolf.SetRollSource(landNoCrit())
+		wolf.AttackTarget(target)
+	})
+	o.srv.AdvanceUntil(t, "offline owner's revived pet reaching and hitting the monster", func() bool {
+		return target.CurrentHP() < target.MaxHP()
+	})
+	if nx, _, _ := wolf.Position(); nx <= x {
+		t.Fatalf("pet hit a monster 300 away from x %d without moving (x %d)", x, nx)
 	}
 }
 

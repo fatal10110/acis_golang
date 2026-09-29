@@ -208,3 +208,29 @@ func TestItemStore_DeleteByOwner(t *testing.T) {
 		t.Errorf("ListByOwner() after delete = %v, want empty", got)
 	}
 }
+
+// TestItemStore_SetEnchantOwned: the enchant level changes only on a row the
+// named owner still holds.
+func TestItemStore_SetEnchantOwned(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.SharedDB(t))
+
+	const ownerID, otherID = 0x10000091, 0x10000092
+	inst := item.Instance{ObjectID: 0x10000391, TemplateID: 2375, Count: 1, EnchantLevel: 9, Location: item.LocationInventory, ManaLeft: -1}
+	if err := store.Create(ctx, ownerID, inst); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	if ok, err := store.SetEnchantOwned(ctx, otherID, inst.ObjectID, 12); err != nil || ok {
+		t.Fatalf("SetEnchantOwned(other owner) = %v, %v; want false, nil", ok, err)
+	}
+	if ok, err := store.SetEnchantOwned(ctx, ownerID, inst.ObjectID, 10); err != nil || !ok {
+		t.Fatalf("SetEnchantOwned(owner) = %v, %v; want true, nil", ok, err)
+	}
+	got, err := store.ListByOwner(ctx, ownerID)
+	if err != nil {
+		t.Fatalf("ListByOwner() unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].EnchantLevel != 10 {
+		t.Fatalf("ListByOwner() after SetEnchantOwned = %+v, want one row at enchant 10", got)
+	}
+}
