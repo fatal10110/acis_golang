@@ -40,6 +40,18 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	return c.Die(attacker)
 }
 
+// NotifyAttacked reports a damaging physical hit, or an offensive skill,
+// from attacker reaching this character: it enters its attack stance.
+func (c *Character) NotifyAttacked(attacker attackable.Combatant) {
+	c.emit(event.Attacked{Attacker: attacker})
+}
+
+// NotifyEvaded reports a physical hit from attacker that missed this
+// character, which is told whose attack it avoided.
+func (c *Character) NotifyEvaded(attacker attackable.Combatant) {
+	c.emit(event.Evaded{Attacker: attacker})
+}
+
 // Dead reports whether the player has died.
 func (c *Character) Dead() bool {
 	return c.dead.Load()

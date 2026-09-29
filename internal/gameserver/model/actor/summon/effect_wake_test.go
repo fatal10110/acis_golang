@@ -23,6 +23,7 @@ func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref, bool) bo
 func (*thinkCountingAI) AbortAll()                                                 {}
 func (*thinkCountingAI) FollowInstead(attackable.Combatant)                        {}
 func (*thinkCountingAI) TryToMoveTo(location.Location) bool                        { return false }
+func (*thinkCountingAI) StepAside(location.Location) bool                          { return false }
 func (*thinkCountingAI) StopMove()                                                 {}
 func (*thinkCountingAI) StopAttack()                                               {}
 func (*thinkCountingAI) AttackingNow() bool                                        { return false }

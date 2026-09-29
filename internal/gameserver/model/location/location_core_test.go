@@ -148,3 +148,30 @@ func TestLocationFleeFrom(t *testing.T) {
 		}
 	}
 }
+
+// TestEquidistantPoint pins Circle.getEquidistantPoints(12, z) for a radius
+// 70 circle (SummonMove.avoidAttack). Oracle: the reference method run on a
+// JVM, printing each point's offset from the center; note the truncated
+// 34s where the sine or cosine of 30-degree steps rounds just under 0.5.
+func TestEquidistantPoint(t *testing.T) {
+	want := [12][2]int{
+		{70, 0},
+		{60, 34},
+		{35, 60},
+		{0, 70},
+		{-34, 60},
+		{-60, 35},
+		{-70, 0},
+		{-60, -34},
+		{-35, -60},
+		{0, -70},
+		{34, -60},
+		{60, -35},
+	}
+	for i, w := range want {
+		got := EquidistantPoint(1000, -2000, 55, 70, 12, i)
+		if got != (Location{X: 1000 + w[0], Y: -2000 + w[1], Z: 55}) {
+			t.Errorf("point %d = %+v, want offset %v at z 55", i, got, w)
+		}
+	}
+}

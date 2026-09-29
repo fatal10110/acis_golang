@@ -3030,3 +3030,118 @@ func TestAttackableLatchedAttackReplacesMoveToPromotedByThink(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the latched RunAI = %v, want %v", got, IntentionAttack)
 	}
 }
+
+// ---- summon step-aside ----
+// stepAsideMove records every walk a summon AI starts.
+type stepAsideMove struct {
+	summonMove
+	walks []location.Location
+}
+
+func (m *stepAsideMove) MoveToLocation(dest location.Location) (bool, error) {
+	m.walks = append(m.walks, dest)
+	return true, nil
+}
+
+// TestSummonAIStepAsideOnlyFromIdleOrFollow pins SummonMove.avoidAttack's
+// intention gate: an idle or following summon walks to the spot and takes a
+// MOVE_TO intention, while one attacking, casting or unable to act refuses
+// and keeps its intention.
+func TestSummonAIStepAsideOnlyFromIdleOrFollow(t *testing.T) {
+	dest := location.Location{X: 1070, Y: 1000, Z: 0}
+	ref := skill.Ref{ID: 4139, Level: 8}
+
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, brain *Summon, owner *fakeActor, strike *recordingAttack, cast *recordingCast)
+		want  Intention
+		walks bool
+	}{
+		{name: "idle", want: IntentionMoveTo, walks: true},
+		{
+			name: "follow",
+			setup: func(t *testing.T, brain *Summon, _ *fakeActor, _ *recordingAttack, _ *recordingCast) {
+				if !brain.TryToFollow(actor(1)) {
+					t.Fatal("TryToFollow() = false, want accepted follow")
+				}
+			},
+			want:  IntentionMoveTo,
+			walks: true,
+		},
+		{
+			name: "attack",
+			setup: func(t *testing.T, brain *Summon, _ *fakeActor, strike *recordingAttack, _ *recordingCast) {
+				if !brain.TryToAttack(actor(200)) {
+					t.Fatal("TryToAttack() = false, want accepted attack")
+				}
+				// Between swings: only the intention holds the summon back.
+				strike.attackingNow = false
+			},
+			want: IntentionAttack,
+		},
+		{
+			name: "cast",
+			setup: func(t *testing.T, brain *Summon, _ *fakeActor, _ *recordingAttack, cast *recordingCast) {
+				// The summon is still closing distance, so the cast intention
+				// stays current with no cast in flight.
+				brain.TryToCast(actor(200), ref, false)
+				if cast.castCalled {
+					t.Fatal("Cast() called while closing distance, want the approach only")
+				}
+			},
+			want: IntentionCast,
+		},
+		{
+			name: "idle but denied AI action",
+			setup: func(_ *testing.T, _ *Summon, owner *fakeActor, _ *recordingAttack, _ *recordingCast) {
+				owner.denyAction = true
+			},
+			want: IntentionIdle,
+		},
+		{
+			name: "idle mid-swing",
+			setup: func(_ *testing.T, _ *Summon, _ *fakeActor, strike *recordingAttack, _ *recordingCast) {
+				strike.attackingNow = true
+			},
+			want: IntentionIdle,
+		},
+		{
+			name: "idle mid-cast",
+			setup: func(_ *testing.T, _ *Summon, _ *fakeActor, _ *recordingAttack, cast *recordingCast) {
+				cast.casting = true
+			},
+			want: IntentionIdle,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			owner := actor(100)
+			move := &stepAsideMove{summonMove: summonMove{recordingMove: recordingMove{followStarted: true}}}
+			strike := &recordingAttack{canAttack: true}
+			cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
+			brain := NewSummon(owner, move, strike)
+			brain.SetCastController(cast)
+			if tc.setup != nil {
+				tc.setup(t, brain, owner, strike, cast)
+			}
+			before := len(move.walks)
+
+			got := brain.StepAside(dest)
+			if got != tc.walks {
+				t.Fatalf("StepAside() = %v, want %v", got, tc.walks)
+			}
+			if kind := brain.CurrentIntention(); kind != tc.want {
+				t.Fatalf("CurrentIntention() = %v, want %v", kind, tc.want)
+			}
+			walks := move.walks[before:]
+			if tc.walks {
+				if len(walks) != 1 || walks[0] != dest {
+					t.Fatalf("walks = %v, want [%v]", walks, dest)
+				}
+			} else if len(walks) != 0 {
+				t.Fatalf("walks = %v, want none", walks)
+			}
+		})
+	}
+}

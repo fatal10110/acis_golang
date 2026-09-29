@@ -477,13 +477,34 @@ func (c *Controller) deliverHit(hit Hit) {
 	if c.player != nil {
 		c.player.NotePvPAttack(hit.Target)
 	}
+	// The target hears of a miss before the attacker's feedback goes out.
+	target, reacts := hit.Target.(attackedTarget)
+	if hit.Miss && reacts {
+		target.NotifyEvaded(c.actor)
+	}
 	// The attacker's feedback goes out before the target takes the damage.
 	c.reportHit(hit)
 	if hit.Miss || hit.Damage <= 0 {
 		return
 	}
+	c.emit(event.AttackStanceRequested{})
+	if reacts {
+		target.NotifyAttacked(c.actor)
+	}
 	hit.Target.TakeDamage(hit.Damage, c.actor)
 	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit})
+}
+
+// attackedTarget is a hit target whose AI reacts to the hit: players and
+// summons. A hostile NPC's aggression runs from its damage path; its attack
+// stance is not modeled yet (#2730).
+type attackedTarget interface {
+	// NotifyAttacked reports a damaging physical hit, or an offensive
+	// skill, from attacker reaching the target.
+	NotifyAttacked(attacker attackable.Combatant)
+	// NotifyEvaded reports a physical hit from attacker that missed the
+	// target.
+	NotifyEvaded(attacker attackable.Combatant)
 }
 
 // invulTarget is the target state the attacker's damage feedback reads when

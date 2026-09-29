@@ -516,6 +516,8 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 	return true
 }
 
+// startLiveAutoAttack enters or refreshes live's attack stance. Entering it
+// shows the stance on live's summon first, then on live.
 func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	if live == nil {
 		return
@@ -526,8 +528,35 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 	if !live.SetInCombat(true) {
 		return
 	}
+	if l.world != nil {
+		if obj, ok := l.world.Summon(live.ObjectID()); ok {
+			if actor, ok := obj.(*summon.Actor); ok {
+				l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
+			}
+		}
+	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameAutoAttackStart(live.ObjectID())
+	})
+}
+
+// startSummonAttackStance enters or refreshes the attack stance of actor's
+// owner, which a summon's stance is. Entering it shows the stance on actor,
+// then on its owner.
+func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
+	owner, ok := liveSummonOwner(actor)
+	if !ok {
+		return
+	}
+	if l.attackStance != nil {
+		l.attackStance.Add(owner)
+	}
+	if !owner.SetInCombat(true) {
+		return
+	}
+	l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
+	l.broadcastLiveFrame(owner, func() wire.Frame {
+		return serverpackets.FrameAutoAttackStart(owner.ObjectID())
 	})
 }
 

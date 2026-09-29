@@ -37,7 +37,7 @@ func sessionOnly(ev event.Event) bool {
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
 		event.SkillResisted, event.MagicResisted, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
-		event.WeightPenaltyChanged, event.VitalsChanged:
+		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded:
 		return true
 	}
 	return false
@@ -240,8 +240,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
 	case event.Relocated:
 		l.revalidateZones(live, e.Previous)
-	case event.AttackStarted:
+	case event.AttackStarted, event.AttackStanceRequested, event.Attacked:
 		l.startLiveAutoAttack(live)
+	case event.Evaded:
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))
 	case event.AttackFinished:
 		l.finishDeferredPickup(live)
 		magicHeld := l.finishDeferredMagicSkill(live)
