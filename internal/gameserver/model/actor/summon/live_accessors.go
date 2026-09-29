@@ -359,10 +359,14 @@ func (a *Actor) refreshGrowthLocked() bool {
 	return a.level != oldLevel
 }
 
+// resetVitals fills a's HP and MP for a level-up. A dead pet keeps its
+// corpse values: a level gained while dead must not raise it.
 func (a *Actor) resetVitals() {
 	hp, mp := a.MaxHPValue(), a.MaxMPValue()
 	a.vitals.mu.Lock()
-	a.vitals.hp, a.vitals.mp = hp, mp
+	if !a.dead {
+		a.vitals.hp, a.vitals.mp = hp, mp
+	}
 	a.vitals.mu.Unlock()
 }
 

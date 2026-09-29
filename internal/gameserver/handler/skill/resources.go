@@ -69,6 +69,7 @@ func (h healHandler) UseResult(cast Cast) Result {
 				continue
 			}
 			restored := target.AddHP(amount * target.HealEffectiveness() / 100)
+			sendRestoreStatus(obj, restored)
 			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 		}
 	}
@@ -102,10 +103,12 @@ func (h healPercentHandler) UseResult(cast Cast) Result {
 		}
 		if isHP {
 			restored := target.AddHP(target.MaxHPValue() * float64(cast.Skill.Power) / 100)
+			sendRestoreStatus(obj, restored)
 			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 			continue
 		}
 		restored := target.AddMP(target.MaxMPValue() * float64(cast.Skill.Power) / 100)
+		sendRestoreStatus(obj, restored)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, false)
 	}
 	return result
@@ -126,6 +129,7 @@ func (manaHealHandler) Use(cast Cast) {
 			mp = target.RechargeMP(mp)
 		}
 		restored := target.AddMP(mp)
+		sendRestoreStatus(obj, restored)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -158,10 +162,22 @@ func (h combatPointHealHandler) UseResult(cast Cast) Result {
 		if target.CP()+amount > target.MaxCPValue() {
 			amount = target.MaxCPValue() - target.CP()
 		}
+		// Setting CP reports the status even when nothing was missing.
 		target.SetCP(target.CP() + amount)
+		target.BroadcastStatus()
 		notifyRestored(obj, cast.Caster, amount, restoredCP, true)
 	}
 	return result
+}
+
+// sendRestoreStatus sends a player target its own status for a restore that
+// applied anything, ahead of the restored message; a restore that applied
+// nothing sends none. A summon or NPC already republished its status from
+// its own vitals mutator.
+func sendRestoreStatus(target Actor, applied float64) {
+	if p, ok := asPlayer(target); ok && applied > 0 {
+		p.BroadcastStatus()
+	}
 }
 
 func notifyRestored(target, caster Actor, amount float64, resource restoredResource, playerCasterOnly bool) {
@@ -263,6 +279,11 @@ func (h balanceLifeHandler) UseResult(cast Cast) Result {
 	ratio := currentHP / fullHP
 	for _, target := range targets {
 		target.SetHP(target.MaxHPValue() * ratio)
+		// A player's HP set reports its status whether or not the value
+		// moved; a summon's or NPC's SetHP republishes its own.
+		if p, ok := asPlayer(target); ok {
+			p.BroadcastStatus()
+		}
 	}
 	return result
 }

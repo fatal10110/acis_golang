@@ -353,11 +353,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		return
 	}
 	pet.SetHP(curHP)
-	// A pet saved as a corpse comes back as one: the owner has to revive it,
-	// and cannot get it back alive by calling it out again.
-	if hasSaved && curHP < creature.DeathHP {
-		pet.RestoreDead()
-	}
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
 	// saved current values (Pet.java:552-556); NewPet already seeds
 	// current HP/MP at max, so a restored value only needs applying when
@@ -368,6 +363,12 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		} else {
 			pet.AddMP(curMP - pet.MPValue())
 		}
+	}
+	// A pet saved as a corpse comes back as one: the owner has to revive it,
+	// and cannot get it back alive by calling it out again. The saved MP
+	// lands first, since a dead pet's MP no longer changes.
+	if hasSaved && curHP < creature.DeathHP {
+		pet.RestoreDead()
 	}
 
 	// Combat AI wiring (owner-commanded attack/follow execution against a

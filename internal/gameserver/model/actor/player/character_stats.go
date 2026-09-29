@@ -396,7 +396,8 @@ func (c *Character) AddHP(amount float64) float64 {
 	return amount
 }
 
-// AddMP restores MP, clamped to MaxMP, and returns the applied amount.
+// AddMP restores MP, clamped to MaxMP, and returns the applied amount. Like
+// AddHP it leaves a dead character's MP alone, under the lock MarkDead holds.
 func (c *Character) AddMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
@@ -404,7 +405,7 @@ func (c *Character) AddMP(amount float64) float64 {
 	maxMP := c.MaxMPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.curMP >= maxMP {
+	if c.dead.Load() || c.curMP >= maxMP {
 		return 0
 	}
 	if c.curMP+amount > maxMP {
@@ -414,7 +415,8 @@ func (c *Character) AddMP(amount float64) float64 {
 	return amount
 }
 
-// AddCP restores CP, clamped to MaxCP, and returns the applied amount.
+// AddCP restores CP, clamped to MaxCP, and returns the applied amount. A
+// dead character gains nothing.
 func (c *Character) AddCP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
@@ -422,7 +424,7 @@ func (c *Character) AddCP(amount float64) float64 {
 	maxCP := c.MaxCPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.curCP >= maxCP {
+	if c.dead.Load() || c.curCP >= maxCP {
 		return 0
 	}
 	if c.curCP+amount > maxCP {
@@ -432,14 +434,15 @@ func (c *Character) AddCP(amount float64) float64 {
 	return amount
 }
 
-// ReduceMP subtracts MP, clamped at zero, and returns the applied amount.
+// ReduceMP subtracts MP, clamped at zero, and returns the applied amount. A
+// dead character loses nothing.
 func (c *Character) ReduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.curMP <= 0 {
+	if c.dead.Load() || c.curMP <= 0 {
 		return 0
 	}
 	if amount > c.curMP {
@@ -633,11 +636,15 @@ func (c *Character) SetHP(value float64) {
 	c.curHP = value
 }
 
-// SetCP sets current CP, clamped to [0, MaxCP].
+// SetCP sets current CP, clamped to [0, MaxCP]. It has no effect on a dead
+// character.
 func (c *Character) SetCP(value float64) {
 	maxCP := c.MaxCPValue()
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
+	if c.dead.Load() {
+		return
+	}
 	if value < 0 {
 		value = 0
 	}

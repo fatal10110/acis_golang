@@ -151,39 +151,46 @@ func (h *Hostile) publishVitals(applied float64) float64 {
 	return applied
 }
 
-// addMP is AddMP without the status report.
+// addMP is AddMP without the status report. A dead NPC gains nothing.
 func (h *Hostile) addMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	maxMP := h.MaxMPValue()
-	h.mpMu.Lock()
-	defer h.mpMu.Unlock()
-	if h.mp >= maxMP {
-		return 0
-	}
-	if h.mp+amount > maxMP {
-		amount = maxMP - h.mp
-	}
-	h.mp += amount
-	return amount
+	applied := 0.0
+	h.whileAliveMP(func() {
+		if h.mp >= maxMP {
+			return
+		}
+		applied = min(amount, maxMP-h.mp)
+		h.mp += applied
+	})
+	return applied
 }
 
-// reduceMP is ReduceMP without the status report.
+// reduceMP is ReduceMP without the status report. A dead NPC loses nothing.
 func (h *Hostile) reduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
-	h.mpMu.Lock()
-	defer h.mpMu.Unlock()
-	if h.mp <= 0 {
-		return 0
-	}
-	if amount > h.mp {
-		amount = h.mp
-	}
-	h.mp -= amount
-	return amount
+	applied := 0.0
+	h.whileAliveMP(func() {
+		applied = min(amount, h.mp)
+		h.mp -= applied
+	})
+	return applied
+}
+
+// whileAliveMP runs write, which changes mp, only while h is alive. Death
+// is decided by HP, which a killing blow zeroes under the health lock
+// before the dead flag follows, so the write holds that lock too: no MP
+// change lands on a corpse, whichever queue the killing blow came from.
+func (h *Hostile) whileAliveMP(write func()) {
+	h.health.WhileAlive(func() {
+		h.mpMu.Lock()
+		defer h.mpMu.Unlock()
+		write()
+	})
 }
 
 // ReduceHP applies skill HP damage and runs the once-only death path. The

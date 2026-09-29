@@ -72,8 +72,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		// the isHerb guard at :96 only skips the item destroy, not this message.
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 		applyItemCastCharges(live, res)
-		beforeVitals := live.Vitals()
+		// A restore the herb applies reports the user's status itself.
 		l.sendSkillHandlerResult(live, res.Apply())
-		sendMagicStatusUpdate(live, beforeVitals)
 	}
 }

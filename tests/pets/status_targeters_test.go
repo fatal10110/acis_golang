@@ -247,6 +247,59 @@ func TestBalanceLifeOnPetPublishesItsStatusOnce(t *testing.T) {
 	assertCurHPUpdates(t, "watcher targeting the pet", got, curHPFixture(pet.ObjectID(), int32(wantHP)))
 }
 
+// TestBalanceLifeOnPlayerCasterSendsOneSelfStatus has the owner cast
+// Balance Life over itself and its wounded wolf. BalanceLife.java:65 sets the
+// caster's HP through CreatureStatus.setHp, whose broadcast is, for a player,
+// PlayerStatus.broadcastStatusUpdate (PlayerStatus.java:408-416): one self
+// StatusUpdate carrying CUR_HP at the balanced value, CUR_MP, CUR_CP and
+// MAX_CP, and no further CUR_HP update after the hit.
+func TestBalanceLifeOnPlayerCasterSendsOneSelfStatus(t *testing.T) {
+	t.Parallel()
+	h, pet := bootBalanceLifeOwner(t)
+	runOn(t, pet.Queue(), func() { pet.SetHP(pet.HP() - 200) })
+	drainUntilQuiet(t, h.client)
+
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner not in world")
+	}
+	owner := obj.(interface {
+		HP() float64
+		MaxHPValue() float64
+	})
+	ratio := (owner.HP() + pet.HP()) / (owner.MaxHPValue() + pet.MaxHPValue())
+	wantHP := owner.MaxHPValue() * ratio
+	if wantHP == owner.HP() {
+		t.Fatalf("balanced HP %v equals the owner's current HP; the fixture must move it", wantHP)
+	}
+
+	h.client.Send(encodeRequestMagicSkillUse(balanceLifeSkill))
+	h.srv.AdvanceUntil(t, "Balance Life landing on the owner", func() bool { return owner.HP() == wantHP })
+
+	updates, _ := statusUpdatesFor(drainFrames(t, h.client), h.ownerID)
+	if len(updates) != 1 {
+		t.Fatalf("owner got %d self StatusUpdates %x, want one", len(updates), updates)
+	}
+	want := []byte{serverpackets.OpcodeStatusUpdate}
+	want = binary.LittleEndian.AppendUint32(want, uint32(h.ownerID))
+	want = binary.LittleEndian.AppendUint32(want, 4)
+	for _, attr := range []struct {
+		typ   serverpackets.StatusType
+		value int
+	}{
+		{serverpackets.StatusCurrentHP, int(wantHP)},
+		{serverpackets.StatusCurrentMP, h.srv.PlayerCurrentMP(t, h.ownerID)},
+		{serverpackets.StatusCurrentCP, h.srv.PlayerCurrentCP(t, h.ownerID)},
+		{serverpackets.StatusMaxCP, h.srv.PlayerMaxCP(t, h.ownerID)},
+	} {
+		want = binary.LittleEndian.AppendUint32(want, uint32(attr.typ))
+		want = binary.LittleEndian.AppendUint32(want, uint32(int32(attr.value)))
+	}
+	if !bytes.Equal(updates[0], want) {
+		t.Fatalf("owner self StatusUpdate = %x, want %x", updates[0], want)
+	}
+}
+
 // TestPetLevelUpRefreshesTargeterBar drives a kill-reward level-up on a
 // wounded wolf. PetStatus.addLevel -> PlayableStatus.addLevel
 // (PlayableStatus.java:147-170) calls setMaxHpMp, whose setHp(getMaxHp())

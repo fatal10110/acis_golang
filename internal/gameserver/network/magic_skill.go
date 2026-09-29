@@ -242,17 +242,13 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 }
 
 // applyCastHit dispatches a player cast's effects to the affected set its
-// launch resolved. The final MP/HP costs already sent their own statuses;
-// what is left is a status for any change the effects made to the caster
-// after the last status the cast's messages sent it.
+// launch resolved. The final MP/HP costs already sent their own statuses,
+// and every change the effects make to the caster's vitals reports its own
+// status where it happens, so the hit sends none of its own.
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
-	before := live.Vitals()
-	handlers.Sink = l.playerMessageSink(live, func() { before = live.Vitals() })
+	handlers.Sink = l.playerMessageSink(live, nil)
 	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
 	l.syncCubicTargets(live, result, def)
-	if !live.Character.Dead() {
-		sendMagicStatusUpdate(live, before)
-	}
 }
 
 // attemptMagicSkill runs a player's skill request through the pre-attempt

@@ -179,14 +179,16 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	hostile.AI().SetRandomWalkRate(n.randomWalkRate)
 
-	if hp == fullHP {
-		hp = hostile.MaxHP()
-	}
-	hostile.SetCurrentHP(hp)
+	// MP goes first: a saved HP of zero leaves the NPC dead, and a dead
+	// NPC's MP no longer changes.
 	if mp == fullMP {
 		mp = hostile.CurrentMP()
 	}
 	hostile.SetCurrentMP(mp)
+	if hp == fullHP {
+		hp = hostile.MaxHP()
+	}
+	hostile.SetCurrentHP(hp)
 	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: n.rewarderFor(hostile, tmpl), Remover: n}
 	if los, ok := n.geo.(npc.LineOfSight); ok {
 		rt.LOS = los

@@ -668,3 +668,83 @@ func TestEscapeScrollReuseIsRejected(t *testing.T) {
 		t.Fatalf("scroll count after rejected reuse = %d, want 2 (unchanged)", inst.Count)
 	}
 }
+
+// TestUseManaPotionSendsStatusBeforeRestoredMessage pins the mana potion's
+// feedback order. Its ManaHeal effect restores twice, the second time by the
+// amount the first applied; each restore reports the user's full status
+// (CUR_HP, CUR_MP, CUR_CP, MAX_CP) where it lands, S1_MP_RESTORED with the
+// first amount follows, and no StatusUpdate trails the potion.
+func TestUseManaPotionSendsStatusBeforeRestoredMessage(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 728, 3)
+	startInWorld(t, c)
+	// Empty the pool so the second restore also has room to land.
+	srv.DrainPlayerMP(t, objID, srv.PlayerCurrentMP(t, objID))
+	drained := srv.PlayerCurrentMP(t, objID)
+
+	c.Send(encodeUseItem(potion, false))
+	frames := collectUntilQuiet(t, c)
+	msgAt := -1
+	var statusAt []int
+	for i, f := range frames {
+		switch f[0] {
+		case serverpackets.OpcodeSystemMessage:
+			if msgAt < 0 && systemMessageID(t, f) == serverpackets.SystemMessageS1MPRestored {
+				msgAt = i
+			}
+		case serverpackets.OpcodeStatusUpdate:
+			if wire.NewReader(f[1:]).ReadInt32() == objID {
+				statusAt = append(statusAt, i)
+			}
+		}
+	}
+	if msgAt < 0 {
+		t.Fatal("S1_MP_RESTORED never arrived")
+	}
+	if len(statusAt) != 2 || statusAt[0] != msgAt-2 || statusAt[1] != msgAt-1 {
+		t.Fatalf("user StatusUpdates at frames %v, want frames %d and %d right before S1_MP_RESTORED", statusAt, msgAt-2, msgAt-1)
+	}
+	msg := wire.NewReader(frames[msgAt][1:])
+	msg.ReadInt32()
+	if params, typ := msg.ReadInt32(), msg.ReadInt32(); params != 1 || typ != serverpackets.SystemMessageParamNumber {
+		t.Fatalf("S1_MP_RESTORED params = %d of type %d, want one number", params, typ)
+	}
+	restored := int(msg.ReadInt32())
+	final := srv.PlayerCurrentMP(t, objID)
+	if restored <= 0 || final <= drained+restored || final > drained+2*restored {
+		t.Fatalf("S1_MP_RESTORED amount %d with MP %d -> %d, want two restores of up to %d", restored, drained, final, restored)
+	}
+	for k, wantMP := range []int{drained + restored, final} {
+		assertPlayerStatus(t, frames[statusAt[k]], []int32{
+			int32(serverpackets.StatusCurrentHP), int32(srv.PlayerCurrentHP(t, objID)),
+			int32(serverpackets.StatusCurrentMP), int32(wantMP),
+			int32(serverpackets.StatusCurrentCP), int32(srv.PlayerCurrentCP(t, objID)),
+			int32(serverpackets.StatusMaxCP), int32(srv.PlayerMaxCP(t, objID)),
+		})
+	}
+}
+
+// assertPlayerStatus asserts frame is a StatusUpdate carrying exactly the
+// given type/value pairs in order.
+func assertPlayerStatus(t *testing.T, frame []byte, want []int32) {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32()
+	if n := r.ReadInt32(); n != int32(len(want)/2) {
+		t.Fatalf("StatusUpdate attribute count = %d, want %d", n, len(want)/2)
+	}
+	for i := 0; i < len(want); i += 2 {
+		if typ, val := r.ReadInt32(), r.ReadInt32(); typ != want[i] || val != want[i+1] {
+			t.Fatalf("StatusUpdate attribute %d = %d:%d, want %d:%d", i/2, typ, val, want[i], want[i+1])
+		}
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read StatusUpdate: %v", err)
+	}
+}

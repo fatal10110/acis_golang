@@ -21,19 +21,19 @@ func (h *Hostile) MPRegenRate() float64 {
 // TickRegen applies one HP/MP regeneration step (CreatureStatus.
 // doRegeneration: each resource short of its calculated max gains at least
 // 1, then the resulting HP is broadcast to known observers) and is a no-op
-// once this NPC has died.
+// once this NPC has died. A kill landing from another queue after the
+// liveness check still stops the tick: neither write touches a corpse, and
+// a tick that wrote nothing reports nothing.
 func (h *Hostile) TickRegen() {
 	if h.AlikeDead() {
 		return
 	}
 	changed := false
 	if h.HP() < h.MaxHPValue() {
-		h.health.Add(math.Max(1, h.HPRegenRate()), h.MaxHPValue())
-		changed = true
+		changed = h.health.Add(math.Max(1, h.HPRegenRate()), h.MaxHPValue()) > 0
 	}
 	if h.MPValue() < h.MaxMPValue() {
-		h.addMP(math.Max(1, h.MPRegenRate()))
-		changed = true
+		changed = h.addMP(math.Max(1, h.MPRegenRate())) > 0 || changed
 	}
 	if !changed {
 		return

@@ -10,7 +10,8 @@ import (
 
 // deliverChanceCast runs one chance-triggered skill and delivers its result
 // the way a finished cast by the same caster delivers one: a player gets its
-// messages and its own status change, a summon's messages go to its owner,
+// messages (a change to its own vitals reported its status where it
+// happened), a summon's messages go to its owner,
 // and an NPC's reach only the players they name.
 func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply func() actorcast.EffectResult) {
 	var live *livePlayer
@@ -27,7 +28,6 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply f
 		l.sendSkillHandlerResult(nil, apply())
 		return
 	}
-	before := live.Vitals()
 	result := apply()
 	for _, message := range result.Messages {
 		switch m := message.(type) {
@@ -38,5 +38,4 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply f
 		}
 	}
 	l.sendSkillHandlerResult(live, result)
-	sendMagicStatusUpdate(live, before)
 }

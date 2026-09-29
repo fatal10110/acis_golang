@@ -70,6 +70,20 @@ func (h *Health) Add(amount, max float64) float64 {
 	return amount
 }
 
+// WhileAlive runs fn under h's lock when the actor is alive, and reports
+// whether it ran. A write to another resource made inside fn cannot land
+// after a killing blow: Damage zeroes HP under the same lock, and nothing
+// brings it back above zero.
+func (h *Health) WhileAlive(fn func()) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.current == nil || *h.current <= 0 {
+		return false
+	}
+	fn()
+	return true
+}
+
 // Damage applies non-negative damage, clamps at zero, and reports whether
 // this damage newly left HP below DeathHP.
 func (h *Health) Damage(dmg int) bool {

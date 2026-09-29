@@ -69,10 +69,71 @@ func assertRestoredBy(t *testing.T, r *wire.Reader, healer string, amount int32)
 	}
 }
 
+// collectThroughMessage reads c's frames until system message wantID has
+// arrived and the server has gone quiet after it, and returns them all.
+func collectThroughMessage(t *testing.T, c *testsupport.ScriptedClient, wantID int32) [][]byte {
+	t.Helper()
+	var frames [][]byte
+	for range 100 {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			t.Fatalf("system message %d never arrived", wantID)
+		}
+		frames = append(frames, frame)
+		if frame[0] == serverpackets.OpcodeSystemMessage && wireReader(frame[1:]).ReadInt32() == wantID {
+			return append(frames, collectUntilQuiet(t, c)...)
+		}
+	}
+	t.Fatalf("system message %d not among 100 frames", wantID)
+	return nil
+}
+
+// selfStatusesThenMessage reads c's frames through system message wantID
+// until the server goes quiet, and asserts that every StatusUpdate for objID
+// among them sits immediately before that message, in one unbroken run of
+// want frames: a restore reports its status at the change, ahead of the
+// restored message, and nothing after it does. It returns those statuses in
+// order and the message positioned at its params.
+func selfStatusesThenMessage(t *testing.T, c *testsupport.ScriptedClient, objID, wantID int32, want int) ([][]byte, *wire.Reader) {
+	t.Helper()
+	frames := collectThroughMessage(t, c, wantID)
+	msgAt := -1
+	var statusAt []int
+	for i, frame := range frames {
+		switch frame[0] {
+		case serverpackets.OpcodeSystemMessage:
+			if msgAt < 0 && wireReader(frame[1:]).ReadInt32() == wantID {
+				msgAt = i
+			}
+		case serverpackets.OpcodeStatusUpdate:
+			if wireReader(frame[1:]).ReadInt32() == objID {
+				statusAt = append(statusAt, i)
+			}
+		}
+	}
+	if msgAt < 0 {
+		t.Fatalf("system message %d never arrived", wantID)
+	}
+	if len(statusAt) != want {
+		t.Fatalf("got %d StatusUpdates for %d at frames %v, want %d", len(statusAt), objID, statusAt, want)
+	}
+	statuses := make([][]byte, 0, want)
+	for k, at := range statusAt {
+		if at != msgAt-want+k {
+			t.Fatalf("StatusUpdates for %d at frames %v, want frames %d..%d right before message %d at %d",
+				objID, statusAt, msgAt-want, msgAt-1, wantID, msgAt)
+		}
+		statuses = append(statuses, frames[at])
+	}
+	r := wireReader(frames[msgAt][1:])
+	r.ReadInt32()
+	return statuses, r
+}
+
 // TestHealSelfCastRestoresDamagedCaster heals a damaged caster through a real
-// self-cast: each MP payment reports its own StatusUpdate, and the hit's
-// trailing StatusUpdate reports the restored HP, clamped at the
-// stat-computed max.
+// self-cast: each MP payment reports its own StatusUpdate, the heal reports
+// the caster's full status at the restore, then S1_HP_RESTORED follows, and
+// no further StatusUpdate trails the hit.
 func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -100,14 +161,58 @@ func TestHealSelfCastRestoresDamagedCaster(t *testing.T) {
 	// The final MP payment reports itself before the heal lands.
 	assertCasterStatus(t, srv, c.Read(), objID, before, 25)
 
-	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1HPRestored)), 8)
-	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{
-		{Type: serverpackets.StatusCurrentHP, Value: maxHP},
-	})
+	statuses, msg := selfStatusesThenMessage(t, c, objID, int32(serverpackets.SystemMessageS1HPRestored), 1)
+	assertCasterStatus(t, srv, statuses[0], objID, maxHP, 25)
+	assertRestoredNumber(t, msg, 8)
 	if hp := srv.PlayerCurrentHP(t, objID); hp != maxHP {
 		t.Fatalf("caster HP after heal = %d, want restored to computed max %d (was %d)", hp, maxHP, before)
 	}
-	drainUntilQuiet(t, c)
+}
+
+// TestHealOtherPlayerSendsStatusBeforeRestoredBy heals another player: the
+// patient gets its own full status at the restore, then
+// S2_HP_RESTORED_BY_S1 naming the healer, and no other StatusUpdate.
+func TestHealOtherPlayerSendsStatusBeforeRestoredBy(t *testing.T) {
+	t.Parallel()
+	const (
+		skillID  = 1224
+		headroom = 8
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Healer", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			CastRange: 600, SkillType: "HEAL", Power: 50,
+		}})),
+	)
+	healer := srv.Client
+	healerID := srv.SoleObjectID(t)
+	patientID := srv.SeedCharacterFor(t, "player2", "Patient", 5, 0).ID
+	patient := srv.DialClient(t, "player2", 1)
+	seedKnownSkill(t, srv, healerID, skillID, 1)
+
+	startInWorld(t, healer)
+	startInWorldAmongPlayers(t, patient)
+	drainUntilQuiet(t, healer)
+	drainUntilQuiet(t, patient)
+
+	before, maxHP := damageToHealHeadroom(t, srv, patientID, headroom)
+	x, y, z := srv.PlayerPosition(t, patientID)
+	healer.Send(encodeAction(patientID, int32(x), int32(y), int32(z), false))
+	drainUntilQuiet(t, healer)
+	drainUntilQuiet(t, patient)
+
+	healer.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, healer, healerID, skillID, 1, 500, 60_000, patientID)
+	statuses, msg := selfStatusesThenMessage(t, patient, patientID, int32(serverpackets.SystemMessageS2HPRestoredByS1), 1)
+	assertCasterStatus(t, srv, statuses[0], patientID, maxHP, srv.PlayerCurrentMP(t, patientID))
+	assertRestoredBy(t, msg, "Healer", headroom)
+	if hp := srv.PlayerCurrentHP(t, patientID); hp != maxHP {
+		t.Fatalf("patient HP after heal = %d, want restored to computed max %d (was %d)", hp, maxHP, before)
+	}
+	drainUntilQuiet(t, healer)
 }
 
 func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
@@ -137,11 +242,12 @@ func TestManaHealSelfCastSendsMPRestoredMessage(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
-	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1MPRestored)), headroom)
+	statuses, msg := selfStatusesThenMessage(t, c, objID, int32(serverpackets.SystemMessageS1MPRestored), 1)
+	assertCasterStatus(t, srv, statuses[0], objID, srv.PlayerCurrentHP(t, objID), before)
+	assertRestoredNumber(t, msg, headroom)
 	if mp := srv.PlayerCurrentMP(t, objID); mp != before {
 		t.Fatalf("caster MP after mana heal = %d, want %d", mp, before)
 	}
-	drainUntilQuiet(t, c)
 }
 
 func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
@@ -175,11 +281,12 @@ func TestCombatPointHealSelfCastSendsCPRestoredMessage(t *testing.T) {
 	want := maxCP - srv.PlayerCurrentCP(t, objID)
 	c.Send(encodeRequestMagicSkillUse(healSkillID, false, false))
 	readCastStartFrames(t, c, objID, healSkillID, 1, 500, 0, objID)
-	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1CPWillBeRestored)), int32(want))
+	statuses, msg := selfStatusesThenMessage(t, c, objID, int32(serverpackets.SystemMessageS1CPWillBeRestored), 1)
+	assertCasterStatus(t, srv, statuses[0], objID, srv.PlayerCurrentHP(t, objID), srv.PlayerCurrentMP(t, objID))
+	assertRestoredNumber(t, msg, int32(want))
 	if cp := srv.PlayerCurrentCP(t, objID); cp != maxCP {
 		t.Fatalf("caster CP after heal = %d, want restored to computed max %d", cp, maxCP)
 	}
-	drainUntilQuiet(t, c)
 }
 
 // TestHealOverTimeTicksRestoreDamagedCaster lands a heal-over-time on a
@@ -280,7 +387,12 @@ func TestHealEffectSelfCastSendsHPRestoredMessage(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
-	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1HPRestored)), healPower)
+	// Each of the effect's two restores reports its own status first.
+	statuses, msg := selfStatusesThenMessage(t, c, objID, int32(serverpackets.SystemMessageS1HPRestored), 2)
+	mp := srv.PlayerCurrentMP(t, objID)
+	assertCasterStatus(t, srv, statuses[0], objID, before+healPower, mp)
+	assertCasterStatus(t, srv, statuses[1], objID, maxHP, mp)
+	assertRestoredNumber(t, msg, healPower)
 
 	if hp := srv.PlayerCurrentHP(t, objID); hp != maxHP {
 		t.Fatalf("caster HP after heal effect = %d, want restored to computed max %d (was %d)", hp, maxHP, before)
@@ -326,7 +438,11 @@ func TestManaHealEffectSelfCastSendsMPRestoredMessage(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
-	assertRestoredNumber(t, findSystemMessage(t, c, int32(serverpackets.SystemMessageS1MPRestored)), healPower)
+	statuses, msg := selfStatusesThenMessage(t, c, objID, int32(serverpackets.SystemMessageS1MPRestored), 2)
+	hp := srv.PlayerCurrentHP(t, objID)
+	assertCasterStatus(t, srv, statuses[0], objID, hp, before-headroom+healPower)
+	assertCasterStatus(t, srv, statuses[1], objID, hp, before)
+	assertRestoredNumber(t, msg, healPower)
 
 	if mp := srv.PlayerCurrentMP(t, objID); mp != before {
 		t.Fatalf("caster MP after mana-heal effect = %d, want restored to %d", mp, before)
