@@ -64,6 +64,9 @@ type Owner interface {
 	PvPFlagState() task.PvPFlagState
 	// AwardSummonKillKarma credits killer for killing the owner's summon.
 	AwardSummonKillKarma(killer attackable.Combatant)
+	// OfferSummonRevive offers the owner the resurrection of its summon,
+	// which just died under a Phoenix Blessing.
+	OfferSummonRevive()
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.

@@ -117,3 +117,4 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 func (*fakeSummonOwner) ServitorVanished()                         {}
 func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState           { return task.PvPFlagNone }
 func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant) {}
+func (*fakeSummonOwner) OfferSummonRevive()                        {}

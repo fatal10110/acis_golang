@@ -14,7 +14,7 @@ import (
 // same victim can die again.
 type killableVictim interface {
 	Die(killer attackable.Combatant) bool
-	Revive(fraction float64) bool
+	Revive() bool
 	Queue() *sim.Queue
 }
 
@@ -61,7 +61,7 @@ func TestPKCountersSurviveKillsOnTwoQueues(t *testing.T) {
 		for _, v := range victims {
 			v.Queue().Post(func() {
 				if v.Die(killer) {
-					v.Revive(1)
+					v.Revive()
 				}
 			})
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -23,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -3286,30 +3288,48 @@ type reviveFakeCaster struct {
 	neutralCreature
 	world.Presence
 	fakeActor
-	wit float64
+	kind    actor.Kind
+	wit     int
+	refused []event.ReviveRefusal
 }
 
-func (c *reviveFakeCaster) WITBonus() float64 { return c.wit }
+func (c *reviveFakeCaster) WIT() int              { return c.wit }
+func (c *reviveFakeCaster) Kind() actor.Kind      { return c.kind }
+func (c *reviveFakeCaster) CharacterName() string { return "Healer" }
+func (c *reviveFakeCaster) NotifyReviveRefused(r event.ReviveRefusal) {
+	c.refused = append(c.refused, r)
+}
 
 type reviveFakeTarget struct {
 	world.Presence
 	neutralPlayer
 	fakeActor
-	restoredPercent, percent float64
+	restoredPercent float64
+	offers          []reviveOffer
 }
 
-func (t *reviveFakeTarget) ReviveRestoringExp(restorePercent, percent float64) bool {
-	t.restoredPercent, t.percent = restorePercent, percent
+type reviveOffer struct {
+	reviver string
+	power   float64
+	isPet   bool
+}
+
+func (t *reviveFakeTarget) ReviveRestoringExp(restorePercent float64) bool {
+	t.restoredPercent = restorePercent
 	return true
+}
+
+func (t *reviveFakeTarget) ReviveRequest(reviver player.Reviver, power float64, isPet bool) {
+	t.offers = append(t.offers, reviveOffer{reviver.CharacterName(), power, isPet})
 }
 func (*reviveFakeTarget) Kind() actor.Kind { return actor.KindPlayer }
 
-// TestResurrectRevivesEveryTarget matches Player.doRevive(double)
-// (Player.java:6008-6012): every player target gets its exp restore and its
-// revive at the caster's revive power.
-func TestResurrectRevivesEveryTarget(t *testing.T) {
+// TestResurrectByPlayerOffersEveryTarget: a player caster's resurrection
+// asks each dead player first, carrying the WIT-scaled revive power, and
+// revives nobody outright.
+func TestResurrectByPlayerOffersEveryTarget(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := &reviveFakeCaster{wit: 1.5}
+	caster := &reviveFakeCaster{kind: actor.KindPlayer, wit: 30}
 	a := &reviveFakeTarget{}
 	b := &reviveFakeTarget{}
 
@@ -3321,15 +3341,35 @@ func TestResurrectRevivesEveryTarget(t *testing.T) {
 		t.Fatal("Use() returned false for RESURRECT")
 	}
 
-	want := formulas.RevivePower(1.5, 40)
+	want := reviveOffer{"Healer", formulas.RevivePower(statbonus.WITBonus[30], 40), false}
 	for i, target := range []*reviveFakeTarget{a, b} {
-		if target.percent != want || target.restoredPercent != want {
-			t.Fatalf("target %d revive/restore percent = %v/%v, want %v", i, target.percent, target.restoredPercent, want)
+		if len(target.offers) != 1 || target.offers[0] != want {
+			t.Fatalf("target %d offers = %+v, want [%+v]", i, target.offers, want)
+		}
+		if target.restoredPercent != 0 {
+			t.Fatalf("target %d revived outright at %v, want only the offer", i, target.restoredPercent)
 		}
 	}
 }
 
-func TestResurrectWithoutCasterInterfaceIsNoop(t *testing.T) {
+// TestResurrectByNonPlayerRevivesOutright: any other caster revives a dead
+// player without asking, restoring the revive power's share of lost exp.
+func TestResurrectByNonPlayerRevivesOutright(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &reviveFakeCaster{kind: actor.KindNPC, wit: 30}
+	a := &reviveFakeTarget{}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "RESURRECT", Power: 40},
+		Targets: []Actor{a},
+	})
+	if want := formulas.RevivePower(statbonus.WITBonus[30], 40); a.restoredPercent != want || len(a.offers) != 0 {
+		t.Fatalf("restore percent = %v, offers = %+v; want %v and no offer", a.restoredPercent, a.offers, want)
+	}
+}
+
+func TestResurrectWithoutCasterIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
 	a := &reviveFakeTarget{}
 
@@ -3337,8 +3377,8 @@ func TestResurrectWithoutCasterInterfaceIsNoop(t *testing.T) {
 		Skill:   modelskill.Definition{SkillType: "RESURRECT"},
 		Targets: []Actor{a},
 	})
-	if a.percent != 0 {
-		t.Fatalf("revive percent = %v, want unchanged 0", a.percent)
+	if a.restoredPercent != 0 || len(a.offers) != 0 {
+		t.Fatalf("restore percent = %v, offers = %+v; want untouched", a.restoredPercent, a.offers)
 	}
 }
 

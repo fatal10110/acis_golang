@@ -591,6 +591,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		Log:    l.log,
 		Rules: player.Rules{
 			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
+			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,
 			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
 			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
 			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,

@@ -5,15 +5,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// handleDlgAnswer routes a client's ConfirmDlg response, matching
-// DlgAnswer.runImpl's messageId dispatch (DlgAnswer.java:20-37). Only the
-// summon-confirm dialog is wired: other messageIds (revive, engage, gate)
-// have no dialog sender yet, so a client answer for one of them is a no-op
-// here exactly as it is in the reference when its own player.* method isn't
-// reached — no pending state exists server-side for an unrecognized id.
+// handleDlgAnswer routes a client's ConfirmDlg response by the dialog's
+// message id: the resurrection offer (or the restore question that shares
+// its answer) and the summon-friend request. Other message ids (engage,
+// gate) have no dialog sender yet, so an answer for one of them finds no
+// pending state and does nothing, as it would with no dialog open. The
+// dialog itself closes client-side, so no answer is owed on any branch.
 func (l *GameClientLink) handleDlgAnswer(live *livePlayer, req clientpackets.DlgAnswer) {
-	if req.MessageID != serverpackets.ConfirmDlgSummonFriendRequest {
-		return
+	switch req.MessageID {
+	case serverpackets.ConfirmDlgResurrectionRequest, serverpackets.ConfirmDlgRestoreRequest:
+		live.Character.ReviveAnswer(req.Answer)
+	case serverpackets.ConfirmDlgSummonFriendRequest:
+		live.Character.TeleportAnswer(req.Answer, req.RequesterID)
 	}
-	live.Character.TeleportAnswer(req.Answer, req.RequesterID)
 }

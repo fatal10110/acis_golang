@@ -152,6 +152,7 @@ func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) 
 // Rules is the server-configuration slice a character's own rules read.
 type Rules struct {
 	RateKarmaExpLost       float64
+	RespawnRestoreHP       float64
 	WeightLimitMultiplier  float64
 	PerfectShieldBlockRate int
 	MaxBuffsAmount         int
@@ -187,6 +188,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.levelTable = rt.Levels
 	c.log = rt.Log
 	c.rateKarmaExpLost = rt.Rules.RateKarmaExpLost
+	c.respawnRestoreHP = rt.Rules.RespawnRestoreHP
 	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
 	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
 	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount

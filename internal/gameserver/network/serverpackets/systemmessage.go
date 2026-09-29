@@ -14,6 +14,9 @@ const (
 	SystemMessageResultsPeriodBegun                = 1262
 	SystemMessageValidationPeriodBegun             = 1263
 	SystemMessageDeathPenaltyLevelS1Added          = 1916
+	SystemMessageMasterCannotRes                   = 1511
+	SystemMessageResHasAlreadyBeenProposed         = 1513
+	SystemMessageCannotResPet2                     = 1515
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48

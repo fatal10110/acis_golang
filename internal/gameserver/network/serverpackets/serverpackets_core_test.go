@@ -620,6 +620,23 @@ func TestFrameConfirmDlgSummonFriendRequest(t *testing.T) {
 	}
 }
 
+// TestFrameConfirmDlgResurrectionRequest pins the resurrection offer's
+// bytes: ConfirmDlg.writeImpl with one TYPE_TEXT entry (addCharName) and a
+// zero time and requester id, which it leaves off the wire.
+func TestFrameConfirmDlgResurrectionRequest(t *testing.T) {
+	got := framePayload(t, FrameConfirmDlgResurrectionRequest("Bob"))
+	want := []byte{
+		0xed,
+		0xe6, 0x05, 0x00, 0x00, // 1510 RESSURECTION_REQUEST_BY_S1
+		0x01, 0x00, 0x00, 0x00, // 1 info entry
+		0x00, 0x00, 0x00, 0x00, // TYPE_TEXT
+		'B', 0x00, 'o', 0x00, 'b', 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameConfirmDlgResurrectionRequest() = %x, want %x", got, want)
+	}
+}
+
 // ---- from crest_test.go ----
 func TestFramePledgeCrest(t *testing.T) {
 	data := []byte{0x01, 0x02, 0x03}

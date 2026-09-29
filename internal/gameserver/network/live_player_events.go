@@ -96,7 +96,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
 		})
-	case event.FakeDeathRevived:
+	case event.FakeDeathRevived, event.Revived:
 		l.broadcastLiveRevive(live)
 	case event.PostureSettled:
 		// A cast queued behind the sit/stand transition runs now, unless a
@@ -105,6 +105,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.finishDeferredMagicSkill(live)
 			l.finishDeferredItemAICast(live)
 		}
+	case event.ReviveRequested:
+		live.SendFrame(serverpackets.FrameConfirmDlgResurrectionRequest(e.ReviverName))
+	case event.ReviveRefused:
+		live.SendFrame(serverpackets.FrameSystemMessage(reviveRefusalMessage(e.Reason)))
+	case event.EtcStatusChanged:
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 	case event.Died:
 		l.broadcastLiveDie(live)
 	case event.FusionCastersStopRequested:
@@ -409,5 +415,18 @@ func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRe
 	if e.Cast {
 		live.StopCast()
 		live.tryToIdle(e.AIDenied)
+	}
+}
+
+// reviveRefusalMessage is the system message a refused resurrection offer
+// sends its reviver.
+func reviveRefusalMessage(reason event.ReviveRefusal) int {
+	switch reason {
+	case event.RevivePetWhileOwnerPending:
+		return serverpackets.SystemMessageCannotResPet2
+	case event.ReviveOwnerWhilePetPending:
+		return serverpackets.SystemMessageMasterCannotRes
+	default:
+		return serverpackets.SystemMessageResHasAlreadyBeenProposed
 	}
 }
