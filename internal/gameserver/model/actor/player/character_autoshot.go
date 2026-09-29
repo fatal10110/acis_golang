@@ -1,6 +1,10 @@
 package player
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+import (
+	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+)
 
 // AutoSoulShotStatus describes the outcome of an auto-shot toggle request.
 type AutoSoulShotStatus uint8
@@ -33,6 +37,19 @@ func (c *Character) AutoSoulShotEnabled(itemID int32) bool {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.autoSoulShots[itemID]
+}
+
+// AutoSoulShotIDs returns the item ids active for automatic shot use, in
+// ascending order.
+func (c *Character) AutoSoulShotIDs() []int32 {
+	c.stateMu.RLock()
+	ids := make([]int32, 0, len(c.autoSoulShots))
+	for id := range c.autoSoulShots {
+		ids = append(ids, id)
+	}
+	c.stateMu.RUnlock()
+	slices.Sort(ids)
+	return ids
 }
 
 // ToggleAutoSoulShot applies auto-shot item rules and records the new state.

@@ -121,3 +121,30 @@ func TestWyvernRiderCannotAttack(t *testing.T) {
 		t.Fatalf("hostile HP = %d after rider click, want unchanged %d", got, before)
 	}
 }
+
+// TestMountedPlayerCannotEquipWeapon pins UseItem's mounted hand-slot gate:
+// a rider equipping a weapon answers CANNOT_EQUIP_ITEM_DUE_TO_BAD_CONDITION
+// alone — no UserInfo refresh — and the weapon stays in the inventory.
+func TestMountedPlayerCannotEquipWeapon(t *testing.T) {
+	t.Parallel()
+	const swordID = int32(30)
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), wyvernTemplate()})),
+	}, seedItem{TemplateID: wyvernCollarID, Count: 1}, seedItem{TemplateID: swordID, Count: 1})
+
+	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
+	assertFrameOpcode(t, mustRead(t, h.client, "Ride broadcast"), serverpackets.OpcodeRide, "Ride")
+	drainUntilQuiet(t, h.client)
+
+	sword := h.seededItem(t, swordID)
+	h.client.Send(encodeUseItem(sword, false))
+	assertStaticSystemMessage(t, mustRead(t, h.client, "mounted equip refusal"), serverpackets.SystemMessageCannotEquipItemDueToBadCondition)
+	if extra := drainFrames(t, h.client); len(extra) != 0 {
+		t.Fatalf("mounted equip refusal sent %d more frames (first opcode %#x), want none", len(extra), extra[0][0])
+	}
+
+	inv := h.ownerInventory(t)
+	if inst := inv.ItemByObjectID(sword); inst == nil || inst.Snapshot().Equipped() {
+		t.Fatalf("sword after the mounted refusal = %+v, want held and unequipped", inst)
+	}
+}

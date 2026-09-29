@@ -175,15 +175,28 @@ var equipNoiseOpcodes = map[byte]bool{
 	serverpackets.OpcodeEtcStatusUpdate: true,
 }
 
+// equipAnnouncements are the S1_EQUIPPED / S1_S2_EQUIPPED messages a
+// UseItem equip sends ahead of its UserInfo; suites that only wait for the
+// refresh skip them, and the equip-message scenarios pin them.
+var equipAnnouncements = map[int32]bool{
+	serverpackets.SystemMessageS1Equipped:   true,
+	serverpackets.SystemMessageS1S2Equipped: true,
+}
+
 // readSkippingEquipNoise reads frames until one whose opcode is not in
-// equipNoiseOpcodes, returning it.
+// equipNoiseOpcodes and that is not an equip announcement, returning it.
 func readSkippingEquipNoise(t *testing.T, c *testsupport.ScriptedClient, what string) []byte {
 	t.Helper()
 	for i := 0; i < 10; i++ {
 		frame := c.Read()
-		if !equipNoiseOpcodes[frame[0]] {
-			return frame
+		if equipNoiseOpcodes[frame[0]] {
+			continue
 		}
+		if frame[0] == serverpackets.OpcodeSystemMessage && len(frame) >= 5 &&
+			equipAnnouncements[wire.NewReader(frame[1:]).ReadInt32()] {
+			continue
+		}
+		return frame
 	}
 	t.Fatalf("no %s frame after skipping equip noise", what)
 	return nil
