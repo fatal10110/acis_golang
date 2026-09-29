@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -48,6 +49,7 @@ type gameplayConfig struct {
 	SkillEnchantSPBookNeeded skillEnchantSPBookNeeded
 	AutoLearnSkills          autoLearnSkills
 	WeightLimitMultiplier    weightLimitMultiplier
+	InventorySlots           player.InventorySlots
 	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
 	AllowDelevel             allowDelevel
 	RateKarmaExpLost         rateKarmaExpLost
@@ -99,6 +101,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.WeightLimitMultiplier, err = loadWeightLimitMultiplier(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.InventorySlots, err = loadInventorySlots(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.KarmaPlayerCanTeleport, err = loadKarmaPlayerCanTeleport(paths); err != nil {
@@ -251,6 +256,24 @@ func loadWeightLimitMultiplier(paths gameServerPaths) (weightLimitMultiplier, er
 		return 0, err
 	}
 	return weightLimitMultiplier(config.NewFields(props, "weight limit").Float64("WeightLimit", 1)), nil
+}
+
+// loadInventorySlots reads the base player inventory slot counts by race.
+func loadInventorySlots(paths gameServerPaths) (player.InventorySlots, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return player.InventorySlots{}, err
+	}
+	fields := config.NewFields(props, "inventory slots")
+	slots := player.InventorySlots{
+		NoDwarf:    fields.Int("MaximumSlotsForNoDwarf", player.DefaultInventorySlots.NoDwarf),
+		Dwarf:      fields.Int("MaximumSlotsForDwarf", player.DefaultInventorySlots.Dwarf),
+		Configured: true,
+	}
+	if err := fields.Err(); err != nil {
+		return player.InventorySlots{}, err
+	}
+	return slots, nil
 }
 
 func loadAutoLearnSkills(paths gameServerPaths) (autoLearnSkills, error) {

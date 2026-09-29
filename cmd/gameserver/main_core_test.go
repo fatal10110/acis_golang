@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -1018,4 +1019,51 @@ func (f *countingItemFlusher) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.n
+}
+
+func TestLoadInventorySlotsUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("MaximumSlotsForNoDwarf = 90\nMaximumSlotsForDwarf = 117\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadInventorySlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadInventorySlots() error = %v", err)
+	}
+	if got != (player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}) {
+		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:90 Dwarf:117}", got)
+	}
+}
+
+// TestLoadInventorySlotsKeepsExplicitZero pins the reference's as-is read:
+// an explicit 0 is a 0-slot base, not the shipped default.
+func TestLoadInventorySlotsKeepsExplicitZero(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte("MaximumSlotsForNoDwarf = 0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadInventorySlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadInventorySlots() error = %v", err)
+	}
+	if got != (player.InventorySlots{NoDwarf: 0, Dwarf: 100, Configured: true}) {
+		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:0 Dwarf:100 Configured:true}", got)
+	}
+}
+
+func TestLoadInventorySlotsDefaults(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadInventorySlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadInventorySlots() error = %v", err)
+	}
+	if got != player.DefaultInventorySlots {
+		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:80 Dwarf:100}", got)
+	}
 }

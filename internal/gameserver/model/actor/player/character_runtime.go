@@ -144,6 +144,9 @@ func (c *Character) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
+	if inv != nil {
+		inv.SetSlotLimiter(c)
+	}
 	if c.roll == nil {
 		c.roll = rand.IntN
 	}
@@ -154,6 +157,7 @@ type Rules struct {
 	RateKarmaExpLost       float64
 	RespawnRestoreHP       float64
 	WeightLimitMultiplier  float64
+	InventorySlots         InventorySlots
 	PerfectShieldBlockRate int
 	MaxBuffsAmount         int
 	DeathPenaltyChance     int
@@ -190,6 +194,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.rateKarmaExpLost = rt.Rules.RateKarmaExpLost
 	c.respawnRestoreHP = rt.Rules.RespawnRestoreHP
 	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
+	c.inventorySlots = rt.Rules.InventorySlots
 	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
 	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount
 	c.deathPenaltyChance = rt.Rules.DeathPenaltyChance

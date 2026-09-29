@@ -98,6 +98,8 @@ const (
 // bool/float parameter per config key.
 type PlayerConfig struct {
 	WeightLimitMultiplier float64
+	// InventorySlots is the base player inventory slot count by race.
+	InventorySlots player.InventorySlots
 	// AllowWater controls whether entering a water zone starts the
 	// drowning breath-gauge countdown at all.
 	AllowWater          bool

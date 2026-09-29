@@ -31,14 +31,6 @@ const (
 	defaultTitleColor = 0xFFFF77
 )
 
-// dwarfInventoryLimit and nonDwarfInventoryLimit are the shipped default
-// inventory slot counts by race; nothing here scales them with equipment or
-// skills yet.
-const (
-	nonDwarfInventoryLimit = 80
-	dwarfInventoryLimit    = 100
-)
-
 // weaponEquippedBonusSlots and noWeaponBonusSlots are the two values the
 // client's per-character bonus-slot field takes, gated on whether a weapon
 // is equipped. The client-side meaning of "bonus slots" here (commonly
@@ -117,10 +109,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
 	}
 
-	inventoryLimit := nonDwarfInventoryLimit
-	if c.Race == player.RaceDwarf {
-		inventoryLimit = dwarfInventoryLimit
-	}
+	inventoryLimit := c.InventoryLimit()
 
 	enchantEffect := rhand.EnchantLevel
 	if enchantEffect > maxDisplayedEnchant {

@@ -21,6 +21,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -750,7 +752,7 @@ func TestFrameExStorageMaxCount(t *testing.T) {
 	got := framePayload(t, FrameExStorageMaxCount(&player.Character{Race: player.RaceDwarf}))
 	want := []byte{OpcodeExtended}
 	want = appendH(want, OpcodeExStorageMaxCount)
-	want = appendD(want, dwarfInventoryLimit)
+	want = appendD(want, 100) // MaximumSlotsForDwarf default
 	want = appendD(want, warehouseSlotsDwarf)
 	want = appendD(want, freightSlots)
 	want = appendD(want, privateStoreSlotsDwarf)
@@ -3112,7 +3114,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint16(want, 0) // recommendations received
 	want = binary.LittleEndian.AppendUint32(want, 0) // mount npc id
 
-	want = binary.LittleEndian.AppendUint16(want, nonDwarfInventoryLimit)
+	want = binary.LittleEndian.AppendUint16(want, 80) // MaximumSlotsForNoDwarf default
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxCP))
@@ -3204,13 +3206,52 @@ func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 	if len(human) != len(dwarf) {
 		t.Fatalf("human and dwarf encodings differ in length: %d vs %d", len(human), len(dwarf))
 	}
-	wantHuman := binary.LittleEndian.AppendUint16(nil, nonDwarfInventoryLimit)
-	wantDwarf := binary.LittleEndian.AppendUint16(nil, dwarfInventoryLimit)
+	wantHuman := binary.LittleEndian.AppendUint16(nil, 80)
+	wantDwarf := binary.LittleEndian.AppendUint16(nil, 100)
 	if !bytes.Contains(human, wantHuman) {
-		t.Errorf("human encoding did not contain the non-dwarf inventory limit %d", nonDwarfInventoryLimit)
+		t.Errorf("human encoding did not contain the non-dwarf inventory limit 80")
 	}
 	if !bytes.Contains(dwarf, wantDwarf) {
-		t.Errorf("dwarf encoding did not contain the dwarf inventory limit %d", dwarfInventoryLimit)
+		t.Errorf("dwarf encoding did not contain the dwarf inventory limit 100")
+	}
+}
+
+// TestStorageLimitPacketsReportLiveInventoryLimit pins UserInfo's and
+// ExStorageMaxCount's inventory-limit field to the character's live limit:
+// the configured race base plus the inventoryLimit stat.
+func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
+	c := &player.Character{Race: player.RaceDwarf, Name: "D"}
+	c.Configure(player.Runtime{Rules: player.Rules{InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}}})
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.InvLim, Op: effect.OpAdd, Value: 1}})
+
+	storage := framePayload(t, FrameExStorageMaxCount(c))
+	if got := binary.LittleEndian.Uint32(storage[3:7]); got != 118 {
+		t.Fatalf("ExStorageMaxCount inventory limit = %d, want 118", got)
+	}
+
+	full := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: &player.Template{}}))
+	plain := &player.Character{Race: player.RaceDwarf, Name: "D"}
+	base := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: plain, Template: &player.Template{}}))
+	if len(full) != len(base) {
+		t.Fatalf("UserInfo lengths differ: %d vs %d", len(full), len(base))
+	}
+	// The two characters differ only in their inventory limit (118 vs the
+	// default 100), so the first differing byte starts that field.
+	idx := 0
+	for idx < len(base) && base[idx] == full[idx] {
+		idx++
+	}
+	if idx+2 > len(base) {
+		t.Fatal("UserInfo does not change with the inventory limit")
+	}
+	if got := binary.LittleEndian.Uint16(base[idx : idx+2]); got != 100 {
+		t.Fatalf("default dwarf UserInfo inventory limit = %d, want 100", got)
+	}
+	if got := binary.LittleEndian.Uint16(full[idx : idx+2]); got != 118 {
+		t.Fatalf("UserInfo inventory limit = %d, want 118", got)
+	}
+	if !bytes.Equal(base[idx+2:], full[idx+2:]) {
+		t.Fatal("UserInfo differs beyond the inventory-limit field")
 	}
 }
 

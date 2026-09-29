@@ -98,9 +98,11 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 // toggleEquipItem puts inst on, or takes it off when it is worn, for
 // UseItem. A weapon loses its shot charges either way. Taking an item off
 // announces it before the paperdoll changes; putting one on announces it
-// after, then recharges auto-use shots for a main-hand weapon.
+// after, then recharges auto-use shots for a main-hand weapon. An equip
+// change that moved the inventory limit resends the storage limits last.
 func (l *GameClientLink) toggleEquipItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
 	st := inst.Snapshot()
+	oldInventoryLimit := live.InventoryLimit()
 	if tmpl.Kind == item.KindWeapon {
 		inst.UnchargeAllShots()
 	}
@@ -133,6 +135,9 @@ func (l *GameClientLink) toggleEquipItem(live *livePlayer, inv *itemcontainer.In
 	}
 	live.RefreshExpertisePenalty()
 	l.broadcastEquipmentChange(live)
+	if live.InventoryLimit() != oldInventoryLimit {
+		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
+	}
 }
 
 // sendUnequippedMessage names an item that came off the paperdoll, with

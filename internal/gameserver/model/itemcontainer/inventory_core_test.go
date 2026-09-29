@@ -1811,3 +1811,54 @@ func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
 		}
 	}
 }
+
+// paperdollReadingLimiter is a slot limit that reads its inventory's
+// paperdoll, as an owner's stat conditions may.
+type paperdollReadingLimiter struct {
+	inv   *Inventory
+	limit int
+}
+
+func (l paperdollReadingLimiter) InventoryLimit() int {
+	return l.limit + len(l.inv.PaperdollItems())
+}
+
+// TestInventorySlotLimiterReplacesSlotLimit pins the owner-driven limit: a
+// limiter overrides SlotLimit, is asked on every check, and is read before
+// Exchange locks the inventories, so a limit that reads the paperdoll
+// cannot deadlock the settle check.
+func TestInventorySlotLimiterReplacesSlotLimit(t *testing.T) {
+	templates := equipTestTemplates()
+	a := NewPlayerInventory(0x10000001, templates)
+	b := NewPlayerInventory(0x10000002, templates)
+	a.SlotLimit = 100
+	limiter := &paperdollReadingLimiter{inv: a, limit: 1}
+	a.SetSlotLimiter(limiter)
+	a.AddNew(swordID, 1, 0x20000001)
+
+	if a.ValidateCapacity(1) {
+		t.Fatal("ValidateCapacity(1) at the limiter's limit = true, want false (SlotLimit must not apply)")
+	}
+	limiter.limit = 2
+	if !a.ValidateCapacity(1) {
+		t.Fatal("ValidateCapacity(1) after the limit grew = false, want true")
+	}
+
+	done := make(chan [2]bool, 1)
+	go Exchange(a, b, func(heldA, heldB Held) {
+		done <- [2]bool{heldA.ValidateCapacity(1), heldA.ValidateCapacity(2)}
+	})
+	select {
+	case got := <-done:
+		if !got[0] || got[1] {
+			t.Fatalf("Held.ValidateCapacity(1), (2) = %v, want [true false]", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Exchange deadlocked reading a paperdoll-reading slot limit")
+	}
+
+	a.SetSlotLimiter(nil)
+	if !a.ValidateCapacity(99) || a.ValidateCapacity(100) {
+		t.Fatal("clearing the limiter did not restore SlotLimit")
+	}
+}

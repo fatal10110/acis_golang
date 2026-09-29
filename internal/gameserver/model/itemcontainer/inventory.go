@@ -60,8 +60,12 @@ type Update struct {
 // unlimited, sourced the same way Container.SlotLimit is: this package
 // doesn't load config or read owner stats itself.
 //
-// mu guards paperdoll, wornMask, totalWeight and updates. Mutable item fields
-// are guarded by item.Instance.
+// An inventory whose owner computes its slot limit live (a player's, which
+// follows config and the inventoryLimit stat) takes that owner as its
+// SlotLimiter instead of a fixed SlotLimit.
+//
+// mu guards paperdoll, wornMask, totalWeight, updates and slotLimiter.
+// Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
 
@@ -75,6 +79,41 @@ type Inventory struct {
 	totalWeight int
 	updates     []Update
 	delivery    Delivery
+	slotLimiter SlotLimiter
+}
+
+// SlotLimiter reports how many item slots an inventory's owner may hold
+// right now.
+type SlotLimiter interface {
+	InventoryLimit() int
+}
+
+// SetSlotLimiter makes limiter the source of inv's slot limit, replacing
+// SlotLimit. A nil limiter restores SlotLimit.
+func (inv *Inventory) SetSlotLimiter(limiter SlotLimiter) {
+	inv.mu.Lock()
+	inv.slotLimiter = limiter
+	inv.mu.Unlock()
+}
+
+// slotLimit returns inv's current slot limit and whether it has one. It
+// asks the limiter without holding any inventory lock, so callers must not
+// hold one either: the owner's limit may read the paperdoll.
+func (inv *Inventory) slotLimit() (limit int, bounded bool) {
+	inv.mu.Lock()
+	limiter := inv.slotLimiter
+	inv.mu.Unlock()
+	if limiter != nil {
+		return limiter.InventoryLimit(), true
+	}
+	return inv.SlotLimit, inv.SlotLimit > 0
+}
+
+// ValidateCapacity reports whether adding slotCount more stacks/instances
+// keeps inv within its slot limit.
+func (inv *Inventory) ValidateCapacity(slotCount int) bool {
+	limit, bounded := inv.slotLimit()
+	return slotsFit(inv.Size(), slotCount, limit, bounded)
 }
 
 // Delivery handles a live inventory's queued updates and weight changes.
