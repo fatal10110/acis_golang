@@ -2583,6 +2583,35 @@ func TestCharacterNoteServitorPvPIgnoresHitsOnTheOwnerAndItsSummon(t *testing.T)
 	}
 }
 
+func TestCharacterNoteServitorPvPNonOffensiveSkillMarksTheFlagAsTheSummons(t *testing.T) {
+	owner := &Character{ID: 1}
+	flagged := &Character{ID: 2}
+	flagged.UpdatePvPFlag(task.PvPFlagOn)
+	pker := &Character{ID: 3, KarmaPoints: 500}
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{flagged}, false, "BUFF")
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{pker}, false, "HEAL")
+	got := event.Of[event.PvPFlagged](rec)
+
+	want := event.PvPFlagged{ByServitor: true}
+	if len(got) != 2 || got[0] != want || got[1] != want {
+		t.Fatalf("PvPFlagged after the summon buffed a flagged and a karma'd player = %+v, want two %+v", got, want)
+	}
+}
+
+func TestCharacterNoteServitorPvPNonOffensiveSkillIgnoresTheOwnerAndItsSummon(t *testing.T) {
+	owner := &Character{ID: 1, KarmaPoints: 500}
+	owner.UpdatePvPFlag(task.PvPFlagOn)
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{owner, summonKiller{owner: owner}}, false, "BUFF")
+
+	if n := event.Count[event.PvPFlagged](rec); n != 0 {
+		t.Fatalf("PvPFlagged count = %d after the summon buffed its flagged, karma'd owner and itself, want 0", n)
+	}
+}
+
 func TestCharacterNotePvPSkillTargetsFlagsEligibleNonOffensiveTargets(t *testing.T) {
 	tmpl := combatTemplate()
 	items := combatItems()
