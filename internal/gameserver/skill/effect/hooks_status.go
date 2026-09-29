@@ -124,10 +124,11 @@ func randomizeHateStart(e *Effect) bool {
 // effect scans for a redirect candidate.
 const confusionRadius = 1000
 
-// confusionStart aborts a non-player target's current move, then redirects
-// its aggression toward a random nearby attackable actor found within
-// confusionRadius, measured on the horizontal plane between positions. A
-// player target is left untouched entirely.
+// confusionStart aborts a non-player target's current move, then turns it
+// on a random creature found within confusionRadius, measured on the
+// horizontal plane between positions: a summon attacks it through its AI,
+// an NPC takes it as an overriding attack desire. A player target is left
+// untouched entirely.
 func confusionStart(e *Effect) bool {
 	if isPlayer(e.Effected) {
 		return true
@@ -135,6 +136,12 @@ func confusionStart(e *Effect) bool {
 	e.Effected.StopMove()
 	refresh(e.Effected)
 
+	if summon, ok := asSummon(e.Effected); ok {
+		if candidate, ok := summon.RandomConfusionTarget(confusionRadius); ok {
+			summon.TryToAttack(candidate)
+		}
+		return true
+	}
 	target, ok := asNPC(e.Effected)
 	if !ok {
 		return true
@@ -147,9 +154,17 @@ func confusionStart(e *Effect) bool {
 	return true
 }
 
+// confusionExit sends a confused summon back to following its owner and
+// drops an NPC's forced redirect.
 func confusionExit(e *Effect) {
 	refresh(e.Effected)
 	if isPlayer(e.Effected) {
+		return
+	}
+	if summon, ok := asSummon(e.Effected); ok {
+		if owner, ok := summon.OwnerObject(); ok {
+			summon.TryToFollow(owner)
+		}
 		return
 	}
 	if target, ok := asNPC(e.Effected); ok {

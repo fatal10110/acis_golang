@@ -654,28 +654,44 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 	return candidates[h.roll(len(candidates))], true
 }
 
-// RandomNearbyCombatant returns a random other attackable NPC known within
-// radius units, excluding chests, or ok false if none exist or this NPC
-// has no world placement yet. Distance is measured point to point on the
-// horizontal plane: height differences are ignored and collision radii do
-// not widen the search. Nearby playable actors are not candidates yet
-// (#2642).
+// RandomNearbyCombatant returns a random confusion target known within
+// radius units of this NPC; see RandomConfusionTarget.
 func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
-	if h.world == nil {
+	target, ok := RandomConfusionTarget(h.world, h, radius, h.roll)
+	if !ok {
 		return nil, false
 	}
-	var candidates []attackable.Combatant
-	h.world.ForEachKnownIn2DRadius(h, radius, func(obj world.Tracked) {
-		other, ok := obj.(*Hostile)
-		if !ok || other.chestKind() {
+	combatant, ok := target.(attackable.Combatant)
+	return combatant, ok
+}
+
+// RandomConfusionTarget returns a random creature a confused self may turn
+// on: an attackable NPC other than a lootable chest, a player, or a summon,
+// known within radius units of self. Every result is also an
+// attackable.Combatant. Distance is measured point to point on the
+// horizontal plane: height differences are ignored and collision radii do
+// not widen the search. ok is false when none is in range or self has no
+// world placement yet. roll draws a uniform integer in [0, n).
+func RandomConfusionTarget(w *world.State, self world.Tracked, radius int, roll func(n int) int) (world.Tracked, bool) {
+	if w == nil {
+		return nil, false
+	}
+	var candidates []world.Tracked
+	w.ForEachKnownIn2DRadius(self, radius, func(obj world.Tracked) {
+		if other, ok := obj.(*Hostile); ok {
+			if !other.chestKind() {
+				candidates = append(candidates, other)
+			}
 			return
 		}
-		candidates = append(candidates, other)
+		if _, ok := obj.(attackable.Combatant); ok && obj.Kind().Playable() {
+			candidates = append(candidates, obj)
+		}
 	})
 	if len(candidates) == 0 {
 		return nil, false
 	}
-	return candidates[h.roll(len(candidates))], true
+	return candidates[roll(len(candidates))], true
 }
 
 // StopMostHatedTarget clears this NPC's physical threat against whichever

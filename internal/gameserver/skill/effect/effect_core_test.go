@@ -2818,6 +2818,7 @@ func (t *liveEffectTarget) SetCollisionRadius(float64)                          
 func (t *liveEffectTarget) ResetCollisionRadius()                                  {}
 func (t *liveEffectTarget) OwnerObject() (world.Tracked, bool)                     { return nil, false }
 func (t *liveEffectTarget) TryToFollow(world.Tracked)                              {}
+func (t *liveEffectTarget) RandomConfusionTarget(int) (world.Tracked, bool)        { return nil, false }
 
 // playerStubs supplies the player-only effect surface (except
 // BroadcastAbnormalEffect) as no-ops, so a fake that records abnormal-effect

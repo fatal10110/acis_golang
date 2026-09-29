@@ -146,6 +146,9 @@ type SummonActor interface {
 	OwnerObject() (world.Tracked, bool)
 	TryToAttack(world.Tracked)
 	TryToFollow(world.Tracked)
+	// RandomConfusionTarget returns a random creature within radius a
+	// confused summon may turn on.
+	RandomConfusionTarget(radius int) (world.Tracked, bool)
 	// Think wakes the summon's AI to continue its current intention.
 	Think() error
 }
