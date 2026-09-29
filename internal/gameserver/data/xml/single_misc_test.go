@@ -80,6 +80,27 @@ func TestLoadHealSps(t *testing.T) {
 	if got := table.Calculate(1401, 11, 76, 875); got != 286 {
 		t.Fatalf("Calculate(1401, 11, 76, 875) = %v, want 286", got)
 	}
+	// Values from the reference lookup run verbatim under a JVM against this
+	// file: an exact id/level entry wins over the magic-level ladder, the
+	// ladder takes the highest level not above the skill's, an M.Atk
+	// shortfall costs half its size, and magic level 0 without an exact
+	// entry yields nothing.
+	for _, tc := range []struct {
+		id                      skill.ID
+		level, magicLevel, mAtk int
+		want                    float64
+	}{
+		{1217, 33, 74, 700, 206},
+		{1217, 1, 38, 1000, 103},
+		{1401, 11, 76, 870, 283.5},
+		{1011, 5, 20, 37, 42},
+		{3125, 10, 74, 900, 281},
+		{1011, 1, 0, 50, 0},
+	} {
+		if got := table.Calculate(tc.id, tc.level, tc.magicLevel, tc.mAtk); got != tc.want {
+			t.Errorf("Calculate(%d, %d, %d, %d) = %v, want %v", tc.id, tc.level, tc.magicLevel, tc.mAtk, got, tc.want)
+		}
+	}
 }
 
 func TestLoadNewbieBuffs(t *testing.T) {

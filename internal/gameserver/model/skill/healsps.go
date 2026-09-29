@@ -44,7 +44,15 @@ func NewHealSpsTable(entries []HealSps) (*HealSpsTable, error) {
 
 func (t *HealSpsTable) Count() int { return len(t.entries) }
 
+// Calculate returns the spiritshot heal correction for a skill cast at
+// mAtk: the exact skill id/level entry, else the entry with the highest
+// magic level not above magicLevel (only for magicLevel > 0), reduced by
+// half the M.Atk shortfall below the entry's needed M.Atk. No entry, or a
+// nil table, yields 0.
 func (t *HealSpsTable) Calculate(skillID ID, skillLevel, magicLevel, mAtk int) float64 {
+	if t == nil {
+		return 0
+	}
 	var selected *HealSps
 	for i := range t.entries {
 		entry := &t.entries[i]

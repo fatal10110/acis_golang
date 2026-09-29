@@ -228,7 +228,7 @@ func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T)
 	state := world.New()
 	activity := newSignetActivity()
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
-	r := NewDefaultRegistryWithSignet(nil, true, SignetDeps{
+	r := NewDefaultRegistryWithSignet(nil, true, nil, SignetDeps{
 		Effects:   effect.Env{Activity: activity},
 		Templates: fakeSignetTemplates{byID: map[int]*npc.Template{13018: {ID: 13018, Type: "EffectPoint"}}},
 		IDs:       &fakeSignetIDs{},

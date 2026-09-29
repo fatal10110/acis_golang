@@ -125,6 +125,7 @@ func provideGameClientLink(
 		Skills:        skills,
 		Spellbooks:    spellbooks,
 		SkillTrees:    data.Trees,
+		HealSps:       data.HealSps,
 		CursedWeapons: data.CursedWeapons,
 		World:         state,
 		NPCs:          data.NPCs,

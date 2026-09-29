@@ -648,3 +648,16 @@ func Positive(v float64) float64 {
 func SkillTypeKey(s string) string {
 	return strings.ToUpper(strings.TrimSpace(s))
 }
+
+// ResolveHealInput builds the caster side of a HEAL or HEAL_STATIC cast:
+// skill power, the caster's heal proficiency and M.Atk, and how a charged
+// spiritshot scales that M.Atk. The shot state is sampled by the caller.
+func ResolveHealInput(def modelskill.Definition, proficiency, mAtk float64, scaling formulas.HealShotScaling) formulas.HealInput {
+	return formulas.HealInput{
+		Power:       float64(def.Power),
+		Proficiency: proficiency,
+		Static:      SkillTypeKey(def.SkillType) == "HEAL_STATIC",
+		MAtk:        int(mAtk),
+		Scaling:     scaling,
+	}
+}

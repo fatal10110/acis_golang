@@ -71,6 +71,7 @@ type options struct {
 	characters             []characterSpec
 	skills                 *skillstate.Persistence
 	trees                  *modelskill.Trees
+	healSps                *modelskill.HealSpsTable
 	spellbooks             modelskill.BookPolicy
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
@@ -138,6 +139,12 @@ func WithStoreSkillCooltime(enabled bool) Option {
 
 // WithSkillTrees supplies the skill trees available at learn time.
 func WithSkillTrees(trees *modelskill.Trees) Option { return func(o *options) { o.trees = trees } }
+
+// WithHealSps supplies the spiritshot heal corrections a charged heal reads
+// (none by default).
+func WithHealSps(table *modelskill.HealSpsTable) Option {
+	return func(o *options) { o.healSps = table }
+}
 
 // WithSpellbooks supplies the spellbook policy applied to skill learning.
 func WithSpellbooks(policy modelskill.BookPolicy) Option {
@@ -1212,6 +1219,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
 		SkillTrees:       o.trees,
+		HealSps:          o.healSps,
 		CursedWeapons:    cursed,
 		World:            state,
 		NPCs:             o.npcs,

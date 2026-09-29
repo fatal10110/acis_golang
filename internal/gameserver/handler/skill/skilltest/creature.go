@@ -77,8 +77,8 @@ func (Creature) ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant,
 }
 func (Creature) CounterSkillPhysical() float64 { return 0 }
 func (Creature) Invulnerable() bool            { return false }
-func (Creature) HealAmount(modelskill.Definition) (float64, bool) {
-	return 0, false
+func (Creature) HealInput(modelskill.Definition) (formulas.HealInput, bool) {
+	return formulas.HealInput{}, false
 }
 func (Creature) MaxHPValue() float64 { return 0 }
 func (Creature) MaxMPValue() float64 { return 0 }

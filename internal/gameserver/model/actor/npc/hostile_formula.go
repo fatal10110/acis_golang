@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"math"
 	"math/rand"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -293,13 +292,10 @@ func (h *Hostile) RechargeMP(amount float64) float64 {
 	return h.calcStat(stat.RechargeMPRate, amount)
 }
 
-// HealAmount resolves h's outgoing HEAL amount before target effectiveness.
-func (h *Hostile) HealAmount(def modelskill.Definition) (float64, bool) {
-	amount := float64(def.Power) + h.HealProficiency()
-	if creature.SkillTypeKey(def.SkillType) == "HEAL_STATIC" {
-		return amount, true
-	}
-	return amount + math.Sqrt(float64(int(h.MAtk()))), true
+// HealInput resolves h's side of an outgoing HEAL. Any charged spiritshot
+// quadruples an NPC's M.Atk term.
+func (h *Hostile) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
+	return creature.ResolveHealInput(def, h.HealProficiency(), h.MAtk(), formulas.HealShotScalingNPC), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill

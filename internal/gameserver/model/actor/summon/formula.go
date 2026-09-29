@@ -1,7 +1,6 @@
 package summon
 
 import (
-	"math"
 	"math/rand/v2"
 	"strings"
 	"sync"
@@ -646,13 +645,10 @@ func (a *Actor) RechargeMP(amount float64) float64 {
 	return a.calcStat(stat.RechargeMPRate, amount)
 }
 
-// HealAmount resolves a's outgoing HEAL amount before target effectiveness.
-func (a *Actor) HealAmount(def modelskill.Definition) (float64, bool) {
-	amount := float64(def.Power) + a.HealProficiency()
-	if creature.SkillTypeKey(def.SkillType) == "HEAL_STATIC" {
-		return amount, true
-	}
-	return amount + math.Sqrt(float64(int(a.MAtk()))), true
+// HealInput resolves a's side of an outgoing HEAL. A summon's charged
+// spiritshot scales its M.Atk term the way a mage-class player's does.
+func (a *Actor) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
+	return creature.ResolveHealInput(def, a.HealProficiency(), a.MAtk(), formulas.HealShotScalingMage), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill

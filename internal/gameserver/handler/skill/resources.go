@@ -4,6 +4,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 type restoredResource uint8
@@ -32,15 +34,35 @@ type realDamageTarget interface {
 	Die(killer attackable.Combatant)
 }
 
-type healHandler struct{}
+// healHandler restores HP after landing the skill's effects through the
+// BUFF handler, so a heal's heal-over-time, negate or buff reaches its
+// targets the way a buff's would.
+type healHandler struct {
+	buff    continuousHandler
+	healSps *modelskill.HealSpsTable
+}
 
 func (healHandler) Types() []string { return []string{"HEAL", "HEAL_STATIC"} }
 
-func (healHandler) Use(cast Cast) {
+func (h healHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+func (h healHandler) UseResult(cast Cast) Result {
 	if cast.Caster == nil {
-		return
+		return Result{messages: cast.messages}
 	}
-	if amount, ok := cast.Caster.HealAmount(cast.Skill); ok {
+	// The shot state is sampled before the BUFF pass, which may spend the
+	// shot itself; the heal amount and the discharge below both use it.
+	sps, bsps := spiritshotCharges(cast.Caster)
+	result := h.buff.UseResult(cast)
+
+	if in, ok := cast.Caster.HealInput(cast.Skill); ok {
+		in.Spiritshot, in.BlessedSpiritshot = sps, bsps
+		if (sps || bsps) && !in.Static {
+			in.SpsCorrection = h.healSps.Calculate(cast.Skill.ID, cast.Skill.Level, cast.Skill.MagicLevel, in.MAtk)
+		}
+		amount := formulas.HealAmount(in)
 		for _, obj := range cast.Targets {
 			target, ok := asEffected(obj)
 			if !ok || !target.CanBeHealed() {
@@ -51,11 +73,10 @@ func (healHandler) Use(cast Cast) {
 		}
 	}
 	// A static heal and a potion leave the caster's spiritshot charged.
-	// HealAmount does not yet apply the spiritshot heal bonus (HealSps
-	// correction and M.Atk multiplier); tracked in #2647.
 	if skillTypeKey(cast.Skill.SkillType) != "HEAL_STATIC" && !cast.Skill.Potion {
-		dischargeSpiritshot(cast)
+		spendSpiritshot(cast, bsps)
 	}
+	return result
 }
 
 type healPercentHandler struct{}
@@ -104,6 +125,7 @@ func (manaHealHandler) Use(cast Cast) {
 		restored := target.AddMP(mp)
 		notifyRestored(obj, cast.Caster, restored, restoredMP, true)
 	}
+	applySelfEffects(cast, cast.Skill)
 	if !cast.Skill.Potion {
 		dischargeSpiritshot(cast)
 	}

@@ -76,6 +76,7 @@ type gameData struct {
 	Geo           *engine.Engine
 	Finder        *pathfind.Finder
 	Hennas        *henna.Table
+	HealSps       *skill.HealSpsTable
 }
 
 type geodata struct {
@@ -158,11 +159,15 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	healSps, err := gamexml.LoadHealSps(filepath.Join(xmlRoot, "healSps.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Msg("game data loaded")
 	return &gameData{
 		Players:       players,
 		Levels:        levels,
@@ -182,6 +187,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Geo:           geo.Engine,
 		Finder:        geo.Finder,
 		Hennas:        hennas,
+		HealSps:       healSps,
 	}, nil
 }
 

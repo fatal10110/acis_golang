@@ -3806,26 +3806,42 @@ func compareGolden(t testing.TB, want, got map[string]float64) {
 }
 
 // ---- from character_stats_heal_test.go ----
-func TestCharacterHealAmountUsesMagicAttackAndHealProficiency(t *testing.T) {
+func TestCharacterHealInputUsesMagicAttackAndHealProficiency(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 49
 	c := liveCharacter(1, tmpl, combatItems())
 	c.AddStatFuncs([]effect.Mod{{Stat: stat.HealProficiency, Op: effect.OpAdd, Value: 11, Owner: testModOwner()}})
 
-	amount, ok := c.HealAmount(modelskill.Definition{SkillType: "HEAL", Power: 25})
+	in, ok := c.HealInput(modelskill.Definition{SkillType: "HEAL", Power: 25})
 	if !ok {
-		t.Fatal("HealAmount() ok = false")
+		t.Fatal("HealInput() ok = false")
 	}
-	if want := 41.099019513592786; !closeFloat(amount, want) {
+	if in.Power != 25 || in.Proficiency != 11 || in.Static || in.MAtk != int(c.MAtk()) {
+		t.Fatalf("HealInput() = %+v, want power 25, proficiency 11, M.Atk %d", in, int(c.MAtk()))
+	}
+	if amount, want := formulas.HealAmount(in), 41.099019513592786; !closeFloat(amount, want) {
 		t.Fatalf("HealAmount() = %v, want %v", amount, want)
 	}
-
-	static, ok := c.HealAmount(modelskill.Definition{SkillType: "HEAL_STATIC", Power: 25})
-	if !ok {
-		t.Fatal("HealAmount(HEAL_STATIC) ok = false")
+	// Class 0 is a fighter: a charged shot does not scale its M.Atk term.
+	if in.Scaling != formulas.HealShotScalingNone {
+		t.Fatalf("fighter HealInput scaling = %v, want none", in.Scaling)
 	}
-	if want := 25.0 + 11; !closeFloat(static, want) {
-		t.Fatalf("HealAmount(HEAL_STATIC) = %v, want %v", static, want)
+
+	static, ok := c.HealInput(modelskill.Definition{SkillType: "HEAL_STATIC", Power: 25})
+	if !ok || !static.Static {
+		t.Fatalf("HealInput(HEAL_STATIC) = %+v, %v, want static", static, ok)
+	}
+	if got, want := formulas.HealAmount(static), 25.0+11; !closeFloat(got, want) {
+		t.Fatalf("HealAmount(HEAL_STATIC) = %v, want %v", got, want)
+	}
+
+	// Human Mystic (10) and its cleric line are mage classes.
+	for _, classID := range []int{10, 15, 16} {
+		c.ClassID = classID
+		mage, _ := c.HealInput(modelskill.Definition{SkillType: "HEAL", Power: 25})
+		if mage.Scaling != formulas.HealShotScalingMage {
+			t.Fatalf("class %d HealInput scaling = %v, want mage", classID, mage.Scaling)
+		}
 	}
 }
 

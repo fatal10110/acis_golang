@@ -268,6 +268,9 @@ type GameClientLinkConfig struct {
 	Skills        *skillstate.Persistence
 	Spellbooks    modelskill.BookPolicy
 	SkillTrees    *modelskill.Trees
+	// HealSps holds the spiritshot heal corrections; nil gives a charged
+	// heal no correction term.
+	HealSps       *modelskill.HealSpsTable
 	CursedWeapons *entity.CursedWeaponTable
 	World         *world.State
 	NPCs          *npc.Table
@@ -399,7 +402,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		trades:           tradebook.NewBook(time.Now),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
-		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, handlerskill.SignetDeps{
+		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
 			Templates: cfg.NPCs,
 			IDs:       cfg.IDs,
 			World:     cfg.World,

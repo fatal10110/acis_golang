@@ -156,6 +156,33 @@ func TestHostileCalcStatFloorsNonNegativeStatsAtOne(t *testing.T) {
 	}
 }
 
+// TestHostileHealInputScalesShotsAsNPC pins an NPC healer's side of a HEAL:
+// its M.Atk and heal proficiency, and the NPC shot scaling that quadruples
+// the M.Atk term under either spiritshot.
+func TestHostileHealInputScalesShotsAsNPC(t *testing.T) {
+	hostile, err := NewHostile(&Instance{
+		ObjectID: 101,
+		Template: &Template{ID: 9001, Type: "Monster", Level: 20, MAtk: 64},
+		Kind:     "Monster",
+	}, newHostileLive(t), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.HealProficiency, Op: effect.OpAdd, Value: 5}})
+
+	in, ok := hostile.HealInput(skill.Definition{SkillType: "HEAL", Power: 30})
+	if !ok {
+		t.Fatal("HealInput() ok = false")
+	}
+	if in.Power != 30 || in.Proficiency != 5 || in.Static || in.MAtk != int(hostile.MAtk()) || in.Scaling != formulas.HealShotScalingNPC {
+		t.Fatalf("HealInput() = %+v, want power 30, proficiency 5, M.Atk %d, NPC scaling", in, int(hostile.MAtk()))
+	}
+	static, _ := hostile.HealInput(skill.Definition{SkillType: "HEAL_STATIC", Power: 30})
+	if got := formulas.HealAmount(static); !static.Static || got != 35 {
+		t.Fatalf("HEAL_STATIC input %+v amount %v, want static 35", static, got)
+	}
+}
+
 func TestHostileStatActorImplementsConditionsActor(t *testing.T) {
 	hostile, err := NewHostile(&Instance{
 		ObjectID: 101,
