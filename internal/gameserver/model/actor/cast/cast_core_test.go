@@ -133,6 +133,96 @@ func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
 	}
 }
 
+// TestFinishRequestsShotRechargeForTheSkillsShotKind pins the finalizer's
+// shot recharge (CreatureCast.onMagicFinalizer): a natural finish asks for
+// the soulshot or spiritshot recharge the skill spends, ahead of the attack
+// stance and CastFinished; a skill that spends neither, an aborted cast and a
+// FUSION channel (whose hit timer aborts before any recharge) ask for none.
+func TestFinishRequestsShotRechargeForTheSkillsShotKind(t *testing.T) {
+	now := time.Unix(1000, 0)
+	pdam := modelskill.Definition{ID: 1, Level: 1, SkillType: "PDAM", Offensive: true, HitTime: 1000}
+	magic := modelskill.Definition{ID: 3, Level: 1, SkillType: "MDAM", Magic: true, Offensive: true, HitTime: 1000}
+	finish := func(_ *testing.T, c *Controller, _ Plan) { c.Finish() }
+	stop := func(_ *testing.T, c *Controller, _ Plan) { c.Stop() }
+
+	tests := []struct {
+		name string
+		def  modelskill.Definition
+		end  func(*testing.T, *Controller, Plan)
+		want *event.ShotsRechargeRequested
+	}{
+		{name: "pdam finish", def: pdam, end: finish, want: &event.ShotsRechargeRequested{Physical: true}},
+		{
+			name: "blow finish",
+			def:  modelskill.Definition{ID: 2, Level: 1, SkillType: "BLOW", Offensive: true, HitTime: 1000},
+			end:  finish,
+			want: &event.ShotsRechargeRequested{Physical: true},
+		},
+		{name: "magic finish", def: magic, end: finish, want: &event.ShotsRechargeRequested{Magic: true}},
+		{
+			name: "non-magic heal finish",
+			def:  modelskill.Definition{ID: 4, Level: 1, SkillType: "HEAL", HitTime: 1000},
+			end:  finish,
+		},
+		{name: "pdam stopped mid-cast", def: pdam, end: stop},
+		{name: "magic stopped mid-cast", def: magic, end: stop},
+		{
+			name: "fusion channel completes",
+			def:  modelskill.Definition{ID: 426, Level: 1, Magic: true, SkillType: "FUSION", HitTime: 15000},
+			end: func(t *testing.T, c *Controller, plan Plan) {
+				clock := newCastClock()
+				c.SetQueue(clock.q)
+				ended := 0
+				if !c.ScheduleFusion(plan, time.Second, func() bool { return true }, func() { ended++ }) {
+					t.Fatal("ScheduleFusion() = false for an in-flight cast")
+				}
+				clock.advance(plan.LaunchDelay)
+				if ended != 1 || c.CastingNow() {
+					t.Fatalf("fusion channel after launch delay: end calls %d, casting %v; want 1 and false", ended, c.CastingNow())
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl, _, rec := newAbortController()
+			plan, err := ctrl.Start(now, testTarget{}, tt.def)
+			if err != nil {
+				t.Fatalf("Start() error: %v", err)
+			}
+			ctrl.SetLaunchTargets(1)
+
+			tt.end(t, ctrl, plan)
+
+			recharges := event.Of[event.ShotsRechargeRequested](rec)
+			if tt.want == nil {
+				if len(recharges) != 0 {
+					t.Fatalf("recharge events = %+v, want none", recharges)
+				}
+				return
+			}
+			if len(recharges) != 1 || recharges[0] != *tt.want {
+				t.Fatalf("recharge events = %+v, want exactly %+v", recharges, *tt.want)
+			}
+			var order []string
+			for _, e := range rec.Events() {
+				switch e.(type) {
+				case event.ShotsRechargeRequested:
+					order = append(order, "recharge")
+				case event.AttackStanceRequested:
+					order = append(order, "stance")
+				case event.CastFinished:
+					order = append(order, "finished")
+				}
+			}
+			if want := []string{"recharge", "stance", "finished"}; !slices.Equal(order, want) {
+				t.Fatalf("finalizer event order = %v, want %v", order, want)
+			}
+		})
+	}
+}
+
 // TestFinishObserverReportsTheCastsTarget pins that CastFinished carries the
 // cast's final target on every way a cast ends: the nextActionAttack
 // follow-up attacks that target after a natural finish and after an abort

@@ -4,7 +4,14 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // TestBeastSoulshotChargesPetAndConsumes uses a beast soulshot from the
@@ -181,5 +188,108 @@ func TestPetAttackRechargesAutoBeastSoulshots(t *testing.T) {
 	}
 	if got := h.ownerItemCount(t, 6645); got != 0 {
 		t.Fatalf("beast soulshot stack = %d, want 0 after the recharge", got)
+	}
+}
+
+// beastSpiritshotID is the plain beast spiritshot (BeastSpiritShots handler,
+// charge skill 2008).
+const beastSpiritshotID = int32(6646)
+
+// magicOwnerPetSkillID is a magic OWNER_PET heal the wolf casts on its
+// owner; being magic it spends a spiritshot charge.
+const magicOwnerPetSkillID = 5201
+
+// TestPetMagicCastRechargesAutoBeastSpiritshots pins
+// CreatureCast.onMagicFinalizer (rechargeShots(skill.useSoulShot(),
+// skill.useSpiritShot())) with Summon.rechargeShots (Summon.java:408-435)
+// for the spiritshot arm: once a pet's magic cast finishes, its owner's
+// auto-use beast spiritshots charge it through the same handler a direct use
+// runs (PET_USES_S1, then the charge MagicSkillUse cast by the pet),
+// consuming the pet's per-cast spiritshot count.
+func TestPetMagicCastRechargesAutoBeastSpiritshots(t *testing.T) {
+	t.Parallel()
+	const spsCount = 2
+	wolf := wolfTemplate()
+	levels := make(map[int]npc.PetLevelStats, len(wolf.Pet.Levels))
+	for lvl, stats := range wolf.Pet.Levels {
+		stats.SPSCount = spsCount
+		levels[lvl] = stats
+	}
+	wolf.Pet.Levels = levels
+	wolf.Skills = map[int]int{magicOwnerPetSkillID: 1}
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
+		{
+			ID: summonCreatureID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "SUMMON_CREATURE", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
+		},
+		// Not static-reuse: a static-reuse skill writes its spent charge
+		// back as still charged.
+		{
+			ID: magicOwnerPetSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOwnerPet,
+			SkillType: "HEAL", Magic: true, Power: 10, CastRange: 600, HitTime: 1000, ReuseDelay: 60_000,
+			StaticHitTime: true,
+		},
+	}), gamesql.NewCharacterSkillStore(db))
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf, treeTemplate()})),
+		gameservertest.WithSkills(skills),
+	}, seedItem{TemplateID: beastSpiritshotID, Count: 5})
+	petActor, _ := h.spawnWolf(t)
+	drainUntilQuiet(t, h.client)
+
+	// Charge the pet by hand, then turn auto use on: the heal's hit spends
+	// that charge and the finalizer charges it again from the stack.
+	h.client.Send(encodeUseItem(h.seededItem(t, beastSpiritshotID), false))
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeRequestAutoSoulShot(beastSpiritshotID, 1))
+	drainUntilQuiet(t, h.client)
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner missing from the world")
+	}
+	owner, ok := obj.(interface {
+		attackable.Combatant
+		AutoSoulShotEnabled(int32) bool
+	})
+	if !ok || !owner.AutoSoulShotEnabled(beastSpiritshotID) || !petActor.SpiritshotCharged() {
+		t.Fatalf("owner %T: pet not charged, or auto beast spiritshots off, before the cast", obj)
+	}
+	before := h.ownerItemCount(t, beastSpiritshotID)
+
+	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(magicOwnerPetSkillID, owner, false) })
+	h.srv.AdvanceUntil(t, "the pet's heal finishing", func() bool { return !petActor.CastingNow() })
+	frames := drainFrames(t, h.client)
+	if !petActor.SpiritshotCharged() {
+		t.Fatal("pet uncharged after its magic cast: the finalizer did not recharge it")
+	}
+
+	launched, uses, casts := false, 0, 0
+	for _, frame := range frames {
+		r := wire.NewReader(frame[1:])
+		switch frame[0] {
+		case serverpackets.OpcodeMagicSkillLaunched:
+			launched = true
+		case serverpackets.OpcodeSystemMessage:
+			if r.ReadInt32() == serverpackets.SystemMessagePetUsesS1 {
+				if !launched {
+					t.Fatal("PET_USES_S1 ahead of the cast's MagicSkillLaunched")
+				}
+				uses++
+			}
+		case serverpackets.OpcodeMagicSkillUse:
+			if caster, target, skill := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster == petActor.ObjectID() && target == caster && skill == 2008 {
+				if casts == uses {
+					t.Fatal("charge MagicSkillUse ahead of its PET_USES_S1")
+				}
+				casts++
+			}
+		}
+	}
+	if uses != 1 || casts != 1 {
+		t.Fatalf("recharge after the magic cast: PET_USES_S1 = %d, charge MagicSkillUse = %d; want 1, 1", uses, casts)
+	}
+	if got := h.ownerItemCount(t, beastSpiritshotID); got != before-spsCount {
+		t.Fatalf("beast spiritshot stack = %d, want %d after one %d-per-cast recharge", got, before-spsCount, spsCount)
 	}
 }
