@@ -35,7 +35,7 @@ func TestControllerRaidCurseGateBeforeDamage(t *testing.T) {
 			target := &timingTarget{id: 2, raidRelated: true}
 			ctrl := NewPlayable(actor, nil)
 
-			ctrl.deliverHits(0, []Hit{{Target: target, Damage: 1}})
+			ctrl.deliverHits(0, []Hit{{Target: target, Damage: 1}}, nil)
 
 			if actor.curseCalls != 1 {
 				t.Fatalf("curse checks = %d, want 1", actor.curseCalls)
@@ -820,7 +820,7 @@ func TestControllerReportsHitFeedbackPerActorKind(t *testing.T) {
 			hit := tt.hit
 			hit.Target = target
 
-			ctrl.deliverHits(0, []Hit{hit})
+			ctrl.deliverHits(0, []Hit{hit}, nil)
 
 			if got := event.Of[event.HitDealt](rec); !slices.Equal(got, tt.want) {
 				t.Fatalf("HitDealt = %+v, want %+v", got, tt.want)
@@ -937,9 +937,9 @@ func TestControllerNotifiesHitTargets(t *testing.T) {
 		{Target: secondary, Miss: true},
 		{Target: zero},
 		{Target: plain, Damage: 10},
-	})
+	}, nil)
 	// A dual weapon's second hit lands as its own group.
-	ctrl.deliverHits(0, []Hit{{Target: primary, Miss: true}})
+	ctrl.deliverHits(0, []Hit{{Target: primary, Miss: true}}, nil)
 
 	want := []string{
 		"feedback miss=false", "stance", "attacked 2 by 1", "damage 2", "landed 2",
@@ -1089,11 +1089,62 @@ func TestControllerReflectAbsorbOrder(t *testing.T) {
 				target.dead = tc.killed
 			}
 
-			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage})
+			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage}, nil)
 
 			if !slices.Equal(*events, tc.want) {
 				t.Fatalf("hit steps =\n%q\nwant\n%q", *events, tc.want)
 			}
 		})
+	}
+}
+
+// shotTimingPlayer counts the soulshot discharges its attack makes.
+type shotTimingPlayer struct {
+	timingPlayer
+	discharges int
+}
+
+func (a *shotTimingPlayer) SetChargedShot(kind item.ShotKind, charged bool) {
+	if kind == item.ShotSoul && !charged {
+		a.discharges++
+	}
+}
+
+// TestControllerSwingSpendsAndRechargesShotsOnce pins the hit timer's shot
+// step (CreatureAttack.java:134-145): it runs once per swing, at the first
+// hit group, so a dual weapon's second hit neither spends the charge the
+// first hit's recharge put back nor charges again. Only a playable's swing
+// asks for the recharge.
+func TestControllerSwingSpendsAndRechargesShotsOnce(t *testing.T) {
+	actor := &shotTimingPlayer{timingPlayer: timingPlayer{timingActor: timingActor{attackType: item.WeaponDual, attackSpeed: 500}}}
+	clock := newTimingClock()
+	rec := &event.Recorder{}
+	ctrl := NewPlayer(actor, rec)
+	ctrl.SetQueue(clock.q)
+
+	ctrl.DoAttack(&timingTarget{id: 2})
+	clock.fire(500 * time.Millisecond)
+	if actor.discharges != 1 || event.Count[event.ShotsRechargeRequested](rec) != 1 {
+		t.Fatalf("after the first hit: discharges = %d, recharges = %d; want 1, 1", actor.discharges, event.Count[event.ShotsRechargeRequested](rec))
+	}
+	if got := event.Of[event.ShotsRechargeRequested](rec); got[0] != (event.ShotsRechargeRequested{Physical: true}) {
+		t.Fatalf("recharge = %+v, want physical only", got[0])
+	}
+	clock.fire(time.Second)
+	if actor.discharges != 1 || event.Count[event.ShotsRechargeRequested](rec) != 1 {
+		t.Fatalf("after the second hit: discharges = %d, recharges = %d; want still 1, 1", actor.discharges, event.Count[event.ShotsRechargeRequested](rec))
+	}
+
+	npcRec := &event.Recorder{}
+	npc := NewAttackable(&timingActor{attackSpeed: 500}, npcRec)
+	npc.SetQueue(clock.q)
+	npcTarget := &timingTarget{id: 3}
+	npc.DoAttack(npcTarget)
+	clock.fire(1500 * time.Millisecond)
+	if npcTarget.hits != 1 {
+		t.Fatalf("NPC hits = %d, want 1", npcTarget.hits)
+	}
+	if got := event.Count[event.ShotsRechargeRequested](npcRec); got != 0 {
+		t.Fatalf("NPC swing recharges = %d, want 0", got)
 	}
 }

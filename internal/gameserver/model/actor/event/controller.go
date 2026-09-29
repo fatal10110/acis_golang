@@ -46,6 +46,16 @@ type BowShotFinished struct{}
 // controllers emit it.
 type AttackRethink struct{}
 
+// ShotsRechargeRequested reports a point where the actor charges its shots
+// again from the ones it has set to auto-use: the first hit group of its
+// swing reaching the target (Physical), and a skill's cast finalizer
+// (Physical for a skill that spends soulshots, Magic for one that spends
+// spiritshots). A player charges its weapon from its own shots, a summon
+// from its owner's beast shots. Attack controllers emit it for players and
+// summons only. Cast controllers emit it for every caster; an NPC's owner
+// drops it, since an NPC's shots recharge from its AI.
+type ShotsRechargeRequested struct{ Physical, Magic bool }
+
 // HitDealt reports one of the actor's physical auto-attack hits resolving
 // against a target, for the attacking side's damage feedback. Only a player
 // or a summon reports it; a summon reports neither a miss nor a hit on its
@@ -92,17 +102,18 @@ type Arrived struct{}
 // path. The receiver owes observers the stopped-cell correction.
 type MoveBlocked struct{}
 
-func (CastAborted) event()           {}
-func (CastFinished) event()          {}
-func (CastStopAck) event()           {}
-func (SkillMasteryProc) event()      {}
-func (AttackFinished) event()        {}
-func (AttackRethink) event()         {}
-func (BowShotFinished) event()       {}
-func (HitDealt) event()              {}
-func (HitLanded) event()             {}
-func (AttackStanceRequested) event() {}
-func (Attacked) event()              {}
-func (Evaded) event()                {}
-func (Arrived) event()               {}
-func (MoveBlocked) event()           {}
+func (CastAborted) event()            {}
+func (CastFinished) event()           {}
+func (CastStopAck) event()            {}
+func (SkillMasteryProc) event()       {}
+func (AttackFinished) event()         {}
+func (AttackRethink) event()          {}
+func (ShotsRechargeRequested) event() {}
+func (BowShotFinished) event()        {}
+func (HitDealt) event()               {}
+func (HitLanded) event()              {}
+func (AttackStanceRequested) event()  {}
+func (Attacked) event()               {}
+func (Evaded) event()                 {}
+func (Arrived) event()                {}
+func (MoveBlocked) event()            {}

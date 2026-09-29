@@ -482,6 +482,22 @@ func (d Definition) IsDamage() bool {
 	return false
 }
 
+// UsesSoulShot reports whether casting d spends a soulshot charge: the
+// physical damage, blow, stun and charge-damage skill types.
+func (d Definition) UsesSoulShot() bool {
+	switch d.SkillType {
+	case "BLOW", "PDAM", "STUN", "CHARGEDAM":
+		return true
+	}
+	return false
+}
+
+// UsesSpiritShot reports whether casting d spends a spiritshot charge: every
+// magic skill.
+func (d Definition) UsesSpiritShot() bool {
+	return d.Magic
+}
+
 // defaultBaseCritRate is the BaseCritRate a level defaults to when its data
 // doesn't set one explicitly: a physical-damage or blow skill always has a
 // chance to critical, everything else has none.
