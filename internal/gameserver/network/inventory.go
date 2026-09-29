@@ -85,7 +85,29 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
-	res, failure := l.inventory.ToggleEquipItem(inv, objectID)
+	switch tmpl.Slot {
+	case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
+		if live.Mounted() {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEquipItemDueToBadCondition))
+			return
+		}
+	}
+	l.toggleEquipItem(live, inv, inst, tmpl)
+}
+
+// toggleEquipItem puts inst on, or takes it off when it is worn, for
+// UseItem. A weapon loses its shot charges either way. Taking an item off
+// announces it before the paperdoll changes; putting one on announces it
+// after, then recharges auto-use shots for a main-hand weapon.
+func (l *GameClientLink) toggleEquipItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
+	st := inst.Snapshot()
+	if tmpl.Kind == item.KindWeapon {
+		inst.UnchargeAllShots()
+	}
+	if st.Equipped() {
+		sendUnequippedMessage(live, st.TemplateID, st.EnchantLevel)
+	}
+	res, failure := l.inventory.ToggleEquipItem(inv, st.ObjectID)
 	switch failure {
 	case invops.EquipOK:
 	case invops.EquipBadCondition:
@@ -98,8 +120,29 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	l.applyEquipStatChanges(live, inv, res)
+	l.applyEquipItemStats(live, inv, res)
+	if !st.Equipped() {
+		if st.EnchantLevel > 0 {
+			live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageS1S2Equipped, int32(st.EnchantLevel), st.TemplateID))
+		} else {
+			live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Equipped, st.TemplateID))
+		}
+		if tmpl.Slot == item.SlotLRHand || tmpl.Slot == item.SlotRHand {
+			l.rechargeShots(live, inv, true, true)
+		}
+	}
+	live.RefreshExpertisePenalty()
 	l.broadcastEquipmentChange(live)
+}
+
+// sendUnequippedMessage names an item that came off the paperdoll, with
+// its enchant level when it has one.
+func sendUnequippedMessage(live *livePlayer, templateID int32, enchantLevel int) {
+	if enchantLevel > 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageEquipmentS1S2Removed, int32(enchantLevel), templateID))
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disarmed, templateID))
 }
 
 // applyEquipStatChanges attaches or detaches the stat functions each
@@ -111,6 +154,17 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 // Putting on or taking off formal wear always resends SkillList, since
 // every entry's greyed-out flag follows it.
 func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
+	if live == nil || inv == nil {
+		return
+	}
+	l.applyEquipItemStats(live, inv, res)
+	live.RefreshExpertisePenalty()
+}
+
+// applyEquipItemStats is applyEquipStatChanges without the closing grade
+// penalty refresh, for a caller that has to send its own packets between
+// the two.
+func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
 	if live == nil || inv == nil {
 		return
 	}
@@ -162,7 +216,6 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 			}
 		}
 	}
-	live.RefreshExpertisePenalty()
 }
 
 // ExpireShadowItem unequips and destroys an exhausted shadow item.
@@ -302,16 +355,15 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	for _, unequipped := range res.Changed {
+		unequipped.UnchargeAllShots()
+	}
 	l.applyEquipStatChanges(live, inv, res)
 	l.broadcastEquipmentChange(live)
 
 	if len(res.Changed) > 0 {
-		unequipped := res.Changed[0]
-		if unequipped.EnchantLevel > 0 {
-			live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageEquipmentS1S2Removed, int32(unequipped.EnchantLevel), unequipped.TemplateID))
-		} else {
-			live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disarmed, unequipped.TemplateID))
-		}
+		unequipped := res.Changed[0].Snapshot()
+		sendUnequippedMessage(live, unequipped.TemplateID, unequipped.EnchantLevel)
 	}
 }
 
@@ -347,15 +399,21 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A worn item leaves the paperdoll before it reaches the ground: its
+	// stat functions, item skills and shot charges go with it.
+	for _, unequipped := range res.Changed {
+		unequipped.UnchargeAllShots()
+	}
+	l.applyEquipStatChanges(live, inv, res.Result)
+	if res.EquipmentChanged {
+		l.broadcastEquipmentChange(live)
+	}
+
 	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build dropped ground item")
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
-	}
-
-	if res.EquipmentChanged {
-		l.broadcastEquipmentChange(live)
 	}
 
 	l.groundItems.Drop(ground, task.DropOptions{
@@ -429,6 +487,10 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 		return
 	}
 
+	l.applyEquipStatChanges(live, inv, res.Result)
+	if len(res.Changed) > 0 {
+		sendUnequippedMessage(live, res.SourceItemID, res.Changed[0].Snapshot().EnchantLevel)
+	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, res.SourceItemID))
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
