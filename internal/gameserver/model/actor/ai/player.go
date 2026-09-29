@@ -92,6 +92,15 @@ func (p *PlayerAttack) ResumeAfterCast() bool {
 	return true
 }
 
+// DropResumeAfterCast forgets an attack requested while casting, without
+// touching the attack intention itself: a later request queued behind the
+// same cast has replaced it as the next intention.
+func (p *PlayerAttack) DropResumeAfterCast() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.deferred = false
+}
+
 // Stop clears the attack intention and stops any movement toward it.
 func (p *PlayerAttack) Stop() {
 	p.mu.Lock()

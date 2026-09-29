@@ -95,7 +95,7 @@ type livePlayer struct {
 	pickupMu       sync.Mutex
 	pickup         *pickupIntention
 	deferredPickup *pickupIntention
-	deferredMagic  *clientpackets.RequestMagicSkillUse
+	deferredMagic  *deferredMagicSkill
 	deferredItem   *itemAICastIntention
 	pickupLocked   bool
 	pickupLockGen  uint64
@@ -155,6 +155,14 @@ type pickupIntention struct {
 	// set for a non-shift click — a shift click fails outright instead of
 	// walking — so it never needs this field.
 	shift bool
+}
+
+// deferredMagicSkill is a skill request waiting as the next CAST intention.
+// selected is the target the request was made on: the queued cast resolves
+// against it, not against whatever is selected once it runs.
+type deferredMagicSkill struct {
+	req      clientpackets.RequestMagicSkillUse
+	selected world.Tracked
 }
 
 type itemAICastIntention struct {
@@ -323,15 +331,17 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 	return pickup
 }
 
-func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse) {
+// deferMagicSkill stores req as the next CAST intention, against the
+// selection it was requested on, replacing whatever was queued before.
+func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredItem = nil
-	p.deferredMagic = &req
+	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
 }
 
-func (p *livePlayer) takeDeferredMagicSkill() *clientpackets.RequestMagicSkillUse {
+func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	req := p.deferredMagic
