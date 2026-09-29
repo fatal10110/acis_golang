@@ -198,6 +198,13 @@ type Attackable struct {
 	// the first wander step walks immediately and later steps wait the
 	// wander timer then roll RandomWalkRate.
 	lastDesire Intention
+	// latched is the one-pass attack latch. An attack promoted while the
+	// last executed desire was idle or wander is latched, and the next
+	// promotion pass takes it instead of the queue's heaviest desire, even
+	// after its desire left the queue; that pass clears it again. While it
+	// is set the empty-queue idle waits. kind is IntentionIdle when unset.
+	// A respawn builds a new loop, so it starts unset.
+	latched intention
 	// wanderReady is the earliest time a subsequent wander step may walk
 	// or re-roll. Zero means the timer is not running.
 	wanderReady time.Time
@@ -706,17 +713,25 @@ func (a *Attackable) think(mode thinkMode) error {
 	}
 	a.dropCurrentIfUnqueued()
 	canPromote := a.canPromote(updateTick, instantRun)
+	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
+	// a latched attack: the latched step runs first and the idle then
+	// aborts it, as the cycle's idle does not wait for the latch.
+	idleAfterLatch := false
 	if updateTick {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {
 			if a.lifeTime > 0 && !a.castingNow() {
-				a.thinkIdle()
-				a.queueIdleFollow()
-				idled = true
+				if a.hasLatch() {
+					idleAfterLatch = true
+				} else {
+					a.thinkIdle()
+					a.queueIdleFollow()
+					idled = true
+				}
 			}
 		}
 		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime > 0 && !a.castingNow() {
+			if a.lifeTime > 0 && !a.castingNow() && !idleAfterLatch {
 				a.queueIdleWander()
 			}
 		}
@@ -728,12 +743,30 @@ func (a *Attackable) think(mode thinkMode) error {
 	if !canPromote {
 		return nil
 	}
+	err := a.promoteAndStep(mode != thinkContinue)
+	if idleAfterLatch {
+		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
+			a.thinkIdle()
+			a.queueIdleFollow()
+			if _, ok := a.desires.Peek(); !ok {
+				a.queueIdleWander()
+			}
+		}
+	}
+	return err
+}
+
+// promoteAndStep promotes the next desire and runs one step of the current
+// intention. A lost attack or cast target re-promotes at once, except for a
+// latched attack, which is the whole pass. useLatch is false for Think,
+// which neither takes nor updates the latch.
+func (a *Attackable) promoteAndStep(useLatch bool) error {
 	for attempts := 0; attempts <= maxDesires; attempts++ {
-		a.promoteNext()
+		latched := a.promoteNext(useLatch)
 		switch a.current.kind {
 		case IntentionAttack:
 			again, err := a.thinkAttack()
-			if again {
+			if again && !latched {
 				continue
 			}
 			a.lastDesire = IntentionAttack
@@ -765,7 +798,7 @@ func (a *Attackable) think(mode thinkMode) error {
 // queued desire and is not already idle aborts everything and goes idle.
 // It reports whether it did; the idle then takes no further step this pass.
 func (a *Attackable) idleOnEmptyQueue() bool {
-	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.actor.DenyAIAction() || a.castingNow() {
+	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.actor.DenyAIAction() || a.castingNow() {
 		return false
 	}
 	if _, ok := a.desires.Peek(); ok {
@@ -784,23 +817,59 @@ func (a *Attackable) inHitAnimation() bool {
 	return a.hitAnimation != nil && a.hitAnimation.InHitAnimation()
 }
 
-func (a *Attackable) promoteNext() {
+// hasLatch reports whether a latched attack waits for the next pass.
+func (a *Attackable) hasLatch() bool {
+	return a.latched.kind != IntentionIdle
+}
+
+// promoteNext picks the latched attack, else the heaviest queued desire,
+// and, with useLatch, updates the latch from it. The latched attack always
+// becomes current; a queued pick does only when the current intention may
+// be replaced. It reports whether the pick was the latched attack.
+func (a *Attackable) promoteNext(useLatch bool) bool {
 	if a.inHitAnimation() {
-		return
+		return false
+	}
+	next, fromLatch, ok := a.nextToDo(useLatch)
+	if !ok {
+		return false
+	}
+	if a.current.kind == IntentionWander && next.kind == IntentionWander {
+		return false
+	}
+	if useLatch {
+		if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
+			a.latched = next
+		} else {
+			a.latched = intention{}
+		}
+	}
+	if !fromLatch {
+		switch a.current.kind {
+		case IntentionIdle, IntentionFollow, IntentionWander:
+		default:
+			return false
+		}
+	}
+	if a.current.kind == IntentionWander {
+		a.wanderReady = time.Time{}
+	}
+	a.lastKind = a.current.kind
+	a.current = next
+	return fromLatch
+}
+
+// nextToDo returns the latched attack when useLatch and one is set, else
+// the heaviest queued desire as an intention. ok is false when there is
+// neither or the heaviest desire's kind is not promotable.
+func (a *Attackable) nextToDo(useLatch bool) (next intention, fromLatch, ok bool) {
+	if useLatch && a.hasLatch() {
+		return a.latched, true, true
 	}
 	desire, ok := a.desires.Peek()
 	if !ok {
-		return
+		return intention{}, false, false
 	}
-	if a.current.kind == IntentionWander && desire.Kind == IntentionWander {
-		return
-	}
-	switch a.current.kind {
-	case IntentionIdle, IntentionFollow, IntentionWander:
-	default:
-		return
-	}
-	var next intention
 	switch desire.Kind {
 	case IntentionAttack:
 		next = intention{kind: IntentionAttack, target: desire.FinalTarget}
@@ -813,13 +882,9 @@ func (a *Attackable) promoteNext() {
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
 	default:
-		return
+		return intention{}, false, false
 	}
-	if a.current.kind == IntentionWander {
-		a.wanderReady = time.Time{}
-	}
-	a.lastKind = a.current.kind
-	a.current = next
+	return next, false, true
 }
 
 // Tick advances the AI clock and applies periodic attack, cast, and
