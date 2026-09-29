@@ -1222,6 +1222,45 @@ func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 	}
 }
 
+// TestVitalsMutatorsUpdateStatusOncePerChange pins that every HP/MP restore
+// or MP payment that changes a summon's vitals republishes its status once,
+// and one that changes nothing stays silent. Regeneration changes both
+// resources but republishes once for the pair.
+func TestVitalsMutatorsUpdateStatusOncePerChange(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*Actor)
+		apply func(*Actor) float64
+		want  int
+	}{
+		{"add hp", func(a *Actor) { a.SetHP(50) }, func(a *Actor) float64 { return a.AddHP(10) }, 1},
+		{"add hp at max", nil, func(a *Actor) float64 { return a.AddHP(10) }, 0},
+		{"add mp", func(a *Actor) { a.reduceMP(50) }, func(a *Actor) float64 { return a.AddMP(10) }, 1},
+		{"add mp at max", nil, func(a *Actor) float64 { return a.AddMP(10) }, 0},
+		{"reduce mp", nil, func(a *Actor) float64 { return a.ReduceMP(10) }, 1},
+		{"reduce empty mp", func(a *Actor) { a.reduceMP(200) }, func(a *Actor) float64 { return a.ReduceMP(10) }, 0},
+		{"regen both", func(a *Actor) { a.SetHP(50); a.reduceMP(50) }, func(a *Actor) float64 { a.TickRegen(); return 1 }, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			a := mustPet(t, PetConfig{Stats: CombatStats{MaxHP: 100, MaxMP: 100}})
+			if tc.setup != nil {
+				tc.setup(a)
+			}
+			rec := &event.Recorder{}
+			a.Attach(Runtime{Sink: rec})
+
+			applied := tc.apply(a)
+
+			if (applied > 0) != (tc.want > 0) {
+				t.Fatalf("applied = %v, want a change only when %d updates are expected", applied, tc.want)
+			}
+			if updates := event.Count[event.StatusChanged](rec); updates != tc.want {
+				t.Fatalf("status updates = %d, want %d", updates, tc.want)
+			}
+		})
+	}
+}
+
 func TestReduceHPNotifiesKnownDirectAttackerOnly(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
