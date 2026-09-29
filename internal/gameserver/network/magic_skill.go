@@ -885,7 +885,7 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToUnlockDoor))
 			}
-		case skillhandler.UnlockInvalidTargetMessage:
+		case skillhandler.InvalidTargetMessage:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 			}
