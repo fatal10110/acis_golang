@@ -241,7 +241,7 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if got, want := mana.MDef, 46.080000000000005; !closeFloat(got, want) {
 		t.Fatalf("ManaDamageInput MDef = %v, want %v", got, want)
 	}
-	if got, want := mana.TargetMaxMp, 38.4; !closeFloat(got, want) {
+	if got, want := mana.TargetMaxMp, 38.0; got != want {
 		t.Fatalf("ManaDamageInput TargetMaxMp = %v, want %v", got, want)
 	}
 	if mana.SkillPower != 20 || mana.VulnMul != 1 {
@@ -4888,8 +4888,8 @@ func TestNewCharacter(t *testing.T) {
 // TestNewCharacterVitalsApplyBonusOnce pins that a freshly created
 // character's computed maxima fold the CON/MEN bonus exactly once: the raw
 // level-table bases stored at creation are finalized through the live stat
-// calculator without pre-multiplication, and no current value starts above
-// its own maximum.
+// calculator without pre-multiplication (then truncated to whole points), and
+// no current value starts above its own maximum.
 func TestNewCharacterVitalsApplyBonusOnce(t *testing.T) {
 	tmpl := humanFighterTemplate()
 
@@ -4900,14 +4900,14 @@ func TestNewCharacterVitalsApplyBonusOnce(t *testing.T) {
 	c.AttachRuntime(tmpl, nil)
 
 	res := c.ResourceValues()
-	if want := tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want {
-		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once = %v", res.MaxHP, want)
+	if want := math.Trunc(tmpl.HPTable[0] * statbonus.CONBonus[tmpl.CON]); res.MaxHP != want {
+		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once, truncated = %v", res.MaxHP, want)
 	}
-	if want := tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want {
-		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once = %v", res.MaxMP, want)
+	if want := math.Trunc(tmpl.MPTable[0] * statbonus.MENBonus[tmpl.MEN]); res.MaxMP != want {
+		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once, truncated = %v", res.MaxMP, want)
 	}
-	if want := tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want {
-		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once = %v", res.MaxCP, want)
+	if want := math.Trunc(tmpl.CPTable[0] * statbonus.CONBonus[tmpl.CON]); res.MaxCP != want {
+		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once, truncated = %v", res.MaxCP, want)
 	}
 	if res.CurrentHP > res.MaxHP || res.CurrentMP > res.MaxMP || res.CurrentCP > res.MaxCP {
 		t.Errorf("current vitals %+v exceed their maxima on a fresh character", res)
@@ -4948,14 +4948,14 @@ func TestRestoreVitalsRebasesFromTemplate(t *testing.T) {
 	restored.RestoreVitals(tmpl)
 
 	res := restored.ResourceValues()
-	if want := tmpl.HPTable[1] * statbonus.CONBonus[tmpl.CON]; res.MaxHP != want {
-		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once = %v", res.MaxHP, want)
+	if want := math.Trunc(tmpl.HPTable[1] * statbonus.CONBonus[tmpl.CON]); res.MaxHP != want {
+		t.Errorf("MaxHPValue() = %v, want table*CONBonus applied once, truncated = %v", res.MaxHP, want)
 	}
-	if want := tmpl.MPTable[1] * statbonus.MENBonus[tmpl.MEN]; res.MaxMP != want {
-		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once = %v", res.MaxMP, want)
+	if want := math.Trunc(tmpl.MPTable[1] * statbonus.MENBonus[tmpl.MEN]); res.MaxMP != want {
+		t.Errorf("MaxMPValue() = %v, want table*MENBonus applied once, truncated = %v", res.MaxMP, want)
 	}
-	if want := tmpl.CPTable[1] * statbonus.CONBonus[tmpl.CON]; res.MaxCP != want {
-		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once = %v", res.MaxCP, want)
+	if want := math.Trunc(tmpl.CPTable[1] * statbonus.CONBonus[tmpl.CON]); res.MaxCP != want {
+		t.Errorf("MaxCPValue() = %v, want table*CONBonus applied once, truncated = %v", res.MaxCP, want)
 	}
 	if want := finalHP / 2; res.CurrentHP != want {
 		t.Errorf("CurrentHP = %v, want restored value preserved = %v", res.CurrentHP, want)

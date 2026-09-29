@@ -1,6 +1,8 @@
 package player
 
 import (
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -31,7 +33,9 @@ func (c *Character) Vitals() Vitals {
 	return Vitals{HP: c.CurrentHP(), MP: c.CurrentMP()}
 }
 
-// ResourceValues returns a synchronized HP/MP/CP resource snapshot.
+// ResourceValues returns a synchronized HP/MP/CP resource snapshot. The
+// maxima are whole points (see finalMax); the current values keep their
+// fractions.
 func (c *Character) ResourceValues() Resources {
 	c.vitalsMu.RLock()
 	res := Resources{
@@ -40,13 +44,23 @@ func (c *Character) ResourceValues() Resources {
 		MaxCP: c.maxCP, CurrentCP: c.curCP,
 	}
 	c.vitalsMu.RUnlock()
-	if c.template() == nil {
-		return res
-	}
-	res.MaxHP = c.calcStat(stat.MaxHP, res.MaxHP)
-	res.MaxMP = c.calcStat(stat.MaxMP, res.MaxMP)
-	res.MaxCP = c.calcStat(stat.MaxCP, res.MaxCP)
+	res.MaxHP = c.finalMax(stat.MaxHP, res.MaxHP)
+	res.MaxMP = c.finalMax(stat.MaxMP, res.MaxMP)
+	res.MaxCP = c.finalMax(stat.MaxCP, res.MaxCP)
 	return res
+}
+
+// finalMax finalizes a raw HP/MP/CP maximum through c's calculator and drops
+// the fraction. A maximum is a whole-point value: every restore, refill,
+// full check and percent-of-max formula measures against the truncated
+// number, so a pool the client shows as full cannot absorb a sub-point
+// "restore" (and the status packet it would trigger). Current values stay
+// fractional.
+func (c *Character) finalMax(s stat.Stat, base float64) float64 {
+	if c.template() != nil {
+		base = c.calcStat(s, base)
+	}
+	return math.Trunc(base)
 }
 
 // SetResourceValues replaces c's persisted HP/MP/CP resource values.
@@ -150,12 +164,9 @@ func (c *Character) ReduceCurrentMP(amount int) {
 // current values: a level gained while dead must not raise the corpse. The
 // check shares vitalsMu with MarkDead.
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
-	currentHP, currentMP, currentCP := maxHP, maxMP, maxCP
-	if c.template() != nil {
-		currentHP = c.calcStat(stat.MaxHP, maxHP)
-		currentMP = c.calcStat(stat.MaxMP, maxMP)
-		currentCP = c.calcStat(stat.MaxCP, maxCP)
-	}
+	currentHP := c.finalMax(stat.MaxHP, maxHP)
+	currentMP := c.finalMax(stat.MaxMP, maxMP)
+	currentCP := c.finalMax(stat.MaxCP, maxCP)
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	c.maxHP, c.maxMP, c.maxCP = maxHP, maxMP, maxCP

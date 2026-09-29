@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -212,11 +213,11 @@ func TestGameClientLinkEnterWorldRebasesRestoredVitalBases(t *testing.T) {
 	res := character.ResourceValues()
 	// The computed maxima are the level-table bases finalized once through
 	// the live attributes — not the row snapshot re-finalized.
-	if want := tmpl.HPTable[0] * statbonus.CONBonus[character.CON()]; res.MaxHP != want {
-		t.Errorf("MaxHPValue() after restore = %v, want base finalized once = %v", res.MaxHP, want)
+	if want := math.Trunc(tmpl.HPTable[0] * statbonus.CONBonus[character.CON()]); res.MaxHP != want {
+		t.Errorf("MaxHPValue() after restore = %v, want base finalized once, truncated = %v", res.MaxHP, want)
 	}
-	if want := tmpl.MPTable[0] * statbonus.MENBonus[character.MEN()]; res.MaxMP != want {
-		t.Errorf("MaxMPValue() after restore = %v, want base finalized once = %v", res.MaxMP, want)
+	if want := math.Trunc(tmpl.MPTable[0] * statbonus.MENBonus[character.MEN()]); res.MaxMP != want {
+		t.Errorf("MaxMPValue() after restore = %v, want base finalized once, truncated = %v", res.MaxMP, want)
 	}
 	if res.CurrentHP != restoredHP {
 		t.Errorf("CurrentHP after restore = %v, want row value preserved = %v", res.CurrentHP, restoredHP)
