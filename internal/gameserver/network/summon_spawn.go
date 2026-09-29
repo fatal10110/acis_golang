@@ -568,7 +568,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		l.sendSummonSkillResult(actor, result)
 	}
 	brain.SetCastController(aiController)
-	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
+	actor.Attach(summon.Runtime{AI: brain, Cast: castController, Sink: sink})
 	// Each cleanup is registered directly after the thing it releases
 	// starts, never before and never batched into a single field written
 	// after both. Once the summon is attached, another actor's ERASE or

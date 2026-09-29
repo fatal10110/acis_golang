@@ -159,14 +159,25 @@ func (h *Hostile) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceHP applies skill HP damage and runs the once-only death path. Hate,
-// the shot-recharge roll, and the party/minion attacked call always run for
-// a live hit with positive amount, mirroring Npc.reduceCurrentHp
-// (Npc.java:390-464), which runs unconditionally one layer above the
-// invul/damage-permission guard (CreatureStatus.java:209-226): an
-// invulnerable NPC, or one hit by an attacker without damage permission,
+// ReduceHP applies skill HP damage and runs the once-only death path. The
+// hit first rolls whether it breaks h's cast, whatever the damage
+// permission. Hate, the shot-recharge roll, and the party/minion attacked
+// call always run for a live hit with positive amount, mirroring
+// Npc.reduceCurrentHp (Npc.java:390-464), which runs unconditionally one
+// layer above the invul/damage-permission guard (CreatureStatus.java:209-226):
+// an invulnerable NPC, or one hit by an attacker without damage permission,
 // still aggroes and calls its party, but takes no damage.
 func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	if h.AlikeDead() {
+		return
+	}
+	h.breakCastOnDamage(amount)
+	h.reduceHP(amount, attacker)
+}
+
+// reduceHP is ReduceHP without the cast-break roll, for HP loss that is not
+// a damage hit of its own.
+func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
 	if h.AlikeDead() {
 		return
 	}
@@ -367,13 +378,14 @@ func (h *Hostile) LethalInput(caster creature.FormulaActor, def modelskill.Defin
 	}, true
 }
 
-// ApplyLethalOutcome applies a lethal-strike tier to h.
-func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
+// ApplyLethalOutcome applies a lethal-strike tier to h. The HP loss rolls
+// no cast break of its own.
+func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, _ modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
-		h.ReduceHP(h.HP()-1, caster, def)
+		h.reduceHP(h.HP()-1, caster)
 	case formulas.LethalHalf:
-		h.ReduceHP(h.HP()/2, caster, def)
+		h.reduceHP(h.HP()/2, caster)
 	}
 }
 

@@ -516,15 +516,29 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceHP applies a skill hit's HP damage; see reduceHP.
+// ReduceHP applies a skill hit's HP damage; see reduceHP. The hit first
+// rolls whether it breaks a's cast, whatever the damage permission.
 func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	if a.Dead() {
+		return
+	}
+	a.breakCastOnDamage(amount)
 	a.reduceHP(amount, attacker)
 }
 
 // TakeDamage applies a landed auto-attack hit; see reduceHP. It reports
-// whether the hit killed a.
+// whether the hit killed a. A hit that leaves a alive then rolls whether it
+// breaks a's cast, whatever the damage permission; a killing hit's death has
+// already ended the cast.
 func (a *Actor) TakeDamage(damage int, attacker attackable.Combatant) bool {
-	return a.reduceHP(float64(damage), attacker)
+	if a.Dead() {
+		return false
+	}
+	if a.reduceHP(float64(damage), attacker) {
+		return true
+	}
+	a.breakCastOnDamage(float64(damage))
+	return false
 }
 
 // reduceHP applies one direct hit, from a skill or an auto-attack, and
@@ -716,13 +730,14 @@ func (a *Actor) LethalInput(caster creature.FormulaActor, def modelskill.Definit
 	}, true
 }
 
-// ApplyLethalOutcome applies a lethal-strike tier to a.
-func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
+// ApplyLethalOutcome applies a lethal-strike tier to a. The HP loss rolls
+// no cast break of its own.
+func (a *Actor) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, _ modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
-		a.ReduceHP(a.HP()-1, caster, def)
+		a.reduceHP(a.HP()-1, caster)
 	case formulas.LethalHalf:
-		a.ReduceHP(a.HP()/2, caster, def)
+		a.reduceHP(a.HP()/2, caster)
 	}
 }
 

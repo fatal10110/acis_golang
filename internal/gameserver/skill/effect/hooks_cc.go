@@ -89,7 +89,7 @@ func abortCastStart(e *Effect) bool {
 	if e.Effected.RaidRelated() {
 		return false
 	}
-	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() {
+	if target, ok := asCaster(e.Effected); ok && target.CastingNow() {
 		target.InterruptCast()
 	}
 	return true
@@ -187,7 +187,7 @@ func thinkIfNotPlayer(target Actor) {
 func removeTargetStart(e *Effect) bool {
 	e.Effected.ClearTarget()
 	e.Effected.StopAttack()
-	if target, ok := asPlayer(e.Effected); ok {
+	if target, ok := asCaster(e.Effected); ok {
 		target.StopCast()
 	}
 	return true

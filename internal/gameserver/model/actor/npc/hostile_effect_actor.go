@@ -5,7 +5,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-var _ effect.NPCActor = (*Hostile)(nil)
+var (
+	_ effect.NPCActor    = (*Hostile)(nil)
+	_ effect.CasterActor = (*Hostile)(nil)
+)
 
 // AbortAll stops the NPC's movement, attack and cast without sending it
 // idle: while the effect that asked for the abort holds, the think loop

@@ -236,10 +236,8 @@ func watchCast(t *testing.T, c *testsupport.ScriptedClient, until time.Time) cas
 // other physical cast is never broken; a magic cast breaks when the roll
 // falls under the clamped rate.
 //
-// The raid-related half of calcCastBreak's first guard needs a non-player
-// caster taking damage, which no damage path forwards to the cast yet
-// (#2650); the controller-level TestInterruptOnDamageImmuneOverridesFusion
-// covers it.
+// The raid-related half of calcCastBreak's first guard only applies to an
+// NPC caster; TestPlayerSkillHitBreaksNPCMagicCast pins it end to end.
 func TestDamageCastBreakRules(t *testing.T) {
 	t.Parallel()
 	const hitTime = 10_000

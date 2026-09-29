@@ -127,6 +127,9 @@ type Hostile struct {
 	// the template. See RaidRelated.
 	raidRelated atomic.Bool
 
+	// cast is the live cast controller; see SetCastController.
+	cast atomic.Pointer[CastControl]
+
 	spoil          item.SpoilPool
 	seed           SeedState
 	overhit        overhitState

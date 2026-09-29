@@ -130,6 +130,9 @@ type Actor struct {
 	// world; see despawn. Nothing it runs may despawn this summon again.
 	despawnOnce sync.Once
 	brain       AI
+	// cast is the live cast controller. Attach installs it with brain and
+	// sink.
+	cast CastControl
 	// sink receives this summon's events. Attach installs it before
 	// SpawnBesideOwner publishes this summon into world.State; that publish
 	// takes a registry mutex, giving every other goroutine's read a
