@@ -17,8 +17,12 @@ func applyEffects(effector effect.Actor, effected Actor, def modelskill.Definiti
 	applyEffectsWithLanding(effector, effected, def, templates, formulas.ShieldFailed, false)
 }
 
-func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate) {
-	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, formulas.ShieldFailed, false))
+// applyCastEffects lands templates on effected for cast and reports the
+// resisted icon count. shield and bss are the handler's resolved shield
+// outcome and its blessed-spiritshot sample, which every per-template
+// landing roll reuses.
+func applyCastEffects(cast Cast, effected Actor, def modelskill.Definition, templates []modelskill.EffectTemplate, shield formulas.ShieldDefense, bss bool) {
+	cast.reportResisted(effected, def, applyEffectsWithLanding(cast.Caster, effected, def, templates, shield, bss))
 }
 
 // applyCasterSelfEffects lands a skill's self effects on its caster. Unlike

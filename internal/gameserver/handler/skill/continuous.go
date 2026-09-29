@@ -95,10 +95,13 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 
 		// Offensive and debuff skills roll to land, folding in the caster's
 		// blessed-spiritshot charge and the target's shield-block outcome
-		// against this cast; everything else acts unconditionally.
+		// against this cast; everything else acts unconditionally, with no
+		// shield block. The per-template landing rolls reuse both inputs.
 		acted := true
+		shield := formulas.ShieldFailed
 		if def.Offensive || def.Debuff {
-			succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, def, bsps)
+			shield = resolveShieldDefense(cast.Caster, effected, def)
+			succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, def, bsps, shield)
 			acted = ok && succeeded
 		}
 
@@ -108,7 +111,7 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 				stopEffectsBySkillID(effected.EffectList(), def.ID)
 			}
 
-			applyCastEffects(cast, effected, def, def.Effects)
+			applyCastEffects(cast, effected, def, def.Effects, shield, bsps)
 
 			if skillType == "AGGDEBUFF" {
 				fireAggressionEvent(cast.Caster, effected, def)

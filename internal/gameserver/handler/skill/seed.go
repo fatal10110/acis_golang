@@ -1,6 +1,9 @@
 package skill
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+)
 
 type seedHandler struct{}
 
@@ -33,6 +36,6 @@ func (seedHandler) Use(cast Cast) {
 			continue
 		}
 
-		applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects)
+		applyCastEffects(cast, target, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false)
 	}
 }

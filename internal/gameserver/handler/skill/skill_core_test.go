@@ -876,6 +876,12 @@ type disablerFake struct {
 	level                  int
 	reflects               bool
 
+	// shieldRolls counts ShieldDefense calls; templateLandings records the
+	// blessed-spiritshot and shield inputs of every per-template landing
+	// roll made against d.
+	shieldRolls      int
+	templateLandings []templateLanding
+
 	// lastBss and lastShield record the most recent SkillSuccessInput call's
 	// resolved caster/target state, for tests asserting checkSkillSuccess
 	// threaded them through correctly.
@@ -913,7 +919,21 @@ func (d *disablerFake) SkillSuccessInput(caster creature.FormulaActor, def model
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
 // exercise checkSkillSuccess's shield-block threading.
 func (d *disablerFake) ShieldDefense(caster creature.FormulaActor, def modelskill.Definition, isCrit bool) formulas.ShieldDefense {
+	d.shieldRolls++
 	return d.shield
+}
+
+// templateLanding is one per-template landing roll's resolved inputs.
+type templateLanding struct {
+	bss    bool
+	shield formulas.ShieldDefense
+}
+
+// EffectSuccessInput records the landing inputs and lands the template
+// unless the shield block was perfect.
+func (d *disablerFake) EffectSuccessInput(_ creature.FormulaActor, _ modelskill.Definition, _ modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	d.templateLandings = append(d.templateLandings, templateLanding{bss: bss, shield: shield})
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, true
 }
 
 // SkillReflectInput reports a guaranteed reflect when d.reflects is set
@@ -4609,5 +4629,162 @@ func TestDrainMagicFailureUsesDrainMessages(t *testing.T) {
 	}
 	if len(result.Messages) < 2 || result.Messages[0] != any(DrainHalfSucceededMessage{}) || result.Messages[1] != any(MagicResist{TargetID: 2, AttackerName: "Caster", Drain: true}) {
 		t.Fatalf("messages = %+v, want DrainHalfSucceeded then a drain MagicResist", result.Messages)
+	}
+}
+
+// rolledStun is an effect template carrying its own landing roll, so landing
+// it goes through the target's per-template success input.
+func rolledStun() []modelskill.EffectTemplate {
+	return []modelskill.EffectTemplate{{Name: "Stun", Time: 10, EffectType: "STUN", EffectPower: 80, EffectPowerSet: true}}
+}
+
+// TestContinuousPassesBlessedShotAndShieldToTemplateLanding pins the inputs
+// the continuous handler hands each per-template landing roll: the blessed
+// spiritshot sampled at cast start, and the shield outcome it resolved for
+// an offensive or debuff skill (no block for anything else).
+func TestContinuousPassesBlessedShotAndShieldToTemplateLanding(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		def        modelskill.Definition
+		bss        bool
+		shield     formulas.ShieldDefense
+		want       templateLanding
+		wantRolls  int
+		wantLanded int
+	}{
+		{
+			name:   "debuff with blessed shot and shield block",
+			def:    modelskill.Definition{ID: 1, SkillType: "DEBUFF", Debuff: true, Offensive: true, Magic: true},
+			bss:    true,
+			shield: formulas.ShieldSuccess,
+			want:   templateLanding{bss: true, shield: formulas.ShieldSuccess}, wantRolls: 1, wantLanded: 1,
+		},
+		{
+			name:   "debuff without blessed shot",
+			def:    modelskill.Definition{ID: 1, SkillType: "DEBUFF", Debuff: true, Magic: true},
+			shield: formulas.ShieldSuccess,
+			want:   templateLanding{shield: formulas.ShieldSuccess}, wantRolls: 1, wantLanded: 1,
+		},
+		{
+			name:   "buff never rolls the shield",
+			def:    modelskill.Definition{ID: 1, SkillType: "BUFF", Magic: true},
+			bss:    true,
+			shield: formulas.ShieldSuccess,
+			want:   templateLanding{bss: true, shield: formulas.ShieldFailed}, wantRolls: 0, wantLanded: 1,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := &bssCasterFake{bss: tc.bss}
+			target := newDisablerFake(2)
+			target.shield = tc.shield
+			def := tc.def
+			def.Effects = rolledStun()
+			continuousHandler{}.UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{target}})
+
+			if target.shieldRolls != tc.wantRolls {
+				t.Fatalf("shield rolls = %d, want %d", target.shieldRolls, tc.wantRolls)
+			}
+			if len(target.templateLandings) != 1 || target.templateLandings[0] != tc.want {
+				t.Fatalf("template landing inputs = %+v, want [%+v]", target.templateLandings, tc.want)
+			}
+			if got := len(target.list.All()); got != tc.wantLanded {
+				t.Fatalf("landed effects = %d, want %d", got, tc.wantLanded)
+			}
+		})
+	}
+}
+
+// TestDisablersPassBlessedShotAndShieldToTemplateLanding pins the Disablers
+// landing inputs: one shield roll per target ahead of the type switch (even
+// for a type that never rolls its own landing), reused with the cast-start
+// blessed spiritshot by every per-template roll; a perfect block refuses
+// every effect, including a type with no landing roll of its own.
+func TestDisablersPassBlessedShotAndShieldToTemplateLanding(t *testing.T) {
+	for _, tc := range []struct {
+		skillType  string
+		shield     formulas.ShieldDefense
+		attackable bool
+		wantInputs []templateLanding
+		wantLanded int
+	}{
+		{skillType: "STUN", shield: formulas.ShieldSuccess, wantInputs: []templateLanding{{bss: true, shield: formulas.ShieldSuccess}}, wantLanded: 1},
+		{skillType: "BETRAY", shield: formulas.ShieldSuccess, wantInputs: []templateLanding{{bss: true, shield: formulas.ShieldSuccess}}, wantLanded: 1},
+		{skillType: "NEGATE", shield: formulas.ShieldSuccess, wantInputs: []templateLanding{{bss: true, shield: formulas.ShieldSuccess}}, wantLanded: 1},
+		{skillType: "AGGDAMAGE", shield: formulas.ShieldSuccess, wantInputs: []templateLanding{{bss: true, shield: formulas.ShieldSuccess}}, wantLanded: 1},
+		{skillType: "AGGREDUCE", shield: formulas.ShieldSuccess, attackable: true, wantInputs: []templateLanding{{bss: true, shield: formulas.ShieldSuccess}}, wantLanded: 1},
+		{skillType: "FAKE_DEATH", shield: formulas.ShieldPerfect},
+		{skillType: "NEGATE", shield: formulas.ShieldPerfect},
+		{skillType: "CANCEL_DEBUFF", shield: formulas.ShieldSuccess},
+	} {
+		t.Run(fmt.Sprintf("%s/shield%d", tc.skillType, tc.shield), func(t *testing.T) {
+			caster := &bssCasterFake{bss: true}
+			target := newDisablerFake(2)
+			target.shield = tc.shield
+			target.attackableFlag = tc.attackable
+			disablersHandler{}.Use(Cast{
+				Caster:  caster,
+				Skill:   modelskill.Definition{ID: 1, SkillType: tc.skillType, Magic: true, Effects: rolledStun()},
+				Targets: []Actor{target},
+			})
+			if target.shieldRolls != 1 {
+				t.Fatalf("shield rolls = %d, want 1 per target", target.shieldRolls)
+			}
+			if !slices.Equal(target.templateLandings, tc.wantInputs) {
+				t.Fatalf("template landing inputs = %+v, want %+v", target.templateLandings, tc.wantInputs)
+			}
+			if got := len(target.list.All()); got != tc.wantLanded {
+				t.Fatalf("landed effects = %d, want %d", got, tc.wantLanded)
+			}
+		})
+	}
+}
+
+// TestResourceHandlersRunBuffPassFirst drives HEAL_PERCENT,
+// MANAHEAL_PERCENT, COMBATPOINTHEAL and BALANCE_LIFE through the registry:
+// each lands the skill's effects once through the BUFF pass before its own
+// restore, and spends the spiritshot sampled at cast start with the
+// static-reuse flag, unless the skill is a potion.
+func TestResourceHandlersRunBuffPassFirst(t *testing.T) {
+	shots := []struct {
+		name        string
+		charged     map[item.ShotKind]bool
+		potion      bool
+		staticReuse bool
+		wantShots   []item.ShotKind
+		wantFlags   []bool
+	}{
+		{name: "plain", charged: map[item.ShotKind]bool{item.ShotSpirit: true}, wantShots: []item.ShotKind{item.ShotSpirit}, wantFlags: []bool{false}},
+		{name: "blessed", charged: map[item.ShotKind]bool{item.ShotSpirit: true, item.ShotBlessedSpirit: true}, wantShots: []item.ShotKind{item.ShotBlessedSpirit}, wantFlags: []bool{false}},
+		{name: "static reuse", charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: true}, staticReuse: true, wantShots: []item.ShotKind{item.ShotBlessedSpirit}, wantFlags: []bool{true}},
+		{name: "potion", charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: true}, potion: true},
+	}
+	for _, skillType := range []string{"HEAL_PERCENT", "MANAHEAL_PERCENT", "COMBATPOINTHEAL", "BALANCE_LIFE"} {
+		for _, shot := range shots {
+			t.Run(skillType+"/"+shot.name, func(t *testing.T) {
+				caster := &skillTarget{isPlayer: true, name: "Caster", charged: shot.charged, effects: newTestList(nil)}
+				target := &skillTarget{isPlayer: true, hp: 50, maxHP: 100, mp: 10, maxMP: 100, cp: 10, maxCP: 100, effects: newTestList(nil)}
+				NewDefaultRegistry().Use(Cast{
+					Caster: caster,
+					Skill: modelskill.Definition{
+						ID: 1, Level: 1, SkillType: skillType, Power: 20,
+						Potion: shot.potion, StaticReuse: shot.staticReuse,
+						Effects: buffEffect(), SelfEffects: buffEffect(),
+					},
+					Targets: []Actor{target},
+				})
+				if !slices.Equal(caster.shots, shot.wantShots) || !slices.Equal(caster.shotFlags, shot.wantFlags) {
+					t.Fatalf("spent shots = %v %v, want %v %v", caster.shots, caster.shotFlags, shot.wantShots, shot.wantFlags)
+				}
+				if got := len(target.effects.All()); got != 1 {
+					t.Fatalf("target effects = %d, want the skill's effect exactly once", got)
+				}
+				if got := len(caster.effects.All()); got != 1 {
+					t.Fatalf("caster self effects = %d, want 1", got)
+				}
+				if skillType == "HEAL_PERCENT" && target.effectsAtHeal != 1 {
+					t.Fatalf("effects on target when HP was restored = %d, want 1 (BUFF pass first)", target.effectsAtHeal)
+				}
+			})
+		}
 	}
 }
