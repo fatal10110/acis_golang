@@ -847,3 +847,36 @@ func TestChestUnlockRate(t *testing.T) {
 		})
 	}
 }
+
+// ---- heal amount ----
+// TestHealAmountMatchesReferenceVectors pins HealAmount to values produced
+// by running the reference heal formula and healSps lookup verbatim under a
+// JVM (OpenJDK 21) against the shipped healSps.xml; SpsCorrection is the
+// lookup's result for each row.
+func TestHealAmountMatchesReferenceVectors(t *testing.T) {
+	cases := []struct {
+		name string
+		in   HealInput
+		want float64
+	}{
+		{"no shot", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingMage, SpsCorrection: 206}, 498.4575131106459},
+		{"mage bsps below neededMatk", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingMage, BlessedSpiritshot: true, SpsCorrection: 206}, 730.9150262212918},
+		{"mage sps below neededMatk", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingMage, Spiritshot: true, SpsCorrection: 206}, 593.8765738677394},
+		{"fighter bsps", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingNone, BlessedSpiritshot: true, SpsCorrection: 206}, 704.4575131106459},
+		{"fighter sps", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingNone, Spiritshot: true, SpsCorrection: 206}, 582.9175131106459},
+		{"summon bsps above neededMatk", HealInput{Power: 204, MAtk: 1000, Scaling: HealShotScalingMage, BlessedSpiritshot: true, SpsCorrection: 103}, 370.2455532033676},
+		{"summon sps above neededMatk", HealInput{Power: 204, MAtk: 1000, Scaling: HealShotScalingMage, Spiritshot: true, SpsCorrection: 103}, 290.9513595499958},
+		{"npc sps", HealInput{Power: 204, MAtk: 1000, Scaling: HealShotScalingNPC, Spiritshot: true, SpsCorrection: 103}, 309.47555320336755},
+		{"npc bsps", HealInput{Power: 204, MAtk: 1000, Scaling: HealShotScalingNPC, BlessedSpiritshot: true, SpsCorrection: 103}, 370.2455532033676},
+		{"exact skill entry", HealInput{Power: 1004, MAtk: 870, Scaling: HealShotScalingMage, BlessedSpiritshot: true, SpsCorrection: 283.5}, 1346.4915248150105},
+		{"no healSps entry", HealInput{Power: 30, MAtk: 50, Scaling: HealShotScalingMage, BlessedSpiritshot: true}, 44.14213562373095},
+		{"both shots flagged", HealInput{Power: 472, MAtk: 700, Scaling: HealShotScalingMage, Spiritshot: true, BlessedSpiritshot: true, SpsCorrection: 206}, 609.3750262212918},
+		{"proficiency", HealInput{Power: 100, Proficiency: 11.5, MAtk: 37, Scaling: HealShotScalingMage, BlessedSpiritshot: true, SpsCorrection: 42}, 165.66552506059645},
+		{"static ignores shot", HealInput{Power: 300, Proficiency: 7, Static: true, MAtk: 900, Scaling: HealShotScalingMage, BlessedSpiritshot: true, SpsCorrection: 281}, 307},
+	}
+	for _, tc := range cases {
+		if got := HealAmount(tc.in); got != tc.want {
+			t.Errorf("%s: HealAmount() = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package items
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -155,6 +156,75 @@ func TestHealCastSpendsChargedSpiritshot(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(healSkillID))
 	srv.AdvanceUntil(t, "spiritshot spent by the heal", func() bool { return !caster.ChargedShot(item.ShotSpirit) })
 	drainUntilQuiet(t, c)
+}
+
+// TestHealCastWithBlessedSpiritshotAddsHealSpsBonus casts a real HEAL with
+// a blessed spiritshot charged: the heal adds the healSps correction on top
+// of power and the caster's M.Atk term (unscaled for a fighter-class
+// player), and the cast spends the shot.
+func TestHealCastWithBlessedSpiritshotAddsHealSpsBonus(t *testing.T) {
+	t.Parallel()
+	const (
+		healSkillID = 1011
+		power       = 1
+		correction  = 10
+	)
+	healSps, err := modelskill.NewHealSpsTable([]modelskill.HealSps{{MagicLevel: 1, Correction: correction}})
+	if err != nil {
+		t.Fatalf("NewHealSpsTable() error: %v", err)
+	}
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
+		ID: healSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, StaticHitTime: true, ReuseDelay: 60_000, SkillType: "HEAL", Power: power, MagicLevel: 1,
+	}}), gamesql.NewCharacterSkillStore(db))
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(skills),
+		gameservertest.WithHealSps(healSps),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, healSkillID, 1); err != nil {
+		t.Fatalf("seed known skill: %v", err)
+	}
+	weapon := srv.GiveItem(t, objID, 30, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeUseItem(weapon, false))
+	assertFrameOpcode(t, readSkippingEquipNoise(t, c, "equip UserInfo"), serverpackets.OpcodeUserInfo, "equip UserInfo")
+	srv.InventoryUpdates.Tick()
+	readInventoryUpdateFor(t, c, weapon, 1)
+	drainUntilQuiet(t, c)
+
+	live, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("caster missing from the world")
+	}
+	caster, ok := live.(interface {
+		shotWeapon
+		MAtk() float64
+	})
+	if !ok {
+		t.Fatalf("caster %T exposes no weapon shot charge or M.Atk", live)
+	}
+	caster.SetChargedShot(item.ShotBlessedSpirit, true)
+
+	// Fighter class: power + correction + sqrt(1 * M.Atk).
+	want := int(power + (correction + math.Sqrt(float64(int(caster.MAtk())))))
+	maxHP := srv.PlayerMaxHP(t, objID)
+	if want >= maxHP-1 {
+		t.Fatalf("boosted heal %d leaves no headroom above 1 HP under max HP %d", want, maxHP)
+	}
+	srv.DamagePlayerHP(t, objID, srv.PlayerCurrentHP(t, objID)-1)
+	before := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(healSkillID))
+	srv.AdvanceUntil(t, "blessed spiritshot spent by the heal", func() bool { return !caster.ChargedShot(item.ShotBlessedSpirit) })
+	drainUntilQuiet(t, c)
+	if got := srv.PlayerCurrentHP(t, objID) - before; got != want {
+		t.Fatalf("healed %d HP, want the shot-boosted %d", got, want)
+	}
 }
 
 func encodeRequestMagicSkillUse(skillID int32) []byte {

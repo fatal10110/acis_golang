@@ -1702,8 +1702,12 @@ type skillTarget struct {
 	recharge float64
 
 	healAmount        float64
+	healMAtk          int
+	healScaling       formulas.HealShotScaling
 	healEffectiveness float64
 	healOK            bool
+	// effectsAtHeal is the effect count AddHP last saw.
+	effectsAtHeal int
 
 	physicalInput formulas.PhysicalSkillInput
 	physicalOK    bool
@@ -1808,9 +1812,20 @@ func (t *skillTarget) NotifyCPRestored(name string, amount int, other bool) {
 	t.noticeKind, t.noticeName, t.noticeAmount, t.noticeOther = "cp", name, amount, other
 }
 
-func (t *skillTarget) HealAmount(skill modelskill.Definition) (float64, bool) {
-	return t.healAmount, t.healOK
+// HealInput resolves healAmount as the power term; healMAtk and
+// healScaling feed the spiritshot terms.
+func (t *skillTarget) HealInput(skill modelskill.Definition) (formulas.HealInput, bool) {
+	return formulas.HealInput{
+		Power:   t.healAmount,
+		Static:  skillTypeKey(skill.SkillType) == "HEAL_STATIC",
+		MAtk:    t.healMAtk,
+		Scaling: t.healScaling,
+	}, t.healOK
 }
+
+func (t *skillTarget) SpiritshotCharged() bool { return t.charged[item.ShotSpirit] }
+
+func (t *skillTarget) BlessedSpiritshotCharged() bool { return t.charged[item.ShotBlessedSpirit] }
 
 func (t *skillTarget) HealEffectiveness() float64 {
 	if t.healEffectiveness == 0 {
@@ -1825,6 +1840,9 @@ func (t *skillTarget) MaxHPValue() float64 { return t.maxHP }
 func (t *skillTarget) SetHP(v float64) { t.hp = v }
 
 func (t *skillTarget) AddHP(v float64) float64 {
+	if t.effects != nil {
+		t.effectsAtHeal = len(t.effects.All())
+	}
 	if t.hp+v > t.maxHP {
 		v = t.maxHP - t.hp
 	}
@@ -1999,6 +2017,103 @@ func TestHealRestoresResolvedAmount(t *testing.T) {
 	})
 	if target.hp != 200 {
 		t.Fatalf("HEAL_STATIC hp = %v, want clamped to 200", target.hp)
+	}
+}
+
+// TestHealLandsSkillEffectsBeforeRestoringHP pins the BUFF pass a heal
+// runs first: the skill's effects land on each target (and its self effects
+// on the caster) before the HP restore reads the target, and the restore
+// still reaches every healable target.
+func TestHealLandsSkillEffectsBeforeRestoringHP(t *testing.T) {
+	for _, skillType := range []string{"HEAL", "HEAL_STATIC"} {
+		t.Run(skillType, func(t *testing.T) {
+			caster := &skillTarget{healAmount: 30, healOK: true, effects: newTestList(nil)}
+			target := &skillTarget{hp: 50, maxHP: 100, healEffectiveness: 100, effects: newTestList(nil)}
+			NewDefaultRegistry().Use(Cast{
+				Caster: caster,
+				Skill: modelskill.Definition{
+					ID: 1217, Level: 1, SkillType: skillType, Power: 30,
+					Effects:     []modelskill.EffectTemplate{{Name: "HealOverTime", Value: 10, Count: 3, Time: 1, Icon: true}},
+					SelfEffects: buffEffect(),
+				},
+				Targets: []Actor{target},
+			})
+			if got := len(target.effects.All()); got != 1 {
+				t.Fatalf("target effects = %d, want the skill's heal-over-time", got)
+			}
+			if target.effectsAtHeal != 1 {
+				t.Fatalf("effects on target when HP was restored = %d, want 1 (BUFF pass first)", target.effectsAtHeal)
+			}
+			if target.hp != 80 {
+				t.Fatalf("target hp = %v, want 80", target.hp)
+			}
+			if got := len(caster.effects.All()); got != 1 {
+				t.Fatalf("caster self effects = %d, want 1", got)
+			}
+		})
+	}
+}
+
+// TestHealSpiritshotBonusUsesHealSpsAndScaling drives a heal under each
+// spiritshot through the registry: the healSps correction (scaled by 0.41
+// for a plain shot) and the caster's M.Atk multiplier join the amount, and
+// the sampled shot is the one spent.
+func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
+	table, err := modelskill.NewHealSpsTable([]modelskill.HealSps{{MagicLevel: 1, Correction: 17, NeededMAtk: 6}})
+	if err != nil {
+		t.Fatalf("NewHealSpsTable() error: %v", err)
+	}
+	registry := newDefaultRegistry(nil, true, table)
+	for _, tc := range []struct {
+		name      string
+		scaling   formulas.HealShotScaling
+		shot      item.ShotKind
+		skillType string
+		want      float64
+		wantShots []item.ShotKind
+	}{
+		{"mage blessed", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(4*100)), []item.ShotKind{item.ShotBlessedSpirit}},
+		{"mage plain", formulas.HealShotScalingMage, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(2*100)), []item.ShotKind{item.ShotSpirit}},
+		{"fighter blessed", formulas.HealShotScalingNone, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(100)), []item.ShotKind{item.ShotBlessedSpirit}},
+		{"npc plain", formulas.HealShotScalingNPC, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(4*100)), []item.ShotKind{item.ShotSpirit}},
+		{"static keeps the shot", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL_STATIC", 20, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := &skillTarget{
+				healAmount: 20, healMAtk: 100, healScaling: tc.scaling, healOK: true,
+				charged: map[item.ShotKind]bool{tc.shot: true},
+			}
+			target := &skillTarget{hp: 100, maxHP: 1000, healEffectiveness: 100}
+			registry.Use(Cast{
+				Caster:  caster,
+				Skill:   modelskill.Definition{ID: 1011, Level: 1, MagicLevel: 10, SkillType: tc.skillType, Power: 20},
+				Targets: []Actor{target},
+			})
+			if got := target.hp - 100; math.Abs(got-tc.want) > 1e-9 {
+				t.Fatalf("healed %v, want %v", got, tc.want)
+			}
+			if !slices.Equal(caster.shots, tc.wantShots) {
+				t.Fatalf("discharged shots = %v, want %v", caster.shots, tc.wantShots)
+			}
+		})
+	}
+}
+
+// TestManaHealRefreshesSelfEffects pins the self-effect refresh after the
+// MP restore: the caster's prior self effect of the skill is replaced, not
+// stacked.
+func TestManaHealRefreshesSelfEffects(t *testing.T) {
+	caster := &skillTarget{mp: 10, maxMP: 100, effects: newTestList(nil)}
+	def := modelskill.Definition{ID: 1013, Level: 1, SkillType: "MANAHEAL", Power: 20, SelfEffects: buffEffect()}
+	registry := NewDefaultRegistry()
+	for range 2 {
+		registry.Use(Cast{Caster: caster, Skill: def, Targets: []Actor{caster}})
+	}
+	if got := len(caster.effects.All()); got != 1 {
+		t.Fatalf("caster self effects after two casts = %d, want 1", got)
+	}
+	if caster.mp != 50 {
+		t.Fatalf("caster mp = %v, want 50", caster.mp)
 	}
 }
 
@@ -2334,8 +2449,8 @@ func TestRegistryPassesMagicFailuresToMdam(t *testing.T) {
 		want     bool
 	}{
 		{"default", NewDefaultRegistry(), true},
-		{"signet registry off", NewDefaultRegistryWithSignet(nil, false, SignetDeps{}), false},
-		{"signet registry on", NewDefaultRegistryWithSignet(nil, true, SignetDeps{}), true},
+		{"signet registry off", NewDefaultRegistryWithSignet(nil, false, nil, SignetDeps{}), false},
+		{"signet registry on", NewDefaultRegistryWithSignet(nil, true, nil, SignetDeps{}), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			target := &skillTarget{hp: 2000}
@@ -2828,6 +2943,48 @@ func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
 
 	if got, want := caster.shots, []item.ShotKind{item.ShotSoul, item.ShotBlessedSpirit}; !slices.Equal(got, want) {
 		t.Fatalf("discharged shots = %v, want %v", got, want)
+	}
+}
+
+// TestNPCCasterSpendsItsSpiritshot drives HEAL and MDAM from a real
+// *npc.Hostile, which exposes its charge through SpiritshotCharged and has
+// no ChargedShot: the cast spends the NPC's spiritshot, and a static-reuse
+// cast writes the bit back set, as Npc.setChargedShot does for any caster.
+func TestNPCCasterSpendsItsSpiritshot(t *testing.T) {
+	magicTarget := func() *skillTarget {
+		return &skillTarget{
+			hp:         1000,
+			magicInput: formulas.MagicDamageInput{MAtk: 100, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1},
+			magicOK:    true,
+		}
+	}
+	for _, tc := range []struct {
+		name        string
+		skill       modelskill.Definition
+		charged     bool
+		target      func() *skillTarget
+		wantCharged bool
+	}{
+		{"heal spends the charge", modelskill.Definition{SkillType: "HEAL", Power: 20}, true, func() *skillTarget {
+			return &skillTarget{hp: 10, maxHP: 1000, healEffectiveness: 100}
+		}, false},
+		{"mdam spends the charge", modelskill.Definition{SkillType: "MDAM", Power: 20}, true, magicTarget, false},
+		{"static-reuse heal writes the charge", modelskill.Definition{SkillType: "HEAL", Power: 20, StaticReuse: true}, false, func() *skillTarget {
+			return &skillTarget{hp: 10, maxHP: 1000, healEffectiveness: 100}
+		}, true},
+		{"static-reuse mdam writes the charge", modelskill.Definition{SkillType: "MDAM", Power: 20, StaticReuse: true}, false, magicTarget, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newTestHostile(t, 20001, 0)
+			caster.SetChargedShot(item.ShotSpirit, tc.charged)
+			target := tc.target()
+			if !NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tc.skill, Targets: []Actor{target}}) {
+				t.Fatalf("Use() returned false for %s", tc.skill.SkillType)
+			}
+			if got := caster.SpiritshotCharged(); got != tc.wantCharged {
+				t.Fatalf("NPC spiritshot charged = %v after %s, want %v", got, tc.name, tc.wantCharged)
+			}
+		})
 	}
 }
 

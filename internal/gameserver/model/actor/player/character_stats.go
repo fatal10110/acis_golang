@@ -631,13 +631,14 @@ func (c *Character) RechargeMP(amount float64) float64 {
 	return c.calcStat(stat.RechargeMPRate, amount)
 }
 
-// HealAmount resolves c's outgoing HEAL amount before target effectiveness.
-func (c *Character) HealAmount(def modelskill.Definition) (float64, bool) {
-	amount := float64(def.Power) + c.HealProficiency()
-	if creature.SkillTypeKey(def.SkillType) == "HEAL_STATIC" {
-		return amount, true
+// HealInput resolves c's side of an outgoing HEAL. A mage-class player's
+// charged spiritshot scales its M.Atk term; a fighter's does not.
+func (c *Character) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
+	scaling := formulas.HealShotScalingNone
+	if ClassMage(c.ClassID) {
+		scaling = formulas.HealShotScalingMage
 	}
-	return amount + math.Sqrt(float64(int(c.MAtk()))), true
+	return creature.ResolveHealInput(def, c.HealProficiency(), c.MAtk(), scaling), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill

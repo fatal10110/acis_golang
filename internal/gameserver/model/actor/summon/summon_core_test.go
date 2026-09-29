@@ -898,19 +898,22 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 		t.Fatalf("RechargeMP() = %v, want %v", got, want)
 	}
 
-	heal, ok := caster.HealAmount(modelskill.Definition{SkillType: "HEAL", Power: 25})
+	heal, ok := caster.HealInput(modelskill.Definition{SkillType: "HEAL", Power: 25})
 	if !ok {
-		t.Fatal("HealAmount() ok = false")
+		t.Fatal("HealInput() ok = false")
+	}
+	if heal.Scaling != formulas.HealShotScalingMage {
+		t.Fatalf("summon HealInput scaling = %v, want mage", heal.Scaling)
 	}
 	wantHeal := 25.0 + 11 + math.Sqrt(float64(int(caster.MAtk())))
-	if !closeSummonFloat(heal, wantHeal) {
-		t.Fatalf("HealAmount() = %v, want %v", heal, wantHeal)
+	if got := formulas.HealAmount(heal); !closeSummonFloat(got, wantHeal) {
+		t.Fatalf("HealAmount() = %v, want %v", got, wantHeal)
 	}
-	static, ok := caster.HealAmount(modelskill.Definition{SkillType: "HEAL_STATIC", Power: 25})
+	static, ok := caster.HealInput(modelskill.Definition{SkillType: "HEAL_STATIC", Power: 25})
 	if !ok {
-		t.Fatal("HealAmount(static) ok = false")
+		t.Fatal("HealInput(static) ok = false")
 	}
-	if got, want := static, 36.0; !closeSummonFloat(got, want) {
+	if got, want := formulas.HealAmount(static), 36.0; !closeSummonFloat(got, want) {
 		t.Fatalf("HealAmount(static) = %v, want %v", got, want)
 	}
 }

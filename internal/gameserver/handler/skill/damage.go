@@ -13,11 +13,6 @@ type shotCharger interface {
 	SetChargedShot(modelitem.ShotKind, bool)
 }
 
-type chargedShotUser interface {
-	shotCharger
-	ChargedShot(modelitem.ShotKind) bool
-}
-
 // dischargeSoulshot spends the caster's soulshot at the end of a cast. The
 // charge flag written is the skill's static-reuse flag, so a static-reuse
 // skill leaves the shot marked charged.
@@ -31,12 +26,28 @@ func dischargeSoulshot(cast Cast) {
 // charged, otherwise its plain spiritshot, writing the static-reuse flag
 // the way dischargeSoulshot does.
 func dischargeSpiritshot(cast Cast) {
-	caster, ok := cast.Caster.(chargedShotUser)
+	_, bsps := spiritshotCharges(cast.Caster)
+	spendSpiritshot(cast, bsps)
+}
+
+// spiritshotCharges reports the caster's plain and blessed spiritshot
+// charges; a cast with no caster holds neither.
+func spiritshotCharges(caster Creature) (sps, bsps bool) {
+	if caster == nil {
+		return false, false
+	}
+	return caster.SpiritshotCharged(), caster.BlessedSpiritshotCharged()
+}
+
+// spendSpiritshot writes the static-reuse flag onto the blessed spiritshot
+// when blessed is set, otherwise onto the plain one.
+func spendSpiritshot(cast Cast, blessed bool) {
+	caster, ok := cast.Caster.(shotCharger)
 	if !ok {
 		return
 	}
 	kind := modelitem.ShotSpirit
-	if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
+	if blessed {
 		kind = modelitem.ShotBlessedSpirit
 	}
 	caster.SetChargedShot(kind, cast.Skill.StaticReuse)

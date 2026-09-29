@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // damageToHealHeadroom drops the caster so its remaining HP sits exactly
@@ -380,4 +382,170 @@ func TestHealEffectOtherCastSendsHPRestoredByHealer(t *testing.T) {
 	}
 	drainUntilQuiet(t, healer)
 	drainUntilQuiet(t, patient)
+}
+
+// collectUntilQuiet returns every frame the client receives until the server
+// stays quiet for a full read timeout.
+func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
+	var frames [][]byte
+	for range 100 {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			return frames
+		}
+		frames = append(frames, frame)
+	}
+	t.Fatal("client kept receiving frames after 100 reads")
+	return nil
+}
+
+// hpRestoredAmount returns the amount of the single S1_HP_RESTORED message
+// among frames.
+func hpRestoredAmount(t *testing.T, frames [][]byte) int32 {
+	t.Helper()
+	found, amount := 0, int32(0)
+	for _, frame := range frames {
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wireReader(frame[1:])
+		if r.ReadInt32() != int32(serverpackets.SystemMessageS1HPRestored) {
+			continue
+		}
+		if params, typ := r.ReadInt32(), r.ReadInt32(); params != 1 || typ != serverpackets.SystemMessageParamNumber {
+			t.Fatalf("S1_HP_RESTORED params = %d type %d, want one number", params, typ)
+		}
+		amount = r.ReadInt32()
+		found++
+	}
+	if found != 1 {
+		t.Fatalf("S1_HP_RESTORED messages = %d, want 1", found)
+	}
+	return amount
+}
+
+// hasAbnormalIcon reports whether any AbnormalStatusUpdate among frames
+// carries skillID's icon.
+func hasAbnormalIcon(t *testing.T, frames [][]byte, skillID int32) bool {
+	t.Helper()
+	for _, frame := range frames {
+		if frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+			continue
+		}
+		for _, e := range readAbnormalStatusUpdateEntriesFromFrame(t, frame) {
+			if e.SkillID == skillID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// TestHealCastLandsItsHealOverTime casts a Greater Heal-shaped HEAL: the
+// instant heal lands and the skill's heal-over-time effect lands with it,
+// showing its icon to the caster.
+func TestHealCastLandsItsHealOverTime(t *testing.T) {
+	t.Parallel()
+	const (
+		skillID = 1217
+		power   = 5
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			SkillType: "HEAL", Power: power,
+			Effects: []modelskill.EffectTemplate{{
+				Name: "HealOverTime", Value: 15, Count: 15, Time: 1, Icon: true,
+				StackType: "life_force_others", StackOrder: 2,
+			}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	maxHP := srv.PlayerMaxHP(t, objID)
+	srv.DamagePlayerHP(t, objID, srv.PlayerCurrentHP(t, objID)-1)
+	before := srv.PlayerCurrentHP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+	srv.Advance(t, 700*time.Millisecond)
+	frames := collectUntilQuiet(t, c)
+
+	if !hasAbnormalIcon(t, frames, skillID) {
+		t.Fatalf("no AbnormalStatusUpdate carried the heal-over-time icon of skill %d", skillID)
+	}
+	live, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("caster missing from the world")
+	}
+	caster, ok := live.(interface{ MAtk() float64 })
+	if !ok {
+		t.Fatalf("caster %T exposes no M.Atk", live)
+	}
+	want := int32(power + math.Sqrt(float64(int(caster.MAtk()))))
+	if int(want) >= maxHP-before {
+		t.Fatalf("heal %d leaves no headroom under max HP %d", want, maxHP)
+	}
+	healed := hpRestoredAmount(t, frames)
+	if healed != want {
+		t.Fatalf("instant heal = %d, want %d", healed, want)
+	}
+	if got := srv.PlayerCurrentHP(t, objID); got != before+int(healed) {
+		t.Fatalf("HP after heal = %d, want %d + %d", got, before, healed)
+	}
+}
+
+// TestStaticHealCastBuffsBeforeHealing casts a Battle Roar-shaped
+// HEAL_STATIC whose buff raises max HP by the heal's own power. The buff
+// lands first, so the heal fills the raised ceiling instead of clamping at
+// the old one.
+func TestStaticHealCastBuffsBeforeHealing(t *testing.T) {
+	t.Parallel()
+	const (
+		skillID  = 3125
+		power    = 30
+		headroom = 10
+	)
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			SkillType: "HEAL_STATIC", Power: power,
+			Effects: []modelskill.EffectTemplate{{
+				Name: "Buff", Time: 120, Icon: true, StackType: "abnormal_item", StackOrder: 1,
+				Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: power}},
+			}},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, skillID, 1)
+	startInWorld(t, c)
+
+	before, maxHP := damageToHealHeadroom(t, srv, objID, headroom)
+
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
+	srv.Advance(t, 700*time.Millisecond)
+	frames := collectUntilQuiet(t, c)
+
+	if !hasAbnormalIcon(t, frames, skillID) {
+		t.Fatalf("no AbnormalStatusUpdate carried the buff icon of skill %d", skillID)
+	}
+	if got := hpRestoredAmount(t, frames); got != power {
+		t.Fatalf("static heal = %d, want the full %d under the raised max HP", got, power)
+	}
+	if got := srv.PlayerMaxHP(t, objID); got != maxHP+power {
+		t.Fatalf("max HP after the buff = %d, want %d", got, maxHP+power)
+	}
+	if got := srv.PlayerCurrentHP(t, objID); got != before+power {
+		t.Fatalf("HP after heal = %d, want %d", got, before+power)
+	}
 }

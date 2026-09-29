@@ -81,7 +81,9 @@ type Creature interface {
 	ApplyLethalOutcome(formulas.LethalOutcome, attackable.Combatant, modelskill.Definition)
 	CounterSkillPhysical() float64
 	Invulnerable() bool
-	HealAmount(modelskill.Definition) (float64, bool)
+	// HealInput resolves this creature's side of an outgoing HEAL; the
+	// handler adds the spiritshot state it sampled.
+	HealInput(modelskill.Definition) (formulas.HealInput, bool)
 	MaxMPValue() float64
 	SetHP(float64)
 }
@@ -362,17 +364,17 @@ func NewDefaultRegistry() *Registry {
 // shipped MagicFailures=true, providing loaded skill definitions to handlers
 // that need cross-skill effect lookup.
 func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
-	return newDefaultRegistry(defs, true)
+	return newDefaultRegistry(defs, true, nil)
 }
 
-func newDefaultRegistry(defs Definitions, magicFailures bool) *Registry {
+func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable) *Registry {
 	return NewRegistry(
 		pdamHandler{},
 		chargeDamHandler{},
 		mdamHandler{magicFailures: magicFailures},
 		blowHandler{},
 		manaDamageHandler{},
-		healHandler{},
+		healHandler{buff: continuousHandler{defs: defs}, healSps: healSps},
 		healPercentHandler{},
 		manaHealHandler{},
 		combatPointHealHandler{},
@@ -418,10 +420,11 @@ type SignetDeps struct {
 }
 
 // NewDefaultRegistryWithSignet returns the default handlers under the
-// server's MagicFailures switch, plus the signet cast shape wired with
-// signet's own world-spawning collaborators.
-func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, signet SignetDeps) *Registry {
-	r := newDefaultRegistry(defs, magicFailures)
+// server's MagicFailures switch, with the healSps table a spiritshot-boosted
+// heal reads, plus the signet cast shape wired with signet's own
+// world-spawning collaborators.
+func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable, signet SignetDeps) *Registry {
+	r := newDefaultRegistry(defs, magicFailures, healSps)
 	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }
