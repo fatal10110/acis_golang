@@ -157,3 +157,27 @@ func TestControllerCancelFriendlyFollowKeepsTheWalk(t *testing.T) {
 	controller.CancelFriendlyFollow()
 	requireFollow(t, mover, FollowOffensive, target.ObjectID(), "offensive follow after a friendly cancel")
 }
+
+// A pawn move walks toward the target's current position and broadcasts the
+// target-relative movement packet at the given offset, without arming a
+// follow task that would re-aim or re-issue it.
+func TestControllerMoveToPawnBroadcastsPawnMoveWithoutFollow(t *testing.T) {
+	controller, mover, self := newPlayerFriendlyFollowController(t)
+	target := &followTarget{x: 200}
+
+	if !controller.MoveToPawn(target, 100) {
+		t.Fatal("MoveToPawn() = false, want the walk accepted")
+	}
+	if got := len(self.moves); got != 1 {
+		t.Fatalf("move broadcasts = %d, want 1", got)
+	}
+	if ev := self.moves[0]; ev.FollowTarget != target.ObjectID() || ev.FollowOffset != 100 || ev.Destination != (location.Location{X: 200}) {
+		t.Fatalf("move = %+v, want a pawn move toward the target at offset 100", ev)
+	}
+	if !mover.Moving() {
+		t.Fatal("Moving() = false after MoveToPawn, want the walk under way")
+	}
+	if mover.Following() {
+		t.Fatalf("follow mode = %v after MoveToPawn, want none", mover.FollowMode())
+	}
+}

@@ -210,7 +210,7 @@ func startOwnedPetApproach(t *testing.T, h *petWorld, pet *summon.Actor) {
 	drainUntilQuiet(t, h.client)
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
 	assertFrameOpcode(t, mustRead(t, h.client, "interact ActionFailed"), serverpackets.OpcodeActionFailed, "interact ActionFailed")
-	assertFrameOpcode(t, mustRead(t, h.client, "approach MoveToLocation"), serverpackets.OpcodeMoveToLocation, "approach MoveToLocation")
+	assertFrameOpcode(t, mustRead(t, h.client, "approach MoveToPawn"), serverpackets.OpcodeMoveToPawn, "approach MoveToPawn")
 	drainUntilQuiet(t, h.client)
 }
 

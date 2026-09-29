@@ -208,14 +208,13 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 }
 
 const (
-	// summonInteractApproachRange mirrors PlayerAI.thinkInteract's
-	// maybeMoveToPawn(target, 100, isShiftPressed) offset
-	// (PlayerAI.java:437): already this close skips the walk and opens the
-	// pet status window immediately.
-	summonInteractApproachRange = 100
-	// summonInteractRange mirrors Npc.INTERACTION_DISTANCE, the gate
-	// canDoInteract re-checks once an approach walk arrives
-	// (PlayerAI.java:538, Npc.java:89).
+	// summonInteractApproachOffset is how far short of an owned summon the
+	// owner's interact approach stops. A click from within this offset plus
+	// both bodies' collision radii skips the walk.
+	summonInteractApproachOffset = 100
+	// summonInteractRange is the interaction distance: the gate every
+	// interact re-checks before the status window opens, and the distance
+	// the owner is shown facing the summon from.
 	summonInteractRange = 150
 )
 
@@ -246,31 +245,53 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 }
 
 // showOwnedPetStatus is the owner's interact with its own summon: the
-// status window, after an approach walk when out of range.
+// status window, after an approach walk when out of range. The interact
+// replaces the follow intention.
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
-	// Interacting with an owned summon releases the pending action the client
-	// registered for the click before showing the status window; PetStatusShow
-	// alone leaves that action outstanding and locks further input. The
-	// interact replaces the follow intention.
 	live.endFollow()
+	l.thinkOwnedPetInteract(live, pet, shift)
+}
+
+// thinkOwnedPetInteract runs one think of the owner's interact with its own
+// summon, on the click and again when an approach walk arrives. It always
+// releases the pending client action first; PetStatusShow alone leaves that
+// action outstanding and locks further input. An owner that cannot act,
+// sits, flies, runs a private store or trades gets nothing more. Out of
+// approach range, a movable owner walks toward the summon unless shift is
+// held. In range, the owner still inside interaction distance faces the
+// summon and gets its status window.
+func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Actor, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
-	if summonInRange(live, pet, summonInteractApproachRange) {
-		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {
 		return
 	}
-	if shift || live.move == nil {
+	if !summonInRange(live, pet, int(summonInteractApproachOffset+live.CollisionRadius()+pet.CollisionRadius())) {
+		if shift || live.move == nil || live.MovementDisabled() {
+			return
+		}
+		live.clearParkedApproaches()
+		live.setPetInteract(pet)
+		if !live.move.MoveToPawn(pet, summonInteractApproachOffset) {
+			live.takePetInteract()
+			return
+		}
+		live.Character.SetHeading(live.move.Position().HeadingTo(petLocation(pet)))
 		return
 	}
-	px, py, pz := pet.Position()
-	live.clearParkedApproaches()
-	live.setPetInteract(pet)
-	accepted, err := live.move.MoveToLocation(location.Location{X: px, Y: py, Z: pz})
-	if err != nil {
-		l.log.Warn().Err(err).Msg("move: broadcast")
+	if !l.playerCanDoInteract(live, pet) {
+		return
 	}
-	if !accepted {
-		live.takePetInteract()
-	}
+	at := live.CurrentLocation()
+	live.Character.SetHeading(at.HeadingTo(petLocation(pet)))
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMoveToPawn(live.ObjectID(), pet.ObjectID(), summonInteractRange, at)
+	})
+	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+}
+
+func petLocation(pet *summon.Actor) location.Location {
+	x, y, z := pet.Position()
+	return location.Location{X: x, Y: y, Z: z}
 }
 
 func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
@@ -279,31 +300,22 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 	return location.In3DRadius(lx, ly, lz, px, py, pz, radius)
 }
 
-// finishPetInteract fires once an approach walk started by showOwnedPetStatus
-// arrives (the Arrived event from its move.Controller), mirroring
-// thinkInteract's post-move canDoInteract recheck: the owner or pet may have
-// moved again meanwhile, so the range and ownership gates run again before
-// the status window opens.
+// finishPetInteract fires once an approach walk started by
+// thinkOwnedPetInteract arrives (the Arrived event from its move.Controller)
+// and thinks the interact again: the owner or pet may have moved meanwhile,
+// so every gate runs again, and a summon that walked out of approach range
+// is approached anew. A summon that left the world or changed owner ends the
+// interact.
 func (l *GameClientLink) finishPetInteract(live *livePlayer) {
-	l.applyOwnedPetInteract(live, live.takePetInteract())
-}
-
-// applyOwnedPetInteract is the onInteract half of an owned-pet INTERACT:
-// world/owner checks plus the shared canDoInteract gate, then PetStatusShow.
-func (l *GameClientLink) applyOwnedPetInteract(live *livePlayer, pet *summon.Actor) {
+	pet := live.takePetInteract()
 	if pet == nil {
 		return
 	}
-	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) {
+	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) || pet.OwnerID() != live.ObjectID() {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if pet.OwnerID() != live.ObjectID() {
-		return
-	}
-	if !l.playerCanDoInteract(live, pet) {
-		return
-	}
-	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	l.thinkOwnedPetInteract(live, pet, false)
 }
 
 // onPlayerArrivedBlocked is the player blocked-arrival arm: INTERACT in
@@ -335,15 +347,20 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 	return false
 }
 
-// playerCanDoInteract is operating / active trade / 150 3D range. Blocked
-// INTERACT uses this as the single StopMove+PetStatusShow gate. Arrived
-// INTERACT also requires the pet still in world before the same gate
-// (thinkInteract's isTargetLost check).
-func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
-	if live == nil || pet == nil || live.Operating() {
+// playerCanAttemptInteract reports whether live may interact at all: not
+// while running a private store or trading.
+func (l *GameClientLink) playerCanAttemptInteract(live *livePlayer) bool {
+	if live.Operating() {
 		return false
 	}
-	if l.trades != nil && l.trades.HasActive(live.ObjectID()) {
+	return l.trades == nil || !l.trades.HasActive(live.ObjectID())
+}
+
+// playerCanDoInteract is the interact attempt gate plus the 150 3D
+// interaction distance. Blocked INTERACT uses this as the single
+// StopMove+PetStatusShow gate.
+func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
+	if live == nil || pet == nil || !l.playerCanAttemptInteract(live) {
 		return false
 	}
 	return summonInRange(live, pet, summonInteractRange)
