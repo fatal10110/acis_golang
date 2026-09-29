@@ -34,33 +34,54 @@ func (c *Character) PvPFlagState() task.PvPFlagState {
 	return c.pvpFlag
 }
 
-func (c *Character) flagPvP(useFlaggedDuration bool) {
-	c.emit(event.PvPFlagged{UseFlaggedDuration: useFlaggedDuration})
+func (c *Character) flagPvP(useFlaggedDuration, byServitor bool) {
+	c.emit(event.PvPFlagged{UseFlaggedDuration: useFlaggedDuration, ByServitor: byServitor})
 }
 
 // UpdatePvPStatus starts the normal PvP flag window outside a PvP zone.
 func (c *Character) UpdatePvPStatus() {
 	if !c.InPvPZone() {
-		c.flagPvP(false)
+		c.flagPvP(false, false)
 	}
 }
 
 // NotePvPAttack records one resolved physical attack against target.
 func (c *Character) NotePvPAttack(target attackable.Combatant) {
+	c.notePvPAttack(target, false)
+}
+
+// NoteServitorPvPAttack records a physical hit c's summon landed on target:
+// it flags c as c's own hit would. A hit on c itself flags nothing.
+func (c *Character) NoteServitorPvPAttack(target attackable.Combatant) {
+	c.notePvPAttack(target, true)
+}
+
+func (c *Character) notePvPAttack(target attackable.Combatant, byServitor bool) {
 	if victim := actingCharacter(target); victim != nil {
-		victim.notePvPHitFromAttacker(c)
+		victim.notePvPHitFromAttacker(c, byServitor)
 	}
 }
 
 // NotePvPSkillTargets records a resolved skill cast against targets.
 func (c *Character) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+	c.notePvPSkillTargets(targets, offensive, skillType, false)
+}
+
+// NoteServitorPvPSkillTargets records a skill c's summon cast against
+// targets: it flags c as c's own cast would. c and its own summon never
+// flag it.
+func (c *Character) NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+	c.notePvPSkillTargets(targets, offensive, skillType, true)
+}
+
+func (c *Character) notePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string, byServitor bool) {
 	for _, target := range targets {
 		if offensive {
-			c.NotePvPAttack(target)
+			c.notePvPAttack(target, byServitor)
 			continue
 		}
 		if c.skillTargetFlagsPvP(target, skillType) {
-			c.flagPvP(false)
+			c.flagPvP(false, byServitor)
 		}
 	}
 }
@@ -79,17 +100,18 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a
-// resolved physical or offensive-skill attack, mirroring Player.updatePvPStatus(Creature target)/
-// Playable.checkIfPvP: a karma'd victim (c) never flags its attacker —
-// hitting a PKer is PK territory, not PvP — and attacking oneself is a
-// no-op. When it does flag, the shorter PvP-vs-PvP duration applies only
-// when both sides are karma-free and c is already flagged (an ongoing PvP
-// fight); otherwise the longer "engaging an innocent" duration applies.
-// attacker resolves through *Character, so only a live player attacker can
-// ever be flagged — an NPC/monster attacker (which never satisfies this
-// assertion) is always a no-op, matching the reference's
-// target.getActingPlayer() == null bail.
-func (c *Character) notePvPHitFromAttacker(attacker any) {
+// resolved physical or offensive-skill attack, mirroring
+// Player.updatePvPStatus(Creature target)/Playable.checkIfPvP: a karma'd
+// victim (c) never flags its attacker — hitting a PKer is PK territory, not
+// PvP — and attacking oneself is a no-op. When it does flag, the shorter
+// PvP-vs-PvP duration applies only when both sides are karma-free and c is
+// already flagged (an ongoing PvP fight); otherwise the longer "engaging an
+// innocent" duration applies. attacker resolves through *Character, so only
+// a live player attacker can ever be flagged — an NPC/monster attacker
+// (which never satisfies this assertion) is always a no-op, matching the
+// reference's target.getActingPlayer() == null bail. byServitor marks the
+// attack as the attacker's summon's.
+func (c *Character) notePvPHitFromAttacker(attacker any, byServitor bool) {
 	pk, ok := attacker.(*Character)
 	if !ok || pk == c || c.Karma() != 0 {
 		return
@@ -98,5 +120,5 @@ func (c *Character) notePvPHitFromAttacker(attacker any) {
 		return
 	}
 	useFlagged := pk.Karma() == 0 && c.PvPFlagState() != task.PvPFlagNone
-	pk.flagPvP(useFlagged)
+	pk.flagPvP(useFlagged, byServitor)
 }

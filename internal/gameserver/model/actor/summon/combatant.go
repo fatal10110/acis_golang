@@ -72,8 +72,22 @@ func (a *Actor) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool
 // RaceMultiplier reports 1: only NPC races scale damage.
 func (a *Actor) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
 
-// NotePvPSkillTargets does nothing: PvP flagging tracks the owning player.
-func (a *Actor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+// NotePvPAttack flags the owner for a physical hit this summon is landing
+// on target, as the owner's own hit would. PvP flagging tracks the owning
+// player.
+func (a *Actor) NotePvPAttack(target attackable.Combatant) {
+	if owner := a.currentOwner(); owner != nil {
+		owner.NoteServitorPvPAttack(target)
+	}
+}
+
+// NotePvPSkillTargets flags the owner for a skill this summon cast on
+// targets, as the owner's own cast would.
+func (a *Actor) NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string) {
+	if owner := a.currentOwner(); owner != nil {
+		owner.NoteServitorPvPSkillTargets(targets, offensive, skillType)
+	}
+}
 
 // Flying reports false: summons never fly.
 func (a *Actor) Flying() bool { return false }

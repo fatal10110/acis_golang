@@ -84,6 +84,12 @@ type Owner interface {
 	PvPFlagState() task.PvPFlagState
 	// AwardSummonKillKarma credits killer for killing the owner's summon.
 	AwardSummonKillKarma(killer attackable.Combatant)
+	// NoteServitorPvPAttack flags the owner for a physical hit its summon
+	// is landing on target.
+	NoteServitorPvPAttack(target attackable.Combatant)
+	// NoteServitorPvPSkillTargets flags the owner for a skill its summon
+	// cast on targets.
+	NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
 	// OfferSummonRevive offers the owner the resurrection of its summon,
 	// which just died under a Phoenix Blessing.
 	OfferSummonRevive()

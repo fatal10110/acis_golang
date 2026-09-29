@@ -874,6 +874,7 @@ type timingSummon struct {
 
 func (a *timingSummon) InPeaceZone() bool                            { return false }
 func (a *timingSummon) TestCursesOnAttack(attackable.Combatant) bool { return false }
+func (a *timingSummon) NotePvPAttack(attackable.Combatant)           {}
 func (a *timingSummon) Owner() (attackable.Combatant, bool) {
 	return a.owner, a.owner != nil
 }

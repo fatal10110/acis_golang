@@ -1,53 +1,116 @@
 package network
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+import (
+	"sync"
 
-// applyPKKarmaSideEffects runs what a PK karma gain costs the killer, on its
-// own queue: every equipped item whose conditions it no longer meets comes
-// off, then its PvP flag task stops and the flag resets. Until the task has
-// run, live's PvP flag requests queue behind it (see applyPvPFlag).
-func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
-	live.pkSideEffectsPending.Add(1)
-	if !postLive(live, func() {
-		defer live.pkSideEffectsPending.Add(-1)
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+)
+
+// pvpChange is one PvP flag change owed to a player: the side effects of a
+// PK karma gain (reset), or the start or refresh of its flag window.
+type pvpChange struct {
+	reset              bool
+	useFlaggedDuration bool
+}
+
+// pendingPvPChanges is the FIFO of PvP flag changes a player's queue still
+// has to run. Every change reaches the queue through it, so a flag its
+// summon raises before a PK kill's reset stays ahead of it, and one raised
+// after stays behind it, whichever task runs them.
+type pendingPvPChanges struct {
+	mu      sync.Mutex
+	changes []pvpChange
+}
+
+func (p *pendingPvPChanges) push(c pvpChange) {
+	p.mu.Lock()
+	p.changes = append(p.changes, c)
+	p.mu.Unlock()
+}
+
+func (p *pendingPvPChanges) take() []pvpChange {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	changes := p.changes
+	p.changes = nil
+	return changes
+}
+
+func (p *pendingPvPChanges) empty() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.changes) == 0
+}
+
+// queuePvPChange hands c to live's queue behind the changes already
+// pending. The posted task runs whatever is still pending by then; a task
+// of live's own may already have run it (settlePvPChanges).
+func (l *GameClientLink) queuePvPChange(live *livePlayer, c pvpChange) {
+	live.pvpChanges.push(c)
+	postLive(live, func() { l.settlePvPChanges(live) })
+}
+
+// settlePvPChanges runs, in order, every PvP flag change pending for live.
+// It runs on live's queue only.
+func (l *GameClientLink) settlePvPChanges(live *livePlayer) {
+	for _, c := range live.pvpChanges.take() {
 		if live.detached() {
 			return
 		}
-		l.unequipRestrictedItems(live)
-		if l.pvpFlags != nil {
-			l.pvpFlags.Remove(live.Character, true)
+		if c.reset {
+			l.runPKKarmaSideEffects(live)
+			continue
 		}
-	}) {
-		live.pkSideEffectsPending.Add(-1)
+		l.startPvPFlag(live, c.useFlaggedDuration)
 	}
 }
 
-// applyPvPFlag starts or refreshes live's PvP flag window. A flag request
-// that arrives while a PK side-effect task is pending is posted behind it,
-// so the queue runs the reset first: an offensive skill that kills an
-// innocent player flags its caster again after the kill, and the caster
-// ends flagged.
-func (l *GameClientLink) applyPvPFlag(live *livePlayer, useFlaggedDuration bool) {
+// applyPKKarmaSideEffects schedules what a PK karma gain costs the killer:
+// every equipped item whose conditions it no longer meets comes off, then
+// its PvP flag task stops and the flag resets. The kill can run on another
+// actor's queue, so this queues the work; a task of live's own runs it
+// before its next skill message (playerMessageSink), the way the reference
+// runs it inside the killing blow.
+func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
+	l.queuePvPChange(live, pvpChange{reset: true})
+}
+
+func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
+	l.unequipRestrictedItems(live)
+	if l.pvpFlags != nil {
+		l.pvpFlags.Remove(live.Character, true)
+	}
+}
+
+// applyPvPFlag starts or refreshes live's PvP flag window. A request from
+// live's own action applies at once unless a change is still pending, in
+// which case it queues behind it: an offensive skill that kills an innocent
+// player flags its caster again after the kill's reset, and the caster ends
+// flagged. A request from live's summon comes from the summon's queue and
+// always queues, so the flag and a PK kill's reset keep the order the
+// summon produced them in: a lethal hit flags first and ends unflagged, a
+// lethal skill flags after and ends flagged.
+func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
 	if l.pvpFlags == nil {
 		return
 	}
-	apply := func() {
-		if useFlaggedDuration {
-			l.pvpFlags.AddFlagged(live.Character)
-			return
-		}
-		l.pvpFlags.AddNormal(live.Character)
-	}
-	if live.pkSideEffectsPending.Load() == 0 {
-		apply()
+	if e.ByServitor || !live.pvpChanges.empty() {
+		l.queuePvPChange(live, pvpChange{useFlaggedDuration: e.UseFlaggedDuration})
 		return
 	}
-	postLive(live, func() {
-		if live.detached() {
-			return
-		}
-		apply()
-	})
+	l.startPvPFlag(live, e.UseFlaggedDuration)
+}
+
+func (l *GameClientLink) startPvPFlag(live *livePlayer, useFlaggedDuration bool) {
+	if l.pvpFlags == nil {
+		return
+	}
+	if useFlaggedDuration {
+		l.pvpFlags.AddFlagged(live.Character)
+		return
+	}
+	l.pvpFlags.AddNormal(live.Character)
 }
 
 // unequipRestrictedItems takes off, through the UseItem equip toggle, every
