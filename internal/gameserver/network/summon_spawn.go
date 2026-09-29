@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -523,6 +524,12 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		OnLaunchAbort: func(reason actorcast.LaunchAbortReason) {
 			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 				sendLaunchAbort(owner, reason)
+			}
+		},
+		// A failed target condition is reported to the owner the same way.
+		OnTargetRejection: func(rejection skilltarget.CastRejection, def modelskill.Definition) {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				sendTargetCastRejection(owner, rejection, def)
 			}
 		},
 	}

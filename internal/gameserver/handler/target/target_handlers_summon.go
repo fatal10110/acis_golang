@@ -79,6 +79,17 @@ func (ownerPetHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Ac
 }
 
 func (ownerPetHandler) CanCast(caster, target Actor, _ *modelskill.Definition, _ bool) bool {
-	owner, ok := ownerOf(caster)
-	return ok && sameCreature(owner, target) && !target.Dead()
+	return target != nil && ownerPetCastRejection(caster, target) == CastRejectNone
+}
+
+// ownerPetCastRejection refuses a target other than the casting summon's
+// owner as invalid, and a dead owner by the skill's name.
+func ownerPetCastRejection(caster, target Actor) CastRejection {
+	if owner, ok := ownerOf(caster); !ok || !sameCreature(owner, target) {
+		return CastRejectInvalidTarget
+	}
+	if target.Dead() {
+		return CastRejectCannotUseSkill
+	}
+	return CastRejectNone
 }

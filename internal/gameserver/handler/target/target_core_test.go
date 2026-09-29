@@ -378,6 +378,36 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	caster := &targetActor{id: 1, kind: actor.KindPlayer, peace: true}
 	offensive := &modelskill.Definition{Offensive: true}
 
+	// Party fixtures: the party is 21 and 22; 23 is the caster's summon.
+	partyCaster := &targetActor{id: 20, kind: actor.KindPlayer, inParty: true, partyMembers: map[int32]bool{21: true, 22: true, 25: true}}
+	partyCasterSummon := &targetActor{id: 23, kind: actor.KindSummon, owner: partyCaster}
+	partyCaster.summon = partyCasterSummon
+	partyFighter := &targetActor{id: 21, kind: actor.KindPlayer}
+	partyMage := &targetActor{id: 22, kind: actor.KindPlayer, mageClass: true}
+	stranger := &targetActor{id: 24, kind: actor.KindPlayer}
+	deadPartyMate := &targetActor{id: 25, kind: actor.KindPlayer, dead: true}
+	monster := &targetActor{id: 26, kind: actor.KindNPC, monster: true}
+	regular := &modelskill.Definition{ID: 1, Level: 1}
+	summonFriend := &modelskill.Definition{ID: summonFriendSkillID, Level: 1}
+
+	// Area fixtures: a clear-zone caster aims at living targets.
+	areaCaster := &targetActor{id: 30, kind: actor.KindPlayer}
+	policyDenied := &targetActor{id: 31, kind: actor.KindPlayer, playableCastDenied: true}
+	flagged := &targetActor{id: 32, kind: actor.KindPlayer, attackableBy: true, attackableWithoutForce: true}
+	unflagged := &targetActor{id: 33, kind: actor.KindPlayer, attackableBy: true}
+	untouchable := &targetActor{id: 34, kind: actor.KindNPC}
+	deadMob := &targetActor{id: 35, kind: actor.KindNPC, dead: true, attackableBy: true, attackableWithoutForce: true}
+
+	// Owner-pet fixtures.
+	owner := &targetActor{id: 40, kind: actor.KindPlayer}
+	ownedSummon := &targetActor{id: 41, kind: actor.KindSummon, owner: owner}
+	deadOwner := &targetActor{id: 42, kind: actor.KindPlayer, dead: true}
+	orphanedSummon := &targetActor{id: 43, kind: actor.KindSummon, owner: deadOwner}
+
+	// Corpse-ally fixtures.
+	olympian := &targetActor{id: 50, kind: actor.KindPlayer, olympiad: true}
+	olympianSummon := &targetActor{id: 51, kind: actor.KindSummon, owner: olympian}
+
 	tests := []struct {
 		name       string
 		targetType modelskill.Target
@@ -414,6 +444,57 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"summon nil", modelskill.TargetSummon, caster, nil, nil, CastRejectNone},
 		{"corpse mob nil", modelskill.TargetCorpseMob, caster, nil, nil, CastRejectNone},
 		{"area corpse mob nil", modelskill.TargetAreaCorpseMob, caster, nil, nil, CastRejectNone},
+
+		{"party member self", modelskill.TargetPartyMember, partyCaster, partyCaster, regular, CastRejectNone},
+		{"party member own summon", modelskill.TargetPartyMember, partyCaster, partyCasterSummon, regular, CastRejectNone},
+		{"party member party player", modelskill.TargetPartyMember, partyCaster, partyFighter, regular, CastRejectNone},
+		{"party member non-playable", modelskill.TargetPartyMember, partyCaster, monster, regular, CastRejectCannotUseSkill},
+		{"party member dead party player", modelskill.TargetPartyMember, partyCaster, deadPartyMate, regular, CastRejectCannotUseSkill},
+		{"party member non-party player", modelskill.TargetPartyMember, partyCaster, stranger, regular, CastRejectCannotUseSkill},
+		{"party member summon friend on own summon", modelskill.TargetPartyMember, partyCaster, partyCasterSummon, summonFriend, CastRejectCannotUseSkill},
+		{"party member summon friend on dead party player", modelskill.TargetPartyMember, partyCaster, deadPartyMate, summonFriend, CastRejectCannotUseSkill},
+		{"party member summon friend on non-party player", modelskill.TargetPartyMember, partyCaster, stranger, summonFriend, CastRejectCannotUseSkill},
+		{"party member summon friend on party player", modelskill.TargetPartyMember, partyCaster, partyFighter, summonFriend, CastRejectNone},
+		{"party member nil", modelskill.TargetPartyMember, partyCaster, nil, regular, CastRejectNone},
+
+		{"party other self", modelskill.TargetPartyOther, partyCaster, partyCaster, regular, CastRejectCannotUseOnYourself},
+		{"party other own summon", modelskill.TargetPartyOther, partyCaster, partyCasterSummon, regular, CastRejectInvalidTarget},
+		{"party other dead party player", modelskill.TargetPartyOther, partyCaster, deadPartyMate, regular, CastRejectInvalidTarget},
+		{"party other 426 on mage", modelskill.TargetPartyOther, partyCaster, partyMage, &modelskill.Definition{ID: dualcastManaSkillID, Level: 1}, CastRejectCannotUseSkill},
+		{"party other 427 on fighter", modelskill.TargetPartyOther, partyCaster, partyFighter, &modelskill.Definition{ID: dualcastHealSkillID, Level: 1}, CastRejectCannotUseSkill},
+		{"party other 426 on fighter", modelskill.TargetPartyOther, partyCaster, partyFighter, &modelskill.Definition{ID: dualcastManaSkillID, Level: 1}, CastRejectNone},
+		{"party other non-party player", modelskill.TargetPartyOther, partyCaster, stranger, regular, CastRejectCannotUseSkill},
+		{"party other party player", modelskill.TargetPartyOther, partyCaster, partyMage, regular, CastRejectNone},
+		{"party other nil", modelskill.TargetPartyOther, partyCaster, nil, regular, CastRejectNone},
+
+		{"aura undead in peace", modelskill.TargetAuraUndead, caster, caster, offensive, CastRejectCantAttackPeaceZone},
+		{"aura undead non-offensive in peace", modelskill.TargetAuraUndead, caster, caster, regular, CastRejectNone},
+		{"aura undead outside peace", modelskill.TargetAuraUndead, areaCaster, areaCaster, offensive, CastRejectNone},
+
+		{"area playable the caster may not hit", modelskill.TargetArea, policyDenied, flagged, offensive, CastRejectInvalidTarget},
+		{"area unattackable target", modelskill.TargetArea, areaCaster, untouchable, offensive, CastRejectInvalidTarget},
+		{"area target needing a forced attack", modelskill.TargetArea, areaCaster, unflagged, offensive, CastRejectInvalidTarget},
+		{"area flagged target", modelskill.TargetArea, areaCaster, flagged, offensive, CastRejectNone},
+		{"area non-offensive", modelskill.TargetArea, areaCaster, untouchable, regular, CastRejectNone},
+		{"area dead target has no final target", modelskill.TargetArea, areaCaster, deadMob, offensive, CastRejectSilent},
+		{"area self has no final target", modelskill.TargetArea, areaCaster, areaCaster, offensive, CastRejectSilent},
+		{"area nil", modelskill.TargetArea, areaCaster, nil, offensive, CastRejectNone},
+
+		{"front area skips the playable policy", modelskill.TargetFrontArea, policyDenied, flagged, offensive, CastRejectNone},
+		{"front area unattackable target", modelskill.TargetFrontArea, areaCaster, untouchable, offensive, CastRejectInvalidTarget},
+		{"front area target needing a forced attack", modelskill.TargetFrontArea, areaCaster, unflagged, offensive, CastRejectInvalidTarget},
+		{"front area non-offensive", modelskill.TargetFrontArea, areaCaster, untouchable, regular, CastRejectNone},
+		{"front area nil", modelskill.TargetFrontArea, areaCaster, nil, offensive, CastRejectNone},
+
+		{"owner pet living owner", modelskill.TargetOwnerPet, ownedSummon, owner, regular, CastRejectNone},
+		{"owner pet another target", modelskill.TargetOwnerPet, ownedSummon, stranger, regular, CastRejectInvalidTarget},
+		{"owner pet ownerless caster", modelskill.TargetOwnerPet, owner, owner, regular, CastRejectInvalidTarget},
+		{"owner pet dead owner", modelskill.TargetOwnerPet, orphanedSummon, deadOwner, regular, CastRejectCannotUseSkill},
+		{"owner pet nil", modelskill.TargetOwnerPet, ownedSummon, nil, regular, CastRejectNone},
+
+		{"corpse ally in olympiad", modelskill.TargetCorpseAlly, olympian, olympian, regular, CastRejectOlympiadUnavailable},
+		{"corpse ally summon of an olympian", modelskill.TargetCorpseAlly, olympianSummon, olympianSummon, regular, CastRejectOlympiadUnavailable},
+		{"corpse ally outside olympiad", modelskill.TargetCorpseAlly, areaCaster, areaCaster, regular, CastRejectNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -421,6 +502,65 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 				t.Fatalf("CastRejectionFor = %v, want %v", got, tt.want)
 			}
 		})
+	}
+
+	// CTRL forces the attack an unflagged target otherwise refuses.
+	for _, targetType := range []modelskill.Target{modelskill.TargetArea, modelskill.TargetFrontArea} {
+		if got := CastRejectionFor(targetType, areaCaster, unflagged, offensive, true); got != CastRejectNone {
+			t.Fatalf("CastRejectionFor(%s, ctrl) on an unflagged target = %v, want none", targetType, got)
+		}
+	}
+}
+
+// TestCanCastAgreesWithCastRejectionFor pins the classifier as the complete
+// playable cast condition: for every handler but GROUND (checked on its own),
+// CanCast on the handler's final target passes exactly when the target
+// classifies as CastRejectNone.
+func TestCanCastAgreesWithCastRejectionFor(t *testing.T) {
+	owner := &targetActor{id: 1, kind: actor.KindPlayer, inParty: true, partyMembers: map[int32]bool{3: true, 4: true}}
+	ownSummon := &targetActor{id: 2, kind: actor.KindSummon, owner: owner}
+	owner.summon = ownSummon
+	peaceOlympian := &targetActor{id: 9, kind: actor.KindPlayer, peace: true, olympiad: true, playableCastDenied: true}
+	casters := []*targetActor{owner, ownSummon, peaceOlympian}
+	selections := []*targetActor{
+		owner, ownSummon, peaceOlympian,
+		{id: 3, kind: actor.KindPlayer, mageClass: true, attackableBy: true},
+		{id: 4, kind: actor.KindPlayer, dead: true},
+		{id: 5, kind: actor.KindNPC, monster: true, attackableBy: true, attackableWithoutForce: true},
+		{id: 6, kind: actor.KindNPC, dead: true, corpse: true, monster: true},
+		{id: 7, kind: actor.KindNPC, undead: true, monster: true, holy: true},
+		{id: 8, kind: actor.KindDoor, door: true},
+	}
+	skills := []*modelskill.Definition{
+		{ID: 1, Level: 1},
+		{ID: 2, Level: 1, Offensive: true, SkillType: "PDAM"},
+		{ID: summonFriendSkillID, Level: 1},
+		{ID: dualcastManaSkillID, Level: 1},
+		{ID: dualcastHealSkillID, Level: 1},
+	}
+	registry := NewRegistry(knownList{})
+	for typ, handler := range registry.handlers {
+		if typ == modelskill.TargetGround {
+			continue
+		}
+		for _, caster := range casters {
+			for _, selected := range selections {
+				for _, skill := range skills {
+					for _, ctrl := range []bool{false, true} {
+						final := handler.FinalTarget(caster, selected, skill)
+						if final == nil {
+							continue
+						}
+						can := handler.CanCast(caster, final, skill, ctrl)
+						rejection := CastRejectionFor(typ, caster, final, skill, ctrl)
+						if can != (rejection == CastRejectNone) {
+							t.Fatalf("%s caster %d target %d skill %d ctrl %v: CanCast = %v, CastRejectionFor = %v",
+								typ, caster.ObjectID(), final.ObjectID(), skill.ID, ctrl, can, rejection)
+						}
+					}
+				}
+			}
+		}
 	}
 }
 
