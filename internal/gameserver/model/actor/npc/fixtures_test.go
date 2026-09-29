@@ -149,7 +149,7 @@ type hostileEffectTarget struct {
 	effecttest.Actor
 }
 
-func (*hostileEffectTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
+func (*hostileEffectTarget) FleeFrom(effector effect.Actor, distance int) {}
 
 func addHostileEffect(t *testing.T, hostile *Hostile, name string) *effect.Effect {
 	t.Helper()

@@ -200,6 +200,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if e.Target != nil {
 			l.attackLiveTarget(live, e.Target)
 		}
+	case event.FleeRequested:
+		l.fleeLivePlayer(live, e)
 	case event.Retargeted:
 		if e.Target == nil {
 			l.clearLiveTarget(live)

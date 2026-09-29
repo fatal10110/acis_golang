@@ -78,6 +78,34 @@ func (l Location) HeadingTo(other Location) int {
 	return int(math.Round(angle * headingScale))
 }
 
+// FleeFrom returns the point distance units from l directly away from
+// (fromX, fromY) on the XY plane, with Z unchanged. The offset is split
+// between the axes so that |dx|+|dy| = distance, and each part is truncated.
+// A source on l's own Y line, l itself included, leaves l unchanged.
+func (l Location) FleeFrom(fromX, fromY, distance int) Location {
+	xDiff := float64(fromX - l.X)
+	yDiff := float64(fromY - l.Y)
+	if yDiff == 0 {
+		// The ratio below is infinite or NaN here, and both axis offsets
+		// truncate to zero.
+		return l
+	}
+	ratio := math.Abs(xDiff / yDiff)
+	dy := int(float64(distance) / (ratio + 1))
+	dx := int(float64(dy) * ratio)
+	if xDiff < 0 {
+		l.X += dx
+	} else {
+		l.X -= dx
+	}
+	if yDiff < 0 {
+		l.Y += dy
+	} else {
+		l.Y -= dy
+	}
+	return l
+}
+
 // AddRandomOffsetBetween adds a polar offset with radius in [minOffset,
 // maxOffset] and a uniform heading. Negative or inverted ranges leave l
 // unchanged.

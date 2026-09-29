@@ -122,3 +122,29 @@ func TestAddRandomOffsetBetweenRejectsInvalidRange(t *testing.T) {
 		}
 	}
 }
+
+// TestLocationFleeFrom pins the flee point against vectors computed with IEEE
+// double arithmetic and truncating int casts, the reference arithmetic:
+// the offset splits distance between the axes by the |dx/dy| ratio, and a
+// source on the same Y line (or the point itself) produces no offset.
+func TestLocationFleeFrom(t *testing.T) {
+	cases := []struct {
+		from       Location
+		srcX, srcY int
+		want       Location
+	}{
+		{Location{X: 0, Y: 0, Z: 7}, 100, 100, Location{X: -250, Y: -250, Z: 7}},
+		{Location{X: 1000, Y: 2000, Z: -30}, 1300, 2100, Location{X: 625, Y: 1875, Z: -30}},
+		{Location{X: 0, Y: 0}, -7, 3, Location{X: 350, Y: -150}},
+		{Location{X: 0, Y: 0}, 0, 1, Location{X: 0, Y: -500}},
+		{Location{X: -80000, Y: 150000}, -80400, 150300, Location{X: -79715, Y: 149786}},
+		{Location{X: 10, Y: 10}, 11, -1000, Location{X: 10, Y: 509}},
+		{Location{X: 0, Y: 0}, 100, 0, Location{X: 0, Y: 0}},
+		{Location{X: 5, Y: 5}, 5, 5, Location{X: 5, Y: 5}},
+	}
+	for _, tc := range cases {
+		if got := tc.from.FleeFrom(tc.srcX, tc.srcY, 500); got != tc.want {
+			t.Errorf("%+v.FleeFrom(%d, %d, 500) = %+v, want %+v", tc.from, tc.srcX, tc.srcY, got, tc.want)
+		}
+	}
+}

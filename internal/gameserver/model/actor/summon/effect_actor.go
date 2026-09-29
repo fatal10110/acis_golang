@@ -76,24 +76,52 @@ func (a *Actor) StopAttack() {
 	a.TryToIdle()
 }
 
-// Afraid reports false: summon fear state is not modeled yet.
-func (a *Actor) Afraid() bool { return false }
+// Afraid reports whether a held effect fears the summon.
+func (a *Actor) Afraid() bool { return a.effects.IsAffected(effect.FlagFear) }
 
-// FearImmune reports false: fear immunity is not modeled yet.
-func (a *Actor) FearImmune() bool { return false }
+// FearImmune reports whether fear cannot take hold of the summon: siege
+// summons shrug it off.
+func (a *Actor) FearImmune() bool { return a.SiegeSummon() }
 
-// FleeFrom reports false: fleeing movement is not modeled yet.
-func (a *Actor) FleeFrom(effect.Actor, int) bool { return false }
+// FleeFrom makes running distance units directly away from effector the
+// summon's current intention, the way a move request does. A summon that
+// could not take AI actions before the effect in progress landed, which
+// includes one already afraid, stays put; one that cannot move goes idle.
+// Summons are always in run stance, so no stance change is sent; hungry-pet
+// walk stance arrives with the feed tick (#2378).
+func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
+	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 || a.brain == nil {
+		return
+	}
+	if a.aiDeniedBeforeEffect() {
+		return
+	}
+	if a.MovementDisabled() {
+		a.TryToIdle()
+		return
+	}
+	fromX, fromY, _ := effector.Position()
+	a.brain.TryToMoveTo(a.Move().Position().FleeFrom(fromX, fromY, distance))
+}
 
-// BluffExempt reports false: summons are never exempt from bluff.
-func (a *Actor) BluffExempt() bool { return false }
+// aiDeniedBeforeEffect is DenyAIAction limited to effects whose on-start
+// hook has completed; see effect.List.StartedAffected.
+func (a *Actor) aiDeniedBeforeEffect() bool {
+	a.stateMu.RLock()
+	paralyzed := a.paralyzed
+	a.stateMu.RUnlock()
+	return a.AlikeDead() || paralyzed || a.Teleporting() || a.effects.StartedAffected(effect.AIDenyFlags)
+}
 
-// StopEffects does nothing yet: stopping effects by type is not wired.
-func (a *Actor) StopEffects(effect.Type) {}
+// BluffExempt reports whether bluff cannot turn the summon: siege summons
+// are exempt.
+func (a *Actor) BluffExempt() bool { return a.SiegeSummon() }
 
-// StopSkillEffectsByID does nothing yet: stopping effects by skill is not
-// wired.
-func (a *Actor) StopSkillEffectsByID(modelskill.ID) {}
+// StopEffects removes every effect of type t the summon holds.
+func (a *Actor) StopEffects(t effect.Type) { a.effects.StopByType(t) }
+
+// StopSkillEffectsByID removes every effect skill id applied to the summon.
+func (a *Actor) StopSkillEffectsByID(id modelskill.ID) { a.effects.StopBySkillID(id) }
 
 // AddChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (a *Actor) AddChanceTrigger(*effect.Effect) {}

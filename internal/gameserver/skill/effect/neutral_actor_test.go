@@ -44,7 +44,7 @@ func (neutralActor) SetImmobilized(bool) bool                   { return false }
 func (neutralActor) SetInvul(bool) bool                         { return false }
 func (neutralActor) Afraid() bool                               { return false }
 func (neutralActor) FearImmune() bool                           { return false }
-func (neutralActor) FleeFrom(Actor, int) bool                   { return false }
+func (neutralActor) FleeFrom(Actor, int)                        {}
 func (neutralActor) BluffExempt() bool                          { return false }
 func (neutralActor) FlyTo(location.Location, modelskill.Flight) {}
 func (neutralActor) SetXYZ(int, int, int)                       {}

@@ -611,7 +611,7 @@ type ccFleeTarget struct {
 	effecttest.Actor
 }
 
-func (*ccFleeTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
+func (*ccFleeTarget) FleeFrom(effector effect.Actor, distance int) {}
 
 func attachTestLive(t *testing.T, c *Character) {
 	t.Helper()

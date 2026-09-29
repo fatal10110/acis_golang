@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -18,6 +19,7 @@ func (*thinkCountingAI) TryToIdle()                                          {}
 func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref) bool { return false }
 func (*thinkCountingAI) AbortAll()                                           {}
 func (*thinkCountingAI) FollowInstead(attackable.Combatant)                  {}
+func (*thinkCountingAI) TryToMoveTo(location.Location) bool                  { return false }
 func (*thinkCountingAI) StopMove()                                           {}
 func (*thinkCountingAI) StopAttack()                                         {}
 func (*thinkCountingAI) AttackingNow() bool                                  { return false }

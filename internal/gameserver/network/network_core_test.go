@@ -1095,6 +1095,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.GradePenaltyChanged{},
 		event.DeathPenaltyChanged{},
 		event.AttackRequested{},
+		event.FleeRequested{},
 		event.Retargeted{},
 		event.SummonConfirmRequested{},
 		event.TeleportRequested{},

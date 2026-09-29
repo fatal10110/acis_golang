@@ -258,7 +258,7 @@ type ccTestTarget struct {
 	effecttest.Actor
 }
 
-func (*ccTestTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
+func (*ccTestTarget) FleeFrom(effector effect.Actor, distance int) {}
 
 func addTestEffect(t *testing.T, live *Live, name string) *effect.Effect {
 	t.Helper()
