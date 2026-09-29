@@ -558,6 +558,13 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	return entries
 }
 
+// The production movement geo answers the sight queries a player takes from
+// it; a double without them leaves the player seeing everything.
+var (
+	_ player.LineOfSight         = move.EngineGeo{}
+	_ player.LineOfSightIgnoring = move.EngineGeo{}
+)
+
 func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 	if mover == nil || zones == nil {
 		return

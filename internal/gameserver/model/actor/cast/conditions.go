@@ -21,6 +21,38 @@ type conditionGate interface {
 	SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool)
 }
 
+// olympiadGate is the optional Actor capability CanCast asks after the
+// <cond> clauses: whether the player acting for the caster (the player
+// itself, or a summon's owner) is in Olympiad mode, where hero and
+// RESURRECT skills are refused. NPC casts never ask.
+type olympiadGate interface {
+	ActingPlayerInOlympiad() bool
+}
+
+// olympiadRestricted reports whether def is barred from Olympiad matches.
+func olympiadRestricted(def modelskill.Definition) bool {
+	return def.HeroSkill || def.SkillType == "RESURRECT"
+}
+
+// ActingPlayerInOlympiad reports whether the player is in Olympiad mode.
+func (a PlayerActor) ActingPlayerInOlympiad() bool {
+	return a.Character != nil && a.Character.OlympiadMode()
+}
+
+// ActingPlayerInOlympiad reports whether the summon's owner is in Olympiad
+// mode; an ownerless summon never is.
+func (a SummonActor) ActingPlayerInOlympiad() bool {
+	if a.Summon == nil {
+		return false
+	}
+	owner, ok := a.Summon.Owner()
+	if !ok {
+		return false
+	}
+	player, ok := owner.(interface{ OlympiadMode() bool })
+	return ok && player.OlympiadMode()
+}
+
 // SkillConditions evaluates def's <cond> clauses with the player as caster.
 func (a PlayerActor) SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool) {
 	return conditions.EvaluateSkill(def, a.Character, target)

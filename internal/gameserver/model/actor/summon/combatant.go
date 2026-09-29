@@ -56,16 +56,12 @@ func (a *Actor) Owner() (attackable.Combatant, bool) {
 }
 
 // CanSeeTarget reports whether t is visible to this summon for the cast
-// pipeline's launch-phase line-of-sight gate: the same geodata query as
+// pipeline's line-of-sight gates: the same geodata query as
 // CanSee, keyed to t's own eye height, or permissive when no query is
 // attached.
 func (a *Actor) CanSeeTarget(t skilltarget.Actor) bool {
-	if a.los == nil {
-		return true
-	}
-	ox, oy, oz := a.Position()
 	tx, ty, tz := t.Position()
-	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, t.CollisionHeight())
+	return a.canSeeObject(t, tx, ty, tz, t.CollisionHeight())
 }
 
 // ShieldDefense reports ShieldFailed: summons carry no shield.

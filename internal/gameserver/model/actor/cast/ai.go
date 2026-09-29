@@ -166,9 +166,10 @@ func (a *AIController) AttemptCast(target attackable.Combatant, ref modelskill.R
 
 // CanCastPlayable runs a playable caster's gates immediately before its cast
 // commits, in the reference order: HP/MP and mute, line of sight to the
-// target of a ranged skill, the skill's own conditions and item cost, and
-// last the target conditions judged with ctrl. The first failure is reported
-// through OnCastRefusal, or OnTargetRejection for a target condition.
+// target of a ranged skill, the skill's own conditions, the Olympiad skill
+// ban and item cost (CanCastSighted), and last the target conditions judged
+// with ctrl. The first failure is reported through OnCastRefusal, or
+// OnTargetRejection for a target condition.
 func (a *AIController) CanCastPlayable(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool {
 	if a.Controller == nil || a.Caster == nil || target == nil {
 		return false
@@ -181,14 +182,7 @@ func (a *AIController) CanCastPlayable(target attackable.Combatant, ref modelski
 	if !ok {
 		return false
 	}
-	err := a.Controller.MeetsHPMPDisabled(castTarget, def)
-	if err == nil && def.CastRange > 0 && !launchCanSee(a.Caster, castTarget) {
-		err = ErrCantSeeTarget
-	}
-	if err == nil {
-		err = a.Controller.CanCast(castTarget, def)
-	}
-	if err != nil {
+	if err := a.Controller.CanCastSighted(a.Caster, castTarget, def); err != nil {
 		a.refuse(err, def)
 		return false
 	}

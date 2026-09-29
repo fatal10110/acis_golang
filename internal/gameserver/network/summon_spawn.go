@@ -662,6 +662,10 @@ func (l *GameClientLink) sendSummonSkillResult(actor *summon.Actor, result actor
 	l.sendSkillHandlerResult(owner, actorcast.EffectResult{Messages: messages})
 }
 
+// The production movement geo answers the sight queries a summon takes from
+// it.
+var _ summon.LineOfSight = move.EngineGeo{}
+
 // summonLineOfSight returns the geodata query summons use for attack
 // visibility, or nil when the geodata collaborator provides none.
 func (l *GameClientLink) summonLineOfSight() summon.LineOfSight {

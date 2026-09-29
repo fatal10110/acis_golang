@@ -52,6 +52,9 @@ var (
 	// ErrWeaponNotAllowed means the skill is restricted to weapon or shield
 	// types the caster does not hold.
 	ErrWeaponNotAllowed = errors.New("cast: weapon not allowed")
+	// ErrOlympiadSkill means a hero or RESURRECT skill was cast while the
+	// acting player is in Olympiad mode.
+	ErrOlympiadSkill = errors.New("cast: skill not available in olympiad")
 )
 
 // Actor is the owner state a cast controller reads and updates while
@@ -341,8 +344,8 @@ func (c *Controller) groundTargetGate(def modelskill.Definition) error {
 
 // CanCast validates the reusable pre-cast checks for target, reuse, current
 // MP/HP, mute state, the weapon or shield the skill needs, the skill's
-// <cond> clauses (for a caster that evaluates them), and required skill
-// items.
+// <cond> clauses and the Olympiad skill ban (for a caster that evaluates
+// them), and required skill items.
 func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
@@ -376,6 +379,9 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		if clause, ok := gate.SkillConditions(target, def); !ok {
 			return &ConditionError{Clause: clause}
 		}
+	}
+	if gate, ok := c.actor.(olympiadGate); ok && olympiadRestricted(def) && gate.ActingPlayerInOlympiad() {
+		return ErrOlympiadSkill
 	}
 	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
 		if c.actor.CubicListFull() {
@@ -411,6 +417,21 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 		return ErrPhysicalMuted
 	}
 	return nil
+}
+
+// CanCastSighted is CanCast for a caster whose ranged skill needs line of
+// sight to its target, in the reference order: HP/MP and mute first, then
+// sight to a target other than the caster when the skill has a cast range,
+// then the rest of CanCast. A GROUND skill targets its caster, so its point
+// sight is left to its own gate.
+func (c *Controller) CanCastSighted(caster LaunchCaster, target Target, def modelskill.Definition) error {
+	if err := c.MeetsHPMPDisabled(target, def); err != nil {
+		return err
+	}
+	if def.CastRange > 0 && caster != nil && !sameLaunchTarget(caster, target) && !launchCanSee(caster, target) {
+		return ErrCantSeeTarget
+	}
+	return c.CanCast(target, def)
 }
 
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and

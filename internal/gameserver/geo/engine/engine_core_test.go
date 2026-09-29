@@ -492,6 +492,12 @@ func TestCanSeeWithHeightsIgnoringDynamicObject(t *testing.T) {
 	if !e.CanSeeWithHeightsIgnoring(worldX(0), worldY(0), 0, 0, worldX(2), worldY(0), 0, 0, door) {
 		t.Fatal("CanSeeWithHeightsIgnoring() = false when target dynamic object is ignored, want true")
 	}
+	if e.CanSeeActor(worldX(0), worldY(0), 0, 0, worldX(2), worldY(0), 0, 0) {
+		t.Fatal("CanSeeActor() = true through closed dynamic object, want false")
+	}
+	if !e.CanSeeActorIgnoring(worldX(0), worldY(0), 0, 0, worldX(2), worldY(0), 0, 0, door) {
+		t.Fatal("CanSeeActorIgnoring() = false when target dynamic object is ignored, want true")
+	}
 }
 
 func TestCanSeeActor(t *testing.T) {
