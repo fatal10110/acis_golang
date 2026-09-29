@@ -140,16 +140,21 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 				CastRange: 40, CanBeReflected: true, Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
 			}
 			skills := handlerskill.NewDefaultRegistry()
+			// Production cubic fire and applyCastHit stream through the
+			// player's message sink rather than flushing after the handler.
+			sink := link.playerMessageSink(live, nil)
 			var result actorcast.EffectResult
 			if cubic {
-				result = actorcast.ApplyCubicEffect(skills, caster, def, target)
+				result = actorcast.ApplyCubicEffect(skills, caster, def, target, sink)
 			} else {
-				result = actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: skilltarget.NewRegistry(nil), Skills: skills}, caster, target, def)
+				result = actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: skilltarget.NewRegistry(nil), Skills: skills, Sink: sink}, caster, target, def)
 			}
 			if !result.Handled {
 				t.Fatal("cast was not handled")
 			}
-			link.sendSkillHandlerResult(live, result)
+			if len(result.Messages) != 0 {
+				t.Fatalf("result Messages = %+v, want none left after streaming", result.Messages)
+			}
 			got := frames.Frames()
 			if len(got) != 2 {
 				t.Fatalf("caster frame count = %d, want 2", len(got))

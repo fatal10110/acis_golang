@@ -563,6 +563,13 @@ func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ models
 	a.reduceHP(amount, attacker)
 }
 
+// ReduceHPWithoutCastBreak is ReduceHP for a skill hit whose cast-break roll
+// the caller already ran through BreakCastOnDamage, ahead of other per-hit
+// work.
+func (a *Actor) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	a.reduceHP(amount, attacker)
+}
+
 // TakeDamage applies a landed auto-attack hit; see reduceHP. It reports
 // whether the hit killed a. The hit's cast-break roll is the attacker's to
 // run, through BreakCastOnDamage, once the hit's reflected and absorbed

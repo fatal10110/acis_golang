@@ -202,6 +202,13 @@ func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ mode
 	h.reduceHP(amount, attacker)
 }
 
+// ReduceHPWithoutCastBreak is ReduceHP for a skill hit whose cast-break roll
+// the caller already ran through BreakCastOnDamage, ahead of other per-hit
+// work.
+func (h *Hostile) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+	h.reduceHP(amount, attacker)
+}
+
 // reduceHP is ReduceHP without the cast-break roll, for HP loss that is not
 // a damage hit of its own.
 func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {

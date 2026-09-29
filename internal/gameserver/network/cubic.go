@@ -207,10 +207,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
 			return
 		}
-		result := actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target)
-		if l.sendSkillHandlerResult(live, result) {
-			beforeVitals = live.Vitals()
-		}
+		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }

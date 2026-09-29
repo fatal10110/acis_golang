@@ -265,10 +265,16 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 		damage := int(formulas.MagicDamage(in))
 		if damage > 0 {
-			// MDAM reports the damage before applying it, unlike the
-			// physical handlers.
-			recordDamage(&result, cast.Caster, target, damage, in.MagicCrit, false)
-			target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+			// MDAM rolls the target's cast break, then reports the damage
+			// before applying it, unlike the physical handlers.
+			if breaker, ok := target.(earlyCastBreaker); ok {
+				breaker.BreakCastOnDamage(float64(damage))
+				recordDamage(&result, cast.Caster, target, damage, in.MagicCrit, false)
+				breaker.ReduceHPWithoutCastBreak(float64(damage), cast.Caster, cast.Skill)
+			} else {
+				recordDamage(&result, cast.Caster, target, damage, in.MagicCrit, false)
+				target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
+			}
 			applyMdamEffects(cast, obj, in.BlessedSoulShot, in.Shield, &result)
 		}
 	}
@@ -317,8 +323,8 @@ func (h drainHandler) Use(cast Cast) {
 }
 
 // earlyCastBreaker is a target whose damage-driven cast-break roll can run
-// ahead of its HP loss. DRAIN rolls the break, reports the damage and lands
-// its effects before the target takes the HP.
+// ahead of its HP loss. MDAM rolls the break and reports the damage before
+// the target takes the HP; DRAIN also lands its effects in between.
 type earlyCastBreaker interface {
 	BreakCastOnDamage(damage float64)
 	ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
@@ -787,6 +793,17 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if mp > 0 {
 			target.ReduceMP(mp)
 		}
+		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
+		// (pre-clamp) damage is positive, after the drain and before the
+		// drain messages, through the same effect-list removal path
+		// stopEffectsBySkillID uses.
+		if rawDamage > 0 {
+			if elt, ok := effective.(effect.Actor); ok {
+				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
+					return e.Type == effect.TypeSleep || e.Type == effect.TypeImmobileUntilAttacked
+				})
+			}
+		}
 		if obj.Kind() == actor.KindPlayer {
 			result.ManaDrains = append(result.ManaDrains, ManaDrain{
 				TargetID:   obj.ObjectID(),
@@ -798,16 +815,6 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
 			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
 			result.record(OpponentMPReducedMessage{MP: int32(mp)})
-		}
-		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
-		// (pre-clamp) damage is positive, after the drain, through the
-		// same effect-list removal path stopEffectsBySkillID uses.
-		if rawDamage > 0 {
-			if elt, ok := effective.(effect.Actor); ok {
-				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
-					return e.Type == effect.TypeSleep || e.Type == effect.TypeImmobileUntilAttacked
-				})
-			}
 		}
 	}
 	applySelfEffects(cast, cast.Skill)

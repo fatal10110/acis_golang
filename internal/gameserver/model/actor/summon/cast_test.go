@@ -126,3 +126,53 @@ func TestSummonDamageBreaksCastOnlyWhileCasting(t *testing.T) {
 		t.Fatalf("rolls = %+v after a hit with no cast in flight, want no new roll", c.rolls)
 	}
 }
+
+// TestSummonBreakFirstPairRollsOncePerHit pins the split MDAM, DRAIN and the
+// signet MDAM tick use on a summon target: BreakCastOnDamage rolls the cast
+// break once on the raw damage without touching HP, ReduceHPWithoutCastBreak
+// then applies the hit without a second roll, and neither does anything to
+// a dead summon.
+func TestSummonBreakFirstPairRollsOncePerHit(t *testing.T) {
+	a, c := newCastingPet(t, false)
+	full := a.HP()
+	attacker := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 10, Stats: CombatStats{MaxHP: 500}})
+
+	a.BreakCastOnDamage(50)
+
+	want := castBreakRoll{damage: 50, roll: 7, hp: full}
+	if len(c.rolls) != 1 || c.rolls[0] != want {
+		t.Fatalf("BreakCastOnDamage rolls = %+v, want [%+v]", c.rolls, want)
+	}
+	if got := a.HP(); got != full {
+		t.Fatalf("HP = %v after BreakCastOnDamage, want the untouched %v", got, full)
+	}
+
+	a.ReduceHPWithoutCastBreak(50, attacker, modelskill.Definition{})
+
+	if len(c.rolls) != 1 {
+		t.Fatalf("rolls = %+v after ReduceHPWithoutCastBreak, want no new roll", c.rolls)
+	}
+	if got := a.HP(); got != full-50 {
+		t.Fatalf("HP = %v after ReduceHPWithoutCastBreak, want %v", got, full-50)
+	}
+
+	a.ReduceHPWithoutCastBreak(100_000, attacker, modelskill.Definition{})
+	if !a.Dead() || a.HP() != 0 {
+		t.Fatalf("dead/hp = %v/%v after a lethal ReduceHPWithoutCastBreak, want true/0", a.Dead(), a.HP())
+	}
+	if len(c.rolls) != 1 {
+		t.Fatalf("rolls = %+v after the lethal hit, want no new roll", c.rolls)
+	}
+
+	// The recording cast keeps reporting a cast in flight, so only the dead
+	// guard stops these.
+	c.casting = true
+	a.BreakCastOnDamage(50)
+	a.ReduceHPWithoutCastBreak(50, attacker, modelskill.Definition{})
+	if len(c.rolls) != 1 {
+		t.Fatalf("rolls = %+v on a dead summon, want no new roll", c.rolls)
+	}
+	if got := a.HP(); got != 0 || !a.Dead() {
+		t.Fatalf("dead/hp = %v/%v after hits on a dead summon, want true/0", a.Dead(), got)
+	}
+}

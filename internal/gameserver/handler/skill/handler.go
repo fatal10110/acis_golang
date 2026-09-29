@@ -190,16 +190,41 @@ type Cast struct {
 	// cubic reads the owner's blessed-spiritshot charge for its landing
 	// rolls but never spends it, so the Continuous and Disablers handlers
 	// skip their end-of-cast discharge for it.
-	Cubic    bool
+	Cubic bool
+	// Sink, when set, receives each handler message the moment the handler
+	// produces it, so the message keeps its place among the frames the
+	// cast's own state changes send at once (a target's status, death and
+	// kill rewards). A message a sink received is not returned in
+	// Result.Messages.
+	Sink     MessageSink
 	resisted *Result
-	messages *[]any
+	messages *messageLog
 }
 
-// record appends a caster-visible message to the dispatching registry's
-// result; a cast used outside a registry drops it.
+// MessageSink delivers one handler message.
+type MessageSink func(message any)
+
+// messageLog is the ordered message stream a registry dispatch shares
+// between a cast and its result: each message goes to sink when there is
+// one and is kept in pending otherwise.
+type messageLog struct {
+	sink    MessageSink
+	pending []any
+}
+
+func (l *messageLog) add(message any) {
+	if l.sink != nil {
+		l.sink(message)
+		return
+	}
+	l.pending = append(l.pending, message)
+}
+
+// record hands a caster-visible message to the dispatching registry's
+// message stream; a cast used outside a registry drops it.
 func (c Cast) record(message any) {
 	if c.messages != nil {
-		*c.messages = append(*c.messages, message)
+		c.messages.add(message)
 	}
 }
 
@@ -321,7 +346,7 @@ type (
 type Result struct {
 	// Messages retains the order in which handler messages were produced.
 	Messages       []any
-	messages       *[]any
+	messages       *messageLog
 	AttackFailed   int
 	Counterattacks []Counterattack
 	Lethals        []Lethal
@@ -353,7 +378,7 @@ type Result struct {
 
 func (r *Result) record(message any) {
 	if r.messages != nil {
-		*r.messages = append(*r.messages, message)
+		r.messages.add(message)
 		return
 	}
 	r.Messages = append(r.Messages, message)
@@ -485,10 +510,11 @@ func (r *Registry) Use(cast Cast) bool {
 }
 
 // UseResult dispatches cast and returns any caster-visible handler result.
+// Messages cast.Sink received are left out of the result's Messages.
 func (r *Registry) UseResult(cast Cast) (Result, bool) {
-	var messages []any
-	cast.messages = &messages
-	reported := Result{messages: &messages}
+	messages := &messageLog{sink: cast.Sink}
+	cast.messages = messages
+	reported := Result{messages: messages}
 	cast.resisted = &reported
 	h, ok := r.Handler(cast.Skill.SkillType)
 	if !ok {
@@ -497,11 +523,11 @@ func (r *Registry) UseResult(cast Cast) (Result, bool) {
 	if rh, ok := h.(resultHandler); ok {
 		result := rh.UseResult(cast)
 		result.Resisted = append(result.Resisted, reported.Resisted...)
-		result.Messages = messages
+		result.Messages = messages.pending
 		return result, true
 	}
 	h.Use(cast)
-	reported.Messages = messages
+	reported.Messages = messages.pending
 	return reported, true
 }
 

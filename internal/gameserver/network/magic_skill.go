@@ -199,8 +199,8 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 		}
 		live.clearFusionTarget(target.ObjectID())
 	}
+	handlers.Sink = l.playerMessageSink(live, nil)
 	result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
-	l.sendSkillHandlerResult(live, result)
 	l.syncCubicTargets(live, result, def)
 
 	l.broadcastCastStart(live, target, def, plan)
@@ -243,13 +243,12 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 
 // applyCastHit dispatches a player cast's effects to the affected set its
 // launch resolved. The final MP/HP costs already sent their own statuses;
-// what is left is a status for any change the effects made to the caster.
+// what is left is a status for any change the effects made to the caster
+// after the last status the cast's messages sent it.
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
 	before := live.Vitals()
+	handlers.Sink = l.playerMessageSink(live, func() { before = live.Vitals() })
 	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
-	if l.sendSkillHandlerResult(live, result) {
-		before = live.Vitals()
-	}
 	l.syncCubicTargets(live, result, def)
 	if !live.Character.Dead() {
 		sendMagicStatusUpdate(live, before)
@@ -553,8 +552,8 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
+		handlers.Sink = l.playerMessageSink(live, nil)
 		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
-		l.sendSkillHandlerResult(live, result)
 		l.syncCubicTargets(live, result, def)
 	} else {
 		skillhandler.StopEffect(live.Character, def.ID)
@@ -712,6 +711,18 @@ func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
 	handlers := l.castEffects()
 	handlers.OnHitResult = l.DeliverHitResult
 	return handlers
+}
+
+// playerMessageSink delivers a player caster's skill-handler messages as the
+// handler produces them, so each keeps its place among the frames the hit
+// itself sends (the target's status, death, the kill's rewards). onStatus,
+// when set, runs after each message that sent live its own status.
+func (l *GameClientLink) playerMessageSink(live *livePlayer, onStatus func()) skillhandler.MessageSink {
+	return func(message any) {
+		if l.sendSkillHandlerResult(live, actorcast.EffectResult{Messages: []any{message}}) && onStatus != nil {
+			onStatus()
+		}
+	}
 }
 
 // castEffects returns the effect handlers a cast dispatches through: the
