@@ -412,6 +412,11 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	// Built here, not lazily: every client goroutine shares this link.
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
+	if link.zones != nil {
+		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {
+			boss.Eject = func(a zone.Actor) { link.ejectBossPlayer(boss, a) }
+		}
+	}
 	return link, nil
 }
 
