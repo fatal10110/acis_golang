@@ -37,7 +37,7 @@ func sessionOnly(ev event.Event) bool {
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
 		event.RelaxHPFull, event.Restored, event.EffectEnded, event.EffectFelt, event.SpoilResult,
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
-		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.SkillDamageDealt, event.UserInfoChanged,
+		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge:
 		return true
@@ -230,6 +230,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, e.AttackerName))
 	case event.DamageReceived:
 		live.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS1GaveYouS2Dmg, e.AttackerName, int32(e.Amount)))
+	case event.ServitorDamageShared:
+		live.SendFrame(serverpackets.FrameSystemMessageTwoNumbers(serverpackets.SystemMessageGivenS1DamageToTargetS2ToServitor, int32(e.TargetDamage), int32(e.ServitorDamage)))
 	case event.SkillDamageDealt:
 		sendDamageMessage(live, skillhandler.Damage{
 			Source: skillhandler.DamageByPlayer, Amount: int32(e.Amount),

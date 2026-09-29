@@ -3,6 +3,7 @@ package player
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -469,7 +470,8 @@ type hitOutcome struct {
 // melee auto-attack, which passes no skill). Every damage route in the
 // reference converges on this block — melee (CreatureAttack.java:263), DOT
 // (EffectDamOverTime.java:48), and skill-cast (Player.java:6152/6154) — so
-// ReduceHP, ReduceHPByDOT, and TakeDamage all call it under vitalsMu, after
+// ReduceHP, ReduceHPByDOT, and TakeDamage all reach it through landHit,
+// after the servitor's damage share and under vitalsMu, and after
 // applyNonConsumptionDamageEffects's sleep/immobile-stop, stand-up, and
 // stun-break side effects (PlayerStatus.java:118-134), which run first in
 // the reference. Already-dead is a no-op, matching PlayerStatus.reduceHp.
@@ -503,23 +505,134 @@ func (c *Character) hitByOther(attacker attackable.Combatant) bool {
 	return attacker != nil && attacker.ObjectID() != c.ObjectID()
 }
 
+// hitBySelf reports whether attacker is c itself, by object id like
+// hitByOther. A nil attacker (a fall) is neither.
+func (c *Character) hitBySelf(attacker attackable.Combatant) bool {
+	return attacker != nil && attacker.ObjectID() == c.ObjectID()
+}
+
+// invulnerableTo reports whether c's invulnerability drops this damage: all
+// damage from anyone else or from no attacker, and c's own damage unless it
+// is a damage-over-time tick.
+func (c *Character) invulnerableTo(attacker attackable.Combatant, isDOT bool) bool {
+	return c.Invul() && (!c.hitBySelf(attacker) || !isDOT)
+}
+
+// damagePermitted reports whether attacker's damage permission lets its
+// damage change c's CP and HP. Only another creature's permission counts:
+// c's own damage (drowning, its own damage over time) always lands.
+func (c *Character) damagePermitted(attacker attackable.Combatant) bool {
+	return c.hitBySelf(attacker) || creature.CanDealDamage(attacker)
+}
+
+// servitorDamageShareRadius is how close c's servitor must be to take its
+// share of c's damage.
+const servitorDamageShareRadius = 900
+
+// damageShareServitor is the servitor surface a damage share lands through.
+type damageShareServitor interface {
+	IsPet() bool
+	Position() (x, y, z int)
+	HP() float64
+	TakeDamage(damage int, attacker attackable.Combatant) bool
+}
+
+// shareDamageWithServitor moves c's damage-transfer share of a hit another
+// creature dealt onto c's servitor (never a pet) when it is within
+// servitorDamageShareRadius, and returns that share. The share never takes
+// the servitor below 1 HP, and it lands through the servitor's own damage
+// path with the original attacker. It runs outside vitalsMu: the servitor
+// reports its damage to c.
+func (c *Character) shareDamageWithServitor(amount float64, attacker attackable.Combatant) int {
+	if !c.hitByOther(attacker) {
+		return 0
+	}
+	obj, ok := c.Summon()
+	if !ok {
+		return 0
+	}
+	servitor, ok := obj.(damageShareServitor)
+	if !ok || servitor.IsPet() {
+		return 0
+	}
+	sx, sy, sz := servitor.Position()
+	x, y, z := c.Position()
+	if !location.In3DRadius(x, y, z, sx, sy, sz, servitorDamageShareRadius) {
+		return 0
+	}
+	share := int(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100)
+	share = min(int(servitor.HP())-1, share)
+	if share <= 0 {
+		return 0
+	}
+	servitor.TakeDamage(share, attacker)
+	return share
+}
+
+// servitorShareRecipient is a player told how a hit it dealt was split
+// between its target and the target's servitor.
+type servitorShareRecipient interface {
+	NotifyServitorDamageShare(targetDamage, servitorDamage int)
+}
+
+// NotifyServitorDamageShare tells c that a hit it dealt, or its summon
+// dealt, landed targetDamage on its target and servitorDamage on the
+// target's servitor.
+func (c *Character) NotifyServitorDamageShare(targetDamage, servitorDamage int) {
+	c.emit(event.ServitorDamageShared{TargetDamage: targetDamage, ServitorDamage: servitorDamage})
+}
+
+// landHit applies one hit that got past the invulnerability, wake-up and
+// damage-permission steps: the servitor's share first, then CP before HP,
+// then the hit's feedback. It reports whether the hit left c dead; the
+// caller runs the death.
+func (c *Character) landHit(amount float64, attacker attackable.Combatant, ignoreCP, isDOT bool) bool {
+	shared := c.shareDamageWithServitor(amount, attacker)
+	amount -= float64(shared)
+	c.vitalsMu.Lock()
+	hit := c.absorbCPThenReduceHP(amount, attacker, ignoreCP)
+	c.vitalsMu.Unlock()
+	if !hit.applied {
+		return false
+	}
+	c.sendHitFeedback(amount, attacker, hit, isDOT, shared)
+	return hit.dead
+}
+
 // sendHitFeedback sends the damaged character what one applied hit owes
 // it: its status and, for a hit of at least one point another creature
 // dealt outside a damage-over-time tick, S1_GAVE_YOU_S2_DMG naming the
-// attacker with the full damage before CP absorbed any of it. The damage
-// report sits between the CP write and the HP write; only the write that
-// ends the hit reports the status, so a hit CP absorbed whole reports its
-// status first and any other hit reports it last.
-func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatant, hit hitOutcome, isDOT bool) {
+// attacker with the damage left after the servitor's share and before CP
+// absorbed any of it. When the servitor took a share, the attacking player
+// (a summon's owner) is told of the split next. The damage report sits
+// between the CP write and the HP write; only the write that ends the hit
+// reports the status, so a hit CP absorbed whole reports its status first
+// and any other hit reports it last.
+func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatant, hit hitOutcome, isDOT bool, shared int) {
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
 	if full := int(amount); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
+		if shared > 0 {
+			if recipient, ok := actingPlayer(attacker).(servitorShareRecipient); ok {
+				recipient.NotifyServitorDamageShare(full, shared)
+			}
+		}
 	}
 	if !hit.cpOnly {
 		c.BroadcastStatus()
 	}
+}
+
+// actingPlayer returns the creature a acts for: a summon's owner, or a
+// itself. Only a player among them takes player-addressed feedback.
+func actingPlayer(a attackable.Combatant) attackable.Combatant {
+	if a.Kind() == actor.KindSummon {
+		owner, _ := a.Owner()
+		return owner
+	}
+	return a
 }
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
@@ -538,7 +651,7 @@ func (c *Character) ReduceHPWithoutCastBreak(amount float64, attacker attackable
 // reduceSkillHP rolls a skill hit's cast break before the hit touches the
 // character, on the full damage and whatever the attacker's damage
 // permission: the break roll only exempts an invulnerable target. The
-// wake-up side effects follow, and only then does an attacker without
+// wake-up side effects follow, and only then does another attacker without
 // damage permission stop short of the CP and HP change.
 func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition, breakCast bool) {
 	if amount <= 0 || c.Invul() || c.Dead() {
@@ -548,17 +661,10 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 		c.breakCastOnDamage(amount)
 	}
 	c.applyNonConsumptionDamageEffects(false)
-	if !creature.CanDealDamage(attacker) {
+	if !c.damagePermitted(attacker) {
 		return
 	}
-	c.vitalsMu.Lock()
-	hit := c.absorbCPThenReduceHP(amount, attacker, skill.DirectHPDamage)
-	c.vitalsMu.Unlock()
-	if !hit.applied {
-		return
-	}
-	c.sendHitFeedback(amount, attacker, hit, false)
-	if hit.dead {
+	if c.landHit(amount, attacker, skill.DirectHPDamage, false) {
 		c.Die(attacker)
 	}
 }
@@ -573,43 +679,41 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 // 1-in-10 STUN-break roll. No datapack DOT effect sets dmgDirectlyToHp (the
 // only skill that does, Backstab, is a BLOW burst hit, never delivered
 // through EffectDamOverTime), so ignoreCP is always false here.
+//
+// Invulnerability drops the damage unless it is c's own damage-over-time
+// tick; drowning, which is c's own damage but not such a tick, is dropped
+// too. The wake-up side effects run next, and only then does another
+// attacker's damage permission gate the CP and HP change: c's own damage is
+// never gated by c's own permission.
 func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	killer, _ := attacker.(attackable.Combatant)
-	if amount <= 0 || c.Invul() || !creature.CanDealDamage(killer) {
+	if amount <= 0 || c.Dead() || c.invulnerableTo(killer, isDOT) {
 		return
 	}
-	c.vitalsMu.Lock()
-	if c.Dead() {
-		c.vitalsMu.Unlock()
-		return
-	}
-	c.vitalsMu.Unlock()
 	c.applyNonConsumptionDamageEffects(isDOT)
-	c.vitalsMu.Lock()
-	hit := c.absorbCPThenReduceHP(amount, killer, false)
-	c.vitalsMu.Unlock()
-	if !hit.applied {
+	if !c.damagePermitted(killer) {
 		return
 	}
-	c.sendHitFeedback(amount, killer, hit, isDOT)
-	if hit.dead {
+	if c.landHit(amount, killer, false, isDOT) {
 		c.Die(killer)
 	}
 }
 
 // applyNonConsumptionDamageEffects mirrors PlayerStatus.reduceHp's
 // !isHPConsumption block: every normal-hit or DOT damage source stops SLEEP
-// and IMMOBILE_UNTIL_ATTACKED, stands the character up unless it is in shop
-// mode, and — for non-DOT damage only — has a 1-in-10 chance to break STUN.
-// HP spent as a skill's own resource cost (isHPConsumption=true in the
-// reference) never routes through here.
+// and IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished
+// sitting down (an ordinary sit or a fake-death lie-down) unless it is in
+// shop mode, and — for non-DOT damage only — has a 1-in-10 chance to break
+// STUN. A sit-down or lie-down still under way is left to finish. HP spent
+// as a skill's own resource cost (isHPConsumption=true in the reference)
+// never routes through here.
 func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	live := c.liveLocked()
 	list := live.EffectList()
 	list.StopByType(effect.TypeSleep)
 	list.StopByType(effect.TypeImmobileUntilAttacked)
 
-	if !c.Standing() && !c.Operating() {
+	if c.Seated() && !c.Operating() {
 		c.StandUp()
 	}
 

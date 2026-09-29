@@ -201,6 +201,12 @@ func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant) {
 	})
 }
 
+// CanAttack reports whether the NPC's attack controller would start a swing
+// at target now, the check its AI runs before every swing.
+func (h *AttackingHostile) CanAttack(target attackable.Combatant) bool {
+	return h.ctl.CanAttack(target)
+}
+
 // AttackingHostileTemplate returns a fresh copy of the template
 // SpawnAttackingHostileNPCAt spawns, for a suite that tunes a field (for
 // example a heavier or lighter PAtk) and spawns it with

@@ -719,9 +719,10 @@ func (c *Character) SiegeGuard() bool { return false }
 // Playable reports whether this combatant is player-controlled.
 func (c *Character) Playable() bool { return true }
 
-// AttackableBy reports whether attacker may attack this player.
+// AttackableBy reports whether attacker may attack this player: any
+// living one, fake death included.
 func (c *Character) AttackableBy(target.Actor) bool {
-	return !c.AlikeDead()
+	return !c.Dead()
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force:

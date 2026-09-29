@@ -308,7 +308,8 @@ func (p *PlayerAttack) targetLost(target attackable.Combatant) bool {
 	if target == nil {
 		return true
 	}
-	if target.AlikeDead() {
+	// A fake-dead target is still there to attack; only a dead one is lost.
+	if target.Dead() {
 		return true
 	}
 	return !p.actor.Knows(target)

@@ -207,6 +207,14 @@ type DamageReceived struct {
 	Amount       int
 }
 
+// ServitorDamageShared reports a hit the character, or its summon, dealt
+// that its target's servitor took a share of: TargetDamage is what the
+// target took and ServitorDamage the servitor's share.
+type ServitorDamageShared struct {
+	TargetDamage   int
+	ServitorDamage int
+}
+
 // SkillDamageDealt reports a skill hit's damage to the attacking character,
 // for hits delivered outside a cast's own handler result. Blocked marks an
 // invulnerable target and Petrified one that is also paralyzed.
@@ -314,6 +322,7 @@ func (AttackFailed) event()           {}
 func (SkillResisted) event()          {}
 func (MagicResisted) event()          {}
 func (DamageReceived) event()         {}
+func (ServitorDamageShared) event()   {}
 func (SkillDamageDealt) event()       {}
 func (HerbConsumed) event()           {}
 func (AttackRequested) event()        {}
