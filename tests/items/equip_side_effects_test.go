@@ -380,3 +380,176 @@ func TestUseItemWeaponEquipRechargesAutoShots(t *testing.T) {
 	}
 	drainUntilQuiet(t, c)
 }
+
+// framesUntilUserInfo reads frames up to the next UserInfo and returns the
+// ones before it.
+func framesUntilUserInfo(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
+	var frames [][]byte
+	for range 20 {
+		f := c.Read()
+		if f[0] == serverpackets.OpcodeUserInfo {
+			return frames
+		}
+		frames = append(frames, f)
+	}
+	t.Fatal("no UserInfo within 20 frames")
+	return nil
+}
+
+// assertSilentWeaponEquip requires an equip burst whose only system message
+// is S1_EQUIPPED for templateID, with no ActionFailed, no ExAutoSoulShot and
+// no charge visual ahead of UserInfo.
+func assertSilentWeaponEquip(t *testing.T, frames [][]byte, templateID int32, what string) {
+	t.Helper()
+	var messages [][]byte
+	for _, f := range frames {
+		switch f[0] {
+		case serverpackets.OpcodeSystemMessage:
+			messages = append(messages, f)
+		case serverpackets.OpcodeActionFailed:
+			t.Fatalf("%s: ActionFailed ahead of UserInfo, want none for a server-driven recharge", what)
+		case serverpackets.OpcodeMagicSkillUse:
+			t.Fatalf("%s: charge visual (MagicSkillUse) ahead of UserInfo, want no recharge", what)
+		case serverpackets.OpcodeExtended:
+			if len(f) >= 3 && wire.NewReader(f[1:]).ReadUint16() == serverpackets.OpcodeExAutoSoulShot {
+				t.Fatalf("%s: ExAutoSoulShot ahead of UserInfo, want the auto-use icon left alone", what)
+			}
+		}
+	}
+	if len(messages) != 1 {
+		t.Fatalf("%s: %d system messages ahead of UserInfo, want only S1_EQUIPPED", what, len(messages))
+	}
+	assertSystemMessageItem(t, messages[0], serverpackets.SystemMessageS1Equipped, templateID)
+}
+
+// autoSoulShotEnabled reads whether objID has itemID set to auto-use.
+func autoSoulShotEnabled(t *testing.T, srv *gameservertest.Server, objID, itemID int32) bool {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("player %d not online", objID)
+	}
+	holder, ok := obj.(interface{ AutoSoulShotEnabled(int32) bool })
+	if !ok {
+		t.Fatalf("player %d = %T has no auto-shot state", objID, obj)
+	}
+	return holder.AutoSoulShotEnabled(itemID)
+}
+
+// TestUseItemWeaponEquipAutoShotGradeMismatchIsSilent pins a rejected
+// auto-use recharge: equipping the D-grade sword with a C-grade soulshot on
+// auto-use is refused by the grade gate without a word, since the stack is
+// auto-enabled and no click is pending. The equip burst carries only
+// S1_EQUIPPED ahead of UserInfo, the stack keeps every shot, and auto-use
+// stays on.
+func TestUseItemWeaponEquipAutoShotGradeMismatchIsSilent(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	weapon := srv.GiveItem(t, objID, 30, 1)
+	shot := srv.GiveItem(t, objID, 1464, 10)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestAutoSoulShot(1464, 1))
+	assertExAutoSoulShot(t, c.Read(), 1464, true)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeUseItem(weapon, false))
+	assertSilentWeaponEquip(t, framesUntilUserInfo(t, c), 30, "grade-mismatched auto soulshot")
+	for _, f := range collectUntilQuiet(t, c) {
+		if f[0] == serverpackets.OpcodeActionFailed || f[0] == serverpackets.OpcodeSystemMessage {
+			t.Fatalf("frame %#x after the equip UserInfo, want no rejection reply at all", f[0])
+		}
+	}
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	srv.FlushItems(t)
+	if inst := mustFindItem(t, srv, objID, shot); inst.Count != 10 {
+		t.Fatalf("shot count after the rejected recharge = %d, want 10", inst.Count)
+	}
+	if !autoSoulShotEnabled(t, srv, objID, 1464) {
+		t.Fatal("grade mismatch turned auto-use off, want it left on")
+	}
+}
+
+// TestUseItemWeaponEquipDropsStaleAutoShot pins the stale auto-use entry: a
+// soulshot stack destroyed whole while on auto-use leaves its id behind, and
+// the next weapon equip removes it without a packet. Picking a new stack of
+// the same shot up does not revive the entry, so a later equip does not recharge until
+// auto-use is turned on again.
+func TestUseItemWeaponEquipDropsStaleAutoShot(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	weapon := srv.GiveItem(t, objID, 30, 1)
+	shot := srv.GiveItem(t, objID, 1463, 10)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestAutoSoulShot(1463, 1))
+	assertExAutoSoulShot(t, c.Read(), 1463, true)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestDestroyItem(shot, 10))
+	drainUntilQuiet(t, c)
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	if carriedCount(t, srv, objID, 1463) != 0 {
+		t.Fatal("soulshot stack still carried after destroying all of it")
+	}
+	if !autoSoulShotEnabled(t, srv, objID, 1463) {
+		t.Fatal("destroying the stack cleared auto-use; the stale-entry path needs it left behind")
+	}
+
+	c.Send(encodeUseItem(weapon, false))
+	assertSilentWeaponEquip(t, framesUntilUserInfo(t, c), 30, "stale auto-use entry")
+	drainUntilQuiet(t, c)
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	if autoSoulShotEnabled(t, srv, objID, 1463) {
+		t.Fatal("equip kept the auto-use entry of a stack no longer carried")
+	}
+
+	// Take the weapon off, pick up a fresh stack of the same shot, and put
+	// the weapon on again: the entry is gone, so nothing recharges.
+	c.Send(encodeUseItem(weapon, false))
+	readUntilUserInfo(t, c)
+	drainUntilQuiet(t, c)
+	srv.SeedGroundItem(t, objID, 1463, 10, spawnX, spawnY, spawnZ)
+	drainUntilQuiet(t, c)
+	c.Send(encodeAction(soleGroundObjectID(t, srv), spawnX, spawnY, spawnZ, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup pending-action release")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, "GetItem")
+	drainUntilQuiet(t, c)
+	srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, c)
+	if got := carriedCount(t, srv, objID, 1463); got != 10 {
+		t.Fatalf("soulshots carried after pickup = %d, want 10", got)
+	}
+
+	c.Send(encodeUseItem(weapon, false))
+	assertSilentWeaponEquip(t, framesUntilUserInfo(t, c), 30, "re-equip after pickup")
+	drainUntilQuiet(t, c)
+	if got := carriedCount(t, srv, objID, 1463); got != 10 {
+		t.Fatalf("soulshots carried after re-equip = %d, want 10 (no recharge without auto-use)", got)
+	}
+
+	// Turning auto-use back on makes the next equip recharge again.
+	c.Send(encodeRequestAutoSoulShot(1463, 1))
+	assertExAutoSoulShot(t, c.Read(), 1463, true)
+	drainUntilQuiet(t, c)
+	c.Send(encodeUseItem(weapon, false))
+	readUntilUserInfo(t, c)
+	drainUntilQuiet(t, c)
+	c.Send(encodeUseItem(weapon, false))
+	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageS1Equipped, 30)
+	if id := systemMessageID(t, c.Read()); id != serverpackets.SystemMessageEnabledSoulshot {
+		t.Fatalf("message after S1_EQUIPPED with auto-use back on = %d, want EnabledSoulshot (%d)", id, serverpackets.SystemMessageEnabledSoulshot)
+	}
+	drainUntilQuiet(t, c)
+	if got := carriedCount(t, srv, objID, 1463); got != 9 {
+		t.Fatalf("soulshots carried after the re-enabled recharge = %d, want 9", got)
+	}
+}
