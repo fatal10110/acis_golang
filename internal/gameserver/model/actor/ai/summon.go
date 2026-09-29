@@ -36,12 +36,22 @@ type SummonMoveController interface {
 	MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error)
 }
 
+// SummonCastController is the cast controller a summon AI drives: the shared
+// AI cast gates plus the playable target conditions checked last, after the
+// cost gates.
+type SummonCastController interface {
+	CastController
+	// MeetsCastConditions applies ref's target-type conditions against
+	// target, reporting any failure to the owner.
+	MeetsCastConditions(target attackable.Combatant, ref skill.Ref, ctrl bool) bool
+}
+
 // Summon drives one pet or servitor's owner-directed intentions.
 type Summon struct {
 	actor  SummonActor
 	move   SummonMoveController
 	attack AttackController
-	cast   CastController
+	cast   SummonCastController
 	log    zerolog.Logger
 
 	// mu guards current and next. A Betray effect turns the summon on its
@@ -72,7 +82,7 @@ func (s *Summon) SetLogger(log zerolog.Logger) {
 // SetCastController wires the AI loop's TryToCast handling to controller.
 // Left unset (the default), TryToCast is a no-op, matching a summon with no
 // commandable special skill.
-func (s *Summon) SetCastController(controller CastController) {
+func (s *Summon) SetCastController(controller SummonCastController) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.cast = controller
@@ -137,7 +147,8 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 
 // TryToCast sets target/ref as the cast intention and evaluates it once,
 // mirroring TryToAttack's shape for an owner-commanded special-skill cast.
-func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref) bool {
+// ctrl is the command's forced-use modifier, read by the target conditions.
+func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -148,10 +159,10 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref) bool {
 		return false
 	}
 	if s.busyLocked() {
-		s.next = intention{kind: IntentionCast, target: target, skill: ref}
+		s.next = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl}
 		return true
 	}
-	s.current = intention{kind: IntentionCast, target: target, skill: ref}
+	s.current = intention{kind: IntentionCast, target: target, skill: ref, ctrl: ctrl}
 	accepted, err := s.thinkCastLocked()
 	if err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -374,7 +385,7 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 		}
 	}
 
-	if !s.cast.CanCast(target, ref) {
+	if !s.cast.CanCast(target, ref) || !s.cast.MeetsCastConditions(target, ref, s.current.ctrl) {
 		s.current = intention{kind: IntentionIdle}
 		if target.ObjectID() != s.actor.ObjectID() {
 			s.actor.BroadcastMoveToPawn(target)

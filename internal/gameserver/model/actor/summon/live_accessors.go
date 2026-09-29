@@ -512,13 +512,14 @@ func (a *Actor) CanUseSkill() bool {
 // PlayableAI.java:297, void return) does not feed back into the result
 // here. TryUseSkill returns false only wherever Java's useSkill would
 // (unknown skill, level gap, no attached AI); a dispatched cast reports
-// true even if the AI goes on to reject it.
-func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant) bool {
+// true even if the AI goes on to reject it. ctrl is the command's
+// forced-use modifier.
+func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool) bool {
 	ref, ok := a.GetSkill(skillID)
 	if !ok || !a.CanUseSkill() || a.brain == nil {
 		return false
 	}
-	a.brain.TryToCast(target, ref)
+	a.brain.TryToCast(target, ref, ctrl)
 	return true
 }
 

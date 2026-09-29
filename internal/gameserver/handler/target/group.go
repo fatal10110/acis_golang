@@ -203,33 +203,36 @@ func (partyMemberHandler) FinalTarget(_, target Actor, _ *modelskill.Definition)
 	return target
 }
 
-// CanCast gates a single-target party-member skill. The Summon Friend skill
-// (id 1403) only accepts a living player target; other skills also accept the
-// caster's own summon and otherwise require a living playable. Every case
-// then requires the target to be a member of the caster's party.
-//
-// The reference sends an "S1 cannot be used" system message on each failed
-// branch; that network send belongs to the cast pipeline, not this layer.
 func (partyMemberHandler) CanCast(caster, target Actor, skill *modelskill.Definition, _ bool) bool {
-	if target == nil {
-		return false
-	}
+	return target != nil && partyMemberCastRejection(caster, target, skill) == CastRejectNone
+}
+
+// partyMemberCastRejection gates a single-target party-member skill. The
+// caster itself always passes. The Summon Friend skill (id 1403) only
+// accepts a living player target; other skills also accept the caster's own
+// summon and otherwise require a living playable. Every other target must
+// then be a member of the caster's party. Each failure refuses the skill by
+// name.
+func partyMemberCastRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
 	if sameCreature(caster, target) {
-		return true
+		return CastRejectNone
 	}
 	if skill != nil && skill.ID == summonFriendSkillID {
 		if !isPlayerLike(target) || target.Dead() {
-			return false
+			return CastRejectCannotUseSkill
 		}
 	} else {
 		if summon, ok := summonOf(caster); ok && sameCreature(summon, target) {
-			return true
+			return CastRejectNone
 		}
 		if !isPlayable(target) || target.Dead() {
-			return false
+			return CastRejectCannotUseSkill
 		}
 	}
-	return caster.IsInParty() && caster.PartyContains(target)
+	if !caster.IsInParty() || !caster.PartyContains(target) {
+		return CastRejectCannotUseSkill
+	}
+	return CastRejectNone
 }
 
 type partyOtherHandler struct{}
@@ -244,28 +247,33 @@ func (partyOtherHandler) FinalTarget(_, target Actor, _ *modelskill.Definition) 
 	return target
 }
 
-// CanCast gates a single-target party-other skill: never on self, only on a
-// living player, with the dual-class tracker skills (426 on a mage, 427 on a
-// non-mage) rejected, and the target must be in the caster's party.
-//
-// As with the party-member handler, the reference's system-message sends on
-// each failed branch belong to the cast pipeline and are not reproduced here.
 func (partyOtherHandler) CanCast(caster, target Actor, skill *modelskill.Definition, _ bool) bool {
-	if target == nil || sameCreature(caster, target) {
-		return false
+	return target != nil && partyOtherCastRejection(caster, target, skill) == CastRejectNone
+}
+
+// partyOtherCastRejection gates a single-target party-other skill: never on
+// the caster, only on a living player, with the dual-class tracker skills
+// (426 on a mage, 427 on a non-mage) refused, and the target must be in the
+// caster's party.
+func partyOtherCastRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
+	if sameCreature(caster, target) {
+		return CastRejectCannotUseOnYourself
 	}
 	if !isPlayerLike(target) || target.Dead() {
-		return false
+		return CastRejectInvalidTarget
 	}
 	if skill != nil {
 		if skill.ID == dualcastManaSkillID && target.MageClass() {
-			return false
+			return CastRejectCannotUseSkill
 		}
 		if skill.ID == dualcastHealSkillID && !target.MageClass() {
-			return false
+			return CastRejectCannotUseSkill
 		}
 	}
-	return caster.IsInParty() && caster.PartyContains(target)
+	if !caster.IsInParty() || !caster.PartyContains(target) {
+		return CastRejectCannotUseSkill
+	}
+	return CastRejectNone
 }
 
 type corpseAllyHandler struct{ known Known }
@@ -304,15 +312,17 @@ func (corpseAllyHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) 
 	return caster
 }
 
-// CanCast blocks corpse-ally skills while the caster participates in the
-// Olympiad; the "skill unavailable during the Olympiad" send is the cast
-// pipeline's responsibility.
 func (corpseAllyHandler) CanCast(caster, _ Actor, _ *modelskill.Definition, _ bool) bool {
-	player, ok := actingPlayerOf(caster)
-	if !ok {
-		return true
+	return corpseAllyCastRejection(caster) == CastRejectNone
+}
+
+// corpseAllyCastRejection bars corpse-ally skills while the caster's acting
+// player takes part in the Olympiad.
+func corpseAllyCastRejection(caster Actor) CastRejection {
+	if player, ok := actingPlayerOf(caster); ok && player.OlympiadMode() {
+		return CastRejectOlympiadUnavailable
 	}
-	return !player.OlympiadMode()
+	return CastRejectNone
 }
 
 // summonFriendSkillID matches the Summon Friend skill that TargetPartyMember

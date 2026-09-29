@@ -105,8 +105,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
-			// No final target, or a handler that reports its failure only
-			// as a bool: the request is dropped with ActionFailed alone.
+			// No final target: the request is dropped with ActionFailed
+			// alone.
 			sendMagicActionFailed(live)
 			return
 		}
@@ -319,14 +319,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
-	if finalTarget == nil {
-		return nil, skilltarget.CastRejectNone
-	}
 	// Ground LOS/peace/heading run after cost validation via AfterCanCast.
-	// handler.CanCast here would drop the caster target and skip those messages.
-	if def.Target != modelskill.TargetGround && !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
-		return nil, skilltarget.CastRejectNone
-	}
 	return finalTarget, skilltarget.CastRejectNone
 }
 
@@ -349,6 +342,10 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
 	case skilltarget.CastRejectSweepNotMonster:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	case skilltarget.CastRejectCannotUseOnYourself:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseOnYourself))
+	case skilltarget.CastRejectOlympiadUnavailable:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillUnavailableForOlympiad))
 	}
 }
 

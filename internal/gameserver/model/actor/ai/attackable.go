@@ -137,8 +137,10 @@ type intention struct {
 	kind   Intention
 	target attackable.Combatant
 	skill  skill.Ref
-	loc    location.Location
-	timer  int
+	// ctrl is a summon cast's CTRL (forced-use) modifier.
+	ctrl  bool
+	loc   location.Location
+	timer int
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
