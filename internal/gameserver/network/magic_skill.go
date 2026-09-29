@@ -115,6 +115,11 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		if errors.Is(err, errGroundCastRejected) {
 			return
 		}
+		// A nextActionAttack skill refused at its cost and condition checks
+		// still hands on to the attack, after the refusal's own packets.
+		if started.CanCastFailure {
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target))
+		}
 		// A player's cast that fails its cost or target conditions after the
 		// hit-time stop answers with its reason alone: no ActionFailed, no
 		// heading toward the target and no MoveToPawn (those belong to the
@@ -170,6 +175,13 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 			sendMagicCastFailureReason(live, def, err)
 		},
 	})
+}
+
+// castCombatant is a cast's final target as a creature, nil when it is not
+// one.
+func castCombatant(target actorcast.Target) attackable.Combatant {
+	combatant, _ := target.(attackable.Combatant)
+	return combatant
 }
 
 // broadcastCastStart sends a player's cast-start MagicSkillUse to everyone
@@ -546,14 +558,14 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live, false)
 			sendMagicActionFailed(live)
-			live.endCastIntention(def)
+			live.endCastIntention(def, castCombatant(target))
 			return
 		}
 		sendMagicCastFailure(live, def, err)
 		return
 	}
 	// A toggle's cast ends as soon as it has switched, with no CastFinished.
-	defer live.endCastIntention(def)
+	defer live.endCastIntention(def, castCombatant(target))
 
 	if activated {
 		// Each cost CastToggle paid already sent its own status.

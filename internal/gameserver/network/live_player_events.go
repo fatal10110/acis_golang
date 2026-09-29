@@ -3,6 +3,8 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -272,8 +274,16 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 		live.finishAttack()
 	case event.BowShotFinished:
-		// A shot's end re-thinks only an attack queued behind it; the bow
-		// reuse still running answers it with ActionFailed.
+		// A shot's end runs whatever was queued behind it, while the bow
+		// still reloads: a pickup, cast or follow starts now, and an attack
+		// is re-thought, which the running reuse answers with ActionFailed.
+		l.finishDeferredPickup(live)
+		magicHeld := l.finishDeferredMagicSkill(live)
+		itemHeld := l.finishDeferredItemAICast(live)
+		followHeld := l.finishDeferredFollow(live)
+		if magicHeld || itemHeld || followHeld {
+			return
+		}
 		if live.combat != nil && live.combat.ThinkQueued() {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
@@ -307,7 +317,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SkillMasteryProc:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillReadyToUseAgain))
 	case event.CastFinished:
-		l.finishLiveCast(live, e.Skill)
+		l.finishLiveCast(live, e.Skill, e.Target)
 	case event.PetSummonRequested:
 		if controlItem, ok := e.ControlItem.(*item.Instance); ok {
 			(&gameSummonSpawner{link: l, live: live}).SpawnPet(live.Character, controlItem)
@@ -402,8 +412,9 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
 }
 
-// finishLiveCast resumes live's intentions once an in-flight cast ends.
-func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition) {
+// finishLiveCast resumes live's intentions once an in-flight cast of def on
+// target ends.
+func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
 	// A queued item cast or skill request replaced the cast that just ended
 	// as the intention, whether it starts now or not: the ended cast's
 	// nextActionAttack follow-up does not run.
@@ -425,23 +436,39 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		}
 		return
 	}
-	live.endCastIntention(def)
+	live.endCastIntention(def, target)
 }
 
-// endCastIntention ends the CAST intention a cast of def held, with nothing
-// queued behind it: a skill carrying nextActionAttack re-engages the attack
-// it replaced; anything else, a toggle included, goes idle.
-func (live *livePlayer) endCastIntention(def modelskill.Definition) {
+// endCastIntention ends the CAST intention a cast of def on target held,
+// with nothing queued behind it: a skill carrying nextActionAttack attacks
+// target when live may attack it without force; anything else, a toggle
+// included, goes idle.
+func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant) {
 	if live.combat == nil {
 		return
 	}
-	if def.NextActionIsAttack {
-		if live.combat.FollowUpAfterCast() {
-			live.SendFrame(serverpackets.FrameActionFailed())
-		}
+	if live.attackAfterCast(def, target) {
 		return
 	}
 	live.combat.Stop()
+}
+
+// attackAfterCast starts the attack a nextActionAttack skill hands on to its
+// final target, once its cast ends or is refused at its cost and condition
+// checks. It reports false, starting nothing, for any other skill, or a
+// target live may not attack without force.
+func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant) bool {
+	if live.combat == nil || !def.NextActionIsAttack || target == nil {
+		return false
+	}
+	rules, ok := target.(skilltarget.Actor)
+	if !ok || !rules.AttackableWithoutForceBy(live.Character) {
+		return false
+	}
+	if live.combat.AttackAfterCast(target) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+	return true
 }
 
 // stopLiveActions stops what e names in target, movement, attack, cast

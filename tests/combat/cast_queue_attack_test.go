@@ -35,11 +35,14 @@ func queueScrollSkill() modelskill.Definition {
 	}
 }
 
-// queueFollowUpSkill is a long self cast carrying nextActionAttack. It is
-// not offensive, so the fixture monster never answers it with its own
-// swings.
+// queueFollowUpSkill is a long offensive cast on the selected monster
+// carrying nextActionAttack: with nothing queued behind it, its end attacks
+// the monster. The fixture monster is parked and never swings back.
 func queueFollowUpSkill() modelskill.Definition {
 	def := queueCastSkill(queueFollowUpSkillID)
+	def.Target = modelskill.TargetOne
+	def.CastRange = 600
+	def.Offensive = true
 	def.NextActionIsAttack = true
 	return def
 }
