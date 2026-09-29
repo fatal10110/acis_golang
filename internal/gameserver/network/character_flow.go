@@ -303,14 +303,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
 	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
-	if l.world != nil {
-		x, y, z := c.Position()
-		l.world.Spawn(live, x, y, z, c.LastHeading)
-		l.world.AddPlayer(live)
-		if l.zones != nil && live.zoneActor != nil {
-			live.zoneActor.revalidate(l.zones)
-		}
-	}
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
 	if l.playerClock != nil {
@@ -334,6 +326,14 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.skills.ReplayEffects(c)
 	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
+	if l.world != nil {
+		x, y, z := c.Position()
+		l.world.Spawn(live, x, y, z, c.LastHeading)
+		l.world.AddPlayer(live)
+		if live.zoneActor != nil {
+			live.zoneActor.revalidate(l.zones)
+		}
+	}
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))
 	if l.sevenSigns != nil {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(sevenSignsPeriodMessage(l.sevenSigns.CurrentPeriod())))

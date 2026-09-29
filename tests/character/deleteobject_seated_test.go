@@ -31,8 +31,12 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 		observer.Read()
 		observer.Read()
 		observer.Send(encodeEnterWorld())
+		for _, opcode := range []byte{serverpackets.OpcodeSendMacroList, serverpackets.OpcodeExtended, serverpackets.OpcodeHennaInfo, serverpackets.OpcodeEtcStatusUpdate} {
+			mustReadOpcode(t, observer, opcode, "EnterWorld prefix")
+		}
 		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "seated player CharInfo")
 		mustReadOpcode(t, observer, serverpackets.OpcodeChairSit, "seated player ChairSit")
+		gameservertest.ReadInitialCompass(t, observer, serverpackets.OpcodeStaticObjectInfo)
 	})
 
 	t.Run("ground sitting", func(t *testing.T) {
@@ -48,8 +52,11 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 		observer.Read()
 		observer.Read()
 		observer.Send(encodeEnterWorld())
+		for _, opcode := range []byte{serverpackets.OpcodeSendMacroList, serverpackets.OpcodeExtended, serverpackets.OpcodeHennaInfo, serverpackets.OpcodeEtcStatusUpdate} {
+			mustReadOpcode(t, observer, opcode, "EnterWorld prefix")
+		}
 		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "ground-sitting player CharInfo")
-		mustReadOpcode(t, observer, serverpackets.OpcodeSendMacroList, "ground-sitting player enter-world burst")
+		gameservertest.ReadInitialCompass(t, observer)
 	})
 }
 
@@ -73,9 +80,9 @@ func TestLogoutDeleteObjectSeatedFlag(t *testing.T) {
 	})
 }
 
-func bootObserverPair(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient, *testsupport.ScriptedClient, int32) {
+func bootObserverPair(t *testing.T, opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, *testsupport.ScriptedClient, int32) {
 	t.Helper()
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1)}, opts...)...)
 	c := srv.Client
 	enterWorld(t, c)
 	drainQuiet(t, c)

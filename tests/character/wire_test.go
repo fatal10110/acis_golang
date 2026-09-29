@@ -110,6 +110,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		serverpackets.OpcodeActionFailed,
 	}
 	frames := make([][]byte, 0, len(want))
+	var compass []byte
 	for i, opcode := range want {
 		frame := c.Read()
 		// A client that already knows another player receives that player's
@@ -121,8 +122,12 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			compass = gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+		}
 	}
-	return frames
+	// Preserve the established burst indices used by other flow tests.
+	return append(frames, compass)
 }
 
 func assertStatusAttrs(t *testing.T, frame []byte, objectID int32, attrs []serverpackets.StatusAttribute) {

@@ -15,6 +15,7 @@ const (
 	OpcodeExEnchantSkillInfo          uint16 = 0x0018
 	OpcodeExMailArrived               uint16 = 0x002d
 	OpcodeExStorageMaxCount           uint16 = 0x002e
+	OpcodeExSetCompassZoneCode        uint16 = 0x0032
 	OpcodeExPledgeCrestLarge          uint16 = 0x0028
 	OpcodeExPledgeSkillList           uint16 = 0x0039
 	OpcodeExCursedWeaponList          uint16 = 0x0045

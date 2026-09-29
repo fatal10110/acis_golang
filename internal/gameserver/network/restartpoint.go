@@ -125,6 +125,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	if l.water != nil {
 		l.water.Remove(live)
 	}
+	if live.zoneActor != nil {
+		live.zoneActor.sendCurrentCompass()
+	}
 	l.updateLivePlayerPosition(live, target, heading)
 }
 
