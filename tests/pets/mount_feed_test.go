@@ -71,7 +71,8 @@ func mountRestartTable() *restart.Table {
 }
 
 // bootWyvernRider boots the owner with a wyvern collar and the fed wyvern,
-// and mounts it. It returns the harness and the frames the mount sent.
+// and mounts it. It returns the harness and the frames the mount sent from
+// its Ride through the rider's UserInfo.
 func bootWyvernRider(t *testing.T, seeds ...seedItem) (*petWorld, [][]byte) {
 	t.Helper()
 	return bootWyvernRiderOpts(t, nil, seeds...)
@@ -88,7 +89,8 @@ func bootWyvernRiderOpts(t *testing.T, extra []gameservertest.Option, seeds ...s
 		t.Skip("counting 10-second feed ticks needs the driven clock")
 	}
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
-	return h, readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")
+	ride := readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "mount Ride")
+	return h, append(ride[len(ride)-1:], readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")...)
 }
 
 // feedGauge is one green SetupGauge frame.
@@ -406,6 +408,7 @@ func TestMountedPlayerKeepsMoveType(t *testing.T) {
 	}
 
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "mount Ride")
 	readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")
 	drainUntilQuiet(t, h.client)
 

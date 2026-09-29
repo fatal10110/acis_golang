@@ -67,7 +67,7 @@ func TestWyvernRiderUsesMountFootprint(t *testing.T) {
 	}
 
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
-	assertFrameOpcode(t, mustRead(t, h.client, "Ride broadcast"), serverpackets.OpcodeRide, "Ride")
+	readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "Ride broadcast")
 	readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")
 
 	if got := rider.CollisionRadius(); got != wyvernRadius {
@@ -95,7 +95,7 @@ func TestWyvernRiderCannotAttack(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
-	assertFrameOpcode(t, mustRead(t, h.client, "Ride broadcast"), serverpackets.OpcodeRide, "Ride")
+	readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "Ride broadcast")
 	drainUntilQuiet(t, h.client)
 
 	obj, ok := h.srv.State.Player(h.ownerID)
@@ -133,7 +133,7 @@ func TestMountedPlayerCannotEquipWeapon(t *testing.T) {
 	}, seedItem{TemplateID: wyvernCollarID, Count: 1}, seedItem{TemplateID: swordID, Count: 1})
 
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
-	assertFrameOpcode(t, mustRead(t, h.client, "Ride broadcast"), serverpackets.OpcodeRide, "Ride")
+	readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "Ride broadcast")
 	drainUntilQuiet(t, h.client)
 
 	sword := h.seededItem(t, swordID)

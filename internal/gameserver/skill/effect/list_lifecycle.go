@@ -153,6 +153,22 @@ func (l *List) StopBySkillID(id modelskill.ID) {
 	}
 }
 
+// StopAllToggles removes every toggle held among the buffs, running each
+// exit hook, matching EffectList.stopAllToggles.
+func (l *List) StopAllToggles() {
+	if l == nil {
+		return
+	}
+	l.mu.Lock()
+	buffs := slices.Clone(l.buffs)
+	l.mu.Unlock()
+	for _, e := range buffs {
+		if e != nil && e.Skill.Toggle {
+			l.Remove(e)
+		}
+	}
+}
+
 // StopAll removes every active effect, running each exit hook.
 func (l *List) StopAll() {
 	if l == nil {

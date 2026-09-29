@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
@@ -192,16 +193,21 @@ func (c *Character) autoFeedMount(food1, food2 int32, hungry bool) {
 }
 
 // Dismount takes the character off its mount and stops the mount's feed
-// task, and reports whether it was mounted.
+// task, and reports whether it was mounted. Leaving a flying mount takes
+// Wyvern Breath away.
 func (c *Character) Dismount() bool {
 	c.stateMu.Lock()
 	if c.mountNPCID == 0 {
 		c.stateMu.Unlock()
 		return false
 	}
+	wasFlying := c.flying
 	c.mountNPCID, c.mountObjectID, c.mountType = 0, 0, 0
 	c.flying = false
 	c.stateMu.Unlock()
+	if wasFlying {
+		c.SetSkillLevel(int(modelskill.WyvernBreathSkillID), 0)
+	}
 
 	f := &c.mountFeed
 	f.mu.Lock()

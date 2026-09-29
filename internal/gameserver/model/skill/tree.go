@@ -108,6 +108,10 @@ const LuckySkillMaxLevel = 10
 // lookahead every other skill gets.
 const ExpertiseSkillID ID = 239
 
+// WyvernBreathSkillID is the skill a wyvern rider holds, at level 1, while
+// flying it.
+const WyvernBreathSkillID ID = 4289
+
 // NewEnchantSkill builds an EnchantSkill from one <enchantSkill> element's
 // decoded attributes. itemID and itemCount are both zero when the level
 // carries no item requirement.

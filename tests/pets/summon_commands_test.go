@@ -91,8 +91,8 @@ func TestWyvernCollarMountsPlayer(t *testing.T) {
 	secondCollar := wyvernCollar
 
 	h.client.Send(encodeUseItem(wyvernCollar, false))
-	frame := mustRead(t, h.client, "Ride broadcast")
-	assertFrameOpcode(t, frame, serverpackets.OpcodeRide, "Ride")
+	ride := readUntilOpcode(t, h.client, serverpackets.OpcodeRide, "Ride broadcast")
+	frame := ride[len(ride)-1]
 	r := wire.NewReader(frame[1:])
 	if id := r.ReadInt32(); id != h.ownerID {
 		t.Fatalf("Ride rider id = %d, want %d", id, h.ownerID)
