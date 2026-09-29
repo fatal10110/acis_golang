@@ -16,7 +16,9 @@ const (
 	SystemMessageDeathPenaltyLevelS1Added          = 1916
 	SystemMessageMasterCannotRes                   = 1511
 	SystemMessageResHasAlreadyBeenProposed         = 1513
+	SystemMessageCannotResMaster                   = 1514
 	SystemMessageCannotResPet2                     = 1515
+	SystemMessageCannotBeResurrectedDuringSiege    = 1053
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48

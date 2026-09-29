@@ -67,6 +67,14 @@ func (c *Character) ReviveRequest(reviver Reviver, power float64, isPet bool) {
 	c.emit(event.ReviveRequested{ReviverName: reviver.CharacterName()})
 }
 
+// ReviveOffer reports whether this character has a resurrection offer open,
+// and whether that offer is for its pet rather than for itself.
+func (c *Character) ReviveOffer() (pending, forPet bool) {
+	c.reviveMu.Lock()
+	defer c.reviveMu.Unlock()
+	return c.reviveRequested, c.reviveRequested && c.revivePet
+}
+
 // OfferSummonRevive offers this character the resurrection of its summon,
 // which just died under a Phoenix Blessing.
 func (c *Character) OfferSummonRevive() {

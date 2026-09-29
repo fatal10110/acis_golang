@@ -261,6 +261,8 @@ type servitorOwner struct {
 	srv    *gameservertest.Server
 	client *testsupport.ScriptedClient
 	id     int32
+	// seeded maps each seeded template id to the object ids given for it.
+	seeded map[int32][]int32
 }
 
 const (
@@ -279,6 +281,13 @@ func bootServitorOwner(t *testing.T, extra ...gameservertest.Option) *servitorOw
 // bootServitorOwnerWithSkills boots an owner who knows a servitor summon
 // skill and every skill in known.
 func bootServitorOwnerWithSkills(t *testing.T, known []modelskill.Definition, extra ...gameservertest.Option) *servitorOwner {
+	t.Helper()
+	return bootServitorOwnerWithItems(t, known, nil, extra...)
+}
+
+// bootServitorOwnerWithItems is bootServitorOwnerWithSkills with seeds put
+// in the owner's inventory before it enters the world.
+func bootServitorOwnerWithItems(t *testing.T, known []modelskill.Definition, seeds []seedItem, extra ...gameservertest.Option) *servitorOwner {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable(append([]modelskill.Definition{{
@@ -304,8 +313,12 @@ func bootServitorOwnerWithSkills(t *testing.T, known []modelskill.Definition, ex
 			t.Fatalf("seed known skill %d: %v", def.ID, err)
 		}
 	}
+	seeded := map[int32][]int32{}
+	for _, seed := range seeds {
+		seeded[seed.TemplateID] = append(seeded[seed.TemplateID], srv.GiveItem(t, ownerID, seed.TemplateID, seed.Count))
+	}
 	startInWorld(t, srv.Client)
-	return &servitorOwner{srv: srv, client: srv.Client, id: ownerID}
+	return &servitorOwner{srv: srv, client: srv.Client, id: ownerID, seeded: seeded}
 }
 
 // summonServitor casts the servitor summon and waits for the servitor.

@@ -393,6 +393,16 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 // it — and Start reports ErrNotCasting so the caller does not announce a cast
 // that is already cancelled.
 func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
+	return c.StartCarried(now, target, def, nil)
+}
+
+// StartCarried is Start for a cast an item carries. Once the cast is
+// claimed, and before any start-of-cast cost, it runs consumeCarrier to
+// consume that item: the item is gone before the skill's own consume item,
+// reuse, mastery proc and initial MP are charged. An error from it releases
+// the claim, charges nothing, and is returned unchanged. A nil
+// consumeCarrier makes it Start.
+func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.Definition, consumeCarrier func() error) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
 	}
@@ -412,15 +422,27 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 	seq := c.castSeq
 	c.mu.Unlock()
 
+	if consumeCarrier != nil {
+		if err := consumeCarrier(); err != nil {
+			c.releaseClaim(seq)
+			return Plan{}, err
+		}
+	}
+
 	// The cast is claimed above so a concurrent Start is rejected; a failed
 	// item consume releases the claim unless the cast was already ended.
 	//
 	// Deliberate divergence from the reference (issue #2336): the reference
 	// destroys the consume item after claiming the cast and ignores a failed
 	// destroy, so a race that empties the item mid-cast still casts uncharged.
-	// CanCast already verified the count here, so ConsumeItem can only fail on
-	// that same narrow race; releasing the claim and rejecting the cast in
-	// that case is preferred over silently casting an unpaid skill.
+	// For an ordinary cast CanCast already verified the count, so ConsumeItem
+	// can only fail on that same narrow race; releasing the claim and
+	// rejecting the cast in that case is preferred over silently casting an
+	// unpaid skill. For a carried cast whose carrier is also the skill's
+	// consume item (e.g. an ItemSkills scroll whose skill consumes the
+	// scroll itself), consumeCarrier has already taken a unit, so at a stack
+	// of exactly one the failure here is deterministic: the carrier is gone
+	// and nothing is cast, where the reference still casts (#2791).
 	//
 	// The ItemConsumeCount > 0 half of this guard (and CanCast's matching
 	// check) is a second, separate divergence: the reference gates solely on
@@ -431,11 +453,7 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 	// item it never touched — again preferred over reproducing that
 	// zero-count side effect.
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount) {
-		c.mu.Lock()
-		if c.castingLocked(seq) {
-			c.clearLocked()
-		}
-		c.mu.Unlock()
+		c.releaseClaim(seq)
 		return Plan{}, ErrNotEnoughItems
 	}
 
@@ -468,6 +486,17 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 		return Plan{}, ErrNotCasting
 	}
 	return plan, nil
+}
+
+// releaseClaim drops the claim Start took for the cast identified by seq,
+// unless that cast was already ended. Nothing was announced for it yet, so
+// no abort observer runs.
+func (c *Controller) releaseClaim(seq uint64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.castingLocked(seq) {
+		c.clearLocked()
+	}
 }
 
 // Hit applies the final MP and HP costs for the active cast. It leaves an

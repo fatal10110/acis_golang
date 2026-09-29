@@ -17,22 +17,13 @@ import (
 
 // useItemAICast runs each non-instant item-carried skill through the same
 // Start/Launch/Hit/Finish sequence a player-initiated RequestMagicSkillUse
-// drives, targeting the player's current selection. The first eligible
-// skill starts immediately; a later eligible skill is stored as the next
-// CAST intention and runs when the in-flight action finishes. A later
-// queue call overwrites an earlier one. Resolving skills and consuming the
-// item are itemhandler's decisions; this method sends the packets those
-// decisions produce. The item is consumed before the cast/launch packets
-// go out, not only on a successful hit.
+// drives, targeting the player's current selection. Resolving skills and
+// consuming the item are itemhandler's decisions; this method sends the
+// packets those decisions produce.
 //
-// Schedule of a started skill is deferred until this function returns, so
-// a later skill's reuse rejection cannot skip the first skill's timers,
-// and a zero-delay launch cannot fire before later skills are queued.
-//
-// Each skill first passes the player's pre-attempt gate, as a skill-bar
-// request does: a skill that fails it is answered and neither queued nor
-// started. ctrl is the UseItem Ctrl modifier; it is the cast's force-use
-// flag, and a queued skill keeps it.
+// Each skill first passes the item's own condition and reuse checks, which
+// answer a refused skill and stop the rest. ctrl is the UseItem Ctrl
+// modifier; it is the cast's force-use flag, and a queued skill keeps it.
 //
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
@@ -48,7 +39,25 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 	if len(defs) == 0 {
 		return false
 	}
+	l.castItemSkills(live, inv, inst, defs, ctrl, true)
+	return true
+}
 
+// castItemSkills casts defs one after another, as tryToCast would: the
+// first eligible skill starts immediately; a later eligible skill is stored
+// as the next CAST intention and runs when the in-flight action finishes. A
+// later queue call overwrites an earlier one. carrier is the item carrying
+// the casts, consumed as each one starts and before its start-of-cast
+// costs; nil casts them as ordinary skills. itemGate runs an ItemSkills
+// item's condition and reuse checks on each skill first.
+//
+// Schedule of a started skill is deferred until this function returns, so
+// a later skill's reuse rejection cannot skip the first skill's timers,
+// and a zero-delay launch cannot fire before later skills are queued.
+//
+// Each skill passes the player's pre-attempt gate, as a skill-bar request
+// does: a skill that fails it is answered and neither queued nor started.
+func (l *GameClientLink) castItemSkills(live *livePlayer, inv *itemcontainer.Inventory, carrier *item.Instance, defs []modelskill.Definition, ctrl, itemGate bool) {
 	var run func()
 	defer func() {
 		if run != nil {
@@ -56,13 +65,15 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		}
 	}()
 	for _, def := range defs {
-		if failed, ok := conditions.EvaluateSkill(def, live.Character, live.Target()); !ok {
-			sendSkillConditionFailure(live, failed, def.ID)
-			return true
-		}
-		if live.SkillDisabled(actorcast.ReuseKey(def)) {
-			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
-			return true
+		if itemGate {
+			if failed, ok := conditions.EvaluateSkill(def, live.Character, live.Target()); !ok {
+				sendSkillConditionFailure(live, failed, def.ID)
+				return
+			}
+			if live.SkillDisabled(actorcast.ReuseKey(def)) {
+				live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
+				return
+			}
 		}
 		selected := live.Target()
 		if !l.attemptItemAICast(live, selected, def) {
@@ -74,20 +85,19 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 			live.combat.ReplaceWithCast()
 		}
 		if run != nil || itemAICastBusy(live) {
-			live.deferItemAICast(inv, inst, def, selected, ctrl)
+			live.deferItemAICast(inv, carrier, def, selected, ctrl)
 			sendMagicActionFailed(live)
 			continue
 		}
-		next, rejected, failed := l.beginItemAICast(live, inv, inst, tmpl, selected, def, ctrl)
+		next, rejected, failed := l.beginItemAICast(live, inv, carrier, selected, def, ctrl)
 		if failed {
-			return true
+			return
 		}
 		if rejected {
 			continue
 		}
 		run = next
 	}
-	return true
 }
 
 // itemAICastBusy reports whether a later attached skill must wait: an
@@ -113,13 +123,38 @@ func inPostureTransition(live *livePlayer) bool {
 	return live.SittingNow() || live.StandingNow()
 }
 
-// beginItemAICast starts and consumes one item-carried skill, sending its
-// MagicSkillUse/gauge packets, but does not Schedule. rejected means the
-// start gates refused the skill (the attached-skill loop continues). failed
-// means the item could not be consumed after the cast had already opened
-// (the loop stops).
-func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, selected world.Tracked, def modelskill.Definition, ctrl bool) (run func(), rejected, failed bool) {
+// beginItemAICast starts one item-carried skill, sending its
+// MagicSkillUse/gauge packets, but does not Schedule. The carrier, when
+// there is one, is consumed and its shared reuse announced once the cast
+// is claimed and before any start-of-cast cost; without one the cast is an
+// ordinary skill cast and announces USE_S1. rejected means the start gates
+// refused the skill (the attached-skill loop continues). failed means the
+// carrier could not be consumed (the loop stops).
+func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, carrier *item.Instance, selected world.Tracked, def modelskill.Definition, ctrl bool) (run func(), rejected, failed bool) {
 	controller := l.castController(live)
+	var carrierLost bool
+	var consumeCarrier func() error
+	if carrier != nil {
+		tmpl, _ := inv.Templates().Get(carrier.TemplateID)
+		consumeCarrier = func() error {
+			consumed := itemhandler.ConsumeAICastItem(itemhandler.ConsumeAICastItemRequest{
+				Caster:     live.Character,
+				Definition: def,
+				Inventory:  inv,
+				Item:       carrier,
+				Template:   tmpl,
+				Destroyer:  l.inventory,
+			})
+			if consumed.Err != nil {
+				carrierLost = true
+				return consumed.Err
+			}
+			if consumed.SharedReuseGroup >= 0 {
+				live.SendFrame(serverpackets.FrameExUseSharedGroupItem(carrier.TemplateID, consumed.SharedReuseGroup, consumed.ReuseMillis, consumed.ReuseMillis))
+			}
+			return nil
+		}
+	}
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
 		Caster:      live.Character,
@@ -128,11 +163,16 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		Definitions: l.skills,
 		Ctrl:        ctrl,
 		Hooks: actorcast.StartHooks{
-			ResolveTarget: l.resolveMagicSkillTarget,
-			StopMovement:  l.stopMovementForCast(live),
+			ResolveTarget:  l.resolveMagicSkillTarget,
+			StopMovement:   l.stopMovementForCast(live),
+			ConsumeCarrier: consumeCarrier,
 		},
 	})
 	if err != nil {
+		if carrierLost {
+			sendItemConsumeFailure(live)
+			return nil, false, true
+		}
 		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)
 			return nil, true, false
@@ -153,35 +193,23 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	target := started.Target
 	plan := started.Plan
 
-	consumed := itemhandler.ConsumeAICastItem(itemhandler.ConsumeAICastItemRequest{
-		Controller: controller,
-		Definition: def,
-		Inventory:  inv,
-		Item:       inst,
-		Template:   tmpl,
-		Destroyer:  l.inventory,
-	})
-	if consumed.Err != nil {
-		sendItemConsumeFailure(live)
-		return nil, false, true
+	if carrier == nil {
+		l.broadcastCastStart(live, target, def, plan)
+	} else {
+		casterObject := skillCastObject(live)
+		targetObject := skillCastObject(target)
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMagicSkillUse(
+				casterObject,
+				targetObject,
+				int32(def.ID),
+				int32(def.Level),
+				millis(plan.HitTime),
+				millis(plan.ReuseDelay),
+				false,
+			)
+		})
 	}
-	if consumed.SharedReuseGroup >= 0 {
-		live.SendFrame(serverpackets.FrameExUseSharedGroupItem(inst.TemplateID, consumed.SharedReuseGroup, consumed.ReuseMillis, consumed.ReuseMillis))
-	}
-
-	casterObject := skillCastObject(live)
-	targetObject := skillCastObject(target)
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMagicSkillUse(
-			casterObject,
-			targetObject,
-			int32(def.ID),
-			int32(def.Level),
-			millis(plan.HitTime),
-			millis(plan.ReuseDelay),
-			false,
-		)
-	})
 	if plan.GaugeDuration > 0 {
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
@@ -238,8 +266,7 @@ func (l *GameClientLink) resumeItemAICast(live *livePlayer, itemCast *itemAICast
 		sendMagicCastFailureReason(live, itemCast.skill, err)
 		return
 	}
-	tmpl, _ := itemCast.inventory.Templates().Get(itemCast.item.TemplateID)
-	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.selected, itemCast.skill, itemCast.ctrl)
+	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, itemCast.selected, itemCast.skill, itemCast.ctrl)
 	if failed || rejected || run == nil {
 		return
 	}

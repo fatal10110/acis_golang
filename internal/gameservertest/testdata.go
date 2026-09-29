@@ -133,6 +133,11 @@ const TwoSkillScrollID int32 = 9700
 // UnlockableKeyID is a non-potion ItemSkills fixture for target-validation tests.
 const UnlockableKeyID int32 = 9701
 
+// PetResurrectionScrollID is the Blessed Scroll of Resurrection for Pets
+// (datapack item 6387): a ScrollsOfResurrection item whose skill, 2179,
+// consumes the scroll itself.
+const PetResurrectionScrollID int32 = 6387
+
 // FormalWearID is the full-body formal dress (bodypart alldress) that forbids
 // item and skill use while worn.
 const FormalWearID int32 = 6408
@@ -363,6 +368,19 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
+		{
+			ID:             PetResurrectionScrollID,
+			Name:           "Blessed Scroll of Resurrection for Pets",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Dropable:       true,
+			Tradable:       true,
+			Destroyable:    true,
+			Depositable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ScrollsOfResurrection", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2179, Level: 1}},
 		},
 		{
 			ID:             5593,
