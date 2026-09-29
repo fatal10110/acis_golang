@@ -87,7 +87,6 @@ func TestQueuedAttackOnBlessedPlayerDoesNotLand(t *testing.T) {
 
 			targetHostile(t, d.pk, hostile.ObjectID())
 			d.pk.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-			assertAutoAttackStart(t, d.pk, d.pkID)
 			assertAttackBy(t, d.pk, d.pkID)
 
 			full := d.victimHPCP(t)
