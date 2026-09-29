@@ -1,6 +1,7 @@
 package combat
 
 import (
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -85,12 +86,16 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
 
 	c.Send(encodeRequestTargetCancel(1))
-	// The swing loop may broadcast one more in-flight Attack before the
-	// cancel lands; skip such trailing combat frames to reach the ack.
+	// The swing loop may broadcast one more in-flight Attack, and land its
+	// hit with damage feedback, before the cancel lands; skip such trailing
+	// combat frames to reach the ack.
 	for {
 		frame := mustRead(t, c, "cancel ack")
 		if frame[0] == serverpackets.OpcodeActionFailed {
 			break
+		}
+		if frame[0] == serverpackets.OpcodeSystemMessage && slices.Contains(damageFeedbackIDs, wireReader(frame[1:]).ReadInt32()) {
+			continue
 		}
 		if frame[0] != serverpackets.OpcodeAttack && frame[0] != serverpackets.OpcodeStatusUpdate {
 			t.Fatalf("cancel ack opcode = %#x, want ActionFailed", frame[0])

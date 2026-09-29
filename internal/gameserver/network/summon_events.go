@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -169,6 +170,16 @@ func (s *summonSink) Emit(ev event.Event) {
 			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, e.AttackerName, e.Damage))
+	case event.HitDealt:
+		owner, ok := l.livePlayerByID(actor.OwnerID())
+		if !ok {
+			return
+		}
+		source := skillhandler.DamageByServitor
+		if actor.IsPet() {
+			source = skillhandler.DamageByPet
+		}
+		sendDamageMessage(owner, hitDamage(e, source))
 	case event.Died:
 		// Observers see the summon fall, then its own combat stance end. The
 		// stance is its owner's: the owner stays in combat and keeps its own

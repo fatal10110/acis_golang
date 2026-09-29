@@ -478,10 +478,40 @@ func (c *Controller) deliverHit(hit Hit) {
 	if c.player != nil {
 		c.player.NotePvPAttack(hit.Target)
 	}
+	// The attacker's feedback goes out before the target takes the damage.
+	c.reportHit(hit)
 	if hit.Miss || hit.Damage <= 0 {
 		return
 	}
 	hit.Target.TakeDamage(hit.Damage, c.actor)
+}
+
+// invulTarget is the target state the attacker's damage feedback reads when
+// the hit resolves.
+type invulTarget interface {
+	Invul() bool
+	Paralyzed() bool
+}
+
+// reportHit emits the attacker's damage feedback for hit. NPCs report
+// nothing. A summon stays silent on a miss and against its own owner, who
+// would otherwise read the hit twice.
+func (c *Controller) reportHit(hit Hit) {
+	if c.playable == nil {
+		return
+	}
+	if c.player == nil {
+		owner, ok := c.actor.Owner()
+		if hit.Miss || !ok || owner == nil || owner.ObjectID() == hit.Target.ObjectID() {
+			return
+		}
+	}
+	e := event.HitDealt{Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
+	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
+		e.Blocked = true
+		e.Petrified = t.Paralyzed()
+	}
+	c.emit(e)
 }
 
 func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
