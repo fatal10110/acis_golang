@@ -61,6 +61,7 @@ TestServer = True
 PvpServer = False
 AllowCursedWeapons = False
 AllowWater = False
+EnableFallingDamage = False
 UseBlowfishCipher = False
 ZoneTown = 2
 `)
@@ -123,6 +124,9 @@ HexID = -7fff
 	if cfg.AllowWater {
 		t.Error("AllowWater = true, want false")
 	}
+	if cfg.EnableFallingDamage {
+		t.Error("EnableFallingDamage = true, want false")
+	}
 	if cfg.UseBlowfishCipher {
 		t.Error("UseBlowfishCipher = true, want false")
 	}
@@ -174,6 +178,9 @@ HexID = -7fff
 	}
 	if !cfg.AllowWater {
 		t.Error("AllowWater = false, want true default")
+	}
+	if !cfg.EnableFallingDamage {
+		t.Error("EnableFallingDamage = false, want true default")
 	}
 	if !cfg.UseBlowfishCipher {
 		t.Error("UseBlowfishCipher = false, want true default")

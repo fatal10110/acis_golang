@@ -184,6 +184,7 @@ const (
 	SystemMessageSPDecreasedS1          = 538  // number parameter
 	SystemMessageExpDecreasedByS1       = 539  // number parameter
 	SystemMessageDrownDamage            = 297  // number parameter
+	SystemMessageFallDamage             = 296  // number parameter
 	SystemMessageSkillRemovedDueLackHP  = 610  // no parameter
 	SystemMessageSkillRemovedDueLackMP  = 140  // no parameter
 	SystemMessageSkillDeactivatedHPFull = 175  // no parameter

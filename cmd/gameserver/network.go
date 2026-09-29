@@ -103,6 +103,7 @@ func provideGameClientLink(
 		KarmaPlayerCanTeleport:   bool(gameplay.KarmaPlayerCanTeleport),
 		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,
+		EnableFallingDamage:      cfg.EnableFallingDamage,
 		AllowDelevel:             bool(gameplay.AllowDelevel),
 		RateKarmaExpLost:         float64(gameplay.RateKarmaExpLost),
 		CharacterSelectDelay:     time.Duration(gameplay.CharacterSelectDelay),

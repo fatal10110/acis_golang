@@ -81,6 +81,7 @@ type options struct {
 	water                  bool
 	waterNow               func() time.Time
 	disallowWater          bool
+	disableFallingDamage   bool
 	attackStance           *task.AttackStance
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
@@ -192,6 +193,11 @@ func WithWater(now func() time.Time) Option {
 // keeps water zones swimming but never starts a breath countdown.
 func WithAllowWater(allowed bool) Option {
 	return func(o *options) { o.disallowWater = !allowed }
+}
+
+// WithFallingDamage sets the EnableFallingDamage server option (default true).
+func WithFallingDamage(enabled bool) Option {
+	return func(o *options) { o.disableFallingDamage = !enabled }
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -1241,7 +1247,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

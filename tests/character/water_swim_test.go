@@ -78,10 +78,14 @@ func TestValidatePositionGroundMeasuresDriftIn2D(t *testing.T) {
 // for MoveType.SWIM (WaterZone.onEnter adds it): the desync is distance3D,
 // so a report off only in height beyond the swim speed is corrected.
 func TestValidatePositionSwimmingMeasuresDriftIn3D(t *testing.T) {
-	srv, _, objID := bootInZones(t, waterZones(t, -1_000, 1_000))
+	srv, character, objID := bootInZones(t, waterZones(t, -1_000, 1_000))
 	x, y, z := srv.PlayerPosition(t, objID)
+	hp := character.HP()
 
 	assertValidateLocation(t, validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - 1_000}), objID, location.Location{X: x, Y: y, Z: z})
+	if got := character.HP(); got != hp {
+		t.Fatalf("swimming height report HP = %v, want %v", got, hp)
+	}
 }
 
 // TestValidatePositionFlyingMeasuresDriftIn3D pins ValidatePosition.java:76

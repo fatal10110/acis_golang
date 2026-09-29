@@ -68,15 +68,17 @@ func HennaTemplates(t testing.TB) *henna.Table {
 // character selects, usable without a testing context.
 func ClassTemplate() *player.Template {
 	return &player.Template{
-		ID:        0,
-		BaseLevel: 1,
-		HPTable:   []float64{80},
-		MPTable:   []float64{30},
-		CPTable:   []float64{32},
-		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
-		RunSpeed:  120,
-		WalkSpeed: 60,
-		SwimSpeed: 50,
+		ID:                   0,
+		BaseLevel:            1,
+		HPTable:              []float64{80},
+		MPTable:              []float64{30},
+		CPTable:              []float64{32},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:             120,
+		WalkSpeed:            60,
+		SwimSpeed:            50,
+		SafeFallHeightFemale: 270,
+		SafeFallHeightMale:   250,
 		Skills: []player.SkillGrant{
 			{SkillID: 3, Level: 1, MinLevel: 5, Cost: 50},
 			{SkillID: 900001, Level: 1, MinLevel: 50, Cost: 0},
@@ -88,15 +90,17 @@ func ClassTemplate() *player.Template {
 // the duelist line requires the table to carry.
 func fighterLineTemplate(id int) *player.Template {
 	return &player.Template{
-		ID:        id,
-		BaseLevel: 1,
-		HPTable:   []float64{80},
-		MPTable:   []float64{30},
-		CPTable:   []float64{32},
-		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
-		RunSpeed:  120,
-		WalkSpeed: 60,
-		SwimSpeed: 50,
+		ID:                   id,
+		BaseLevel:            1,
+		HPTable:              []float64{80},
+		MPTable:              []float64{30},
+		CPTable:              []float64{32},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:             120,
+		WalkSpeed:            60,
+		SwimSpeed:            50,
+		SafeFallHeightFemale: 270,
+		SafeFallHeightMale:   250,
 	}
 }
 
@@ -105,15 +109,17 @@ func fighterLineTemplate(id int) *player.Template {
 // classes land in the same world region.
 func duelistTemplate() *player.Template {
 	return &player.Template{
-		ID:        88,
-		BaseLevel: 76,
-		HPTable:   []float64{80},
-		MPTable:   []float64{30},
-		CPTable:   []float64{32},
-		Spawns:    []location.Location{{X: 10, Y: 20, Z: 30}},
-		RunSpeed:  120,
-		WalkSpeed: 60,
-		SwimSpeed: 50,
+		ID:                   88,
+		BaseLevel:            76,
+		HPTable:              []float64{80},
+		MPTable:              []float64{30},
+		CPTable:              []float64{32},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		RunSpeed:             120,
+		WalkSpeed:            60,
+		SwimSpeed:            50,
+		SafeFallHeightFemale: 270,
+		SafeFallHeightMale:   250,
 	}
 }
 

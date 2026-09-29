@@ -22,14 +22,15 @@ import (
 )
 
 type gameServerConfig struct {
-	ListenAddr         string
-	LoginAddr          string
-	Auth               network.LoginServerAuth
-	Database           db.Config
-	AllowCursedWeapons bool
-	AllowWater         bool
-	UseBlowfishCipher  bool
-	TownCombatRule     int
+	ListenAddr          string
+	LoginAddr           string
+	Auth                network.LoginServerAuth
+	Database            db.Config
+	AllowCursedWeapons  bool
+	AllowWater          bool
+	EnableFallingDamage bool
+	UseBlowfishCipher   bool
+	TownCombatRule      int
 }
 
 // gameplayConfig aggregates the gameplay knobs read from the properties
@@ -508,10 +509,11 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 			Password:       serverProps.String("Password", ""),
 			MaxConnections: maxConnections,
 		},
-		AllowCursedWeapons: serverProps.Bool("AllowCursedWeapons", true),
-		AllowWater:         serverProps.Bool("AllowWater", true),
-		UseBlowfishCipher:  serverProps.Bool("UseBlowfishCipher", true),
-		TownCombatRule:     townCombatRule,
+		AllowCursedWeapons:  serverProps.Bool("AllowCursedWeapons", true),
+		AllowWater:          serverProps.Bool("AllowWater", true),
+		EnableFallingDamage: serverProps.Bool("EnableFallingDamage", true),
+		UseBlowfishCipher:   serverProps.Bool("UseBlowfishCipher", true),
+		TownCombatRule:      townCombatRule,
 	}, nil
 }
 
