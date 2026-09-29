@@ -46,6 +46,30 @@ func (a *Actor) CancelDecay() {
 	a.emit(event.DecayCanceled{})
 }
 
+// ResurrectOutright is a non-player caster's resurrection at power percent.
+// It runs on a's own queue, as every other command on a does. A summon
+// still linked to its owner drops its pending decay first, so a revived
+// servitor stays in the world, as does a living servitor a player revived
+// earlier; a dead one then revives as ReviveRestoringExp does. A corpse its
+// owner left behind cannot be revived and keeps its decay, so it still
+// leaves the world at its deadline.
+func (a *Actor) ResurrectOutright(power float64) {
+	// A closed queue refuses the job, which is what the job would do too:
+	// the queue closes with the owner's session, when a living summon has
+	// left the world and a corpse is left behind.
+	if q := a.Queue(); q != nil {
+		q.Post(func() { a.resurrectOutright(power) })
+	}
+}
+
+func (a *Actor) resurrectOutright(power float64) bool {
+	if a.OwnerLeft() {
+		return false
+	}
+	a.CancelDecay()
+	return a.ReviveRestoringExp(power)
+}
+
 // restoreExp gives a pet back percent of the experience its last death
 // penalty took, once: the recorded pre-death experience is then cleared.
 // Climbing back over a level threshold raises the level, which refreshes

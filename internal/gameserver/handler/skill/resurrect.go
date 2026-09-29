@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
@@ -19,15 +20,24 @@ type petIdentity interface {
 	IsPet() bool
 }
 
-// summonReviver is a summon a resurrection revives outright.
+// summonReviver is a summon a player caster's resurrection revives
+// outright.
 type summonReviver interface {
 	ReviveRestoringExp(power float64) bool
-	CancelDecay()
+}
+
+// outrightSummonReviver is a summon a non-player caster's resurrection
+// revives, on the summon's own queue.
+type outrightSummonReviver interface {
+	ResurrectOutright(power float64)
 }
 
 var (
 	_ reviveRequestTarget = (*player.Character)(nil)
 	_ player.Reviver      = (*player.Character)(nil)
+
+	_ summonReviver         = (*summon.Actor)(nil)
+	_ outrightSummonReviver = (*summon.Actor)(nil)
 )
 
 type resurrectHandler struct{}
@@ -41,7 +51,7 @@ func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
 // revived outright, a pet getting the revive power's share of its lost exp
 // back; a servitor revived this way keeps its pending decay. Any other
 // caster revives a dead player or summon outright, restoring the revive
-// power's share of the lost exp, and drops the summon's decay first. The
+// power's share of the lost exp; a summon it revives drops its decay. The
 // spiritshot is spent either way.
 func (resurrectHandler) Use(cast Cast) {
 	if cast.Caster != nil {
@@ -108,12 +118,12 @@ func reviveOrOfferSummon(cast Cast, obj Actor, reviver player.Reviver, power flo
 }
 
 // reviveTargets revives every dead player and summon target outright. A
-// summon's decay is dropped first, whether or not it is still dead.
+// summon revives on its own queue, and drops its decay unless its owner
+// left it behind.
 func reviveTargets(cast Cast, power float64) {
 	for _, obj := range cast.Targets {
-		if s, ok := obj.(summonReviver); ok && obj.Kind() == actor.KindSummon {
-			s.CancelDecay()
-			s.ReviveRestoringExp(power)
+		if s, ok := obj.(outrightSummonReviver); ok && obj.Kind() == actor.KindSummon {
+			s.ResurrectOutright(power)
 			continue
 		}
 		target, ok := asPlayer(obj)
