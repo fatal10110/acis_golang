@@ -19,6 +19,7 @@ import (
 const (
 	queueLongSkillID = 3
 	queueNextSkillID = 4
+	queueOneSkillID  = 5
 	queueHitTime     = 5000
 )
 
@@ -29,6 +30,15 @@ func queueCastSkill(id int) modelskill.Definition {
 	}
 }
 
+// queueOneSkill is a ONE-target skill to queue on the selected monster.
+func queueOneSkill() modelskill.Definition {
+	def := queueCastSkill(queueOneSkillID)
+	def.Target = modelskill.TargetOne
+	def.CastRange = 600
+	def.MPConsume = 5
+	return def
+}
+
 // bootMidCastBesideHostile selects the fixture monster, then starts the long
 // self cast, leaving the caster mid-cast with the monster still selected.
 func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Character, int32) {
@@ -36,7 +46,7 @@ func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Cha
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{queueCastSkill(queueLongSkillID), queueCastSkill(queueNextSkillID)})),
+		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{queueCastSkill(queueLongSkillID), queueCastSkill(queueNextSkillID), queueOneSkill()})),
 	)
 	if !srv.DrivesClock() {
 		t.Skip("holding a cast open needs the driven clock")
@@ -44,6 +54,7 @@ func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Cha
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, queueLongSkillID, 1)
 	seedKnownSkill(t, srv, objID, queueNextSkillID, 1)
+	seedKnownSkill(t, srv, objID, queueOneSkillID, 1)
 	startInWorld(t, c)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 20, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
@@ -122,5 +133,48 @@ func TestMidCastAttackReplacesQueuedSkill(t *testing.T) {
 	readUntil(t, c, serverpackets.OpcodeAttack, "queued attack")
 	if pc.SkillDisabled(key) || pc.CastingNow() {
 		t.Fatal("replaced queued skill ran")
+	}
+}
+
+// TestQueuedSkillWhoseTargetLeftSendsNothing pins the resume's lost-target
+// check: a ONE-target skill queued on the selected monster, which then
+// leaves the world before the cast ends, is dropped with no packet at all —
+// no ActionFailed, no reason message, no cast — and costs nothing.
+func TestQueuedSkillWhoseTargetLeftSendsNothing(t *testing.T) {
+	t.Parallel()
+	srv, pc, hostileID := bootMidCastBesideHostile(t)
+	c := srv.Client
+	key := cast.ReuseKey(queueOneSkill())
+	mpBefore := srv.PlayerCurrentMP(t, pc.ObjectID())
+
+	c.Send(encodeRequestMagicSkillUse(queueOneSkillID, false, false))
+	assertFrameOpcode(t, mustRead(t, c, "queued skill ActionFailed"), serverpackets.OpcodeActionFailed, "queued skill ActionFailed")
+
+	hostile, ok := srv.State.Object(hostileID)
+	if !ok {
+		t.Fatal("fixture monster missing from world state")
+	}
+	srv.State.Despawn(hostile)
+	drainUntilQuiet(t, c)
+	if !pc.CastingNow() {
+		t.Fatal("long cast ended before the queued skill's target left")
+	}
+
+	srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
+	for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
+		frame := c.ReadWithTimeout(300 * time.Millisecond)
+		if frame == nil {
+			continue
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeMagicSkillUse:
+			t.Fatalf("resume with its target gone sent opcode %#x, want no packet", frame[0])
+		}
+	}
+	if pc.SkillDisabled(key) || pc.CastingNow() {
+		t.Fatal("queued skill ran with its target gone")
+	}
+	if got := srv.PlayerCurrentMP(t, pc.ObjectID()); got != mpBefore {
+		t.Fatalf("MP after the dropped queued skill = %d, want unchanged %d", got, mpBefore)
 	}
 }

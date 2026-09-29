@@ -305,3 +305,34 @@ func opcodesOf(frames [][]byte) []byte {
 	}
 	return out
 }
+
+// TestQueuedSkillWhenCasterCannotActSendsActionFailedAlone pins the resume's
+// can-act check: a queued skill whose caster can no longer act once the
+// cast ends is dropped with ActionFailed alone — no reason message and no
+// cast — unlike a fresh request, which would run the pre-attempt gate.
+func TestQueuedSkillWhenCasterCannotActSendsActionFailedAlone(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootMidCast(t)
+	mpBefore := srv.PlayerCurrentMP(t, objID)
+
+	assertQueuedWithActionFailed(t, c, queueSkillID)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.SetParalyzed(true) })
+
+	advanceUntilCastEnds(t, srv, objID)
+	frames := queueFrames(t, c)
+	if castStartedFor(t, frames, queueSkillID) {
+		t.Fatal("queued skill started for a caster that cannot act")
+	}
+	if n := countOpcode(frames, serverpackets.OpcodeActionFailed); n != 1 {
+		t.Fatalf("resume for a caster that cannot act sent %d ActionFailed, want 1: opcodes %x", n, opcodesOf(frames))
+	}
+	if n := countOpcode(frames, serverpackets.OpcodeSystemMessage); n != 0 {
+		t.Fatalf("resume for a caster that cannot act sent %d system messages, want none: opcodes %x", n, opcodesOf(frames))
+	}
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("a cast is in flight after the queued skill was dropped")
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
+		t.Fatalf("MP after the dropped queued skill = %d, want unchanged %d", got, mpBefore)
+	}
+}
