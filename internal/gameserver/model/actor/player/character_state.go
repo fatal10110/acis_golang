@@ -62,18 +62,13 @@ const sitStandDelay = 2500 * time.Millisecond
 // sit/stand transition, and reports whether the posture changed. An
 // unchanged posture starts no transition.
 func (c *Character) ChangePosture(standing bool) bool {
-	if !c.SetStanding(standing) {
-		return false
-	}
-	c.beginPostureTransition(standing)
-	return true
+	return c.changePosture(standing, false)
 }
 
 // Sit changes to the ordinary seated stance, starts the sit-down transition
 // and broadcasts it.
 func (c *Character) Sit() bool {
-	changed := c.SetStanding(false)
-	c.beginPostureTransition(false)
+	changed := c.changePosture(false, true)
 	c.broadcastStanceChange(event.StanceSitting)
 	return changed
 }
@@ -81,9 +76,24 @@ func (c *Character) Sit() bool {
 // StandUp changes to the standing stance, starts the stand-up transition
 // and broadcasts it.
 func (c *Character) StandUp() bool {
-	changed := c.SetStanding(true)
-	c.beginPostureTransition(true)
+	changed := c.changePosture(true, true)
 	c.broadcastStanceChange(event.StanceStanding)
+	return changed
+}
+
+// changePosture sets the posture and, when it changed or always is set,
+// starts the matching transition, in one stateMu section: a posture change
+// on another goroutine cannot land between the two and leave the posture
+// and the transition disagreeing. It reports whether the posture changed.
+func (c *Character) changePosture(standing, always bool) bool {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.initStateLocked()
+	changed := c.standing != standing
+	c.standing = standing
+	if changed || always {
+		c.beginPostureTransitionLocked(standing)
+	}
 	return changed
 }
 
@@ -110,13 +120,12 @@ func (c *Character) StandingNow() bool {
 	return c.standingNow
 }
 
-// beginPostureTransition starts a sit-down (standing false) or stand-up
-// transition, replacing any transition still running. It ends sitStandDelay
-// later with a PostureSettled event. A character without a live runtime has
-// no queue to end it on and starts none.
-func (c *Character) beginPostureTransition(standing bool) {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
+// beginPostureTransitionLocked starts a sit-down (standing false) or
+// stand-up transition, replacing any transition still running. It ends
+// sitStandDelay later with a PostureSettled event. A character without a
+// live runtime has no queue to end it on and starts none. c.stateMu must be
+// held.
+func (c *Character) beginPostureTransitionLocked(standing bool) {
 	if c.Live == nil {
 		return
 	}

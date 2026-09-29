@@ -273,15 +273,7 @@ func (l *GameClientLink) attemptMagicSkill(live *livePlayer, def modelskill.Defi
 // magicSkillFinalTarget is the creature def would be cast on given the
 // caster's selection, before any cast condition is checked.
 func (l *GameClientLink) magicSkillFinalTarget(live *livePlayer, def modelskill.Definition, selected world.Tracked) skilltarget.Actor {
-	if l.targets == nil {
-		return nil
-	}
-	handler, ok := l.targets.Handler(def.Target)
-	if !ok {
-		return nil
-	}
-	selectedActor, _ := selected.(skilltarget.Actor)
-	return handler.FinalTarget(live.Character, selectedActor, &def)
+	return l.skillFinalTarget(live, selected, def)
 }
 
 // magicCastFailureReasonOnly reports the cast-condition failures a player

@@ -1,6 +1,7 @@
 package items
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -91,6 +92,124 @@ func TestUseItemSkillWaitsOutStandUp(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
 	srv.InventoryUpdates.Tick()
 	readInventoryUpdateFor(t, c, scroll, 2)
+	assertItemCount(t, srv, objID, scroll, 2)
+}
+
+// TestUseItemSkillStandUpNotEndedByStaleSitTimer pins that a stand-up
+// started before the sit-down ended owns the transition: the sit-down's
+// timer, still running when the stand-up replaces it, must not end the
+// stand-up early. An item cast queued during that stand-up runs only once
+// the stand-up's own 2.5s have passed, as the reference holds isStandingNow()
+// until standUp's own task (Player.java:1566-1580).
+func TestUseItemSkillStandUpNotEndedByStaleSitTimer(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(consumableSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
+	startInWorld(t, c)
+
+	changePosture(t, c, false)
+	srv.Advance(t, time.Second)
+	changePosture(t, c, true)
+	standAt := c.Now()
+	c.Send(encodeUseItem(scroll, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
+
+	frame := c.Read()
+	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+		t.Fatalf("queued item cast ran %v after stand-up, want no earlier than %v", elapsed, sitStandDelay)
+	}
+	assertMagicSkillUseSelf(t, frame, objID, 2013, 1, 0, 5000)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	srv.InventoryUpdates.Tick()
+	readInventoryUpdateFor(t, c, scroll, 2)
+	assertItemCount(t, srv, objID, scroll, 2)
+}
+
+// longCastSkillID is a known self buff whose 4s hit time outlasts the
+// stand-up.
+const longCastSkillID = 1040
+
+// longCastSkills is the escape scroll's skill plus longCastSkillID.
+func longCastSkills(t *testing.T) *skillstate.Persistence {
+	t.Helper()
+	db := sqltest.SharedDB(t)
+	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
+		{ID: 248, Level: 3},
+		{ID: 294, Level: 1},
+		{
+			ID: 2013, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "TELEPORT", StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 5000,
+		},
+		{
+			ID: longCastSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", StaticHitTime: true, HitTime: 4000, StaticReuse: true,
+		},
+	}), gamesql.NewCharacterSkillStore(db))
+}
+
+// TestQueuedItemSkillOutlastsStandUpBehindCast pins that the end of a
+// sit/stand transition leaves a queued item cast alone while a cast is still
+// in flight: the item cast runs when that cast finishes, rather than being
+// tried at the stand-up's end and refused as already casting. A skill-bar
+// cast started during the stand-up holds the caster past the stand-up's end
+// (#2673 tracks queueing that cast too).
+func TestQueuedItemSkillOutlastsStandUpBehindCast(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(longCastSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, longCastSkillID, 1); err != nil {
+		t.Fatalf("seed known skill: %v", err)
+	}
+	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
+	startInWorld(t, c)
+	sitAndSettle(t, srv)
+
+	changePosture(t, c, true)
+	c.Send(encodeRequestMagicSkillUse(longCastSkillID))
+	assertMagicSkillUseSelf(t, c.Read(), objID, longCastSkillID, 1, 4000, 0)
+	castAt := c.Now()
+	c.Send(encodeUseItem(scroll, false))
+	for {
+		frame := c.Read()
+		if frame[0] == serverpackets.OpcodeActionFailed {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeMagicSkillUse {
+			t.Fatal("item cast started while the long cast was in flight")
+		}
+	}
+
+	launched := false
+	for {
+		frame := c.ReadWithTimeout(2 * sitStandDelay)
+		if frame == nil {
+			t.Fatal("queued item cast never ran after the long cast finished")
+		}
+		switch frame[0] {
+		case serverpackets.OpcodeMagicSkillLaunched:
+			launched = true
+			continue
+		case serverpackets.OpcodeMagicSkillUse:
+		default:
+			continue
+		}
+		if !launched {
+			t.Fatal("queued item cast started before the long cast launched")
+		}
+		if elapsed := c.Now().Sub(castAt); elapsed < 4*time.Second {
+			t.Fatalf("queued item cast ran %v into the 4s cast, want after it", elapsed)
+		}
+		assertMagicSkillUseSelf(t, frame, objID, 2013, 1, 0, 5000)
+		break
+	}
+	drainUntilQuiet(t, c)
 	assertItemCount(t, srv, objID, scroll, 2)
 }
 
