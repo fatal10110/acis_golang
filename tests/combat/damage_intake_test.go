@@ -166,6 +166,8 @@ func bootHostilePair(t *testing.T) (*gameservertest.Server, *scriptedClient, int
 	// Within melee range: the parked monster never closes distance itself.
 	tmpl := gameservertest.AttackingHostileTemplate()
 	tmpl.BaseAttackRange = 40
+	// A quick swing lands and finishes well inside the 2.5s sit-down.
+	tmpl.AtkSpd = 1500
 	hostile := srv.SpawnAttackingHostileNPCTemplate(t, tmpl, location.Location{X: playerOrigin.X + 20, Y: playerOrigin.Y, Z: playerOrigin.Z})
 	drainUntilQuiet(t, c)
 	return srv, c, player, hostile

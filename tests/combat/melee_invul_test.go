@@ -197,6 +197,9 @@ func TestNoDamagePermissionAttackerStillWakesSeatedPlayer(t *testing.T) {
 	victim := livePlayer(t, srv, objID)
 	attacker := deniedDamageAttacker{objID: srv.NewObjectID()}
 	sitPlayer(t, c)
+	// Only a finished sit-down stands up on a hit.
+	seated := intakePlayerOf(t, srv, objID)
+	srv.AdvanceUntil(t, "sit-down ended", seated.Seated)
 	drainUntilQuiet(t, c)
 
 	beforeHP := srv.PlayerCurrentHP(t, objID)
