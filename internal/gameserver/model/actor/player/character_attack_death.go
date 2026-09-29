@@ -84,7 +84,8 @@ func (c *Character) MarkDead() bool {
 // and is used up; otherwise HP comes back to the configured respawn
 // fraction of max HP. Observers see the new HP and the revive, the player
 // loses a Charm of Courage and gets its status flags refreshed, and any
-// pending resurrection offer lapses.
+// pending resurrection offer lapses. A rider's mount is full again and
+// starts eating anew.
 func (c *Character) Revive() bool {
 	c.reviveMu.Lock()
 	defer c.reviveMu.Unlock()
@@ -140,18 +141,20 @@ func (c *Character) revive() bool {
 	c.EffectList().StopByType(effect.TypeCharmOfCourage)
 	c.emit(event.EtcStatusChanged{})
 	c.reviveRequested, c.revivePower = false, 0
+	c.StartMountFeed()
 	return true
 }
 
 // Die runs this player's death sequence: the once-only dead-state
 // transition and zero-HP status, then the death packet broadcast to this
 // player's own session and every observer, so the corpse-fall animation
-// plays live and reaches clients before any death side effect's updates.
-// The killer's PK/PvP credit follows, then this player's own costs: charges,
-// the experience/karma loss, the stop of every fusion channel on this player,
-// and the death-penalty level, whose karma gate reads the karma left after
-// that loss. A player whose Phoenix Blessing survived the death is then
-// offered its own resurrection, and the effect icons are refreshed last.
+// plays live and reaches clients before any death side effect's updates. A
+// rider's mount stops eating. The killer's PK/PvP credit follows, then this
+// player's own costs: charges, the experience/karma loss, the stop of every
+// fusion channel on this player, and the death-penalty level, whose karma
+// gate reads the karma left after that loss. A player whose Phoenix Blessing
+// survived the death is then offered its own resurrection, and the effect
+// icons are refreshed last.
 //
 // Stripping a Phoenix or Noblesse Blessing's companions (the other blessing
 // and a Charm of Luck) refreshes the player's appearance for observers once
@@ -167,6 +170,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	}
 	c.BroadcastStatus()
 	c.BroadcastDie()
+	c.stopMountFeed()
 	c.awardKillerPKKarma(killer)
 	c.awardKillerPvPKill(killer)
 	c.ClearCharges()

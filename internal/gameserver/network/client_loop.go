@@ -823,6 +823,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				case actionSitStand:
 					l.requestChangeWaitType(live, !live.Standing())
 				case actionWalkRun:
+					// A rider keeps its stance. The reference answers with
+					// nothing, and the toggle leaves no client action
+					// pending, so silence is the matching answer.
+					if live.Mounted() {
+						return
+					}
 					l.changeLiveMoveType(live, !live.Running())
 				default:
 					if !l.handleSummonActionUse(ctx, live, req) {
@@ -870,7 +876,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			if live != nil {
-				onLive(live, func() { l.changeLiveMoveType(live, req.Run) })
+				onLive(live, func() {
+					// A rider keeps its stance; silent for the same reasons
+					// as the action-bar toggle above.
+					if live.Mounted() {
+						return
+					}
+					l.changeLiveMoveType(live, req.Run)
+				})
 			}
 
 		case clientpackets.OpcodeRequestChangeWaitType:

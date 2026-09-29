@@ -99,6 +99,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			return serverpackets.FrameRide(live.ObjectID(), summonItem.NPCID)
 		})
 		live.Character.UpdateUserInfo()
+		live.Character.StartMountFeed()
 		return true
 	}
 

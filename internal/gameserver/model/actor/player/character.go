@@ -137,6 +137,8 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	mounts                   MountBodies
+	mountFeeds               MountFeeds
+	mountFeed                mountFeedState
 	insidePvPZone            atomic.Bool
 	insidePeaceZone          atomic.Bool
 	insideSiegeZone          atomic.Bool

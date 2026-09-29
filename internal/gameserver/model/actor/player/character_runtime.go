@@ -174,10 +174,13 @@ type Runtime struct {
 	LOS    LineOfSight
 	Zones  PeaceZoneQuery
 	Mounts MountBodies
-	Skills skillDefinitions
-	Levels *LevelTable
-	Log    zerolog.Logger
-	Rules  Rules
+	// MountFeeds resolves a mount's feeding data; nil leaves every mount
+	// unfed.
+	MountFeeds MountFeeds
+	Skills     skillDefinitions
+	Levels     *LevelTable
+	Log        zerolog.Logger
+	Rules      Rules
 }
 
 // Configure installs rt. Call it before exposing c to the world.
@@ -188,6 +191,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.los = rt.LOS
 	c.zones = rt.Zones
 	c.mounts = rt.Mounts
+	c.mountFeeds = rt.MountFeeds
 	c.skillDefs = rt.Skills
 	c.levelTable = rt.Levels
 	c.log = rt.Log

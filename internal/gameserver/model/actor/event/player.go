@@ -371,3 +371,23 @@ func (ReviveRequested) event()  {}
 func (ReviveRefused) event()    {}
 func (Revived) event()          {}
 func (EtcStatusChanged) event() {}
+
+// MountFeedGauge reports the ridden mount's feed gauge, in the client's
+// gauge units.
+type MountFeedGauge struct{ Current, Max int }
+
+// MountFoodDue reports that the ridden mount is hungry and eats the food
+// item ObjectID from its rider's inventory.
+type MountFoodDue struct{ ObjectID int32 }
+
+// Dismounted reports the character getting off its mount.
+type Dismounted struct{}
+
+// MountOutOfFeed reports that the mount threw its rider for lack of feed.
+// WasFlying is whether the rider was flying on it.
+type MountOutOfFeed struct{ WasFlying bool }
+
+func (MountFeedGauge) event() {}
+func (MountFoodDue) event()   {}
+func (Dismounted) event()     {}
+func (MountOutOfFeed) event() {}

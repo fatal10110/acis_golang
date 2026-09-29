@@ -2,7 +2,8 @@ package player
 
 const wyvernNPCID int32 = 12621
 
-// Mount records the active mount.
+// Mount records the active mount and the feeding data of the mount at the
+// character's level. StartMountFeed starts feeding it.
 func (c *Character) Mount(npcID, controlItemID int32) bool {
 	if npcID <= 0 || controlItemID <= 0 {
 		return false
@@ -22,6 +23,7 @@ func (c *Character) Mount(npcID, controlItemID int32) bool {
 		c.flying = true
 	}
 	c.stateMu.Unlock()
+	c.loadMountFeed(npcID)
 	return true
 }
 
