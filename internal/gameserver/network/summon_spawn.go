@@ -699,6 +699,7 @@ func (inertSummonMoveController) MoveToLocation(location.Location) (bool, error)
 func (inertSummonMoveController) CanMoveTo(location.Location) bool               { return true }
 func (inertSummonMoveController) MoveHome(location.Location) error               { return nil }
 func (inertSummonMoveController) Stop()                                          {}
+func (inertSummonMoveController) CancelFollow()                                  {}
 func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }

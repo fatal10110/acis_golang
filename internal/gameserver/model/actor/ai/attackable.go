@@ -73,6 +73,9 @@ type MoveController interface {
 	MoveToLocation(location.Location) (bool, error)
 	// CanMoveTo reports whether a path to the destination exists.
 	CanMoveTo(location.Location) bool
+	// CancelFollow drops any follow task without stopping a walk under
+	// way, so the old intention's chase cannot pull the actor back.
+	CancelFollow()
 	Stop()
 }
 
@@ -823,9 +826,15 @@ func (a *Attackable) hasLatch() bool {
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
-// and, with useLatch, updates the latch from it. The latched attack always
-// becomes current; a queued pick does only when the current intention may
-// be replaced. It reports whether the pick was the latched attack.
+// and, with useLatch, updates the latch from it. It reports whether the
+// pick was the latched attack.
+//
+// Desire selection (useLatch) always makes the pick current, whatever the
+// current intention is, so a heavier attack on another target, a cast or a
+// walk takes over a running attack. Think (no useLatch) only continues the
+// current intention; it takes up a queued desire only from idle, follow or
+// wander. Replacing the intention with a different one drops any follow
+// task and the queued next intention the old one left behind.
 func (a *Attackable) promoteNext(useLatch bool) bool {
 	if a.inHitAnimation() {
 		return false
@@ -844,7 +853,7 @@ func (a *Attackable) promoteNext(useLatch bool) bool {
 			a.latched = intention{}
 		}
 	}
-	if !fromLatch {
+	if !useLatch {
 		switch a.current.kind {
 		case IntentionIdle, IntentionFollow, IntentionWander:
 		default:
@@ -854,9 +863,19 @@ func (a *Attackable) promoteNext(useLatch bool) bool {
 	if a.current.kind == IntentionWander {
 		a.wanderReady = time.Time{}
 	}
+	if !a.current.same(next) {
+		a.move.CancelFollow()
+		a.next = intention{}
+	}
 	a.lastKind = a.current.kind
 	a.current = next
 	return fromLatch
+}
+
+// same reports whether o is the same intention as i: same kind, aimed at
+// the same target with the same skill, or walking to the same location.
+func (i intention) same(o intention) bool {
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc
 }
 
 // nextToDo returns the latched attack when useLatch and one is set, else

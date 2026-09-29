@@ -438,6 +438,16 @@ func (s *Server) TickEffects() {
 	}
 }
 
+// TickPositions runs one production movement-correction tick for every
+// actor with movement in flight — interpolation, arrival and the offensive
+// follow re-check — and waits for the posted ticks to run.
+func (s *Server) TickPositions() {
+	s.positions.Tick()
+	if err := s.queues.settle(); err != nil {
+		panic(err)
+	}
+}
+
 // parkedMove is a MoveController that never moves.
 type parkedMove struct{}
 
@@ -448,6 +458,7 @@ func (parkedMove) MoveToLocation(location.Location) (bool, error) { return false
 func (parkedMove) CanMoveTo(location.Location) bool               { return true }
 func (parkedMove) MoveHome(location.Location) error               { return nil }
 func (parkedMove) Stop()                                          {}
+func (parkedMove) CancelFollow()                                  {}
 
 // parkedAttack is an AttackController that never attacks.
 type parkedAttack struct{}

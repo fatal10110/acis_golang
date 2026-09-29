@@ -618,6 +618,8 @@ func (m *recordingMove) CanMoveTo(location.Location) bool { return !m.denyMove }
 
 func (m *recordingMove) Stop() { m.stopCount++ }
 
+func (m *recordingMove) CancelFollow() {}
+
 type recordingAttack struct {
 	canAttack       bool
 	canAttackTarget map[int32]bool

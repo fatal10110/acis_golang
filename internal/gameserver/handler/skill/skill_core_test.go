@@ -1392,6 +1392,7 @@ func (disablerHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) 
 }
 func (disablerHostileMove) MoveHome(location.Location) error { return nil }
 func (disablerHostileMove) Stop()                            {}
+func (disablerHostileMove) CancelFollow()                    {}
 
 type disablerHostileAttack struct{}
 
