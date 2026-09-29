@@ -141,6 +141,13 @@ type List struct {
 	// effect periods are measured on its clock. Set once before the owner is
 	// published.
 	queue *sim.Queue
+
+	// triggers are the started chance-skill-trigger effects, in start order.
+	// triggersMu guards them apart from mu: effect start and exit hooks
+	// register them, and another actor's queue reads them when it hits or
+	// casts on the owner.
+	triggersMu sync.Mutex
+	triggers   []*Effect
 }
 
 func (l *List) now() time.Time { return l.queue.Now() }

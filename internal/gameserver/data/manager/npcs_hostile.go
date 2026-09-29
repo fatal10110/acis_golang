@@ -140,7 +140,7 @@ func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
 // controller, resolving their mutual construction-order dependency on the
 // finished Hostile via locatedRef/creatureActorRef/statOwnerRef.
 func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *task.PositionUpdates, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, maxBuffsAmount, maxGeoPathFailCount int, zones *zone.Index, effects effect.Env, queue *sim.Queue) (*npc.Hostile, *walkerActorRef, error) {
-	control := &hostileControl{walker: walker, log: log}
+	control := &hostileControl{walker: walker, log: log, chance: castEffects.Chance}
 	statRef := &statOwnerRef{}
 	live, err := creature.NewLive(inst.Home, speed, geo, statRef, effect.WithEnv(effects))
 	if err != nil {
@@ -235,11 +235,15 @@ type hostileControl struct {
 	walkerRef *walkerActorRef
 	routeMove *atomic.Bool
 	log       zerolog.Logger
+	// chance runs the chance procs of the NPC's landed hits.
+	chance *actorcast.ChanceProcs
 }
 
 // Emit maps one controller event to the NPC's AI and broadcasts.
 func (c *hostileControl) Emit(ev event.Event) {
 	switch e := ev.(type) {
+	case event.HitLanded:
+		c.chance.AttackHit(c.hostile, e.Target, e.Crit)
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks

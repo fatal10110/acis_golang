@@ -3,14 +3,13 @@ package summon
 import (
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
 func (a *Actor) SkillDisabled(key int32) bool {
-	a.assertOwner()
+	a.skillsMu.Lock()
+	defer a.skillsMu.Unlock()
 	expiresAt, ok := a.disabledSkills[key]
 	if !ok {
 		return false
@@ -27,7 +26,8 @@ func (a *Actor) DisableSkill(key int32, delay time.Duration) {
 	if delay <= 0 {
 		return
 	}
-	a.assertOwner()
+	a.skillsMu.Lock()
+	defer a.skillsMu.Unlock()
 	if a.disabledSkills == nil {
 		a.disabledSkills = make(map[int32]time.Time)
 	}
@@ -42,12 +42,3 @@ func (a *Actor) AddSkillReuse(_ modelskill.Ref, key int32, delay time.Duration) 
 
 // ShortBuffTaskSkillID returns zero because a summon has no item-window HUD.
 func (*Actor) ShortBuffTaskSkillID() int32 { return 0 }
-
-// assertOwner panics unless the caller is one of a's queue tasks. A summon
-// not yet given its owner's queue is still confined to the goroutine
-// building it.
-func (a *Actor) assertOwner() {
-	if q := a.Queue(); q != nil {
-		sim.AssertOwner(q)
-	}
-}

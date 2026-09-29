@@ -3,7 +3,6 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
-	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -59,7 +58,7 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 		Inventory:   petInv,
 		Item:        inst,
 		Definitions: l.skills,
-		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Effects:     l.castEffects(),
 		Destroyer:   l.inventory,
 		IsPet:       true,
 	})

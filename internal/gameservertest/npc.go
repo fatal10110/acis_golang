@@ -157,15 +157,23 @@ type AttackingHostile struct {
 }
 
 // attackFinishedSignal is the attack controller sink of an AttackingHostile:
-// it signals every finished swing on its channel.
-type attackFinishedSignal chan struct{}
+// it signals every finished swing on its channel and runs the chance procs
+// of every landed hit, as production's hostile controller sink does.
+type attackFinishedSignal struct {
+	finished chan struct{}
+	chance   *actorcast.ChanceProcs
+	hostile  *npc.Hostile
+}
 
-func (c attackFinishedSignal) Emit(ev event.Event) {
-	if _, ok := ev.(event.AttackFinished); ok {
+func (c *attackFinishedSignal) Emit(ev event.Event) {
+	switch e := ev.(type) {
+	case event.AttackFinished:
 		select {
-		case c <- struct{}{}:
+		case c.finished <- struct{}{}:
 		default:
 		}
+	case event.HitLanded:
+		c.chance.AttackHit(c.hostile, e.Target, e.Crit)
 	}
 }
 
@@ -230,10 +238,11 @@ func (s *Server) SpawnAttackingHostileNPCAt(t *testing.T, at location.Location) 
 func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Template, at location.Location) *AttackingHostile {
 	t.Helper()
 	actorRef := &hostileActorRef{}
-	finished := make(attackFinishedSignal, 1)
-	attackCtl := attack.NewAttackable(actorRef, finished)
+	signal := &attackFinishedSignal{finished: make(chan struct{}, 1), chance: s.castEffects.Chance}
+	attackCtl := attack.NewAttackable(actorRef, signal)
 	hostile := s.spawnHostile(t, tmpl, at, attackCtl)
 	actorRef.CreatureActor = hostile
+	signal.hostile = hostile
 	// A deterministic zero roll always lands (Missed's rate is never
 	// negative) so DoAttack's swing reliably deals damage instead of
 	// occasionally missing. It also always crits whenever the template's
@@ -242,7 +251,7 @@ func (s *Server) SpawnAttackingHostileNPCTemplate(t *testing.T, tmpl *npc.Templa
 	// non-zero CritRate will see every landed hit crit, not the
 	// configured percentage.
 	hostile.SetRollSource(func(int) int { return 0 })
-	return &AttackingHostile{Hostile: hostile, ctl: attackCtl, finished: finished, srv: s}
+	return &AttackingHostile{Hostile: hostile, ctl: attackCtl, finished: signal.finished, srv: s}
 }
 
 type movingHostileStatRef struct{ effect.StatOwner }
@@ -400,6 +409,8 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		c.server.runAI(c.hostile)
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
+	case event.HitLanded:
+		c.server.castEffects.Chance.AttackHit(c.hostile, e.Target, e.Crit)
 	}
 }
 

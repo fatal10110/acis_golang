@@ -14,6 +14,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -216,6 +217,7 @@ type GameClientLink struct {
 	enchant          *enchantflow.Service
 	targets          *skilltarget.Registry
 	skillHandlers    *handlerskill.Registry
+	chance           *actorcast.ChanceProcs
 	log              zerolog.Logger
 
 	// newCipherKey supplies each connection's XOR cipher key; overridden in
@@ -413,6 +415,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	// Built here, not lazily: every client goroutine shares this link.
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
+	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {
 			boss.Eject = func(a zone.Actor) { link.ejectBossPlayer(boss, a) }

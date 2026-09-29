@@ -1,0 +1,407 @@
+package skills
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"testing"
+
+	"github.com/rs/zerolog"
+
+	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
+)
+
+// The fixtures below mirror shipped chance skills: Mirage (445) arms an
+// ON_ATTACKED trigger for 5144, "Item Skill: Heal" (3207) is a passive
+// ON_HIT skill triggering 5146, and "Special Ability: Infinity Scepter"
+// (3595) is a passive ON_MAGIC_GOOD skill triggering 3596. Each triggered
+// skill carries an icon effect here so its landing is observable, and each
+// triggered debuff lands at a fixed rate so the test does not depend on the
+// landing roll.
+const (
+	mirageSkill       = 445
+	mirageTriggered   = 5144
+	onHitPassive      = 3207
+	onHitTriggered    = 5146
+	onGoodPassive     = 3595
+	onGoodTriggered   = 3596
+	selfBuffSkill     = 1204
+	npcShieldSkill    = 4493
+	npcShieldTrigger  = 5520
+	onHitTriggerReuse = 30_000
+)
+
+func chanceSkills() []modelskill.Definition {
+	return []modelskill.Definition{
+		{
+			ID: mirageSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", HitTime: 500, StaticHitTime: true,
+			Effects: []modelskill.EffectTemplate{{
+				Name: "ChanceSkillTrigger", Time: 60, Icon: true, StackType: "mirage", StackOrder: 1,
+				TriggeredID: mirageTriggered, TriggeredLevel: 1, ChanceType: "ON_ATTACKED", ActivationChance: 80,
+			}},
+		},
+		{
+			ID: mirageTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, CastRange: 900, EffectRange: 1400,
+			BaseLandRate: 100, IgnoreResists: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
+		},
+		{
+			ID: onHitPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: 1,
+			TriggeredID: onHitTriggered, TriggeredLevel: 1,
+		},
+		{
+			ID: onHitTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", ReuseDelay: onHitTriggerReuse,
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "item_heal", StackOrder: 1}},
+		},
+		{
+			ID: onGoodPassive, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", ChanceType: "ON_MAGIC_GOOD", ActivationChance: 3,
+			TriggeredID: onGoodTriggered, TriggeredLevel: 1,
+		},
+		{
+			ID: onGoodTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF",
+			Effects:   []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "full_recover", StackOrder: 1}},
+		},
+		{
+			ID: selfBuffSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", HitTime: 500, StaticHitTime: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 1}},
+		},
+		{
+			ID: npcShieldSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", HitTime: 500, StaticHitTime: true,
+			Effects: []modelskill.EffectTemplate{{
+				Name: "ChanceSkillTrigger", Time: 300, StackType: "debuff_shield", StackOrder: 1,
+				TriggeredID: npcShieldTrigger, TriggeredLevel: 1, ChanceType: "ON_ATTACKED", ActivationChance: -1,
+			}},
+		},
+		{
+			ID: npcShieldTrigger, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
+			BaseLandRate: 100, IgnoreResists: true,
+			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "shield_debuff", StackOrder: 1}},
+		},
+	}
+}
+
+// bootChanceHolder boots a player knowing skills, in world, on a fixed roll.
+func bootChanceHolder(t *testing.T, roll int, skills ...int) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, chanceSkills())),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	for _, id := range skills {
+		seedKnownSkill(t, srv, objID, id, 1)
+	}
+	startInWorld(t, c)
+	setPlayerRoll(t, srv, objID, roll)
+	return srv, c, objID
+}
+
+func setPlayerRoll(t *testing.T, srv *gameservertest.Server, objID int32, roll int) {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	roller, ok := obj.(interface{ SetRollSource(func(int) int) })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T, want SetRollSource", objID, obj)
+	}
+	roller.SetRollSource(func(n int) int { return min(roll, n-1) })
+}
+
+func worldCombatant(t *testing.T, srv *gameservertest.Server, objID int32) attackable.Combatant {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	victim, ok := obj.(attackable.Combatant)
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is no combatant", objID, obj)
+	}
+	return victim
+}
+
+// castSelf casts skillID on the player itself and waits for its effect.
+func castSelf(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, skillID int32) {
+	t.Helper()
+	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	srv.AdvanceUntil(t, "self cast lands", func() bool { return slices.Contains(liveHeldSkillIDs(t, srv, objID), skillID) })
+}
+
+// startMelee clicks hostile twice: the first click targets it, the second
+// starts the auto-attack.
+func startMelee(t *testing.T, srv *gameservertest.Server, objID, hostileID int32) {
+	t.Helper()
+	px, py, pz := srv.PlayerPosition(t, objID)
+	srv.Client.Send(encodeAction(hostileID, int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, srv.Client)
+	srv.Client.Send(encodeAction(hostileID, int32(px), int32(py), int32(pz), false))
+}
+
+type procFrames struct {
+	launched, used int
+}
+
+// procSeen reports the index of the triggered cast's MagicSkillLaunched and
+// MagicSkillUse among frames (-1 when absent), asserting each one names the
+// expected caster and target, a zero cast time and no reuse.
+func procSeen(t *testing.T, frames [][]byte, casterID, skillID, skillLevel, targetID int32) procFrames {
+	t.Helper()
+	seen := procFrames{launched: -1, used: -1}
+	for i, frame := range frames {
+		r := wireReader(frame[1:])
+		switch frame[0] {
+		case serverpackets.OpcodeMagicSkillLaunched:
+			caster, id, level, count := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+			if id != skillID {
+				continue
+			}
+			if seen.launched >= 0 {
+				t.Fatalf("MagicSkillLaunched for skill %d sent twice", skillID)
+			}
+			if caster != casterID || level != skillLevel || count != 1 || r.ReadInt32() != targetID {
+				t.Fatalf("MagicSkillLaunched(skill %d) = caster %d level %d count %d, want caster %d level %d target %d",
+					skillID, caster, level, count, casterID, skillLevel, targetID)
+			}
+			seen.launched = i
+		case serverpackets.OpcodeMagicSkillUse:
+			caster, target, id, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+			if id != skillID {
+				continue
+			}
+			if seen.used >= 0 {
+				t.Fatalf("MagicSkillUse for skill %d sent twice", skillID)
+			}
+			hitTime, reuse := r.ReadInt32(), r.ReadInt32()
+			if caster != casterID || target != targetID || level != skillLevel || hitTime != 0 || reuse != 0 {
+				t.Fatalf("MagicSkillUse(skill %d) = %d->%d level %d hit %d reuse %d, want %d->%d level %d hit 0 reuse 0",
+					skillID, caster, target, level, hitTime, reuse, casterID, targetID, skillLevel)
+			}
+			seen.used = i
+		}
+	}
+	return seen
+}
+
+func assertProc(t *testing.T, frames [][]byte, casterID, skillID, skillLevel, targetID int32) {
+	t.Helper()
+	seen := procSeen(t, frames, casterID, skillID, skillLevel, targetID)
+	if seen.launched < 0 || seen.used < 0 {
+		t.Fatalf("triggered skill %d frames: MagicSkillLaunched at %d, MagicSkillUse at %d, want both", skillID, seen.launched, seen.used)
+	}
+	if seen.launched > seen.used {
+		t.Fatalf("triggered skill %d sent MagicSkillUse (%d) before MagicSkillLaunched (%d)", skillID, seen.used, seen.launched)
+	}
+}
+
+func holds(effects []*effect.Effect, skillID int) bool {
+	return slices.ContainsFunc(effects, func(e *effect.Effect) bool { return int(e.Skill.ID) == skillID })
+}
+
+// TestChanceTriggerEffectProcsWhenHolderIsHit: a player under Mirage who
+// takes a landed melee hit rolls its 80% ON_ATTACKED trigger; on a win it
+// casts 5144 at the attacker, shown as the player's own launch and
+// animation, and the debuff lands on the attacker. A roll of 80 loses.
+func TestChanceTriggerEffectProcsWhenHolderIsHit(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		roll  int
+		procs bool
+	}{
+		{"roll wins", 79, true},
+		{"roll loses", 80, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv, c, objID := bootChanceHolder(t, tc.roll, mirageSkill)
+			castSelf(t, srv, c, objID, mirageSkill)
+			drainUntilQuiet(t, c)
+
+			px, py, pz := srv.PlayerPosition(t, objID)
+			attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+			drainUntilQuiet(t, c)
+			attacker.DoAttack(t, worldCombatant(t, srv, objID))
+			frames := queueFrames(t, c)
+
+			if !tc.procs {
+				if seen := procSeen(t, frames, objID, mirageTriggered, 1, attacker.ObjectID()); seen.launched >= 0 || seen.used >= 0 {
+					t.Fatalf("lost roll still cast %d: %+v", mirageTriggered, seen)
+				}
+				if holds(attacker.EffectList().All(), mirageTriggered) {
+					t.Fatal("lost roll still debuffed the attacker")
+				}
+				return
+			}
+			assertProc(t, frames, objID, mirageTriggered, 1, attacker.ObjectID())
+			if !holds(attacker.EffectList().All(), mirageTriggered) {
+				t.Fatalf("attacker effects = %v, want the triggered %d debuff", attacker.EffectList().All(), mirageTriggered)
+			}
+		})
+	}
+}
+
+// TestChanceTriggerStopsWithItsEffect: once Mirage's effect leaves the
+// player, a landed hit no longer procs it.
+func TestChanceTriggerStopsWithItsEffect(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootChanceHolder(t, 0, mirageSkill)
+	castSelf(t, srv, c, objID, mirageSkill)
+	liveEffectList(t, srv, objID).StopBySkillID(mirageSkill)
+	srv.Settle(t)
+	drainUntilQuiet(t, c)
+
+	px, py, pz := srv.PlayerPosition(t, objID)
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+	drainUntilQuiet(t, c)
+	attacker.DoAttack(t, worldCombatant(t, srv, objID))
+	if seen := procSeen(t, queueFrames(t, c), objID, mirageTriggered, 1, attacker.ObjectID()); seen.launched >= 0 || seen.used >= 0 {
+		t.Fatalf("hit after Mirage ended still cast %d: %+v", mirageTriggered, seen)
+	}
+}
+
+// TestPassiveChanceSkillProcsOnOwnHit: a player knowing a passive ON_HIT
+// chance skill triggers its self buff when its own melee hit lands, and the
+// triggered skill's reuse starts, so the next hits do not cast it again.
+func TestPassiveChanceSkillProcsOnOwnHit(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootChanceHolder(t, 0, onHitPassive)
+	px, py, pz := srv.PlayerPosition(t, objID)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+	drainUntilQuiet(t, c)
+
+	startMelee(t, srv, objID, hostile.ObjectID())
+	srv.AdvanceUntil(t, "on-hit proc", func() bool { return slices.Contains(liveHeldSkillIDs(t, srv, objID), onHitTriggered) })
+	assertProc(t, queueFrames(t, c), objID, onHitTriggered, 1, objID)
+
+	liveEffectList(t, srv, objID).StopBySkillID(onHitTriggered)
+	hp := hostile.CurrentHP()
+	srv.AdvanceUntil(t, "another landed hit", func() bool { return hostile.CurrentHP() < hp || hostile.Dead() })
+	srv.Settle(t)
+	if slices.Contains(liveHeldSkillIDs(t, srv, objID), onHitTriggered) {
+		t.Fatal("triggered skill cast again inside its reuse delay")
+	}
+}
+
+// TestPassiveChanceSkillProcsOnGoodMagic: a player knowing a passive
+// ON_MAGIC_GOOD chance skill triggers it when its own self buff lands.
+func TestPassiveChanceSkillProcsOnGoodMagic(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootChanceHolder(t, 0, onGoodPassive, selfBuffSkill)
+	castSelf(t, srv, c, objID, selfBuffSkill)
+	srv.AdvanceUntil(t, "on-good-magic proc", func() bool { return slices.Contains(liveHeldSkillIDs(t, srv, objID), onGoodTriggered) })
+	assertProc(t, queueFrames(t, c), objID, onGoodTriggered, 1, objID)
+}
+
+// TestNPCChanceTriggerProcsWhenNPCIsHit: a monster holding an ON_ATTACKED
+// chance trigger answers the player's landed hit by casting the triggered
+// debuff on the player, shown as the monster's launch and animation.
+func TestNPCChanceTriggerProcsWhenNPCIsHit(t *testing.T) {
+	t.Parallel()
+	defs := skillPersistence(t, chanceSkills())
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(defs),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	setPlayerRoll(t, srv, objID, 0)
+	hostile, aiCtl := srv.SpawnCastingHostileNPC(t, &npc.Template{
+		ID: 100, TemplateID: 100, Type: "Monster", Level: 1, HPMax: 100_000,
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+	}, defs)
+	hostile.SetRollSource(func(int) int { return 0 })
+	if !hostile.Queue().Post(func() { aiCtl.Cast(hostile, modelskill.Ref{ID: npcShieldSkill, Level: 1}) }) {
+		t.Fatal("post npc cast: queue closed")
+	}
+	srv.AdvanceUntil(t, "npc shield", func() bool { return holds(hostile.EffectList().All(), npcShieldSkill) })
+	drainUntilQuiet(t, c)
+
+	startMelee(t, srv, objID, hostile.ObjectID())
+	srv.AdvanceUntil(t, "npc proc", func() bool { return slices.Contains(liveHeldSkillIDs(t, srv, objID), npcShieldTrigger) })
+	assertProc(t, queueFrames(t, c), hostile.ObjectID(), npcShieldTrigger, 1, objID)
+}
+
+// shippedSkillDefinitions loads the shared datapack's skill definitions,
+// skipping the calling test when the datapack is not checked out next to
+// the module.
+func shippedSkillDefinitions(t *testing.T) []modelskill.Definition {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed to resolve the test file path")
+	}
+	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml", "skills")
+	if _, err := os.Stat(dir); err != nil {
+		t.Skipf("aCis_datapack not checked out near the module root, skipping oracle comparison")
+	}
+	table, err := xmldata.LoadSkillDefinitions(dir, zerolog.Nop())
+	if err != nil {
+		t.Fatalf("LoadSkillDefinitions: %v", err)
+	}
+	return table.All()
+}
+
+// TestShippedChanceSkillsProc drives the shipped data: Mirage (445) arms
+// an 80% ON_ATTACKED trigger for 5144 level 1 (triggeredLevel defaults to
+// 1), and "Item Skill: Heal" level 10 (3207) is a passive 5% ON_HIT skill
+// triggering 5146 level 10. A won roll casts each one.
+func TestShippedChanceSkillsProc(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, shippedSkillDefinitions(t))),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, mirageSkill, 1)
+	seedKnownSkill(t, srv, objID, onHitPassive, 10)
+	startInWorld(t, c)
+	setPlayerRoll(t, srv, objID, 0)
+	// Mirage costs 63 MP, more than the fixture character's pool.
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		pc.AddStatFuncs([]effect.Mod{{Stat: stat.MaxMP, Op: effect.OpAdd, Value: 100}})
+		pc.AddMP(pc.MaxMPValue())
+	})
+	castSelf(t, srv, c, objID, mirageSkill)
+	drainUntilQuiet(t, c)
+
+	px, py, pz := srv.PlayerPosition(t, objID)
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+	drainUntilQuiet(t, c)
+	attacker.DoAttack(t, worldCombatant(t, srv, objID))
+	assertProc(t, queueFrames(t, c), objID, mirageTriggered, 1, attacker.ObjectID())
+
+	// The triggered heal leaves no effect behind; its reuse, started by the
+	// proc, shows it ran.
+	obj, _ := srv.State.Player(objID)
+	reuse, ok := obj.(interface{ SkillDisabled(int32) bool })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no SkillDisabled", objID, obj)
+	}
+	startMelee(t, srv, objID, attacker.ObjectID())
+	srv.AdvanceUntil(t, "Item Skill: Heal proc", func() bool { return reuse.SkillDisabled(onHitTriggered*256 + 10) })
+	assertProc(t, queueFrames(t, c), objID, onHitTriggered, 10, objID)
+}

@@ -132,7 +132,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	target := started.Target
 	plan := started.Plan
 
-	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	handlers := l.castEffects()
 	if def.SkillType == "FUSION" {
 		l.startFusionCast(live, controller, handlers, target, def, plan)
 		return
@@ -511,7 +511,7 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
 // that kills the caster sends its own packets from inside that consume.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
-	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	handlers := l.castEffects()
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,
 		l.castController(live),
@@ -696,7 +696,16 @@ func (l *GameClientLink) DeliverHitResult(result actorcast.EffectResult) {
 // read-only after construction, so NPC and player queues share them) and
 // DeliverHitResult for target-addressed messages.
 func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
-	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, OnHitResult: l.DeliverHitResult}
+	handlers := l.castEffects()
+	handlers.OnHitResult = l.DeliverHitResult
+	return handlers
+}
+
+// castEffects returns the effect handlers a cast dispatches through: the
+// link's target and skill registries and its chance procs, all read-only
+// after construction and shared by every actor's queue.
+func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
+	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, Chance: l.chance}
 }
 
 // sendSkillHandlerResult delivers both caster-addressed messages (sent to

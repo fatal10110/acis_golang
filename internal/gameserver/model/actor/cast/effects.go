@@ -20,6 +20,9 @@ type EffectHandlers struct {
 	// constructor parameter because EffectHandlers is already the bundle
 	// carried from boot wiring down to the AIController that needs it.
 	OnHitResult func(EffectResult)
+	// Chance fires the chance procs a landing skill sets off on its caster
+	// and targets; nil fires none.
+	Chance *ChanceProcs
 }
 
 // EffectResult reports whether effect dispatch reached a skill handler and
@@ -164,6 +167,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		}
 	}
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
+	handlers.Chance.skillHit(castCaster, affected, def)
 	if def.Offensive {
 		switch def.SkillType {
 		case "AGGREDUCE", "AGGREMOVE", "AGGREDUCE_CHAR":

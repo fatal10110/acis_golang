@@ -514,7 +514,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,
-		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Effects:     l.castEffects(),
 		Caster:      actor,
 		// Every summon removal aborts first, so a hit reaching a summon
 		// that has left the world lost a race with that abort.
@@ -565,30 +565,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// Damage feedback already names the owner as its recipient and is
 	// forwarded unchanged.
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
-		owner, ok := l.livePlayerByID(actor.OwnerID())
-		if !ok {
-			return
-		}
-		// Only the unconditional skill-level Resisted entries (Mdam.java:69,
-		// Blow.java:74, Manadam.java:55, L2SkillChargeDmg.java:77 — no
-		// `instanceof Player` gate) reach the owner via Summon.sendPacket's
-		// unconditional forwarding; the
-		// generic per-effect L2Skill.getEffects resist is gated
-		// `effector instanceof Player` and never fires for a Summon caster.
-		var messages []any
-		for _, message := range result.Messages {
-			switch m := message.(type) {
-			case handlerskill.Resisted:
-				if m.Unconditional {
-					messages = append(messages, m)
-				}
-			case handlerskill.OpponentMPReducedMessage:
-				// This caster-only message does not reach a summon's owner.
-			default:
-				messages = append(messages, message)
-			}
-		}
-		l.sendSkillHandlerResult(owner, actorcast.EffectResult{Messages: messages})
+		l.sendSummonSkillResult(actor, result)
 	}
 	brain.SetCastController(aiController)
 	actor.Attach(summon.Runtime{AI: brain, Sink: sink})
@@ -607,6 +584,35 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		sink.onDespawn(func() { l.ai.Remove(runner) })
 	}
 	return aiController
+}
+
+// sendSummonSkillResult delivers the result of a skill summon cast to its
+// owner, the only client a summon's messages reach.
+func (l *GameClientLink) sendSummonSkillResult(actor *summon.Actor, result actorcast.EffectResult) {
+	owner, ok := l.livePlayerByID(actor.OwnerID())
+	if !ok {
+		return
+	}
+	// Only the unconditional skill-level Resisted entries (Mdam.java:69,
+	// Blow.java:74, Manadam.java:55, L2SkillChargeDmg.java:77 — no
+	// `instanceof Player` gate) reach the owner via Summon.sendPacket's
+	// unconditional forwarding; the
+	// generic per-effect L2Skill.getEffects resist is gated
+	// `effector instanceof Player` and never fires for a Summon caster.
+	var messages []any
+	for _, message := range result.Messages {
+		switch m := message.(type) {
+		case handlerskill.Resisted:
+			if m.Unconditional {
+				messages = append(messages, m)
+			}
+		case handlerskill.OpponentMPReducedMessage:
+			// This caster-only message does not reach a summon's owner.
+		default:
+			messages = append(messages, message)
+		}
+	}
+	l.sendSkillHandlerResult(owner, actorcast.EffectResult{Messages: messages})
 }
 
 // summonLineOfSight returns the geodata query summons use for attack

@@ -68,15 +68,13 @@ func (c *Character) StopEffects(t effect.Type) { c.EffectList().StopByType(t) }
 // StopSkillEffectsByID removes every effect skill id applied to c.
 func (c *Character) StopSkillEffectsByID(id modelskill.ID) { c.EffectList().StopBySkillID(id) }
 
-// The chance-trigger hooks below have no player behavior yet; each is a
-// deliberate no-op so the effect runs exactly as it did before the player
-// side existed.
+// AddChanceTrigger registers a started chance-skill-trigger effect as one of
+// c's chance procs.
+func (c *Character) AddChanceTrigger(e *effect.Effect) { c.EffectList().AddChanceTrigger(e) }
 
-// AddChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (c *Character) AddChanceTrigger(*effect.Effect) {}
-
-// RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (c *Character) RemoveChanceTrigger(*effect.Effect) {}
+// RemoveChanceTrigger drops an exiting chance-skill-trigger effect from c's
+// chance procs.
+func (c *Character) RemoveChanceTrigger(e *effect.Effect) { c.EffectList().RemoveChanceTrigger(e) }
 
 // StopCharmOfLuck runs when a Charm of Luck ends: the effect has already
 // left the list, so only the player's appearance is refreshed for observers.

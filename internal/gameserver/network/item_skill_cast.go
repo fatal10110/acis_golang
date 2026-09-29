@@ -181,7 +181,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
 
-	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	handlers := l.castEffects()
 	var affected []skilltarget.Actor
 	return func() {
 		controller.Schedule(plan, actorcast.Hooks{
