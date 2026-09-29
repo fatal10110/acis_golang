@@ -392,16 +392,28 @@ func (s *Summon) Think() {
 }
 
 // FinishedAttack runs the queued intention once a swing ends, replacing the
-// attack; with none queued, the current intention carries on.
-//
-// ponytail: with none queued, a target the summon cannot keep attacking
-// (an unflagged player outside duel, Olympiad and PVP zones) should send it
-// idle instead; not modeled yet (#2700).
-func (s *Summon) FinishedAttack() {
+// attack. With none queued, the current intention carries on, except an
+// attack on a target the summon cannot keep attacking: then the summon goes idle and
+// reports true: following follow when it is non-nil (as FollowInstead),
+// otherwise standing still (as TryToIdle). The idle is decided and applied
+// under one hold of mu, as in FinishedCasting.
+func (s *Summon) FinishedAttack(follow attackable.Combatant) (idled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.runNextLocked()
-	s.thinkLocked()
+	if s.runNextLocked() {
+		s.thinkLocked()
+		return false
+	}
+	if s.current.kind != IntentionAttack || canKeepAttacking(s.actor, s.current.target) {
+		s.thinkLocked()
+		return false
+	}
+	if follow != nil {
+		s.followInsteadLocked(follow)
+	} else {
+		s.idleLocked()
+	}
+	return true
 }
 
 // FinishedCasting runs the queued intention once a cast ends. With none

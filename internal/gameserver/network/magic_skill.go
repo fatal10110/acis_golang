@@ -74,8 +74,11 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	// The request is the CAST intention now, whatever its outcome: the attack
 	// intention it replaced swings again only if the cast ends with
 	// nextActionAttack.
-	if known && live.combat != nil && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle) {
-		live.combat.ReplaceWithCast()
+	if known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle) {
+		if live.combat != nil {
+			live.combat.ReplaceWithCast()
+		}
+		live.endFollow()
 	}
 	if known && def.Activation == modelskill.ActivationToggle {
 		l.handleToggleSkillUse(live, req, selected)

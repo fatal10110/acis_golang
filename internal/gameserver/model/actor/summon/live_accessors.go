@@ -578,7 +578,7 @@ func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool)
 // summon, matching Summon.isOutOfControl (Summon.java:296-298):
 // super.isOutOfControl() || isBetrayed().
 func (a *Actor) OutOfControl() bool {
-	return a.disabled || a.effects.IsAffected(effect.FlagBetrayed)
+	return a.disabled || a.Betrayed()
 }
 
 // InCombat reports the owner's attack-stance state, matching
@@ -669,11 +669,27 @@ func (a *Actor) idleFollow() attackable.Combatant {
 	return a.owner
 }
 
-// FinishedAttack moves the attached AI on once a swing ends.
+// FinishedAttack moves the attached AI on once a swing ends: to the queued
+// intention, on with the attack, or idle when the summon cannot keep
+// attacking its target.
 func (a *Actor) FinishedAttack() {
-	if a.brain != nil {
-		a.brain.FinishedAttack()
+	if a.brain == nil {
+		return
 	}
+	follow := a.idleFollow()
+	if !a.brain.FinishedAttack(follow) {
+		return
+	}
+	if follow != nil {
+		a.setIntent(IntentFollowOwner)
+	} else {
+		a.setIntent(IntentIdle)
+	}
+}
+
+// Betrayed reports whether this summon has been turned on its owner.
+func (a *Actor) Betrayed() bool {
+	return a.effects.IsAffected(effect.FlagBetrayed)
 }
 
 // FinishedCasting moves the attached AI on once a cast completes: to the

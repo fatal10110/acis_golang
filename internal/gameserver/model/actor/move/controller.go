@@ -108,6 +108,11 @@ type Controller struct {
 	offensiveTarget        attackable.Combatant
 	offensiveRange         int
 	offensiveFollowElapsed time.Duration
+	// friendlyTarget is a player's friendly follow, which this controller
+	// rechecks on the position-update ticks.
+	friendlyTarget        attackable.Combatant
+	friendlyOffset        int
+	friendlyFollowElapsed time.Duration
 }
 
 // NewController adapts move for self, the position/footprint of the actor
@@ -156,7 +161,7 @@ func (c *Controller) blocked() {
 // target, then reports the arrival.
 func (c *Controller) arrived() {
 	c.mu.Lock()
-	following := c.offensiveTarget != nil
+	following := c.tracksFollowLocked()
 	c.mu.Unlock()
 	if !following {
 		c.removePositionUpdate()
@@ -230,6 +235,9 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 // identity stays server-side for the follow tick. An actor that cannot move
 // starts nothing and reports false, leaving any running follow untouched; a
 // friendly follow already running toward target keeps running.
+//
+// A player follows differently (see startPawnFriendlyFollow) and always
+// reports true once the follow is armed.
 func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
 	disabled := c.self.MovementDisabled()
 	c.mu.Lock()
@@ -237,8 +245,95 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 	if disabled && !c.followingLocked(target, FollowFriendly) {
 		return false, nil
 	}
-	c.clearOffensiveFollow()
+	c.clearFollow()
+	if c.selfFollowsByPawn() {
+		c.startPawnFriendlyFollow(target, offset)
+		return true, nil
+	}
 	return c.maybeStartFollow(target, offset, FollowFriendly, false, nil)
+}
+
+// CancelFriendlyFollow drops a player's friendly follow task, leaving a walk
+// already under way running to its destination. Any other follow is left
+// alone.
+func (c *Controller) CancelFriendlyFollow() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.friendlyTarget != nil {
+		c.clearFollow()
+	}
+}
+
+// startPawnFriendlyFollow arms a player's friendly follow task toward
+// target and runs its first tick at once. The task then ticks every
+// FollowInterval on the position updates: it walks toward target only when
+// the player stands still farther than offset from it (no footprints), with
+// the target-relative movement packet, and stops the player when target is
+// no longer known.
+func (c *Controller) startPawnFriendlyFollow(target attackable.Combatant, offset int) {
+	c.move.StartFriendlyFollow(target.ObjectID(), offset)
+	c.friendlyTarget = target
+	c.friendlyOffset = offset
+	c.friendlyFollowElapsed = 0
+	c.addPositionUpdate()
+	c.pawnFriendlyFollowTick()
+}
+
+// pawnFriendlyFollowTick is one run of a player's friendly follow task.
+func (c *Controller) pawnFriendlyFollowTick() {
+	target := c.friendlyTarget
+	if actor, ok := c.self.(targetKnower); ok && !actor.Knows(target) {
+		// The follower goes idle: the task and any walk stop.
+		c.stopLocked()
+		return
+	}
+	if c.move.Moving() {
+		return
+	}
+	other, ok := target.(Located)
+	if !ok {
+		return
+	}
+	sx, sy, sz := c.self.Position()
+	tx, ty, tz := other.Position()
+	dest := location.Location{X: tx, Y: ty, Z: tz}
+	if (location.Location{X: sx, Y: sy, Z: sz}).In2DRadius(dest, c.friendlyOffset) {
+		return
+	}
+	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
+	if err != nil {
+		return
+	}
+	c.applyPathFindOutcome(outcome)
+	ev.FollowTarget = target.ObjectID()
+	ev.FollowOffset = c.friendlyOffset
+	c.self.BroadcastMove(ev)
+	c.addPositionUpdate()
+}
+
+func (c *Controller) recheckFriendlyFollow() {
+	if c.friendlyTarget == nil {
+		return
+	}
+	c.friendlyFollowElapsed += PositionUpdateInterval
+	if c.friendlyFollowElapsed < c.move.FollowInterval() {
+		return
+	}
+	c.friendlyFollowElapsed = 0
+	c.pawnFriendlyFollowTick()
+}
+
+// selfFollowsByPawn reports whether the actor approaches targets with the
+// target-relative movement packet, as a player does.
+func (c *Controller) selfFollowsByPawn() bool {
+	actor, ok := c.self.(pawnFollowActor)
+	return ok && actor.OffensiveFollowIsPawnMove()
+}
+
+// tracksFollowLocked reports whether this controller rechecks a follow task
+// on the position-update ticks, and so must keep receiving them.
+func (c *Controller) tracksFollowLocked() bool {
+	return c.offensiveTarget != nil || c.friendlyTarget != nil
 }
 
 // followingLocked reports whether a follow of mode toward target is already
@@ -283,7 +378,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			return false, nil
 		}
 		if unseen == nil || !unseen() {
-			c.clearOffensiveFollow()
+			c.clearFollow()
 			return false, nil
 		}
 		offset = int(other.CollisionRadius())
@@ -311,7 +406,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
 			// on progress that will never happen.
-			c.clearOffensiveFollow()
+			c.clearFollow()
 			return false, nil
 		}
 		c.applyPathFindOutcome(outcome)
@@ -401,8 +496,12 @@ func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
 func (c *Controller) Stop() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.stopLocked()
+}
+
+func (c *Controller) stopLocked() {
 	wasMoving := c.move.Moving() || c.move.Following()
-	c.clearOffensiveFollow()
+	c.clearFollow()
 	c.move.CancelMove()
 	c.removePositionUpdate()
 	if wasMoving {
@@ -415,7 +514,7 @@ func (c *Controller) Stop() {
 func (c *Controller) CancelFollow() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.clearOffensiveFollow()
+	c.clearFollow()
 }
 
 // CanMoveTo reports whether a straight-line geodata walk from the actor's
@@ -459,11 +558,12 @@ func (c *Controller) PositionUpdate() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recheckOffensiveFollow()
+	c.recheckFriendlyFollow()
 	if !moving {
-		if !c.move.Moving() && c.offensiveTarget == nil {
+		if !c.move.Moving() && !c.tracksFollowLocked() {
 			c.removePositionUpdate()
 		}
-		return c.move.Moving() || c.offensiveTarget != nil
+		return c.move.Moving() || c.tracksFollowLocked()
 	}
 	c.self.SyncPosition(ev.Origin)
 	return true
@@ -474,7 +574,7 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	if actor, ok := c.self.(targetKnower); ok && !actor.Knows(c.offensiveTarget) {
-		c.clearOffensiveFollow()
+		c.clearFollow()
 		return
 	}
 	c.offensiveFollowElapsed += PositionUpdateInterval
@@ -488,6 +588,7 @@ func (c *Controller) recheckOffensiveFollow() {
 // startOffensiveFollow arms the offensive follow task toward target at
 // offset, tracking it for rechecks unless the actor's own AI owns them.
 func (c *Controller) startOffensiveFollow(target attackable.Combatant, offset int) {
+	c.friendlyTarget = nil
 	c.move.StartOffensiveFollow(target.ObjectID(), offset)
 	if !c.selfOwnsOffensiveFollowTicker() {
 		c.offensiveTarget = target
@@ -504,11 +605,15 @@ func (c *Controller) selfHasOffensiveFollowLead() bool {
 	return ok && actor.OffensiveFollowLead()
 }
 
-func (c *Controller) clearOffensiveFollow() {
+// clearFollow drops any follow task, offensive or friendly.
+func (c *Controller) clearFollow() {
 	c.move.CancelFollow()
 	c.offensiveTarget = nil
 	c.offensiveRange = 0
 	c.offensiveFollowElapsed = 0
+	c.friendlyTarget = nil
+	c.friendlyOffset = 0
+	c.friendlyFollowElapsed = 0
 }
 
 func (c *Controller) addPositionUpdate() {

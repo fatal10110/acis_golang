@@ -3225,10 +3225,12 @@ type gateFake struct {
 	owner    *gateFake
 	casting  bool
 	denied   bool
+	betrayed bool
 	refusals int
 }
 
 func (g *gateFake) ObjectID() int32          { return g.id }
+func (g *gateFake) Betrayed() bool           { return g.betrayed }
 func (g *gateFake) Kind() modelactor.Kind    { return g.kind }
 func (g *gateFake) Level() int               { return g.level }
 func (g *gateFake) Karma() int               { return g.karma }
@@ -3567,5 +3569,201 @@ func TestSummonAIAbortAllLeavesTheStoppedCastAlone(t *testing.T) {
 	cast.onStop = nil
 	if _, handled := brain.CastStopped(actor(1)); !handled {
 		t.Fatal("CastStopped() after AbortAll returned unhandled, want the abort guard released")
+	}
+}
+
+// ---- keep attacking after a swing ----
+
+func TestCanKeepAttacking(t *testing.T) {
+	inPvP := func(g *gateFake) *gateFake { g.pvp = true; return g }
+	betrayedSummon := func(g *gateFake) *gateFake { g.betrayed = true; return g }
+	npc := &gateFake{id: 9, kind: modelactor.KindNPC}
+
+	tests := []struct {
+		name     string
+		attacker attackable.Combatant
+		target   attackable.Combatant
+		want     bool
+	}{
+		{"no target", gatePlayerFake(1, 40, 0), nil, false},
+		{"non-playable target", gatePlayerFake(1, 40, 0), npc, true},
+		{"unflagged player", gatePlayerFake(1, 40, 0), gatePlayerFake(2, 40, 0), false},
+		{"karma player", gatePlayerFake(1, 40, 0), gatePlayerFake(2, 40, 500), true},
+		{"summon of a karma player", gatePlayerFake(1, 40, 0), gateSummonFake(3, gatePlayerFake(2, 40, 500)), true},
+		{"summon of an unflagged player", gatePlayerFake(1, 40, 0), gateSummonFake(3, gatePlayerFake(2, 40, 0)), false},
+		{"both inside a PvP zone", inPvP(gatePlayerFake(1, 40, 0)), inPvP(gatePlayerFake(2, 40, 0)), true},
+		{"only the target inside a PvP zone", gatePlayerFake(1, 40, 0), inPvP(gatePlayerFake(2, 40, 0)), false},
+		{"only the attacker inside a PvP zone", inPvP(gatePlayerFake(1, 40, 0)), gatePlayerFake(2, 40, 0), false},
+		{"summon in a PvP zone at a player in one", inPvP(gateSummonFake(3, gatePlayerFake(1, 40, 0))), inPvP(gatePlayerFake(2, 40, 0)), true},
+		{"betrayed summon at its owner", betrayedSummon(gateSummonFake(3, gatePlayerFake(1, 40, 0))), gatePlayerFake(1, 40, 0), true},
+		{"loyal summon at an unflagged player", gateSummonFake(3, gatePlayerFake(1, 40, 0)), gatePlayerFake(2, 40, 0), false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canKeepAttacking(tc.attacker, tc.target); got != tc.want {
+				t.Fatalf("canKeepAttacking() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// A swing that ends with nothing queued swings again only at a target the
+// player can keep attacking; any other goes idle silently.
+func TestPlayerAttackFinishedAttackKeepsOnlyKeepableTargets(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		karma int
+		swing bool
+	}{
+		{"unflagged player", 0, false},
+		{"karma player", 500, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pc := gatePlayerFake(1, 40, 0)
+			target := gatePlayerFake(2, 40, tc.karma)
+			strike := &recordingAttack{canAttack: true}
+			move := &recordingMove{}
+			brain := NewPlayerAttack(pc, move, strike)
+			if !brain.Start(target) {
+				t.Fatal("Start() = false, want the first swing")
+			}
+			strike.attackingNow = false
+
+			if brain.FinishedAttack() {
+				t.Fatal("FinishedAttack() = true, want no ActionFailed")
+			}
+			wantSwings := 1
+			if tc.swing {
+				wantSwings = 2
+			}
+			if strike.doAttackCalls != wantSwings {
+				t.Fatalf("swings = %d, want %d", strike.doAttackCalls, wantSwings)
+			}
+			if kept := brain.Target() != nil; kept != tc.swing {
+				t.Fatalf("attack intention kept = %v, want %v", kept, tc.swing)
+			}
+		})
+	}
+}
+
+// An attack requested again mid-swing is the next intention: it runs when
+// the swing ends, keepable target or not.
+func TestPlayerAttackFinishedAttackRunsTheQueuedAttack(t *testing.T) {
+	pc := gatePlayerFake(1, 40, 0)
+	target := gatePlayerFake(2, 40, 0)
+	strike := &recordingAttack{canAttack: true}
+	brain := NewPlayerAttack(pc, &recordingMove{}, strike)
+	if !brain.Start(target) {
+		t.Fatal("Start() = false, want the first swing")
+	}
+	brain.Start(target)
+	strike.attackingNow = false
+
+	brain.FinishedAttack()
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("swings = %d, want the queued attack to swing again", strike.doAttackCalls)
+	}
+}
+
+// A dead unflagged player goes idle silently; a dead karma player is thought
+// once more and lost, answered ActionFailed.
+func TestPlayerAttackFinishedAttackOnDeadTarget(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		karma        int
+		actionFailed bool
+	}{
+		{"unflagged player", 0, false},
+		{"karma player", 500, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pc := gatePlayerFake(1, 40, 0)
+			target := &deadGateFake{gateFake: gatePlayerFake(2, 40, tc.karma)}
+			strike := &recordingAttack{canAttack: true}
+			brain := NewPlayerAttack(pc, &recordingMove{}, strike)
+			if !brain.Start(target) {
+				t.Fatal("Start() = false, want the first swing")
+			}
+			strike.attackingNow = false
+			target.dead = true
+
+			if got := brain.FinishedAttack(); got != tc.actionFailed {
+				t.Fatalf("FinishedAttack() = %v, want %v", got, tc.actionFailed)
+			}
+			if brain.Target() != nil {
+				t.Fatal("attack intention kept on a dead target")
+			}
+		})
+	}
+}
+
+type deadGateFake struct {
+	*gateFake
+	dead bool
+}
+
+func (d *deadGateFake) AlikeDead() bool { return d.dead }
+
+// A summon that cannot keep attacking its target goes idle once the swing
+// ends: back to following its owner, or standing still with follow off.
+func TestSummonAIFinishedAttackIdlesOnUnkeepableTarget(t *testing.T) {
+	owner := gatePlayerFake(1, 40, 0)
+	pet := gateSummonFake(3, owner)
+	target := gatePlayerFake(2, 40, 0)
+	strike := &recordingAttack{canAttack: true}
+	move := &summonMove{}
+	brain := NewSummon(pet, move, strike)
+	if !brain.TryToAttack(target) {
+		t.Fatal("TryToAttack() = false, want the first swing")
+	}
+	strike.attackingNow = false
+
+	if !brain.FinishedAttack(owner) {
+		t.Fatal("FinishedAttack() = false, want the summon sent idle")
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want follow", got)
+	}
+	if move.friendlyTarget != owner {
+		t.Fatalf("friendly follow target = %v, want the owner", move.friendlyTarget)
+	}
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("swings = %d, want 1", strike.doAttackCalls)
+	}
+
+	still := NewSummon(gateSummonFake(4, owner), &summonMove{}, &recordingAttack{canAttack: true})
+	still.TryToAttack(target)
+	if !still.FinishedAttack(nil) || still.CurrentIntention() != IntentionIdle {
+		t.Fatalf("follow-off FinishedAttack: intention = %v, want idle", still.CurrentIntention())
+	}
+}
+
+// Against a keepable target, or with an intention queued, the swing's end
+// carries on as before.
+func TestSummonAIFinishedAttackKeepsKeepableTargets(t *testing.T) {
+	owner := gatePlayerFake(1, 40, 0)
+	pet := gateSummonFake(3, owner)
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(pet, &summonMove{}, strike)
+	karma := gatePlayerFake(2, 40, 500)
+	brain.TryToAttack(karma)
+	strike.attackingNow = false
+
+	if brain.FinishedAttack(owner) {
+		t.Fatal("FinishedAttack() = true, want the attack kept")
+	}
+	if strike.doAttackCalls != 2 || brain.CurrentIntention() != IntentionAttack {
+		t.Fatalf("swings = %d, intention = %v; want a second swing on the attack", strike.doAttackCalls, brain.CurrentIntention())
+	}
+
+	white := gatePlayerFake(5, 40, 0)
+	strike.attackingNow = true
+	brain.TryToAttack(white)
+	strike.attackingNow = false
+	if brain.FinishedAttack(owner) {
+		t.Fatal("FinishedAttack() with a queued attack = true, want it run")
+	}
+	if strike.target != white {
+		t.Fatalf("swing target = %v, want the queued attack's", strike.target)
 	}
 }

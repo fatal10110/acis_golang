@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -97,6 +98,7 @@ type livePlayer struct {
 	deferredPickup *pickupIntention
 	deferredMagic  *deferredMagicSkill
 	deferredItem   *itemAICastIntention
+	deferredFollow *followIntention
 	pickupLocked   bool
 	pickupLockGen  uint64
 
@@ -260,6 +262,7 @@ func (p *livePlayer) Stop() {
 	p.takePickup()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
+	p.takeDeferredFollow()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -313,6 +316,7 @@ func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
 	defer p.pickupMu.Unlock()
 	p.deferredMagic = nil
 	p.deferredItem = nil
+	p.deferredFollow = nil
 	p.pickup = &pickupIntention{ctx: ctx, target: target}
 }
 
@@ -329,6 +333,7 @@ func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shif
 	defer p.pickupMu.Unlock()
 	p.deferredMagic = nil
 	p.deferredItem = nil
+	p.deferredFollow = nil
 	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
@@ -347,6 +352,7 @@ func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, sel
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredItem = nil
+	p.deferredFollow = nil
 	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
 }
 
@@ -379,6 +385,7 @@ func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *i
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredMagic = nil
+	p.deferredFollow = nil
 	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
 }
 
@@ -388,6 +395,33 @@ func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {
 	itemCast := p.deferredItem
 	p.deferredItem = nil
 	return itemCast
+}
+
+// deferFollow stores following target as the next intention, replacing
+// whatever was queued before.
+func (p *livePlayer) deferFollow(target attackable.Combatant, shift bool) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.deferredPickup = nil
+	p.deferredMagic = nil
+	p.deferredItem = nil
+	p.deferredFollow = &followIntention{target: target, shift: shift}
+}
+
+func (p *livePlayer) takeDeferredFollow() *followIntention {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	follow := p.deferredFollow
+	p.deferredFollow = nil
+	return follow
+}
+
+// hasDeferredFollow reports whether a follow is queued as the next
+// intention.
+func (p *livePlayer) hasDeferredFollow() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredFollow != nil
 }
 
 func (p *livePlayer) setPetInteract(pet *summon.Actor) {
@@ -413,6 +447,16 @@ func (p *livePlayer) thinkAttack() {
 	}
 }
 
+// finishAttack re-thinks p's attack intention once a swing ends. With
+// nothing queued behind the swing, a target p cannot keep attacking sends
+// the intention idle silently; otherwise the think answers ActionFailed as
+// thinkAttack does.
+func (p *livePlayer) finishAttack() {
+	if p.combat != nil && p.combat.FinishedAttack() {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
 // tryToIdle drops every intention p holds, active and queued, and stops its
 // movement (combat.Stop stops the shared move controller, whatever the walk
 // was for). A character that was already unable to act keeps its intentions
@@ -432,6 +476,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
 	p.takeDeferredItemAICast()
+	p.takeDeferredFollow()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -442,11 +487,21 @@ func (p *livePlayer) tryToIdle(denied bool) {
 }
 
 // clearParkedApproaches drops pickup, pet-interact, and deferred-magic
-// approach slots so a later walk or chase cannot inherit them.
+// approach slots and the follow intention, current or queued, so a later
+// walk or chase cannot inherit them.
 func (p *livePlayer) clearParkedApproaches() {
 	p.takePickup()
 	p.takePetInteract()
 	p.takeDeferredMagicSkill()
+	p.takeDeferredFollow()
+	p.endFollow()
+}
+
+// endFollow drops p's follow intention, leaving a walk under way running.
+func (p *livePlayer) endFollow() {
+	if p.move != nil {
+		p.move.CancelFriendlyFollow()
+	}
 }
 
 // enterPickupLock starts a new pickup-paralysis lock, invalidating any lock

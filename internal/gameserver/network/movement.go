@@ -15,11 +15,8 @@ import (
 // floor-to-head Z conversion below.
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin location.Location) {
 	// Reference: MoveBackwardToLocation.java:76 rejects while
-	// player.isOutOfControl() (Creature.java:652-655) — the full 8-flag
-	// union: Stunned, ImmobileUntilAttacked, Sleeping, Paralyzed, Afraid,
-	// Confused, Teleporting, Dead.
-	if live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
-		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead() {
+	// player.isOutOfControl() (Creature.java:652-655).
+	if liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -189,6 +186,8 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	}
 	live.takeDeferredMagicSkill()
 	live.takeDeferredItemAICast()
+	live.takeDeferredFollow()
+	live.endFollow()
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
 	if stand {
