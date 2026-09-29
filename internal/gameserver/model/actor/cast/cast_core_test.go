@@ -1310,22 +1310,61 @@ func TestCubicGrantedLevel(t *testing.T) {
 type fakeCubicHealTarget struct {
 	world.Presence
 	effecttest.Actor
+	kind          modelactor.Kind
 	healable      bool
 	effectiveness float64
+	full          bool
 	added         float64
+	broadcasts    int
 }
 
 func (f *fakeCubicHealTarget) ObjectID() int32           { return 1 }
+func (f *fakeCubicHealTarget) Kind() modelactor.Kind     { return f.kind }
 func (f *fakeCubicHealTarget) Position() (int, int, int) { return 0, 0, 0 }
 func (f *fakeCubicHealTarget) CanBeHealed() bool         { return f.healable }
 func (f *fakeCubicHealTarget) AddHP(amount float64) float64 {
 	f.added = amount
+	if f.full {
+		return 0
+	}
 	return amount
 }
 func (f *fakeCubicHealTarget) HealEffectiveness() float64 { return f.effectiveness }
+func (f *fakeCubicHealTarget) BroadcastStatus()           { f.broadcasts++ }
+
+// TestApplyCubicHeal_PlayerStatusOnlyWhenHPApplied pins Cubic.useHealSkill's
+// addHp (Cubic.java:364-373, CreatureStatus.java:169-187): a player whose HP
+// rose is sent its own status through setHp, whoever the healed player is;
+// a player already at full HP gets none, and a summon or NPC target is
+// left to its own AddHP. The heal still counts as landed either way, so the
+// caller sends REJUVENATING_HP.
+func TestApplyCubicHeal_PlayerStatusOnlyWhenHPApplied(t *testing.T) {
+	tests := []struct {
+		name  string
+		kind  modelactor.Kind
+		full  bool
+		wantN int
+	}{
+		{"damaged player", modelactor.KindPlayer, false, 1},
+		{"player at full HP", modelactor.KindPlayer, true, 0},
+		{"damaged summon", modelactor.KindSummon, false, 0},
+		{"damaged npc", modelactor.KindNPC, false, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			target := &fakeCubicHealTarget{kind: tt.kind, healable: true, effectiveness: 100, full: tt.full}
+			if !ApplyCubicHeal(50, target) {
+				t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
+			}
+			if target.broadcasts != tt.wantN {
+				t.Fatalf("BroadcastStatus calls = %d, want %d", target.broadcasts, tt.wantN)
+			}
+		})
+	}
+}
 
 func TestApplyCubicHeal_FlatFormulaNoCasterStats(t *testing.T) {
-	target := &fakeCubicHealTarget{healable: true, effectiveness: 150}
+	target := &fakeCubicHealTarget{kind: modelactor.KindPlayer, healable: true, effectiveness: 150}
 	if !ApplyCubicHeal(200, target) {
 		t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
 	}
@@ -1337,7 +1376,7 @@ func TestApplyCubicHeal_FlatFormulaNoCasterStats(t *testing.T) {
 }
 
 func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
-	target := &fakeCubicHealTarget{healable: false, effectiveness: 100}
+	target := &fakeCubicHealTarget{kind: modelactor.KindPlayer, healable: false, effectiveness: 100}
 	if ApplyCubicHeal(200, target) {
 		t.Fatal("ApplyCubicHeal() = true for an unhealable target, want false")
 	}

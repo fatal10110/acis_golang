@@ -83,25 +83,31 @@ func TestPetLevelUpBroadcastsSocialAction(t *testing.T) {
 	}
 }
 
-// TestPetExpWithoutLevelUpSendsNoSocialAction grants exp that stays inside
-// the current level: the owner is told the exp earned, but the pet plays no
-// animation.
-func TestPetExpWithoutLevelUpSendsNoSocialAction(t *testing.T) {
+// TestPetExpWithoutLevelUpSendsOnlyTheEarnedMessage grants exp that stays
+// inside the current level. Pet.addExpAndSp -> PetStatus.addExpAndSp ->
+// PlayableStatus.addExpAndSp (PlayableStatus.java:119-130) binds to
+// addExp(long) (:70-93), not PetStatus.addExp(int), whose
+// updateAndBroadcastStatus never runs here; addSp only sets the value. So
+// the owner is told the exp earned and nothing else: no PetStatusUpdate and
+// no animation, and a watching player gets no NpcInfo.
+func TestPetExpWithoutLevelUpSendsOnlyTheEarnedMessage(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	actor, _ := h.spawnWolf(t)
+	watcher := h.joinSecondPlayer(t, "Watcher")
 	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, watcher.client)
 
-	actor.AddExpAndSp(100, 0)
+	runOn(t, actor.Queue(), func() { actor.AddExpAndSp(100, 10) })
 	if actor.Level() != wolfLevel {
 		t.Fatalf("pet level after small exp = %d, want unchanged %d", actor.Level(), wolfLevel)
 	}
 
 	frames := drainFrames(t, h.client)
-	if findSystemMessage(t, frames, serverpackets.SystemMessagePetEarnedS1Exp) == nil {
-		t.Fatalf("no PET_EARNED_S1_EXP after exp gain; opcodes %x", frameOpcodes(frames))
+	if len(frames) != 1 || findSystemMessage(t, frames, serverpackets.SystemMessagePetEarnedS1Exp) == nil {
+		t.Fatalf("owner frames after a plain exp grant = opcodes %x, want PET_EARNED_S1_EXP alone", frameOpcodes(frames))
 	}
-	if actions, _ := petSocialActions(t, frames, actor.ObjectID()); len(actions) != 0 {
-		t.Fatalf("pet SocialAction ids without a level change = %v, want none", actions)
+	if n := countNPCInfoFor(drainFrames(t, watcher.client), actor.ObjectID()); n != 0 {
+		t.Fatalf("watcher got %d pet NpcInfo after a plain exp grant, want none", n)
 	}
 }

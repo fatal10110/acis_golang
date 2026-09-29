@@ -197,13 +197,17 @@ func bootBalanceLifeOwner(t *testing.T) (*petWorld, *summon.Actor) {
 	return h, pet
 }
 
-// TestBalanceLifeOnPetPublishesItsStatusOnce has the owner cast Balance
-// Life over itself and its wounded wolf. BalanceLife.java:65 sets each
-// target's HP through CreatureStatus.setHp, whose broadcastStatusUpdate
+// TestBalanceLifeOnPetRefreshesThenPublishesBalancedStatus has the owner
+// cast Balance Life over itself and its wounded wolf. The player's hit
+// first republishes every summon among its targets
+// (CreatureCast.onMagicHitTimer, CreatureCast.java:274-288 ->
+// Summon.updateAndBroadcastStatus): the owner gets a PetStatusUpdate with
+// the pet's old HP and an observer an NpcInfo. Then BalanceLife.java:65 sets
+// the pet's HP through CreatureStatus.setHp, whose broadcastStatusUpdate
 // (CreatureStatus.java:130-162) is, for a summon, SummonStatus's: the
-// targeting player gets CUR_HP, the owner one PetStatusUpdate carrying the
-// balanced HP, and an observer one NpcInfo.
-func TestBalanceLifeOnPetPublishesItsStatusOnce(t *testing.T) {
+// targeting player gets CUR_HP, the owner a second PetStatusUpdate carrying
+// the balanced HP, and an observer a second NpcInfo.
+func TestBalanceLifeOnPetRefreshesThenPublishesBalancedStatus(t *testing.T) {
 	t.Parallel()
 	h, pet := bootBalanceLifeOwner(t)
 	watcher := h.joinSecondPlayer(t, "Watcher")
@@ -225,10 +229,11 @@ func TestBalanceLifeOnPetPublishesItsStatusOnce(t *testing.T) {
 	if wantHP == pet.HP() {
 		t.Fatalf("balanced HP %v equals the pet's current HP; the fixture must move it", wantHP)
 	}
+	before := currentPetVitals(pet)
 
 	h.client.Send(encodeRequestMagicSkillUse(balanceLifeSkill))
 	h.srv.AdvanceUntil(t, "Balance Life landing on the pet", func() bool { return pet.HP() == wantHP })
-	want := petVitals{hp: int32(wantHP), mp: int32(pet.MPValue())}
+	balanced := petVitals{hp: int32(wantHP), mp: int32(pet.MPValue())}
 
 	var updates []petVitals
 	for _, frame := range drainFrames(t, h.client) {
@@ -236,12 +241,12 @@ func TestBalanceLifeOnPetPublishesItsStatusOnce(t *testing.T) {
 			updates = append(updates, readPetStatusVitals(t, frame))
 		}
 	}
-	if len(updates) != 1 || updates[0] != want {
-		t.Fatalf("owner PetStatusUpdates = %+v, want one carrying %+v", updates, want)
+	if want := []petVitals{before, balanced}; !slices.Equal(updates, want) {
+		t.Fatalf("owner PetStatusUpdates = %+v, want the pre-skill %+v then the balanced %+v", updates, before, balanced)
 	}
 	frames := drainFrames(t, watcher.client)
-	if n := countNPCInfoFor(frames, pet.ObjectID()); n != 1 {
-		t.Fatalf("watcher got %d pet NpcInfo, want 1", n)
+	if n := countNPCInfoFor(frames, pet.ObjectID()); n != 2 {
+		t.Fatalf("watcher got %d pet NpcInfo, want 2 (pre-skill refresh, then the balanced HP)", n)
 	}
 	got, _ := statusUpdatesFor(frames, pet.ObjectID())
 	assertCurHPUpdates(t, "watcher targeting the pet", got, curHPFixture(pet.ObjectID(), int32(wantHP)))

@@ -11,8 +11,10 @@ import (
 // TestPetAddExpAndSpGuards pins the per-amount guards of a pet exp/SP grant:
 // a negative amount is skipped, SP stops at the 32-bit ceiling, and a grant
 // where neither amount applies sends nothing. A grant where either amount
-// applies still refreshes status and reports the (rate-scaled) exp, even a
-// negative one, as the pet-earned message does.
+// applies reports the (rate-scaled) exp, even a negative one, as the
+// pet-earned message does, and nothing else: PlayableStatus.addExpAndSp
+// binds to addExp(long), so PetStatus.addExp(int)'s status refresh never
+// runs on this path (PetStatus.java:25-42, PlayableStatus.java:70-130).
 func TestPetAddExpAndSpGuards(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -30,14 +32,14 @@ func TestPetAddExpAndSpGuards(t *testing.T) {
 			startSP:    math.MaxInt32 - 10,
 			sp:         100,
 			wantSP:     math.MaxInt32,
-			wantEvents: []event.Event{event.StatusChanged{}, event.ExpGained{Exp: 0}},
+			wantEvents: []event.Event{event.ExpGained{Exp: 0}},
 		},
 		{
 			name:       "negative sp leaves sp unchanged",
 			startSP:    500,
 			sp:         -100,
 			wantSP:     500,
-			wantEvents: []event.Event{event.StatusChanged{}, event.ExpGained{Exp: 0}},
+			wantEvents: []event.Event{event.ExpGained{Exp: 0}},
 		},
 		{
 			name:       "exp still lands while sp is at max",
@@ -47,7 +49,7 @@ func TestPetAddExpAndSpGuards(t *testing.T) {
 			sp:         50,
 			wantExp:    1100,
 			wantSP:     math.MaxInt32,
-			wantEvents: []event.Event{event.StatusChanged{}, event.ExpGained{Exp: 100}},
+			wantEvents: []event.Event{event.ExpGained{Exp: 100}},
 		},
 		{
 			name:       "negative exp is skipped while sp lands",
@@ -57,7 +59,7 @@ func TestPetAddExpAndSpGuards(t *testing.T) {
 			sp:         25,
 			wantExp:    1000,
 			wantSP:     35,
-			wantEvents: []event.Event{event.StatusChanged{}, event.ExpGained{Exp: -40}},
+			wantEvents: []event.Event{event.ExpGained{Exp: -40}},
 		},
 		{
 			name:     "negative exp and full sp pool is silent",

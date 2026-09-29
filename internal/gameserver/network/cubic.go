@@ -194,12 +194,13 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 			if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
 				return
 			}
+			// The heal sends a healed player its own status; the owner gets
+			// no status of its own for a heal that landed on someone else.
 			if healed := actorcast.ApplyCubicHeal(def.Power, target); healed {
 				if recipient, ok := target.(cubicHealMessageTarget); ok {
 					recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRejuvenatingHP))
 				}
 			}
-			sendMagicStatusUpdate(live, beforeVitals)
 		})
 		return
 	}

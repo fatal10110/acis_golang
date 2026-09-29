@@ -60,10 +60,13 @@ func bootOwnerHealer(t *testing.T) (*petWorld, *summon.Actor) {
 }
 
 // TestOwnerHealOnPetRefreshesPetWindow has the owner heal, then mana heal,
-// its wounded, drained wolf. Each restore sends the owner exactly one
-// PetStatusUpdate carrying the new values and shows a watching player the
-// pet's NpcInfo once, as the reference's summon status broadcast does on
-// every HP or MP change.
+// its wounded, drained wolf. The player's hit first republishes the pet's
+// status before the restore lands (CreatureCast.onMagicHitTimer,
+// CreatureCast.java:274-288 -> Summon.updateAndBroadcastStatus): one
+// PetStatusUpdate with the old values to the owner and one NpcInfo to a
+// watching player. The restore then sends its own pair, the PetStatusUpdate
+// carrying the new values, as the reference's summon status broadcast does
+// on every HP or MP change.
 func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -96,11 +99,11 @@ func TestOwnerHealOnPetRefreshesPetWindow(t *testing.T) {
 					updates = append(updates, readPetStatusVitals(t, frame))
 				}
 			}
-			if len(updates) != 1 || updates[0] != want {
-				t.Fatalf("owner PetStatusUpdates = %+v, want one carrying %+v", updates, want)
+			if len(updates) != 2 || updates[0] != before || updates[1] != want {
+				t.Fatalf("owner PetStatusUpdates = %+v, want the pre-skill %+v then %+v", updates, before, want)
 			}
-			if n := countNPCInfoFor(drainFrames(t, watcher.client), pet.ObjectID()); n != 1 {
-				t.Fatalf("watcher got %d pet NpcInfo, want 1", n)
+			if n := countNPCInfoFor(drainFrames(t, watcher.client), pet.ObjectID()); n != 2 {
+				t.Fatalf("watcher got %d pet NpcInfo, want 2 (pre-skill refresh, then the restore)", n)
 			}
 		})
 	}
