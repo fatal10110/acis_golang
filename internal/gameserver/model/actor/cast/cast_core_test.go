@@ -28,6 +28,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -961,6 +962,91 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 	if got.AttackFailed != 1 {
 		t.Fatalf("OnHitResult AttackFailed = %d, want 1", got.AttackFailed)
 	}
+}
+
+// TestAIControllerCastStreamsHandlerMessagesToOnHitResult pins how NPC and
+// summon casts deliver skill-handler messages: each message reaches
+// OnHitResult on its own the moment the handler records it, ahead of the
+// hit's later work on the target, and the final OnHitResult carries no
+// messages. A summon MDAM that kills its target must report the owner's
+// damage message before the target's death frames, as Mdam.java sends the
+// damage message before reduceCurrentHp.
+func TestAIControllerCastStreamsHandlerMessagesToOnHitResult(t *testing.T) {
+	clock := newCastClock()
+	actor := scalingActor()
+	ctrl := NewController(actor, nil)
+	ctrl.SetQueue(clock.q)
+
+	ref := modelskill.Ref{ID: scalingDef.ID, Level: scalingDef.Level}
+	def := scalingDef
+	def.Target = modelskill.TargetOne
+	def.SkillType = "MDAM"
+	def.Offensive = true
+
+	var log []any
+	caster := &streamingSummonCaster{fakeBroadcastingCaster: fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindSummon}}, ownerID: 77}
+	target := &mdamMarkerTarget{fakeCastCreature: fakeCastCreature{id: 2, kind: modelactor.KindNPC}, log: &log}
+
+	var calls []EffectResult
+	ai := &AIController{
+		Controller:  ctrl,
+		Definitions: fakeDefinitions{ref: def},
+		Effects: EffectHandlers{
+			Targets: skilltarget.NewRegistry(effectsKnown{}),
+			Skills:  handlerskill.NewDefaultRegistry(),
+		},
+		Caster: caster,
+		OnHitResult: func(result EffectResult) {
+			calls = append(calls, result)
+			log = append(log, result.Messages...)
+		},
+	}
+
+	ai.Cast(target, ref)
+	clock.advance(125 * time.Millisecond) // Launch
+	clock.advance(400 * time.Millisecond) // Hit
+
+	if len(calls) != 2 {
+		t.Fatalf("OnHitResult calls = %d (%+v), want 2: the streamed damage message, then the final result", len(calls), calls)
+	}
+	if len(calls[0].Messages) != 1 {
+		t.Fatalf("first OnHitResult Messages = %+v, want exactly the one damage message", calls[0].Messages)
+	}
+	damage, ok := calls[0].Messages[0].(handlerskill.Damage)
+	if !ok || damage.RecipientID != 77 || damage.Source != handlerskill.DamageByServitor || damage.Amount <= 0 {
+		t.Fatalf("streamed message = %#v, want the servitor Damage for owner 77", calls[0].Messages[0])
+	}
+	if got := calls[1].Messages; len(got) != 0 {
+		t.Fatalf("final OnHitResult Messages = %+v, want none (already streamed)", got)
+	}
+	if len(log) != 2 || log[1] != mdamReduceHPMarker {
+		t.Fatalf("delivery order = %+v, want [damage message, target ReduceHP]", log)
+	}
+}
+
+type streamingSummonCaster struct {
+	fakeBroadcastingCaster
+	ownerID int32
+}
+
+func (c *streamingSummonCaster) OwnerID() int32 { return c.ownerID }
+func (*streamingSummonCaster) IsPet() bool      { return false }
+
+const mdamReduceHPMarker = "target ReduceHP"
+
+// mdamMarkerTarget takes a fixed positive magic hit and logs the moment its
+// HP is reduced.
+type mdamMarkerTarget struct {
+	fakeCastCreature
+	log *[]any
+}
+
+func (*mdamMarkerTarget) MagicDamageInput(creature.FormulaActor, modelskill.Definition, bool) (formulas.MagicDamageInput, bool) {
+	return formulas.MagicDamageInput{MAtk: 100, MDef: 10, SkillPower: 10, PvPMul: 1, ElementalMul: 1, Shield: formulas.ShieldFailed}, true
+}
+
+func (m *mdamMarkerTarget) ReduceHP(float64, attackable.Combatant, modelskill.Definition) {
+	*m.log = append(*m.log, mdamReduceHPMarker)
 }
 
 // TestAIControllerCastSkipsEffectsForFusionSkill matches
