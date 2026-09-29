@@ -652,9 +652,15 @@ func (c *Character) ReduceHPWithoutCastBreak(amount float64, attacker attackable
 // character, on the full damage and whatever the attacker's damage
 // permission: the break roll only exempts an invulnerable target. The
 // wake-up side effects follow, and only then does another attacker without
-// damage permission stop short of the CP and HP change.
+// damage permission stop short of the CP and HP change. A hit that works
+// out to no damage still rolls the break and runs the wake-up side
+// effects; it then writes nothing unless it is another playable's hit
+// through CP, which rewrites CP unchanged and reports the status.
 func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition, breakCast bool) {
-	if amount <= 0 || c.Invul() || c.Dead() {
+	if amount < 0 {
+		amount = 0
+	}
+	if c.Invul() || c.Dead() {
 		return
 	}
 	if breakCast {
@@ -662,6 +668,9 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 	}
 	c.applyNonConsumptionDamageEffects(false)
 	if !c.damagePermitted(attacker) {
+		return
+	}
+	if amount == 0 && (skill.DirectHPDamage || !c.hitByOther(attacker) || !attacker.Kind().Playable()) {
 		return
 	}
 	if c.landHit(amount, attacker, skill.DirectHPDamage, false) {

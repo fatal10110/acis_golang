@@ -47,6 +47,16 @@ func (l frameLog) index(match func(frame []byte) bool) int {
 	return -1
 }
 
+// lastIndex returns the position of the last frame match accepts, or -1.
+func (l frameLog) lastIndex(match func(frame []byte) bool) int {
+	for i := len(l) - 1; i >= 0; i-- {
+		if match(l[i]) {
+			return i
+		}
+	}
+	return -1
+}
+
 // systemMessage matches a SystemMessage frame with id and returns its
 // parameter reader.
 func systemMessage(frame []byte, id int) (*wire.Reader, bool) {

@@ -483,6 +483,28 @@ func TestMagicDamagePerfectShieldReturnsOne(t *testing.T) {
 	}
 }
 
+// TestNoDamageSkillFormulasReturnZero pins the damage-denied attacker's
+// skill damage: 0 from the physical-skill and magic formulas, ahead of the
+// flat 1 a perfect shield block would otherwise give.
+func TestNoDamageSkillFormulasReturnZero(t *testing.T) {
+	for _, shield := range []ShieldDefense{ShieldFailed, ShieldPerfect} {
+		physical := PhysicalSkillInput{
+			AttackPower: 100, SkillPower: 50, Defence: 50, Shield: shield, Crit: true,
+			RandomMul: 1, ElementalMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, NoDamage: true,
+		}
+		if got := PhysicalSkillDamage(physical); got != 0 {
+			t.Fatalf("NoDamage PhysicalSkillDamage(shield %v) = %v, want 0", shield, got)
+		}
+		magic := MagicDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20, MagicCrit: true,
+			PvPMul: 1, ElementalMul: 1, Shield: shield, NoDamage: true,
+		}
+		if got := MagicDamage(magic); got != 0 {
+			t.Fatalf("NoDamage MagicDamage(shield %v) = %v, want 0", shield, got)
+		}
+	}
+}
+
 func TestMagicDamageShieldSuccessUsesRaisedMDef(t *testing.T) {
 	plain := MagicDamageInput{
 		MAtk: 400, MDef: 50, SkillPower: 20,

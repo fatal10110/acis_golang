@@ -490,7 +490,10 @@ func TestReduceHPForwardsDamageToCastController(t *testing.T) {
 	}
 }
 
-func TestReduceHPSkipsCastControllerOnZeroDamage(t *testing.T) {
+// TestReduceHPRollsCastBreakOnZeroDamage pins that a skill hit working out
+// to no damage (a CHARGEDAM from a damage-denied caster) still rolls the
+// cast break, at the zero amount, and leaves HP alone.
+func TestReduceHPRollsCastBreakOnZeroDamage(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetHP(100)
 	spy := &spyCastController{casting: true, magic: true}
@@ -498,8 +501,66 @@ func TestReduceHPSkipsCastControllerOnZeroDamage(t *testing.T) {
 
 	c.ReduceHP(0, nil, modelskill.Definition{})
 
-	if len(spy.damageCalls) != 0 {
-		t.Fatalf("InterruptCastOnDamage calls = %d, want 0 for zero damage", len(spy.damageCalls))
+	if len(spy.damageCalls) != 1 || spy.damageCalls[0].damage != 0 {
+		t.Fatalf("InterruptCastOnDamage calls = %+v, want one at damage 0", spy.damageCalls)
+	}
+	if got := c.HP(); got != 100 {
+		t.Fatalf("HP after a zero-damage hit = %v, want 100", got)
+	}
+}
+
+// deniedPlayableAttacker is another playable whose damage permission is
+// revoked.
+type deniedPlayableAttacker struct {
+	reduceHPPlayableAttacker
+}
+
+func (deniedPlayableAttacker) CanGiveDamage() bool { return false }
+
+// TestReduceHPZeroDamageReportsStatusOnlyForPlayableCPHit pins which zero
+// skill hits write anything: every one ends the sleep and rolls the cast
+// break, but only another permitted playable's hit that goes through CP
+// rewrites CP unchanged and reports the status, once. An NPC's, the
+// character's own, a damage-denied attacker's and a direct-to-HP zero hit
+// leave CP and HP alone and report nothing.
+func TestReduceHPZeroDamageReportsStatusOnlyForPlayableCPHit(t *testing.T) {
+	tests := []struct {
+		name       string
+		attacker   func(c *Character) attackable.Combatant
+		def        modelskill.Definition
+		broadcasts int
+	}{
+		{"other playable", func(*Character) attackable.Combatant { return reduceHPPlayableAttacker{} }, modelskill.Definition{}, 1},
+		{"npc", func(*Character) attackable.Combatant { return &reduceHPNpcAttacker{} }, modelskill.Definition{}, 0},
+		{"direct to HP", func(*Character) attackable.Combatant { return reduceHPPlayableAttacker{} }, modelskill.Definition{DirectHPDamage: true}, 0},
+		{"self", func(c *Character) attackable.Combatant { return c }, modelskill.Definition{}, 0},
+		{"damage denied", func(*Character) attackable.Combatant { return deniedPlayableAttacker{} }, modelskill.Definition{}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := liveCharacter(1, combatTemplate(), combatItems())
+			c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 400, MaxCP: 200, CurrentCP: 150})
+			attachTestLive(t, c)
+			addCharacterEffect(t, c, "Sleep")
+			spy := &spyCastController{casting: true, magic: true}
+			c.SetCastController(spy)
+			rec := recordEvents(c)
+
+			c.ReduceHP(0, tt.attacker(c), tt.def)
+
+			if got := countVitals(rec); got != tt.broadcasts {
+				t.Fatalf("status broadcasts = %d, want %d", got, tt.broadcasts)
+			}
+			if c.CP() != 150 || c.HP() != 400 {
+				t.Fatalf("cp/hp = %v/%v, want 150/400 unchanged", c.CP(), c.HP())
+			}
+			if c.Sleeping() {
+				t.Fatal("Sleeping() = true after a zero hit, want the sleep effect stopped")
+			}
+			if len(spy.damageCalls) != 1 || spy.damageCalls[0].damage != 0 {
+				t.Fatalf("InterruptCastOnDamage calls = %+v, want one at damage 0", spy.damageCalls)
+			}
+		})
 	}
 }
 
@@ -3744,22 +3805,17 @@ func TestCharacterBlowInputSkipsShieldRollOnMiss(t *testing.T) {
 	}
 }
 
-// TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission
-// pins issue #2333: Java only gates a skill-damage formula on the attacker's
-// damage permission (Formulas.java), never on the target's own isInvul() —
-// that check runs inside reduceHp, after hate has already registered
-// (CreatureStatus.java:209-219). So an invulnerable target must still yield
-// a computed input (ok=true) letting the caller reach ReduceHP; only a
-// damage-denied attacker is rejected at this stage. ManaDamageInput is the
-// one documented exception on the target side (Manadam.java:43-44 gates
-// isInvul() up front, with no reduceHp-style backstop afterward), so it
-// alone still rejects an invulnerable target here. On the attacker side,
-// though, MANADAM is the odd one out in the other direction (issue #2339):
-// Manadam.java has no canGiveDamage() check anywhere in its handler or in
-// Formulas.calcMagicAffected/calcManaDam, unlike the other three resolvers'
-// formulas — so ManaDamageInput alone still accepts a damage-denied
-// attacker.
-func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermission(t *testing.T) {
+// TestCharacterDamageInputsAcceptInvulnerableTargetAndResolveNoDamagePermission
+// pins issue #2333: a skill-damage formula is never gated on the target's
+// own invulnerability, which the HP reduction checks after hate registers,
+// so an invulnerable target still yields a computed input. MANADAM is the
+// target-side exception: it refuses an invulnerable target up front.
+//
+// On the attacker side (issue #2740) a damage-denied attacker's physical
+// and magic inputs still resolve, flagged NoDamage so the formula yields 0
+// before any shield or magic-failure outcome; the blow and mana inputs have
+// no attacker-permission gate at all.
+func TestCharacterDamageInputsAcceptInvulnerableTargetAndResolveNoDamagePermission(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
@@ -3781,14 +3837,18 @@ func TestCharacterDamageInputsAcceptInvulnerableTargetButRejectNoDamagePermissio
 
 	target.SetSpawnProtection(false)
 	caster.SetCanGiveDamage(false)
-	if _, ok := target.PhysicalSkillInput(caster, def); ok {
-		t.Fatal("PhysicalSkillInput accepted an attacker without damage permission")
+	physical, ok := target.PhysicalSkillInput(caster, def)
+	if !ok || !physical.NoDamage || formulas.PhysicalSkillDamage(physical) != 0 {
+		t.Fatalf("PhysicalSkillInput from a damage-denied attacker = %+v, %v; want a resolved zero-damage input", physical, ok)
 	}
-	if _, ok := target.MagicDamageInput(caster, def, true); ok {
-		t.Fatal("MagicDamageInput accepted an attacker without damage permission")
+	magic, ok := target.MagicDamageInput(caster, def, true)
+	if !ok || !magic.NoDamage || magic.Failure != formulas.MagicFailureNone || formulas.MagicDamage(magic) != 0 {
+		t.Fatalf("MagicDamageInput from a damage-denied attacker = %+v, %v; want a resolved zero-damage input with no failure roll", magic, ok)
 	}
-	if _, ok := target.BlowInput(caster, def); ok {
-		t.Fatal("BlowInput accepted an attacker without damage permission")
+	// The blow formula has no damage-permission gate: the target's HP
+	// reduction refuses the damage instead.
+	if _, ok := target.BlowInput(caster, def); !ok {
+		t.Fatal("BlowInput rejected an attacker without damage permission")
 	}
 	if _, ok := target.ManaDamageInput(caster, def); !ok {
 		t.Fatal("ManaDamageInput rejected an attacker without damage permission")
