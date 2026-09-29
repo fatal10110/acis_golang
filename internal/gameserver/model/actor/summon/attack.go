@@ -20,14 +20,9 @@ import (
 // dead, paralyzed, or held by stun, sleep, fear, or an immobile-until-attacked
 // effect. Unlike DenyAIAction, teleporting does not disable attacking; it
 // gates movement instead.
+// See effectHeld for the effects it counts while AbortAll runs.
 func (a *Actor) AttackDisabled() bool {
-	if a.AlikeDead() || a.Paralyzed() {
-		return true
-	}
-	if a.effects == nil {
-		return false
-	}
-	return a.effects.IsAffected(effect.FlagStunned | effect.FlagMeditating | effect.FlagSleep | effect.FlagFear)
+	return a.AlikeDead() || a.paralyzedLock() || a.effectHeld(effect.AIDenyFlags)
 }
 
 // MovementDisabled reports whether this summon cannot move. Fear is not

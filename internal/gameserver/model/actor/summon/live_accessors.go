@@ -439,19 +439,23 @@ func (a *Actor) SummonOwner() Owner { return a.currentOwner() }
 func (a *Actor) UnSummon(Owner) { a.Unsummon() }
 
 // DenyAIAction reports whether this summon cannot act now.
+// See effectHeld for the effects it counts while AbortAll runs.
 func (a *Actor) DenyAIAction() bool {
-	return a.AlikeDead() || a.Paralyzed() || a.Teleporting() || a.effects.IsAffected(
-		effect.FlagStunned|effect.FlagMeditating|effect.FlagSleep|effect.FlagFear,
-	)
+	return a.AlikeDead() || a.paralyzedLock() || a.Teleporting() || a.effectHeld(effect.AIDenyFlags)
 }
 
 // Paralyzed reports whether this summon is temporarily paralyzed or carries
 // an active paralyze effect.
 func (a *Actor) Paralyzed() bool {
+	return a.paralyzedLock() || a.effects.IsAffected(effect.FlagParalyzed)
+}
+
+// paralyzedLock reports the summon's transient paralysis lock (see
+// SetParalyzed), leaving paralyze effects out.
+func (a *Actor) paralyzedLock() bool {
 	a.stateMu.RLock()
-	paralyzed := a.paralyzed
-	a.stateMu.RUnlock()
-	return paralyzed || a.effects.IsAffected(effect.FlagParalyzed)
+	defer a.stateMu.RUnlock()
+	return a.paralyzed
 }
 
 // SetParalyzed sets or clears this summon's transient paralysis lock.
