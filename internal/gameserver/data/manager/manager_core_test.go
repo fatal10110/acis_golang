@@ -362,6 +362,41 @@ func TestKillReward_AutoLootsRolledItemsIntoKillerInventory(t *testing.T) {
 	}
 }
 
+// TestKillReward_AutoLootDropsItemWhenInventoryIsFull pins the capacity gate:
+// an auto-looted item that does not fit the killer's inventory goes to the
+// ground reserved for the killer, and no object id is spent on the refused
+// inventory add.
+func TestKillReward_AutoLootDropsItemWhenInventoryIsFull(t *testing.T) {
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena", Stackable: true}})
+	ground := &recordingGround{}
+	ids := &sequentialIDs{}
+
+	categories := []item.DropCategory{
+		{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: 57, Min: 10, Max: 10, Chance: 100}}},
+	}
+	rates := item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+
+	killer := &lootKiller{id: 77, full: true}
+	r := NewKillReward(categories, nil, 1, false, rates, true, false, ids, items, ground, nil, 0, 0, 0, 0, 0)
+	r.CalculateRewards(killer)
+
+	if len(killer.items) != 0 {
+		t.Fatalf("AddRewardItem stored %v into a full inventory, want nothing", killer.items)
+	}
+	if len(ground.items) != 1 {
+		t.Fatalf("dropped %d items on the ground, want 1", len(ground.items))
+	}
+	if got := ground.items[0]; got.Instance.TemplateID != 57 || got.Instance.Count != 10 {
+		t.Fatalf("ground item = template %d x%d, want 57 x10", got.Instance.TemplateID, got.Instance.Count)
+	}
+	if got := ground.items[0].ObjectID(); got != 1 {
+		t.Fatalf("ground item object id = %d, want 1 (no id spent on the refused inventory add)", got)
+	}
+	if got := ground.dropped[0].ProtectOwnerID; got != 77 {
+		t.Fatalf("ProtectOwnerID = %d, want 77 (the killer)", got)
+	}
+}
+
 func TestKillReward_SkipsItemOnIDExhaustion(t *testing.T) {
 	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
 	ground := &recordingGround{}

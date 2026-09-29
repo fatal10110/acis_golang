@@ -738,6 +738,62 @@ func TestInventory_SlotsNeededFor(t *testing.T) {
 	}
 }
 
+// TestInventory_SlotsNeededForItemIDAtSlotLimit covers every branch of the
+// by-template-id slot count auto-loot relies on, and the capacity verdict for
+// each at a full inventory (and with one slot free): a held stackable merges
+// into its stack for 0 slots and always fits, a new stackable needs 1, a
+// non-stackable needs one per unit, and an unknown template counts as
+// non-stackable.
+func TestInventory_SlotsNeededForItemIDAtSlotLimit(t *testing.T) {
+	const (
+		heldStackID int32 = 1
+		newStackID  int32 = 2
+		weaponID    int32 = 3
+		unknownID   int32 = 99
+	)
+	templates := item.NewTable([]*item.Template{
+		{ID: heldStackID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: newStackID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: weaponID, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+
+	tests := []struct {
+		name       string
+		templateID int32
+		count      int
+		wantSlots  int
+		fitsFull   bool // SlotLimit == Size()
+		fitsOneGap bool // SlotLimit == Size()+1
+	}{
+		{"held stackable merges", heldStackID, 5, 0, true, true},
+		{"new stackable opens a stack", newStackID, 5, 1, false, true},
+		{"non-stackable x1", weaponID, 1, 1, false, true},
+		{"non-stackable x3", weaponID, 3, 3, false, false},
+		{"unknown template counts per unit", unknownID, 2, 2, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inv := NewPlayerInventory(0x10000001, templates)
+			inv.AddNew(heldStackID, 10, 0x20000001)
+			inv.AddNew(weaponID, 1, 0x20000002)
+
+			if got := inv.SlotsNeededForItemID(tt.templateID, tt.count); got != tt.wantSlots {
+				t.Fatalf("SlotsNeededForItemID(%d, %d) = %d, want %d", tt.templateID, tt.count, got, tt.wantSlots)
+			}
+
+			inv.SlotLimit = inv.Size()
+			if got := inv.ValidateCapacityByItemID(tt.templateID, tt.count); got != tt.fitsFull {
+				t.Errorf("ValidateCapacityByItemID(%d, %d) at SlotLimit == Size() = %v, want %v", tt.templateID, tt.count, got, tt.fitsFull)
+			}
+
+			inv.SlotLimit = inv.Size() + 1
+			if got := inv.ValidateCapacityByItemID(tt.templateID, tt.count); got != tt.fitsOneGap {
+				t.Errorf("ValidateCapacityByItemID(%d, %d) with one free slot = %v, want %v", tt.templateID, tt.count, got, tt.fitsOneGap)
+			}
+		})
+	}
+}
+
 // TestInventory_UpdateNotifierFiresOnQueuedUpdate pins the hook every queued
 // inventory change relies on, matching the reference's Inventory.addUpdate
 // registering with InventoryUpdateTaskManager unconditionally: the batching
