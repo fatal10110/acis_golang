@@ -2421,7 +2421,7 @@ func TestNotePvPHitFromAttackerFlagsInnocentVictimHit(t *testing.T) {
 	victim := &Character{ID: 2}
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
@@ -2436,7 +2436,7 @@ func TestNotePvPHitFromAttackerSkipsMutualPvPZone(t *testing.T) {
 	victim.SetInPvPZone(true)
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -2458,7 +2458,7 @@ func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.
 	victim.pvpFlag = task.PvPFlagOn
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != true {
@@ -2472,7 +2472,7 @@ func TestNotePvPHitFromAttackerUsesNormalDurationWhenAttackerHasKarma(t *testing
 	victim.pvpFlag = task.PvPFlagOn
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 	calls := pvpFlagCalls(rec)
 
 	if len(calls) != 1 || calls[0] != false {
@@ -2485,7 +2485,7 @@ func TestNotePvPHitFromAttackerSkipsWhenVictimHasKarma(t *testing.T) {
 	victim := &Character{ID: 2, KarmaPoints: 500}
 	rec := recordEvents(attacker)
 
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -2497,20 +2497,20 @@ func TestNotePvPHitFromAttackerSkipsNonPlayerAttacker(t *testing.T) {
 	victim := &Character{ID: 2}
 
 	// Should not panic and should be a no-op for a non-*Character attacker.
-	victim.notePvPHitFromAttacker(npcKiller{id: 99})
+	victim.notePvPHitFromAttacker(npcKiller{id: 99}, false)
 }
 
 func TestNotePvPHitFromAttackerSkipsNilAttacker(t *testing.T) {
 	victim := &Character{ID: 2}
 
-	victim.notePvPHitFromAttacker(nil)
+	victim.notePvPHitFromAttacker(nil, false)
 }
 
 func TestNotePvPHitFromAttackerSkipsSelfHit(t *testing.T) {
 	c := &Character{ID: 1}
 	rec := recordEvents(c)
 
-	c.notePvPHitFromAttacker(c)
+	c.notePvPHitFromAttacker(c, false)
 	called := event.Count[event.PvPFlagged](rec) > 0
 
 	if called {
@@ -2524,7 +2524,7 @@ func TestNotePvPHitFromAttackerNoopWithoutHook(t *testing.T) {
 
 	// Should not panic when no hook is wired (e.g. character not attached
 	// to a live session).
-	victim.notePvPHitFromAttacker(attacker)
+	victim.notePvPHitFromAttacker(attacker, false)
 }
 
 func TestCharacterNotePvPAttackFlagsInnocentVictim(t *testing.T) {
@@ -2552,6 +2552,63 @@ func TestCharacterNotePvPAttackFlagsOwnerOfSummonedTarget(t *testing.T) {
 
 	if len(calls) != 1 || calls[0] {
 		t.Fatalf("hook calls after summoned target = %v, want [false]", calls)
+	}
+}
+
+func TestCharacterNoteServitorPvPMarksTheFlagAsTheSummons(t *testing.T) {
+	owner := &Character{ID: 1}
+	victim := &Character{ID: 2}
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPAttack(victim)
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{victim}, true, "PDAM")
+	got := event.Of[event.PvPFlagged](rec)
+
+	want := event.PvPFlagged{ByServitor: true}
+	if len(got) != 2 || got[0] != want || got[1] != want {
+		t.Fatalf("PvPFlagged after the summon's hit and skill = %+v, want two %+v", got, want)
+	}
+}
+
+func TestCharacterNoteServitorPvPIgnoresHitsOnTheOwnerAndItsSummon(t *testing.T) {
+	owner := &Character{ID: 1}
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPAttack(owner)
+	owner.NoteServitorPvPAttack(summonKiller{owner: owner})
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{owner, summonKiller{owner: owner}}, true, "PDAM")
+
+	if n := event.Count[event.PvPFlagged](rec); n != 0 {
+		t.Fatalf("PvPFlagged count = %d after the summon hit its owner and itself, want 0", n)
+	}
+}
+
+func TestCharacterNoteServitorPvPNonOffensiveSkillMarksTheFlagAsTheSummons(t *testing.T) {
+	owner := &Character{ID: 1}
+	flagged := &Character{ID: 2}
+	flagged.UpdatePvPFlag(task.PvPFlagOn)
+	pker := &Character{ID: 3, KarmaPoints: 500}
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{flagged}, false, "BUFF")
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{pker}, false, "HEAL")
+	got := event.Of[event.PvPFlagged](rec)
+
+	want := event.PvPFlagged{ByServitor: true}
+	if len(got) != 2 || got[0] != want || got[1] != want {
+		t.Fatalf("PvPFlagged after the summon buffed a flagged and a karma'd player = %+v, want two %+v", got, want)
+	}
+}
+
+func TestCharacterNoteServitorPvPNonOffensiveSkillIgnoresTheOwnerAndItsSummon(t *testing.T) {
+	owner := &Character{ID: 1, KarmaPoints: 500}
+	owner.UpdatePvPFlag(task.PvPFlagOn)
+	rec := recordEvents(owner)
+
+	owner.NoteServitorPvPSkillTargets([]attackable.Combatant{owner, summonKiller{owner: owner}}, false, "BUFF")
+
+	if n := event.Count[event.PvPFlagged](rec); n != 0 {
+		t.Fatalf("PvPFlagged count = %d after the summon buffed its flagged, karma'd owner and itself, want 0", n)
 	}
 }
 

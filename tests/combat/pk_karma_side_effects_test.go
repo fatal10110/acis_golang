@@ -206,9 +206,11 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 
 // TestPKSkillKillEndsWithTheKillerFlagged has the same flagged killer kill
 // the innocent player with an offensive skill. The kill's karma gain takes
-// the knife off and resets the flag as for a physical kill, but an
-// offensive skill flags its caster once its effects have run, so the killer
-// is flagged again after the reset and ends with both karma and the flag.
+// the knife off and resets the flag as for a physical kill, inside the
+// killing blow: both reach the killer before the skill's YOU_DID_S1_DMG
+// (Pdam sends it after reduceCurrentHp). An offensive skill flags its
+// caster once its effects have run, so the killer is flagged again after
+// the damage message and ends with both karma and the flag.
 func TestPKSkillKillEndsWithTheKillerFlagged(t *testing.T) {
 	t.Parallel()
 	s := bootPKKillScene(t)
@@ -220,9 +222,13 @@ func TestPKSkillKillEndsWithTheKillerFlagged(t *testing.T) {
 
 	frames, aborted := s.assertKnifeTakenOff(t)
 	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
-	reflag := indexOf(frames, flagReset+1, serverpackets.OpcodeUserInfo, -1)
-	if flagReset < 0 || reflag < 0 {
-		t.Fatalf("frames after the karma change = %x, want the flag reset's UserInfo, then the re-flag's", opcodesOf(frames))
+	damage := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageYouDidS1Dmg)
+	if flagReset < 0 || damage < flagReset {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED and the flag reset's UserInfo before YOU_DID_S1_DMG", opcodesOf(frames))
+	}
+	reflag := indexOf(frames, damage+1, serverpackets.OpcodeUserInfo, -1)
+	if reflag < 0 {
+		t.Fatalf("frames after the karma change = %x, want the re-flag's UserInfo after YOU_DID_S1_DMG", opcodesOf(frames))
 	}
 	if karma := s.karma(); karma != 240 {
 		t.Fatalf("killer karma = %d after the skill PK kill, want 240", karma)

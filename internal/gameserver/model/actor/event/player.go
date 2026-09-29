@@ -255,8 +255,10 @@ type TeleportRequested struct{ X, Y, Z, Radius int }
 type Relocated struct{ Previous location.Location }
 
 // PvPFlagged reports a hit that flags the character for PvP; UseFlaggedDuration
-// selects the PvP-versus-PvP duration.
-type PvPFlagged struct{ UseFlaggedDuration bool }
+// selects the PvP-versus-PvP duration. ByServitor marks a hit or skill of
+// the character's summon, reported from the summon's queue rather than the
+// character's own.
+type PvPFlagged struct{ UseFlaggedDuration, ByServitor bool }
 
 // RelationChanged reports a PvP flag or karma change observers must see.
 type RelationChanged struct{}

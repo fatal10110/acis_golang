@@ -77,6 +77,9 @@ type PlayableActor interface {
 	// TestCursesOnAttack applies the raid curse for attacking a raid-related
 	// target and reports whether it blocked the attack.
 	TestCursesOnAttack(attackable.Combatant) bool
+	// NotePvPAttack records a physical hit about to land on target for PvP
+	// flagging of the acting player: the actor itself or a summon's owner.
+	NotePvPAttack(attackable.Combatant)
 }
 
 // PlayerActor is the player-only attack surface.
@@ -90,8 +93,6 @@ type PlayerActor interface {
 	NotifyBowDraw(gaugeMs int)
 	ClearRecentFakeDeath()
 	ClientActionFailed()
-	// NotePvPAttack records a resolved physical hit for PvP flagging.
-	NotePvPAttack(attackable.Combatant)
 	// BroadcastStatus reports a change to the player's HP, MP or CP that its
 	// own writer left unreported.
 	BroadcastStatus()
@@ -484,8 +485,8 @@ func (c *Controller) deliverHit(hit Hit) {
 		// passes.
 		c.actor.SetChargedShot(item.ShotSoul, false)
 	}
-	if c.player != nil {
-		c.player.NotePvPAttack(hit.Target)
+	if c.playable != nil {
+		c.playable.NotePvPAttack(hit.Target)
 	}
 	// The target hears of a miss before the attacker's feedback goes out.
 	target, reacts := hit.Target.(attackedTarget)

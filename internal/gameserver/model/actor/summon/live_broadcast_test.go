@@ -114,8 +114,11 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 	}
 }
 
-func (*fakeSummonOwner) ServitorVanished()                         {}
-func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState           { return task.PvPFlagNone }
-func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant) {}
-func (*fakeSummonOwner) OfferSummonRevive()                        {}
-func (*fakeSummonOwner) ClearReviveOffer()                         {}
+func (*fakeSummonOwner) ServitorVanished()                          {}
+func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState            { return task.PvPFlagNone }
+func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant)  {}
+func (*fakeSummonOwner) OfferSummonRevive()                         {}
+func (*fakeSummonOwner) ClearReviveOffer()                          {}
+func (*fakeSummonOwner) NoteServitorPvPAttack(attackable.Combatant) {}
+func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
+}

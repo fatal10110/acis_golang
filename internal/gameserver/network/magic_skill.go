@@ -249,10 +249,13 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 // applyCastHit dispatches a player cast's effects to the affected set its
 // launch resolved. The final MP/HP costs already sent their own statuses,
 // and every change the effects make to the caster's vitals reports its own
-// status where it happens, so the hit sends none of its own.
+// status where it happens, so the hit sends none of its own. A PK kill the
+// hit made, and the flag the skill raised after it, settle before anything
+// else the hit sends.
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
 	handlers.Sink = l.playerMessageSink(live, nil)
 	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
+	l.settlePvPChanges(live)
 	l.syncCubicTargets(live, result, def)
 }
 
@@ -763,8 +766,13 @@ func (l *GameClientLink) HostileCastEffects() actorcast.EffectHandlers {
 // handler produces them, so each keeps its place among the frames the hit
 // itself sends (the target's status, death, the kill's rewards). onStatus,
 // when set, runs after each message that sent live its own status.
+//
+// The sink runs on live's queue, so it first runs the PvP flag changes
+// pending for live: a PK kill the hit just made takes its items off and
+// resets its flag before the message that follows the killing blow.
 func (l *GameClientLink) playerMessageSink(live *livePlayer, onStatus func()) skillhandler.MessageSink {
 	return func(message any) {
+		l.settlePvPChanges(live)
 		if l.sendSkillHandlerResult(live, actorcast.EffectResult{Messages: []any{message}}) && onStatus != nil {
 			onStatus()
 		}
