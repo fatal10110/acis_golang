@@ -52,7 +52,7 @@ func tickThinkPromote(ai *Attackable) error {
 
 func thinkWanderOnce(ai *Attackable) error {
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
-	return ai.Think()
+	return ai.RunAI()
 }
 
 func TestAttackableAIAddDamageHateDoesNotQueueAttackDesire(t *testing.T) {
@@ -126,7 +126,7 @@ func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 
 	addAttackHate(ai, low, 0, 10)
 	addAttackHate(ai, high, 0, 25)
-	ai.Think()
+	ai.RunAI()
 
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
@@ -154,7 +154,7 @@ func TestAttackableThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 	ai := NewAttackable(owner, move, strike)
 
 	addAttackHate(ai, target, 0, 10)
-	if err := ai.Think(); err != nil {
+	if err := ai.RunAI(); err != nil {
 		t.Fatalf("Think() error = %v, want nil", err)
 	}
 
@@ -176,7 +176,7 @@ func TestAttackableAIStartsOffensiveFollowBeforeAttack(t *testing.T) {
 	ai := NewAttackable(owner, move, strike)
 
 	addAttackHate(ai, target, 0, 100)
-	ai.Think()
+	ai.RunAI()
 
 	if move.followTarget != target || move.followRange != 80 {
 		t.Fatalf("follow check = (%v, %d), want (%v, 80)", move.followTarget, move.followRange, target)
@@ -198,7 +198,7 @@ func TestAttackableAIQueuesAttackWhileBusy(t *testing.T) {
 	ai := NewAttackable(owner, move, strike)
 
 	addAttackHate(ai, target, 0, 100)
-	ai.Think()
+	ai.RunAI()
 
 	next, nextTarget, ok := ai.NextIntention()
 	if !ok {
@@ -221,7 +221,7 @@ func TestAttackableAIIgnoresLostTarget(t *testing.T) {
 	ai := NewAttackable(owner, move, strike)
 
 	addAttackHate(ai, target, 0, 100)
-	ai.Think()
+	ai.RunAI()
 
 	if move.followTarget != nil {
 		t.Fatalf("follow target = %v, want none for lost target", move.followTarget)
@@ -254,7 +254,7 @@ func TestAttackableAIKeepsTargetWhenCanAttackFails(t *testing.T) {
 
 	addAttackHate(ai, other, 0, 25)
 	addAttackHate(ai, blocked, 0, 100)
-	ai.Think()
+	ai.RunAI()
 
 	if strike.target != nil {
 		t.Fatalf("attacked target = %v, want none while blocked target is retried", strike.target)
@@ -282,7 +282,7 @@ func TestAttackableAIPromotesQueuedCastDesireAndCasts(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if got := ai.CurrentIntention(); got != IntentionCast {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionCast)
@@ -306,7 +306,7 @@ func TestAttackableAICastStopsMovementAndFacesTargetForLongCast(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if move.stopCount != 1 {
 		t.Fatalf("stop count = %d, want 1", move.stopCount)
@@ -332,7 +332,7 @@ func TestAttackableAICastDoesNotFaceSelfTarget(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: owner, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if owner.headingTarget != nil {
 		t.Fatalf("heading target = %v, want none for self-targeted skill", owner.headingTarget)
@@ -353,7 +353,7 @@ func TestAttackableAICastStartsOffensiveFollowBeforeCasting(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if cast.castCalled {
 		t.Fatal("Cast() called while still closing distance")
@@ -377,7 +377,7 @@ func TestAttackableAICastRespectsPreMovementCooldownGate(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if move.followTarget != nil {
 		t.Fatalf("follow target = %v, want none while skill is on cooldown", move.followTarget)
@@ -398,7 +398,7 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if cast.castCalled {
 		t.Fatal("Cast() called after the final cast gate rejected the attempt")
@@ -423,7 +423,7 @@ func TestAttackableThinkCastStopsMovementAndStillFacesTarget(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	if err := ai.Think(); err != nil {
+	if err := ai.RunAI(); err != nil {
 		t.Fatalf("Think() error = %v, want nil", err)
 	}
 
@@ -445,7 +445,7 @@ func TestAttackableAICastFinalGateRejectDoesNotBroadcastForSelfTarget(t *testing
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: owner, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if owner.moveToPawnCalls != 0 {
 		t.Fatalf("BroadcastMoveToPawn calls = %d, want 0 for a self-targeted skill", owner.moveToPawnCalls)
@@ -463,7 +463,7 @@ func TestAttackableAICastSummonFriendBypassesTargetLostCheck(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if !cast.castCalled || cast.castedTarget != target {
 		t.Fatal("Cast() not called for a SUMMON_FRIEND cast against an unknown target")
@@ -481,7 +481,7 @@ func TestAttackableAIIgnoresCastDesireForLostTarget(t *testing.T) {
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
-	ai.Think()
+	ai.RunAI()
 
 	if cast.castCalled {
 		t.Fatal("Cast() called for a lost target")
@@ -498,7 +498,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 
-	ai.Think() // must not panic with no CastController wired.
+	ai.RunAI() // must not panic with no CastController wired.
 
 	if got := ai.CurrentIntention(); got != IntentionCast {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionCast)
@@ -799,7 +799,7 @@ func TestAttackableThinkPrunesZeroWeightCastDesire(t *testing.T) {
 	ai.SetCastController(cast)
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 0})
 
-	ai.Think()
+	ai.RunAI()
 
 	if got := ai.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires = %d, want 0", got)
@@ -821,7 +821,7 @@ func TestAttackableThinkPrunesCastWhenHPMPDisabledFails(t *testing.T) {
 	ai.SetCastController(cast)
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 100})
 
-	ai.Think()
+	ai.RunAI()
 
 	if got := ai.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires = %d, want 0", got)
@@ -845,7 +845,7 @@ func TestAttackableThinkPrunesAttackDesireBeyond1500(t *testing.T) {
 	addAttackHate(ai, far, 0, 100)
 	addAttackHate(ai, near, 0, 50)
 
-	ai.Think()
+	ai.RunAI()
 
 	if strike.target != near {
 		t.Fatalf("attacked target = %v, want nearer attacker (far desire pruned)", strike.target)
@@ -864,7 +864,7 @@ func TestAttackableThinkKeepsAttackDesireAt1500(t *testing.T) {
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 	addAttackHate(ai, target, 0, 20)
 
-	ai.Think()
+	ai.RunAI()
 
 	if strike.target != target {
 		t.Fatalf("attacked target = %v, want target at exactly 1500", strike.target)
@@ -880,7 +880,7 @@ func TestAttackableThinkKeepsFarAttackWhenOutOfControl(t *testing.T) {
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
 	addAttackHate(ai, far, 0, 20)
 
-	ai.Think()
+	ai.RunAI()
 
 	if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: far}) {
 		t.Fatal("far ATTACK desire pruned while out of control")
@@ -897,7 +897,7 @@ func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 	addAttackHate(ai, target, 0, 20)
-	ai.Think()
+	ai.RunAI()
 	if strike.target != target {
 		t.Fatalf("first Think attacked = %v, want target", strike.target)
 	}
@@ -1143,7 +1143,7 @@ func TestAttackableAISetBackToPeaceClearsCombatState(t *testing.T) {
 
 	addAttackHate(ai, target, 5, 20)
 	ai.AddHate(target, 30)
-	ai.Think()
+	ai.RunAI()
 
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() before reset = %v, want %v", got, IntentionAttack)
@@ -1179,7 +1179,7 @@ func TestAttackableAIReduceAllAggroHateReturnsToPeaceWhenExhausted(t *testing.T)
 	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
 
 	addAttackHate(ai, target, 0, 5)
-	ai.Think()
+	ai.RunAI()
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() before decay = %v, want %v", got, IntentionAttack)
 	}
@@ -1202,7 +1202,7 @@ func TestAttackableAIStopAggroHateReturnsToPeaceWhenExhausted(t *testing.T) {
 	ai := NewAttackable(owner, move, &recordingAttack{canAttack: true})
 
 	addAttackHate(ai, target, 0, 20)
-	ai.Think()
+	ai.RunAI()
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() before stop = %v, want %v", got, IntentionAttack)
 	}
@@ -1225,7 +1225,7 @@ func TestAttackableAIReduceAllAggroHateKeepsAttackWhenSkillHateRemains(t *testin
 
 	addAttackHate(ai, target, 0, 5)
 	ai.AddHate(target, 50)
-	ai.Think()
+	ai.RunAI()
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() before decay = %v, want %v", got, IntentionAttack)
 	}
@@ -1422,11 +1422,11 @@ func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionMoveTo)
 	}
 	if move.home != home {
 		t.Fatalf("MoveHome destination = %#v, want %#v", move.home, home)
@@ -1495,11 +1495,11 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionMoveTo)
 	}
 
 	// |ΔZ| > Desire.Equal's 30 so thinkMoveTo's fast path cannot idle.
@@ -1525,8 +1525,8 @@ func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 
 	brain.ArrivedBlocked()
@@ -1551,11 +1551,11 @@ func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionMoveTo)
 	}
 
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
@@ -1588,8 +1588,8 @@ func TestAttackableAIFollowArrivedSkipsSpawnHeadingAndOOTSweep(t *testing.T) {
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionFollow, FinalTarget: target, Weight: 5})
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := ai.CurrentIntention(); got != IntentionFollow {
 		t.Fatalf("CurrentIntention() = %v, want follow", got)
@@ -1617,8 +1617,8 @@ func TestAttackableAIAttackArrivedRestoresHeadingAndArmsOOTSweep(t *testing.T) {
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
 	addAttackHate(ai, target, 0, 1000)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want attack", got)
@@ -1903,8 +1903,8 @@ func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
 	strike := &recordingAttack{canAttack: true, attackingNow: true}
 	ai := NewAttackable(owner, move, strike)
 	addAttackHate(ai, target, 0, 20)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want attack", got)
@@ -1973,8 +1973,8 @@ func TestAttackableAIIdleSkipsAbortWhileCasting(t *testing.T) {
 	ai := NewAttackable(owner, move, strike)
 	ai.SetCastController(cast)
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 10})
-	if err := ai.Think(); err != nil {
-		t.Fatalf("Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
 	}
 
 	ai.Desires().Clear()
@@ -2005,28 +2005,28 @@ func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
 	ai.roll = func(int) int { return 0 }
 
 	if err := thinkWanderOnce(ai); err != nil {
-		t.Fatalf("first Think() error: %v", err)
+		t.Fatalf("first RunAI() error: %v", err)
 	}
 	owner.wanderCalls = 0
 
-	if err := ai.Think(); err != nil {
-		t.Fatalf("arm-timer Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("arm-timer RunAI() error: %v", err)
 	}
 	if owner.wanderCalls != 0 {
 		t.Fatalf("wander calls while timer arms = %d, want 0", owner.wanderCalls)
 	}
 
 	now = start.Add(4 * time.Second)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("early Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("early RunAI() error: %v", err)
 	}
 	if owner.wanderCalls != 0 {
 		t.Fatalf("wander calls before timer = %d, want 0", owner.wanderCalls)
 	}
 
 	now = start.Add(5 * time.Second)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("due Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("due RunAI() error: %v", err)
 	}
 	if owner.wanderCalls != 1 {
 		t.Fatalf("wander calls after timer + rate = %d, want 1", owner.wanderCalls)
@@ -2043,24 +2043,24 @@ func TestAttackableAIWanderRateZeroReschedulesWithoutWalking(t *testing.T) {
 	ai.SetRandomWalkRate(0)
 
 	if err := thinkWanderOnce(ai); err != nil {
-		t.Fatalf("first Think() error: %v", err)
+		t.Fatalf("first RunAI() error: %v", err)
 	}
 	owner.wanderCalls = 0
-	if err := ai.Think(); err != nil {
-		t.Fatalf("arm-timer Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("arm-timer RunAI() error: %v", err)
 	}
 
 	now = start.Add(5 * time.Second)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("due Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("due RunAI() error: %v", err)
 	}
 	if owner.wanderCalls != 0 {
 		t.Fatalf("wander calls with rate 0 = %d, want 0", owner.wanderCalls)
 	}
 
 	now = start.Add(9 * time.Second)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("before second timer Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("before second timer RunAI() error: %v", err)
 	}
 	if owner.wanderCalls != 0 {
 		t.Fatalf("wander calls before rescheduled timer = %d, want 0", owner.wanderCalls)
@@ -2076,12 +2076,12 @@ func TestAttackableAIAttackInterruptsWander(t *testing.T) {
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 
 	if err := thinkWanderOnce(ai); err != nil {
-		t.Fatalf("wander Think() error: %v", err)
+		t.Fatalf("wander RunAI() error: %v", err)
 	}
 
 	addAttackHate(ai, target, 0, 10)
-	if err := ai.Think(); err != nil {
-		t.Fatalf("attack Think() error: %v", err)
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("attack RunAI() error: %v", err)
 	}
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() = %v, want attack interrupting wander", got)
@@ -2932,6 +2932,13 @@ func TestAttackableAttackDesireReplacesFollow(t *testing.T) {
 	brain.AddDamageHate(target, 0, 200)
 	brain.AddAttackDesire(target, 200)
 	brain.Think()
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v (Think does not select)", got, IntentionFollow)
+	}
+	if strike.target != nil {
+		t.Fatalf("Think attacked %v, want the attack left for RunAI", strike.target)
+	}
+	brain.RunAI()
 	if got := brain.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() after attack desire = %v, want %v", got, IntentionAttack)
 	}
@@ -3066,15 +3073,15 @@ func TestAttackableThinkNeitherRunsNorClearsLatch(t *testing.T) {
 	}
 }
 
-func TestAttackableLatchedAttackReplacesMoveToPromotedByThink(t *testing.T) {
+func TestAttackableThinkLeavesQueuedMoveToAndLatchForRunAI(t *testing.T) {
 	a, _, strike := latchedAttackAI(t)
 	a.AddMoveToDesire(location.Location{X: 100, Y: 100}, 50)
 
 	if err := a.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
-	if got := a.CurrentIntention(); got != IntentionMoveTo {
-		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	if got := a.CurrentIntention(); got == IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want the queued walk left for RunAI", got)
 	}
 
 	if err := a.RunAI(); err != nil {
@@ -3766,5 +3773,86 @@ func TestSummonAIFinishedAttackKeepsKeepableTargets(t *testing.T) {
 	}
 	if strike.target != white {
 		t.Fatalf("swing target = %v, want the queued attack's", strike.target)
+	}
+}
+
+// ---- Think continues, never selects ----
+
+// TestAttackableThinkFromIdleLeavesQueuedAttackForRunAI pins that Think
+// only continues the current intention: an idle actor with a queued attack
+// desire takes no step on Think, and the next RunAI takes the attack up.
+func TestAttackableThinkFromIdleLeavesQueuedAttackForRunAI(t *testing.T) {
+	owner := actor(1)
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.AddDamageHate(target, 0, 20)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 20})
+
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionIdle)
+	}
+	if strike.doAttackCalls != 0 {
+		t.Fatalf("DoAttack calls after Think = %d, want 0", strike.doAttackCalls)
+	}
+	if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
+		t.Fatal("attack desire dropped by Think, want it still queued")
+	}
+
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionAttack)
+	}
+	if strike.target != target {
+		t.Fatalf("attacked target after RunAI = %v, want %v", strike.target, target)
+	}
+}
+
+// TestAttackableThinkDuringWanderTakesNoStep pins that the THINK event has
+// no wander step and does not swap a wander for a queued attack: the walk
+// and the attack wait for desire selection.
+func TestAttackableThinkDuringWanderTakesNoStep(t *testing.T) {
+	owner := actor(1)
+	owner.moveSpeed = 50
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	ai := NewAttackable(owner, &recordingMove{}, strike)
+	ai.SetRandomWalkRate(100)
+	ai.roll = func(int) int { return 0 }
+	if err := thinkWanderOnce(ai); err != nil {
+		t.Fatalf("wander RunAI() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionWander)
+	}
+	walks, stances := owner.wanderCalls, owner.walkStanceCalls
+
+	ai.AddDamageHate(target, 0, 20)
+	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 20})
+	if err := ai.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v kept", got, IntentionWander)
+	}
+	if owner.wanderCalls != walks || owner.walkStanceCalls != stances {
+		t.Fatalf("wander walks/stances after Think = %d/%d, want %d/%d (no wander step)", owner.wanderCalls, owner.walkStanceCalls, walks, stances)
+	}
+	if strike.doAttackCalls != 0 {
+		t.Fatalf("DoAttack calls after Think = %d, want 0", strike.doAttackCalls)
+	}
+
+	if err := ai.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionAttack)
 	}
 }
