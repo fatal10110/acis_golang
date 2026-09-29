@@ -66,6 +66,7 @@ const (
 	SystemMessageAvoidedS1Attack                   = 42
 	SystemMessageMissedTarget                      = 43
 	SystemMessageYouDidS1Dmg                       = 35
+	SystemMessageS1GaveYouS2Dmg                    = 36
 	SystemMessageCriticalHit                       = 44
 	SystemMessageCriticalHitMagic                  = 1280
 	SystemMessagePetHitForS1Damage                 = 1015

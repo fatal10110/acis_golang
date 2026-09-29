@@ -115,6 +115,7 @@ type Player interface {
 	NotifyAttackFailed()
 	NotifyResistedSkill(targetName string, skillID modelskill.ID, level int)
 	NotifyResistedMagic(attackerName string)
+	NotifySkillDamage(amount int, magicCrit, blocked, petrified bool)
 	NotifySpoilAlready()
 	NotifySpoilSuccess()
 	// Summon-friend eligibility state the caster and target share.
@@ -268,6 +269,14 @@ type ManaDrain struct {
 	TargetID   int32
 	CasterName string
 	MP         int32
+}
+
+// DamageReceived reports a hit's damage to the player target that took it,
+// naming the attacker.
+type DamageReceived struct {
+	TargetID     int32
+	AttackerName string
+	Amount       int32
 }
 
 // DamageSource selects the damage feedback family: a player's own, or a
