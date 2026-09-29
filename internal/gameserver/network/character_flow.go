@@ -114,11 +114,17 @@ func (l *GameClientLink) sendCharSelectInfo(ctx context.Context, client *Client)
 // the same items, which is a bug here rather than a detach flush that never
 // landed: those items are claimed and restored, not dropped.
 func (l *GameClientLink) restoreItemRows(ownerID int32, items []*item.Instance) []*item.Instance {
+	return l.restoreRows(ownerID, items, restoredItemLocation)
+}
+
+// restoreRows is restoreItemRows for a container that rebuilds itself from
+// the rows at the locations restored reports.
+func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, restored func(item.Location) bool) []*item.Instance {
 	var claimed map[int32]*item.Instance
 	if l.itemInstances != nil {
 		ids := make([]int32, 0, len(items))
 		for _, inst := range items {
-			if inst != nil && restoredItemLocation(inst.Location) {
+			if inst != nil && restored(inst.Location) {
 				ids = append(ids, inst.ObjectID)
 			}
 		}
@@ -327,6 +333,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
 	if l.world != nil {
+		// A pet corpse this character left behind is its pet again, as the
+		// character is restored and before it enters the world.
+		l.reclaimPetCorpse(live)
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		l.world.AddPlayer(live)

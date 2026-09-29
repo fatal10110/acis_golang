@@ -111,8 +111,12 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 
 	// An unsummon or logout whose pets-row write is still queued restores
 	// from the state it queued; otherwise the row has to be read.
+	//
+	// Such a write leaves no items behind under the collar: an unsummon and a
+	// decay hand every item to the owner, and a logout leaves a dead pet's
+	// items with its corpse, which keeps the owner's summon slot.
 	if state, hasSaved := link.queuedPets.latest(controlItem.ObjectID); hasSaved {
-		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true)
+		s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, true, nil)
 		return
 	}
 	// The read runs on the control item's persistence lane: behind every
@@ -176,6 +180,10 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		restoreCtx, cancel := context.WithTimeout(context.Background(), petRestoreTimeout)
 		defer cancel()
 		state, hasSaved, err := link.petStore.Get(restoreCtx, controlItem.ObjectID)
+		var items []*item.Instance
+		if err == nil {
+			items, err = link.petItemRows(restoreCtx, controlItem.ObjectID)
+		}
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
 			if !postLive(live, func() { s.endRestore(releaseFinish) }) {
@@ -185,7 +193,7 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		}
 		posted := postLive(live, func() {
 			defer s.endRestore(releaseFinish)
-			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved)
+			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved, items)
 		})
 		if !posted {
 			s.endRestore(releaseFinish)
@@ -230,7 +238,9 @@ func (s *gameSummonSpawner) endRestore(releaseFinish func()) {
 // (Player.java:6266-6283), and its spawn had no separate continuation to
 // leave behind. The detaching flag is the same one taskeffects.go checks
 // before applying a deferred effect to a departing session.
-func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool) {
+//
+// items are the pet's saved item rows, which it carries again.
+func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonItem item.SummonItem, npcTmpl *npc.Template, state petmodel.State, hasSaved bool, items []*item.Instance) {
 	link, live := s.link, s.live
 	if live.detached() {
 		return
@@ -315,23 +325,18 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		Growth:          npcTmpl.Pet,
 		CON:             npcTmpl.CON,
 		Config:          nil, // set by newPet from link.petConfig
-		Inventory: itemcontainer.NewPetInventoryWithDelivery(objID, live.Inventory().Templates(), &petInventoryDelivery{
-			updates: link.inventoryUpdates,
-			live:    live,
-			state:   link.world,
-			log:     link.log,
-		}, link.itemPersister(objID)),
-		Fed:           fed,
-		MaxMeal:       levelStats.MaxMeal,
-		MealInNormal:  levelStats.MealInNormal,
-		MealInBattle:  levelStats.MealInBattle,
-		Food1:         int32(npcTmpl.Pet.Food1),
-		Food2:         int32(npcTmpl.Pet.Food2),
-		FoodRestore1:  foodRestore1,
-		FoodRestore2:  foodRestore2,
-		AutoFeedLimit: npcTmpl.Pet.AutoFeedLimit,
-		HungryLimit:   npcTmpl.Pet.HungryLimit,
-		UnsummonLimit: npcTmpl.Pet.UnsummonLimit,
+		Inventory:       link.newPetInventory(live, controlItem.ObjectID, items),
+		Fed:             fed,
+		MaxMeal:         levelStats.MaxMeal,
+		MealInNormal:    levelStats.MealInNormal,
+		MealInBattle:    levelStats.MealInBattle,
+		Food1:           int32(npcTmpl.Pet.Food1),
+		Food2:           int32(npcTmpl.Pet.Food2),
+		FoodRestore1:    foodRestore1,
+		FoodRestore2:    foodRestore2,
+		AutoFeedLimit:   npcTmpl.Pet.AutoFeedLimit,
+		HungryLimit:     npcTmpl.Pet.HungryLimit,
+		UnsummonLimit:   npcTmpl.Pet.UnsummonLimit,
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
@@ -393,6 +398,37 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
+}
+
+// newPetInventory builds the live inventory of live's pet called out of the
+// collar controlItemID, carrying items, its saved rows.
+//
+// A pet's items are saved under its collar, not under the pet's own object
+// id, which is new each time it is called out: a dead pet keeps its items
+// across its owner's logout, and a server restart must not lose them.
+func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, items []*item.Instance) *itemcontainer.Inventory {
+	inv := itemcontainer.NewPetInventoryWithDelivery(controlItemID, live.Inventory().Templates(), &petInventoryDelivery{
+		updates: l.inventoryUpdates,
+		ownerID: live.ObjectID(),
+		state:   l.world,
+		log:     l.log,
+	}, l.itemPersister(controlItemID))
+	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
+	return inv
+}
+
+// petItemRows reads the item rows saved under the collar controlItemID.
+func (l *GameClientLink) petItemRows(ctx context.Context, controlItemID int32) ([]*item.Instance, error) {
+	if l.items == nil {
+		return nil, nil
+	}
+	return l.items.ListByOwner(ctx, controlItemID)
+}
+
+// restoredPetItemLocation reports whether a row at loc is one a pet inventory
+// rebuilds itself from: its base and equip locations.
+func restoredPetItemLocation(loc item.Location) bool {
+	return loc == item.LocationPet || loc == item.LocationPetEquip
 }
 
 // SpawnServitor creates the non-cubic SUMMON skill's live servitor beside its
@@ -506,6 +542,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	attackController.SetQueue(queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
 	sink.brain = brain
+	sink.attack = attackController
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
 	// SetLogger records broadcast errors from TryToAttack/TryToFollow/TryToIdle/Think
 	// that have no caller left to return them to; left unset, they're silently
@@ -513,6 +550,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	brain.SetLogger(l.log)
 	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, sink)
 	castController.SetQueue(queue)
+	sink.cast = castController
 	aiController := &actorcast.AIController{
 		Controller:  castController,
 		Definitions: l.skills,

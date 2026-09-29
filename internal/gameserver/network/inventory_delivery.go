@@ -35,9 +35,12 @@ func (d *playerInventoryDelivery) UpdateInventoryWeight(inv *itemcontainer.Inven
 	d.character.RefreshWeightPenalty()
 }
 
+// petInventoryDelivery reports a pet inventory's changes to the session the
+// pet answers to, which changes when a pet corpse left behind is handed to
+// its owner's next session.
 type petInventoryDelivery struct {
 	updates *task.InventoryUpdates
-	live    *livePlayer
+	ownerID int32
 	state   *world.State
 	log     zerolog.Logger
 }
@@ -46,8 +49,8 @@ func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory
 	if d == nil || d.updates == nil {
 		return
 	}
-	if pet, ok := d.pet(inv); ok {
-		d.updates.Add(inv, &petInventoryOwner{live: d.live, pet: pet, log: d.log})
+	if pet, live, ok := d.pet(inv); ok {
+		d.updates.Add(inv, &petInventoryOwner{live: live, pet: pet, log: d.log})
 	}
 }
 
@@ -56,26 +59,31 @@ func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory
 // carries the new carried weight.
 // TODO(#2524): refresh the pet's weight-penalty band first.
 func (d *petInventoryDelivery) UpdateInventoryWeight(inv *itemcontainer.Inventory) {
-	if pet, ok := d.pet(inv); ok {
+	if pet, _, ok := d.pet(inv); ok {
 		pet.UpdateStatus()
 		sendSummonInfosToOwner(pet)
 	}
 }
 
-// pet returns the owner's live pet when inv is still its inventory.
-func (d *petInventoryDelivery) pet(inv *itemcontainer.Inventory) (*summon.Actor, bool) {
-	if d == nil || d.live == nil || d.state == nil || d.live.detached() {
-		return nil, false
+// pet returns the owner's pet while inv is still its inventory, with the
+// connected session it answers to.
+func (d *petInventoryDelivery) pet(inv *itemcontainer.Inventory) (*summon.Actor, *livePlayer, bool) {
+	if d == nil || d.state == nil {
+		return nil, nil, false
 	}
-	obj, ok := d.state.Summon(d.live.ObjectID())
+	obj, ok := d.state.Summon(d.ownerID)
 	if !ok {
-		return nil, false
+		return nil, nil, false
 	}
 	pet, ok := obj.(*summon.Actor)
 	if !ok || pet.PetInventory() != inv {
-		return nil, false
+		return nil, nil, false
 	}
-	return pet, true
+	live, ok := liveSummonOwner(pet)
+	if !ok || live.detached() {
+		return nil, nil, false
+	}
+	return pet, live, true
 }
 
 // ownerItemPersister is the live persistence dependency of one inventory: its

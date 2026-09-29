@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -145,9 +146,11 @@ type List struct {
 	silent bool
 
 	// queue is the owner's queue: periodic effect actions run on it and
-	// effect periods are measured on its clock. Set once before the owner is
-	// published.
-	queue *sim.Queue
+	// effect periods are measured on its clock. Set before the owner is
+	// published, and moved only with the owner's own work (a pet corpse
+	// relinked to its returning owner's session); the effects sweep reads it
+	// from the scheduler goroutine, hence atomic.
+	queue atomic.Pointer[sim.Queue]
 
 	// triggers are the started chance-skill-trigger effects, in start order.
 	// triggersMu guards them apart from mu: effect start and exit hooks
@@ -157,15 +160,17 @@ type List struct {
 	triggers   []*Effect
 }
 
-func (l *List) now() time.Time { return l.queue.Now() }
+func (l *List) now() time.Time { return l.queue.Load().Now() }
 
 // SetQueue makes q, the owner's queue, the queue this list's periodic
 // actions run on and the clock its effect periods are measured on. Every
-// list needs one before it holds an effect.
-func (l *List) SetQueue(q *sim.Queue) { l.queue = q }
+// list needs one before it holds an effect. Move a published list only
+// while none of its work can run on the queue it leaves (that queue is
+// owned by the mover, or closed), so no tick of it runs beside the move.
+func (l *List) SetQueue(q *sim.Queue) { l.queue.Store(q) }
 
-// Queue returns the queue SetQueue installed.
-func (l *List) Queue() *sim.Queue { return l.queue }
+// Queue returns the queue SetQueue installed last.
+func (l *List) Queue() *sim.Queue { return l.queue.Load() }
 
 // NewList returns an empty effect list.
 func NewList(owner StatOwner, opts ...Option) *List {

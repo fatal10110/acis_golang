@@ -18,8 +18,10 @@ import (
 // they skip only a dead pet. A servitor keeps its decay: at the deadline it
 // leaves the world, alive (Decay).
 //
-// A corpse its owner left behind stays dead: it still answers to the session
-// that left it (#2680).
+// A corpse its owner left behind stays dead while its owner is away: it
+// still answers to the session that left it, whose queue is closed. A pet's
+// corpse can be revived again once its returning owner has it back
+// (RelinkOwner).
 func (a *Actor) Revive() bool {
 	if a.OwnerLeft() {
 		return false
@@ -51,15 +53,13 @@ func (a *Actor) CancelDecay() {
 // still linked to its owner drops its pending decay first, so a revived
 // servitor stays in the world, as does a living servitor a player revived
 // earlier; a dead one then revives as ReviveRestoringExp does. A corpse its
-// owner left behind cannot be revived and keeps its decay, so it still
-// leaves the world at its deadline.
+// owner left behind cannot be revived while its owner is away and keeps its
+// decay, so it still leaves the world at its deadline.
 func (a *Actor) ResurrectOutright(power float64) {
 	// A closed queue refuses the job, which is what the job would do too:
 	// the queue closes with the owner's session, when a living summon has
 	// left the world and a corpse is left behind.
-	if q := a.Queue(); q != nil {
-		q.Post(func() { a.resurrectOutright(power) })
-	}
+	a.Post(func() { a.resurrectOutright(power) })
 }
 
 func (a *Actor) resurrectOutright(power float64) bool {
@@ -122,8 +122,8 @@ func (a *Actor) revive() bool {
 	}
 	a.vitals.mu.Unlock()
 
-	if a.isPet && a.owner != nil {
-		a.owner.ClearReviveOffer()
+	if owner := a.currentOwner(); a.isPet && owner != nil {
+		owner.ClearReviveOffer()
 	}
 	if blessed {
 		a.EffectList().StopByType(effect.TypePhoenixBless)

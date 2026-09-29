@@ -3,7 +3,6 @@ package network
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -23,7 +22,7 @@ func TestInventoryDeliverySkipsDetachedOrDespawnedOwners(t *testing.T) {
 		t.Fatal("detached player inventory registered for delivery")
 	}
 
-	petInv := itemcontainer.NewPetInventoryWithDelivery(2, templates, &petInventoryDelivery{updates: updates, live: &livePlayer{Character: &player.Character{ID: 1}}, state: world.New()}, nil)
+	petInv := itemcontainer.NewPetInventoryWithDelivery(2, templates, &petInventoryDelivery{updates: updates, ownerID: 1, state: world.New()}, nil)
 	petInv.AddNew(1, 1, 2)
 	if updates.Contains(petInv) {
 		t.Fatal("despawned pet inventory registered for delivery")

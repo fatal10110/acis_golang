@@ -234,7 +234,8 @@ func (a *Actor) Invul() bool {
 	if invul {
 		return true
 	}
-	return a.owner != nil && a.owner.SpawnProtected()
+	owner := a.currentOwner()
+	return owner != nil && owner.SpawnProtected()
 }
 
 // SetInvul sets or clears this summon's invulnerability flag and reports
@@ -255,7 +256,8 @@ func (a *Actor) CanGiveDamage() bool {
 	if a == nil {
 		return false
 	}
-	return a.owner == nil || a.owner.CanGiveDamage()
+	owner := a.currentOwner()
+	return owner == nil || owner.CanGiveDamage()
 }
 
 // Invulnerable reports whether a ignores direct resource effects.

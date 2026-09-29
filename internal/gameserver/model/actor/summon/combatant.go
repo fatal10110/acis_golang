@@ -11,19 +11,21 @@ import (
 
 // Karma reports the owner's karma: a summon carries none of its own.
 func (a *Actor) Karma() int {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return 0
 	}
-	return a.owner.Karma()
+	return owner.Karma()
 }
 
 // PvPFlagState reports the owner's PvP flag: a summon carries none of its
 // own.
 func (a *Actor) PvPFlagState() task.PvPFlagState {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return task.PvPFlagNone
 	}
-	return a.owner.PvPFlagState()
+	return owner.PvPFlagState()
 }
 
 // FakeDeath reports false: summons never feign death.
@@ -46,10 +48,11 @@ func (a *Actor) Guard() bool { return false }
 
 // Owner returns the summon's controlling player.
 func (a *Actor) Owner() (attackable.Combatant, bool) {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return nil, false
 	}
-	return a.owner, true
+	return owner, true
 }
 
 // CanSeeTarget reports whether t is visible to this summon for the cast

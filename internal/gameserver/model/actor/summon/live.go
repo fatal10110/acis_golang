@@ -115,8 +115,12 @@ type Actor struct {
 	// outlives its owner's session (AdoptCorpseQueue).
 	queue atomic.Pointer[sim.Queue]
 
-	id             int32
-	owner          Owner
+	id int32
+	// binding is the owner this summon answers to and that owner's
+	// inventory. It is set once before the summon is published and replaced
+	// only when a pet corpse its owner left behind is handed to the owner's
+	// next session (RelinkOwner), so it is read from any goroutine.
+	binding        atomic.Pointer[ownerBinding]
 	world          *world.State
 	los            LineOfSight
 	isPet          bool
@@ -176,7 +180,6 @@ type Actor struct {
 	followOff          atomic.Bool
 	belowUnsummonLimit bool
 
-	ownerInventory   *itemcontainer.Inventory
 	timeLostIdle     int
 	timeLostActive   int
 	itemConsumeID    int32
@@ -428,7 +431,6 @@ type ServitorConfig struct {
 func NewServitor(cfg ServitorConfig) (*Actor, error) {
 	a := &Actor{
 		id:               cfg.ObjectID,
-		owner:            cfg.Owner,
 		level:            cfg.Level,
 		npcID:            cfg.NPCID,
 		radius:           cfg.CollisionRadius,
@@ -436,7 +438,6 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		name:             cfg.Name,
 		passive:          cfg.Passive,
 		intent:           IntentFollowOwner,
-		ownerInventory:   cfg.OwnerInventory,
 		lifetime:         cfg.Lifetime,
 		timeLostIdle:     defaultPositive(cfg.TimeLostIdle, 1000),
 		timeLostActive:   defaultPositive(cfg.TimeLostActive, 1000),
@@ -452,6 +453,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		zones:            cfg.Zones,
 		los:              cfg.LOS,
 	}
+	a.bindOwner(cfg.Owner, cfg.OwnerInventory)
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}
@@ -471,7 +473,6 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 	}
 	a := &Actor{
 		id:             cfg.ObjectID,
-		owner:          cfg.Owner,
 		level:          cfg.Level,
 		isPet:          true,
 		npcID:          cfg.NPCID,
@@ -485,7 +486,6 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		petConfig:      petCfg,
 		growth:         cfg.Growth,
 		controlItemID:  cfg.ControlItemID,
-		ownerInventory: cfg.OwnerInventory,
 		exp:            cfg.Exp,
 		sp:             cfg.SP,
 		expType:        cfg.ExpType,
@@ -508,6 +508,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		zones:          cfg.Zones,
 		los:            cfg.LOS,
 	}
+	a.bindOwner(cfg.Owner, cfg.OwnerInventory)
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}

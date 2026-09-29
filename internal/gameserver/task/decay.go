@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // DecayTick is the fixed corpse-decay sweep interval.
@@ -115,25 +116,37 @@ func (d *Decay) Tick() error {
 	defer d.endTick()
 
 	d.cancelUnlinkedSummons()
-	d.tickDue(d.now(), func(actor DecayActor) {
-		postToCurrentQueue(actor, func() { d.effects.Decay(actor) })
-	})
+	d.tickDue(d.now(), d.post)
 	return nil
 }
 
-// postToCurrentQueue runs job on actor's queue. A corpse whose owner leaves
-// moves to a queue of its own before the owner's queue closes, so a post the
-// queue read first refuses goes to the one actor has moved to: the entry is
-// already gone, and dropping the job would leave the corpse in the world for
-// good.
-func postToCurrentQueue(actor DecayActor, job func()) {
+// post runs actor's decay on actor's queue. A corpse whose owner leaves
+// moves to a queue of its own before the owner's queue closes, and a pet's
+// corpse moves back onto its owner's queue when the owner returns for it, so
+// a post the queue read first refuses goes to the one actor has moved to, and
+// a decay a queue accepted just before actor moved off it is handed on rather
+// than run beside actor's work on the new queue. Dropping it would leave the
+// corpse in the world for good. An actor moves only while the queue it leaves
+// is owned, so the check the job makes before running cannot race the move.
+func (d *Decay) post(actor DecayActor) {
 	q := actor.Queue()
-	if q.Post(job) {
+	if q == nil || d.postOn(q, actor) {
 		return
 	}
-	if moved := actor.Queue(); moved != q {
-		moved.Post(job)
+	if moved := actor.Queue(); moved != q && moved != nil {
+		d.postOn(moved, actor)
 	}
+}
+
+// postOn posts actor's decay to q, reporting whether q accepted it.
+func (d *Decay) postOn(q *sim.Queue, actor DecayActor) bool {
+	return q.Post(func() {
+		if actor.Queue() != q {
+			d.post(actor)
+			return
+		}
+		d.effects.Decay(actor)
+	})
 }
 
 func (d *Decay) cancelUnlinkedSummons() {

@@ -23,19 +23,18 @@ func TestGiveItemToPetMovesStackAndPersists(t *testing.T) {
 	h.giveToPet(t, adenaID, 30)
 
 	h.srv.FlushItems(t)
-	petObj, ok := h.srv.State.Summon(h.ownerID)
-	if !ok {
+	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("active pet missing after give")
 	}
-	rows, err := h.srv.Items.ListByOwner(petCtx(), petObj.ObjectID())
+	rows, err := h.srv.Items.ListByOwner(petCtx(), h.collarID)
 	if err != nil {
 		t.Fatalf("list pet items: %v", err)
 	}
 	var petStack int
 	for _, row := range rows {
 		if row.TemplateID == item.AdenaID {
-			if row.Location != item.LocationPet || row.OwnerID != petObj.ObjectID() {
-				t.Fatalf("pet stack = %+v, want LocationPet owned by the pet", row)
+			if row.Location != item.LocationPet || row.OwnerID != h.collarID {
+				t.Fatalf("pet stack = %+v, want LocationPet saved under the pet's collar", row)
 			}
 			petStack += row.Count
 		}
@@ -122,7 +121,7 @@ func TestPetPickupGroundItem(t *testing.T) {
 		t.Fatal("ground object still present after pickup")
 	}
 	h.srv.FlushItems(t)
-	rows, err := h.srv.Items.ListByOwner(petCtx(), petActor.ObjectID())
+	rows, err := h.srv.Items.ListByOwner(petCtx(), h.collarID)
 	if err != nil {
 		t.Fatalf("list pet items: %v", err)
 	}
@@ -130,8 +129,8 @@ func TestPetPickupGroundItem(t *testing.T) {
 	for _, row := range rows {
 		if row.ObjectID == groundID {
 			picked = row.Count
-			if row.Location != item.LocationPet || row.OwnerID != petActor.ObjectID() {
-				t.Fatalf("picked row = %+v, want LocationPet owned by the pet", row)
+			if row.Location != item.LocationPet || row.OwnerID != h.collarID {
+				t.Fatalf("picked row = %+v, want LocationPet saved under the pet's collar", row)
 			}
 		}
 	}
