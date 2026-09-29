@@ -110,6 +110,8 @@ const (
 	SystemMessageCannotGiveItemsToDeadPet          = 590
 	SystemMessageYouCannotRestoreHungryPets        = 594
 	SystemMessageYourPetAteALittleButIsStillHungry = 596
+	SystemMessageOutOfFeedMountCanceled            = 1248
+	SystemMessagePetTookS1BecauseHeWasHungry       = 1527
 	SystemMessageItemNotForPets                    = 544
 	SystemMessagePetCannotCarryMoreItems           = 545
 	SystemMessagePetTooEncumbered                  = 546

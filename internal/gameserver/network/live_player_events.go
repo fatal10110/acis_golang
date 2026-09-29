@@ -37,7 +37,7 @@ func sessionOnly(ev event.Event) bool {
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
-		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded:
+		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge:
 		return true
 	}
 	return false
@@ -151,6 +151,14 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)
 		})
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouIncreasedYourLevel))
+	case event.MountFeedGauge:
+		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeGreen, e.Current, e.Max))
+	case event.MountFoodDue:
+		l.feedMountFood(live, e.ObjectID)
+	case event.Dismounted:
+		l.broadcastDismount(live)
+	case event.MountOutOfFeed:
+		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	case event.ChargesChanged, event.EtcStatusChanged:

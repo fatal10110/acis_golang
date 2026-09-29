@@ -2179,6 +2179,19 @@ func TestFrameRideMountWyvern(t *testing.T) {
 	}
 }
 
+// TestFrameDismount pins Ride(objectId, ACTION_DISMOUNT, 0): no ride type
+// and the bare 1000000 class offset.
+func TestFrameDismount(t *testing.T) {
+	want := []byte{OpcodeRide}
+	want = binary.LittleEndian.AppendUint32(want, 7)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 1000000)
+	if got := framePayload(t, FrameDismount(7)); string(got) != string(want) {
+		t.Fatalf("Dismount = %x, want %x", got, want)
+	}
+}
+
 // ---- from shop_trade_test.go ----
 func TestFrameBuyList(t *testing.T) {
 	templates := item.NewTable([]*item.Template{

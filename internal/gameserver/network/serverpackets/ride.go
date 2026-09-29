@@ -14,6 +14,16 @@ func FrameRide(objectID, npcID int32) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
+// FrameDismount builds the dismount transition packet for a player.
+func FrameDismount(objectID int32) wire.Frame {
+	w := newFrameWriter(OpcodeRide)
+	w.WriteInt32(objectID)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(1_000_000)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
 func mountType(npcID int32) int32 {
 	if npcID == 12621 {
 		return 2
