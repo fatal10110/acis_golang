@@ -177,6 +177,24 @@ func TestForeignPetResurrectionAsksItsOwner(t *testing.T) {
 		s.resurrect(t, s.h.ownerID)
 		assertRefusal(t, s.healer, serverpackets.SystemMessageMasterCannotRes)
 		assertNoConfirmDlg(t, s.h.client, "owner offer while the pet's is open")
+
+		// Accepting the pet's offer closes it. Summon revival is not
+		// modeled yet (#2679), so the pet stays dead, and a new
+		// resurrection on it reaches the owner as a fresh offer.
+		drainUntilQuiet(t, s.healer)
+		s.h.client.Send(encodePetDlgAnswer(serverpackets.ConfirmDlgResurrectionRequest, 1))
+		s.h.srv.Settle(t)
+		if !s.pet.Dead() {
+			t.Fatal("accepting the pet's offer revived the pet")
+		}
+		drainUntilQuiet(t, s.h.client)
+		s.resurrect(t, s.pet.ObjectID())
+		readResurrectionOffer(t, s.h.client, "Healer")
+		for _, f := range drainFrames(t, s.healer) {
+			if f[0] == serverpackets.OpcodeSystemMessage && int(wire.NewReader(f[1:]).ReadInt32()) == serverpackets.SystemMessageResHasAlreadyBeenProposed {
+				t.Fatal("healer got 1513 after the owner accepted: the pet's offer stayed open")
+			}
+		}
 	})
 
 	t.Run("owner offer first", func(t *testing.T) {

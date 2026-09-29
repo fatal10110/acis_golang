@@ -81,7 +81,7 @@ func (c *Character) OfferSummonRevive() {
 // Either way the offer is then closed.
 //
 // Accepting an offer for the pet closes it without reviving the pet: summon
-// revival is not modeled yet.
+// revival is not modeled yet (#2679).
 func (c *Character) ReviveAnswer(answer int32) {
 	c.reviveMu.Lock()
 	defer c.reviveMu.Unlock()

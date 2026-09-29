@@ -35,8 +35,8 @@ func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
 // restoring the revive power's share of the lost exp.
 //
 // A player's own dead pet, a servitor, and any caster reviving a summon
-// revive it outright; summon revival is not modeled yet, so those targets
-// are left dead. The spiritshot is spent either way.
+// revive it outright; summon revival is not modeled yet (#2679), so those
+// targets are left dead. The spiritshot is spent either way.
 func (resurrectHandler) Use(cast Cast) {
 	if cast.Caster != nil {
 		power := formulas.RevivePower(statbonus.WITBonus[cast.Caster.WIT()], float64(cast.Skill.Power))
