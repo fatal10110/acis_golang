@@ -60,40 +60,40 @@ func TestBlockedInteractRangeBoundaryIsExclusive(t *testing.T) {
 }
 
 // TestShiftInteractApproachBoundaryIsExclusive pins the owned-pet interact
-// approach check on a shift-click, which never walks: exactly 100 units
-// away is out of reach (ActionFailed only), 99 opens the status window.
-// The 100 here is today's approach radius without either collision radius;
-// #2796 adds the collision radii and will move this boundary.
+// approach check on a shift-click, which never walks: exactly the approach
+// offset plus both bodies away is out of reach (ActionFailed only), one unit
+// closer opens the status window.
 func TestShiftInteractApproachBoundaryIsExclusive(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
-		name     string
-		distance int
-		want     bool
+		name  string
+		inset int
+		want  bool
 	}{
-		{name: "exactly 100", distance: 100, want: false},
-		{name: "99", distance: 99, want: true},
+		{name: "exactly reach", inset: 0, want: false},
+		{name: "reach minus one", inset: 1, want: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			h := bootOwnerWithCollar(t)
+			h := bootBodiedOwner(t)
 			pet, _ := h.spawnWolf(t)
+			distance := interactReach(t, h, pet) - tc.inset
 			px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
-			placePet(t, pet, location.Location{X: px + tc.distance, Y: py, Z: pz})
+			placePet(t, pet, location.Location{X: px + distance, Y: py, Z: pz})
 			drainUntilQuiet(t, h.client)
 
-			h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
-			drainUntilQuiet(t, h.client)
-			h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), true))
-			frames := drainFrames(t, h.client)
+			frames := clickOwnedPet(t, h, pet, true)
 			if !hasOpcode(frames, serverpackets.OpcodeActionFailed) {
-				t.Fatalf("shift INTERACT at %d missing ActionFailed: opcodes %x", tc.distance, frameOpcodes(frames))
+				t.Fatalf("shift INTERACT at %d missing ActionFailed: opcodes %x", distance, frameOpcodes(frames))
 			}
 			if hasOpcode(frames, serverpackets.OpcodeMoveToLocation) {
-				t.Fatalf("shift INTERACT at %d walked: opcodes %x", tc.distance, frameOpcodes(frames))
+				t.Fatalf("shift INTERACT at %d walked: opcodes %x", distance, frameOpcodes(frames))
+			}
+			if h.srv.PlayerMove(t, h.ownerID).Moving() {
+				t.Fatalf("shift INTERACT at %d left the owner moving", distance)
 			}
 			if got := hasOpcode(frames, serverpackets.OpcodePetStatusShow); got != tc.want {
-				t.Fatalf("shift INTERACT at %d PetStatusShow = %v, want %v: opcodes %x", tc.distance, got, tc.want, frameOpcodes(frames))
+				t.Fatalf("shift INTERACT at %d PetStatusShow = %v, want %v: opcodes %x", distance, got, tc.want, frameOpcodes(frames))
 			}
 		})
 	}

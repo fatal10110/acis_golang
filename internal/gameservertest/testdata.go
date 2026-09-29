@@ -43,8 +43,14 @@ func (Geo) Walkable(int, int, int) bool { return true }
 // use: level-1 human fighter stats with the shared acquire-skill grants.
 func Templates(t testing.TB) *player.TemplateTable {
 	t.Helper()
+	return templatesWith(t, ClassTemplate())
+}
+
+// templatesWith is Templates with class 0 replaced by class0.
+func templatesWith(t testing.TB, class0 *player.Template) *player.TemplateTable {
+	t.Helper()
 	table, err := player.NewTemplateTable(map[int]*player.Template{
-		0:  ClassTemplate(),
+		0:  class0,
 		1:  fighterLineTemplate(1),
 		2:  fighterLineTemplate(2),
 		88: duelistTemplate(),

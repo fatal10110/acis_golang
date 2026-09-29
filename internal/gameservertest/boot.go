@@ -113,6 +113,7 @@ type options struct {
 	enchantRoll            func() float64
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
+	classTemplate          *player.Template
 	log                    zerolog.Logger
 	geo                    move.Geo
 	itemTemplates          *item.Table
@@ -401,6 +402,13 @@ func WithSkillEnchantRoll(roll func() int) Option {
 // skill enchant have real thresholds to check.
 func WithLevels(levels *player.LevelTable) Option {
 	return func(o *options) { o.levels = levels }
+}
+
+// WithClassTemplate replaces the human-fighter class template (id 0) every
+// seeded character selects (default: ClassTemplate), so a suite can give its
+// characters, say, a real body size.
+func WithClassTemplate(tmpl *player.Template) Option {
+	return func(o *options) { o.classTemplate = tmpl }
 }
 
 // WithLog sets the link logger (default zero-logger).
@@ -1154,6 +1162,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("new shadow items: %v", err)
 	}
 	templates := Templates(t)
+	if o.classTemplate != nil {
+		templates = templatesWith(t, o.classTemplate)
+	}
 	itemTemplates := o.itemTemplates
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
