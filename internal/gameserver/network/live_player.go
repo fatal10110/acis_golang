@@ -28,6 +28,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// A live player reaches attackable.PlayableRefuses as the attacker behind a
+// dynamic type assertion; if it stopped satisfying Playable, every
+// playable-attacker rule would silently turn off.
+var _ attackable.Playable = (*livePlayer)(nil)
+
 type livePlayer struct {
 	*player.Character
 	link *GameClientLink

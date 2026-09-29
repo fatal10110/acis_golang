@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -176,10 +177,10 @@ func TestPetDeathPenaltyInsideCombatZones(t *testing.T) {
 }
 
 // TestKarmaOwnersPetCannotAttackBlessedLowLevelPlayer has a level-30 owner
-// with karma command its pet onto a level-1 player under Blessing of
-// Protection. Outside a PvP zone the owner is told TARGET_IS_INCORRECT and
-// the pet never swings; inside an arena, where neither needs force, the pet
-// attacks.
+// with karma command its pet onto a PvP-flagged level-1 player under
+// Blessing of Protection. The flag makes the command an attack rather than a
+// follow. Outside a PvP zone the owner is told TARGET_IS_INCORRECT and the
+// pet never swings; inside an arena the pet attacks.
 func TestKarmaOwnersPetCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -199,14 +200,15 @@ func TestKarmaOwnersPetCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 			wolf, _ := h.spawnWolf(t)
 			victim := h.joinSecondPlayer(t, "Blessed")
 			blessPlayer(t, victim.actor)
+			runOn(t, victim.queue, func() {
+				victim.actor.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+			})
 			drainUntilQuiet(t, h.client)
 			x, y, z := victim.actor.Position()
 
 			h.client.Send(encodeAction(victim.id, int32(x), int32(y), int32(z), false))
 			drainUntilQuiet(t, h.client)
-			// Outside a PvP zone the blessed player is only attackable
-			// with force; the gate refuses the forced command.
-			h.client.Send(encodeRequestActionUse(petAttackAction, !tt.arena))
+			h.client.Send(encodeRequestActionUse(petAttackAction, false))
 
 			if tt.arena {
 				h.srv.AdvanceUntil(t, "the pet's swing at the blessed player", wolf.IsAttackingNow)
