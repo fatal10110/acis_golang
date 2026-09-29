@@ -71,9 +71,9 @@ func (h *Hostile) SetCurrentMP(mp int) {
 // first (AttackableStatus.reduceHp order), then that guard drops only the
 // HP change itself (CreatureStatus.java:209-226): an invulnerable NPC, or
 // one hit by an attacker without damage permission, still aggroes and calls
-// its party, but takes no damage. A hit that leaves the NPC alive then rolls
-// whether it breaks the NPC's cast, whatever the damage permission; a
-// killing hit's death has already ended the cast.
+// its party, but takes no damage. The hit's cast-break roll is the
+// attacker's to run, through BreakCastOnDamage, once the hit's reflected
+// and absorbed damage have applied.
 func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if h.AlikeDead() {
 		return false
@@ -84,7 +84,6 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 		h.registerHit(attacker, float64(dmg), false)
 	}
 	if h.Invul() || !creature.CanDealDamage(attacker) {
-		h.breakCastOnDamage(float64(dmg))
 		return false
 	}
 	if dmg > 0 {
@@ -93,7 +92,6 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	newlyDead := h.health.Damage(dmg)
 	h.BroadcastStatus()
 	if !newlyDead {
-		h.breakCastOnDamage(float64(dmg))
 		return false
 	}
 	return h.Die(attacker, h.rewards)

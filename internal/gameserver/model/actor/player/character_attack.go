@@ -427,6 +427,15 @@ func (c *Character) PoleAttackCountMax() int {
 	return int(c.calcStat(stat.AttackCountMax, 0))
 }
 
+// ActiveWeaponItem returns the weapon the player attacks with: the one in
+// its right hand, or its class's fists when that hand holds no weapon.
+func (c *Character) ActiveWeaponItem() *item.WeaponDetail {
+	if tmpl := c.activeWeapon().tmpl; tmpl != nil {
+		return tmpl.Weapon
+	}
+	return nil
+}
+
 // WeaponReuseDelay returns the active weapon reuse delay, used for bows.
 func (c *Character) WeaponReuseDelay() time.Duration {
 	return c.activeWeapon().reuseDelay()

@@ -174,7 +174,7 @@ func (c *attackFinishedSignal) Emit(ev event.Event) {
 		default:
 		}
 	case event.HitLanded:
-		c.chance.AttackHit(c.hostile, e.Target, e.Crit)
+		c.chance.AttackHit(c.hostile, e)
 	}
 }
 
@@ -426,7 +426,7 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
 	case event.HitLanded:
-		c.server.castEffects.Chance.AttackHit(c.hostile, e.Target, e.Crit)
+		c.server.castEffects.Chance.AttackHit(c.hostile, e)
 	}
 }
 

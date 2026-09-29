@@ -61,10 +61,12 @@ type HitDealt struct {
 
 // HitLanded reports a physical hit that dealt damage to Target, after the
 // damage applied. The receiver runs the chance procs the hit sets off on the
-// attacker and on Target.
+// attacker and on Target. Reflected reports that Target reflected part of
+// the damage back on the attacker.
 type HitLanded struct {
-	Target attackable.Combatant
-	Crit   bool
+	Target    attackable.Combatant
+	Crit      bool
+	Reflected bool
 }
 
 // AttackStanceRequested reports that the actor landed a damaging physical

@@ -129,6 +129,12 @@ func (h *Hostile) MagicAttackSpeed() int {
 	return int(h.calcStat(stat.MagicAttackSpeed, h.Instance.Template.AtkSpd))
 }
 
+// ActiveWeaponItem returns this NPC's resolved right-hand weapon, nil when
+// it is unarmed.
+func (h *Hostile) ActiveWeaponItem() *item.WeaponDetail {
+	return h.weapon
+}
+
 // WeaponReuseDelay returns this NPC's weapon reuse delay; only read for a
 // bow attacker. Zero when unarmed or not wielding a template-defined
 // weapon.

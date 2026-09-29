@@ -35,8 +35,9 @@ func newCastingHostile(t *testing.T) (*Hostile, *recordingCast) {
 }
 
 // TestHostileTakeDamageRollsCastBreakAfterHPChange pins the auto-attack
-// order of CreatureAttack.onHitTimer: the target's HP is reduced first, then
-// the cast break is rolled with the target's own roll.
+// order of CreatureAttack.doHit: the target's HP is reduced first, with no
+// cast-break roll of its own; the attacker then rolls the break through
+// BreakCastOnDamage, with the target's own roll.
 func TestHostileTakeDamageRollsCastBreakAfterHPChange(t *testing.T) {
 	h, c := newCastingHostile(t)
 	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 10, HPMax: 500})
@@ -44,6 +45,10 @@ func TestHostileTakeDamageRollsCastBreakAfterHPChange(t *testing.T) {
 	full := h.HP()
 
 	h.TakeDamage(50, attacker)
+	if len(c.rolls) != 0 {
+		t.Fatalf("TakeDamage rolled cast breaks %+v, want none", c.rolls)
+	}
+	h.BreakCastOnDamage(50)
 
 	want := castBreakRoll{damage: 50, roll: 7, hp: full - 50}
 	if len(c.rolls) != 1 || c.rolls[0] != want {
@@ -64,6 +69,7 @@ func TestHostileTakeDamageWithoutDamagePermissionStillRollsCastBreak(t *testing.
 	if h.TakeDamage(50, attacker) {
 		t.Fatal("TakeDamage() killed the NPC, want the hit blocked")
 	}
+	h.BreakCastOnDamage(50)
 
 	if got := h.HP(); got != full {
 		t.Fatalf("HP = %v after a hit without damage permission, want untouched %v", got, full)

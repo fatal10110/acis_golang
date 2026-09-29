@@ -22,6 +22,7 @@ const (
 	SystemMessageS1PreparedForReuse                = 48
 	SystemMessageCannotUseOnYourself               = 51
 	SystemMessageSkillReadyToUseAgain              = 2015
+	SystemMessageS1HasBeenActivated                = 2012
 	SystemMessageEarnedS2S1S                       = 53
 	SystemMessageNothingHappened                   = 61
 	SystemMessageS1SuccessfullyEnchanted           = 62

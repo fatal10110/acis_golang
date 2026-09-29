@@ -14,13 +14,13 @@ import (
 // 103-116). Otherwise the sleep/immobile-stop, stand-up, and stun-break side
 // effects always run for a live hit (PlayerStatus.java:118-134) before the
 // damage-permission check (:136-140): an attacker without damage permission
-// still wakes/interrupts the target and can still break its cast — only the
-// HP/CP change itself is dropped. A Playable attacker other than the actor
-// itself drains CP before HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
+// still wakes/interrupts the target — only the HP/CP change itself is
+// dropped. A Playable attacker other than the actor itself drains CP before
+// HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
 // PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
-// The status and damage report of the hit go out before the cast-break
-// roll: an auto-attack rolls the break only once the hit has landed, and a
-// killing hit's death has already ended the cast.
+// The hit's cast-break roll is the attacker's to run, through
+// BreakCastOnDamage, once the hit has landed and its reflected and absorbed
+// damage have applied.
 func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if c.AlikeDead() || c.Invul() {
 		return false
@@ -29,7 +29,6 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 		c.applyNonConsumptionDamageEffects(false)
 	}
 	if !creature.CanDealDamage(attacker) {
-		c.breakCastOnDamage(float64(dmg))
 		return false
 	}
 	c.vitalsMu.Lock()
@@ -42,7 +41,6 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if hit.dead {
 		return c.Die(attacker)
 	}
-	c.breakCastOnDamage(float64(dmg))
 	return false
 }
 

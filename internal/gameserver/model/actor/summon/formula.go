@@ -564,18 +564,14 @@ func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ models
 }
 
 // TakeDamage applies a landed auto-attack hit; see reduceHP. It reports
-// whether the hit killed a. A hit that leaves a alive then rolls whether it
-// breaks a's cast, whatever the damage permission; a killing hit's death has
-// already ended the cast.
+// whether the hit killed a. The hit's cast-break roll is the attacker's to
+// run, through BreakCastOnDamage, once the hit's reflected and absorbed
+// damage have applied.
 func (a *Actor) TakeDamage(damage int, attacker attackable.Combatant) bool {
 	if a.Dead() {
 		return false
 	}
-	if a.reduceHP(float64(damage), attacker) {
-		return true
-	}
-	a.breakCastOnDamage(float64(damage))
-	return false
+	return a.reduceHP(float64(damage), attacker)
 }
 
 // reduceHP applies one direct hit, from a skill or an auto-attack, and

@@ -86,13 +86,18 @@ func TestSummonSkillDamageRollsCastBreakBeforeHPChange(t *testing.T) {
 }
 
 // TestSummonAutoAttackRollsCastBreakAfterHPChange pins the auto-attack
-// order of CreatureAttack.onHitTimer: the HP is reduced first, then the
-// cast break is rolled; a killing hit rolls nothing.
+// order of CreatureAttack.doHit: the HP is reduced first, with no cast-break
+// roll of its own; the attacker then rolls the break through
+// BreakCastOnDamage. A killing hit rolls nothing.
 func TestSummonAutoAttackRollsCastBreakAfterHPChange(t *testing.T) {
 	a, c := newCastingPet(t, false)
 	full := a.HP()
 
 	a.TakeDamage(50, nil)
+	if len(c.rolls) != 0 {
+		t.Fatalf("TakeDamage rolled cast breaks %+v, want none", c.rolls)
+	}
+	a.BreakCastOnDamage(50)
 
 	want := castBreakRoll{damage: 50, roll: 7, hp: full - 50}
 	if len(c.rolls) != 1 || c.rolls[0] != want {

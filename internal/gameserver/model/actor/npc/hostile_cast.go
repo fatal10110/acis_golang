@@ -59,6 +59,12 @@ func (h *Hostile) StopCast() {
 	}
 }
 
+// BreakCastOnDamage rolls whether a landed auto-attack hit of damage breaks
+// h's cast.
+func (h *Hostile) BreakCastOnDamage(damage float64) {
+	h.breakCastOnDamage(damage)
+}
+
 // breakCastOnDamage rolls whether damage h takes breaks its cast, reading
 // MEN, ATTACK_CANCEL and the roll from h itself. A raid-related or
 // invulnerable NPC is never broken. An NPC with no cast in flight draws no
