@@ -261,6 +261,11 @@ type PvPFlagged struct{ UseFlaggedDuration bool }
 // RelationChanged reports a PvP flag or karma change observers must see.
 type RelationChanged struct{}
 
+// PKKarmaGained reports that a kill made the character a PKer and its
+// karma gain has been announced: its equipped items must meet their
+// conditions again, and its PvP flag ends.
+type PKKarmaGained struct{}
+
 // ChargeMessage reports a Force/Soul charge change to the owning client;
 // Maxed means the maximum was reached.
 type ChargeMessage struct {
@@ -317,6 +322,7 @@ func (TeleportRequested) event()      {}
 func (Relocated) event()              {}
 func (PvPFlagged) event()             {}
 func (RelationChanged) event()        {}
+func (PKKarmaGained) event()          {}
 func (ChargeMessage) event()          {}
 func (ChargesChanged) event()         {}
 

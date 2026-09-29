@@ -184,7 +184,6 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 			notifyTargets = append(notifyTargets, c)
 		}
 	}
-	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	handlers.Chance.skillHit(castCaster, affected, def)
 	if def.Offensive {
 		switch def.SkillType {
@@ -216,6 +215,9 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		Item:    item,
 		Sink:    handlers.Sink,
 	})
+	// PvP flagging follows the skill's effects, so a skill that makes its
+	// caster a PKer flags it again after the kill ended its flag.
+	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
 	if !ok {
 		return EffectResult{}
 	}

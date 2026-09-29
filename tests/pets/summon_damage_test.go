@@ -249,6 +249,54 @@ func TestSummonKillKarmaFollowsTheOwnersStanding(t *testing.T) {
 	}
 }
 
+// TestSummonPKKillEndsTheKillersFlag has a PvP-flagged player kill the pet
+// of an unflagged, karma-free owner: the kill earns karma, so the killer's
+// PvP flag task stops and its flag resets, which the owner sees as a
+// RelationChanged without the flag.
+func TestSummonPKKillEndsTheKillersFlag(t *testing.T) {
+	t.Parallel()
+	flags := task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil)
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithPvPFlags(flags)})
+	pet, _ := h.spawnWolf(t)
+	killer := h.joinSecondPlayer(t, "Killer")
+	flagged := killer.actor.(interface {
+		task.PvPFlagActor
+		PvPFlagState() task.PvPFlagState
+	})
+	runOn(t, killer.queue, func() { flags.AddNormal(flagged) })
+	drainUntilQuiet(t, h.client)
+
+	runOn(t, killer.queue, func() { pet.ReduceHP(pet.HP()+100, killer.actor, modelskill.Definition{}) })
+	if !pet.Dead() {
+		t.Fatal("pet alive after a lethal hit")
+	}
+	h.srv.Settle(t)
+	if karma := killer.actor.Karma(); karma <= 0 {
+		t.Fatalf("killer karma = %d, want a PK gain for an innocent owner's summon", karma)
+	}
+	if state := flagged.PvPFlagState(); state != task.PvPFlagNone {
+		t.Fatalf("killer PvP flag = %v after the summon PK kill, want none", state)
+	}
+	if n := flags.Len(); n != 0 {
+		t.Fatalf("PvP flag task tracks %d players after the summon PK kill, want none", n)
+	}
+	var last []byte
+	for _, f := range drainFrames(t, h.client) {
+		if f[0] == serverpackets.OpcodeRelationChanged && wire.NewReader(f[1:]).ReadInt32() == killer.id {
+			last = f
+		}
+	}
+	if last == nil {
+		t.Fatal("owner never received the killer's RelationChanged")
+	}
+	r := wire.NewReader(last[1:])
+	r.ReadInt32()
+	relation, _, karma := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	if pvpFlag := r.ReadInt32(); relation&serverpackets.RelationPvPFlag != 0 || pvpFlag != 0 || karma <= 0 {
+		t.Fatalf("owner's last RelationChanged for the killer = relation %#x karma %d flag %d, want karma and no flag", relation, karma, pvpFlag)
+	}
+}
+
 // TestOtherPlayerNeedsForceToAttackAPet has a second player click the pet
 // of an unflagged owner: a plain second click only releases the action,
 // while an attack request on the selected pet attacks it, flags the

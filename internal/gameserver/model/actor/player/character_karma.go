@@ -66,8 +66,7 @@ func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 // awarded for it. Killing one's own summon awards nothing.
 //
 // The duel and clan-war exemptions are not applied: that state is not
-// tracked yet, the same as for a player kill (#1301). Neither kill resets
-// the killer's PvP flag or rechecks its equipment yet (#2622).
+// tracked yet, the same as for a player kill (#1301).
 func (c *Character) AwardSummonKillKarma(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
 	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
@@ -84,11 +83,13 @@ func (c *Character) AwardSummonKillKarma(killer attackable.Combatant) {
 }
 
 // publishPKKarma reports c's karma after a PK gain to its own client and its
-// observers.
+// observers, then has c's equipped items rechecked against their conditions
+// and its PvP flag ended, in that order.
 func (c *Character) publishPKKarma(karma int) {
 	c.notifyKarmaChanged(karma)
 	c.UpdateUserInfo()
 	c.BroadcastRelations()
+	c.emit(event.PKKarmaGained{})
 }
 
 // awardKillerPvPKill grants the killer a PvP-kill point for an actively
