@@ -86,6 +86,37 @@ func TestCompassZoneTownToTownTeleport(t *testing.T) {
 	assertCompassCodes(t, appear(t, srv.Client), 0x0c)      // destination PEACEZONE
 }
 
+func TestCompassZoneTeleportFollowsKnownListClear(t *testing.T) {
+	zones := zone.NewIndex()
+	zones.Add(newCountedPeace(t, -10_000, 10_000, -10_000, 10_000))
+	srv, c, observer, objID := bootObserverPair(t, gameservertest.WithZones(zones))
+	srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	drainQuiet(t, c)
+	drainQuiet(t, observer)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	character, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatal("player has no live character")
+	}
+	x, y, z := srv.PlayerPosition(t, objID)
+	character.TeleportTo(x+300, y, z, 0)
+	frames := readUntilQuiet(c)
+	deleted := firstOpcode(frames, serverpackets.OpcodeDeleteObject)
+	compass := -1
+	for i, frame := range frames {
+		if len(frame) >= 3 && bytes.Equal(frame[:3], []byte{0xfe, 0x32, 0}) {
+			compass = i
+			break
+		}
+	}
+	if deleted < 0 || compass <= deleted {
+		t.Fatalf("teleport DeleteObject index = %d, compass index = %d; want known-list clear before compass", deleted, compass)
+	}
+}
+
 func TestCompassZoneWalkIntoPvPArena(t *testing.T) {
 	form, err := zone.NewCuboid(100, 500, -100, 100, -10_000, 10_000)
 	if err != nil {

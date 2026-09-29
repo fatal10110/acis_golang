@@ -176,7 +176,6 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -207,6 +206,9 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate)
+		}
 	}
 	return frames
 }

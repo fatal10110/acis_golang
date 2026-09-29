@@ -143,7 +143,6 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 	}
 
 	c.Send(encodeEnterWorld())
-	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -170,6 +169,9 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], want[i])
 		}
 		frames = append(frames, frame)
+		if want[i] == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+		}
 		i++
 	}
 	drainUntilQuiet(t, c)
@@ -227,7 +229,6 @@ func readEnterWorldBurstWithRestoredBuff(t *testing.T, c *testsupport.ScriptedCl
 
 func readFrameSequence(t *testing.T, c *testsupport.ScriptedClient, want []byte) [][]byte {
 	t.Helper()
-	gameservertest.ReadInitialCompass(t, c)
 	frames := make([][]byte, 0, len(want))
 	for i, opcode := range want {
 		frame := c.Read()
@@ -235,6 +236,9 @@ func readFrameSequence(t *testing.T, c *testsupport.ScriptedClient, want []byte)
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c)
+		}
 	}
 	return frames
 }

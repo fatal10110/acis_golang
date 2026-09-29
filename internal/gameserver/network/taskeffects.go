@@ -178,6 +178,7 @@ func (a *liveZoneActor) compassUpdate() (code int32, changed, flagPvP bool) {
 		code = serverpackets.CompassSiegeZone
 	case a.flags.Has(zone.FlagPvP):
 		code = serverpackets.CompassPvPZone
+	// Seven Signs dungeon membership will be handled by #222.
 	case a.flags.Has(zone.FlagPeace):
 		code = serverpackets.CompassPeaceZone
 	default:

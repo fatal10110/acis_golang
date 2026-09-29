@@ -112,7 +112,6 @@ func readSkippingEquipNoise(t *testing.T, c *testsupport.ScriptedClient, what st
 
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeSpawnItem)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -143,6 +142,9 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeSpawnItem)
+		}
 	}
 	return frames
 }

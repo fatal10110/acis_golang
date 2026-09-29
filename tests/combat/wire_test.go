@@ -122,7 +122,6 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 // interleave whenever someone is already in the shared spawn region.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -152,6 +151,9 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 		}
 		if frame[0] != opcode {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
+		}
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 		}
 	}
 }

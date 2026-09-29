@@ -35,7 +35,6 @@ func encodeEnterWorld() []byte {
 // burst.
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	ReadInitialCompass(t, c)
 	want := []byte{
 		serverpackets.OpcodeSendMacroList,
 		serverpackets.OpcodeExtended,
@@ -59,6 +58,9 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			ReadInitialCompass(t, c)
+		}
 	}
 	return frames
 }
