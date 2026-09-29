@@ -138,6 +138,11 @@ const UnlockableKeyID int32 = 9701
 // consumes the scroll itself.
 const PetResurrectionScrollID int32 = 6387
 
+// SelfConsumingScrollID is the Petrification Scroll (datapack item 8379): an
+// ItemSkills scroll whose skill, 2239, also names the scroll as its own
+// consume item, so one use destroys the carrier and then the skill's item.
+const SelfConsumingScrollID int32 = 8379
+
 // FormalWearID is the full-body formal dress (bodypart alldress) that forbids
 // item and skill use while worn.
 const FormalWearID int32 = 6408
@@ -406,6 +411,16 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2014, Level: 1}, {ID: 2015, Level: 1}},
+		},
+		{
+			ID:             SelfConsumingScrollID,
+			Name:           "Petrification Scroll",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2239, Level: 1}},
 		},
 		{
 			ID:             UnlockableKeyID,

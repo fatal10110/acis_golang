@@ -116,7 +116,25 @@ type Plan struct {
 	GaugeDuration  time.Duration
 	ReuseKey       int32
 	SkillMastery   bool
+	// ItemCharge is how the skill's own consume item was paid when the cast
+	// started. The caller reports it to the caster once it has announced the
+	// cast.
+	ItemCharge ItemCharge
 }
+
+// ItemCharge is the outcome of a started cast's own consume-item step.
+type ItemCharge uint8
+
+const (
+	// ItemChargeNone means the skill names no consume item to pay.
+	ItemChargeNone ItemCharge = iota
+	// ItemChargePaid means the caster's consume step for the skill's item
+	// succeeded.
+	ItemChargePaid
+	// ItemChargeShort means an item-carried cast could no longer pay its
+	// own consume item and runs anyway, the item unpaid.
+	ItemChargeShort
+)
 
 // DamageInterrupt is the state needed to decide whether incoming damage
 // interrupts the current cast.
@@ -410,8 +428,10 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 // claimed, and before any start-of-cast cost, it runs consumeCarrier to
 // consume that item: the item is gone before the skill's own consume item,
 // reuse, mastery proc and initial MP are charged. An error from it releases
-// the claim, charges nothing, and is returned unchanged. A nil
-// consumeCarrier makes it Start.
+// the claim, charges nothing, and is returned unchanged. Once the carrier is
+// paid, a failed own consume item no longer refuses the cast: it runs with
+// Plan.ItemCharge set to ItemChargeShort. A nil consumeCarrier makes it
+// Start.
 func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.Definition, consumeCarrier func() error) (Plan, error) {
 	if err := c.CanCast(target, def); err != nil {
 		return Plan{}, err
@@ -448,11 +468,15 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 	// For an ordinary cast CanCast already verified the count, so ConsumeItem
 	// can only fail on that same narrow race; releasing the claim and
 	// rejecting the cast in that case is preferred over silently casting an
-	// unpaid skill. For a carried cast whose carrier is also the skill's
-	// consume item (e.g. an ItemSkills scroll whose skill consumes the
-	// scroll itself), consumeCarrier has already taken a unit, so at a stack
-	// of exactly one the failure here is deterministic: the carrier is gone
-	// and nothing is cast, where the reference still casts (#2791).
+	// unpaid skill.
+	//
+	// A carried cast keeps the reference outcome instead: its carrier is
+	// already paid, so refusing now would take the item and cast nothing.
+	// The failure is deterministic, not a race, when the carrier is also the
+	// skill's consume item (an ItemSkills scroll whose skill consumes the
+	// scroll itself) and the stack held exactly one unit: consumeCarrier took
+	// it, and the cast runs on it alone. From two units up both destroys
+	// succeed and the cast takes two, as the reference does.
 	//
 	// The ItemConsumeCount > 0 half of this guard (and CanCast's matching
 	// check) is a second, separate divergence: the reference gates solely on
@@ -462,9 +486,16 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 	// instead of destroying zero units and reporting success/failure for an
 	// item it never touched — again preferred over reproducing that
 	// zero-count side effect.
-	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount) {
-		c.releaseClaim(seq)
-		return Plan{}, ErrNotEnoughItems
+	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 {
+		switch {
+		case c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount):
+			plan.ItemCharge = ItemChargePaid
+		case consumeCarrier != nil:
+			plan.ItemCharge = ItemChargeShort
+		default:
+			c.releaseClaim(seq)
+			return Plan{}, ErrNotEnoughItems
+		}
 	}
 
 	if plan.SkillMastery {

@@ -214,6 +214,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	if plan.GaugeDuration > 0 {
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
+	sendSkillItemCharge(live, def, plan.ItemCharge)
 
 	handlers := l.castEffects()
 	var affected []skilltarget.Actor

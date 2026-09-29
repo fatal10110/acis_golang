@@ -33,6 +33,16 @@ func (a *Actor) ownerInv() *itemcontainer.Inventory {
 	return nil
 }
 
+// OwnerItemCount is how many units of templateID the owner a answers to
+// carries, or 0 with no owner inventory bound.
+func (a *Actor) OwnerItemCount(templateID int32) int {
+	inv := a.ownerInv()
+	if inv == nil {
+		return 0
+	}
+	return inv.ItemCount(templateID, -1, true)
+}
+
 // RelinkOwner hands a pet corpse its owner left behind to that owner's new
 // session: from here on it answers to owner, reads owner's inventory for its
 // collar, and its work runs on q, owner's queue. It is then fully the new

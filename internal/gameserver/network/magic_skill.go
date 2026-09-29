@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -151,6 +152,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	if plan.GaugeDuration > 0 {
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
+	sendSkillItemCharge(live, def, plan.ItemCharge)
 
 	var affected []skilltarget.Actor
 	controller.Schedule(plan, actorcast.Hooks{
@@ -605,6 +607,46 @@ func sendItemConsumeFailure(live *livePlayer) {
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
 	sendMagicActionFailed(live)
+}
+
+// sendSkillItemCharge tells the caster what its cast's own consume item cost,
+// once the cast has been announced: the item that disappeared, or, for an
+// item-carried cast that could no longer pay it, that there were not enough.
+// Adena reads as adena spent, and a shadow item as its mana running out.
+func sendSkillItemCharge(live *livePlayer, def modelskill.Definition, charge actorcast.ItemCharge) {
+	if live == nil || charge == actorcast.ItemChargeNone {
+		return
+	}
+	itemID := int32(def.ItemConsumeID)
+	count := int32(def.ItemConsumeCount)
+	if charge == actorcast.ItemChargeShort {
+		if itemID == item.AdenaID {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+			return
+		}
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		return
+	}
+	switch {
+	case itemID == item.AdenaID:
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, count))
+	case shadowTemplate(live, itemID):
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageRemainingManaIsNow0, itemID))
+	case count > 1:
+		live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageS2S1Disappeared, itemID, count))
+	default:
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disappeared, itemID))
+	}
+}
+
+// shadowTemplate reports whether templateID is a time-limited shadow item.
+func shadowTemplate(live *livePlayer, templateID int32) bool {
+	inv := live.Inventory()
+	if inv == nil || inv.Templates() == nil {
+		return false
+	}
+	tmpl, ok := inv.Templates().Get(templateID)
+	return ok && tmpl.Duration > -1
 }
 
 // sendMagicCastFailureReason sends the reason alone, for a cast that failed

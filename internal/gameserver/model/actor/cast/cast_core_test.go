@@ -410,17 +410,41 @@ func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
 			items, mp int
 			cooldowns int
 		}
-		if _, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error {
+		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error {
 			seen.casting, seen.items, seen.mp, seen.cooldowns = ctrl.CastingNow(), actor.items[57], actor.mp, len(actor.disabled)
 			return nil
-		}); err != nil {
+		})
+		if err != nil {
 			t.Fatalf("StartCarried() error: %v", err)
+		}
+		if plan.ItemCharge != ItemChargePaid {
+			t.Fatalf("ItemCharge = %d, want ItemChargePaid", plan.ItemCharge)
 		}
 		if !seen.casting || seen.items != 5 || seen.mp != 100 || seen.cooldowns != 0 {
 			t.Fatalf("at carrier consume: casting=%v items=%d mp=%d cooldowns=%d, want claimed with nothing charged (true/5/100/0)", seen.casting, seen.items, seen.mp, seen.cooldowns)
 		}
 		if actor.items[57] != 4 || actor.mp != 100-7 || len(actor.disabled) != 1 {
 			t.Fatalf("after start: items=%d mp=%d disabled=%v, want 4/93/one cooldown", actor.items[57], actor.mp, actor.disabled)
+		}
+	})
+	t.Run("own item short", func(t *testing.T) {
+		// The carrier is paid, so the skill's own item failing to go does
+		// not refuse the cast: it runs, charges its other costs, and reports
+		// the item short.
+		ctrl, actor, def := newReentrantCostController()
+		actor.consumeFail = true
+		plan, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error { return nil })
+		if err != nil {
+			t.Fatalf("StartCarried() error = %v, want the cast started", err)
+		}
+		if plan.ItemCharge != ItemChargeShort {
+			t.Fatalf("ItemCharge = %d, want ItemChargeShort", plan.ItemCharge)
+		}
+		if !ctrl.CastingNow() {
+			t.Fatal("CastingNow() = false, want the carried cast in flight")
+		}
+		if actor.items[57] != 5 || actor.mp != 100-7 || len(actor.disabled) != 1 {
+			t.Fatalf("items=%d mp=%d disabled=%v, want 5/93/one cooldown", actor.items[57], actor.mp, actor.disabled)
 		}
 	})
 	t.Run("carrier missing", func(t *testing.T) {

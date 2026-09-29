@@ -428,7 +428,10 @@ func TestCastItemConsumeShortageNamesSkill(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(5, false, false))
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, 5, 1)
-	drainUntilQuiet(t, c)
+	// The refused cast destroys nothing, so no item message follows.
+	if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+		t.Fatalf("refused cast sent extra opcode %#x, want the refusal alone", extra[0])
+	}
 }
 
 // TestGroundTargetCastRecordsTargetAndAppliesBuff covers the ground-cast
