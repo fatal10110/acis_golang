@@ -47,7 +47,7 @@ func TestAttackStanceTimeoutBroadcastsSummonAutoAttackStop(t *testing.T) {
 
 	seen := map[int32]bool{}
 	deadline := h.client.Now().Add(3 * time.Second)
-	for h.client.Now().Before(deadline) && (len(seen) < 2) {
+	for h.client.Now().Before(deadline) && !(seen[ownerID] && seen[pet.ObjectID()]) {
 		frame := h.client.ReadWithTimeout(200 * time.Millisecond)
 		if frame == nil {
 			continue

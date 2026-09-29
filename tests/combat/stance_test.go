@@ -32,8 +32,9 @@ func TestWalkAwayStopsAutoAttack(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
+	assertAttackBy(t, c, srv.SoleObjectID(t))
 	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	awaitAutoAttackStart(t, c, srv.SoleObjectID(t))
 
 	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
 	drainUntilQuiet(t, c)
@@ -82,8 +83,9 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
+	assertAttackBy(t, c, srv.SoleObjectID(t))
 	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	awaitAutoAttackStart(t, c, srv.SoleObjectID(t))
 
 	c.Send(encodeRequestTargetCancel(1))
 	// The swing loop may broadcast one more in-flight Attack, and land its
@@ -97,7 +99,7 @@ func TestTargetCancelStopsSwingLoop(t *testing.T) {
 		if frame[0] == serverpackets.OpcodeSystemMessage && slices.Contains(damageFeedbackIDs, wireReader(frame[1:]).ReadInt32()) {
 			continue
 		}
-		if frame[0] != serverpackets.OpcodeAttack && frame[0] != serverpackets.OpcodeStatusUpdate {
+		if frame[0] != serverpackets.OpcodeAttack && frame[0] != serverpackets.OpcodeStatusUpdate && frame[0] != serverpackets.OpcodeAutoAttackStart {
 			t.Fatalf("cancel ack opcode = %#x, want ActionFailed", frame[0])
 		}
 	}
@@ -138,8 +140,9 @@ func TestAttackStanceBlocksRestartAndLogout(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, srv.SoleObjectID(t))
+	assertAttackBy(t, c, srv.SoleObjectID(t))
 	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	awaitAutoAttackStart(t, c, srv.SoleObjectID(t))
 
 	// Disengage: the walk stops the swing loop but the combat stance stays
 	// registered until its inactivity period expires.
@@ -192,8 +195,9 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
+	assertAttackBy(t, c, objID)
 	srv.AdvanceUntil(t, "opening swing", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
+	awaitAutoAttackStart(t, c, objID)
 
 	// Walk away: the swing loop stops but the combat-stance tracker stays
 	// registered until inactivity expiry, matching the restart/logout test.
@@ -220,10 +224,7 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 		t.Fatalf("AttackStance.Tick() = %v", err)
 	}
 
-	stop := readSkippingCombat(t, c, serverpackets.OpcodeAutoAttackStop, "timeout AutoAttackStop")
-	if got := wireReader(stop[1:]).ReadInt32(); got != objID {
-		t.Fatalf("AutoAttackStop object id = %d, want %d", got, objID)
-	}
+	readSkippingCombat(t, c, serverpackets.OpcodeAutoAttackStop, objID, "timeout AutoAttackStop")
 	if !srv.PlayerCastingNow(t, objID) {
 		t.Fatal("stance timeout stopped the in-flight cast")
 	}
@@ -231,7 +232,12 @@ func TestAttackStanceTimeoutSendsAutoAttackStopWithoutStoppingCast(t *testing.T)
 		t.Fatal("timeout left the actor in the stance tracker")
 	}
 
-	assertFrameOpcode(t, mustRead(t, c, "MagicSkillLaunched"), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	// The monster the player hit may end its own stance in the same sweep.
+	launched := mustRead(t, c, "MagicSkillLaunched")
+	for launched[0] == serverpackets.OpcodeAutoAttackStop {
+		launched = mustRead(t, c, "MagicSkillLaunched")
+	}
+	assertFrameOpcode(t, launched, serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
 }
 
 // worldActor is a lookup key for InAttackStance, which reads only the id;
@@ -241,10 +247,11 @@ type worldActor struct{ id int32 }
 func (a worldActor) ObjectID() int32 { return a.id }
 func (worldActor) Queue() *sim.Queue { return nil }
 
-// readSkippingCombat reads until opcode want, skipping in-flight Attack
-// and StatusUpdate frames. MagicSkillCanceled is a failure: the timeout
-// must not abort a live cast.
-func readSkippingCombat(t *testing.T, c *scriptedClient, want byte, what string) []byte {
+// readSkippingCombat reads until opcode want naming id, skipping in-flight
+// Attack and StatusUpdate frames and the stance frames of other actors (the
+// monster the player hit ends its own stance in the same sweep).
+// MagicSkillCanceled is a failure: the timeout must not abort a live cast.
+func readSkippingCombat(t *testing.T, c *scriptedClient, want byte, id int32, what string) []byte {
 	t.Helper()
 	deadline := c.Now().Add(3 * time.Second)
 	for c.Now().Before(deadline) {
@@ -254,10 +261,13 @@ func readSkippingCombat(t *testing.T, c *scriptedClient, want byte, what string)
 		}
 		switch frame[0] {
 		case want:
+			if got := wireReader(frame[1:]).ReadInt32(); got != id {
+				continue
+			}
 			return frame
 		case serverpackets.OpcodeMagicSkillCanceled:
 			t.Fatalf("%s: MagicSkillCanceled, want %#x (timeout must not abort the cast)", what, want)
-		case serverpackets.OpcodeAttack, serverpackets.OpcodeStatusUpdate, serverpackets.OpcodeSetupGauge:
+		case serverpackets.OpcodeAttack, serverpackets.OpcodeStatusUpdate, serverpackets.OpcodeSetupGauge, serverpackets.OpcodeAutoAttackStop:
 			continue
 		default:
 			t.Fatalf("%s opcode = %#x, want %#x", what, frame[0], want)

@@ -29,10 +29,6 @@ type CastStopAck struct{}
 // ready to use again.
 type SkillMasteryProc struct{}
 
-// AttackStarted reports an attack animation starting, before its hits are
-// scheduled.
-type AttackStarted struct{}
-
 // AttackFinished reports an attack animation finishing; the actor is free to
 // act again. BowReuse marks the finish of a bow's reuse delay rather than of
 // a swing.
@@ -74,8 +70,9 @@ type HitLanded struct {
 }
 
 // AttackStanceRequested reports that the actor landed a damaging physical
-// hit: it enters its attack stance, or refreshes the one it holds. A summon's
-// stance is its owner's.
+// hit, or finished an offensive cast whose launch resolved a target: it
+// enters its attack stance, or refreshes the one it holds. A summon's stance
+// is its owner's.
 type AttackStanceRequested struct{}
 
 // Attacked reports that a damaging physical hit or an offensive skill from
@@ -99,7 +96,6 @@ func (CastAborted) event()           {}
 func (CastFinished) event()          {}
 func (CastStopAck) event()           {}
 func (SkillMasteryProc) event()      {}
-func (AttackStarted) event()         {}
 func (AttackFinished) event()        {}
 func (AttackRethink) event()         {}
 func (BowShotFinished) event()       {}

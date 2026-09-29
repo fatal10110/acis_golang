@@ -113,7 +113,6 @@ func TestTeleportingPlayerDropsAttackIntention(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
 	if !onlinePlayer(t, srv, objID).SetTeleporting(true) {

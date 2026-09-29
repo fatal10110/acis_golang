@@ -108,7 +108,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
-		Sink: network.HostileSinks(s.State)(hostile),
+		Sink: network.HostileSinks(s.State, s.stance)(hostile),
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
@@ -132,12 +132,14 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 }
 
 // castCanceledBroadcast closes an aborted fixture AI cast with its cancel
-// animation and hands every cast end to the AI, as production's hostile
-// controller sink does.
+// animation, enters the stance an offensive cast earns and hands every cast
+// end to the AI, as production's hostile controller sink does.
 type castCanceledBroadcast struct{ hostile *npc.Hostile }
 
 func (c castCanceledBroadcast) Emit(ev event.Event) {
 	switch e := ev.(type) {
+	case event.AttackStanceRequested:
+		c.hostile.EnterAttackStance()
 	case event.CastAborted:
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
 	case event.CastFinished:
@@ -158,8 +160,9 @@ type AttackingHostile struct {
 }
 
 // attackFinishedSignal is the attack controller sink of an AttackingHostile:
-// it signals every finished swing on its channel and runs the chance procs
-// of every landed hit, as production's hostile controller sink does.
+// it signals every finished swing on its channel, and enters the stance and
+// runs the chance procs of every landed hit, as production's hostile
+// controller sink does.
 type attackFinishedSignal struct {
 	finished chan struct{}
 	chance   *actorcast.ChanceProcs
@@ -173,6 +176,8 @@ func (c *attackFinishedSignal) Emit(ev event.Event) {
 		case c.finished <- struct{}{}:
 		default:
 		}
+	case event.AttackStanceRequested:
+		c.hostile.EnterAttackStance()
 	case event.HitLanded:
 		c.chance.AttackHit(c.hostile, e)
 	}
@@ -386,7 +391,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
-		Sink: network.HostileSinks(s.State)(hostile),
+		Sink: network.HostileSinks(s.State, s.stance)(hostile),
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {
@@ -425,6 +430,8 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		c.server.runAI(c.hostile)
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
+	case event.AttackStanceRequested:
+		c.hostile.EnterAttackStance()
 	case event.HitLanded:
 		c.server.castEffects.Chance.AttackHit(c.hostile, e)
 	}

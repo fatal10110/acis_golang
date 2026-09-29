@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // moveLivePlayer handles a client MoveBackwardToLocation request. target and
@@ -198,6 +199,35 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
 	})
 	return true
+}
+
+// standAttackedLivePlayer answers a hit or offensive skill that reached a
+// seated live player with the stand intention, even where the damage itself
+// stands nobody up (an invulnerable or storing player). A player whose AI is
+// denied (storing, stunned, observing, ...) or who is mounted drops its
+// intention and reads ActionFailed; fake death ends through its effect;
+// anyone else stands up as a stand request does. The stand runs on live's
+// own queue, right after the hit that reached it: it releases a chair and
+// drops queued intentions only that queue may touch.
+func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
+	if live == nil || !live.Seated() {
+		return
+	}
+	postLive(live, func() {
+		if live.detached() || !live.Seated() {
+			return
+		}
+		if live.Character.DenyAIAction() || live.Operating() || live.Mounted() {
+			live.tryToIdle(false)
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		if live.EffectList().IsAffected(effect.FlagFakeDeath) {
+			live.EffectList().StopByType(effect.TypeFakeDeath)
+			return
+		}
+		l.changeLiveWaitType(live, true)
+	})
 }
 
 // broadcastLiveSocialAction mirrors the reference behavior for an emote

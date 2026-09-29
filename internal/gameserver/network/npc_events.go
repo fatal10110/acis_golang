@@ -17,16 +17,18 @@ import (
 const shotRechargeRadius = 600
 
 // HostileSinks returns the event-sink factory for hostile NPCs spawned into
-// state.
-func HostileSinks(state *world.State) func(*npc.Hostile) event.Sink {
-	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, h: h} }
+// state. stance tracks their attack stances; a nil stance leaves NPCs out
+// of it.
+func HostileSinks(state *world.State, stance AttackStanceTracker) func(*npc.Hostile) event.Sink {
+	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, stance: stance, h: h} }
 }
 
 // hostileSink maps one hostile NPC's events to packets for its observers.
 type hostileSink struct {
-	world *world.State
-	h     *npc.Hostile
-	known world.KnownBuffer
+	world  *world.State
+	stance AttackStanceTracker
+	h      *npc.Hostile
+	known  world.KnownBuffer
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -46,6 +48,11 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.SkillCanceled(e.ObjectID) })
 	case event.Died:
 		s.broadcast(func() wire.Frame { return frames.Die(h.ObjectID(), h.SpoilPool().Sweepable()) })
+		s.stopAttackStance()
+	case event.AttackStanceRequested, event.Attacked:
+		s.startAttackStance()
+	case event.AutoAttackStopped:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(h.ObjectID()) })
 	case event.Move:
 		s.broadcast(func() wire.Frame { return frames.Move(h.ObjectID(), e) })
 	case event.MoveToPawn:
@@ -96,6 +103,32 @@ func (s *hostileSink) Emit(ev event.Event) {
 			})
 		})
 	}
+}
+
+// startAttackStance enters or refreshes the NPC's attack stance. Entering
+// it shows AutoAttackStart to the NPC's observers.
+func (s *hostileSink) startAttackStance() {
+	if s.stance == nil {
+		return
+	}
+	s.stance.Add(s.h)
+	if !s.h.SetInCombat(true) {
+		return
+	}
+	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStart(s.h.ObjectID()) })
+}
+
+// stopAttackStance ends the attack stance of an NPC that died: observers
+// that saw it fall see its stance end.
+func (s *hostileSink) stopAttackStance() {
+	if s.stance == nil {
+		return
+	}
+	s.h.SetInCombat(false)
+	if !s.stance.Remove(s.h) {
+		return
+	}
+	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(s.h.ObjectID()) })
 }
 
 // broadcast fans one lazily built frame out over a detached snapshot of the

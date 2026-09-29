@@ -202,3 +202,31 @@ func TestPetLandedHitPutsOwnerInStance(t *testing.T) {
 		t.Fatal("owner not in the stance tracker after its pet's landed hit")
 	}
 }
+
+// TestPetOffensiveSkillPutsOwnerInStance pins the caster side of
+// SummonAI.startAttackStance at cast finalization (CreatureCast.java:308-309):
+// the pet's offensive skill, once it finishes with its launch having named a
+// target, shows AutoAttackStart for the pet and then for its owner, who cast
+// nothing, and puts the owner in stance.
+func TestPetOffensiveSkillPutsOwnerInStance(t *testing.T) {
+	t.Parallel()
+	strike := wolfStrike()
+	strike.Power = 1
+	h, petActor, _ := bootWolfStrikerWith(t, strike, gameservertest.WithAttackStanceClock(time.Now))
+	startWolfStrike(t, h)
+	h.srv.AdvanceUntil(t, "strike finish", func() bool { return !petActor.CastingNow() })
+	frames := drainFrames(t, h.client)
+
+	launched := frameIndex(frames, serverpackets.OpcodeMagicSkillLaunched, petActor.ObjectID())
+	petStart := frameIndex(frames, serverpackets.OpcodeAutoAttackStart, petActor.ObjectID())
+	ownerStart := frameIndex(frames, serverpackets.OpcodeAutoAttackStart, h.ownerID)
+	if launched < 0 || petStart < launched || ownerStart < petStart {
+		t.Fatalf("frames: launch at %d, pet AutoAttackStart at %d, owner's at %d; want the launch, then the pet's, then the owner's", launched, petStart, ownerStart)
+	}
+	if n, m := frameCount(frames, serverpackets.OpcodeAutoAttackStart, petActor.ObjectID()), frameCount(frames, serverpackets.OpcodeAutoAttackStart, h.ownerID); n != 1 || m != 1 {
+		t.Fatalf("AutoAttackStart count: pet %d, owner %d; want 1 each", n, m)
+	}
+	if !h.srv.AttackStance.InAttackStance(ownerKey{id: h.ownerID}) {
+		t.Fatal("owner not in the stance tracker after its pet's offensive skill")
+	}
+}

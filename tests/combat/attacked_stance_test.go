@@ -94,9 +94,10 @@ func TestMonsterHitPutsPlayerInAttackStance(t *testing.T) {
 	if err := srv.AttackStance.Tick(); err != nil {
 		t.Fatalf("AttackStance.Tick() = %v", err)
 	}
-	stop := readSkippingCombat(t, c, serverpackets.OpcodeAutoAttackStop, "stance expiry")
-	if got := wireReader(stop[1:]).ReadInt32(); got != objID {
-		t.Fatalf("AutoAttackStop object id = %d, want %d", got, objID)
+	// The monster's own stance expires in the same sweep.
+	srv.Settle(t)
+	if n := countByID(readQuiet(c), serverpackets.OpcodeAutoAttackStop, objID); n != 1 {
+		t.Fatalf("player AutoAttackStop after its stance expired = %d, want 1", n)
 	}
 }
 
@@ -272,8 +273,20 @@ func TestMonsterSkillPutsPlayerInAttackStance(t *testing.T) {
 		aiCtl.Cast(victim.(attackable.Combatant), modelskill.Ref{ID: monsterNukeSkill, Level: 1})
 	})
 	srv.AdvanceUntil(t, "monster skill landing", func() bool { return srv.AttackStance.InAttackStance(worldActor{id: objID}) })
-	if n := countByID(readQuiet(c), serverpackets.OpcodeAutoAttackStart, objID); n != 1 {
+	frames := readQuiet(c)
+	if n := countByID(frames, serverpackets.OpcodeAutoAttackStart, objID); n != 1 {
 		t.Fatalf("player AutoAttackStart after the monster's skill = %d, want 1", n)
+	}
+
+	// The finished offensive cast puts the monster in its own stance
+	// (CreatureCast.java:308-309).
+	srv.AdvanceUntil(t, "monster cast end", func() bool { return !caster.CastingNow() })
+	frames = append(frames, readQuiet(c)...)
+	if n := countByID(frames, serverpackets.OpcodeAutoAttackStart, caster.ObjectID()); n != 1 {
+		t.Fatalf("monster AutoAttackStart after its offensive cast = %d, want 1", n)
+	}
+	if !srv.AttackStance.InAttackStance(worldActor{id: caster.ObjectID()}) {
+		t.Fatal("monster not in the stance tracker after its offensive cast")
 	}
 }
 
