@@ -36,7 +36,7 @@ func (a *Actor) die(killer attackable.Combatant) {
 	for range a.EffectList().StopOnDeath() {
 		a.UpdateAbnormalEffect()
 	}
-	a.UpdateStatus()
+	a.BroadcastStatus()
 	a.emit(event.Died{})
 	a.idle()
 	if a.owner != nil {

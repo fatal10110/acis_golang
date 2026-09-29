@@ -106,7 +106,9 @@ func (h *Hostile) MaxMPValue() float64 {
 	return h.calcStat(stat.MaxMP, h.Instance.Template.MPMax)
 }
 
-// SetHP sets current HP, clamped to [0, MaxHP].
+// SetHP sets current HP, clamped to [0, MaxHP], and offers the targeters'
+// health bar a refresh even when the value did not move. It has no effect on
+// a dead NPC.
 func (h *Hostile) SetHP(value float64) {
 	maxHP := h.MaxHPValue()
 	if value < 0 {
@@ -115,7 +117,9 @@ func (h *Hostile) SetHP(value float64) {
 	if value > maxHP {
 		value = maxHP
 	}
-	h.health.SetCurrent(value)
+	if h.health.SetCurrent(value) {
+		h.BroadcastStatus()
+	}
 }
 
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount. A

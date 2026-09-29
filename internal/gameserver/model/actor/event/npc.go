@@ -25,8 +25,9 @@ type StatusAttr struct {
 // Status reports changed status values observers must see.
 type Status struct{ Attrs []StatusAttr }
 
-// HPChanged reports a change to an NPC's current HP that the players
-// watching its health bar may need.
+// HPChanged reports a vitals change on an NPC or summon that the players
+// watching its health bar may need. A summon's observers also get the rest
+// of its refreshed status.
 type HPChanged struct{}
 
 // SkillLaunched reports a cast reaching its launch with the targets it hits.

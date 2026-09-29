@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -214,6 +215,11 @@ type Actor struct {
 	effects            *effect.List
 	skillDefs          skillLookup
 	raidCursesDisabled bool
+
+	// hpBar is the health-bar segment state HPStatusUpdate advances. A
+	// summon's bar is never calibrated, so it reports nearly every change.
+	hpBar creature.HPBar
+
 	// stateMu also guards intent and target: another actor's skill landing
 	// on this summon retargets or idles it from that actor's queue.
 	stateMu                             sync.RWMutex

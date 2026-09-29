@@ -38,14 +38,16 @@ func (h *Health) Current() float64 {
 	return *h.current
 }
 
-// SetCurrent overrides current hit points unless the actor is already dead.
-func (h *Health) SetCurrent(v float64) {
+// SetCurrent overrides current hit points unless the actor is already dead,
+// and reports whether it did.
+func (h *Health) SetCurrent(v float64) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.current == nil || *h.current <= 0 {
-		return
+		return false
 	}
 	*h.current = v
+	return true
 }
 
 // Add restores non-negative hit points up to max and returns the applied

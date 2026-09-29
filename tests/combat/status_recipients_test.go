@@ -242,3 +242,54 @@ func TestHostileHPStatusFramesAreOwnedPerTargeter(t *testing.T) {
 	first[0][len(first[0])-1] ^= 0xff
 	assertStatusFrames(t, "second targeter after mutating first", second, want)
 }
+
+// TestHostileSetHPRefreshesTargeterBar pins CreatureStatus.setHp
+// (CreatureStatus.java:130-162), the write BalanceLife.java:65 lands on
+// every target: it ends in broadcastStatusUpdate even when HP did not move,
+// so the NPC's targeters get CUR_HP whenever the bar gate passes, and a
+// dead NPC's setHp returns before broadcasting anything.
+//
+// Fixture max HP 440: interval 1.25, initial checks inc=440, dec=438.75.
+func TestHostileSetHPRefreshesTargeterBar(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	w := joinWatcher(t, srv)
+	hostile := srv.SpawnHostileNPC(t)
+	id := hostile.ObjectID()
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, w)
+	c.Send(encodeAction(id, hostileX, hostileY, hostileZ, false))
+	drainUntilQuiet(t, c)
+
+	// 430 <= dec 438.75: sent; checks move to dec=430, inc=431.25.
+	hostile.SetHP(430)
+	statuses, _ := statusFramesFor(t, c, id)
+	assertStatusFrames(t, "balanced down", statuses, statusFixture(id, wantCurHP, 430))
+	statuses, _ = statusFramesFor(t, w, id)
+	assertStatusFrames(t, "non-targeting observer", statuses)
+
+	// 430.5 stays inside (430, 431.25): the gate declines.
+	hostile.SetHP(430.5)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "inside segment", statuses)
+
+	// An unchanged 430.5 still re-runs the gate, which still declines;
+	// the full-HP write crosses inc=431.25 and is sent.
+	hostile.SetHP(430.5)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "unchanged value", statuses)
+	hostile.SetHP(10000)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "clamped to full", statuses, statusFixture(id, wantCurHP, 440))
+
+	hostile.ConsumeHP(440)
+	statusFramesFor(t, c, id)
+	hostile.SetHP(200)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "dead NPC", statuses)
+	if hp := hostile.CurrentHP(); hp != 0 {
+		t.Fatalf("dead NPC HP = %d after SetHP, want 0", hp)
+	}
+}

@@ -141,10 +141,9 @@ type Hostile struct {
 
 	health creature.Health
 	hp     float64
-	// hpBarMu guards hpBar, the health-bar segment state HPStatusUpdate
-	// advances from whichever goroutine changed HP.
-	hpBarMu sync.Mutex
-	hpBar   hpBar
+	// hpBar is the health-bar segment state HPStatusUpdate advances from
+	// whichever goroutine changed HP.
+	hpBar creature.HPBar
 
 	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
 	// A caster's mana-burn or mana-drain skill reduces it from the caster's
@@ -292,7 +291,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	// match the persisted spawn current-hp/mp contract.
 	h.hp = float64(h.MaxHP())
 	h.mp = float64(int(h.MaxMPValue()))
-	h.hpBar = newHPBar(float64(h.MaxHP()))
+	h.hpBar.Calibrate(float64(h.MaxHP()))
 	return h, nil
 }
 

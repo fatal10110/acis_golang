@@ -29,6 +29,6 @@ func (a *Actor) TickRegen() {
 	changed := a.addHP(math.Max(1, a.HPRegenRate())) > 0
 	changed = a.addMP(math.Max(1, a.MPRegenRate())) > 0 || changed
 	if changed {
-		a.UpdateStatus()
+		a.BroadcastStatus()
 	}
 }

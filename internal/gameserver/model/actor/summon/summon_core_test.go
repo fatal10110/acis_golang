@@ -1216,7 +1216,7 @@ func TestReduceHPUpdatesStatusAfterDirectAndDOTDamage(t *testing.T) {
 
 			damage.apply(a)
 
-			if updates := event.Count[event.StatusChanged](rec); updates != 1 {
+			if updates := event.Count[event.HPChanged](rec); updates != 1 {
 				t.Fatalf("status updates = %d, want 1", updates)
 			}
 		})
@@ -1255,7 +1255,7 @@ func TestVitalsMutatorsUpdateStatusOncePerChange(t *testing.T) {
 			if (applied > 0) != (tc.want > 0) {
 				t.Fatalf("applied = %v, want a change only when %d updates are expected", applied, tc.want)
 			}
-			if updates := event.Count[event.StatusChanged](rec); updates != tc.want {
+			if updates := event.Count[event.HPChanged](rec); updates != tc.want {
 				t.Fatalf("status updates = %d, want %d", updates, tc.want)
 			}
 		})

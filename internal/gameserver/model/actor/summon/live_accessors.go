@@ -95,7 +95,9 @@ func (a *Actor) Level() int {
 	return a.level
 }
 
-// UpdateStatus reports that this summon's current status must be republished.
+// UpdateStatus reports that this summon's current status must be
+// republished to its owner's pet window and observers. A vitals setter uses
+// BroadcastStatus instead, which also reaches the players targeting it.
 func (a *Actor) UpdateStatus() {
 	a.emit(event.StatusChanged{})
 }
