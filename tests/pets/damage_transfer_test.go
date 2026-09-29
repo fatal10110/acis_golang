@@ -1,6 +1,7 @@
 package pets
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -56,7 +57,19 @@ func giveTransferPain(t *testing.T, srv *gameservertest.Server, id int32) {
 // joinHitter brings a second player, the attacker, into the world.
 func joinHitter(t *testing.T, srv *gameservertest.Server, owner *testsupport.ScriptedClient) secondPlayer {
 	t.Helper()
+	return joinHitterKnowing(t, srv, owner)
+}
+
+// joinHitterKnowing is joinHitter with the hitter knowing every skill id at
+// level 1 before it enters the world.
+func joinHitterKnowing(t *testing.T, srv *gameservertest.Server, owner *testsupport.ScriptedClient, skills ...int) secondPlayer {
+	t.Helper()
 	id := srv.SeedCharacterFor(t, "player2", "Hitter", 1, 0).ID
+	for _, skill := range skills {
+		if err := srv.KnownSkills.SetKnownSkill(context.Background(), id, 0, skill, 1); err != nil {
+			t.Fatalf("seed hitter skill %d: %v", skill, err)
+		}
+	}
 	c := srv.DialClient(t, "player2", 1)
 	startInWorld(t, c)
 	obj, ok := srv.State.Player(id)
@@ -215,5 +228,87 @@ func TestNoTransferPainShare(t *testing.T) {
 				t.Fatalf("hitter damage messages = %s, want none", got)
 			}
 		})
+	}
+}
+
+// TestServitorTakesTransferPainShareOfSummonHit has the hitter's own
+// servitor hit a Transfer Pain owner whose servitor stands next to it. The
+// split is the same as for a player's hit; the owner's messages name the
+// attacking summon, and the split report goes to the summon's owner.
+func TestServitorTakesTransferPainShareOfSummonHit(t *testing.T) {
+	t.Parallel()
+	o := bootServitorOwner(t)
+	servitor := o.summonServitor(t)
+	giveTransferPain(t, o.srv, o.id)
+	hitter := joinHitterKnowing(t, o.srv, o.client, killableServitorSkill)
+	hitter.client.Send(encodeRequestMagicSkillUse(killableServitorSkill))
+	var attacker *summon.Actor
+	o.srv.AdvanceUntil(t, "hitter's servitor in world state", func() bool {
+		obj, ok := o.srv.State.Summon(hitter.id)
+		if ok {
+			attacker, ok = obj.(*summon.Actor)
+		}
+		return ok
+	})
+	drainUntilQuiet(t, hitter.client)
+	drainUntilQuiet(t, o.client)
+	servitorBefore, ownerBefore := servitor.HP(), ownerVitals(t, o.srv, o.id)
+
+	obj, _ := o.srv.State.Player(o.id)
+	owner := obj.(attackable.Combatant)
+	runOn(t, attacker.Queue(), func() { owner.TakeDamage(20, attacker) })
+
+	if got := servitorBefore - servitor.HP(); got != 10 {
+		t.Fatalf("servitor lost %v HP, want the 10 transferred", got)
+	}
+	if got := ownerBefore - ownerVitals(t, o.srv, o.id); got != 10 {
+		t.Fatalf("owner lost %d CP+HP, want the 10 left after the transfer", got)
+	}
+	name := attacker.CharacterName()
+	want := fmt.Sprint([]string{
+		fmt.Sprint(serverpackets.SystemMessageSummonReceivedS2ByS1, []any{name, int32(10)}),
+		fmt.Sprint(serverpackets.SystemMessageS1GaveYouS2Dmg, []any{name, int32(10)}),
+	})
+	if got := damageMessages(transferMessages(t, drainFrames(t, o.client))); got != want {
+		t.Fatalf("owner damage messages = %s, want %s", got, want)
+	}
+	want = fmt.Sprint([]string{fmt.Sprint(serverpackets.SystemMessageGivenS1DamageToTargetS2ToServitor, []any{int32(10), int32(10)})})
+	if got := damageMessages(transferMessages(t, drainFrames(t, hitter.client))); got != want {
+		t.Fatalf("summon owner's damage messages = %s, want %s", got, want)
+	}
+}
+
+// TestServitorTakesTransferPainShareOfDOTTick lands another player's
+// damage-over-time tick on a Transfer Pain owner whose servitor stands next
+// to it. The tick is split like a hit, but neither the owner's damage report
+// nor the hitter's split report goes out for a tick; the servitor's own
+// share is an ordinary hit, so its owner still reads it.
+func TestServitorTakesTransferPainShareOfDOTTick(t *testing.T) {
+	t.Parallel()
+	o := bootServitorOwner(t)
+	servitor := o.summonServitor(t)
+	giveTransferPain(t, o.srv, o.id)
+	hitter := joinHitter(t, o.srv, o.client)
+	drainUntilQuiet(t, o.client)
+	servitorBefore, ownerBefore := servitor.HP(), ownerVitals(t, o.srv, o.id)
+
+	obj, _ := o.srv.State.Player(o.id)
+	owner := obj.(interface {
+		ReduceHPByDOT(damage float64, effector effect.Actor, isDOT bool)
+	})
+	runOn(t, hitter.queue, func() { owner.ReduceHPByDOT(20, hitter.actor.(effect.Actor), true) })
+
+	if got := servitorBefore - servitor.HP(); got != 10 {
+		t.Fatalf("servitor lost %v HP, want the 10 transferred", got)
+	}
+	if got := ownerBefore - ownerVitals(t, o.srv, o.id); got != 10 {
+		t.Fatalf("owner lost %d CP+HP, want the 10 left after the transfer", got)
+	}
+	want := fmt.Sprint([]string{fmt.Sprint(serverpackets.SystemMessageSummonReceivedS2ByS1, []any{"Hitter", int32(10)})})
+	if got := damageMessages(transferMessages(t, drainFrames(t, o.client))); got != want {
+		t.Fatalf("owner damage messages = %s, want %s", got, want)
+	}
+	if got := damageMessages(transferMessages(t, drainFrames(t, hitter.client))); got != "[]" {
+		t.Fatalf("hitter damage messages = %s, want none", got)
 	}
 }
