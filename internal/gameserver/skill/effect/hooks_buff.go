@@ -54,14 +54,20 @@ func charmOfCourageStart(e *Effect) bool {
 	return isPlayer(e.Effected)
 }
 
+// charmOfLuckExit and phoenixBlessExit hand a playable's ending blessing to
+// the player or summon it was on, which refreshes its appearance.
 func charmOfLuckExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
+		target.StopCharmOfLuck(e)
+	} else if target, ok := asSummon(e.Effected); ok {
 		target.StopCharmOfLuck(e)
 	}
 }
 
 func phoenixBlessExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
+		target.StopPhoenixBlessing(e)
+	} else if target, ok := asSummon(e.Effected); ok {
 		target.StopPhoenixBlessing(e)
 	}
 }

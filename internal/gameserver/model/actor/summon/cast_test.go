@@ -25,10 +25,11 @@ type castBreakRoll struct {
 	hp     float64
 }
 
-func (c *recordingCast) CastingNow() bool       { return c.casting }
-func (*recordingCast) Now() time.Time           { return time.Time{} }
-func (*recordingCast) Interrupt(time.Time) bool { return false }
-func (*recordingCast) StopCast()                {}
+func (c *recordingCast) CastingNow() bool        { return c.casting }
+func (*recordingCast) CurrentSkillIsMagic() bool { return false }
+func (*recordingCast) Now() time.Time            { return time.Time{} }
+func (*recordingCast) Interrupt(time.Time) bool  { return false }
+func (*recordingCast) StopCast()                 {}
 func (c *recordingCast) InterruptCastOnDamage(damage float64, _ int, _ func(float64) float64, roll int, immune bool) bool {
 	c.rolls = append(c.rolls, castBreakRoll{damage: damage, roll: roll, immune: immune, hp: c.a.HP()})
 	if c.breaks && !immune {

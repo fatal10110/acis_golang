@@ -98,7 +98,6 @@ type PlayerActor interface {
 	ReduceDeathPenaltyLevel() int
 
 	CasterActor
-	CurrentSkillIsMagic() bool
 
 	Standing() bool
 	SetStanding(bool) bool
@@ -152,12 +151,20 @@ type SummonActor interface {
 	RandomConfusionTarget(radius int) (world.Tracked, bool)
 	// Think wakes the summon's AI to continue its current intention.
 	Think() error
+	// StopCharmOfLuck and StopPhoenixBlessing run when that blessing ends
+	// on the summon: the effect is already off its list, and observers
+	// see its appearance refreshed.
+	StopCharmOfLuck(*Effect)
+	StopPhoenixBlessing(*Effect)
 }
 
 // CasterActor is the cast surface of every kind that casts: players, NPCs
 // and summons.
 type CasterActor interface {
 	CastingNow() bool
+	// CurrentSkillIsMagic reports whether the cast in flight is a magic
+	// skill; false when nothing is being cast.
+	CurrentSkillIsMagic() bool
 	// InterruptCast aborts the cast only while it is still inside its
 	// interrupt window; the caster's own client (a summon's owner) reads
 	// CASTING_INTERRUPTED.

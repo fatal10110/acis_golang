@@ -11,6 +11,7 @@ import (
 // CASTING_INTERRUPTED come from the controller's own event sink.
 type CastControl interface {
 	CastingNow() bool
+	CurrentSkillIsMagic() bool
 	Now() time.Time
 	// Interrupt aborts the cast only while it is still inside its interrupt
 	// window at now, and reports whether it did.
@@ -26,6 +27,11 @@ type CastControl interface {
 // CastingNow reports whether a has a cast in flight.
 func (a *Actor) CastingNow() bool {
 	return a.cast != nil && a.cast.CastingNow()
+}
+
+// CurrentSkillIsMagic reports whether a's cast in flight is a magic skill.
+func (a *Actor) CurrentSkillIsMagic() bool {
+	return a.cast != nil && a.cast.CurrentSkillIsMagic()
 }
 
 // InterruptCast aborts a's cast while it is still inside its interrupt

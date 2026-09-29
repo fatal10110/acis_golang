@@ -144,7 +144,7 @@ func invincibleExit(e *Effect) {
 }
 
 func muteStart(e *Effect) bool {
-	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() && target.CurrentSkillIsMagic() {
+	if target, ok := asCaster(e.Effected); ok && target.CastingNow() && target.CurrentSkillIsMagic() {
 		target.StopCast()
 	}
 	refresh(e.Effected)
@@ -152,7 +152,7 @@ func muteStart(e *Effect) bool {
 }
 
 func physicalMuteStart(e *Effect) bool {
-	if target, ok := asPlayer(e.Effected); ok && target.CastingNow() && !target.CurrentSkillIsMagic() {
+	if target, ok := asCaster(e.Effected); ok && target.CastingNow() && !target.CurrentSkillIsMagic() {
 		target.StopCast()
 	}
 	refresh(e.Effected)
@@ -200,7 +200,7 @@ func removeTargetStart(e *Effect) bool {
 }
 
 func silenceAllStart(e *Effect) bool {
-	if target, ok := asPlayer(e.Effected); ok {
+	if target, ok := asCaster(e.Effected); ok {
 		target.StopCast()
 	}
 	refresh(e.Effected)
