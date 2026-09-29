@@ -365,7 +365,7 @@ func (l *GameClientLink) tradePartnerLive(first, second *livePlayer) bool {
 func livePlayersInRange(first, second *livePlayer, radius int) bool {
 	ax, ay, az := first.Position()
 	bx, by, bz := second.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, radius)
+	return location.In3DRadius(ax, ay, az, bx, by, bz, radius)
 }
 
 func (l *GameClientLink) tradeParticipants(session tradebook.Session) (*livePlayer, *livePlayer, bool) {

@@ -252,7 +252,7 @@ func (a *Actor) CanReceiveKillReward(partyRange int) bool {
 	}
 	ax, ay, az := a.Position()
 	ox, oy, oz := owner.Position()
-	return location.In3DRange(ax, ay, az, ox, oy, oz, partyRange)
+	return location.In3DRadius(ax, ay, az, ox, oy, oz, partyRange)
 }
 
 // Exp returns this pet's durable total experience.

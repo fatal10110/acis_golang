@@ -149,7 +149,7 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 	}
 	ax, ay, az := owner.Position()
 	bx, by, bz := pet.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, GiveInteractionDistance)
+	return location.In3DRadius(ax, ay, az, bx, by, bz, GiveInteractionDistance)
 }
 
 // GetFromPet transfers one item from a pet inventory to its owner's

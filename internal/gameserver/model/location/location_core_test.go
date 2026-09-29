@@ -84,6 +84,22 @@ func TestIn3DRadius(t *testing.T) {
 	}
 }
 
+func TestIn3DRadiusPackageHelper(t *testing.T) {
+	// 3-4-12 triangle offset from a non-origin point: distance 13.
+	if In3DRadius(10, 20, 30, 13, 24, 42, 13) {
+		t.Fatal("In3DRadius() package helper = true at exact radius")
+	}
+	if !In3DRadius(10, 20, 30, 13, 24, 42, 14) {
+		t.Fatal("In3DRadius() package helper = false inside radius")
+	}
+	if In3DRadius(10, 20, 30, 10, 20, 30, 0) {
+		t.Fatal("In3DRadius() package helper = true for a zero radius")
+	}
+	if In3DRadius(10, 20, 30, 10, 20, 30, -1) {
+		t.Fatal("In3DRadius() package helper = true for negative radius")
+	}
+}
+
 func TestIn2DRadius(t *testing.T) {
 	origin := Location{X: 0, Y: 0, Z: 0}
 	// 3-4-5 triangle: ground distance 5.

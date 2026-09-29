@@ -185,7 +185,7 @@ func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
 func groundPickupInRange(live *livePlayer, ground *grounditem.Item) bool {
 	sx, sy, sz := live.Position()
 	gx, gy, gz := ground.Position()
-	return location.In3DRange(sx, sy, sz, gx, gy, gz, groundPickupInteractionDistance)
+	return location.In3DRadius(sx, sy, sz, gx, gy, gz, groundPickupInteractionDistance)
 }
 
 func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grounditem.Item) {

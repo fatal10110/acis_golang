@@ -29,13 +29,16 @@ func (l Location) Distance3D(other Location) float64 {
 }
 
 // In3DRange reports whether other is within radius units of l, including
-// the exact boundary.
+// the exact boundary. It is the inclusive check; game range gates (interaction
+// distance, cast range, leash and reward ranges) exclude the boundary and use
+// In3DRadius instead.
 func (l Location) In3DRange(other Location, radius int) bool {
 	return In3DRange(l.X, l.Y, l.Z, other.X, other.Y, other.Z, radius)
 }
 
 // In3DRange reports whether two coordinate triples are within radius units
-// of each other, including the exact boundary.
+// of each other, including the exact boundary. See In3DRadius for the
+// strict variant game range gates use.
 func In3DRange(ax, ay, az, bx, by, bz, radius int) bool {
 	if radius < 0 {
 		return false
@@ -50,6 +53,12 @@ func In3DRange(ax, ay, az, bx, by, bz, radius int) bool {
 // The exact boundary is outside.
 func (l Location) In3DRadius(other Location, radius int) bool {
 	return l.Distance3D(other) < float64(radius)
+}
+
+// In3DRadius reports whether two coordinate triples are strictly inside
+// radius units of each other. The exact boundary is outside.
+func In3DRadius(ax, ay, az, bx, by, bz, radius int) bool {
+	return (Location{X: ax, Y: ay, Z: az}).In3DRadius(Location{X: bx, Y: by, Z: bz}, radius)
 }
 
 // In2DRadius reports whether other is strictly inside radius units of l on
