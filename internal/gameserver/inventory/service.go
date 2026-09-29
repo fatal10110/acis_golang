@@ -69,9 +69,12 @@ const (
 // CrystallizeResult is the domain result of crystallizing one item.
 type CrystallizeResult struct {
 	Result
-	SourceItemID  int32
-	CrystalItemID int32
-	CrystalCount  int
+	SourceItemID int32
+	// SourceEnchantLevel is the crystallized item's enchant level, which a
+	// worn item's removal message names.
+	SourceEnchantLevel int
+	CrystalItemID      int32
+	CrystalCount       int
 }
 
 // EquipFailure is the non-mutating reason an equip toggle failed.
@@ -104,11 +107,11 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 
 	st := inst.Snapshot()
 	if st.Equipped() {
-		unequipped := inv.UnequipSlot(st.LocationData)
-		if unequipped == nil {
+		changed := inv.UnequipItem(inst)
+		if len(changed) == 0 {
 			return Result{}, EquipNoop
 		}
-		return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, EquipOK
+		return Result{EquipmentChanged: true, Changed: changed}, EquipOK
 	}
 	changed, refused := inv.EquipPlayerItem(inst, tmpl)
 	if refused {
@@ -121,6 +124,8 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 }
 
 // UnequipBodySlot clears the paperdoll position represented by bodySlot.
+// Changed lists what the paperdoll changed in order: a bow's or rod's
+// arrows or lure ahead of the bow or rod itself.
 func (s *Service) UnequipBodySlot(inv *itemcontainer.Inventory, bodySlot int32) (Result, bool) {
 	if inv == nil {
 		return Result{}, false
@@ -129,11 +134,11 @@ func (s *Service) UnequipBodySlot(inv *itemcontainer.Inventory, bodySlot int32) 
 	if !ok {
 		return Result{}, false
 	}
-	unequipped := inv.UnequipSlot(paperdollSlot)
-	if unequipped == nil {
+	changed := inv.UnequipItem(inv.ItemAt(paperdollSlot))
+	if len(changed) == 0 {
 		return Result{}, false
 	}
-	return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, true
+	return Result{EquipmentChanged: true, Changed: changed}, true
 }
 
 // DropItem removes count units from inv for a world drop.
@@ -162,19 +167,16 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 		newObjectID = id
 	}
 	wasEquipped := st.Equipped() && st.Count <= count
+	changed := unequipConsumed(inv, inst, wasEquipped)
 	dropped := inv.DropItem(objectID, count, newObjectID)
 	if dropped == nil {
 		return DropResult{}, false, nil
 	}
-	res := DropResult{
-		Result:   Result{EquipmentChanged: wasEquipped},
+	return DropResult{
+		Result:   Result{EquipmentChanged: wasEquipped, Changed: changed},
 		Dropped:  dropped,
 		Template: tmpl,
-	}
-	if wasEquipped {
-		res.Changed = []*item.Instance{dropped}
-	}
-	return res, true, nil
+	}, true, nil
 }
 
 // PickupFailure is the non-mutating reason a ground-item pickup failed.
@@ -267,14 +269,24 @@ func (s *Service) DestroyItemResult(inv *itemcontainer.Inventory, objectID int32
 	inst := inv.ItemByObjectID(objectID)
 	st := inst.Snapshot()
 	wasEquipped := st.Equipped() && st.Count <= count
+	changed := unequipConsumed(inv, inst, wasEquipped)
 	if inv.DestroyItem(inst, count) == nil {
 		return Result{}, DestroyNoop
 	}
-	res := Result{EquipmentChanged: wasEquipped}
-	if wasEquipped {
-		res.Changed = []*item.Instance{inst}
+	return Result{EquipmentChanged: wasEquipped, Changed: changed}, DestroyOK
+}
+
+// unequipConsumed takes a worn item off the paperdoll ahead of the removal
+// that consumes all of it, so the change list carries everything that
+// removal took off: a bow's or rod's arrows or lure too, ahead of the bow or
+// rod. The removal itself then finds nothing left to unequip. A removal
+// that leaves part of a worn stack behind (consumed false) unequips
+// nothing.
+func unequipConsumed(inv *itemcontainer.Inventory, inst *item.Instance, consumed bool) []*item.Instance {
+	if !consumed {
+		return nil
 	}
-	return res, DestroyOK
+	return inv.UnequipItem(inst)
 }
 
 // DestroyItem consumes count units from inv.
@@ -445,24 +457,20 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 		count = st.Count
 	}
 	wasEquipped := st.Equipped() && st.Count <= count
-	sourceItemID := st.TemplateID
+	changed := unequipConsumed(inv, inst, wasEquipped)
 	if inv.DestroyItem(inst, count) == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
 	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-
-	res := CrystallizeResult{
-		Result:        Result{EquipmentChanged: wasEquipped},
-		SourceItemID:  sourceItemID,
-		CrystalItemID: crystalItemID,
-		CrystalCount:  int(crystalCount),
-	}
-	if wasEquipped {
-		res.Changed = []*item.Instance{inst}
-	}
-	return res, CrystallizeOK, nil
+	return CrystallizeResult{
+		Result:             Result{EquipmentChanged: wasEquipped, Changed: changed},
+		SourceItemID:       st.TemplateID,
+		SourceEnchantLevel: st.EnchantLevel,
+		CrystalItemID:      crystalItemID,
+		CrystalCount:       int(crystalCount),
+	}, CrystallizeOK, nil
 }
 
 func (s *Service) nextID() (int32, bool, error) {

@@ -49,9 +49,11 @@ func TestDestroyFlushesBatchedUpdate(t *testing.T) {
 }
 
 // TestCrystallizeGrantsCrystals crystallizes the D-grade sword and requires
-// the crystallized message plus one batched InventoryUpdate carrying both
-// the removed source row and the added crystal reward, mirrored by the items
-// rows.
+// the crystallized message, then the crystal pickup message, then the
+// UserInfo refresh (RequestCrystallizeItem.java:153-158, Player.addItem's
+// YOU_PICKED_UP_S2_S1 at Player.java:1830-1837), plus one batched
+// InventoryUpdate carrying both the removed source row and the added crystal
+// reward, mirrored by the items rows.
 func TestCrystallizeGrantsCrystals(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
@@ -79,6 +81,8 @@ func TestCrystallizeGrantsCrystals(t *testing.T) {
 	if itemID := r.ReadInt32(); itemID != 30 {
 		t.Fatalf("param item id = %d, want 30", itemID)
 	}
+	assertPickedUpCrystals(t, c.Read(), item.CrystalD.ItemID(), 10)
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeUserInfo, "crystallize UserInfo")
 
 	srv.InventoryUpdates.Tick()
 	entries := readInventoryUpdateEntries(t, c.Read())

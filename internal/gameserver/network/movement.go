@@ -188,6 +188,7 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	live.takeDeferredMagicSkill()
 	live.takeDeferredItemAICast()
 	live.takeDeferredFollow()
+	live.takeDeferredUseItem()
 	live.endFollow()
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
