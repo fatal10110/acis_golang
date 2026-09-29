@@ -228,6 +228,7 @@ func (a *Actor) despawn(state *world.State) bool {
 	// moving into it.
 	a.despawnOnce.Do(func() {
 		ran = true
+		a.stopBabyHeal(true)
 		// Unsummoning aborts in-flight actions and settles a pet, while
 		// observers still know this summon.
 		a.emit(event.Unsummoning{})

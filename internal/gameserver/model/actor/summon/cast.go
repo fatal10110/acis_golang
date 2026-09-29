@@ -3,6 +3,7 @@ package summon
 import (
 	"time"
 
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -23,6 +24,9 @@ type CastControl interface {
 	// inputs of the creature taking the damage, and reports whether it
 	// broke the cast.
 	InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool
+	// SkillOnCooldown reports whether def is still waiting for its reuse
+	// delay.
+	SkillOnCooldown(def modelskill.Definition) bool
 }
 
 // CastingNow reports whether a has a cast in flight.

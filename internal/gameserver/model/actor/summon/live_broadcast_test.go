@@ -118,6 +118,9 @@ func (*fakeSummonOwner) ServitorVanished()                          {}
 func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState            { return task.PvPFlagNone }
 func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant)  {}
 func (*fakeSummonOwner) OfferSummonRevive()                         {}
+func (*fakeSummonOwner) Invul() bool                                { return false }
+func (*fakeSummonOwner) HP() float64                                { return 0 }
+func (*fakeSummonOwner) MaxHPValue() float64                        { return 0 }
 func (*fakeSummonOwner) ClearReviveOffer()                          {}
 func (*fakeSummonOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {

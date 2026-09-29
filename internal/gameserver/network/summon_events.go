@@ -182,6 +182,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(e.Exp)))
 		}
+	case event.PetUsedSkill:
+		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+			owner.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, e.SkillID, e.Level))
+		}
 	case event.Damaged:
 		owner, ok := l.livePlayerByID(actor.OwnerID())
 		if !ok {

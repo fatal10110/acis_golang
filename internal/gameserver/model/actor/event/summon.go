@@ -12,6 +12,10 @@ type Damaged struct {
 // ExpGained reports experience a pet earned.
 type ExpGained struct{ Exp int64 }
 
+// PetUsedSkill reports a skill a pet decided to use on its own; its owner
+// is told the pet uses it.
+type PetUsedSkill struct{ SkillID, Level int32 }
+
 // Unsummoning reports that a summon is about to leave the world for good.
 // It is emitted once, while the summon and its owner are both still in world
 // state, so whatever the summon's departure must settle -- a pet's row and
@@ -46,6 +50,7 @@ type DecayCanceled struct{}
 func (OwnerInfoChanged) event() {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
+func (PetUsedSkill) event()     {}
 func (Unsummoning) event()      {}
 func (SummonRemoved) event()    {}
 func (PetCorpseDecayed) event() {}
