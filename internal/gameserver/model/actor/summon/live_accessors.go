@@ -684,9 +684,34 @@ func (a *Actor) FinishedCasting() {
 		return
 	}
 	follow := a.idleFollow()
-	if !a.brain.FinishedCasting(follow) {
+	if a.brain.FinishedCasting(follow) {
+		a.noteIdled(follow)
+	}
+}
+
+// CastStopped moves the attached AI on once a cast is stopped before it
+// completes, as FinishedCasting does, and then sends the summon idle the
+// way every stop of its cast does (see TryToIdle): a resumed attack whose
+// swing already started carries on, anything else ends following the
+// owner. A cast stopped by AbortAll is left to AbortAll's caller.
+func (a *Actor) CastStopped() {
+	if a.brain == nil {
 		return
 	}
+	follow := a.idleFollow()
+	idled, handled := a.brain.CastStopped(follow)
+	if !handled {
+		return
+	}
+	if idled {
+		a.noteIdled(follow)
+	}
+	a.TryToIdle()
+}
+
+// noteIdled records the intent of a summon its AI just sent idle, following
+// follow when non-nil.
+func (a *Actor) noteIdled(follow attackable.Combatant) {
 	if follow != nil {
 		a.setIntent(IntentFollowOwner)
 	} else {

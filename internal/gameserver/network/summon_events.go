@@ -144,14 +144,9 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.AttackStanceRequested, event.Attacked:
 		l.startSummonAttackStance(actor)
 	case event.CastAborted:
-		// The cancel animation goes to every observer; an interrupt also
-		// tells the owner, since a summon's own messages reach its owner.
+		// The cancel animation goes to every observer; the owner reads an
+		// interrupt only once the AI has moved on (see CastFinished).
 		l.broadcastSummon(actor, func() wire.Frame { return frames.SkillCanceled(actor.ObjectID()) })
-		if e.Interrupted {
-			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
-				owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
-			}
-		}
 	case event.AutoAttackStopped:
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
 	case event.SocialAction:
@@ -219,10 +214,18 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.AttackFinished:
 		actor.FinishedAttack()
 	case event.CastFinished:
-		// ponytail: an interrupted cast moves the AI on the same way in the
-		// reference; not modeled yet (#2701).
 		if !e.Interrupted {
 			actor.FinishedCasting()
+			return
+		}
+		// A stopped cast moves the AI on and sends the summon idle; an
+		// interrupt then tells the owner, since a summon's own messages
+		// reach its owner.
+		actor.CastStopped()
+		if e.Broken {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
+			}
 		}
 	case event.Arrived:
 		actor.SyncPosition(s.move.Position())

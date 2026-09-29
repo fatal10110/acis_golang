@@ -174,7 +174,9 @@ type Controller struct {
 //     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
 //   - CastFinished, once whenever an in-flight cast ends, aborted or
 //     completed, letting the owner apply the nextActionAttack resume gate
-//     (PlayableAI.onEvtFinishedCasting, PlayableAI.java:43-63).
+//     (PlayableAI.onEvtFinishedCasting, PlayableAI.java:43-63); Broken
+//     repeats CastAborted's Interrupted for an aborted cast, for an owner
+//     that reports the interrupt only after its AI has moved on.
 //
 // A nil sink drops all three.
 func NewController(actor Actor, sink event.Sink) *Controller {
@@ -528,7 +530,12 @@ func (c *Controller) Stop() {
 	c.stopInternal(false)
 }
 
-func (c *Controller) stopInternal(interrupted bool) {
+// StopInFlight is Stop, reporting whether a cast was in flight to abort.
+func (c *Controller) StopInFlight() bool {
+	return c.stopInternal(false)
+}
+
+func (c *Controller) stopInternal(interrupted bool) bool {
 	c.exitSignetGround()
 	c.enableAllSkills()
 
@@ -540,8 +547,9 @@ func (c *Controller) stopInternal(interrupted bool) {
 	}
 	c.emit(event.CastStopAck{})
 	if finish != nil {
-		finish(true)
+		finish(interrupted)
 	}
+	return abort != nil
 }
 
 // abortLocked clears the cast and returns the observer the caller must run
@@ -560,7 +568,7 @@ func (c *Controller) abortLocked() (func(bool), func(bool)) {
 			}
 			c.emit(event.CastAborted{Interrupted: interrupted})
 		}, func(interrupted bool) {
-			c.emit(event.CastFinished{Interrupted: interrupted, Skill: current})
+			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current})
 		}
 }
 
