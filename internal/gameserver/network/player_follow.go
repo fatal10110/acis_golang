@@ -25,7 +25,7 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 	if !ok || live == nil {
 		return false
 	}
-	// Boats are not ported, so neither side is ever aboard one and the
+	// Boats are not ported (#229), so neither side is ever aboard one and the
 	// boat-mismatch refusal never applies.
 	switch {
 	case other.AttackableWithoutForceBy(live.Character) || (ctrl && other.AttackableBy(live.Character)):
@@ -36,17 +36,19 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 		l.log.Debug().Int32("target", other.ObjectID()).Msg("targeting: private store interact not modeled")
 		live.SendFrame(serverpackets.FrameActionFailed())
 	default:
-		l.followLiveTarget(live, other, shift)
+		l.followLiveTarget(live, other, ctrl, shift)
 	}
 	return true
 }
 
 // followLiveTarget makes following target live's intention. A player that
 // cannot take AI actions, or that clicked itself, is only answered
-// ActionFailed. One still swinging, casting, sitting down or standing up
-// queues the follow for that to end, answered ActionFailed too.
-func (l *GameClientLink) followLiveTarget(live *livePlayer, target attackable.Combatant, shift bool) {
-	if target.ObjectID() == live.ObjectID() || live.DenyAIAction() {
+// ActionFailed; so is a forced (ctrl) request from a player out of control,
+// the attack request that player may not send at all. One still swinging,
+// casting, sitting down or standing up queues the follow for that to end,
+// answered ActionFailed too.
+func (l *GameClientLink) followLiveTarget(live *livePlayer, target attackable.Combatant, ctrl, shift bool) {
+	if target.ObjectID() == live.ObjectID() || live.DenyAIAction() || (ctrl && liveOutOfControl(live)) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

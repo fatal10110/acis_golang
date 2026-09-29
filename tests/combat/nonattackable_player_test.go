@@ -28,12 +28,22 @@ type clickPair struct {
 // kills.
 func bootClickPair(t *testing.T, karma int, opts ...gameservertest.Option) clickPair {
 	t.Helper()
+	return bootClickPairSeeded(t, karma, nil, opts...)
+}
+
+// bootClickPairSeeded is bootClickPair with seed run on the attacker before
+// it enters the world, when its known skills can still be seeded.
+func bootClickPairSeeded(t *testing.T, karma int, seed func(srv *gameservertest.Server, attackerID int32), opts ...gameservertest.Option) clickPair {
+	t.Helper()
 	opts = append([]gameservertest.Option{
 		gameservertest.WithCharacter("Attacker", 1, 0),
 		gameservertest.WithWantChars(1),
 	}, opts...)
 	srv := gameservertest.Boot(t, opts...)
 	c, attackerID := srv.Client, srv.SoleObjectID(t)
+	if seed != nil {
+		seed(srv, attackerID)
+	}
 	victimID := seedPlayer(t, srv, "victim", "Victim", 40, karma)
 	vc := srv.DialClient(t, "victim", 1)
 	startInWorld(t, c)

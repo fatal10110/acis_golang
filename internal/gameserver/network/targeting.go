@@ -241,7 +241,7 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 		l.attackLiveTarget(live, s)
 		return true
 	}
-	l.followLiveTarget(live, s, shift)
+	l.followLiveTarget(live, s, ctrl, shift)
 	return true
 }
 
@@ -501,11 +501,8 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		return false
 	}
 	// Reference: AttackRequest.java:31 rejects via isOutOfControl()
-	// (Creature.java:652-655) before dispatching to onAction — the full
-	// 8-flag union: Stunned, ImmobileUntilAttacked, Sleeping, Paralyzed,
-	// Afraid, Confused, Teleporting, Dead.
-	if live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
-		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead() {
+	// (Creature.java:652-655) before dispatching to onAction.
+	if liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
@@ -529,6 +526,14 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		return false
 	}
 	return true
+}
+
+// liveOutOfControl reports whether live is out of control: stunned,
+// immobile until attacked, sleeping, paralyzed, afraid, confused,
+// teleporting or dead. Such a player may not send an attack request or walk.
+func liveOutOfControl(live *livePlayer) bool {
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
+		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead()
 }
 
 // startLiveAutoAttack enters or refreshes live's attack stance. Entering it
