@@ -190,8 +190,7 @@ func TestLethalHitOrdersStatusRewardDie(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestMagicSkillUse(42, false, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
 
 	var order []string
 	for len(order) == 0 || order[len(order)-1] != "die" {

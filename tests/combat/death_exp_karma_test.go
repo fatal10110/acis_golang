@@ -59,8 +59,7 @@ func killPrimaryClient(t *testing.T, srv *gameservertest.Server, killer *scripte
 	selectPlayerTarget(t, killer, victimID)
 	// An innocent victim is only attackable with force (ctrl), matching the
 	// reference's isAttackableWithoutForce gate.
-	killer.Send(encodeRequestMagicSkillUse(42, true, false))
-	readCastStartFrames(t, killer, killerID, 42, 1, 500, 60_000, victimID)
+	castKillSkill(t, srv, killer, killerID, victimID, true)
 
 	obj, ok := srv.State.Player(victimID)
 	if !ok {

@@ -82,11 +82,18 @@ func (a PlayerActor) scaleMP(def modelskill.Definition, mp int) int {
 	return int(a.Character.CalcStat(rate, float64(mp)))
 }
 
+// ReduceMP pays a skill's MP cost. Each payment that takes MP sends the
+// caster its own status update at once, so a cast paying both an MP and an
+// HP cost sends one update per cost, in payment order, and a later failure
+// reason follows the update for what was already paid. A dead caster pays
+// nothing.
 func (a PlayerActor) ReduceMP(amount int) {
-	if a.Character == nil || amount <= 0 {
+	if a.Character == nil || amount <= 0 || a.Character.Dead() {
 		return
 	}
-	a.Character.ReduceCurrentMP(amount)
+	if a.Character.ReduceMP(float64(amount)) > 0 {
+		a.Character.BroadcastStatus()
+	}
 }
 
 // ReduceHP pays a skill's HP cost. The caster is its own attacker here, so
@@ -105,8 +112,8 @@ func (a PlayerActor) ReduceHP(amount int) {
 		return
 	}
 	dead := a.Character.ReduceCurrentHP(amount)
+	a.Character.BroadcastStatus()
 	if dead {
-		a.Character.BroadcastStatus()
 		a.Character.Die(a.Character)
 	}
 }

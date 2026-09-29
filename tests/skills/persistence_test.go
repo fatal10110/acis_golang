@@ -63,8 +63,9 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(1204, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 1204, 2, 500, 45_000, objID)
-	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	readHitStatusThenIcons(t, srv, c, objID, 25)
 	drainUntilQuiet(t, c)
 
 	logout(t, srv, c)
@@ -143,8 +144,9 @@ func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
-	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	readHitStatusThenIcons(t, srv, c, objID, 25)
 	drainUntilQuiet(t, c)
 	srv.TickAutosave(t)
 	if count, _ := skillSaveRow(t, srv, objID, skillID, level); count != 0 {
@@ -186,8 +188,9 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(1204, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 1204, 2, 500, 45_000, objID)
-	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	readHitStatusThenIcons(t, srv, c, objID, 25)
 	drainUntilQuiet(t, c)
 
 	logout(t, srv, c)
@@ -274,8 +277,9 @@ func TestSelfOnlyEffectDoesNotRestoreOnRelogin(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
-	icons := readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	icons := readHitStatusThenIcons(t, srv, c, objID, 25)
 	found := false
 	for _, e := range icons {
 		if e.SkillID == skillID && int32(e.Level) == level {
@@ -343,8 +347,9 @@ func TestReloginWaitsForQueuedSkillSave(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, skillID, level, 500, 45_000, objID)
-	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	readHitStatusThenIcons(t, srv, c, objID, 25)
 	drainUntilQuiet(t, c)
 
 	release := srv.HoldPersistenceLane(t, objID)

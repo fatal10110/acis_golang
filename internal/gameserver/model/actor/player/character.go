@@ -72,6 +72,13 @@ type Character struct {
 	// attacker's hit or skill writes them from the attacker's queue
 	// (ReduceHP, ReduceMP, TakeDamage), and its formulas read them.
 	vitalsMu sync.RWMutex
+	// reviveMu makes a revive one step from dead to alive, so exactly one
+	// of two revives wins a death. The player's own restart-point request
+	// and a resurrecting caster's hit run on different queues. Without the
+	// lock, the restart could land between the resurrect's dead check and
+	// its exp restore, and the player would keep both. Taken before
+	// progressionMu and vitalsMu.
+	reviveMu sync.Mutex
 
 	Face, HairStyle, HairColor int
 
