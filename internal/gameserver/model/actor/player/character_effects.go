@@ -6,9 +6,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // defaultMaxBuffsAmount is the shipped players.properties MaxBuffsAmount
@@ -42,9 +44,12 @@ func (c *Character) MaxBuffCount() int {
 // must serialize at a higher level (see effect.List, which does this for
 // effect-driven adds).
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
+	runSpeed := false
 	for _, fn := range fns {
 		c.statCalcOrCreate(fn.Stat).AddMod(fn)
+		runSpeed = runSpeed || fn.Stat == stat.RunSpeed
 	}
+	c.statsModified(len(fns) > 0, runSpeed)
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
@@ -55,10 +60,26 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	c.statMu.RLock()
 	calcs := c.statCalcs
 	c.statMu.RUnlock()
-	for _, calc := range calcs {
-		if calc != nil {
-			calc.RemoveOwner(owner)
+	modified, runSpeed := false, false
+	for s, calc := range calcs {
+		if calc != nil && calc.RemoveOwner(owner) {
+			modified = true
+			runSpeed = runSpeed || stat.Stat(s) == stat.RunSpeed
 		}
+	}
+	c.statsModified(modified, runSpeed)
+}
+
+// statsModified follows a stat func change: the movement simulation takes
+// the new move speed, and a RUN_SPEED change reports the full appearance
+// as stale, since the client derives its move speed from it.
+func (c *Character) statsModified(modified, runSpeed bool) {
+	if !modified {
+		return
+	}
+	c.refreshMoveSpeed()
+	if runSpeed {
+		c.emit(event.RunSpeedChanged{})
 	}
 }
 

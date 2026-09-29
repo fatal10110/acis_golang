@@ -76,6 +76,10 @@ type WeightPenaltyChanged struct{}
 // UserInfoChanged reports that the character's own full self-view is stale.
 type UserInfoChanged struct{}
 
+// RunSpeedChanged reports that a stat func change moved the character's
+// RUN_SPEED, so its own and its observers' views of it are stale.
+type RunSpeedChanged struct{}
+
 // GradePenaltyChanged reports a change of the equipment grade penalty.
 type GradePenaltyChanged struct{}
 
@@ -299,6 +303,7 @@ func (EffectIconsChanged) event()     {}
 func (PositionCorrected) event()      {}
 func (WeightPenaltyChanged) event()   {}
 func (UserInfoChanged) event()        {}
+func (RunSpeedChanged) event()        {}
 func (GradePenaltyChanged) event()    {}
 func (DeathPenaltyChanged) event()    {}
 func (ExpSPGained) event()            {}

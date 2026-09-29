@@ -359,35 +359,17 @@ func (c *Character) MagicCriticalRate() float64 {
 	return c.calcStat(stat.MCriticalRate, 8)
 }
 
+// basePlayerAttackSpeed is the base P.Atk. speed of every player template:
+// the class data sets none, so the creature default applies.
+const basePlayerAttackSpeed = 300
+
 // RunSpeed returns the current run speed.
 func (c *Character) RunSpeed() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return 0
 	}
-	base := tmpl.RunSpeed * c.weightPenaltySpeedMultiplier()
-	if agp := c.ArmorGradePenalty(); agp > 0 {
-		base *= math.Pow(0.84, float64(agp))
-	}
-	return c.calcStat(stat.RunSpeed, base)
-}
-
-// MovementSpeedMultiplier is the current move speed over the template's
-// run or walk speed, whichever the run mode picks, or 0 when that base is 0.
-// ponytail: land speeds only; water and swamp zones join it in #2771.
-func (c *Character) MovementSpeedMultiplier() float32 {
-	tmpl := c.template()
-	if tmpl == nil {
-		return 1
-	}
-	base, speed := int(tmpl.WalkSpeed), c.WalkSpeed
-	if c.Running() {
-		base, speed = int(tmpl.RunSpeed), c.RunSpeed
-	}
-	if base == 0 {
-		return 0
-	}
-	return float32(speed()) / float32(base)
+	return c.moveSpeedFrom(int(tmpl.RunSpeed))
 }
 
 // WalkSpeed returns the current walk speed.
@@ -396,27 +378,81 @@ func (c *Character) WalkSpeed() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	base := tmpl.WalkSpeed * c.weightPenaltySpeedMultiplier()
-	if agp := c.ArmorGradePenalty(); agp > 0 {
-		base *= math.Pow(0.84, float64(agp))
-	}
-	return c.calcStat(stat.RunSpeed, base)
+	return c.moveSpeedFrom(int(tmpl.WalkSpeed))
 }
 
-// SwimSpeed returns the current move speed while in water. The reference
-// (PlayerStatus.getRealMoveSpeed) uses one swim speed regardless of the
-// run/walk toggle, but still runs it through the same weight/armor-grade
-// malus and calcStat(RUN_SPEED) pipeline as the land speeds.
+// SwimSpeed returns the current move speed while in water. One swim speed
+// applies regardless of the run/walk toggle, through the same swamp,
+// weight, armor-grade and RUN_SPEED pipeline as the land speeds.
 func (c *Character) SwimSpeed() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return 0
 	}
-	base := float64(tmpl.SwimSpeed) * c.weightPenaltySpeedMultiplier()
-	if agp := c.ArmorGradePenalty(); agp > 0 {
-		base *= math.Pow(0.84, float64(agp))
+	return c.moveSpeedFrom(tmpl.SwimSpeed)
+}
+
+// MoveSpeed returns the speed this character currently moves at: the swim
+// speed in water, otherwise the run or walk speed the run mode picks.
+func (c *Character) MoveSpeed() float64 {
+	switch {
+	case c.InWater():
+		return c.SwimSpeed()
+	case c.Running():
+		return c.RunSpeed()
+	default:
+		return c.WalkSpeed()
 	}
-	return c.calcStat(stat.RunSpeed, base)
+}
+
+// moveSpeedFrom runs a template base speed through the swamp bonus, the
+// weight and armor-grade maluses and the RUN_SPEED stat. Each step narrows
+// to float32 the way the client-facing float speed does.
+func (c *Character) moveSpeedFrom(base int) float64 {
+	speed := float32(base)
+	if bonus := c.swampMoveBonus.Load(); bonus != 0 {
+		speed = float32(float64(speed) * (float64(100+bonus) / 100))
+	}
+	speed = float32(float64(speed) * c.weightPenaltySpeedMultiplier())
+	if agp := c.ArmorGradePenalty(); agp > 0 {
+		speed = float32(float64(speed) * math.Pow(0.84, float64(agp)))
+	}
+	return float64(float32(c.calcStat(stat.RunSpeed, float64(speed))))
+}
+
+// refreshMoveSpeed hands the current move speed to the live movement
+// simulation, so the server keeps pace with what the client is told.
+func (c *Character) refreshMoveSpeed() {
+	if c.Live == nil {
+		return
+	}
+	c.Move().SetSpeed(c.MoveSpeed())
+}
+
+// MovementSpeedMultiplier is the current move speed over the template's
+// run or walk speed, whichever the run mode picks, or 0 when that base is
+// 0. In water the numerator is the swim speed while the base stays the land
+// one. The client scales the base speeds it is sent by this value.
+func (c *Character) MovementSpeedMultiplier() float32 {
+	tmpl := c.template()
+	if tmpl == nil {
+		return 1
+	}
+	base := int(tmpl.WalkSpeed)
+	if c.Running() {
+		base = int(tmpl.RunSpeed)
+	}
+	if base == 0 {
+		return 0
+	}
+	return float32(c.MoveSpeed()) / float32(base)
+}
+
+// AttackSpeedMultiplier is 1.1 times the current P.Atk. speed over the
+// template's base P.Atk. speed. The client scales its attack animation by
+// this value.
+func (c *Character) AttackSpeedMultiplier() float32 {
+	return float32(1.1 * float64(c.AttackSpeed()) / basePlayerAttackSpeed)
 }
 
 // PhysicalAttackRange returns the attack range for the active weapon

@@ -123,14 +123,41 @@ func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) er
 	return nil
 }
 
-// SetSpeed changes the speed used by subsequent movement updates.
+// Speed returns the speed movement updates currently use.
+func (m *CreatureMove) Speed() float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.speed
+}
+
+// SetSpeed changes the speed used by subsequent movement updates. An
+// in-flight leg keeps going from where it stands, its arrival re-timed for
+// the distance left at the new speed; at zero speed it stalls without an
+// arrival until the speed returns.
 func (m *CreatureMove) SetSpeed(speed float64) {
 	if speed < 0 || math.IsNaN(speed) || math.IsInf(speed, 0) {
 		return
 	}
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.speed == speed {
+		return
+	}
 	m.speed = speed
-	m.mu.Unlock()
+	if !m.moving || m.queue == nil {
+		return
+	}
+	if speed == 0 {
+		m.rescheduleLocked(0)
+		return
+	}
+	left := math.Hypot(float64(m.destination.X)-m.accurateX, float64(m.destination.Y)-m.accurateY)
+	const tickDuration = 100 * time.Millisecond
+	ticks := math.Ceil(left / (speed / 10))
+	if math.IsNaN(ticks) || ticks > float64(time.Duration(1<<63-1)/tickDuration) {
+		return
+	}
+	m.rescheduleLocked(max(time.Duration(ticks)*tickDuration, PositionUpdateInterval))
 }
 
 // setOwner records the controller this move reports milestones to. With no
@@ -337,16 +364,18 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive
 // duration, starts a new one that advances origin to destination and fires
-// the arrived hook once it elapses. Callers hold mu.
+// the arrived hook once it elapses. It always advances moveSeq, so an
+// arrival callback that already left the timer (Stop lost the race) is
+// dropped even when no new timer replaces it. Callers hold mu.
 func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 	if m.timer != nil {
 		m.timer.Stop()
 		m.timer = nil
 	}
+	m.moveSeq++
 	if duration <= 0 {
 		return
 	}
-	m.moveSeq++
 	seq := m.moveSeq
 	m.timer = m.queue.After(duration, func() { m.onArrive(seq) })
 }

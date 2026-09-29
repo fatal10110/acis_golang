@@ -89,8 +89,8 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 		w.WriteInt32(0)
 	}
 
-	w.WriteFloat64(1)
-	w.WriteFloat64(1)
+	w.WriteFloat64(float64(c.MovementSpeedMultiplier()))
+	w.WriteFloat64(float64(c.AttackSpeedMultiplier()))
 	w.WriteFloat64(collisionRadius)
 	w.WriteFloat64(collisionHeight)
 

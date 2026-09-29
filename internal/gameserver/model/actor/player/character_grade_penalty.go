@@ -48,6 +48,7 @@ func (c *Character) RefreshExpertisePenalty() {
 	if !changed {
 		return
 	}
+	c.refreshMoveSpeed()
 	if weaponPenalty || armorPenalty > 0 {
 		c.SetSkillLevel(gradePenaltySkillID, 1)
 	} else {

@@ -6723,6 +6723,120 @@ func TestMovementSpeedMultiplier(t *testing.T) {
 	}
 }
 
+// nearSpeed compares a float32-narrowed move speed against its float64
+// oracle.
+func nearSpeed(got, want float64) bool { return math.Abs(got-want) < 1e-4 }
+
+// TestMovementSpeedMultiplierInWaterAndSwamp pins
+// CreatureStatus.getMovementSpeedMultiplier (CreatureStatus.java:784-790)
+// over PlayerStatus.getMoveSpeed (PlayerStatus.java:931-955): in water the
+// numerator is the swim speed while the base stays the run or walk speed,
+// and a swamp scales the base speed by (100 + move_bonus) / 100 before the
+// RUN_SPEED stat.
+func TestMovementSpeedMultiplierInWaterAndSwamp(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.RunSpeed, tmpl.WalkSpeed, tmpl.SwimSpeed = 120, 80, 50
+	c := liveCharacter(1, tmpl, combatItems())
+	dex := statbonus.DEXBonus[tmpl.DEX]
+	closeTo := func(got float32, want float64) bool { return math.Abs(float64(got)-want) < 1e-5 }
+
+	c.SetInWater(true)
+	if got, want := c.MoveSpeed(), 50*dex; !nearSpeed(got, want) {
+		t.Fatalf("MoveSpeed() in water = %v, want the swim speed %v", got, want)
+	}
+	if got, want := c.MovementSpeedMultiplier(), 50*dex/120; !closeTo(got, want) {
+		t.Fatalf("running multiplier in water = %v, want %v", got, want)
+	}
+	c.SetRunning(false)
+	if got, want := c.MovementSpeedMultiplier(), 50*dex/80; !closeTo(got, want) {
+		t.Fatalf("walking multiplier in water = %v, want %v", got, want)
+	}
+
+	c.SetInWater(false)
+	c.SetRunning(true)
+	c.SetSwampMoveBonus(-80)
+	if got, want := c.RunSpeed(), 120*0.2*dex; !nearSpeed(got, want) {
+		t.Fatalf("RunSpeed() in a -80 swamp = %v, want %v", got, want)
+	}
+	if got, want := c.WalkSpeed(), 80*0.2*dex; !nearSpeed(got, want) {
+		t.Fatalf("WalkSpeed() in a -80 swamp = %v, want %v", got, want)
+	}
+	if got, want := c.MovementSpeedMultiplier(), 0.2*dex; !closeTo(got, want) {
+		t.Fatalf("running multiplier in a -80 swamp = %v, want %v", got, want)
+	}
+	c.SetInWater(true)
+	if got, want := c.MovementSpeedMultiplier(), 50*0.2*dex/120; !closeTo(got, want) {
+		t.Fatalf("running multiplier swimming in a -80 swamp = %v, want %v", got, want)
+	}
+	c.SetInWater(false)
+	c.SetSwampMoveBonus(0)
+	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
+		t.Fatalf("multiplier after leaving the swamp = %v, want DEX bonus %v", got, dex)
+	}
+}
+
+// TestRunSpeedStatFuncsRefreshLiveSpeed: a RUN_SPEED func (Wind Walk's
+// flat add) raises the multiplier, the live movement speed follows it, and
+// the change is reported so the client can be told
+// (Creature.broadcastModifiedStats, Creature.java:1243-1253).
+func TestRunSpeedStatFuncsRefreshLiveSpeed(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.RunSpeed, tmpl.WalkSpeed = 120, 80
+	c := attachIdleLive(t, liveCharacter(1, tmpl, combatItems()))
+	rec := recordEvents(c)
+	dex := statbonus.DEXBonus[tmpl.DEX]
+	owner := effect.ModOwnerSkill(modelskill.Ref{ID: 1204, Level: 2})
+
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 33, Owner: owner}})
+	want := 120*dex + 33
+	if got := c.Move().Speed(); !nearSpeed(got, want) {
+		t.Fatalf("live move speed after the buff = %v, want %v", got, want)
+	}
+	if got, wantMult := c.MovementSpeedMultiplier(), want/120; math.Abs(float64(got)-wantMult) > 1e-5 {
+		t.Fatalf("multiplier after the buff = %v, want %v", got, wantMult)
+	}
+	if got := event.Count[event.RunSpeedChanged](rec); got != 1 {
+		t.Fatalf("RunSpeedChanged after the buff = %d, want 1", got)
+	}
+
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner}})
+	if got := event.Count[event.RunSpeedChanged](rec); got != 1 {
+		t.Fatalf("RunSpeedChanged after a P.Atk func = %d, want still 1", got)
+	}
+
+	c.SetRunning(false)
+	if got := c.Move().Speed(); !nearSpeed(got, 80*dex+33) {
+		t.Fatalf("live move speed walking = %v, want %v", got, 80*dex+33)
+	}
+	c.SetRunning(true)
+	c.RemoveStatsByOwner(owner)
+	if got := c.Move().Speed(); !nearSpeed(got, 120*dex) {
+		t.Fatalf("live move speed after the buff ends = %v, want %v", got, 120*dex)
+	}
+	if got := event.Count[event.RunSpeedChanged](rec); got != 2 {
+		t.Fatalf("RunSpeedChanged after the buff ends = %d, want 2", got)
+	}
+}
+
+// TestAttackSpeedMultiplier pins CreatureStatus.getAttackSpeedMultiplier
+// (CreatureStatus.java:795-801): (float) (1.1 * P.Atk. speed / 300), the
+// player templates' base P.Atk. speed.
+func TestAttackSpeedMultiplier(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	base := c.AttackSpeed()
+	if got, want := c.AttackSpeedMultiplier(), float32(1.1*float64(base)/300); got != want {
+		t.Fatalf("multiplier at P.Atk. speed %d = %v, want %v", base, got, want)
+	}
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttackSpeed, Op: effect.OpMul, Value: 1.2}})
+	hasted := c.AttackSpeed()
+	if hasted == base {
+		t.Fatal("P.Atk. speed func changed nothing")
+	}
+	if got, want := c.AttackSpeedMultiplier(), float32(1.1*float64(hasted)/300); got != want {
+		t.Fatalf("multiplier at P.Atk. speed %d = %v, want %v", hasted, got, want)
+	}
+}
+
 // TestFakeDeathDelay pins the fake-death transition times,
 // (int) (millis / multiplier) ms (Player.java:7029,7052): truncated, and a
 // zero multiplier's infinity saturating at Integer.MAX_VALUE.

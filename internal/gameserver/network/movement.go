@@ -151,13 +151,7 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	if live == nil || live.template == nil {
 		return 0
 	}
-	if liveSwimming(live) {
-		return live.SwimSpeed()
-	}
-	if live.Running() {
-		return live.RunSpeed()
-	}
-	return live.WalkSpeed()
+	return live.MoveSpeed()
 }
 
 // liveSwimming reports whether live stands inside a water zone.
@@ -175,6 +169,21 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 			return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
 		})
 	}
+	l.broadcastCharacterInfo(live)
+}
+
+// broadcastRunSpeedChange answers a stat func change that moved RUN_SPEED:
+// the weight and grade penalty bands are refreshed, then the player and its
+// observers get its full view with the new speed multiplier. A player not in
+// the world yet sends nothing; its entry burst carries the new speed.
+func (l *GameClientLink) broadcastRunSpeedChange(live *livePlayer) {
+	if l.world != nil {
+		if current, ok := l.world.Player(live.ObjectID()); !ok || current != live {
+			return
+		}
+	}
+	live.RefreshWeightPenalty()
+	live.RefreshExpertisePenalty()
 	l.broadcastCharacterInfo(live)
 }
 
