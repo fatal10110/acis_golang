@@ -1352,9 +1352,9 @@ func TestListReactivatesNextStackedEffectWhenCancellationDisabled(t *testing.T) 
 		"strong:start",
 		"owner:add",
 		"owner:remove:strong",
-		"strong:exit",
 		"weak:start",
 		"owner:add",
+		"strong:exit",
 	})
 	if !weak.InUse() {
 		t.Fatal("next stacked effect was not reactivated")
@@ -2777,6 +2777,14 @@ func (funcOwner) UpdateEffectIcons() {}
 
 func (eventOwner) UpdateEffectIcons() {}
 
+// iconEventOwner is an eventOwner that also records each icon refresh, for
+// tests that pin where the refresh falls among a removal's other steps.
+type iconEventOwner struct{ eventOwner }
+
+func (o iconEventOwner) UpdateEffectIcons() {
+	*o.events = append(*o.events, "icons")
+}
+
 var (
 	_ PlayerActor = (*liveEffectTarget)(nil)
 	_ NPCActor    = (*liveEffectTarget)(nil)
@@ -2885,3 +2893,109 @@ type deadTarget struct {
 func (*deadTarget) Dead() bool { return true }
 
 func (a fakeConditionActor) CurrentHeading() int { return 0 }
+
+// The removal-order tests below pin the reference's FINISHING sequence
+// (AbstractEffect.scheduleEffect, AbstractEffect.java:308-320): the
+// EffectList removal pass (EffectList.removeEffectFromQueue, java:499-585:
+// stat removal, next stack member's activation, then the worn-off /
+// disappeared / aborted message) and its icon refresh (queueRunner,
+// java:465-495) all finish before the effect's own onExit runs.
+
+func TestListRemoveRunsExitHookAfterMessageAndIcons(t *testing.T) {
+	var events []string
+	list := newTestList(iconEventOwner{eventOwner{events: &events}})
+	e := namedEffect("stun", 5, "none", 0, true, &events)
+	e.Template.Icon = true
+	e.Template.Count = 5
+
+	list.Add(e)
+	events = nil
+	list.Remove(e)
+
+	requireEvents(t, events, []string{
+		"owner:remove:stun",
+		"disappeared:5:0",
+		"icons",
+		"stun:exit",
+	})
+}
+
+func TestListRemovePromotesNextStackMemberBeforeMessageAndExit(t *testing.T) {
+	var events []string
+	list := newTestList(iconEventOwner{eventOwner{events: &events}}, WithEnv(Env{KeepLesser: true}))
+	weak := namedEffect("weak", 1, "speed", 1, false, &events)
+	strong := namedEffect("strong", 2, "speed", 2, false, &events)
+	strong.Template.Icon = true
+	strong.Template.Count = 5
+
+	list.Add(weak)
+	list.Add(strong)
+	events = nil
+	list.Remove(strong)
+
+	requireEvents(t, events, []string{
+		"owner:remove:strong",
+		"weak:start",
+		"owner:add",
+		"disappeared:2:0",
+		"icons",
+		"strong:exit",
+	})
+}
+
+// An exit hook that ends further effects (ImmobileUntilAttacked stopping
+// its skill's other effects) announces them only after its own effect's
+// message and icon refresh have gone out.
+func TestListRemoveExitHookRemovalsFollowOwnAnnouncement(t *testing.T) {
+	var events []string
+	list := newTestList(iconEventOwner{eventOwner{events: &events}})
+	sibling := namedEffect("sibling", 4501, "none", 0, true, &events)
+	sibling.Type = TypeDebuff
+	sibling.Template.Icon = true
+	sibling.Template.Count = 5
+	self := namedEffect("self", 4501, "none", 0, true, &events)
+	self.Template.Icon = true
+	self.Template.Count = 5
+	self.OnExit = func(*Effect) {
+		events = append(events, "self:exit")
+		list.Remove(sibling)
+	}
+
+	list.Add(self)
+	list.Add(sibling)
+	events = nil
+	list.Remove(self)
+
+	requireEvents(t, events, []string{
+		"owner:remove:self",
+		"disappeared:4501:0",
+		"icons",
+		"self:exit",
+		"owner:remove:sibling",
+		"disappeared:4501:0",
+		"icons",
+		"sibling:exit",
+	})
+}
+
+// Displacing an identical buff while adding its replacement keeps the
+// displaced effect's exit hook ahead of the newcomer's start: there the
+// reference's onExit runs inline, inside the add pass (EffectList.java:
+// 624-629), not after a removal pass of its own.
+func TestListIdenticalReplacementExitsBeforeNewcomerStarts(t *testing.T) {
+	var events []string
+	list := newTestList(iconEventOwner{eventOwner{events: &events}})
+	old := namedEffect("old", 1204, "none", 0, false, &events)
+	old.Template.Icon = true
+	fresh := namedEffect("fresh", 1204, "none", 0, false, &events)
+	fresh.Template.Icon = true
+
+	list.Add(old)
+	events = nil
+	list.Add(fresh)
+
+	exit, start := slices.Index(events, "old:exit"), slices.Index(events, "fresh:start")
+	if exit < 0 || start < 0 || exit > start {
+		t.Fatalf("events = %v, want old:exit before fresh:start", events)
+	}
+}
