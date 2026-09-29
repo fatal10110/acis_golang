@@ -1,6 +1,7 @@
 package pets
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -9,8 +10,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -71,10 +74,16 @@ func mountRestartTable() *restart.Table {
 // and mounts it. It returns the harness and the frames the mount sent.
 func bootWyvernRider(t *testing.T, seeds ...seedItem) (*petWorld, [][]byte) {
 	t.Helper()
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+	return bootWyvernRiderOpts(t, nil, seeds...)
+}
+
+// bootWyvernRiderOpts is bootWyvernRider with extra boot options.
+func bootWyvernRiderOpts(t *testing.T, extra []gameservertest.Option, seeds ...seedItem) (*petWorld, [][]byte) {
+	t.Helper()
+	h := bootOwnerWithCollarOpts(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), fedWyvernTemplate()})),
 		gameservertest.WithRestartPoints(mountRestartTable()),
-	}, append([]seedItem{{TemplateID: wyvernCollarID, Count: 1}}, seeds...)...)
+	}, extra...), append([]seedItem{{TemplateID: wyvernCollarID, Count: 1}}, seeds...)...)
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
 	return h, readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")
 }
@@ -177,6 +186,53 @@ func TestWyvernFeedDrainsEveryTenSeconds(t *testing.T) {
 			t.Fatalf("two more periods: feed gauges = %v, want one meal of %d less per period", later, wyvernRideMealInNormal)
 		}
 	}
+}
+
+// TestWyvernFeedInCombatTakesBattleMeal pins Player.getFeedConsume: a
+// rider in attack stance pays the mount's unmounted mealInBattle per tick,
+// not its ride battle meal, and the gauge is scaled by that meal
+// (setCurrentFeed divides both values by the tick's meal). Once the stance
+// times out the tick takes the ride meal again, on the ride scale.
+func TestWyvernFeedInCombatTakesBattleMeal(t *testing.T) {
+	t.Parallel()
+	var nowMS atomic.Int64
+	h, _ := bootWyvernRiderOpts(t, []gameservertest.Option{
+		gameservertest.WithAttackStanceClock(func() time.Time { return time.UnixMilli(nowMS.Load()) }),
+	})
+	drainFrames(t, h.client)
+
+	// A flying rider cannot attack, so a monster's hit is what puts it in
+	// attack stance.
+	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
+	attacker := h.srv.SpawnAttackingHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+	drainUntilQuiet(t, h.client)
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner missing from world state")
+	}
+	rider, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("world player %T is not an online character", obj)
+	}
+	attacker.DoAttack(t, rider)
+	readUntilOpcode(t, h.client, serverpackets.OpcodeAutoAttackStart, "rider AutoAttackStart")
+	if !rider.InCombat() || rider.Dead() {
+		t.Fatalf("rider after the hit: in combat %v dead %v, want in combat and alive", rider.InCombat(), rider.Dead())
+	}
+
+	const battleScale = 10000 / wyvernMealInBattle
+	wantGauges(t, "battle period", feedGauges(t, h.advanceTicks(t, 1)),
+		feedGauge{(wyvernMaxMeal - wyvernMealInBattle) * battleScale, wyvernMaxMeal * battleScale})
+
+	drainUntilQuiet(t, h.client)
+	nowMS.Add(task.AttackStancePeriod.Milliseconds())
+	if err := h.srv.AttackStance.Tick(); err != nil {
+		t.Fatalf("AttackStance.Tick() = %v", err)
+	}
+	readUntilOpcode(t, h.client, serverpackets.OpcodeAutoAttackStop, "rider AutoAttackStop")
+
+	wantGauges(t, "period after the stance timed out", feedGauges(t, h.advanceTicks(t, 1)),
+		gaugeAt(wyvernMaxMeal-wyvernMealInBattle-wyvernRideMealInNormal))
 }
 
 // TestHungryWyvernEatsRiderFood pins FeedTask's auto-feed: once a tick
