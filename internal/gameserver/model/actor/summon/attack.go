@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -83,6 +84,11 @@ type LineOfSight interface {
 type lineOfSightIgnoring interface {
 	CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool
 }
+
+// The production geo must satisfy the optional query: canSeeObject finds it
+// by type assertion, so a signature drift would otherwise silently make a
+// target door hide itself again.
+var _ lineOfSightIgnoring = move.EngineGeo{}
 
 // CanSee reports whether target is visible through geodata, or permits the
 // check when no query is attached (such as isolated domain tests).
