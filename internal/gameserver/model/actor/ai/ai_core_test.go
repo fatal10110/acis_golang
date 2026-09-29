@@ -142,10 +142,10 @@ func TestAttackableAIChoosesMostHatedTargetToAttack(t *testing.T) {
 	}
 }
 
-// TestAttackableThinkStopsMovementAndAttacksOnTheSameTick pins thinkAttack's
+// TestAttackableRunAIStopsMovementAndAttacksOnTheSameTick pins thinkAttack's
 // two-call shape: an accepted swing cancels the walk and starts the attack in
 // the same tick, and reports no error for either.
-func TestAttackableThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
+func TestAttackableRunAIStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
@@ -155,7 +155,7 @@ func TestAttackableThinkStopsMovementAndAttacksOnTheSameTick(t *testing.T) {
 
 	addAttackHate(ai, target, 0, 10)
 	if err := ai.RunAI(); err != nil {
-		t.Fatalf("Think() error = %v, want nil", err)
+		t.Fatalf("RunAI() error = %v, want nil", err)
 	}
 
 	if move.stopCount != 1 {
@@ -408,11 +408,11 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	}
 }
 
-// TestAttackableThinkCastStopsMovementAndStillFacesTarget covers the
+// TestAttackableRunAICastStopsMovementAndStillFacesTarget covers the
 // rejected-cast path: a cast whose skill freezes the caster cancels the walk,
 // and the rotation-only notice observers need still goes out on the same tick
 // even though the cast itself was rejected.
-func TestAttackableThinkCastStopsMovementAndStillFacesTarget(t *testing.T) {
+func TestAttackableRunAICastStopsMovementAndStillFacesTarget(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
@@ -424,7 +424,7 @@ func TestAttackableThinkCastStopsMovementAndStillFacesTarget(t *testing.T) {
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 	if err := ai.RunAI(); err != nil {
-		t.Fatalf("Think() error = %v, want nil", err)
+		t.Fatalf("RunAI() error = %v, want nil", err)
 	}
 
 	if move.stopCount != 1 {
@@ -790,7 +790,7 @@ func TestAttackableAITickDropsCastDesireBelowDecayAmount(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkPrunesZeroWeightCastDesire(t *testing.T) {
+func TestAttackableRunAIPrunesZeroWeightCastDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
@@ -812,7 +812,7 @@ func TestAttackableThinkPrunesZeroWeightCastDesire(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkPrunesCastWhenHPMPDisabledFails(t *testing.T) {
+func TestAttackableRunAIPrunesCastWhenHPMPDisabledFails(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
@@ -834,7 +834,7 @@ func TestAttackableThinkPrunesCastWhenHPMPDisabledFails(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkPrunesAttackDesireBeyond1500(t *testing.T) {
+func TestAttackableRunAIPrunesAttackDesireBeyond1500(t *testing.T) {
 	owner := actor(1)
 	near := actor(2)
 	far := actor(3)
@@ -855,7 +855,7 @@ func TestAttackableThinkPrunesAttackDesireBeyond1500(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkKeepsAttackDesireAt1500(t *testing.T) {
+func TestAttackableRunAIKeepsAttackDesireAt1500(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	target.x = 1500
@@ -871,7 +871,7 @@ func TestAttackableThinkKeepsAttackDesireAt1500(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkKeepsFarAttackWhenOutOfControl(t *testing.T) {
+func TestAttackableRunAIKeepsFarAttackWhenOutOfControl(t *testing.T) {
 	owner := actor(1)
 	owner.denyAction = true
 	far := actor(2)
@@ -899,7 +899,7 @@ func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T
 	addAttackHate(ai, target, 0, 20)
 	ai.RunAI()
 	if strike.target != target {
-		t.Fatalf("first Think attacked = %v, want target", strike.target)
+		t.Fatalf("RunAI attacked = %v, want target", strike.target)
 	}
 
 	target.x = 2000

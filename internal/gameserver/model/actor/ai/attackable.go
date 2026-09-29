@@ -314,8 +314,10 @@ func (a *Attackable) Hates() *attackable.HateTable {
 
 // Desires returns the queue of weighted candidate intentions. Attack threat
 // populates it automatically; a Cast desire is queued by whatever decides
-// this actor should cast a skill (e.g. a monster AI script), and Think
-// promotes whichever queued desire currently outweighs the rest.
+// this actor should cast a skill (e.g. a monster AI script), and the next
+// RunAI / TickThink desire selection (promoteAndStep) promotes whichever
+// queued desire currently outweighs the rest. Think only continues the
+// current intention and never takes a queued desire up.
 func (a *Attackable) Desires() *DesireQueue {
 	return a.desires
 }
@@ -1054,9 +1056,11 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 }
 
 // thinkAttack advances one IntentionAttack step. The first return reports
-// whether Think's caller should immediately re-promote and continue (true)
-// or stop for this cycle (false); the second is any broadcast error from a
-// synchronous call this step made, only meaningful when the first is false.
+// whether RunAI / TickThink desire selection (promoteAndStep) should
+// immediately re-promote and continue (true) or stop for this cycle (false);
+// continueCurrent (Think) ignores it and never re-selects. The second is any
+// broadcast error from a synchronous call this step made, only meaningful
+// when the first is false.
 func (a *Attackable) thinkAttack() (bool, error) {
 	if a.actor.DenyAIAction() {
 		return false, nil
