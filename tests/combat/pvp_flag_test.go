@@ -20,7 +20,9 @@ func TestForcedAttackOnAPlayerFlagsTheAttacker(t *testing.T) {
 		gameservertest.WithPvPFlags(task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil)),
 	)
 	c, attackerID := srv.Client, srv.SoleObjectID(t)
-	victim := srv.SeedCharacterFor(t, "victim", "Victim", 1, 0)
+	// A level 40 victim survives the hit: killing an innocent player would
+	// make the attacker a PKer, which ends its PvP flag again.
+	victim := srv.SeedCharacterFor(t, "victim", "Victim", 40, 0)
 	vc := srv.DialClient(t, "victim", 1)
 	startInWorld(t, vc)
 	startInWorld(t, c)

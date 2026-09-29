@@ -146,6 +146,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return
 		}
 		l.pvpFlags.AddNormal(live.Character)
+	case event.PKKarmaGained:
+		l.applyPKKarmaSideEffects(live)
 	case event.LeveledUp:
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)

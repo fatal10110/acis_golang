@@ -8,6 +8,17 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
+// useConditionsHold reports whether live meets every use condition of tmpl,
+// without telling the client anything.
+func useConditionsHold(live *livePlayer, tmpl *item.Template) bool {
+	for _, uc := range tmpl.UseConditions {
+		if !itemUseConditionHolds(live, uc.Root) {
+			return false
+		}
+	}
+	return true
+}
+
 func rejectUseItemConditions(live *livePlayer, tmpl *item.Template) bool {
 	if live == nil || tmpl == nil || len(tmpl.UseConditions) == 0 {
 		return false
