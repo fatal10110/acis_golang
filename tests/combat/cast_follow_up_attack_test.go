@@ -18,7 +18,17 @@ const (
 	followUpOneSkillID    = 7
 	plainOneSkillID       = 8
 	followUpCostlySkillID = 9
+	followUpLongSkillID   = 10
 )
+
+// followUpLongSkill is a nextActionAttack ONE-target cast long enough that
+// the harness's reads, which move the driven clock while they wait, never
+// leave its interrupt window.
+func followUpLongSkill() modelskill.Definition {
+	def := followUpOneSkill(followUpLongSkillID, true, 1)
+	def.HitTime = queueHitTime
+	return def
+}
 
 func followUpOneSkill(id int, nextActionAttack bool, mp int) modelskill.Definition {
 	return modelskill.Definition{
@@ -29,13 +39,16 @@ func followUpOneSkill(id int, nextActionAttack bool, mp int) modelskill.Definiti
 }
 
 // followUpCaster is a player beside two parked monsters, A and B, knowing
-// the fixture skills.
+// the fixture skills and carrying the fixture scroll, whose attached skill
+// is re-typed as a nextActionAttack ONE-target skill no caster can pay MP
+// for.
 type followUpCaster struct {
 	srv    *gameservertest.Server
 	c      *scriptedClient
 	pc     *player.Character
 	objID  int32
 	a, b   int32
+	scroll int32
 	origin location.Location
 }
 
@@ -48,20 +61,23 @@ func bootFollowUpCaster(t *testing.T) followUpCaster {
 			followUpOneSkill(followUpOneSkillID, true, 1),
 			followUpOneSkill(plainOneSkillID, false, 1),
 			followUpOneSkill(followUpCostlySkillID, true, 1_000_000),
+			followUpOneSkill(queueScrollSkillID, true, 1_000_000),
+			followUpLongSkill(),
 		})),
 	)
 	if !srv.DrivesClock() {
 		t.Skip("holding a cast open needs the driven clock")
 	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	for _, id := range []int{followUpOneSkillID, plainOneSkillID, followUpCostlySkillID} {
+	for _, id := range []int{followUpOneSkillID, plainOneSkillID, followUpCostlySkillID, followUpLongSkillID} {
 		seedKnownSkill(t, srv, objID, id, 1)
 	}
+	scroll := srv.GiveItem(t, objID, queueScrollTemplateID, 3)
 	startInWorld(t, c)
 	a := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 20, Y: hostileY, Z: hostileZ})
 	b := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 20, Y: hostileY + 30, Z: hostileZ})
 	drainUntilQuiet(t, c)
-	return followUpCaster{srv: srv, c: c, pc: onlinePlayer(t, srv, objID), objID: objID, a: a.ObjectID(), b: b.ObjectID(), origin: playerOrigin}
+	return followUpCaster{srv: srv, c: c, pc: onlinePlayer(t, srv, objID), objID: objID, a: a.ObjectID(), b: b.ObjectID(), scroll: scroll, origin: playerOrigin}
 }
 
 // selectAmidFrames clicks id to select it while other frames (a swing's)
@@ -194,4 +210,89 @@ func TestNextActionAttackSkillRefusedForMPStillAttacks(t *testing.T) {
 	if f.pc.CastingNow() {
 		t.Fatal("refused skill started casting")
 	}
+}
+
+// TestNextActionAttackItemSkillRefusedForMPStillAttacks pins the same
+// cost-check refusal on the item-carried path: a scroll whose attached
+// nextActionAttack skill the player cannot pay MP for is answered with
+// NOT_ENOUGH_MP, then the player attacks the selected monster, and no cast
+// starts.
+func TestNextActionAttackItemSkillRefusedForMPStillAttacks(t *testing.T) {
+	t.Parallel()
+	f := bootFollowUpCaster(t)
+	f.selectAmidFrames(t, f.a)
+	drainUntilQuiet(t, f.c)
+
+	f.c.Send(encodeUseItem(f.scroll, false))
+	refusal := readUntil(t, f.c, serverpackets.OpcodeSystemMessage, "NOT_ENOUGH_MP")[0]
+	if got := wireReader(refusal[1:]).ReadInt32(); got != int32(serverpackets.SystemMessageNotEnoughMP) {
+		t.Fatalf("refusal system message = %d, want NOT_ENOUGH_MP (%d)", got, serverpackets.SystemMessageNotEnoughMP)
+	}
+	for i := 0; i < 100; i++ {
+		frame := f.c.ReadWithTimeout(3 * time.Second)
+		if frame == nil {
+			t.Fatal("after the refused item skill: no Attack by the player")
+		}
+		if frame[0] == serverpackets.OpcodeMagicSkillUse && wireReader(frame[1:]).ReadInt32() == f.objID {
+			t.Fatal("refused item skill sent MagicSkillUse")
+		}
+		if attackFrameBy(frame, f.objID) {
+			if got := attackTargetID(frame); got != f.a {
+				t.Fatalf("attack after the refusal target = %d, want the selected monster %d", got, f.a)
+			}
+			break
+		}
+	}
+	if f.pc.CastingNow() {
+		t.Fatal("refused item skill started casting")
+	}
+}
+
+// TestBrokenNextActionAttackCastAttacksItsTarget pins the follow-up on the
+// abort path: a nextActionAttack cast broken inside its interrupt window
+// (the damage and abort-cast break, InterruptCast) still hands on to an
+// attack on the cast's target, as a cast that ended naturally does.
+func TestBrokenNextActionAttackCastAttacksItsTarget(t *testing.T) {
+	t.Parallel()
+	f := bootFollowUpCaster(t)
+	f.selectAmidFrames(t, f.a)
+	drainUntilQuiet(t, f.c)
+
+	f.c.Send(encodeRequestMagicSkillUse(followUpLongSkillID, false, false))
+	f.readUntilOwnMagicSkillUse(t, "follow-up skill MagicSkillUse")
+	if !f.pc.CastingNow() {
+		t.Fatal("follow-up skill not in flight after its MagicSkillUse")
+	}
+
+	obj, ok := f.srv.State.Player(f.objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", f.objID)
+	}
+	holder, ok := obj.(effectHolder)
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no queue", f.objID, obj)
+	}
+	done := make(chan struct{})
+	if !holder.Queue().Post(func() { f.pc.InterruptCast(); close(done) }) {
+		t.Fatal("post interrupt: queue closed")
+	}
+	<-done
+
+	readUntil(t, f.c, serverpackets.OpcodeMagicSkillCanceled, "MagicSkillCanceled")
+	for i := 0; i < 100; i++ {
+		frame := f.c.ReadWithTimeout(3 * time.Second)
+		if frame == nil {
+			t.Fatal("after the broken follow-up skill: no Attack by the player")
+		}
+		if frame[0] == serverpackets.OpcodeMagicSkillLaunched {
+			t.Fatal("broken follow-up skill launched")
+		}
+		if attackFrameBy(frame, f.objID) {
+			if got := attackTargetID(frame); got != f.a {
+				t.Fatalf("attack after the broken cast target = %d, want the cast's target %d", got, f.a)
+			}
+			return
+		}
+	}
+	t.Fatal("after the broken follow-up skill: no Attack by the player within 100 frames")
 }

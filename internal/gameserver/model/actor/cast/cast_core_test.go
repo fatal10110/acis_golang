@@ -133,6 +133,47 @@ func TestFinishObserverReportsTheCastThatEnded(t *testing.T) {
 	}
 }
 
+// TestFinishObserverReportsTheCastsTarget pins that CastFinished carries the
+// cast's final target on every way a cast ends: the nextActionAttack
+// follow-up attacks that target after a natural finish and after an abort
+// alike, since an aborted cast also notifies the AI that it finished.
+func TestFinishObserverReportsTheCastsTarget(t *testing.T) {
+	now := time.Unix(1000, 0)
+
+	tests := []struct {
+		name string
+		end  func(*Controller)
+	}{
+		{name: "natural finish", end: func(c *Controller) { c.Finish() }},
+		{name: "stop", end: func(c *Controller) { c.Stop() }},
+		{name: "interrupt", end: func(c *Controller) {
+			if !c.Interrupt(now) {
+				t.Fatal("Interrupt() = false inside the interrupt window")
+			}
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl, _, rec := newAbortController()
+			target := &fakeCastCreature{id: 42}
+			if _, err := ctrl.Start(now, target, scalingDef); err != nil {
+				t.Fatalf("Start() error: %v", err)
+			}
+
+			tt.end(ctrl)
+
+			finished := event.Of[event.CastFinished](rec)
+			if len(finished) != 1 {
+				t.Fatalf("finish events = %+v, want exactly one", finished)
+			}
+			if finished[0].Target != attackable.Combatant(target) {
+				t.Fatalf("CastFinished.Target = %v, want the cast's target %v", finished[0].Target, target)
+			}
+		})
+	}
+}
+
 func TestFinishObserverReportsEveryInFlightCastOnce(t *testing.T) {
 	now := time.Unix(1000, 0)
 
