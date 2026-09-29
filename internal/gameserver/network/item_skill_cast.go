@@ -84,6 +84,7 @@ func (l *GameClientLink) castItemSkills(live *livePlayer, inv *itemcontainer.Inv
 		if live.combat != nil {
 			live.combat.ReplaceWithCast()
 		}
+		live.endFollow()
 		if run != nil || itemAICastBusy(live) {
 			live.deferItemAICast(inv, carrier, def, selected, ctrl)
 			sendMagicActionFailed(live)

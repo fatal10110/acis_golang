@@ -35,8 +35,10 @@ type AI interface {
 	// Think continues the current intention once.
 	Think()
 	// FinishedAttack runs the queued intention, if any, once a swing ends,
-	// and otherwise continues the current one.
-	FinishedAttack()
+	// and otherwise continues the current one, unless it attacks a target
+	// that cannot be kept attacking: then it goes idle in the same critical
+	// section, following follow when non-nil, and reports true.
+	FinishedAttack(follow attackable.Combatant) bool
 	// FinishedCasting runs the queued intention, or the attack the cast
 	// replaced, once a cast completes; otherwise it goes idle in the same
 	// critical section, following follow when non-nil, and reports true.

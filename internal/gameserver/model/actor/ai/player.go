@@ -207,6 +207,39 @@ func (p *PlayerAttack) Think() (actionFailed bool) {
 	return actionFailed
 }
 
+// FinishedAttack re-thinks the attack once a swing ends and reports whether
+// that is answered with ActionFailed. An attack queued behind the swing (a
+// request made mid-swing, or a think that found the swing in flight) runs
+// as the next intention. With nothing queued, the attack goes on only
+// against a target the player can keep attacking; against any other it goes
+// idle silently, without an ActionFailed. An attack waiting on a cast, or
+// replaced by one, is not current and is not thought.
+func (p *PlayerAttack) FinishedAttack() (actionFailed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.deferred || p.replaced || p.target == nil {
+		return false
+	}
+	if !p.queued && !canKeepAttacking(p.actor, p.target) {
+		p.stopLocked()
+		return false
+	}
+	_, actionFailed, err := p.thinkLocked()
+	if err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
+	return actionFailed
+}
+
+// Replace drops the attack intention for another one that takes its place,
+// leaving any walk under way to the new intention.
+func (p *PlayerAttack) Replace() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.target = nil
+	p.deferred, p.queued, p.replaced = false, false, false
+}
+
 // ThinkQueued re-evaluates the attack only when the last think queued it
 // behind the actor's swing, bow reuse or cast, as the end of a bow shot
 // does; otherwise nothing happens. It reports whether the think is answered

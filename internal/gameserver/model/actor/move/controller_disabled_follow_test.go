@@ -12,9 +12,32 @@ type secondFollowTarget struct{ followTarget }
 
 func (*secondFollowTarget) ObjectID() int32 { return 3 }
 
+// summonFollowSelf is a summon-shaped follower: its own AI rechecks its
+// follows, and it approaches with plain movement requests.
+type summonFollowSelf struct{ tickerOwnedFollowSelf }
+
+func (*summonFollowSelf) OffensiveFollowIsPawnMove() bool { return false }
+
 func newDisabledFollowController(t *testing.T) (*Controller, *CreatureMove, *playerFollowSelf) {
 	t.Helper()
-	self := &playerFollowSelf{}
+	return newDisabledFollowControllerFor(t, &playerFollowSelf{})
+}
+
+// newDisabledSummonFollowController is newDisabledFollowController for a
+// summon-shaped follower, the actor friendly follow re-issues moves for.
+func newDisabledSummonFollowController(t *testing.T) (*Controller, *CreatureMove, *playerFollowSelf) {
+	t.Helper()
+	return newDisabledFollowControllerFor(t, &summonFollowSelf{})
+}
+
+// followSelfActor is a test follower exposing its recording state.
+type followSelfActor interface {
+	Actor
+	followSelf() *playerFollowSelf
+}
+
+func newDisabledFollowControllerFor(t *testing.T, self followSelfActor) (*Controller, *CreatureMove, *playerFollowSelf) {
+	t.Helper()
 	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
 	if err != nil {
 		t.Fatal(err)
@@ -24,7 +47,7 @@ func newDisabledFollowController(t *testing.T) (*Controller, *CreatureMove, *pla
 	if err != nil {
 		t.Fatal(err)
 	}
-	return controller, mover, self
+	return controller, mover, self.followSelf()
 }
 
 func requireFollow(t *testing.T, mover *CreatureMove, mode FollowMode, target int32, what string) {
@@ -94,10 +117,10 @@ func TestControllerOffensiveFollowNewTargetWhileDisabledStartsNothing(t *testing
 	requireFollow(t, freshMover, FollowNone, 0, "disabled idle actor")
 }
 
-// A friendly follow already running toward the target keeps re-issuing its
-// move after movement is disabled.
+// A summon's friendly follow already running toward the target keeps
+// re-issuing its move after movement is disabled.
 func TestControllerFriendlyFollowRunningTowardTargetContinuesWhileDisabled(t *testing.T) {
-	controller, mover, self := newDisabledFollowController(t)
+	controller, mover, self := newDisabledSummonFollowController(t)
 	target := &followTarget{x: 200}
 	if following, err := controller.MaybeStartFriendlyFollow(target, 40); err != nil || !following {
 		t.Fatalf("MaybeStartFriendlyFollow() = %v, %v; want active follow", following, err)
@@ -121,7 +144,7 @@ func TestControllerFriendlyFollowRunningTowardTargetContinuesWhileDisabled(t *te
 // A disabled actor asked to friendly-follow a different target reports false
 // and leaves the follow state and movement as they were.
 func TestControllerFriendlyFollowNewTargetWhileDisabledStartsNothing(t *testing.T) {
-	controller, mover, self := newDisabledFollowController(t)
+	controller, mover, self := newDisabledSummonFollowController(t)
 	first := &followTarget{x: 200}
 	if following, err := controller.MaybeStartFriendlyFollow(first, 40); err != nil || !following {
 		t.Fatalf("MaybeStartFriendlyFollow() = %v, %v; want active follow", following, err)

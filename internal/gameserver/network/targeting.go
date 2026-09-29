@@ -65,6 +65,9 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if selected && l.actOnSummon(live, target, ctrl, shift) {
 		return
 	}
+	if selected && l.actOnPlayer(live, target, ctrl, shift) {
+		return
+	}
 	if selected && l.interactLiveStaticObject(live, target) {
 		return
 	}
@@ -82,11 +85,14 @@ func (l *GameClientLink) interactLiveStaticObject(live *livePlayer, target world
 		return false
 	}
 
+	// Interacting replaces the follow intention.
 	switch obj.Type() {
 	case staticobject.MapType:
+		live.endFollow()
 		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
 	case staticobject.ArenaSignType:
+		live.endFollow()
 		html, ok := l.html.Get("signboard.htm")
 		if !ok {
 			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
@@ -216,7 +222,8 @@ const (
 // actOnSummon answers a click on an already-selected summon and reports
 // whether target was one. Its owner opens the summon's status window, or
 // attacks it when forcing. Anyone else attacks it when the owner's karma or
-// PvP flag allows it without forcing, or when forcing and it is attackable.
+// PvP flag allows it without forcing, or when forcing and it is attackable,
+// and otherwise follows it.
 func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	s, ok := target.(*summon.Actor)
 	if !ok || live == nil {
@@ -234,10 +241,7 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 		l.attackLiveTarget(live, s)
 		return true
 	}
-	// Otherwise the player would walk after the summon, but players have
-	// no follow intention yet (#2619): release the click instead.
-	l.log.Debug().Int32("target", s.ObjectID()).Msg("targeting: player follow intention not modeled")
-	live.SendFrame(serverpackets.FrameActionFailed())
+	l.followLiveTarget(live, s, shift)
 	return true
 }
 
@@ -246,7 +250,9 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
 	// Interacting with an owned summon releases the pending action the client
 	// registered for the click before showing the status window; PetStatusShow
-	// alone leaves that action outstanding and locks further input.
+	// alone leaves that action outstanding and locks further input. The
+	// interact replaces the follow intention.
+	live.endFollow()
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if summonInRange(live, pet, summonInteractApproachRange) {
 		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))

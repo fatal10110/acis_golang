@@ -30,6 +30,7 @@ type npcFollowSelf struct{ playerFollowSelf }
 
 func (*npcFollowSelf) OffensiveFollowLead() bool { return true }
 
+func (s *playerFollowSelf) followSelf() *playerFollowSelf      { return s }
 func (s *playerFollowSelf) ObjectID() int32                    { return 1 }
 func (s *playerFollowSelf) Position() (int, int, int)          { return s.x, s.y, s.z }
 func (s *playerFollowSelf) CollisionRadius() float64           { return 0 }

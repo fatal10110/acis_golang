@@ -110,6 +110,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if !itemAICastBusy(live) {
 			l.finishDeferredMagicSkill(live)
 			l.finishDeferredItemAICast(live)
+			l.finishDeferredFollow(live)
 		}
 	case event.ReviveRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgResurrectionRequest(e.ReviverName))
@@ -254,13 +255,14 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishDeferredPickup(live)
 		magicHeld := l.finishDeferredMagicSkill(live)
 		itemHeld := l.finishDeferredItemAICast(live)
-		// A queued cast took the intention the swing had when it was
-		// queued; whether it started now, was refused, or is held for
+		followHeld := l.finishDeferredFollow(live)
+		// A queued cast or follow took the intention the swing had when it
+		// was queued; whether it started now, was refused, or is held for
 		// PostureSettled, the attack does not swing again.
-		if magicHeld || itemHeld {
+		if magicHeld || itemHeld || followHeld {
 			return
 		}
-		live.thinkAttack()
+		live.finishAttack()
 	case event.BowShotFinished:
 		// A shot's end re-thinks only an attack queued behind it; the bow
 		// reuse still running answers it with ActionFailed.
@@ -401,6 +403,9 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		return
 	}
 	if l.finishDeferredMagicSkill(live) {
+		return
+	}
+	if l.finishDeferredFollow(live) {
 		return
 	}
 	if live.combat == nil {

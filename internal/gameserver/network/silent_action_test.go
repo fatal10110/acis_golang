@@ -38,7 +38,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.Read() // CharCreateOk
 	c.Read() // CharSelectInfo
-	chars.soleObjectID(t)
+	self := chars.soleObjectID(t)
 
 	c.Send(encodeRequestGameStart(0))
 	c.Read() // SSQInfo
@@ -47,6 +47,13 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	readEnterWorldBurst(t, c, false)
 
 	const missingObjectID = 999999
+
+	// Select the player itself: a second click on it is a follow of
+	// oneself, refused.
+	testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeActionOn(self, false))
+		c.Send(encodeRequestManorList())
+	}, serverpackets.OpcodeExtended)
 
 	cases := []struct {
 		name    string
@@ -57,6 +64,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestUnEquipItem for an empty body slot", encodeRequestUnEquipItem(0), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
+		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {
@@ -82,5 +90,15 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 func encodeRequestUnEquipItem(bodySlot int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUnEquipItem)
 	w.WriteInt32(bodySlot)
+	return w.Bytes()
+}
+
+func encodeActionOn(objectID int32, shift bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
+	w.WriteInt32(objectID)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteUint8(wire.BoolByte(shift))
 	return w.Bytes()
 }
