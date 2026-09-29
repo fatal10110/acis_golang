@@ -16,17 +16,22 @@ import (
 const (
 	babyHealDelay  = 3 * time.Second
 	babyHealPeriod = time.Second
+)
 
-	// babyWeakHealID is the heal a baby pet may use on an owner below
-	// babyWeakHealBelow of max HP, when babyWeakHealChance comes up.
-	babyWeakHealID     modelskill.ID = 4717
-	babyWeakHealChance               = 25
-	babyWeakHealBelow                = 0.8
-	// babyStrongHealID is the heal it may use instead on an owner below
-	// babyStrongHealBelow, when babyStrongHealChance comes up.
-	babyStrongHealID     modelskill.ID = 4718
-	babyStrongHealChance               = 75
-	babyStrongHealBelow                = 0.15
+// babyWeakHealID is the heal a baby pet may use on an owner below
+// babyWeakHealBelow of max HP, when a roll of babyWeakHealChance or less
+// comes up; babyStrongHealID is the one it may use instead below
+// babyStrongHealBelow, on a roll of babyStrongHealChance or less.
+const (
+	babyWeakHealID   modelskill.ID = 4717
+	babyStrongHealID modelskill.ID = 4718
+)
+
+const (
+	babyWeakHealChance   = 25
+	babyWeakHealBelow    = 0.8
+	babyStrongHealChance = 75
+	babyStrongHealBelow  = 0.15
 )
 
 // babyHealTask is a baby pet's owner-heal ticker. Its ticks run on the
