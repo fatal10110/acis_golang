@@ -3008,3 +3008,25 @@ func TestAttackableThinkNeitherRunsNorClearsLatch(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
 	}
 }
+
+func TestAttackableLatchedAttackReplacesMoveToPromotedByThink(t *testing.T) {
+	a, _, strike := latchedAttackAI(t)
+	a.AddMoveToDesire(location.Location{X: 100, Y: 100}, 50)
+
+	if err := a.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if got := a.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Think = %v, want %v", got, IntentionMoveTo)
+	}
+
+	if err := a.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	}
+	if got := a.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after the latched RunAI = %v, want %v", got, IntentionAttack)
+	}
+}

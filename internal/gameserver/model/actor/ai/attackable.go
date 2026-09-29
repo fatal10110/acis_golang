@@ -823,9 +823,9 @@ func (a *Attackable) hasLatch() bool {
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
-// makes it current when the current intention may be replaced and, with
-// useLatch, updates the latch from it. It reports whether the pick was the
-// latched attack.
+// and, with useLatch, updates the latch from it. The latched attack always
+// becomes current; a queued pick does only when the current intention may
+// be replaced. It reports whether the pick was the latched attack.
 func (a *Attackable) promoteNext(useLatch bool) bool {
 	if a.inHitAnimation() {
 		return false
@@ -844,10 +844,12 @@ func (a *Attackable) promoteNext(useLatch bool) bool {
 			a.latched = intention{}
 		}
 	}
-	switch a.current.kind {
-	case IntentionIdle, IntentionFollow, IntentionWander:
-	default:
-		return fromLatch
+	if !fromLatch {
+		switch a.current.kind {
+		case IntentionIdle, IntentionFollow, IntentionWander:
+		default:
+			return false
+		}
 	}
 	if a.current.kind == IntentionWander {
 		a.wanderReady = time.Time{}
