@@ -677,6 +677,66 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 	}
 }
 
+// TestContinuousRollsLethalAfterLandingRoll pins the lethal strike the
+// continuous handler rolls on every creature target after the landing roll:
+// a failed landing still rolls it, ATTACK_FAILED is reported before the
+// lethal, a reflected cast rolls it against the caster, and the effect-id
+// substitute skill supplies the lethal chances.
+func TestContinuousRollsLethalAfterLandingRoll(t *testing.T) {
+	sureLethal := formulas.LethalInput{AttackerLevel: 40, TargetLevel: 40, LethalMul: 1}
+	fear := modelskill.Definition{SkillType: "FEAR", Offensive: true, LethalChance2: 100}
+
+	t.Run("failed landing", func(t *testing.T) {
+		target := &skillTarget{hp: 500, lethalInput: sureLethal, lethalOK: true}
+		result, _ := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{hp: 500}, Skill: fear, Targets: []Actor{target}})
+		if result.AttackFailed != 1 || target.hp != 1 {
+			t.Fatalf("AttackFailed = %d, target HP = %v; want 1 and a lethal strike to 1 HP", result.AttackFailed, target.hp)
+		}
+		if len(result.Messages) != 2 {
+			t.Fatalf("messages = %#v, want ATTACK_FAILED then the lethal", result.Messages)
+		}
+		if _, ok := result.Messages[0].(AttackFailedMessage); !ok {
+			t.Fatalf("first message = %T, want AttackFailedMessage", result.Messages[0])
+		}
+		if _, ok := result.Messages[1].(Lethal); !ok {
+			t.Fatalf("second message = %T, want Lethal", result.Messages[1])
+		}
+	})
+
+	t.Run("reflected onto caster", func(t *testing.T) {
+		caster := &skillTarget{hp: 500, lethalInput: sureLethal, lethalOK: true}
+		target := &skillTarget{hp: 500, reflects: true, lethalInput: sureLethal, lethalOK: true}
+		result, _ := NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: fear, Targets: []Actor{target}})
+		if caster.hp != 1 || target.hp != 500 {
+			t.Fatalf("caster HP = %v, target HP = %v; want the reflected lethal on the caster only", caster.hp, target.hp)
+		}
+		if len(result.Lethals) != 1 {
+			t.Fatalf("lethals = %+v, want one", result.Lethals)
+		}
+	})
+
+	t.Run("raid related target", func(t *testing.T) {
+		target := &skillTarget{hp: 500, raidRelated: true, lethalInput: sureLethal, lethalOK: true}
+		result, _ := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{hp: 500}, Skill: fear, Targets: []Actor{target}})
+		if target.hp != 500 || len(result.Lethals) != 0 {
+			t.Fatalf("raid target HP = %v, lethals = %+v; want untouched", target.hp, result.Lethals)
+		}
+	})
+
+	t.Run("effect-id substitute supplies the chances", func(t *testing.T) {
+		defs := continuousDefinitions{{ID: 7, Level: 1}: {ID: 7, Level: 1, SkillType: "DEBUFF", Debuff: true, LethalChance2: 100}}
+		target := &skillTarget{hp: 500, lethalInput: sureLethal, lethalOK: true}
+		continuousHandler{defs: defs}.UseResult(Cast{
+			Caster:  &skillTarget{hp: 500},
+			Skill:   modelskill.Definition{SkillType: "DEBUFF", Debuff: true, EffectID: 7},
+			Targets: []Actor{target},
+		})
+		if target.hp != 1 {
+			t.Fatalf("target HP = %v, want the substitute skill's lethal strike to 1 HP", target.hp)
+		}
+	})
+}
+
 // ---- from cubic_test.go ----
 type fakeCubicSummoner struct {
 	neutralCreature
@@ -2071,7 +2131,8 @@ func TestHealLandsSkillEffectsBeforeRestoringHP(t *testing.T) {
 // TestHealSpiritshotBonusUsesHealSpsAndScaling drives a heal under each
 // spiritshot through the registry: the healSps correction (scaled by 0.41
 // for a plain shot) and the caster's M.Atk multiplier join the amount, and
-// the sampled shot is the one spent.
+// the sampled shot is the one spent: once by the BUFF pass and once by the
+// heal's own discharge, which a static heal skips.
 func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 	table, err := modelskill.NewHealSpsTable([]modelskill.HealSps{{MagicLevel: 1, Correction: 17, NeededMAtk: 6}})
 	if err != nil {
@@ -2086,11 +2147,11 @@ func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 		want      float64
 		wantShots []item.ShotKind
 	}{
-		{"mage blessed", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(4*100)), []item.ShotKind{item.ShotBlessedSpirit}},
-		{"mage plain", formulas.HealShotScalingMage, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(2*100)), []item.ShotKind{item.ShotSpirit}},
-		{"fighter blessed", formulas.HealShotScalingNone, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(100)), []item.ShotKind{item.ShotBlessedSpirit}},
-		{"npc plain", formulas.HealShotScalingNPC, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(4*100)), []item.ShotKind{item.ShotSpirit}},
-		{"static keeps the shot", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL_STATIC", 20, nil},
+		{"mage blessed", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(4*100)), []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit}},
+		{"mage plain", formulas.HealShotScalingMage, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(2*100)), []item.ShotKind{item.ShotSpirit, item.ShotSpirit}},
+		{"fighter blessed", formulas.HealShotScalingNone, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(100)), []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit}},
+		{"npc plain", formulas.HealShotScalingNPC, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(4*100)), []item.ShotKind{item.ShotSpirit, item.ShotSpirit}},
+		{"static spends only in the buff pass", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL_STATIC", 20, []item.ShotKind{item.ShotBlessedSpirit}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			caster := &skillTarget{
@@ -3006,7 +3067,10 @@ func TestNPCCasterSpendsItsSpiritshot(t *testing.T) {
 // handler spends after its target loop, and the static-reuse flag it writes
 // back: CPDAMPERCENT spends the soulshot; HEAL, MANAHEAL, RESURRECT and the
 // CANCEL family spend the blessed spiritshot when one is charged, otherwise
-// the plain spiritshot. A static heal and a potion leave the shot alone.
+// the plain spiritshot; a heal also spends it in its BUFF pass first, so a
+// static heal spends it once there and a potion leaves it alone.
+// The continuous handler spends the spiritshot on every cast but a potion or
+// a toggle; the disablers handler spends it unconditionally.
 func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 	healTarget := func() *skillTarget { return &skillTarget{hp: 10, maxHP: 100, mp: 10, maxMP: 100, recharge: 1} }
 	tests := []struct {
@@ -3014,6 +3078,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 		skill     modelskill.Definition
 		blessed   bool
 		healOK    bool
+		cubic     bool
 		targets   func() []Actor
 		wantShots []item.ShotKind
 	}{
@@ -3041,7 +3106,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
 			healOK:    true,
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotSpirit},
+			wantShots: []item.ShotKind{item.ShotSpirit, item.ShotSpirit},
 		},
 		{
 			name:      "heal blessed spiritshot static reuse",
@@ -3049,20 +3114,21 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			blessed:   true,
 			healOK:    true,
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit},
 		},
 		{
 			name:      "heal without a resolvable amount",
 			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotSpirit},
+			wantShots: []item.ShotKind{item.ShotSpirit, item.ShotSpirit},
 		},
 		{
-			name:    "heal static keeps shot",
-			skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
-			blessed: true,
-			healOK:  true,
-			targets: func() []Actor { return []Actor{healTarget()} },
+			name:      "heal static spends only in the buff pass",
+			skill:     modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
+			blessed:   true,
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
 		},
 		{
 			name:    "heal potion keeps shot",
@@ -3115,6 +3181,71 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			targets:   func() []Actor { return nil },
 			wantShots: []item.ShotKind{item.ShotSpirit},
 		},
+		{
+			name:      "buff plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "BUFF"},
+			targets:   func() []Actor { return []Actor{&skillTarget{}} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "debuff blessed spiritshot static reuse after a failed landing",
+			skill:     modelskill.Definition{SkillType: "DEBUFF", Debuff: true, Offensive: true, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{}} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "hot with no targets",
+			skill:     modelskill.Definition{SkillType: "HOT"},
+			blessed:   true,
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:    "buff potion keeps shot",
+			skill:   modelskill.Definition{SkillType: "BUFF", Potion: true},
+			blessed: true,
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
+			name:    "toggle keeps shot",
+			skill:   modelskill.Definition{SkillType: "CONT", Activation: modelskill.ActivationToggle},
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
+			name:      "stun plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "STUN", Offensive: true},
+			targets:   func() []Actor { return []Actor{&skillTarget{}} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "sleep blessed spiritshot static reuse skips a dead target",
+			skill:     modelskill.Definition{SkillType: "SLEEP", Offensive: true, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{dead: true}} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:    "cubic poison keeps the owner's shot",
+			skill:   modelskill.Definition{SkillType: "POISON", Debuff: true, Offensive: true},
+			blessed: true,
+			cubic:   true,
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
+			name:    "cubic stun keeps the owner's shot",
+			skill:   modelskill.Definition{SkillType: "STUN", Offensive: true},
+			blessed: true,
+			cubic:   true,
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
+			name:      "disabler potion still spends",
+			skill:     modelskill.Definition{SkillType: "CANCEL_DEBUFF", Potion: true},
+			blessed:   true,
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3122,7 +3253,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 				healAmount: 10, healOK: tt.healOK,
 				charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: tt.blessed, item.ShotSpirit: !tt.blessed, item.ShotSoul: true},
 			}
-			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets()})
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets(), Cubic: tt.cubic})
 			if !slices.Equal(caster.shots, tt.wantShots) {
 				t.Fatalf("discharged shots = %v, want %v", caster.shots, tt.wantShots)
 			}

@@ -47,6 +47,9 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 	result := Result{messages: cast.messages}
 	def := h.effectSkill(cast.Skill)
 	skillType := skillTypeKey(def.SkillType)
+	// The blessed-spiritshot charge is read once, before any target, and
+	// both the landing rolls and the end-of-cast discharge use that reading.
+	bsps := blessedSpiritshotCharged(cast.Caster)
 
 	for _, obj := range cast.Targets {
 		// A target that died after the cast resolved it still goes through
@@ -95,29 +98,37 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 		// against this cast; everything else acts unconditionally.
 		acted := true
 		if def.Offensive || def.Debuff {
-			succeeded, ok := checkSkillSuccess(cast.Caster, effected, def)
+			succeeded, ok := checkSkillSuccessBSS(cast.Caster, effected, def, bsps)
 			acted = ok && succeeded
 		}
 
-		if !acted {
+		if acted {
+			// A toggle refresh drops the prior same-skill effect before reapplying.
+			if def.Activation == modelskill.ActivationToggle {
+				stopEffectsBySkillID(effected.EffectList(), def.ID)
+			}
+
+			applyCastEffects(cast, effected, def, def.Effects)
+
+			if skillType == "AGGDEBUFF" {
+				fireAggressionEvent(cast.Caster, effected, def)
+			}
+		} else {
 			result.AttackFailed++
 			result.record(AttackFailedMessage{})
-			continue
 		}
 
-		// A toggle refresh drops the prior same-skill effect before reapplying.
-		if def.Activation == modelskill.ActivationToggle {
-			stopEffectsBySkillID(effected.EffectList(), def.ID)
-		}
-
-		applyCastEffects(cast, effected, def, def.Effects)
-
-		if skillType == "AGGDEBUFF" {
-			fireAggressionEvent(cast.Caster, effected, def)
-		}
+		// Every target that reached the landing roll also rolls a lethal
+		// strike, whether or not the effects landed; a reflected cast rolls
+		// it against the caster.
+		applyLethalHit(cast, def, effected, &result)
 	}
 
 	applySelfEffects(cast, def)
+	// A potion, toggle or cubic proc leaves the spiritshot charged.
+	if !cast.Cubic && !def.Potion && def.Activation != modelskill.ActivationToggle {
+		writeSpiritshot(cast.Caster, bsps, def.StaticReuse)
+	}
 	return result
 }
 

@@ -39,6 +39,9 @@ func (disablersHandler) Types() []string {
 
 func (disablersHandler) Use(cast Cast) {
 	skillType := skillTypeKey(cast.Skill.SkillType)
+	// Sampled before any target: this reading decides which spiritshot the
+	// cast spends at the end.
+	bsps := blessedSpiritshotCharged(cast.Caster)
 
 	for _, obj := range cast.Targets {
 		target, ok := asCreature(obj)
@@ -81,6 +84,10 @@ func (disablersHandler) Use(cast Cast) {
 	}
 
 	applySelfEffects(cast, cast.Skill)
+	// A cubic proc leaves its owner's spiritshot charged.
+	if !cast.Cubic {
+		writeSpiritshot(cast.Caster, bsps, cast.Skill.StaticReuse)
+	}
 }
 
 // checkSkillSuccess rolls an effect-landing attempt of def against target,

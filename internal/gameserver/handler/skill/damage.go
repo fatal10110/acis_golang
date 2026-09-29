@@ -43,7 +43,14 @@ func spiritshotCharges(caster Creature) (sps, bsps bool) {
 // spendSpiritshot writes the static-reuse flag onto the blessed spiritshot
 // when blessed is set, otherwise onto the plain one.
 func spendSpiritshot(cast Cast, blessed bool) {
-	caster, ok := cast.Caster.(shotCharger)
+	writeSpiritshot(cast.Caster, blessed, cast.Skill.StaticReuse)
+}
+
+// writeSpiritshot writes staticReuse to the caster's blessed spiritshot when
+// blessed, otherwise to its plain spiritshot. Handlers that sample the
+// blessed charge before their target loop pass that sample here.
+func writeSpiritshot(caster Actor, blessed, staticReuse bool) {
+	charger, ok := caster.(shotCharger)
 	if !ok {
 		return
 	}
@@ -51,7 +58,7 @@ func spendSpiritshot(cast Cast, blessed bool) {
 	if blessed {
 		kind = modelitem.ShotBlessedSpirit
 	}
-	caster.SetChargedShot(kind, cast.Skill.StaticReuse)
+	charger.SetChargedShot(kind, staticReuse)
 }
 
 // skillReflected rolls whether obj reflects cast's skill back at the
@@ -147,7 +154,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
 				recordDamage(&result, cast.Caster, target, int(damage), false, false)
 			}
-			applyLethalHit(cast, target, &result)
+			applyLethalHit(cast, cast.Skill, target, &result)
 		} else {
 			result.AttackFailed++
 			result.record(AttackFailedMessage{})
@@ -480,7 +487,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
 		// outside the landing gate — a missed blow can still proc it.
-		applyLethalHit(cast, target, &result)
+		applyLethalHit(cast, cast.Skill, target, &result)
 	}
 	applySelfEffects(cast, cast.Skill)
 	return result
@@ -792,7 +799,8 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 	return result
 }
 
-func applyLethalHit(cast Cast, obj Actor, result *Result) {
+// applyLethalHit rolls def's lethal strike from cast's caster against obj.
+func applyLethalHit(cast Cast, def modelskill.Definition, obj Actor, result *Result) {
 	target, ok := asCreature(obj)
 	if !ok {
 		return
@@ -804,13 +812,13 @@ func applyLethalHit(cast Cast, obj Actor, result *Result) {
 	if n, ok := asNPC(obj); ok && !n.Lethalable() {
 		return
 	}
-	in, ok := target.LethalInput(cast.Caster, cast.Skill)
+	in, ok := target.LethalInput(cast.Caster, def)
 	if !ok {
 		return
 	}
 	outcome := formulas.LethalHit(in, rnd.Get)
 	if outcome != formulas.LethalNone {
-		target.ApplyLethalOutcome(outcome, cast.Caster, cast.Skill)
+		target.ApplyLethalOutcome(outcome, cast.Caster, def)
 		if result != nil {
 			result.Lethals = append(result.Lethals, Lethal{
 				AttackerID: counterattackObjectID(cast.Caster),
