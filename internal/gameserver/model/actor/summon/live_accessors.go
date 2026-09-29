@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -261,18 +262,35 @@ func (a *Actor) SP() int {
 // around it when its level increases.
 const socialActionLevelUp = 15
 
+// maxPetSP is the largest SP a pet can hold: SP is a 32-bit field in the
+// pets table and in every pet packet.
+const maxPetSP = math.MaxInt32
+
 // AddExpAndSp grants a pet its raw kill-reward share. Experience uses the
-// pet-specific configured rate; SP is deliberately unscaled. A level increase
-// refreshes the owner, restores vitals and broadcasts the level-up animation
-// before the owner is told the exp earned.
+// pet-specific configured rate; SP is deliberately unscaled. Each amount is
+// applied independently and skipped when negative, and SP stops at maxPetSP.
+// A grant where neither amount applies (negative exp, and SP that is
+// negative or meets a full SP pool) changes nothing and tells nobody.
+// Otherwise a level increase refreshes the owner, restores vitals and
+// broadcasts the level-up animation before the owner is told the exp earned.
 func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	if a == nil || !a.isPet {
 		return
 	}
 	expGain := a.ScaledExpGain(rawExp)
 	a.statusMu.Lock()
-	a.exp += expGain
-	a.sp += sp
+	expApplied := expGain >= 0
+	if expApplied {
+		a.exp += expGain
+	}
+	spApplied := sp >= 0 && a.sp < maxPetSP
+	if spApplied {
+		a.sp += min(sp, maxPetSP-a.sp)
+	}
+	if !expApplied && !spApplied {
+		a.statusMu.Unlock()
+		return
+	}
 	leveled := a.refreshGrowthLocked()
 	a.statusMu.Unlock()
 	if leveled {
