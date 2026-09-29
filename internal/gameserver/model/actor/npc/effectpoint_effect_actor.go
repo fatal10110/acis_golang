@@ -52,6 +52,7 @@ func (ep *EffectPoint) UpdateEffectIcons()                         {}
 func (ep *EffectPoint) NotifyEffectWornOff(modelskill.ID, int)     {}
 func (ep *EffectPoint) NotifyEffectDisappeared(modelskill.ID, int) {}
 func (ep *EffectPoint) NotifyEffectAborted(modelskill.ID, int)     {}
+func (ep *EffectPoint) NotifyEffectFelt(modelskill.ID, int)        {}
 func (ep *EffectPoint) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }

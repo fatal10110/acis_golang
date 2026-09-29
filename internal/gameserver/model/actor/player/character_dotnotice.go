@@ -72,6 +72,12 @@ func (c *Character) NotifyEffectAborted(skillID modelskill.ID, level int) {
 	c.emit(event.EffectEnded{Reason: event.EffectAborted, SkillID: skillID, Level: level})
 }
 
+// NotifyEffectFelt sends YOU_FEEL_S1_EFFECT for an effect that took over its
+// stack group when added.
+func (c *Character) NotifyEffectFelt(skillID modelskill.ID, level int) {
+	c.emit(event.EffectFelt{SkillID: skillID, Level: level})
+}
+
 // NotifyAttackFailed sends ATTACK_FAILED for a half-damage magic resist.
 func (c *Character) NotifyAttackFailed() {
 	c.emit(event.AttackFailed{})

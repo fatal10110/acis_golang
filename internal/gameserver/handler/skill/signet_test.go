@@ -517,6 +517,8 @@ func (*signetFakeCaster) Kind() actor.Kind { return actor.KindNPC }
 
 func (noopStatOwner) NotifyEffectAborted(modelskill.ID, int) {}
 
+func (noopStatOwner) NotifyEffectFelt(modelskill.ID, int) {}
+
 func (noopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 
 func (noopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}

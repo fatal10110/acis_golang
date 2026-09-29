@@ -45,10 +45,12 @@ func (l *List) maxBuffCount() int {
 	return l.owner.MaxBuffCount()
 }
 
-// evictForCap exits the oldest buff-slot-family buffs when e would put the
+// evictForCap retires the oldest buff-slot-family buffs when e would put the
 // list at or over the owner's buff-slot cap. Only buff-slot-family incoming
-// effects trigger eviction, and only buff-slot-family buffs are evicted.
-func (l *List) evictForCap(e *Effect, pending *[]func()) {
+// effects trigger eviction, and only buff-slot-family buffs are evicted. A
+// buff already retired by this insertion is still held, so it still counts
+// toward the cap and can use up one eviction.
+func (l *List) evictForCap(e *Effect, pending *[]func(), retiring *[]*Effect) {
 	if !e.Skill.buffSlot() {
 		return
 	}
@@ -60,7 +62,7 @@ func (l *List) evictForCap(e *Effect, pending *[]func()) {
 		if existing == nil || !existing.Skill.buffSlot() {
 			continue
 		}
-		l.exit(existing, pending)
+		retire(existing, pending, retiring)
 		remaining--
 		if remaining < 0 {
 			break
@@ -126,13 +128,28 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 		return
 	}
 
+	// A stack-head change on the add path tells the owner which effect
+	// left and which took over.
 	if deactivate != nil {
 		*pending = append(*pending, func() { l.removeStats(deactivate) })
 		appendThunk(pending, deactivate.beginExit())
+		l.notifyDisplaced(deactivate, pending)
 	}
 	if activate != nil {
-		*pending = append(*pending, l.beginActivate(activate, func(rejected *Effect) { l.removeRejectedStacked(rejected) }))
+		*pending = append(*pending, l.beginActivate(activate, func(rejected *Effect) { l.removeRejectedStacked(rejected) }, true))
 	}
+}
+
+// notifyDisplaced queues the disappeared message for an icon effect that
+// lost its stack group's head to a newcomer. Unlike notifyExpiry it never
+// reports a toggle abort or a worn-off effect: the displaced effect stays
+// held.
+func (l *List) notifyDisplaced(e *Effect, pending *[]func()) {
+	if !e.Template.Icon || l.owner == nil || l.silent {
+		return
+	}
+	notifier, skillID, level := l.owner, e.Skill.ID, e.Skill.Level
+	*pending = append(*pending, func() { notifier.NotifyEffectDisappeared(skillID, level) })
 }
 
 func (l *List) removeRejectedStacked(e *Effect) {
@@ -159,9 +176,9 @@ func (l *List) removeRejectedStacked(e *Effect) {
 //
 // pending receives the list bookkeeping in order: stat removal, promotion of
 // the next stack member, then the expiry message. exits receives e's exit
-// hook. Remove runs exits only after the icon refresh that follows pending;
-// a replacement or eviction during Add passes pending for both, so the old
-// effect's exit hook runs before the newcomer activates.
+// hook. Remove runs exits only after the icon refresh that follows pending.
+// A buff Add replaces or evicts reaches remove only after the newcomer's
+// activation, with its exit hook already run (see add).
 func (l *List) remove(e *Effect, pending, exits *[]func()) {
 	// wornOff must be read before stopSchedule zeroes e's remaining-tick
 	// counter, so notifyExpiry below can still tell natural exhaustion
@@ -170,12 +187,11 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 	e.stopSchedule()
 
 	if e.stackType() == "none" {
-		removed := l.removeFromVisible(e)
-		if removed && e.InUse() {
+		// Stat removal does not depend on e being active: a buff retired
+		// by Add already ran its exit hook but still holds its stat funcs.
+		if l.removeFromVisible(e) {
 			*pending = append(*pending, func() { l.removeStats(e) })
 			appendThunk(exits, e.beginExit())
-		}
-		if removed {
 			l.notifyExpiry(e, wornOff, pending)
 		}
 		return
@@ -204,7 +220,7 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
 			if next != nil {
-				*pending = append(*pending, l.beginActivate(next, func(*Effect) {}))
+				*pending = append(*pending, l.beginActivate(next, func(*Effect) {}, false))
 			}
 		}
 	}

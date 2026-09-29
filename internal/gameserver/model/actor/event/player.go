@@ -181,6 +181,12 @@ type EffectEnded struct {
 	Level   int
 }
 
+// EffectFelt reports an added effect taking over its stack group.
+type EffectFelt struct {
+	SkillID modelskill.ID
+	Level   int
+}
+
 // AttackFailed reports a half-damage magic resist on the caster.
 type AttackFailed struct{}
 
@@ -296,6 +302,7 @@ func (OverHit) event()                {}
 func (ServitorVanished) event()       {}
 func (ShieldBlocked) event()          {}
 func (EffectEnded) event()            {}
+func (EffectFelt) event()             {}
 func (AttackFailed) event()           {}
 func (SkillResisted) event()          {}
 func (MagicResisted) event()          {}
