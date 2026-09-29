@@ -34,6 +34,7 @@ func (neutralActor) AddMP(float64) float64                      { return 0 }
 func (neutralActor) HealProficiency() float64                   { return 0 }
 func (neutralActor) HealEffectiveness() float64                 { return 100 }
 func (neutralActor) RechargeMP(base float64) float64            { return base }
+func (neutralActor) BroadcastStatus()                           {}
 func (neutralActor) AbortAll(bool)                              {}
 func (neutralActor) StopMove()                                  {}
 func (neutralActor) TryToIdle()                                 {}
@@ -43,7 +44,7 @@ func (neutralActor) SetImmobilized(bool) bool                   { return false }
 func (neutralActor) SetInvul(bool) bool                         { return false }
 func (neutralActor) Afraid() bool                               { return false }
 func (neutralActor) FearImmune() bool                           { return false }
-func (neutralActor) FleeFrom(Actor, int) bool                   { return false }
+func (neutralActor) FleeFrom(Actor, int)                        {}
 func (neutralActor) BluffExempt() bool                          { return false }
 func (neutralActor) FlyTo(location.Location, modelskill.Flight) {}
 func (neutralActor) SetXYZ(int, int, int)                       {}

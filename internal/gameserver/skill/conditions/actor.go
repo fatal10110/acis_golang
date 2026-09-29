@@ -37,8 +37,10 @@ type Actor interface {
 	// returning its level and whether it was found at all.
 	ActiveSkillLevel(id int) (level int, ok bool)
 
-	// ActiveEffectLevel looks up the level of the skill backing an active
-	// effect of id on this actor, returning it and whether one is active.
+	// ActiveEffectLevel looks up the level of the skill backing the first
+	// effect of skill id on this actor, preferring an in-use effect over a
+	// held (stacked-out) one, and reports whether any such effect exists.
+	// A held effect still answers, so ok does not mean its stats apply.
 	ActiveEffectLevel(effectID int) (level int, ok bool)
 
 	// IsNight reports whether it is currently night on this actor's server.

@@ -127,6 +127,10 @@ const TwoSkillScrollID int32 = 9700
 // UnlockableKeyID is a non-potion ItemSkills fixture for target-validation tests.
 const UnlockableKeyID int32 = 9701
 
+// FormalWearID is the full-body formal dress (bodypart alldress) that forbids
+// item and skill use while worn.
+const FormalWearID int32 = 6408
+
 // ItemTemplates builds the item catalog shared by the behavior suites: adena,
 // potions, shots, a weapon, crystals, enchant scrolls, escape scrolls, quest
 // and summon items.
@@ -317,6 +321,16 @@ func ItemTemplates() *item.Table {
 			Armor:       &item.ArmorDetail{Type: item.ArmorMagic},
 		},
 		{
+			ID:            FormalWearID,
+			Name:          "Formal Wear",
+			Kind:          item.KindArmor,
+			Slot:          item.SlotAllDress,
+			Duration:      -1,
+			Destroyable:   true,
+			DefaultAction: item.ActionEquip,
+			Armor:         &item.ArmorDetail{Type: item.ArmorNone},
+		},
+		{
 			ID:             1060,
 			Name:           "Lesser Healing Potion",
 			Kind:           item.KindEtcItem,
@@ -343,6 +357,16 @@ func ItemTemplates() *item.Table {
 			Destroyable:    true,
 			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
 			AttachedSkills: []item.SkillRef{{ID: 2013, Level: 1}},
+		},
+		{
+			ID:             5593,
+			Name:           "SP Scroll: Low Grade",
+			Kind:           item.KindEtcItem,
+			Duration:       -1,
+			Stackable:      true,
+			Destroyable:    true,
+			EtcItem:        &item.EtcItemDetail{Type: item.EtcItemScroll, Handler: "ItemSkills", SharedReuseGroup: -1},
+			AttachedSkills: []item.SkillRef{{ID: 2167, Level: 1}},
 		},
 		{
 			// Synthetic two-skill ItemSkills template. Three shipped

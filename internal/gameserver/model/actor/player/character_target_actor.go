@@ -9,12 +9,24 @@ import (
 
 var _ skilltarget.Actor = (*Character)(nil)
 
-// Party, clan, alliance, duel, Olympiad and summon lookups are not modeled
-// for players yet, and the NPC, corpse and door facts never apply to them:
+// Summon returns c's summon in the world, dead or alive. A summon cast still
+// resolving its pets row is not yet registered, so it is not returned.
+func (c *Character) Summon() (skilltarget.Actor, bool) {
+	if c.world == nil {
+		return nil, false
+	}
+	obj, ok := c.world.Summon(c.ObjectID())
+	if !ok {
+		return nil, false
+	}
+	summon, ok := obj.(skilltarget.Actor)
+	return summon, ok
+}
+
+// Party, clan, alliance, duel and Olympiad lookups are not modeled for
+// players yet, and the NPC, corpse and door facts never apply to them:
 // every method below is the neutral answer target resolution already gives
 // a player without that state.
-func (c *Character) Summon() (skilltarget.Actor, bool) { return nil, false }
-
 func (c *Character) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
 	return true
 }

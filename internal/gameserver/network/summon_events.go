@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -8,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -117,12 +119,35 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.Stop(actor.ObjectID(), location.Location{X: x, Y: y, Z: z}, actor.Heading())
 		})
+	case event.Flight:
+		x, y, z := actor.Position()
+		at := location.Location{X: x, Y: y, Z: z}
+		l.broadcastSummon(actor, func() wire.Frame { return frames.FlyTo(actor.ObjectID(), e.Dest, at, e.Flight) })
+	case event.PositionCorrected:
+		x, y, z := actor.Position()
+		at, heading := location.Location{X: x, Y: y, Z: z}, actor.Heading()
+		l.broadcastSummon(actor, func() wire.Frame { return frames.ValidateLocation(actor.ObjectID(), at, heading) })
 	case event.MagicSkillUse:
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
 		})
+	case event.SkillLaunched:
+		l.broadcastSummon(actor, func() wire.Frame {
+			return frames.SkillLaunched(actor.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
+		})
+	case event.CastAborted:
+		// The cancel animation goes to every observer; an interrupt also
+		// tells the owner, since a summon's own messages reach its owner.
+		l.broadcastSummon(actor, func() wire.Frame { return frames.SkillCanceled(actor.ObjectID()) })
+		if e.Interrupted {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
+			}
+		}
 	case event.AutoAttackStopped:
 		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
+	case event.SocialAction:
+		l.broadcastSummon(actor, func() wire.Frame { return frames.SocialAction(actor.ObjectID(), e.ID) })
 	case event.StatusChanged:
 		l.broadcastSummonStatus(actor)
 	case event.OwnerInfoChanged:
@@ -143,10 +168,27 @@ func (s *summonSink) Emit(ev event.Event) {
 			messageID = serverpackets.SystemMessagePetReceivedS2DamageByS1
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, e.AttackerName, e.Damage))
+	case event.Died:
+		// Observers see the summon fall, then its own combat stance end. The
+		// stance is its owner's: the owner stays in combat and keeps its own
+		// stance icon.
+		l.broadcastSummon(actor, func() wire.Frame { return frames.Die(actor.ObjectID(), false) })
+		l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStop(actor.ObjectID()))
+	case event.DeathSettled:
+		l.notifyOwnerOfSummonDeath(actor)
+		if l.decay != nil {
+			l.decay.Add(actor, actor.DecayDelay())
+		}
+	case event.PetCorpseDecayed:
+		l.destroyDecayedPet(actor)
 	case event.AttackFinished:
 		s.brain.Think()
 	case event.Arrived:
 		actor.SyncPosition(s.move.Position())
+		if s.brain.Arrived() {
+			actor.TryToIdle()
+			return
+		}
 		s.brain.Think()
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
@@ -169,6 +211,58 @@ func (s *summonSink) Emit(ev event.Event) {
 	}
 }
 
+// notifyOwnerOfSummonDeath closes a summon's death for its owner: the
+// owner's summon auto-shots are turned off, then the owner reads the death
+// message for a servitor or a pet.
+func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
+	owner, ok := liveSummonOwner(actor)
+	if !ok {
+		return
+	}
+	for _, itemID := range item.SummonShotIDs() {
+		if owner.AutoSoulShotEnabled(itemID) {
+			l.disableAutoShot(owner, itemID)
+		}
+	}
+	message := serverpackets.SystemMessageServitorPassedAway
+	if actor.IsPet() {
+		message = serverpackets.SystemMessageResurrectPetWithin20Minutes
+	}
+	owner.SendFrame(serverpackets.FrameSystemMessage(message))
+}
+
+// petRowDeleter deletes a pet's saved row. The production pet store has it;
+// a store without it keeps the row.
+type petRowDeleter interface {
+	DeleteByItemObjectID(ctx context.Context, itemObjectID int32) error
+}
+
+// destroyDecayedPet ends a pet whose corpse decayed: its owner loses the
+// collar and the pets row is deleted. The pet has already left the world
+// through the same settle as any other departure (releasePet), so its items
+// are already back with its owner and its row was saved; the delete is queued
+// on the collar's persistence lane, behind that save.
+func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
+	itemObjectID := actor.ControlItemID()
+	if owner, ok := liveSummonOwner(actor); ok {
+		if inv := owner.Inventory(); inv != nil {
+			inv.DestroyByObjectID(itemObjectID, 1)
+		}
+	}
+	store, ok := l.petStore.(petRowDeleter)
+	if !ok || l.persist == nil {
+		return
+	}
+	log := l.log
+	l.persist.Enqueue(itemObjectID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := store.DeleteByItemObjectID(ctx, itemObjectID); err != nil {
+			log.Error().Err(err).Int32("item_obj_id", itemObjectID).Msg("delete decayed pet")
+		}
+	})
+}
+
 // releasePet settles a pet on its way out of the world, whatever took it out:
 // its items go back to its owner, its row and collar are saved, and its
 // container is then flushed and unregistered, since nothing else will ever
@@ -177,7 +271,8 @@ func (s *summonSink) Emit(ev event.Event) {
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
-// arrives with its owner's logout or after dying mid-despawn. Its container
+// arrives with its owner's logout, its corpse's decay, or after dying
+// mid-despawn. Its container
 // is keyed by an object id no later summon reuses, so items left in it would
 // be lost for good, and skipping the row would restore it alive from an
 // older save.

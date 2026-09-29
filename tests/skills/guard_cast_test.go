@@ -57,7 +57,9 @@ func TestOffensiveCastOnGuardRequiresCtrlDamage(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(skillID, tt.ctrl, false))
 			if tt.wantReject {
 				assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-				assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "Guard cast rejection rotation")
+				if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
+					t.Fatalf("Guard cast rejection extra opcode = %#x, want no MoveToPawn", extra[0])
+				}
 				if hp, max := guard.CurrentHP(), guard.MaxHP(); hp != max {
 					t.Fatalf("Guard HP after rejected cast = %d, want unchanged %d", hp, max)
 				}
@@ -142,7 +144,6 @@ func TestUnlockableCastRejectionsUseProductionPackets(t *testing.T) {
 		drainUntilQuiet(t, srv.Client)
 		srv.Client.Send(encodeRequestMagicSkillUse(skillID, false, false))
 		assertStaticSystemMessage(t, srv.Client.Read(), serverpackets.SystemMessageInvalidTarget)
-		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeMoveToPawn, "unlockable rejection rotation")
 		if frame := srv.Client.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 			t.Fatalf("unlockable rejection extra opcode = %#x, want none", frame[0])
 		}

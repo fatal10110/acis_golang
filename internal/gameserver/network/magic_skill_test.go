@@ -197,6 +197,10 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 		{"one invalid", skilltarget.CastRejectInvalidTarget, modelskill.Definition{}, serverpackets.SystemMessageInvalidTarget},
 		{"one target in peace", skilltarget.CastRejectTargetInPeaceZone, modelskill.Definition{}, serverpackets.SystemMessageTargetInPeacezone},
 		{"corpse pet non-pet", skilltarget.CastRejectCannotUseSkill, modelskill.Definition{ID: 2179, Level: 1}, serverpackets.SystemMessageS1CannotBeUsed},
+		{"undead living non-undead", skilltarget.CastRejectCannotUseSkill, modelskill.Definition{ID: 1400, Level: 1}, serverpackets.SystemMessageS1CannotBeUsed},
+		{"corpse mob harvest non-monster", skilltarget.CastRejectHarvestNotMonster, modelskill.Definition{}, serverpackets.SystemMessageHarvestFailedSeedNotSown},
+		{"corpse mob too old", skilltarget.CastRejectCorpseTooOld, modelskill.Definition{}, serverpackets.SystemMessageCorpseTooOldSkillNotUsed},
+		{"corpse mob sweep non-monster", skilltarget.CastRejectSweepNotMonster, modelskill.Definition{}, serverpackets.SystemMessageSweeperFailedTargetNotSpoiled},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)
@@ -243,11 +247,6 @@ func TestResolveMagicSkillTargetKeepsLockedDoorForSilentRejection(t *testing.T) 
 	sendTargetCastRejection(live, rejection, modelskill.Definition{})
 	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 0 {
 		t.Fatalf("silent rejection opcodes = %x, want none", got)
-	}
-	testsupport.ResetCapture(frames)
-	l.rejectMagicCast(live, modelskill.Definition{HitTime: 500}, locked)
-	if got := testsupport.FrameOpcodes(frames.Frames()); len(got) != 1 || got[0] != serverpackets.OpcodeMoveToPawn {
-		t.Fatalf("silent rejection opcodes = %x, want [MoveToPawn]", got)
 	}
 }
 

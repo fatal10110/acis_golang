@@ -22,6 +22,11 @@ func sameCreature(a, b Actor) bool {
 // isPlayable reports a player-controlled actor: a player or its summon.
 func isPlayable(a Actor) bool { return a.Kind().Playable() }
 
+// playableInPeaceZone reports a playable caster standing in a peace zone.
+// The aura handlers' peace refusal is a cast condition only playable casters
+// are held to: an NPC in a peace zone still casts its auras.
+func playableInPeaceZone(caster Actor) bool { return isPlayable(caster) && caster.InPeaceZone() }
+
 // isAttackable reports an attackable NPC.
 func isAttackable(a Actor) bool { return a.Kind() == actor.KindNPC }
 
@@ -42,10 +47,9 @@ func auraCanAffect(caster, creature Actor) bool {
 	return caster.Folk() && isPlayable(creature)
 }
 
-func validUndeadSingleTarget(creature Actor) bool {
-	if creature == nil || creature.Dead() || !creature.Undead() {
-		return false
-	}
+// undeadTargetKind reports a monster or a servitor: the only creatures the
+// UNDEAD single-target check accepts.
+func undeadTargetKind(creature Actor) bool {
 	if isAttackable(creature) {
 		return creature.MonsterKind()
 	}

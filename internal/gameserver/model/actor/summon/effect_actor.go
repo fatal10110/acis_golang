@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -15,6 +16,12 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 		return nil, false
 	}
 	return a.owner, true
+}
+
+// BroadcastStatus republishes the summon's vitals to its owner's pet window
+// and to observers; see UpdateStatus.
+func (a *Actor) BroadcastStatus() {
+	a.UpdateStatus()
 }
 
 // AbortAll stops the summon's movement, attack and cast and sends it idle
@@ -69,24 +76,52 @@ func (a *Actor) StopAttack() {
 	a.TryToIdle()
 }
 
-// Afraid reports false: summon fear state is not modeled yet.
-func (a *Actor) Afraid() bool { return false }
+// Afraid reports whether a held effect fears the summon.
+func (a *Actor) Afraid() bool { return a.effects.IsAffected(effect.FlagFear) }
 
-// FearImmune reports false: fear immunity is not modeled yet.
-func (a *Actor) FearImmune() bool { return false }
+// FearImmune reports whether fear cannot take hold of the summon: siege
+// summons shrug it off.
+func (a *Actor) FearImmune() bool { return a.SiegeSummon() }
 
-// FleeFrom reports false: fleeing movement is not modeled yet.
-func (a *Actor) FleeFrom(effect.Actor, int) bool { return false }
+// FleeFrom makes running distance units directly away from effector the
+// summon's current intention, the way a move request does. A summon that
+// could not take AI actions before the effect in progress landed, which
+// includes one already afraid, stays put; one that cannot move goes idle.
+// Summons are always in run stance, so no stance change is sent; hungry-pet
+// walk stance arrives with the feed tick (#2378).
+func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
+	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 || a.brain == nil {
+		return
+	}
+	if a.aiDeniedBeforeEffect() {
+		return
+	}
+	if a.MovementDisabled() {
+		a.TryToIdle()
+		return
+	}
+	fromX, fromY, _ := effector.Position()
+	a.brain.TryToMoveTo(a.Move().Position().FleeFrom(fromX, fromY, distance))
+}
 
-// BluffExempt reports false: summons are never exempt from bluff.
-func (a *Actor) BluffExempt() bool { return false }
+// aiDeniedBeforeEffect is DenyAIAction limited to effects whose on-start
+// hook has completed; see effect.List.StartedAffected.
+func (a *Actor) aiDeniedBeforeEffect() bool {
+	a.stateMu.RLock()
+	paralyzed := a.paralyzed
+	a.stateMu.RUnlock()
+	return a.AlikeDead() || paralyzed || a.Teleporting() || a.effects.StartedAffected(effect.AIDenyFlags)
+}
 
-// StopEffects does nothing yet: stopping effects by type is not wired.
-func (a *Actor) StopEffects(effect.Type) {}
+// BluffExempt reports whether bluff cannot turn the summon: siege summons
+// are exempt.
+func (a *Actor) BluffExempt() bool { return a.SiegeSummon() }
 
-// StopSkillEffectsByID does nothing yet: stopping effects by skill is not
-// wired.
-func (a *Actor) StopSkillEffectsByID(modelskill.ID) {}
+// StopEffects removes every effect of type t the summon holds.
+func (a *Actor) StopEffects(t effect.Type) { a.effects.StopByType(t) }
+
+// StopSkillEffectsByID removes every effect skill id applied to the summon.
+func (a *Actor) StopSkillEffectsByID(id modelskill.ID) { a.effects.StopBySkillID(id) }
 
 // AddChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (a *Actor) AddChanceTrigger(*effect.Effect) {}
@@ -94,20 +129,29 @@ func (a *Actor) AddChanceTrigger(*effect.Effect) {}
 // RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (a *Actor) RemoveChanceTrigger(*effect.Effect) {}
 
-// ValidLocation returns the destination unchanged: summons are never knocked
-// back, so no geodata correction applies.
-func (a *Actor) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
-	return location.Location{X: tx, Y: ty, Z: tz}
+// ValidLocation resolves a knockback destination against this summon's
+// movement geodata, the same correction a player's landing gets.
+func (a *Actor) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
+	return a.movement.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
-// FlyTo does nothing: summons are never knocked back.
-func (a *Actor) FlyTo(location.Location, modelskill.Flight) {}
+// FlyTo broadcasts a forced-flight animation without changing server position.
+func (a *Actor) FlyTo(dest location.Location, flight modelskill.Flight) {
+	a.emit(event.Flight{Dest: dest, Flight: flight})
+}
 
-// SetXYZ does nothing: summons are never knocked back.
-func (a *Actor) SetXYZ(int, int, int) {}
+// SetXYZ moves the summon immediately and reseeds its ordinary movement
+// state so the next move starts from the forced landing.
+func (a *Actor) SetXYZ(x, y, z int) {
+	position := location.Location{X: x, Y: y, Z: z}
+	a.movement.SetPosition(position)
+	a.SyncPosition(position)
+}
 
-// BroadcastPosition does nothing: summons are never knocked back.
-func (a *Actor) BroadcastPosition() {}
+// BroadcastPosition sends the forced-location correction after a flight lands.
+func (a *Actor) BroadcastPosition() {
+	a.emit(event.PositionCorrected{})
+}
 
 // UpdateEffectIcons refreshes the summon's effect icons.
 func (a *Actor) UpdateEffectIcons() { a.UpdateAbnormalEffect() }

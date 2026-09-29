@@ -22,8 +22,14 @@ type Unsummoning struct{}
 // before the summon leaves the world.
 type SummonRemoved struct{}
 
+// PetCorpseDecayed reports that a dead pet's corpse decayed and has left
+// the world. The pet is gone for good: its owner loses the collar and the
+// pet's saved state with it.
+type PetCorpseDecayed struct{}
+
 func (OwnerInfoChanged) event() {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
 func (Unsummoning) event()      {}
 func (SummonRemoved) event()    {}
+func (PetCorpseDecayed) event() {}

@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -149,5 +150,79 @@ func TestPetStore_SaveUpserts(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("pet rows for collar after upsert = %d, want 1 (update, not a duplicate insert)", count)
+	}
+}
+
+// TestPetStore_GetNullNameIsUnnamed restores a row whose name is NULL — how
+// the shared pets schema stores a pet nobody has named — as an unnamed pet
+// instead of failing the scan.
+func TestPetStore_GetNullNameIsUnnamed(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	store := NewPetStore(db)
+
+	if _, err := db.ExecContext(ctx,
+		`INSERT INTO pets (item_obj_id, name, level, curHp, curMp, exp, sp, fed) VALUES (?,NULL,?,?,?,?,?,?)`,
+		0x10000101, 15, 250, 40, 123456, 7, 88,
+	); err != nil {
+		t.Fatalf("insert NULL-name pet row: %v", err)
+	}
+
+	got, ok, err := store.Get(ctx, 0x10000101)
+	if err != nil {
+		t.Fatalf("Get() unexpected error: %v", err)
+	}
+	if !ok {
+		t.Fatalf("Get() reported not found, want found")
+	}
+	want := pet.State{Level: 15, CurHP: 250, CurMP: 40, Exp: 123456, SP: 7, Fed: 88}
+	if got != want {
+		t.Errorf("Get() = %+v, want %+v", got, want)
+	}
+}
+
+// TestPetStore_SaveUnnamedWritesNull stores an unnamed pet's name as NULL,
+// on insert and when an update overwrites the row, while a named pet keeps
+// its name.
+func TestPetStore_SaveUnnamedWritesNull(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	store := NewPetStore(db)
+
+	nameColumn := func() sql.NullString {
+		t.Helper()
+		var name sql.NullString
+		if err := db.QueryRowContext(ctx, `SELECT name FROM pets WHERE item_obj_id = ?`, 0x10000101).Scan(&name); err != nil {
+			t.Fatalf("read pets.name: %v", err)
+		}
+		return name
+	}
+
+	if err := store.Save(ctx, 0x10000101, pet.State{Level: 1, Fed: 100}); err != nil {
+		t.Fatalf("Save(unnamed insert) error = %v", err)
+	}
+	if name := nameColumn(); name.Valid {
+		t.Fatalf("pets.name after unnamed insert = %q, want NULL", name.String)
+	}
+
+	if err := store.Save(ctx, 0x10000101, pet.State{Name: "Fenrir", Level: 2, Fed: 90}); err != nil {
+		t.Fatalf("Save(named update) error = %v", err)
+	}
+	if name := nameColumn(); !name.Valid || name.String != "Fenrir" {
+		t.Fatalf("pets.name after named update = %+v, want Fenrir", name)
+	}
+
+	if err := store.Save(ctx, 0x10000202, pet.State{Level: 1, Fed: 100}); err != nil {
+		t.Fatalf("Save(second unnamed insert) error = %v", err)
+	}
+	if err := store.Save(ctx, 0x10000202, pet.State{Level: 3, Fed: 80}); err != nil {
+		t.Fatalf("Save(unnamed update) error = %v", err)
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pets WHERE name IS NULL`).Scan(&count); err != nil {
+		t.Fatalf("count NULL-name rows: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("NULL-name rows = %d, want 1 (the second, still unnamed pet)", count)
 	}
 }

@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -23,6 +24,11 @@ type WorldObjects struct {
 	doorTimers *task.Door
 	newSink    func(*door.Object) event.Sink
 	now        func() time.Time
+
+	// doorMu serializes door state changes, so a flag flip and its geodata,
+	// broadcast and timer follow-up land as one step whichever goroutine
+	// (the door timer, a player's unlock) makes it.
+	doorMu sync.Mutex
 
 	doors       map[int]*door.Object
 	doorOrder   []*door.Object
@@ -121,13 +127,16 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	if !ok {
 		return false
 	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
 	return w.changeDoorState(obj, open, false)
 }
 
-// changeDoorState mirrors Door.changeState(open, triggered): triggered is
-// true only for a cascaded change propagated from another door's
-// Template.TriggeredID, and suppresses this door's own auto-timer reschedule
-// so the linked door's cascade doesn't double-schedule it.
+// changeDoorState mirrors Door.changeState(open, triggered); the caller
+// holds doorMu. triggered is true only for a cascaded change propagated from
+// another door's Template.TriggeredID, and suppresses this door's own
+// auto-timer reschedule so the linked door's cascade doesn't double-schedule
+// it.
 func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool) bool {
 	if !obj.SetOpened(open) {
 		return false
@@ -156,7 +165,9 @@ func (w *WorldObjects) ToggleDoor(id int) {
 	if !ok {
 		return
 	}
-	w.SetDoorOpen(id, !obj.Opened())
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	w.changeDoorState(obj, !obj.Opened(), false)
 }
 
 // scheduleDoorTimer schedules obj's next auto transition: closeTime after an
@@ -194,6 +205,7 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	if w.newSink != nil {
 		obj.Attach(w.newSink(obj))
 	}
+	obj.SetOwner(w)
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)

@@ -73,6 +73,23 @@ func (a *Actor) BroadcastSelfSkillUse(skillID, level int32) {
 	a.emit(event.MagicSkillUse{CasterID: a.ObjectID(), CasterAt: at, TargetID: a.ObjectID(), TargetAt: at, SkillID: skillID, Level: level})
 }
 
+// BroadcastSkillUse reports a cast-start animation from this summon to the
+// target at (targetX, targetY, targetZ).
+func (a *Actor) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	x, y, z := a.Position()
+	a.emit(event.MagicSkillUse{
+		CasterID: a.ObjectID(), CasterAt: location.Location{X: x, Y: y, Z: z},
+		TargetID: targetID, TargetAt: location.Location{X: targetX, Y: targetY, Z: targetZ},
+		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
+	})
+}
+
+// BroadcastSkillLaunched reports the cast launch of skillID at level onto
+// targetIDs.
+func (a *Actor) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	a.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
+}
+
 // MarkDiscoveredByOwner records that the owner's client now knows this
 // summon; abnormal-effect changes are reported only from then on.
 func (a *Actor) MarkDiscoveredByOwner() { a.ownerDiscovered.Store(true) }

@@ -54,7 +54,8 @@ func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	c.Send(encodeEnterWorld())
-	readEnterWorldBurst(t, c)
+	// Spawning in the water adds its entry UserInfo to the login burst.
+	drainQuiet(t, c)
 	objID := srv.SoleObjectID(t)
 	target := location.Location{X: 300, Y: 200, Z: 200}
 	c.Send(encodeMoveBackwardToLocation(target, target, 1))

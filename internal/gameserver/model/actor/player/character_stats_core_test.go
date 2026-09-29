@@ -611,7 +611,7 @@ type ccFleeTarget struct {
 	effecttest.Actor
 }
 
-func (*ccFleeTarget) FleeFrom(effector effect.Actor, distance int) bool { return true }
+func (*ccFleeTarget) FleeFrom(effector effect.Actor, distance int) {}
 
 func attachTestLive(t *testing.T, c *Character) {
 	t.Helper()
@@ -722,6 +722,114 @@ func TestCharacterMovementDisabledTracksImmobilityNotFear(t *testing.T) {
 	}
 	if !c.MovementDisabled() {
 		t.Fatal("MovementDisabled() = false while dead")
+	}
+}
+
+// TestCharacterAttackDisabledMatchesReferenceTerms pins the attack gate to
+// the reference's seven-term union (Creature.isAttackingDisabled:
+// flying, stunned, immobile-until-attacked, sleeping, paralyzed, alike-dead,
+// afraid). Rooted, teleporting, immobilized and sitting gate movement only
+// and must leave attacking enabled.
+func TestCharacterAttackDisabledMatchesReferenceTerms(t *testing.T) {
+	effects := []struct {
+		name     string
+		disables bool
+	}{
+		{"Stun", true},
+		{"ImmobileUntilAttacked", true},
+		{"Sleep", true},
+		{"Paralyze", true},
+		{"Fear", true},
+		{"FakeDeath", true},
+		{"Root", false},
+	}
+	for _, tt := range effects {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Character{ID: 1}
+			attachTestLive(t, c)
+			if c.AttackDisabled() {
+				t.Fatal("AttackDisabled() = true with no effect active")
+			}
+			e := addCharacterEffect(t, c, tt.name)
+			if got := c.AttackDisabled(); got != tt.disables {
+				t.Fatalf("AttackDisabled() = %v with %s active, want %v", got, tt.name, tt.disables)
+			}
+			c.EffectList().Remove(e)
+			if c.AttackDisabled() {
+				t.Fatalf("AttackDisabled() = true after %s was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("flying", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetFlying(true)
+		if !c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = false while flying")
+		}
+	})
+
+	t.Run("dead", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.MarkDead()
+		if !c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = false while dead")
+		}
+	})
+
+	t.Run("movement-only states", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetTeleporting(true)
+		c.SetImmobilized(true)
+		c.SetStanding(false)
+		if !c.MovementDisabled() {
+			t.Fatal("MovementDisabled() = false while teleporting, immobilized and sitting")
+		}
+		if c.AttackDisabled() {
+			t.Fatal("AttackDisabled() = true while only teleporting, immobilized and sitting")
+		}
+	})
+}
+
+// mountBodyTable is a one-mount NPC template lookup.
+type mountBodyTable struct {
+	npcID          int32
+	radius, height float64
+}
+
+func (m mountBodyTable) CollisionBody(npcID int32) (float64, float64, bool) {
+	if npcID != m.npcID {
+		return 0, 0, false
+	}
+	return m.radius, m.height, true
+}
+
+// TestCharacterCollisionBodyFollowsMount pins Player.getCollisionRadius /
+// getCollisionHeight: while mounted the mount NPC template's footprint
+// (wyvern 12621: radius 60, height 80 in the shipped npc data) replaces the
+// class template's.
+func TestCharacterCollisionBodyFollowsMount(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.Configure(Runtime{Mounts: mountBodyTable{npcID: 12621, radius: 60, height: 80}})
+
+	if got, want := c.CollisionRadius(), 9.0; got != want {
+		t.Fatalf("unmounted CollisionRadius() = %v, want %v", got, want)
+	}
+	if got, want := c.CollisionHeight(), 23.0; got != want {
+		t.Fatalf("unmounted CollisionHeight() = %v, want %v", got, want)
+	}
+
+	if !c.Mount(12621, 77) {
+		t.Fatal("Mount() = false, want true")
+	}
+	if got, want := c.CollisionRadius(), 60.0; got != want {
+		t.Fatalf("mounted CollisionRadius() = %v, want %v", got, want)
+	}
+	if got, want := c.CollisionHeight(), 80.0; got != want {
+		t.Fatalf("mounted CollisionHeight() = %v, want %v", got, want)
 	}
 }
 
@@ -4903,10 +5011,10 @@ func TestCharacter_AddExpAndSp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := newProgressionCharacter()
-			leveled := c.AddExpAndSp(table, tmpl, tt.exp, tt.sp)
+			leveled := c.AddExpAndSpWith(table, tmpl, tt.exp, tt.sp)
 
 			if leveled != tt.wantLeveled {
-				t.Errorf("AddExpAndSp() leveled = %v, want %v", leveled, tt.wantLeveled)
+				t.Errorf("AddExpAndSpWith() leveled = %v, want %v", leveled, tt.wantLeveled)
 			}
 			if c.CharLevel != tt.wantLevel {
 				t.Errorf("Level = %d, want %d", c.CharLevel, tt.wantLevel)
@@ -4976,7 +5084,7 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 
 	t.Run("removing exp delevels and does not refill HP/MP/CP", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, tmpl, 363, 0) // level 3, exp 363, HP/MP/CP at level 3's row
+		c.AddExpAndSpWith(table, tmpl, 363, 0) // level 3, exp 363, HP/MP/CP at level 3's row
 
 		c.RemoveExpAndSp(table, tmpl, 300, 0) // exp -> 63, under level 2's 68 threshold
 
@@ -4995,7 +5103,7 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 
 	t.Run("removing more exp than held floors at 1, not 0", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, tmpl, 50, 0)
+		c.AddExpAndSpWith(table, tmpl, 50, 0)
 
 		c.RemoveExpAndSp(table, tmpl, 1000, 0)
 
@@ -5009,7 +5117,7 @@ func TestCharacter_RemoveExpAndSp(t *testing.T) {
 
 	t.Run("removing more sp than held floors at 0", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, tmpl, 0, 30)
+		c.AddExpAndSpWith(table, tmpl, 0, 30)
 
 		c.RemoveExpAndSp(table, tmpl, 0, 100)
 
@@ -5160,7 +5268,7 @@ func TestAddExpAndSpNotifiesGain(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := newProgressionCharacter()
 			rec := recordEvents(c)
-			c.AddExpAndSp(table, tmpl, tc.exp, tc.sp)
+			c.AddExpAndSpWith(table, tmpl, tc.exp, tc.sp)
 			var got []gain
 			for _, e := range event.Of[event.ExpSPGained](rec) {
 				got = append(got, gain{e.Exp, e.SP})
@@ -5187,7 +5295,7 @@ func TestAddExpAndSpNotifiesGainAtSPCeiling(t *testing.T) {
 	c := newProgressionCharacter()
 	c.SP = maxSP
 	rec := recordEvents(c)
-	c.AddExpAndSp(table, tmpl, -1, 25)
+	c.AddExpAndSpWith(table, tmpl, -1, 25)
 	if notifications := event.Count[event.ExpSPGained](rec); notifications != 0 {
 		t.Errorf("gain notifications = %d, want 0", notifications)
 	}
@@ -5300,7 +5408,7 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 
 	t.Run("without level drop", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10)+1000, 1000)
+		c.AddExpAndSpWith(table, tmpl, table.RequiredExpForLevel(10)+1000, 1000)
 		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, 10, 25)
 		if lost := event.Of[event.ExpSPLost](rec); len(lost) != 1 || lost[0] != (event.ExpSPLost{Exp: 10, SP: 25, SPLeft: 975}) {
@@ -5313,7 +5421,7 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 
 	t.Run("with level drop", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, tmpl, table.RequiredExpForLevel(10), 1000)
+		c.AddExpAndSpWith(table, tmpl, table.RequiredExpForLevel(10), 1000)
 		before := c.CharLevel
 		rec := recordEvents(c)
 		c.RemoveExpAndSp(table, tmpl, c.Exp, 0)
@@ -5347,7 +5455,7 @@ func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
 
 	t.Run("with level table, no level gained", func(t *testing.T) {
 		c := newProgressionCharacter()
-		c.AddExpAndSp(table, nil, table.RequiredExpForLevel(10), 0)
+		c.AddExpAndSpWith(table, nil, table.RequiredExpForLevel(10), 0)
 		rec := recordEvents(c)
 		c.RewardExpAndSp(table, 1, 10)
 		if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
@@ -6113,7 +6221,7 @@ func TestLevelUpUserInfoPrecedesSPGain(t *testing.T) {
 	sink := &userInfoSPSink{c: c}
 	c.sink = sink
 
-	c.AddExpAndSp(table, levelStepTemplate(81), table.RequiredExpForLevel(2), 40)
+	c.AddExpAndSpWith(table, levelStepTemplate(81), table.RequiredExpForLevel(2), 40)
 
 	if len(sink.sp) != 2 || sink.sp[0] != 0 || sink.sp[1] != 40 {
 		t.Fatalf("UserInfo SP values = %v, want [0 40]", sink.sp)

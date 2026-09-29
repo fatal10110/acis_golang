@@ -148,5 +148,6 @@ func TestWalkerRoutedFallbackClearsGeoPathFailCount(t *testing.T) {
 }
 
 func (*walkerCtlSelf) OwnsOffensiveFollowTicker() bool { return false }
+func (*walkerCtlSelf) MovementDisabled() bool          { return false }
 
 func (*controllerWalker) Queue() *sim.Queue { return testQueue }

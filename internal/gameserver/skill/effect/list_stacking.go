@@ -5,13 +5,15 @@ import (
 	"slices"
 )
 
-// doesStack mirrors Java's _buffs scan (EffectList.java:240-259), not the
-// stack queue: a cancel-lesser victim stays in l.buffs after leaving its
-// stack queue (see addStacked), and Java still counts it here so a same-type
-// buff doesn't trigger cap eviction it wouldn't otherwise need.
+// doesStack reports whether e's skill shares a stack type with a held buff,
+// exempting it from buff-slot cap eviction. The stack type comes from the
+// skill's first effect template (Skill.StackType), not from e itself, and
+// the scan covers l.buffs rather than the stack queue: a cancel-lesser
+// victim stays in l.buffs after leaving its queue (see addStacked) and
+// still counts here.
 func (l *List) doesStack(e *Effect) bool {
-	stackType := e.stackType()
-	if stackType == "none" {
+	stackType := e.Skill.StackType
+	if stackType == "" || stackType == "none" {
 		return false
 	}
 	for _, existing := range l.buffs {

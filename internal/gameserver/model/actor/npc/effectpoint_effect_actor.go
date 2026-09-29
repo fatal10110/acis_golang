@@ -33,6 +33,7 @@ func (ep *EffectPoint) AddMP(float64) float64                      { return 0 }
 func (ep *EffectPoint) HealProficiency() float64                   { return 0 }
 func (ep *EffectPoint) HealEffectiveness() float64                 { return 100 }
 func (ep *EffectPoint) RechargeMP(base float64) float64            { return base }
+func (ep *EffectPoint) BroadcastStatus()                           {}
 func (ep *EffectPoint) AbortAll(bool)                              {}
 func (ep *EffectPoint) StopMove()                                  {}
 func (ep *EffectPoint) TryToIdle()                                 {}
@@ -42,7 +43,7 @@ func (ep *EffectPoint) SetImmobilized(bool) bool                   { return fals
 func (ep *EffectPoint) SetInvul(bool) bool                         { return false }
 func (ep *EffectPoint) Afraid() bool                               { return false }
 func (ep *EffectPoint) FearImmune() bool                           { return false }
-func (ep *EffectPoint) FleeFrom(effect.Actor, int) bool            { return false }
+func (ep *EffectPoint) FleeFrom(effect.Actor, int)                 {}
 func (ep *EffectPoint) BluffExempt() bool                          { return false }
 func (ep *EffectPoint) FlyTo(location.Location, modelskill.Flight) {}
 func (ep *EffectPoint) SetXYZ(int, int, int)                       {}

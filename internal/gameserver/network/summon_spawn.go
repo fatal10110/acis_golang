@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -252,10 +253,9 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// first savePet instead — a deliberate difference locked in by this
 	// suite's "no pets row until a save point" assertions. Level/Name/
 	// Fed/HP/MP/Exp/SP are restored here because summon.Actor already
-	// exposes somewhere to put them. Java's saved-row dead check
-	// (Pet.java:540-544: curHp < 0.5 restores dead and skips regen) has
-	// no Go counterpart yet — summon.Actor has no dead state or regen
-	// task at all — tracked as #2307.
+	// exposes somewhere to put them. A row saved below creature.DeathHP
+	// restores the pet dead (below); summons have no HP/MP regeneration
+	// task yet (#2307), so there is none to keep from starting.
 	level := petmodel.InitialLevel(int(summonItem.NPCID), npcTmpl.Level, live.LevelValue())
 	if hasSaved {
 		level = state.Level
@@ -351,6 +351,11 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		return
 	}
 	pet.SetHP(curHP)
+	// A pet saved as a corpse comes back as one: the owner has to revive it,
+	// and cannot get it back alive by calling it out again.
+	if hasSaved && curHP < creature.DeathHP {
+		pet.RestoreDead()
+	}
 	// Java's Servitor/Pet construction sets max HP/MP before restoring
 	// saved current values (Pet.java:552-556); NewPet already seeds
 	// current HP/MP at max, so a restored value only needs applying when
@@ -427,6 +432,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		OwnerInventory:  live.Inventory(),
 		ExpPenalty:      def.ExpPenalty,
+		CorpseTime:      time.Duration(npcTmpl.CorpseTime) * time.Second,
 		Lifetime: summon.LifetimeState{
 			TimeRemaining:    def.SummonTotalLifeTime,
 			TotalLifeTime:    def.SummonTotalLifeTime,
@@ -499,7 +505,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// that have no caller left to return them to; left unset, they're silently
 	// discarded through the zero-value zerolog.Logger.
 	brain.SetLogger(l.log)
-	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, nil)
+	castController := actorcast.NewController(actorcast.SummonActor{Summon: actor}, sink)
 	castController.SetQueue(queue)
 	aiController := &actorcast.AIController{
 		Controller:  castController,
@@ -509,6 +515,13 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 		// Every summon removal aborts first, so a hit reaching a summon
 		// that has left the world lost a race with that abort.
 		HitNeedsPresence: true,
+		// A summon's launch-gate message reaches its owner, the only
+		// client a summon sends to.
+		OnLaunchAbort: func(reason actorcast.LaunchAbortReason) {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				sendLaunchAbort(owner, reason)
+			}
+		},
 	}
 	// Summon.sendPacket forwards every packet to the owner (base
 	// Creature.sendPacket is a no-op), but Java only calls sendPacket
@@ -611,21 +624,41 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if l.world == nil {
 		return
 	}
-	info, ok := summonInfoSnapshot(actor, owner.npcs)
+	info, ok := summonInfoSnapshot(actor, nil, owner.npcs)
 	if !ok {
 		return
 	}
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameNPCInfo(info)
-	}, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(actor, func(object world.Tracked) {
-			if object.ObjectID() == owner.ObjectID() {
-				return
+	// NpcInfo carries whether each viewer may attack the summon without
+	// forcing, so a viewer gets one of two frames, each built on first use.
+	var frames [2]wire.Frame
+	var built [2]bool
+	defer func() {
+		for i := range frames {
+			if built[i] {
+				frames[i].Release()
 			}
-			if receiver, ok := object.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
+		}
+	}()
+	l.world.ForEachKnown(actor, func(object world.Tracked) {
+		if object.ObjectID() == owner.ObjectID() {
+			return
+		}
+		receiver, ok := object.(frameReceiver)
+		if !ok {
+			return
+		}
+		attackable := 0
+		if viewer, ok := object.(*livePlayer); ok && actor.AttackableWithoutForceBy(viewer.Character) {
+			attackable = 1
+		}
+		if !built[attackable] {
+			info.Attackable = attackable == 1
+			frames[attackable] = serverpackets.FrameNPCInfo(info)
+			built[attackable] = true
+		}
+		if frame, ok := serverpackets.CopyFrame(frames[attackable]); ok {
+			receiver.BroadcastFrame(frame)
+		}
 	})
 }
 

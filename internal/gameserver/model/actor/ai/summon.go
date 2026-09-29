@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
@@ -178,6 +179,35 @@ func (s *Summon) FollowInstead(target attackable.Combatant) {
 	if _, err := s.thinkFollowLocked(); err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
+}
+
+// TryToMoveTo makes walking to dest the current intention, dropping any
+// queued one, and starts the walk; it reports whether the walk started. The
+// caller checks the summon can act and move. The intention holds until
+// Arrived, and Think leaves it alone meanwhile, so the walk is requested once.
+func (s *Summon) TryToMoveTo(dest location.Location) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.current = intention{kind: IntentionMoveTo, loc: dest}
+	s.next = intention{}
+	accepted, err := s.move.MoveToLocation(dest)
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+	return accepted
+}
+
+// Arrived ends a walk-to intention whose walk just finished and reports
+// whether there was one; the caller then sends the summon idle. Any other
+// intention is left for Think.
+func (s *Summon) Arrived() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current.kind != IntentionMoveTo {
+		return false
+	}
+	s.current = intention{kind: IntentionIdle}
+	return true
 }
 
 // StopMove stops movement; intentions are left as they are.

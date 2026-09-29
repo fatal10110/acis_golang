@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable/attackabletest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -112,4 +114,6 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 	}
 }
 
-func (*fakeSummonOwner) ServitorVanished() {}
+func (*fakeSummonOwner) ServitorVanished()                         {}
+func (*fakeSummonOwner) PvPFlagState() task.PvPFlagState           { return task.PvPFlagNone }
+func (*fakeSummonOwner) AwardSummonKillKarma(attackable.Combatant) {}

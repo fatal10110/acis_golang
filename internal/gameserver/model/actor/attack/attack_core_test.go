@@ -57,7 +57,7 @@ func TestControllerDualHitAndCompletionTiming(t *testing.T) {
 	// Each hit arms the next step only once it has landed, so a hit whose
 	// task runs late on a busy queue delays the rest of the attack with it.
 	target.onDamage = func() {
-		if got, want := armedTimers(ctrl), 1+target.hits; got != want {
+		if got, want := armedTimers(ctrl), target.hits; got != want {
 			t.Fatalf("timers armed while hit %d lands = %d, want %d", target.hits, got, want)
 		}
 	}
@@ -211,8 +211,8 @@ func TestControllerPoleSelectsForwardTargetsUpToCap(t *testing.T) {
 	primary.onDamage = func() {
 		// One timer for the whole pole group; completion is armed only
 		// after the group has landed.
-		if got := armedTimers(ctrl); got != 2 {
-			t.Fatalf("timers armed while the pole group lands = %d, want 2 (hit animation, one pole group)", got)
+		if got := armedTimers(ctrl); got != 1 {
+			t.Fatalf("timers armed while the pole group lands = %d, want 1 (one pole group)", got)
 		}
 		actor.dead = true
 		ctrl.Stop()
@@ -581,3 +581,124 @@ func (rangeTarget) Heading() int { return 0 }
 func (*timingPlayer) NotePvPAttack(attackable.Combatant) {}
 
 func (*timingPlayer) TestCursesOnAttack(attackable.Combatant) bool { return false }
+
+// TestControllerFinishClosesHitAnimation pins CreatureAttack.clearAttackTask
+// run as a swing or bow shot finishes: the hit animation window closes then,
+// even when its 300ms timer has not fired yet, so the AI re-run that follows
+// sees it closed.
+func TestControllerFinishClosesHitAnimation(t *testing.T) {
+	tests := []struct {
+		name     string
+		actor    *timingActor
+		finishAt time.Duration
+	}{
+		// attackTime 500ms: the hit lands at 250ms, the swing finishes at
+		// 500ms, before the hit animation's 550ms end.
+		{name: "fast melee swing", actor: &timingActor{attackSpeed: 1000}, finishAt: 500 * time.Millisecond},
+		// attackTime 1000ms: the arrow lands and the shot finishes at 1000ms.
+		{name: "bow shot", actor: &timingActor{attackType: item.WeaponBow, attackSpeed: 500, reuse: 1500 * time.Millisecond}, finishAt: time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clock := newTimingClock()
+			ctrl := NewAttackable(tt.actor, nil)
+			ctrl.SetQueue(clock.q)
+
+			ctrl.DoAttack(&timingTarget{id: 2})
+			clock.fire(tt.finishAt - time.Millisecond)
+			if !ctrl.InHitAnimation() {
+				t.Fatal("InHitAnimation() just before the finish = false, want true")
+			}
+			clock.fire(tt.finishAt)
+			if ctrl.InHitAnimation() {
+				t.Fatal("InHitAnimation() once the attack finished = true, want false")
+			}
+		})
+	}
+}
+
+// TestControllerAttackRethinkOnlyForNPCs pins which attack phases re-run an
+// NPC's AI: the hit animation ending and a bow shot landing emit
+// AttackRethink from an NPC controller only; a swing finishing reports
+// AttackFinished, and a bow's reuse ending AttackFinished{BowReuse}.
+func TestControllerAttackRethinkOnlyForNPCs(t *testing.T) {
+	newCtrl := map[string]func(*timingPlayer) *Controller{
+		"npc":      func(a *timingPlayer) *Controller { return NewAttackable(&a.timingActor, nil) },
+		"creature": func(a *timingPlayer) *Controller { return NewCreature(&a.timingActor, nil) },
+		"player":   func(a *timingPlayer) *Controller { return NewPlayer(a, nil) },
+	}
+	for name, build := range newCtrl {
+		npc := name == "npc"
+		t.Run(name+"/melee", func(t *testing.T) {
+			// attackTime 1000ms: hit at 500ms, hit animation ends at 800ms,
+			// swing finishes at 1000ms.
+			actor := &timingPlayer{timingActor: timingActor{attackSpeed: 500}}
+			clock := newTimingClock()
+			ctrl := build(actor)
+			ctrl.SetQueue(clock.q)
+			rec := &event.Recorder{}
+			ctrl.sink = rec
+
+			ctrl.DoAttack(&timingTarget{id: 2})
+			clock.fire(799 * time.Millisecond)
+			if got := event.Count[event.AttackRethink](rec); got != 0 {
+				t.Fatalf("AttackRethink inside the hit animation = %d, want 0", got)
+			}
+			clock.fire(800 * time.Millisecond)
+			if got, want := event.Count[event.AttackRethink](rec), rethinks(npc, 1); got != want {
+				t.Fatalf("AttackRethink at the hit animation end = %d, want %d", got, want)
+			}
+			clock.fire(time.Second)
+			if got, want := event.Count[event.AttackRethink](rec), rethinks(npc, 1); got != want {
+				t.Fatalf("AttackRethink once the swing finished = %d, want %d", got, want)
+			}
+			if got := event.Of[event.AttackFinished](rec); len(got) != 1 || got[0].BowReuse {
+				t.Fatalf("AttackFinished once the swing finished = %+v, want one swing finish", got)
+			}
+		})
+		t.Run(name+"/bow", func(t *testing.T) {
+			// attackTime 1000ms: the arrow lands at 1000ms, the hit animation
+			// ends at 1300ms, the 1035ms reuse ends at 2035ms.
+			actor := &timingPlayer{timingActor: timingActor{attackType: item.WeaponBow, attackSpeed: 500, reuse: 1500 * time.Millisecond}}
+			clock := newTimingClock()
+			ctrl := build(actor)
+			ctrl.SetQueue(clock.q)
+			rec := &event.Recorder{}
+			ctrl.sink = rec
+
+			ctrl.DoAttack(&timingTarget{id: 2})
+			clock.fire(999 * time.Millisecond)
+			if got := event.Count[event.AttackRethink](rec); got != 0 {
+				t.Fatalf("AttackRethink before the arrow lands = %d, want 0", got)
+			}
+			clock.fire(time.Second)
+			if got, want := event.Count[event.AttackRethink](rec), rethinks(npc, 1); got != want {
+				t.Fatalf("AttackRethink once the arrow landed = %d, want %d", got, want)
+			}
+			if got := event.Count[event.AttackFinished](rec); got != 0 {
+				t.Fatalf("AttackFinished before the reuse ends = %d, want 0", got)
+			}
+			clock.fire(1300 * time.Millisecond)
+			if got, want := event.Count[event.AttackRethink](rec), rethinks(npc, 2); got != want {
+				t.Fatalf("AttackRethink at the hit animation end = %d, want %d", got, want)
+			}
+			clock.fire(2034 * time.Millisecond)
+			if got := event.Count[event.AttackFinished](rec); got != 0 {
+				t.Fatalf("AttackFinished before the reuse ends = %d, want 0", got)
+			}
+			clock.fire(2035 * time.Millisecond)
+			if got := event.Of[event.AttackFinished](rec); len(got) != 1 || !got[0].BowReuse {
+				t.Fatalf("AttackFinished once the reuse ended = %+v, want one bow reuse finish", got)
+			}
+		})
+	}
+}
+
+// rethinks is the AttackRethink count an NPC controller has emitted by a
+// phase; any other controller emits none.
+func rethinks(npc bool, n int) int {
+	if npc {
+		return n
+	}
+	return 0
+}

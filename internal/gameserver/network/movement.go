@@ -73,6 +73,42 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	live.Character.SetHeading(origin.HeadingTo(target))
 }
 
+// fleeLivePlayer runs live away from e.From as a server-driven move: run
+// stance first, then the move request's gates. A player that could not take
+// AI actions before the effect in progress landed, which includes one already
+// afraid, is only answered ActionFailed; one that cannot move goes idle and is
+// answered ActionFailed. Otherwise the walk starts toward the flee point,
+// even when that point is the current cell.
+//
+// The request never arrives mid-attack or mid-cast: fear aborts both before
+// its first flee, and every later flee is refused as AI-denied.
+func (l *GameClientLink) fleeLivePlayer(live *livePlayer, e event.FleeRequested) {
+	l.changeLiveMoveType(live, true)
+	if e.AIDenied {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.MovementDisabled() || liveMoveSpeed(live) == 0 {
+		live.tryToIdle(false)
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if live.combat != nil {
+		live.combat.Stop()
+	}
+	origin := live.move.Position()
+	target := origin.FleeFrom(e.From.X, e.From.Y, e.Distance)
+	accepted, err := live.move.MoveToLocation(target)
+	if err != nil {
+		l.log.Warn().Err(err).Msg("flee: broadcast")
+	}
+	if !accepted {
+		return
+	}
+	live.clearParkedApproaches()
+	live.Character.SetHeading(origin.HeadingTo(target))
+}
+
 func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
 	// CannotMoveAnymore is a stop report, not a position report. The walk
 	// is simulated server-side, so the stop point is wherever that
@@ -92,8 +128,14 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	// drifted beyond a second's worth of movement gets the server position
 	// back, while a report within the threshold changes nothing. The walk
 	// simulation owns the position, so a valid report is never adopted.
+	// Ground movement measures the drift in 2D; a swimming or flying
+	// player moves in 3D, so its height drift counts too.
 	current := live.CurrentLocation()
-	if current.Distance2D(reported) > liveMoveSpeed(live) {
+	drift := current.Distance2D(reported)
+	if liveSwimming(live) || live.Flying() {
+		drift = current.Distance3D(reported)
+	}
+	if drift > liveMoveSpeed(live) {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
 	}
 }
@@ -102,7 +144,7 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	if live == nil || live.template == nil {
 		return 0
 	}
-	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater) {
+	if liveSwimming(live) {
 		return live.SwimSpeed()
 	}
 	if live.Running() {
@@ -111,11 +153,16 @@ func liveMoveSpeed(live *livePlayer) float64 {
 	return live.WalkSpeed()
 }
 
+// liveSwimming reports whether live stands inside a water zone.
+func liveSwimming(live *livePlayer) bool {
+	return live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater)
+}
+
 func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	if !live.SetRunning(run) {
 		return
 	}
-	swimming := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagWater)
+	swimming := liveSwimming(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeMoveType(live.ObjectID(), live.Running(), swimming)
 	})

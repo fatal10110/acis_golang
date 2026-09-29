@@ -226,24 +226,10 @@ func applyRaidCurseEffects(attacker RaidCurseAttacker, target RaidCurseTarget, d
 	if def.Activation == modelskill.ActivationPassive || len(def.Effects) == 0 {
 		return
 	}
-	if attacker.Dead() {
+	if attacker.Dead() || !effect.Lands(target, attacker, def) {
 		return
 	}
-	if def.EffectRange > 0 {
-		ax, ay, az := attacker.Position()
-		tx, ty, tz := target.Position()
-		from := location.Location{X: tx, Y: ty, Z: tz}
-		to := location.Location{X: ax, Y: ay, Z: az}
-		// The landing gate is a strict radius: a target exactly at
-		// EffectRange is outside it.
-		if !from.In3DRadius(to, def.EffectRange) {
-			return
-		}
-	}
-	if (def.Offensive || def.Debuff) && attacker.Invul() {
-		return
-	}
-	effect.Apply(attacker.EffectList(), target, attacker, effect.SkillFromDefinition(def), def.Effects)
+	effect.Apply(target, attacker, effect.SkillFromDefinition(def), def.Effects)
 }
 
 // NPCIDOf returns target's NPC id when it is a raid curse target, otherwise 0.

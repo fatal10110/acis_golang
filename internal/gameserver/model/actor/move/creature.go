@@ -198,11 +198,15 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 }
 
 // ValidLocation resolves a destination against this creature's movement
-// geodata without starting an ordinary move.
+// geodata without starting an ordinary move. Movement never initialized with
+// geodata applies no correction and returns the destination unchanged.
 func (m *CreatureMove) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	m.mu.Lock()
 	geo := m.geo
 	m.mu.Unlock()
+	if geo == nil {
+		return location.Location{X: tx, Y: ty, Z: tz}
+	}
 	return geo.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
@@ -641,6 +645,13 @@ func (m *CreatureMove) FollowMode() FollowMode {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.followMode
+}
+
+// FollowTarget returns the object id the active follow task follows, or 0.
+func (m *CreatureMove) FollowTarget() int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.followTarget
 }
 
 // FollowInterval returns how often the active follow task should be ticked.

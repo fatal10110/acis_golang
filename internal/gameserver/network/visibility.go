@@ -44,7 +44,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			}
 			return
 		}
-		if snap, ok := summonInfoSnapshot(o, p.npcs); ok {
+		if snap, ok := summonInfoSnapshot(o, p, p.npcs); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	case groundItemObject:
@@ -116,7 +116,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 		if !ok || p.ObjectID() == a.OwnerID() {
 			return
 		}
-		if snap, ok := summonInfoSnapshot(a, p.npcs); ok {
+		if snap, ok := summonInfoSnapshot(a, p, p.npcs); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	})
@@ -181,7 +181,11 @@ func rendersObject(obj world.Tracked) bool {
 	}
 }
 
-func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfoSnapshot, bool) {
+// summonInfoSnapshot resolves the NpcInfo fields viewer sees for a summon it
+// does not own. Attackable is per viewer: whether viewer may attack a without
+// forcing, which follows a's owner's karma and PvP flag. A nil viewer sees it
+// as not attackable.
+func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table) (serverpackets.NPCInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
@@ -206,6 +210,7 @@ func summonInfoSnapshot(a *summon.Actor, npcs *npc.Table) (serverpackets.NPCInfo
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(),
+		Attackable:     viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
 	}, true
 }
 

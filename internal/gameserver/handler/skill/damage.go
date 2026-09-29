@@ -18,28 +18,54 @@ type chargedShotUser interface {
 	ChargedShot(modelitem.ShotKind) bool
 }
 
-// reflectEffectTarget returns the effect-list-owning destination for def's
-// effects cast at obj: obj itself, or cast.Caster when obj reflects the
-// skill back — the rule disablers.go's reflectTarget applies, generalized
-// to whatever satisfies effect.Actor rather than the fuller
-// disablerTarget surface (Dead/Invul/Paralyzed) a damage handler's own
-// Dead()/evasion checks already cover before this runs. Returns nil when
-// reflect fires but the caster doesn't expose an effect list to redirect
-// onto — a duck-typing gap safer to drop than to guess through, matching
-// reflectTarget's own behavior. The second return reports whether reflect
-// fired.
+// dischargeSoulshot spends the caster's soulshot at the end of a cast. The
+// charge flag written is the skill's static-reuse flag, so a static-reuse
+// skill leaves the shot marked charged.
+func dischargeSoulshot(cast Cast) {
+	if caster, ok := cast.Caster.(shotCharger); ok {
+		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
+	}
+}
+
+// dischargeSpiritshot spends the caster's blessed spiritshot when one is
+// charged, otherwise its plain spiritshot, writing the static-reuse flag
+// the way dischargeSoulshot does.
+func dischargeSpiritshot(cast Cast) {
+	caster, ok := cast.Caster.(chargedShotUser)
+	if !ok {
+		return
+	}
+	kind := modelitem.ShotSpirit
+	if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
+		kind = modelitem.ShotBlessedSpirit
+	}
+	caster.SetChargedShot(kind, cast.Skill.StaticReuse)
+}
+
+// skillReflected rolls whether obj reflects cast's skill back at the
+// caster. Only a creature can reflect.
+func skillReflected(cast Cast, obj Actor) bool {
+	src, ok := asCreature(obj)
+	if !ok {
+		return false
+	}
+	in := src.SkillReflectInput(cast.Skill)
+	in.SkillType = skillTypeKey(cast.Skill.SkillType)
+	return formulas.SkillReflects(in, rnd.Get(100))
+}
+
+// reflectEffectTarget returns the effect-list-owning destination for the
+// cast's effects at obj when a reflect only redirects the destination and
+// keeps the caster as effector: obj itself, or cast.Caster when obj
+// reflects the skill back. Returns nil when obj has no effect list, or when
+// reflect fires but the caster doesn't expose one to redirect onto. The
+// second return reports whether reflect fired.
 func reflectEffectTarget(cast Cast, obj Actor) (effect.Actor, bool) {
 	target, ok := obj.(effect.Actor)
 	if !ok {
 		return nil, false
 	}
-	src, ok := asCreature(obj)
-	if !ok {
-		return target, false
-	}
-	in := src.SkillReflectInput(cast.Skill)
-	in.SkillType = skillTypeKey(cast.Skill.SkillType)
-	if !formulas.SkillReflects(in, rnd.Get(100)) {
+	if !skillReflected(cast, obj) {
 		return target, false
 	}
 	caster, ok := cast.Caster.(effect.Actor)
@@ -47,6 +73,29 @@ func reflectEffectTarget(cast Cast, obj Actor) (effect.Actor, bool) {
 		return nil, true
 	}
 	return caster, true
+}
+
+// landReflected lands a damage skill's effects back on its caster after
+// reflector bounced the skill. The participants swap: reflector becomes the
+// effects' effector, so it hosts any self-target kind, rolls each
+// template's landing chance, and is the side the landing gates consult,
+// while the caster is the effected. No shield or blessed-spiritshot outcome
+// carries over from the original strike, and a resisted template is
+// reported to reflector when it is a player, never to the caster.
+func landReflected(cast Cast, reflector effect.Actor) {
+	caster, ok := cast.Caster.(effect.Actor)
+	if !ok {
+		return
+	}
+	stopEffectsBySkillID(caster.EffectList(), cast.Skill.ID)
+	resisted := applyEffectsWithLanding(reflector, caster, cast.Skill, cast.Skill.Effects, formulas.ShieldFailed, false)
+	notify, ok := asPlayer(reflector)
+	if !ok {
+		return
+	}
+	for range resisted {
+		notify.NotifyResistedSkill(actorName(cast.Caster), cast.Skill.ID, cast.Skill.Level)
+	}
 }
 
 type pdamHandler struct{}
@@ -93,9 +142,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(shotCharger); ok {
-		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-	}
+	dischargeSoulshot(cast)
 	return result
 }
 
@@ -144,22 +191,18 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(shotCharger); ok {
-		caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-	}
+	dischargeSoulshot(cast)
 	return result
 }
 
-// applyPdamEffects applies a PDAM/FATAL skill's target effect list to obj,
-// mirroring Pdam.java: a target with an active BLOCK_DEBUFF effect is
-// skipped, a reflecting target sends the effects back onto the caster
-// instead, and the destination's prior instance of the same skill is
-// dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow, PDAM
-// applies these unconditionally unless the shared shield outcome is perfect.
+// applyPdamEffects applies a PDAM/FATAL skill's target effect list to obj:
+// a target with an active BLOCK_DEBUFF effect is skipped, a reflecting
+// target lands the effects back on the caster as their effector (see
+// landReflected), and otherwise the target's prior instance of the same
+// skill is dropped first so a repeat cast doesn't stack. Unlike Mdam/Blow,
+// PDAM rolls no skill-level landing check; only a perfect shield block of
+// the original strike stops the target's effects.
 func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, result *Result) {
-	if shield == formulas.ShieldPerfect {
-		return
-	}
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
@@ -167,12 +210,12 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
-	effected, _ := reflectEffectTarget(cast, obj)
-	if effected == nil {
+	if skillReflected(cast, obj) {
+		landReflected(cast, elt)
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
+	stopEffectsBySkillID(elt.EffectList(), cast.Skill.ID)
+	appendResistedCount(result, elt, cast.Skill, applyEffectsWithLanding(cast.Caster, elt, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
 // mdamHandler resolves MDAM/DEATHLINK; magicFailures is the server's
@@ -212,21 +255,15 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(chargedShotUser); ok {
-		kind := modelitem.ShotSpirit
-		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
-			kind = modelitem.ShotBlessedSpirit
-		}
-		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
-	}
+	dischargeSpiritshot(cast)
 	return result
 }
 
 // applyMdamEffects applies an MDAM/DEATHLINK skill's target effect list to
-// obj after a successful damage tick: BLOCK_DEBUFF skips it, reflect
-// redirects it onto the caster, and the non-reflect branch reuses the
-// already-resolved shield outcome for the landing roll. The reflect
-// branch applies effects unconditionally with no landing check.
+// obj after a successful damage tick: BLOCK_DEBUFF skips it, a reflecting
+// target lands it back on the caster as its effector with no skill-level
+// landing check (see landReflected), and the non-reflect branch reuses the
+// already-resolved shield outcome for the landing roll.
 func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
@@ -235,26 +272,20 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 	if !ok || hasEffectType(elt.EffectList(), "BLOCK_DEBUFF") {
 		return
 	}
-	effected, reflected := reflectEffectTarget(cast, obj)
-	if effected == nil {
+	if skillReflected(cast, obj) {
+		landReflected(cast, elt)
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	effectShield := formulas.ShieldFailed
-	if reflected {
-		bss = false
-	} else {
-		effectShield = shield
-		succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, bss, shield)
-		if !ok {
-			return
-		}
-		if !succeeded {
-			appendResisted(result, effected, cast.Skill, 1, true) // id-only addSkillName overload: level 1
-			return
-		}
+	stopEffectsBySkillID(elt.EffectList(), cast.Skill.ID)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, elt, cast.Skill, bss, shield)
+	if !ok {
+		return
 	}
-	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, effectShield, bss))
+	if !succeeded {
+		appendResisted(result, elt, cast.Skill, 1, true) // id-only addSkillName overload: level 1
+		return
+	}
+	appendResistedCount(result, elt, cast.Skill, applyEffectsWithLanding(cast.Caster, elt, cast.Skill, cast.Skill.Effects, shield, bss))
 }
 
 type blowHandler struct{}
@@ -307,9 +338,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 					recordDamage(&result, cast.Caster, target, damage, false, true)
 				}
 			}
-			if caster, ok := cast.Caster.(shotCharger); ok {
-				caster.SetChargedShot(modelitem.ShotSoul, cast.Skill.StaticReuse)
-			}
+			dischargeSoulshot(cast)
 		}
 		// Blow.java rolls the lethal chance unconditionally per target,
 		// outside the landing gate — a missed blow can still proc it.
@@ -474,55 +503,60 @@ func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 }
 
 // applyBlowEffects applies a BLOW skill's target effect list to obj after a
-// successful hit: only a normal reflection redirects it onto the caster;
-// a combined normal-reflect and counter outcome keeps effects on the target.
-// Unlike PDAM/MDAM, BLOW never checks BLOCK_DEBUFF, and a
-// landing-rate roll gates activation with the blessed-spiritshot input
-// forced true — Blow.java hardcodes that argument regardless of the
-// caster's real charge state.
+// successful hit: only a normal reflection lands it back on the caster as
+// its effector (see landReflected); a combined normal-reflect and counter
+// outcome keeps effects on the target. Unlike PDAM/MDAM, BLOW never checks
+// BLOCK_DEBUFF, and on the target a landing-rate roll gates activation with
+// the blessed-spiritshot input forced true — Blow.java hardcodes that
+// argument regardless of the caster's real charge state.
 func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, countered bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	effected, reflected := reflectEffectTarget(cast, obj)
-	if countered && reflected {
-		effected, _ = obj.(effect.Actor)
-	}
-	if effected == nil {
-		return
-	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, true, shield)
+	elt, ok := obj.(effect.Actor)
 	if !ok {
 		return
 	}
-	if !succeeded {
-		appendResisted(result, effected, cast.Skill, cast.Skill.Level, true)
+	if skillReflected(cast, obj) && !countered {
+		landReflected(cast, elt)
 		return
 	}
-	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
+	landRolledDamageEffects(cast, elt, shield, result)
 }
 
+// applyChargeDamEffects applies a CHARGEDAM skill's target effect list to
+// obj: a reflecting target lands it back on the caster as its effector (see
+// landReflected); otherwise the Blow-shaped landing roll gates it.
 func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	effected, reflected := reflectEffectTarget(cast, obj)
-	if effected == nil {
+	elt, ok := obj.(effect.Actor)
+	if !ok {
 		return
 	}
-	stopEffectsBySkillID(effected.EffectList(), cast.Skill.ID)
-	if !reflected {
-		succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, true, shield)
-		if !ok {
-			return
-		}
-		if !succeeded {
-			appendResisted(result, effected, cast.Skill, cast.Skill.Level, true)
-			return
-		}
+	if skillReflected(cast, obj) {
+		landReflected(cast, elt)
+		return
 	}
-	appendResistedCount(result, effected, cast.Skill, applyEffectsWithLanding(cast.Caster, effected, cast.Skill, cast.Skill.Effects, shield, false))
+	landRolledDamageEffects(cast, elt, shield, result)
+}
+
+// landRolledDamageEffects is the unreflected BLOW/CHARGEDAM landing: the
+// target's prior instance of the skill is dropped, then a skill-level
+// landing roll with the blessed-spiritshot input forced true gates the
+// effects, reporting a failure at the cast's skill level.
+func landRolledDamageEffects(cast Cast, target effect.Actor, shield formulas.ShieldDefense, result *Result) {
+	stopEffectsBySkillID(target.EffectList(), cast.Skill.ID)
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, target, cast.Skill, true, shield)
+	if !ok {
+		return
+	}
+	if !succeeded {
+		appendResisted(result, target, cast.Skill, cast.Skill.Level, true)
+		return
+	}
+	appendResistedCount(result, target, cast.Skill, applyEffectsWithLanding(cast.Caster, target, cast.Skill, cast.Skill.Effects, shield, false))
 }
 
 type manaDamageHandler struct{}
@@ -599,10 +633,8 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			result.record(OpponentMPReducedMessage{MP: int32(mp)})
 		}
 		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
-		// (pre-clamp) damage is positive, after the drain. No production
-		// actor implements a StopEffects(Type) method, so this goes
-		// through the same effect-list removal path stopEffectsBySkillID
-		// uses rather than a type assertion that only test fakes satisfy.
+		// (pre-clamp) damage is positive, after the drain, through the
+		// same effect-list removal path stopEffectsBySkillID uses.
 		if rawDamage > 0 {
 			if elt, ok := effective.(effect.Actor); ok {
 				removeMatching(elt.EffectList(), 0, func(e *effect.Effect) bool {
@@ -612,13 +644,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
-	if caster, ok := cast.Caster.(chargedShotUser); ok {
-		kind := modelitem.ShotSpirit
-		if caster.ChargedShot(modelitem.ShotBlessedSpirit) {
-			kind = modelitem.ShotBlessedSpirit
-		}
-		caster.SetChargedShot(kind, cast.Skill.StaticReuse)
-	}
+	dischargeSpiritshot(cast)
 	return result
 }
 

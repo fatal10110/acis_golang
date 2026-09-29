@@ -51,6 +51,10 @@ type Actor interface {
 	HealEffectiveness() float64
 	// RechargeMP adjusts a base MP-restore amount by the recharge rate.
 	RechargeMP(base float64) float64
+	// BroadcastStatus republishes the actor's current vitals to whoever
+	// follows them: a player's own bars, a summon's owner pet window and
+	// observers, an NPC's targeters.
+	BroadcastStatus()
 
 	AbortAll(force bool)
 	StopMove()
@@ -63,9 +67,10 @@ type Actor interface {
 	SetInvul(bool) bool
 	Afraid() bool
 	FearImmune() bool
-	// FleeFrom starts fleeing from effector and reports whether the actor
-	// is able to.
-	FleeFrom(effector Actor, distance int) bool
+	// FleeFrom runs the actor distance units directly away from effector,
+	// as far as the actor's own movement rules let it. A nil or self
+	// effector, or a distance under 10, does nothing.
+	FleeFrom(effector Actor, distance int)
 	// BluffExempt reports whether the actor ignores facing-redirect effects.
 	BluffExempt() bool
 
@@ -102,7 +107,6 @@ type PlayerActor interface {
 	MarkRecentFakeDeath()
 	HPFull() bool
 
-	BroadcastStatus()
 	BroadcastAbnormalEffect()
 	SendRegenMax(count, period int32, hpRegen float64)
 	NotifyEffectRemovedDueLackHP(*Effect)
@@ -142,6 +146,8 @@ type SummonActor interface {
 	OwnerObject() (world.Tracked, bool)
 	TryToAttack(world.Tracked)
 	TryToFollow(world.Tracked)
+	// Think wakes the summon's AI to continue its current intention.
+	Think() error
 }
 
 func asPlayer(a Actor) (PlayerActor, bool) {

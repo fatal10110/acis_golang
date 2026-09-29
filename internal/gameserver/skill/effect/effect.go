@@ -113,6 +113,18 @@ func (e *Effect) period() time.Duration {
 	return time.Duration(e.Template.Time) * time.Second
 }
 
+// initialCount is the tick count a fresh schedule starts from: the
+// template's own, except a fear from one of the halved-duration skills landing
+// on a playable, which starts at half of it. The template itself is left
+// alone, so the icon's repeat-count check and a relog restore's clamp still
+// read the configured count.
+func (e *Effect) initialCount() int {
+	if e.Type == TypeFear && isPlayable(e.Effected) && fearHalvedDurationPlayableSkillIDs[e.Skill.ID] {
+		return e.Template.Count / 2
+	}
+	return e.Template.Count
+}
+
 func (e *Effect) startSchedule(now time.Time) {
 	e.scheduleMu.Lock()
 	defer e.scheduleMu.Unlock()
@@ -123,7 +135,7 @@ func (e *Effect) startSchedule(now time.Time) {
 		return
 	}
 
-	e.remaining = e.Template.Count
+	e.remaining = e.initialCount()
 	if period := e.period(); period > 0 {
 		e.nextAction = now.Add(period)
 		return

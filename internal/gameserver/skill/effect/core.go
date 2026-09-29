@@ -316,11 +316,16 @@ var fearHalvedDurationPlayableSkillIDs = map[modelskill.ID]bool{
 // contributes to every effect instance it applies, shared by a live cast's
 // applyEffects and a relog restore's effect replay.
 func SkillFromDefinition(def modelskill.Definition) Skill {
+	var stackType string
+	if len(def.Effects) > 0 {
+		stackType = def.Effects[0].StackType
+	}
 	return Skill{
 		ID:                  def.ID,
 		Level:               def.Level,
 		Name:                def.Name,
 		SkillType:           def.SkillType,
+		StackType:           stackType,
 		Debuff:              def.Debuff,
 		Toggle:              def.Activation == modelskill.ActivationToggle,
 		KillByDOT:           def.KillByDOT,
@@ -340,21 +345,18 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 	}
 }
 
-// Apply instantiates each of templates and adds it to list as a fresh live
-// effect, attributed to effector. A template naming an effect core this
-// port hasn't wired yet is skipped rather than failing the whole batch.
-func Apply(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
-	if list == nil {
-		return
-	}
+// Apply instantiates each of templates as a fresh live effect of effector on
+// effected and hosts it where Attach places it. It rolls no landing chance
+// and checks no landing gate; callers decide that first (see Lands). A
+// template naming an effect core this port hasn't wired yet is skipped
+// rather than failing the whole batch.
+func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
 	for _, tmpl := range templates {
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
 		}
-		e.Effector = effector
-		e.Effected = effected
-		list.Add(e)
+		Attach(e, effector, effected)
 	}
 }
 

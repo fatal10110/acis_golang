@@ -187,6 +187,16 @@ type HerbConsumed struct{ ItemID int32 }
 // AttackRequested reports an aggression effect provoking an attack on Target.
 type AttackRequested struct{ Target world.Tracked }
 
+// FleeRequested asks the character to run Distance units directly away from
+// From, in run stance, the way a server-driven move is requested. AIDenied
+// reports that the character was already unable to take AI actions before the
+// effect in progress landed: the request is then refused.
+type FleeRequested struct {
+	From     location.Location
+	Distance int
+	AIDenied bool
+}
+
 // Retargeted reports a domain-driven selection change; a nil Target clears
 // the selection.
 type Retargeted struct{ Target world.Tracked }
@@ -258,6 +268,7 @@ func (SkillResisted) event()          {}
 func (MagicResisted) event()          {}
 func (HerbConsumed) event()           {}
 func (AttackRequested) event()        {}
+func (FleeRequested) event()          {}
 func (Retargeted) event()             {}
 func (SummonConfirmRequested) event() {}
 func (TeleportRequested) event()      {}

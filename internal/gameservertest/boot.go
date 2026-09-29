@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -64,6 +65,7 @@ type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
+	petNameLookupErr       error
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -77,7 +79,10 @@ type options struct {
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
+	disallowWater          bool
 	attackStance           *task.AttackStance
+	pvpFlags               *task.PvPFlags
+	decay                  *task.Decay
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -107,7 +112,9 @@ type options struct {
 	geo                    move.Geo
 	itemTemplates          *item.Table
 	productionTickers      bool
+	handAI                 bool
 	realPool               bool
+	doors                  []*door.Template
 }
 
 type characterSpec struct {
@@ -173,10 +180,28 @@ func WithWater(now func() time.Time) Option {
 	}
 }
 
+// WithAllowWater sets the AllowWater server option (default true); false
+// keeps water zones swimming but never starts a breath countdown.
+func WithAllowWater(allowed bool) Option {
+	return func(o *options) { o.disallowWater = !allowed }
+}
+
 // WithAttackStance supplies the combat-stance tracker wired into the link
 // (default: nil, so stance is neither tracked nor consulted).
 func WithAttackStance(tracker *task.AttackStance) Option {
 	return func(o *options) { o.attackStance = tracker }
+}
+
+// WithPvPFlags supplies the PvP-flag tracker wired into the link (default:
+// nil, so a resolved attack flags nobody).
+func WithPvPFlags(flags *task.PvPFlags) Option {
+	return func(o *options) { o.pvpFlags = flags }
+}
+
+// WithDecay supplies the corpse-decay task wired into the link (default:
+// nil, so a dead summon's corpse never decays).
+func WithDecay(decay *task.Decay) Option {
+	return func(o *options) { o.decay = decay }
 }
 
 // WithAttackStanceTracker substitutes the combat-stance tracker the link
@@ -363,6 +388,11 @@ func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
 // must not tick it by hand in parallel.
 func WithProductionTickers() Option { return func(o *options) { o.productionTickers = true } }
 
+// WithAITask wires the AI registry the production boot runs summons and NPCs
+// on, without starting its ticker: the suite drives each one-second AI cycle
+// itself through Server.AI.Tick.
+func WithAITask() Option { return func(o *options) { o.handAI = true } }
+
 // WithItemTemplates boots against tbl instead of the shared catalog, so a
 // suite can hand the server a catalog it also holds a reference to and edit
 // a template mid-test — what a datapack edit looks like from the inside.
@@ -395,7 +425,8 @@ type Server struct {
 	AttackStance     *task.AttackStance
 	Effects          *task.Effects
 	AI               *task.AI
-	Water            *task.Water // set by WithWater; nil otherwise
+	Water            *task.Water               // set by WithWater; nil otherwise
+	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -417,11 +448,13 @@ type Server struct {
 	castEffects actorcast.EffectHandlers
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
-	queues         *queues
-	traffic        *traffic
-	heldLanes      [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
-	log            zerolog.Logger
-	sendObserver   *atomic.Pointer[func(payload []byte)]
+	// zones is the zone index WithZones supplied; nil when none was.
+	zones        *zone.Index
+	queues       *queues
+	traffic      *traffic
+	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
+	log          zerolog.Logger
+	sendObserver *atomic.Pointer[func(payload []byte)]
 
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
@@ -1054,6 +1087,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		itemTemplates = ItemTemplates()
 	}
 	ids := &sequentialIDs{next: 100}
+	var worldObjects *gamemanager.WorldObjects
+	if len(o.doors) > 0 {
+		worldObjects = bootDoors(t, o.doors, ids, state)
+	}
 	levels := o.levels
 	if levels == nil {
 		synthetic := make(map[int]player.Level, 85)
@@ -1133,6 +1170,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	positions := task.NewPositionUpdates(state)
 	var ai *task.AI
+	if o.handAI {
+		ai = task.NewAI(state, o.log)
+	}
 	if o.productionTickers {
 		ai = task.NewAI(state, o.log)
 		if o.attackStance == nil && o.attackStanceNow == nil {
@@ -1176,7 +1216,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: true, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
@@ -1198,6 +1238,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
 		gclConfig.Shortcuts = slowShortcutStore{ShortcutStore: shortcuts, delay: o.slowStores}
 		gclConfig.PetStore = slowPetStore{PetStore: petStore, delay: o.slowStores}
+	}
+	if o.petNameLookupErr != nil {
+		if o.slowStores > 0 {
+			t.Fatal("gameservertest: WithPetNameLookupError cannot be combined with WithSlowStores")
+		}
+		gclConfig.PetStore = failingPetNameStore{PetStore: petStore, err: o.petNameLookupErr}
 	}
 	// Assign through the interface only when set: a typed-nil
 	// *task.AttackStance would otherwise become a non-nil interface and defeat
@@ -1221,6 +1267,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	} else if attackStance != nil {
 		gclConfig.AttackStance = attackStance
 	}
+	if o.pvpFlags != nil {
+		gclConfig.PvPFlags = o.pvpFlags
+	}
+	gclConfig.Decay = o.decay
 	if ai != nil {
 		gclConfig.AI = ai
 	}
@@ -1333,6 +1383,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	srv := &Server{
 		Client:           c,
 		State:            state,
+		WorldObjects:     worldObjects,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,
@@ -1352,6 +1403,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
 		maxGeoPathFail:   o.maxGeoPathFailCount,
+		zones:            o.zones,
 		AI:               ai,
 		Water:            water,
 		account:          o.account,

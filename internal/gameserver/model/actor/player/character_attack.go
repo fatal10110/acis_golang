@@ -231,9 +231,19 @@ func (c *Character) fistTemplate() *item.Template {
 	return fists
 }
 
-// AttackDisabled reports whether this player can start a physical attack.
+// AttackDisabled reports whether this player cannot start a physical
+// attack: flying (a wyvern rider), dead or fake-dead, or held by stun,
+// sleep, paralysis, fear, or an immobile-until-attacked effect. Teleporting
+// and rooted gate movement, not attacking.
 func (c *Character) AttackDisabled() bool {
-	return c.AlikeDead()
+	if c.Flying() || c.AlikeDead() {
+		return true
+	}
+	live := c.liveLocked()
+	if live == nil {
+		return false
+	}
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Afraid()
 }
 
 // MovementDisabled reports whether this player is in a state where they
@@ -562,8 +572,12 @@ func (c *Character) Evasion() int {
 	return int(val)
 }
 
-// CollisionRadius returns this player's body radius.
+// CollisionRadius returns this player's body radius: the mount's while
+// mounted, otherwise the class template's for this character's sex.
 func (c *Character) CollisionRadius() float64 {
+	if radius, _, ok := c.mountBody(); ok {
+		return radius
+	}
 	tmpl := c.template()
 	if tmpl == nil {
 		return 0
@@ -575,8 +589,12 @@ func (c *Character) CollisionRadius() float64 {
 }
 
 // CollisionHeight returns this player's body height, used for line-of-sight
-// eye-height calculation.
+// eye-height calculation: the mount's while mounted, otherwise the class
+// template's for this character's sex.
 func (c *Character) CollisionHeight() float64 {
+	if _, height, ok := c.mountBody(); ok {
+		return height
+	}
 	tmpl := c.template()
 	if tmpl == nil {
 		return 0

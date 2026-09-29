@@ -232,6 +232,51 @@ func TestHostileMovementDisabledTracksCrowdControl(t *testing.T) {
 	}
 }
 
+// TestHostileAttackDisabledMatchesReferenceTerms pins the NPC attack gate to
+// the reference's creature union (Creature.isAttackingDisabled minus flying,
+// which an NPC never is): stun, immobile-until-attacked, sleep, paralysis,
+// fear and death disable attacking; root and teleport gate movement only.
+func TestHostileAttackDisabledMatchesReferenceTerms(t *testing.T) {
+	effects := []struct {
+		name     string
+		disables bool
+	}{
+		{"Stun", true},
+		{"ImmobileUntilAttacked", true},
+		{"Sleep", true},
+		{"Paralyze", true},
+		{"Fear", true},
+		{"Root", false},
+	}
+	for _, tt := range effects {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			if h.AttackDisabled() {
+				t.Fatal("AttackDisabled() = true with no effect active")
+			}
+			e := addHostileEffect(t, h, tt.name)
+			if got := h.AttackDisabled(); got != tt.disables {
+				t.Fatalf("AttackDisabled() = %v with %s active, want %v", got, tt.name, tt.disables)
+			}
+			h.EffectList().Remove(e)
+			if h.AttackDisabled() {
+				t.Fatalf("AttackDisabled() = true after %s was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("teleporting", func(t *testing.T) {
+		h := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+		h.SetTeleporting(true)
+		if !h.MovementDisabled() {
+			t.Fatal("MovementDisabled() = false while teleporting")
+		}
+		if h.AttackDisabled() {
+			t.Fatal("AttackDisabled() = true while only teleporting")
+		}
+	})
+}
+
 // TestHostileReduceHPByDOTLeavesEffectsAloneOnRealDOTTick mirrors the
 // !isDOT gate on CreatureStatus.reduceHp's whole SLEEP/IMMOBILE/STUN block:
 // NpcStatus has no PlayerStatus-style override, so a real DOT tick
@@ -2267,3 +2312,38 @@ func (overhitActor) Position() (x, y, z int) { return 0, 0, 0 }
 func (overhitSummon) Heading() int { return 0 }
 
 func (overhitSummon) Position() (x, y, z int) { return 0, 0, 0 }
+
+// A confused NPC picks its new target among neighbours within a horizontal
+// point distance of 1000: a monster on a ledge far above but 900 across is a
+// candidate, one 1001 across on the same floor is not, even though its body
+// would reach under a collision-widened 3D check.
+func TestRandomNearbyCombatantMeasuresHorizontalPointDistance(t *testing.T) {
+	tpl := &Template{ID: 9001, Type: "Monster", CollisionRadius: 40}
+	tests := []struct {
+		name    string
+		x, y, z int
+		wantHit bool
+	}{
+		{"900 across, 700 above", 900, 0, 700, true},
+		{"diagonal 1000 across, 3000 below", 600, 800, -3000, true},
+		{"1001 across, same floor", 1001, 0, 0, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := world.New()
+			confused := newCombatHostile(t, 1, tpl)
+			other := newCombatHostile(t, 2, tpl)
+			w.Spawn(confused, 0, 0, 0, 0)
+			w.Spawn(other, tc.x, tc.y, tc.z, 0)
+			confused.Attach(Runtime{World: w})
+
+			got, ok := confused.RandomNearbyCombatant(1000)
+			if ok != tc.wantHit {
+				t.Fatalf("RandomNearbyCombatant(1000) ok = %v, want %v", ok, tc.wantHit)
+			}
+			if ok && got.ObjectID() != other.ObjectID() {
+				t.Fatalf("RandomNearbyCombatant(1000) = object %d, want %d", got.ObjectID(), other.ObjectID())
+			}
+		})
+	}
+}

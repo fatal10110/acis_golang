@@ -681,8 +681,15 @@ type fakeCubicSummoner struct {
 	servitor     modelskill.Definition
 }
 
+// newFakeCubicSummoner returns a summoner with its own world object id, so a
+// mass cast can tell the caster from the other recipients.
 func newFakeCubicSummoner(nextAdded bool) *fakeCubicSummoner {
-	return &fakeCubicSummoner{added: map[cubic.ID]bool{}, givenByOther: map[cubic.ID]bool{}, nextAdded: nextAdded}
+	return &fakeCubicSummoner{
+		fakeActor:    fakeActor{objectID: nextFakeObjectID()},
+		added:        map[cubic.ID]bool{},
+		givenByOther: map[cubic.ID]bool{},
+		nextAdded:    nextAdded,
+	}
 }
 
 func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, added bool) {
@@ -1723,7 +1730,9 @@ type skillTarget struct {
 
 	effects *effect.List
 	shots   []item.ShotKind
-	charged map[item.ShotKind]bool
+	// shotFlags parallels shots with the charged flag each write carried.
+	shotFlags []bool
+	charged   map[item.ShotKind]bool
 
 	castBreakDamage []float64
 
@@ -1733,6 +1742,23 @@ type skillTarget struct {
 	noticeName   string
 	noticeAmount int
 	noticeOther  bool
+
+	// reflects makes every reflectable skill bounce off this target.
+	reflects bool
+	// resistNotices records the S1_RESISTED_YOUR_S2 notices sent to this
+	// actor directly rather than through a cast Result.
+	resistNotices []Resisted
+}
+
+func (t *skillTarget) SkillReflectInput(modelskill.Definition) formulas.SkillReflectInput {
+	if !t.reflects {
+		return formulas.SkillReflectInput{}
+	}
+	return formulas.SkillReflectInput{CanBeReflected: true, Magic: true, ReflectChance: 100}
+}
+
+func (t *skillTarget) NotifyResistedSkill(name string, id modelskill.ID, level int) {
+	t.resistNotices = append(t.resistNotices, Resisted{TargetName: name, SkillID: id, SkillLevel: level})
 }
 
 func (t *skillTarget) BreakCastOnDamage(damage float64) {
@@ -1833,6 +1859,7 @@ func (t *skillTarget) ReduceMP(v float64) float64 {
 }
 
 func (t *skillTarget) RechargeMP(v float64) float64 { return v * t.recharge }
+func (t *skillTarget) BroadcastStatus()             {}
 
 func (t *skillTarget) CP() float64         { return t.cp }
 func (t *skillTarget) MaxCPValue() float64 { return t.maxCP }
@@ -1846,7 +1873,7 @@ func (t *skillTarget) SetCP(v float64) {
 	t.cp = v
 }
 
-func (t *skillTarget) AddExpAndSP(exp, sp int) { t.sp += sp }
+func (t *skillTarget) AddExpAndSp(_ int64, sp int) { t.sp += sp }
 
 func (t *skillTarget) Die(killer attackable.Combatant) {
 	t.dead = true
@@ -1857,8 +1884,9 @@ func (t *skillTarget) ReduceHP(v float64, attacker attackable.Combatant, skill m
 	t.hp -= v
 }
 
-func (t *skillTarget) SetChargedShot(kind item.ShotKind, _ bool) {
+func (t *skillTarget) SetChargedShot(kind item.ShotKind, charged bool) {
 	t.shots = append(t.shots, kind)
+	t.shotFlags = append(t.shotFlags, charged)
 }
 
 func (t *skillTarget) ChargedShot(kind item.ShotKind) bool { return t.charged[kind] }
@@ -2801,6 +2829,149 @@ func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
 	}
 }
 
+// TestNonDamageHandlersDischargeChargedShots pins the shot each non-damage
+// handler spends after its target loop, and the static-reuse flag it writes
+// back: CPDAMPERCENT spends the soulshot; HEAL, MANAHEAL, RESURRECT and the
+// CANCEL family spend the blessed spiritshot when one is charged, otherwise
+// the plain spiritshot. A static heal and a potion leave the shot alone.
+func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
+	healTarget := func() *skillTarget { return &skillTarget{hp: 10, maxHP: 100, mp: 10, maxMP: 100, recharge: 1} }
+	tests := []struct {
+		name      string
+		skill     modelskill.Definition
+		blessed   bool
+		healOK    bool
+		targets   func() []Actor
+		wantShots []item.ShotKind
+	}{
+		{
+			name:      "cpdampercent with no targets",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "cpdampercent skips a non-player target",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{cp: 100, maxCP: 100}} },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "cpdampercent static reuse",
+			skill:     modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50, StaticReuse: true},
+			targets:   func() []Actor { return []Actor{&skillTarget{isPlayer: true, cp: 100, maxCP: 100}} },
+			wantShots: []item.ShotKind{item.ShotSoul},
+		},
+		{
+			name:      "heal plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "heal blessed spiritshot static reuse",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20, StaticReuse: true},
+			blessed:   true,
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "heal without a resolvable amount",
+			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:    "heal static keeps shot",
+			skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
+			blessed: true,
+			healOK:  true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:    "heal potion keeps shot",
+			skill:   modelskill.Definition{SkillType: "HEAL", Power: 20, Potion: true},
+			healOK:  true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:      "manaheal plain spiritshot",
+			skill:     modelskill.Definition{SkillType: "MANAHEAL", Power: 20},
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "manarecharge blessed spiritshot",
+			skill:     modelskill.Definition{SkillType: "MANARECHARGE", Power: 20, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:    "manaheal potion keeps shot",
+			skill:   modelskill.Definition{SkillType: "MANAHEAL", Power: 20, Potion: true},
+			blessed: true,
+			targets: func() []Actor { return []Actor{healTarget()} },
+		},
+		{
+			name:      "resurrect by a caster without revive power",
+			skill:     modelskill.Definition{SkillType: "RESURRECT", Power: 20},
+			blessed:   true,
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "cancel with no targets",
+			skill:     modelskill.Definition{SkillType: "CANCEL", Power: 20},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+		{
+			name:      "mage bane skips a dead target",
+			skill:     modelskill.Definition{SkillType: "MAGE_BANE", Power: 20, StaticReuse: true},
+			blessed:   true,
+			targets:   func() []Actor { return []Actor{&skillTarget{dead: true}} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+		},
+		{
+			name:      "warrior bane with no targets",
+			skill:     modelskill.Definition{SkillType: "WARRIOR_BANE", Power: 20},
+			targets:   func() []Actor { return nil },
+			wantShots: []item.ShotKind{item.ShotSpirit},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			caster := &skillTarget{
+				healAmount: 10, healOK: tt.healOK,
+				charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: tt.blessed, item.ShotSpirit: !tt.blessed, item.ShotSoul: true},
+			}
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets()})
+			if !slices.Equal(caster.shots, tt.wantShots) {
+				t.Fatalf("discharged shots = %v, want %v", caster.shots, tt.wantShots)
+			}
+			for i, flag := range caster.shotFlags {
+				if flag != tt.skill.StaticReuse {
+					t.Fatalf("shot write %d charged = %v, want static-reuse flag %v", i, flag, tt.skill.StaticReuse)
+				}
+			}
+		})
+	}
+}
+
+// TestCpDamPercentAlikeDeadCasterKeepsSoulshot pins the one early exit that
+// precedes the soulshot discharge.
+func TestCpDamPercentAlikeDeadCasterKeepsSoulshot(t *testing.T) {
+	caster := &skillTarget{alikeDead: true}
+	NewDefaultRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "CPDAMPERCENT", Power: 50}})
+	if len(caster.shots) != 0 {
+		t.Fatalf("discharged shots = %v, want none from an alike-dead caster", caster.shots)
+	}
+}
+
 func TestPdamReportsDodgeWithoutDealingDamage(t *testing.T) {
 	registry := NewDefaultRegistry()
 	caster := &skillTarget{}
@@ -3554,127 +3725,6 @@ func TestGetPlayerPullsLivingTargetsToCaster(t *testing.T) {
 	}
 }
 
-// ---- from unlock_test.go ----
-type doorFake struct {
-	world.Presence
-	fakeActor
-	unlockable, opened bool
-}
-
-func (d *doorFake) Unlockable() bool { return d.unlockable }
-func (d *doorFake) Opened() bool     { return d.opened }
-func (d *doorFake) Open()            { d.opened = true }
-
-func TestUnlockDoorSpecialGuaranteedSuccess(t *testing.T) {
-	registry := NewDefaultRegistry()
-	door := &doorFake{unlockable: false}
-
-	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "UNLOCK_SPECIAL", Power: 150},
-		Targets: []Actor{door},
-	})
-	if !door.opened {
-		t.Fatal("UNLOCK_SPECIAL with power >= 100 should always open, even an unlockable=false door")
-	}
-}
-
-func TestUnlockDoorLevelZeroNeverOpens(t *testing.T) {
-	registry := NewDefaultRegistry()
-	door := &doorFake{unlockable: true}
-
-	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 0},
-		Targets: []Actor{door},
-	})
-	if door.opened {
-		t.Fatal("level 0 unlock should never open a door")
-	}
-}
-
-func TestUnlockDoorNotUnlockableIsSkipped(t *testing.T) {
-	registry := NewDefaultRegistry()
-	door := &doorFake{unlockable: false}
-
-	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 4},
-		Targets: []Actor{door},
-	})
-	if door.opened {
-		t.Fatal("a non-unlockable door should not open via a regular UNLOCK")
-	}
-}
-
-type chestFake struct {
-	world.Presence
-	fakeActor
-	dead, interacted, box bool
-	level                 int
-
-	died, deleted          bool
-	desireAdded, hateAdded bool
-}
-
-func (c *chestFake) Dead() bool                      { return c.dead }
-func (c *chestFake) Interacted() bool                { return c.interacted }
-func (c *chestFake) SetInteracted()                  { c.interacted = true }
-func (c *chestFake) Box() bool                       { return c.box }
-func (c *chestFake) Level() int                      { return c.level }
-func (c *chestFake) Die(killer attackable.Combatant) { c.died = true }
-func (c *chestFake) DeleteMe()                       { c.deleted = true }
-
-func (c *chestFake) AddAttackDesire(attacker attackable.Combatant, weight float64) {
-	c.desireAdded = true
-}
-
-func (c *chestFake) AddDamageHate(attacker attackable.Combatant, damage, hate float64) {
-	c.hateAdded = true
-}
-
-func TestUnlockChestNotBoxAddsAttackDesire(t *testing.T) {
-	registry := NewDefaultRegistry()
-	chest := &chestFake{box: false}
-
-	registry.Use(Cast{Skill: modelskill.Definition{SkillType: "UNLOCK"}, Targets: []Actor{chest}})
-	if !chest.desireAdded {
-		t.Fatal("expected an attack desire for a non-box chest")
-	}
-	if chest.interacted {
-		t.Fatal("a non-box chest should not be marked interacted")
-	}
-}
-
-func TestUnlockChestDeluxeKeyExactLevelMatchGuaranteedOpen(t *testing.T) {
-	registry := NewDefaultRegistry()
-	chest := &chestFake{box: true, level: 100}
-
-	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "DELUXE_KEY_UNLOCK", ID: 9999, Level: 10},
-		Targets: []Actor{chest},
-	})
-	if !chest.interacted {
-		t.Fatal("chest should be marked interacted")
-	}
-	if !chest.died || !chest.hateAdded {
-		t.Fatalf("exact-level deluxe key should always open: died=%v hateAdded=%v", chest.died, chest.hateAdded)
-	}
-}
-
-func TestUnlockChestAboveBracketTooLowSkillGuaranteedFail(t *testing.T) {
-	registry := NewDefaultRegistry()
-	chest := &chestFake{box: true, level: 70}
-
-	registry.Use(Cast{
-		Skill:   modelskill.Definition{SkillType: "UNLOCK", Level: 5},
-		Targets: []Actor{chest},
-	})
-	if chest.died {
-		t.Fatal("a level 5 unlock skill should never open a level-70 chest")
-	}
-	if !chest.deleted {
-		t.Fatal("a failed chest unlock should delete the chest")
-	}
-}
-
 func (*effectLandingFake) Kind() actor.Kind { return actor.KindNPC }
 
 func (*positionedFakeActor) Kind() actor.Kind { return actor.KindNPC }
@@ -3892,4 +3942,127 @@ func TestSkillDamageFeedbackRecipientAndBlockedTarget(t *testing.T) {
 			}
 		})
 	}
+}
+
+// reflectedDamageCase is one damage handler whose reflect branch swaps the
+// effect participants: the reflecting target becomes the effector and the
+// caster the effected, as Pdam/Mdam/Blow/L2SkillChargeDmg's
+// getEffects(targetCreature, creature) does.
+type reflectedDamageCase struct {
+	skillType string
+	reflector func() *skillTarget
+}
+
+func reflectedDamageCases() []reflectedDamageCase {
+	target := func() *skillTarget {
+		return &skillTarget{
+			fakeActor: fakeActor{objectID: 2}, hp: 5000, isPlayer: true, name: "Reflector",
+			effects: newTestList(nil), reflects: true, skillSuccessOK: true,
+			physicalInput: formulas.PhysicalSkillInput{
+				AttackPower: 100, SkillPower: 50, Defence: 60,
+				RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1, ElementalMul: 1,
+			},
+			physicalOK: true,
+			magicInput: formulas.MagicDamageInput{MAtk: 400, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1},
+			magicOK:    true,
+			blowInput:  formulas.BlowInput{Landed: true, AttackPower: 100, SkillPower: 50, Defence: 50, RandomMul: 1, PosMul: 1},
+			blowOK:     true,
+		}
+	}
+	return []reflectedDamageCase{{"PDAM", target}, {"MDAM", target}, {"BLOW", target}, {"CHARGEDAM", target}}
+}
+
+func reflectCaster() *skillTarget {
+	return &skillTarget{
+		fakeActor: fakeActor{objectID: 1}, hp: 5000, isPlayer: true, name: "Caster",
+		effects: newTestList(nil), skillSuccessOK: true,
+	}
+}
+
+// TestReflectedDamageSkillSwapsEffectorAndEffected pins the reflect swap on
+// every damage handler: a self-target kind (StunSelf, skill 81's effect) is
+// hosted by the reflecting target, an ordinary kind lands on the caster, and
+// both name the reflector as effector and the caster as effected. The
+// caster's own landing roll is forced to fail: a reflected landing rolls
+// none.
+func TestReflectedDamageSkillSwapsEffectorAndEffected(t *testing.T) {
+	for _, tc := range reflectedDamageCases() {
+		t.Run(tc.skillType, func(t *testing.T) {
+			caster := reflectCaster()
+			caster.skillSuccessChance = chanceOf(0)
+			reflector := tc.reflector()
+			NewDefaultRegistry().UseResult(Cast{
+				Caster: caster,
+				Skill: modelskill.Definition{
+					ID: 81, Level: 1, SkillType: tc.skillType, CanBeReflected: true, Offensive: true,
+					Effects: []modelskill.EffectTemplate{{Name: "StunSelf", Time: 9}, {Name: "Debuff", Time: 9}},
+				},
+				Targets: []Actor{reflector},
+			})
+
+			held := reflector.effects.All()
+			if len(held) != 1 || held[0].Type != effect.TypeStunSelf || held[0].Effector != effect.Actor(reflector) || held[0].Effected != effect.Actor(caster) {
+				t.Fatalf("reflector-held effects = %+v, want one StunSelf with effector reflector and effected caster", held)
+			}
+			landed := caster.effects.All()
+			if len(landed) != 1 || landed[0].Type != effect.TypeDebuff || landed[0].Effector != effect.Actor(reflector) || landed[0].Effected != effect.Actor(caster) {
+				t.Fatalf("caster-held effects = %+v, want one Debuff with effector reflector and effected caster", landed)
+			}
+		})
+	}
+}
+
+// TestReflectedDamageSkillReportsResistToTheReflector pins who hears a
+// reflected template's landing resist: the reflector, as the effects'
+// effector, naming the caster at the cast level — never the caster.
+func TestReflectedDamageSkillReportsResistToTheReflector(t *testing.T) {
+	for _, tc := range reflectedDamageCases() {
+		t.Run(tc.skillType, func(t *testing.T) {
+			caster := reflectCaster()
+			reflector := tc.reflector()
+			result, _ := NewDefaultRegistry().UseResult(Cast{
+				Caster: caster,
+				Skill: modelskill.Definition{
+					ID: 7, Level: 20, SkillType: tc.skillType, CanBeReflected: true,
+					Effects: resistedIconTemplate,
+				},
+				Targets: []Actor{reflector},
+			})
+			if len(result.Resisted) != 0 {
+				t.Fatalf("caster-facing Resisted = %+v, want none", result.Resisted)
+			}
+			want := []Resisted{{TargetName: "Caster", SkillID: 7, SkillLevel: 20}}
+			if !slices.Equal(reflector.resistNotices, want) {
+				t.Fatalf("reflector resist notices = %+v, want %+v", reflector.resistNotices, want)
+			}
+		})
+	}
+}
+
+// TestReflectedDamageSkillGatesOnTheSwappedPair pins the landing gates on
+// the swapped pair: an invulnerable caster refuses the reflected offensive
+// effects, and a perfect shield block of the original strike does not stop
+// them.
+func TestReflectedDamageSkillGatesOnTheSwappedPair(t *testing.T) {
+	def := modelskill.Definition{
+		ID: 7, Level: 1, SkillType: "PDAM", CanBeReflected: true, Offensive: true,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 9}},
+	}
+	t.Run("invulnerable caster", func(t *testing.T) {
+		caster := &guardedSkillTarget{skillTarget: reflectCaster(), invul: true}
+		reflector := reflectedDamageCases()[0].reflector()
+		NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{reflector}})
+		if got := caster.effects.All(); len(got) != 0 {
+			t.Fatalf("invulnerable caster effects = %+v, want none", got)
+		}
+	})
+	t.Run("perfect shield", func(t *testing.T) {
+		caster := reflectCaster()
+		reflector := reflectedDamageCases()[0].reflector()
+		reflector.physicalInput.Shield = formulas.ShieldPerfect
+		NewDefaultRegistry().UseResult(Cast{Caster: caster, Skill: def, Targets: []Actor{reflector}})
+		if got := caster.effects.All(); len(got) != 1 || got[0].Effector != effect.Actor(reflector) {
+			t.Fatalf("caster effects = %+v, want the reflected Debuff despite the perfect block", got)
+		}
+	})
 }

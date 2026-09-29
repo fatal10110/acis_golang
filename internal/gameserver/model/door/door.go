@@ -111,7 +111,15 @@ type Object struct {
 
 	opened atomic.Bool
 
-	sink event.Sink
+	sink  event.Sink
+	owner StateOwner
+}
+
+// StateOwner applies a door's open/close change together with everything
+// that follows it: the geodata blocker, the status broadcast, a linked
+// door, and the auto open/close timer.
+type StateOwner interface {
+	SetDoorOpen(id int, open bool) bool
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -179,14 +187,29 @@ func (o *Object) Opened() bool {
 	return o.opened.Load()
 }
 
-// SetOpened updates the door's open state and reports whether it changed.
+// SetOpened updates only the door's open flag and reports whether it
+// changed. It is the state owner's primitive; everything else opens a door
+// with Open, which also applies the change's world side effects.
 func (o *Object) SetOpened(open bool) bool {
 	return o.opened.CompareAndSwap(!open, open)
+}
+
+// Open opens this door through its state owner and reports whether it was
+// closed. A door with no owner stays as it is.
+func (o *Object) Open() bool {
+	if o.owner == nil {
+		return false
+	}
+	return o.owner.SetDoorOpen(o.DoorID(), true)
 }
 
 // Attach installs sink as the receiver of this door's events. Call it once,
 // before the door is spawned.
 func (o *Object) Attach(sink event.Sink) { o.sink = sink }
+
+// SetOwner installs the owner that applies this door's state changes. Call
+// it once, before the door is spawned.
+func (o *Object) SetOwner(owner StateOwner) { o.owner = owner }
 
 // BroadcastStatus reports this door's current open/close state to observers.
 func (o *Object) BroadcastStatus() {

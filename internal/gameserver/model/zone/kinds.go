@@ -271,12 +271,16 @@ func (z *Script) exit(a Actor)       { a.ZoneFlags().Set(FlagScript, false) }
 
 // Water marks water volumes: occupants swim, and players below the
 // surface too long start drowning.
-type Water struct {
-	Zone
-	// SwimStateChanged switches the actor's movement into or out of swim
-	// mode and rebroadcasts its appearance to observers; nil until the
-	// movement layer wires it.
-	SwimStateChanged func(a Actor, swimming bool)
+type Water struct{ Zone }
+
+// Swimmer is an occupant whose movement and appearance follow water: a
+// Water zone tells it when it starts and stops swimming. Each occupant
+// carries its own reaction, so no water zone holds per-server state.
+type Swimmer interface {
+	Actor
+	// SwimStateChanged switches the actor into or out of swim mode and
+	// rebroadcasts its appearance to observers.
+	SwimStateChanged(swimming bool)
 }
 
 // NewWater builds a water zone.
@@ -289,15 +293,15 @@ func (z *Water) affects(Actor) bool { return true }
 
 func (z *Water) enter(a Actor) {
 	a.ZoneFlags().Set(FlagWater, true)
-	if z.SwimStateChanged != nil {
-		z.SwimStateChanged(a, true)
+	if s, ok := a.(Swimmer); ok {
+		s.SwimStateChanged(true)
 	}
 }
 
 func (z *Water) exit(a Actor) {
 	a.ZoneFlags().Set(FlagWater, false)
-	if z.SwimStateChanged != nil {
-		z.SwimStateChanged(a, false)
+	if s, ok := a.(Swimmer); ok {
+		s.SwimStateChanged(false)
 	}
 }
 
@@ -414,11 +418,15 @@ func (z *Town) enter(a Actor) {
 	if z.CombatRule == 1 && a.Class() == ClassPlayer && z.InSiege != nil && z.InSiege(a) {
 		return
 	}
-	if z.Peaceful && z.CombatRule != 2 {
+	if z.raisesPeace() {
 		a.ZoneFlags().Set(FlagPeace, true)
 	}
 	a.ZoneFlags().Set(FlagTown, true)
 }
+
+// raisesPeace reports whether entering the town sets the peace flag: the
+// town must be peaceful and its combat rule must not disable peace townwide.
+func (z *Town) raisesPeace() bool { return z.Peaceful && z.CombatRule != 2 }
 
 func (z *Town) exit(a Actor) {
 	if z.Peaceful {

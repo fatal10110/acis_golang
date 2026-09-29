@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -198,6 +199,70 @@ func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
 	effects := holder.EffectList().All()
 	if len(effects) != 1 || effects[0].Type != effect.TypeStunSelf || effects[0].Effected != hostile {
 		t.Fatalf("caster-held effects = %+v, want one StunSelf effect that retains hostile %d", effects, hostile.ObjectID())
+	}
+}
+
+// TestReflectedPunchOfDoomHostsItsStunSelfOnTheReflector pins the reflect
+// swap: when the struck monster bounces Punch of Doom, the monster becomes
+// the effects' effector, so it holds the StunSelf effect with the caster as
+// the affected participant, and the ordinary effect lands on the caster,
+// credited to the monster.
+func TestReflectedPunchOfDoomHostsItsStunSelfOnTheReflector(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Tyrant", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
+			ID: 81, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+			CastRange: 40, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+			SkillType: "PDAM", Power: 1_000_000, CanBeReflected: true,
+			Effects: []modelskill.EffectTemplate{
+				{Name: "StunSelf", Time: 9},
+				{Name: "Buff", Time: 9},
+			},
+		}})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 81, 1)
+	startInWorld(t, c)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	caster, ok := obj.(interface {
+		effect.Actor
+		EffectList() *effect.List
+	})
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is no effect participant", objID, obj)
+	}
+	// Melee range: a physical skill only reflects within it.
+	x, y, z := caster.Position()
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: x + 20, Y: y, Z: z})
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.ReflectSkillPhysic, Op: effect.OpAdd, Value: 100}})
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(81, false, false))
+	readCastStartFrames(t, c, objID, 81, 1, 500, 60_000, hostile.ObjectID())
+	srv.AdvanceUntil(t, "reflected Punch of Doom effects", func() bool {
+		return len(hostile.EffectList().All()) == 1 && len(caster.EffectList().All()) == 1
+	})
+
+	for _, tc := range []struct {
+		holder string
+		held   []*effect.Effect
+		want   effect.Type
+	}{
+		{"monster", hostile.EffectList().All(), effect.TypeStunSelf},
+		{"caster", caster.EffectList().All(), effect.TypeBuff},
+	} {
+		e := tc.held[0]
+		if e.Type != tc.want || e.Effector.ObjectID() != hostile.ObjectID() || e.Effected.ObjectID() != objID {
+			t.Fatalf("%s-held effect = %s by %d on %d, want %s by monster %d on caster %d",
+				tc.holder, e.Type, e.Effector.ObjectID(), e.Effected.ObjectID(), tc.want, hostile.ObjectID(), objID)
+		}
 	}
 }
 

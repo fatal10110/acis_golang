@@ -3,7 +3,6 @@ package effect
 import (
 	"math"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -27,24 +26,36 @@ func sleepStart(e *Effect) bool {
 	return true
 }
 
+// fearFleeDistance is how far a feared creature runs from its effector on
+// every flee.
+const fearFleeDistance = 500
+
+// fearStart keeps the fear once the target has been sent fleeing, whether or
+// not that first flee could move it. The already-afraid check reads started
+// effects only: this effect is already held, and its own flag must not
+// reject it.
 func fearStart(e *Effect) bool {
-	if isPlayable(e.Effected) && fearHalvedDurationPlayableSkillIDs[e.Skill.ID] {
-		e.Template.Count /= 2
-	}
-	if e.Effected.FearImmune() || e.Effected.Afraid() {
+	if e.Effected.FearImmune() {
 		return false
 	}
 	if isPlayable(e.Effected) && fearSkippedPlayableSkillIDs[e.Skill.ID] {
 		return false
 	}
+	if e.Effected.EffectList().StartedAffected(FlagFear) {
+		return false
+	}
 
 	e.Effected.AbortAll(false)
 	refresh(e.Effected)
-	return fearAction(e)
+	fearAction(e)
+	return true
 }
 
+// fearAction sends the target fleeing again on every tick; the fear lasts its
+// full count whatever the flee does.
 func fearAction(e *Effect) bool {
-	return e.Effected.FleeFrom(e.Effector, 500)
+	e.Effected.FleeFrom(e.Effector, fearFleeDistance)
+	return true
 }
 
 func fearExit(e *Effect) {
@@ -57,10 +68,13 @@ func thinkAndRefreshExit(e *Effect) {
 	refresh(e.Effected)
 }
 
-// think wakes an NPC target's AI; other kinds have no AI loop to wake.
+// think wakes an NPC or summon target's AI; other kinds have no AI loop to
+// wake here.
 func think(target Actor) {
 	if npc, ok := asNPC(target); ok {
 		_ = npc.Think()
+	} else if summon, ok := asSummon(target); ok {
+		_ = summon.Think()
 	}
 }
 
@@ -232,12 +246,12 @@ func immobilizePetBuffExit(e *Effect) {
 // the target is pushed further along the effector-to-effected line. Z is
 // left at the effected's current height even after the X/Y geo correction
 // below — the reference implementation never corrects Z for this effect,
-// a known approximation preserved here rather than fixed. Summons cannot be
-// knocked back yet: they have no flight movement.
+// a known approximation preserved here rather than fixed. Every creature
+// kind, summons included, takes the same flight.
 func throwUpStart(e *Effect) bool {
 	e.Effected.AbortAll(false)
 
-	if e.Effector == nil || e.Effected.Kind() == actor.KindSummon {
+	if e.Effector == nil {
 		return false
 	}
 	sx, sy, sz := e.Effector.Position()
@@ -273,9 +287,6 @@ func throwUpStart(e *Effect) bool {
 // syncs it to observers.
 func throwUpExit(e *Effect) {
 	refresh(e.Effected)
-	if e.Effected.Kind() == actor.KindSummon {
-		return
-	}
 	e.Effected.SetXYZ(e.landing.X, e.landing.Y, e.landing.Z)
 	e.Effected.BroadcastPosition()
 }

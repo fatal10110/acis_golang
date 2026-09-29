@@ -600,16 +600,27 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 // and a radius of -1 matches every object in the searched regions. It does
 // nothing when t is off the grid.
 func (s *State) ForEachKnownInRadius(t Tracked, radius int, fn func(Tracked)) {
-	s.forEachKnownInRadius(t, radius, true, fn)
+	s.forEachKnownInRadius(t, radius, rangeBody3D, fn)
 }
 
-// ForEachKnownInPlainRadius is ForEachKnownInRadius without collision-radius
-// widening: it matches a reference check against a plain point distance
-// (e.g. EffectConfusion.java:41's distance2D filter), not
-// MathUtil.checkIfInRange's body-to-body widening.
-func (s *State) ForEachKnownInPlainRadius(t Tracked, radius int, fn func(Tracked)) {
-	s.forEachKnownInRadius(t, radius, false, fn)
+// ForEachKnownIn2DRadius calls fn for every object whose point position lies
+// within radius units of t's on the horizontal plane, excluding t itself.
+// Height differences are ignored and collision radii never widen the check.
+// Region search and the -1 radius behave as in ForEachKnownInRadius.
+func (s *State) ForEachKnownIn2DRadius(t Tracked, radius int, fn func(Tracked)) {
+	s.forEachKnownInRadius(t, radius, rangePoint2D, fn)
 }
+
+// rangeMetric selects how inRange measures the distance between two objects.
+type rangeMetric uint8
+
+const (
+	// rangeBody3D is the 3D distance, widened by each bodied side's
+	// collision radius.
+	rangeBody3D rangeMetric = iota
+	// rangePoint2D is the plain horizontal distance between positions.
+	rangePoint2D
+)
 
 // knownInRadiusObjectCap is the stack buffer for one region's objects during
 // a radius scan. 256 covers a crowded single region without spilling; a
@@ -620,7 +631,7 @@ func (s *State) ForEachKnownInPlainRadius(t Tracked, radius int, fn func(Tracked
 // replaces costs more.
 const knownInRadiusObjectCap = 256
 
-func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(Tracked)) {
+func (s *State) forEachKnownInRadius(t Tracked, radius int, metric rangeMetric, fn func(Tracked)) {
 	r := t.presence().currentRegion()
 	if r == nil {
 		return
@@ -635,7 +646,7 @@ func (s *State) forEachKnownInRadius(t Tracked, radius int, widen bool, fn func(
 	for _, region := range s.AppendNeighbors(regionBuf[:0], r, searchDepth(radius)) {
 		objects = region.appendObjects(objects[:0])
 		for _, o := range objects {
-			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o, widen) {
+			if o.ObjectID() == t.ObjectID() || !inRange(radius, t, o, metric) {
 				continue
 			}
 			fn(o)
@@ -658,15 +669,15 @@ type bodied interface {
 	CollisionRadius() float64
 }
 
-// inRange reports whether a and b are within rng units of each other,
-// widened (when widen is true) by each side's collision radius when it has
-// one. A rng of -1 means unlimited; any other negative value behaves like
-// its absolute value. The comparison stays in float64 space end to end,
+// inRange reports whether a and b are within rng units of each other under
+// metric. rangeBody3D widens by each side's collision radius when it has
+// one; rangePoint2D drops the Z axis and never widens. A rng of -1 means
+// unlimited; any other negative value behaves like its absolute value. The comparison stays in float64 space end to end,
 // matching MathUtil.checkIfInRange's double totalRadius (MathUtil.java:193-198,
 // 214-217): summing collision radii as an int before comparing, as an
 // earlier version of this function did, silently truncates fractional
 // radii (e.g. 7.5 on female player templates, or Grow-scaled NPC bodies).
-func inRange(rng int, a, b Tracked, widen bool) bool {
+func inRange(rng int, a, b Tracked, metric rangeMetric) bool {
 	if rng == -1 {
 		return true
 	}
@@ -674,7 +685,7 @@ func inRange(rng int, a, b Tracked, widen bool) bool {
 		rng = -rng
 	}
 	total := float64(rng)
-	if widen {
+	if metric == rangeBody3D {
 		if ab, ok := a.(bodied); ok {
 			total += ab.CollisionRadius()
 		}
@@ -687,6 +698,9 @@ func inRange(rng int, a, b Tracked, widen bool) bool {
 	bx, by, bz := b.presence().Position()
 	dx := float64(ax - bx)
 	dy := float64(ay - by)
+	if metric == rangePoint2D {
+		return dx*dx+dy*dy <= total*total
+	}
 	dz := float64(az - bz)
 	return dx*dx+dy*dy+dz*dz <= total*total
 }

@@ -975,3 +975,52 @@ func TestLeaveOffGridIsNoop(t *testing.T) {
 		t.Fatal("Leave placed an off-grid object")
 	}
 }
+
+// bodiedTestObject is a regionTestObject with a collision radius, so the
+// radius searches that widen by body size can be told apart from the
+// point-distance ones.
+type bodiedTestObject struct {
+	regionTestObject
+	radius float64
+}
+
+func (o *bodiedTestObject) CollisionRadius() float64 { return o.radius }
+
+// knownIDs collects the object IDs a radius search reports, sorted.
+func knownIDs(search func(Tracked, int, func(Tracked)), t Tracked, radius int) []int32 {
+	var ids []int32
+	search(t, radius, func(o Tracked) { ids = append(ids, o.ObjectID()) })
+	slices.Sort(ids)
+	return ids
+}
+
+// The confusion retarget filter is wo.distance2D(effected) <= 1000: a plain
+// horizontal point distance, inclusive at the boundary, blind to Z and to
+// collision radii. The 3D body-widened search is the contrast.
+func TestForEachKnownIn2DRadius(t *testing.T) {
+	s := New()
+	center := &bodiedTestObject{regionTestObject: regionTestObject{id: 1}, radius: 20}
+	s.Spawn(center, 0, 0, 0, 0)
+	for _, o := range []struct {
+		obj     Tracked
+		x, y, z int
+	}{
+		{&regionTestObject{id: 2}, 1000, 0, 5000},                    // 2D 1000 on the boundary, far above
+		{&regionTestObject{id: 3}, 600, 800, -3000},                  // 2D 1000 diagonal, far below
+		{&regionTestObject{id: 4}, 1001, 0, 0},                       // 2D 1001: just outside
+		{&bodiedTestObject{regionTestObject{id: 5}, 50}, 1010, 0, 0}, // outside, only a widened check reaches it
+		{&regionTestObject{id: 6}, 0, 999, 0},                        // plainly inside
+	} {
+		s.Spawn(o.obj, o.x, o.y, o.z, 0)
+	}
+
+	if got, want := knownIDs(s.ForEachKnownIn2DRadius, center, 1000), []int32{2, 3, 6}; !slices.Equal(got, want) {
+		t.Fatalf("ForEachKnownIn2DRadius(1000) = %v, want %v", got, want)
+	}
+	if got, want := knownIDs(s.ForEachKnownInRadius, center, 1000), []int32{4, 5, 6}; !slices.Equal(got, want) {
+		t.Fatalf("ForEachKnownInRadius(1000) = %v, want %v (3D, body-widened by 20)", got, want)
+	}
+	if got, want := knownIDs(s.ForEachKnownIn2DRadius, center, -1), []int32{2, 3, 4, 5, 6}; !slices.Equal(got, want) {
+		t.Fatalf("ForEachKnownIn2DRadius(-1) = %v, want every known object %v", got, want)
+	}
+}

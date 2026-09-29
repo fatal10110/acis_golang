@@ -47,7 +47,9 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 	})
 }
 
-func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, shift bool) {
+// handleTargetAction answers a click on objectID. ctrl is set for a forced
+// attack: an AttackRequest on the object already selected.
+func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, ctrl, shift bool) {
 	target := l.resolveTarget(objectID)
 	if target == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -60,7 +62,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		l.selectLiveTarget(live, target)
 		return
 	}
-	if selected && l.showOwnedPetStatus(live, target, shift) {
+	if selected && l.actOnSummon(live, target, ctrl, shift) {
 		return
 	}
 	if selected && l.interactLiveStaticObject(live, target) {
@@ -211,21 +213,47 @@ const (
 	summonInteractRange = 150
 )
 
-func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Tracked, shift bool) bool {
-	pet, ok := target.(*summon.Actor)
-	if !ok || live == nil || !pet.IsPet() || pet.OwnerID() != live.ObjectID() {
+// actOnSummon answers a click on an already-selected summon and reports
+// whether target was one. Its owner opens the summon's status window, or
+// attacks it when forcing. Anyone else attacks it when the owner's karma or
+// PvP flag allows it without forcing, or when forcing and it is attackable.
+func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
+	s, ok := target.(*summon.Actor)
+	if !ok || live == nil {
 		return false
 	}
+	if s.OwnerID() == live.ObjectID() {
+		if ctrl {
+			l.attackLiveTarget(live, s)
+		} else {
+			l.showOwnedPetStatus(live, s, shift)
+		}
+		return true
+	}
+	if s.AttackableWithoutForceBy(live.Character) || (ctrl && s.AttackableBy(live.Character)) {
+		l.attackLiveTarget(live, s)
+		return true
+	}
+	// Otherwise the player would walk after the summon, but players have
+	// no follow intention yet (#2619): release the click instead.
+	l.log.Debug().Int32("target", s.ObjectID()).Msg("targeting: player follow intention not modeled")
+	live.SendFrame(serverpackets.FrameActionFailed())
+	return true
+}
+
+// showOwnedPetStatus is the owner's interact with its own summon: the
+// status window, after an approach walk when out of range.
+func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
 	// Interacting with an owned summon releases the pending action the client
 	// registered for the click before showing the status window; PetStatusShow
 	// alone leaves that action outstanding and locks further input.
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if summonInRange(live, pet, summonInteractApproachRange) {
 		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
-		return true
+		return
 	}
 	if shift || live.move == nil {
-		return true
+		return
 	}
 	px, py, pz := pet.Position()
 	live.clearParkedApproaches()
@@ -237,7 +265,6 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, target world.Track
 	if !accepted {
 		live.takePetInteract()
 	}
-	return true
 }
 
 func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
@@ -591,7 +618,11 @@ func targetColor(attacker *player.Character, target world.Tracked) int {
 	if attacker == nil {
 		return 0
 	}
-	// Only skill actors have attackability; other objects color neutral.
+	// A summon always shows its level difference; other skill actors only
+	// while attackable, and other objects color neutral.
+	if _, ok := target.(*summon.Actor); ok {
+		return attacker.Level() - targetLevel(target)
+	}
 	attackableTarget, ok := target.(skilltarget.Actor)
 	if !ok || !attackableTarget.AttackableBy(attacker) {
 		return 0
@@ -607,6 +638,8 @@ func targetLevel(target world.Tracked) int {
 		if t.Instance != nil && t.Instance.Template != nil {
 			return t.Instance.Template.Level
 		}
+	case *summon.Actor:
+		return t.Level()
 	}
 	return 0
 }

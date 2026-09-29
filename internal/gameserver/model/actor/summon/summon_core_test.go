@@ -409,6 +409,95 @@ func TestSummonMovementDisabledExcludesFear(t *testing.T) {
 	}
 }
 
+// TestSummonAttackDisabledMatchesReferenceTerms pins the summon attack gate
+// to the reference's creature union (Creature.isAttackingDisabled; a summon
+// never flies), distinct from DenyAIAction: teleporting denies AI actions
+// and movement but does not disable attacking.
+func TestSummonAttackDisabledMatchesReferenceTerms(t *testing.T) {
+	flags := []struct {
+		name     string
+		flag     effect.Flag
+		disables bool
+	}{
+		{"stunned", effect.FlagStunned, true},
+		{"meditating", effect.FlagMeditating, true},
+		{"sleeping", effect.FlagSleep, true},
+		{"paralyzed", effect.FlagParalyzed, true},
+		{"afraid", effect.FlagFear, true},
+		{"rooted", effect.FlagRooted, false},
+	}
+	for i, tt := range flags {
+		t.Run(tt.name, func(t *testing.T) {
+			summon := mustServitor(t, ServitorConfig{ObjectID: int32(i + 1)})
+			if summon.AttackDisabled() {
+				t.Fatal("AttackDisabled() = true on a fresh summon")
+			}
+			summon.EffectList().Add(&effect.Effect{Flag: tt.flag})
+			if got := summon.AttackDisabled(); got != tt.disables {
+				t.Fatalf("AttackDisabled() = %v while %s, want %v", got, tt.name, tt.disables)
+			}
+		})
+	}
+
+	t.Run("transient paralysis", func(t *testing.T) {
+		summon := mustServitor(t, ServitorConfig{ObjectID: 10})
+		summon.SetParalyzed(true)
+		if !summon.AttackDisabled() {
+			t.Fatal("AttackDisabled() = false while paralyzed")
+		}
+	})
+
+	t.Run("teleporting", func(t *testing.T) {
+		summon := mustServitor(t, ServitorConfig{ObjectID: 11})
+		summon.SetTeleporting(true)
+		if !summon.MovementDisabled() {
+			t.Fatal("MovementDisabled() = false while teleporting")
+		}
+		if !summon.DenyAIAction() {
+			t.Fatal("DenyAIAction() = false while teleporting")
+		}
+		if summon.AttackDisabled() {
+			t.Fatal("AttackDisabled() = true while only teleporting")
+		}
+	})
+}
+
+// TestSummonImmobilizedRecordsFollowModeOnEveryCall checks that every set of
+// the movement lock records the follow mode and every clear restores it, even
+// when the flag does not change, and that a clear with no set before it
+// restores following.
+func TestSummonImmobilizedRecordsFollowModeOnEveryCall(t *testing.T) {
+	s := mustServitor(t, ServitorConfig{ObjectID: 1})
+	if !s.SetImmobilized(true) {
+		t.Fatal("first SetImmobilized(true) = false, want the flag changed")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the first lock = on, want off")
+	}
+	if s.SetImmobilized(true) {
+		t.Fatal("second SetImmobilized(true) = true, want unchanged")
+	}
+	if !s.SetImmobilized(false) {
+		t.Fatal("first SetImmobilized(false) = false, want the flag changed")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the clear = on, want off as the second lock recorded it")
+	}
+	if s.SetImmobilized(false) {
+		t.Fatal("second SetImmobilized(false) = true, want unchanged")
+	}
+	if s.FollowActive() {
+		t.Fatal("follow mode after the second clear = on, want off")
+	}
+
+	fresh := mustServitor(t, ServitorConfig{ObjectID: 2})
+	fresh.setFollowStatus(false)
+	fresh.SetImmobilized(false)
+	if !fresh.FollowActive() {
+		t.Fatal("a clear with no lock before it left follow off, want following restored")
+	}
+}
+
 func TestSummonImmobilizedIsIndependentOfRooted(t *testing.T) {
 	summon := mustServitor(t, ServitorConfig{ObjectID: 1})
 

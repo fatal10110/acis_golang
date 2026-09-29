@@ -26,6 +26,10 @@ const (
 	HitMiss = 0x80
 )
 
+// hitAnimationTail is how long the hit animation lasts after the first hit
+// group lands.
+const hitAnimationTail = 300 * time.Millisecond
+
 // CreatureActor is the owner state a physical attack controller reads and
 // updates while starting attacks.
 type CreatureActor interface {
@@ -355,10 +359,6 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	c.bowCooling = weapon == item.WeaponBow
 	c.inHitAnimation = true
 
-	if len(hits) > 0 {
-		c.scheduleLocked(hits[0].delay+300*time.Millisecond, func() { c.clearHitAnimation(seq) })
-	}
-
 	finishAt := attackTime
 	finish := func() { c.finishAttack(seq) }
 	if weapon == item.WeaponBow {
@@ -381,10 +381,15 @@ func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index 
 		delay -= groups[index-1].delay
 	}
 	c.scheduleLocked(delay, func() {
-		c.deliverHits(seq, group.hits)
+		landed := c.deliverHits(seq, group.hits)
 
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		if landed && index == 0 {
+			// The hit animation ends on its own timer, which a later stop or
+			// a new swing does not cancel.
+			c.queue.After(hitAnimationTail, c.endHitAnimation)
+		}
 		if seq != c.attackSeq {
 			return
 		}
@@ -433,26 +438,29 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 	return flags
 }
 
-func (c *Controller) deliverHits(seq uint64, hits []Hit) {
+// deliverHits lands one hit group and reports whether it got past the
+// main-target checks, whether or not the hits themselves connect.
+func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
 	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() {
-		return
+		return false
 	}
 	if !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
 		c.Stop()
-		return
+		return false
 	}
 	if hits[0].Target.RaidRelated() {
 		if c.playable != nil && c.playable.TestCursesOnAttack(hits[0].Target) {
 			c.Stop()
-			return
+			return false
 		}
 	}
 	for _, hit := range hits {
 		c.deliverHit(hit)
 	}
+	return true
 }
 
 func (c *Controller) deliverHit(hit Hit) {
@@ -483,18 +491,22 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 		return
 	}
 
+	// A finished shot closes the hit animation before the AI re-runs.
 	c.attacking = false
+	c.inHitAnimation = false
 
 	if reuse > 0 {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 		c.mu.Unlock()
+		c.emitRethink()
 		return
 	}
 
 	c.bowCooling = false
 	c.mu.Unlock()
 
-	c.emit(event.AttackFinished{})
+	c.emitRethink()
+	c.emit(event.AttackFinished{BowReuse: true})
 }
 
 func (c *Controller) finishAttack(seq uint64) {
@@ -503,17 +515,29 @@ func (c *Controller) finishAttack(seq uint64) {
 		c.mu.Unlock()
 		return
 	}
+	// A finished swing closes the hit animation before the AI re-runs.
 	c.attacking = false
+	c.inHitAnimation = false
 	c.mu.Unlock()
 
 	c.emit(event.AttackFinished{})
 }
 
-func (c *Controller) clearHitAnimation(seq uint64) {
+// endHitAnimation closes the hit animation window 300ms after the first hit
+// group lands, unless the swing finished or stopped first. It is not tied to
+// one swing: a swing started inside the window has its flag cleared with it.
+func (c *Controller) endHitAnimation() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if seq == c.attackSeq {
-		c.inHitAnimation = false
+	c.inHitAnimation = false
+	c.mu.Unlock()
+	c.emitRethink()
+}
+
+// emitRethink asks an NPC's AI to re-run desire selection. Other actors'
+// AI does not re-run on attack phases.
+func (c *Controller) emitRethink() {
+	if c.attackable {
+		c.emit(event.AttackRethink{})
 	}
 }
 
@@ -526,7 +550,7 @@ func (c *Controller) clearBowCooldown(seq uint64) {
 	c.bowCooling = false
 	c.mu.Unlock()
 
-	c.emit(event.AttackFinished{})
+	c.emit(event.AttackFinished{BowReuse: true})
 }
 
 func (c *Controller) scaledBowReuse() time.Duration {

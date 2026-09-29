@@ -99,8 +99,11 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 		defer cancel()
 		taken, err := store.NameTaken(readCtx, name)
 		if err != nil {
+			// Fail closed: a lookup that cannot answer treats the name as
+			// taken, so the owner gets the already-in-use rejection instead
+			// of no reply, and the pet stays unnamed.
 			l.log.Error().Err(err).Str("name", name).Msg("check pet name")
-			return
+			taken = true
 		}
 		onLive(live, func() { l.finishChangePetName(live, name, taken) })
 	}

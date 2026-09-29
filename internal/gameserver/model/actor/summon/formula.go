@@ -446,6 +446,15 @@ func (a *Actor) SetHP(value float64) {
 	a.vitals.hp = value
 }
 
+// RestoreDead marks a pet restored from a save below creature.DeathHP as
+// dead. Nothing killed it here, so no death sequence runs: it simply comes
+// back as the corpse it was saved as, and stays one until revived.
+func (a *Actor) RestoreDead() {
+	a.vitals.mu.Lock()
+	a.dead = true
+	a.vitals.mu.Unlock()
+}
+
 // AddHP restores HP, clamped to MaxHP, and returns the applied amount. A dead
 // summon gains nothing; the check shares vitals.mu with the lethal drainHP.
 func (a *Actor) AddHP(amount float64) float64 {
@@ -500,44 +509,84 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceHP applies skill HP damage and marks the summon dead below creature.DeathHP.
+// ReduceHP applies a skill hit's HP damage; see reduceHP.
 func (a *Actor) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
-	if amount <= 0 || a.Invul() || !creature.CanDealDamage(attacker) {
-		return
+	a.reduceHP(amount, attacker)
+}
+
+// TakeDamage applies a landed auto-attack hit; see reduceHP. It reports
+// whether the hit killed a.
+func (a *Actor) TakeDamage(damage int, attacker attackable.Combatant) bool {
+	return a.reduceHP(float64(damage), attacker)
+}
+
+// reduceHP applies one direct hit, from a skill or an auto-attack, and
+// reports whether it killed a. A dead summon ignores it. An invulnerable
+// summon, or a hit from an attacker barred from dealing damage, changes
+// nothing on a; otherwise the hit wakes a sleeping summon, ends an
+// immobilize-until-attacked, breaks a stun one time in ten, and then takes
+// the HP, running the death sequence when it drops below
+// creature.DeathHP. The owner is told of the hit whenever it has an
+// attacker, including a hit that was blocked or that killed.
+func (a *Actor) reduceHP(amount float64, attacker attackable.Combatant) bool {
+	if a.Dead() {
+		return false
 	}
-	if !a.drainHP(amount) {
-		return
+	killed := false
+	if !a.Invul() && creature.CanDealDamage(attacker) {
+		a.applyHitSideEffects()
+		if amount > 0 && a.drainHP(amount) {
+			a.die(attacker)
+			killed = true
+		}
 	}
 	if attacker != nil {
 		a.notifyDamage(attacker, amount)
+	}
+	return killed
+}
+
+// applyHitSideEffects runs what every direct hit does to a before its HP
+// changes. Damage over time and a's own HP costs never reach it.
+func (a *Actor) applyHitSideEffects() {
+	list := a.EffectList()
+	list.StopByType(effect.TypeSleep)
+	list.StopByType(effect.TypeImmobileUntilAttacked)
+	if list.IsAffected(effect.FlagStunned) && a.Roll(10) == 0 {
+		list.StopByType(effect.TypeStun)
 	}
 }
 
 // ConsumeHP pays one of a's own skill HP costs. The summon is its own
 // attacker here: an invulnerable summon still pays the cost, while an owner
 // barred from dealing damage does not. The owner is told of the damage
-// either way, with the summon named as its source.
+// either way, with the summon named as its source. A lethal cost kills a,
+// with a as its own killer.
 func (a *Actor) ConsumeHP(amount float64) {
 	if amount <= 0 || a.Dead() {
 		return
 	}
-	if creature.CanDealDamage(a) {
-		a.drainHP(amount)
+	if creature.CanDealDamage(a) && a.drainHP(amount) {
+		a.die(a)
 	}
 	a.notifyDamage(a, amount)
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
+// A lethal tick kills a.
 func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	killer, _ := attacker.(attackable.Combatant)
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
-	a.drainHP(amount)
+	if a.drainHP(amount) {
+		a.die(killer)
+	}
 }
 
-// drainHP takes amount off a live summon's HP, marks it dead below DeathHP, and
-// refreshes its status. It reports false when the summon was already dead.
+// drainHP takes amount off a live summon's HP, marks it dead below DeathHP,
+// and refreshes its status. It reports whether this call killed the summon;
+// only one caller ever sees true.
 func (a *Actor) drainHP(amount float64) bool {
 	a.vitals.mu.Lock()
 	if a.dead || a.vitals.hp <= 0 {
@@ -545,13 +594,15 @@ func (a *Actor) drainHP(amount float64) bool {
 		return false
 	}
 	a.vitals.hp -= amount
+	killed := false
 	if a.vitals.hp < creature.DeathHP {
 		a.vitals.hp = 0
 		a.dead = true
+		killed = true
 	}
 	a.vitals.mu.Unlock()
 	a.UpdateStatus()
-	return true
+	return killed
 }
 
 // CanBeHealed reports whether a may receive HP/MP restoration.

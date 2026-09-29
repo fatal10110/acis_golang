@@ -54,6 +54,10 @@ func consumableSkills(t *testing.T) *skillstate.Persistence {
 			SkillType: "BUFF", StaticHitTime: true, HitTime: 0, StaticReuse: true,
 		},
 		{
+			ID: 2167, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "GIVE_SP", Power: 500, StaticHitTime: true, HitTime: 200, ReuseDelay: 3000,
+		},
+		{
 			ID: 2236, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetUnlockable,
 			SkillType: "UNLOCK_SPECIAL", StaticHitTime: true, HitTime: 500, StaticReuse: true,
 		},
@@ -268,7 +272,6 @@ func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "select StatusUpdate")
 	c.Send(encodeUseItem(key, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "unlockable key rejection rotation")
 	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 		t.Fatalf("unlockable key rejection extra opcode = %#x, want none", frame[0])
 	}

@@ -1,10 +1,13 @@
 package pets
 
 import (
+	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // renameTo sends RequestChangePetName and returns every frame the flow
@@ -129,5 +132,72 @@ func TestAlreadyNamedPetCannotBeRenamedAgain(t *testing.T) {
 	assertStaticSystemMessage(t, frames[0], serverpackets.SystemMessageNamingYouCannotSetNameOfThePet)
 	if got := pet.Name(); got != "Fenrir" {
 		t.Fatalf("Name() = %q, want unchanged Fenrir", got)
+	}
+}
+
+// TestRenamePetFailsClosedOnLookupError covers a uniqueness lookup that
+// cannot answer: the name is treated as taken, so the owner gets the
+// already-in-use rejection (RequestChangePetName.doesPetNameExist starts from
+// true and keeps it when the query throws) and the pet stays unnamed.
+func TestRenamePetFailsClosedOnLookupError(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithPetNameLookupError(errors.New("pets table unavailable")),
+	})
+	actor, _ := h.spawnWolf(t)
+
+	frames := renameTo(t, h, "Fenrir")
+	messages := sysMessages(frames)
+	if len(messages) != 1 {
+		t.Fatalf("lookup-failure replies = %d system messages, want exactly one; opcodes %x", len(messages), frameOpcodes(frames))
+	}
+	assertStaticSystemMessage(t, messages[0], serverpackets.SystemMessageNamingAlreadyInUseByAnotherPet)
+	if countOpcode(frames, serverpackets.OpcodePetInfo) != 0 {
+		t.Fatalf("lookup failure refreshed PetInfo: opcodes %x", frameOpcodes(frames))
+	}
+	if actor.IsNamed() || actor.Name() != "Wolf" {
+		t.Fatalf("pet after failed lookup: Name()=%q IsNamed()=%v, want unnamed Wolf", actor.Name(), actor.IsNamed())
+	}
+	if state, ok, err := h.srv.Pets.Get(petCtx(), h.collarID); err != nil || (ok && state.Name != "") {
+		t.Fatalf("pets row after failed lookup: state=%+v ok=%v err=%v, want no saved name", state, ok, err)
+	}
+}
+
+// TestUnnamedPetStoresNullAndRestoresFromNull pins the unnamed-pet round trip
+// through the shared pets schema: an unnamed pet is saved with a NULL name,
+// and a row carrying a NULL name summons the pet unnamed instead of leaving
+// the collar unusable.
+func TestUnnamedPetStoresNullAndRestoresFromNull(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	actor, _ := h.spawnWolf(t)
+	actor.AddExpAndSp(100, 0)
+	wantExp := actor.Exp()
+	h.returnPet(t)
+	h.srv.FlushPersistence(t)
+
+	var name sql.NullString
+	if err := h.srv.DB.QueryRowContext(petCtx(), `SELECT name FROM pets WHERE item_obj_id = ?`, h.collarID).Scan(&name); err != nil {
+		t.Fatalf("read pets.name: %v", err)
+	}
+	if name.Valid {
+		t.Fatalf("unnamed pet saved pets.name = %q, want NULL", name.String)
+	}
+
+	respawned, burst := h.spawnWolf(t)
+	if respawned.IsNamed() || respawned.Name() != "Wolf" {
+		t.Fatalf("pet restored from NULL name: Name()=%q IsNamed()=%v, want unnamed Wolf", respawned.Name(), respawned.IsNamed())
+	}
+	if got := respawned.Exp(); got != wantExp {
+		t.Fatalf("pet restored from NULL name Exp() = %d, want saved %d", got, wantExp)
+	}
+	if countOpcode(burst, serverpackets.OpcodePetInfo) == 0 {
+		t.Fatalf("respawn burst has no PetInfo: opcodes %x", frameOpcodes(burst))
+	}
+
+	// The restored pet can still be named: the NULL row is an unnamed pet.
+	renameTo(t, h, "Fenrir")
+	if state := h.savedPetState(t); state.Name != "Fenrir" {
+		t.Fatalf("pets row name after naming restored pet = %q, want Fenrir", state.Name)
 	}
 }

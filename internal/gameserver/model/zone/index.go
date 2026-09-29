@@ -121,8 +121,12 @@ func FindAtXY[T Kind](ix *Index, x, y int) (T, bool) {
 // containing (regionX, regionY) — the caster's own region, not necessarily
 // the region containing (x, y, z), matching the reference's region-only
 // zone lookup. It samples the center point and the four axis-aligned range
-// offsets, mirroring the reference's diamond sample.
+// offsets, mirroring the reference's diamond sample. A nil index, a server
+// booted without zones, holds none.
 func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool {
+	if ix == nil {
+		return false
+	}
 	zones := ix.At(regionX, regionY)
 	if len(zones) == 0 {
 		return false
@@ -142,6 +146,32 @@ func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange i
 			if k.Core().ContainsPoint(s[0], s[1], z) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// NPCInPeaceZone reports whether an NPC standing at (x, y, z) holds the
+// peace flag the zones around it raise for a non-playable occupant: a Peace
+// zone always does, and a peaceful Town does unless its combat rule disables
+// peace townwide. A derby track pacifies playables only, so it never counts
+// here. A nil index, a server booted without zones, holds none.
+func (ix *Index) NPCInPeaceZone(x, y, z int) bool {
+	if ix == nil {
+		return false
+	}
+	for _, k := range ix.At(x, y) {
+		switch v := k.(type) {
+		case *Peace:
+		case *Town:
+			if !v.raisesPeace() {
+				continue
+			}
+		default:
+			continue
+		}
+		if k.Core().ContainsPoint(x, y, z) {
+			return true
 		}
 	}
 	return false

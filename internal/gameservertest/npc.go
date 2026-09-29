@@ -102,6 +102,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
+	s.installPeaceZone(hostile)
 	hostile.Attach(npc.Runtime{
 		World: s.State,
 		Items: s.itemTable,
@@ -130,12 +131,16 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 }
 
 // castCanceledBroadcast closes an aborted fixture AI cast with its cancel
-// animation, as production's hostile controller sink does.
+// animation and hands every cast end to the AI, as production's hostile
+// controller sink does.
 type castCanceledBroadcast struct{ hostile *npc.Hostile }
 
 func (c castCanceledBroadcast) Emit(ev event.Event) {
-	if _, ok := ev.(event.CastAborted); ok {
+	switch e := ev.(type) {
+	case event.CastAborted:
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
+	case event.CastFinished:
+		_ = c.hostile.CastFinished(e.Interrupted)
 	}
 }
 
@@ -351,12 +356,14 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
+	s.installPeaceZone(hostile)
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
 	hostile.Attach(npc.Runtime{
 		World: s.State,
+		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
 		Sink: network.HostileSinks(s.State)(hostile),
@@ -376,7 +383,7 @@ type movingHostileControl struct {
 }
 
 func (c *movingHostileControl) Emit(ev event.Event) {
-	switch ev.(type) {
+	switch e := ev.(type) {
 	case event.Arrived:
 		c.hostile.SyncPosition(c.move.Position())
 		c.hostile.AI().Arrived()
@@ -386,13 +393,25 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		c.hostile.AI().ArrivedBlocked()
 		c.server.think(c.hostile)
 	case event.AttackFinished:
-		c.server.think(c.hostile)
+		if e.BowReuse {
+			c.server.think(c.hostile)
+			return
+		}
+		c.server.runAI(c.hostile)
+	case event.AttackRethink:
+		c.server.runAI(c.hostile)
 	}
 }
 
 func (s *Server) think(hostile *npc.Hostile) {
 	if err := hostile.Think(); err != nil {
 		s.log.Warn().Err(err).Msg("ai: hostile think")
+	}
+}
+
+func (s *Server) runAI(hostile *npc.Hostile) {
+	if err := hostile.RunAI(); err != nil {
+		s.log.Warn().Err(err).Msg("ai: hostile run")
 	}
 }
 
@@ -426,3 +445,14 @@ func (parkedAttack) AttackingNow() bool                  { return false }
 func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
 func (parkedAttack) DoAttack(attackable.Combatant)       {}
 func (parkedAttack) Stop()                               {}
+
+// installPeaceZone gives a fixture NPC the peace-zone query boot installs on
+// every live NPC, when the suite supplied zones through WithZones.
+func (s *Server) installPeaceZone(hostile *npc.Hostile) {
+	if s.zones == nil {
+		return
+	}
+	hostile.SetPeaceZone(func(at location.Location) bool {
+		return s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
+	})
+}

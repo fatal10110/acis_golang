@@ -40,6 +40,7 @@ func (cancelHandler) Use(cast Cast) {
 	}
 
 	applySelfEffects(cast, cast.Skill)
+	dischargeSpiritshot(cast)
 }
 
 func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRate int) {

@@ -70,6 +70,11 @@ type Hostile struct {
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
 	rewards creature.Rewarder
+	// remover takes this NPC out of the world for DeleteMe; nil despawns it
+	// with no respawn. Installed by Attach.
+	remover Remover
+	// interacted latches the first unlock attempt on a chest.
+	interacted atomic.Bool
 
 	// deathMu guards dead and decayed. The killing hit latches death
 	// (TakeDamage → Die → MarkDead) on the attacker's queue.
@@ -100,6 +105,10 @@ type Hostile struct {
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
 	inWater func(location.Location) bool
+	// inPeace reports whether an NPC standing at a location holds the peace
+	// zone flag; nil means no location does. Set before the NPC is
+	// published.
+	inPeace func(location.Location) bool
 
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
@@ -255,6 +264,9 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		spiritshotRate:     spiritshotRate,
 	}
 	h.maxBuffsAmount.Store(maxBuffCount)
+	// RaidBoss.java/GrandBoss.java call setRaidRelated() in their
+	// constructors; minions are marked at spawn (see SetRaidRelated).
+	h.raidRelated.Store(h.RaidBoss())
 	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(!inst.WalkMode)
 	h.brain = ai.NewAttackable(h, movement, attack)
@@ -328,6 +340,7 @@ type Runtime struct {
 	Items   *item.Table
 	Rewards creature.Rewarder
 	Sink    event.Sink
+	Remover Remover
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -341,6 +354,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.log = rt.Log
 	h.rewards = rt.Rewards
 	h.sink = rt.Sink
+	h.remover = rt.Remover
 	if rt.Items == nil || h.Instance.Template.RightHand == 0 {
 		return
 	}
@@ -634,18 +648,16 @@ func (h *Hostile) RandomNearbyMonster(radius int) (attackable.Combatant, bool) {
 
 // RandomNearbyCombatant returns a random other attackable NPC known within
 // radius units, excluding chests, or ok false if none exist or this NPC
-// has no world placement yet. The reference confusion effect also
-// considers nearby playable actors as candidates; no playable actor in
-// this port exposes itself to this search yet, so only other attackable
-// NPCs are ever found here. The search is unwidened by collision radius:
-// EffectConfusion.java:43 filters candidates by plain distance2D, not
-// MathUtil.checkIfInRange's body-to-body widening.
+// has no world placement yet. Distance is measured point to point on the
+// horizontal plane: height differences are ignored and collision radii do
+// not widen the search. Nearby playable actors are not candidates yet
+// (#2642).
 func (h *Hostile) RandomNearbyCombatant(radius int) (attackable.Combatant, bool) {
 	if h.world == nil {
 		return nil, false
 	}
 	var candidates []attackable.Combatant
-	h.world.ForEachKnownInPlainRadius(h, radius, func(obj world.Tracked) {
+	h.world.ForEachKnownIn2DRadius(h, radius, func(obj world.Tracked) {
 		other, ok := obj.(*Hostile)
 		if !ok || other.chestKind() {
 			return
@@ -729,13 +741,35 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// Think runs one hostile AI decision cycle (event-driven: arrival, swing
-// finished, first hate). Empty-queue idle abort belongs on TickThink.
+// Think continues the hostile AI's current intention after arrival or a
+// bow's reuse ending. It never idles on an empty desire queue: RunAI and
+// TickThink do.
 func (h *Hostile) Think() error {
 	if !h.canRunAI() {
 		return nil
 	}
 	return h.brain.Think()
+}
+
+// RunAI re-runs the hostile AI's desire selection on an event: a swing
+// finishing, the hit animation ending, a bow shot landing or a completed
+// cast. Unlike Think it idles an actor whose desire queue ran empty.
+func (h *Hostile) RunAI() error {
+	if !h.canRunAI() {
+		return nil
+	}
+	return h.brain.RunAI()
+}
+
+// CastFinished ends the AI's hold on a cast that completed or was aborted:
+// the desire that drove it is dropped, and only a completed cast re-runs
+// desire selection.
+func (h *Hostile) CastFinished(interrupted bool) error {
+	h.brain.ClearCurrentDesire()
+	if interrupted {
+		return nil
+	}
+	return h.RunAI()
 }
 
 // TickThink runs one periodic AI cycle, including empty-queue idle abort
@@ -809,14 +843,26 @@ func (h *Hostile) SiegeGuard() bool {
 // RaidRelated reports whether this NPC is tied to a raid encounter (a raid
 // boss or one of its minions). A raid-related NPC sees through silent
 // movement in AutoAttackTargetValid regardless of its template's own
-// concealment-detection setting. False until SetRaidRelated marks it.
+// concealment-detection setting, and can't be struck by a lethal hit.
 func (h *Hostile) RaidRelated() bool {
 	return h.raidRelated.Load()
 }
 
 // SetRaidRelated marks or clears this NPC's raid-encounter association.
+// Raid and grand bosses start marked; a Monster-family private spawned for a
+// raid boss master is marked by the spawner (MinionSpawn.doSpawn).
 func (h *Hostile) SetRaidRelated(v bool) {
 	h.raidRelated.Store(v)
+}
+
+// RaidBoss reports whether this NPC is a raid or grand boss itself (Java
+// isRaidBoss), as opposed to RaidRelated, which also covers its minions.
+func (h *Hostile) RaidBoss() bool {
+	switch hostileKind(h.Instance) {
+	case "RaidBoss", "GrandBoss":
+		return true
+	}
+	return false
 }
 
 // AlikeDead reports whether this NPC should be ignored as a live target.
@@ -858,6 +904,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 		return false
 	}
 	h.BroadcastStatus()
+	h.AbortAll(true)
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}

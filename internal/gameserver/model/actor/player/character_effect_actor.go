@@ -2,6 +2,7 @@ package player
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -38,25 +39,38 @@ func (c *Character) aiDeniedBeforeEffect() bool {
 	return c.Dead() || c.liveLocked().AIDeniedBeforeEffect()
 }
 
-// The effect hooks below have no player behavior yet; each is a deliberate
-// no-op (or false) so the effect runs exactly as it did before the player
-// side existed.
-
-// FearImmune reports false: fear immunity is not modeled yet.
+// FearImmune reports false: only folk, siege flags and siege summons shrug
+// off fear.
 func (c *Character) FearImmune() bool { return false }
 
-// FleeFrom reports false: fleeing movement is not modeled yet.
-func (c *Character) FleeFrom(effect.Actor, int) bool { return false }
+// FleeFrom asks c's controller to run distance units directly away from
+// effector. The request carries whether c could take AI actions before the
+// effect in progress landed: a fear's own first flee moves c, while the
+// flees on its later ticks find c already afraid and are refused.
+func (c *Character) FleeFrom(effector effect.Actor, distance int) {
+	if effector == nil || effector.ObjectID() == c.ObjectID() || distance < 10 {
+		return
+	}
+	x, y, z := effector.Position()
+	c.emit(event.FleeRequested{
+		From:     location.Location{X: x, Y: y, Z: z},
+		Distance: distance,
+		AIDenied: c.aiDeniedBeforeEffect(),
+	})
+}
 
 // BluffExempt reports false: players are never exempt from bluff.
 func (c *Character) BluffExempt() bool { return false }
 
-// StopEffects does nothing yet: stopping effects by type is not wired.
-func (c *Character) StopEffects(effect.Type) {}
+// StopEffects removes every effect of type t that c holds.
+func (c *Character) StopEffects(t effect.Type) { c.EffectList().StopByType(t) }
 
-// StopSkillEffectsByID does nothing yet: stopping effects by skill is not
-// wired.
-func (c *Character) StopSkillEffectsByID(modelskill.ID) {}
+// StopSkillEffectsByID removes every effect skill id applied to c.
+func (c *Character) StopSkillEffectsByID(id modelskill.ID) { c.EffectList().StopBySkillID(id) }
+
+// The chance-trigger and blessing hooks below have no player behavior yet;
+// each is a deliberate no-op so the effect runs exactly as it did before the
+// player side existed.
 
 // AddChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (c *Character) AddChanceTrigger(*effect.Effect) {}
