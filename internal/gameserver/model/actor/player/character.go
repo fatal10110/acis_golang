@@ -79,6 +79,16 @@ type Character struct {
 	// its exp restore, and the player would keep both. Taken before
 	// progressionMu and vitalsMu.
 	reviveMu sync.Mutex
+	// The pending resurrection offer: whether one is open, the exp-restore
+	// power it carries, and whether it is for the character's pet. Guarded
+	// by reviveMu: the offer is made on the reviver's queue (a caster, a
+	// killer, the pet's killer) and answered or cleared on this character's.
+	reviveRequested bool
+	revivePower     float64
+	revivePet       bool
+	// respawnRestoreHP is the fraction of max HP a revive restores when no
+	// Phoenix Blessing does it in full.
+	respawnRestoreHP float64
 
 	Face, HairStyle, HairColor int
 

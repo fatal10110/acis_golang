@@ -1461,11 +1461,11 @@ func TestReviveRestoringExpSkipsLivingPlayer(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.applyDeathExpKarmaLoss(&Character{ID: 2}) // Exp: 1500 -> 1100, ExpBeforeDeath = 1500.
 	c.MarkDead()
-	if !c.Revive(0.7) {
+	if !c.Revive() {
 		t.Fatal("restart-point Revive refused a dead player")
 	}
 
-	if c.ReviveRestoringExp(50, 50) {
+	if c.ReviveRestoringExp(50) {
 		t.Fatal("ReviveRestoringExp revived a living player")
 	}
 	if c.Exp != 1100 || c.ExpBeforeDeath != 1500 {
@@ -1486,8 +1486,8 @@ func TestReviveRestoringExpRacingRestartGivesOneRevive(t *testing.T) {
 		var wg sync.WaitGroup
 		start := make(chan struct{})
 		wg.Add(2)
-		go func() { defer wg.Done(); <-start; restarted = c.Revive(0.7) }()
-		go func() { defer wg.Done(); <-start; resurrected = c.ReviveRestoringExp(50, 0.5) }()
+		go func() { defer wg.Done(); <-start; restarted = c.Revive() }()
+		go func() { defer wg.Done(); <-start; resurrected = c.ReviveRestoringExp(50) }()
 		close(start)
 		wg.Wait()
 

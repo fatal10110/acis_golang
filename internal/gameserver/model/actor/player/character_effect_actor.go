@@ -68,9 +68,9 @@ func (c *Character) StopEffects(t effect.Type) { c.EffectList().StopByType(t) }
 // StopSkillEffectsByID removes every effect skill id applied to c.
 func (c *Character) StopSkillEffectsByID(id modelskill.ID) { c.EffectList().StopBySkillID(id) }
 
-// The chance-trigger and blessing hooks below have no player behavior yet;
-// each is a deliberate no-op so the effect runs exactly as it did before the
-// player side existed.
+// The chance-trigger hooks below have no player behavior yet; each is a
+// deliberate no-op so the effect runs exactly as it did before the player
+// side existed.
 
 // AddChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (c *Character) AddChanceTrigger(*effect.Effect) {}
@@ -78,12 +78,21 @@ func (c *Character) AddChanceTrigger(*effect.Effect) {}
 // RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
 func (c *Character) RemoveChanceTrigger(*effect.Effect) {}
 
-// StopCharmOfLuck does nothing yet: Charm of Luck state is not modeled.
-func (c *Character) StopCharmOfLuck(*effect.Effect) {}
+// StopCharmOfLuck runs when a Charm of Luck ends: the effect has already
+// left the list, so only the player's appearance is refreshed for observers.
+func (c *Character) StopCharmOfLuck(*effect.Effect) { c.BroadcastAbnormalEffect() }
 
-// StopPhoenixBlessing does nothing yet: Phoenix Blessing state is not
-// modeled.
-func (c *Character) StopPhoenixBlessing(*effect.Effect) {}
+// StopPhoenixBlessing runs when a Phoenix Blessing ends: the effect has
+// already left the list, so only the player's appearance is refreshed for
+// observers.
+func (c *Character) StopPhoenixBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
+
+// stopPhoenixBlessing uses up every Phoenix Blessing c holds, then refreshes
+// its appearance once more.
+func (c *Character) stopPhoenixBlessing() {
+	c.EffectList().StopByType(effect.TypePhoenixBless)
+	c.BroadcastAbnormalEffect()
+}
 
 // UpdateEffectIcons refreshes the player's effect icons.
 func (c *Character) UpdateEffectIcons() { c.UpdateAbnormalEffect() }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -20,24 +21,29 @@ const petCorpseTime = 1200 * time.Second
 // exactly one caller through. The summon stops moving, attacking and
 // casting, drops its target, loses the effects that do not last through
 // death, and republishes its status. Observers then see it die
-// (event.Died) and it goes idle; killer gets its karma for the kill, and
-// last the owner is told (event.DeathSettled).
+// (event.Died) and it goes idle; killer gets its karma for the kill. A
+// summon whose Phoenix Blessing survived the death offers its owner its
+// resurrection, and last the owner is told (event.DeathSettled).
 //
 // A dead pet stops eating and a dead servitor's lifetime stops (see TickPet
 // and TickServitor). The owner's side then schedules the corpse's decay
-// (DecayDelay, Decay), and last a pet pays its death penalty. A Phoenix
-// Blessing does not offer its revive yet (#2620).
+// (DecayDelay, Decay), and last a pet pays its death penalty.
 func (a *Actor) die(killer attackable.Combatant) {
 	if a.brain != nil {
 		a.brain.AbortAll()
 	}
 	a.SetTarget(nil)
-	a.EffectList().StopOnDeath()
+	for range a.EffectList().StopOnDeath() {
+		a.UpdateAbnormalEffect()
+	}
 	a.UpdateStatus()
 	a.emit(event.Died{})
 	a.idle()
 	if a.owner != nil {
 		a.owner.AwardSummonKillKarma(killer)
+		if a.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
+			a.owner.OfferSummonRevive()
+		}
 	}
 	a.emit(event.DeathSettled{})
 	if a.isPet && a.owner != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TakeDamage applies physical damage, broadcasts the resulting HP to nearby
@@ -62,39 +63,67 @@ func (c *Character) MarkDead() bool {
 	return true
 }
 
-// Revive clears this player's dead state and restores HP to fraction of
-// calculated max HP. It reports whether the player was dead and is now
-// revived; a call on a living player is a no-op.
-func (c *Character) Revive(fraction float64) bool {
+// Revive stands this dead player back up and reports whether it did; a call
+// on a living player is a no-op. A Phoenix Blessing restores full HP and MP
+// and is used up; otherwise HP comes back to the configured respawn
+// fraction of max HP. Observers see the new HP and the revive, the player
+// loses a Charm of Courage and gets its status flags refreshed, and any
+// pending resurrection offer lapses.
+func (c *Character) Revive() bool {
 	c.reviveMu.Lock()
 	defer c.reviveMu.Unlock()
-	return c.revive(fraction)
+	return c.revive()
 }
 
-// ReviveRestoringExp is a resurrection skill's revive: it restores
-// restorePercent of the exp the last death took, then revives the player
-// with fraction of max HP, in the order Player.doRevive(double) runs them.
+// ReviveRestoringExp is a resurrection's revive: it restores restorePercent
+// of the exp the last death took, then revives the player as Revive does.
 // It does nothing to a player that is not dead — a player who already went
 // back to town keeps the loss — and reports whether it revived.
-func (c *Character) ReviveRestoringExp(restorePercent, fraction float64) bool {
+func (c *Character) ReviveRestoringExp(restorePercent float64) bool {
 	c.reviveMu.Lock()
 	defer c.reviveMu.Unlock()
+	return c.reviveRestoringExp(restorePercent)
+}
+
+// reviveRestoringExp is ReviveRestoringExp; the caller holds reviveMu.
+func (c *Character) reviveRestoringExp(restorePercent float64) bool {
 	if !c.dead.Load() {
 		return false
 	}
 	c.RestoreExp(restorePercent)
-	return c.revive(fraction)
+	return c.revive()
 }
 
-// revive is Revive's state transition; the caller holds reviveMu.
-func (c *Character) revive(fraction float64) bool {
-	maxHP := c.ResourceValues().MaxHP
-	c.vitalsMu.Lock()
-	defer c.vitalsMu.Unlock()
-	if !c.dead.CompareAndSwap(true, false) {
+// revive is Revive's state transition and its follow-ups; the caller holds
+// reviveMu. A player in the middle of a teleport is not revived. HP (and MP
+// for a Phoenix Blessing) is set in the same step that clears the dead
+// flag, so no hit lands on a living player at 0 HP.
+func (c *Character) revive() bool {
+	if live := c.liveLocked(); live != nil && live.Teleporting() {
 		return false
 	}
-	c.curHP = maxHP * fraction
+	res := c.ResourceValues()
+	blessed := c.EffectList().IsAffected(effect.FlagPhoenixBlessing)
+	c.vitalsMu.Lock()
+	if !c.dead.CompareAndSwap(true, false) {
+		c.vitalsMu.Unlock()
+		return false
+	}
+	if blessed {
+		c.curHP, c.curMP = res.MaxHP, res.MaxMP
+	} else {
+		c.curHP = min(res.MaxHP*c.respawnRestoreHP, res.MaxHP)
+	}
+	c.vitalsMu.Unlock()
+
+	if blessed {
+		c.stopPhoenixBlessing()
+	}
+	c.BroadcastStatus()
+	c.emit(event.Revived{})
+	c.EffectList().StopByType(effect.TypeCharmOfCourage)
+	c.emit(event.EtcStatusChanged{})
+	c.reviveRequested, c.revivePower = false, 0
 	return true
 }
 
@@ -104,15 +133,22 @@ func (c *Character) revive(fraction float64) bool {
 // plays live and reaches clients before any death side effect's updates.
 // The killer's PK/PvP credit follows, then this player's own costs: charges,
 // the experience/karma loss, the stop of every fusion channel on this player,
-// and last the death-penalty level, whose karma gate reads the karma left
-// after that loss.
+// and the death-penalty level, whose karma gate reads the karma left after
+// that loss. A player whose Phoenix Blessing survived the death is then
+// offered its own resurrection, and the effect icons are refreshed last.
+//
+// Stripping a Phoenix or Noblesse Blessing's companions (the other blessing
+// and a Charm of Luck) refreshes the player's appearance for observers once
+// per blessing stopped, on top of each removed effect's own refresh.
 func (c *Character) Die(killer attackable.Combatant) bool {
 	if !c.MarkDead() {
 		return false
 	}
 	c.BroadcastStatus()
 	c.StopCast()
-	c.EffectList().StopOnDeath()
+	for range c.EffectList().StopOnDeath() {
+		c.BroadcastAbnormalEffect()
+	}
 	c.BroadcastStatus()
 	c.BroadcastDie()
 	c.awardKillerPKKarma(killer)
@@ -122,5 +158,10 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.emit(event.FusionCastersStopRequested{})
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})
+	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
+		c.ReviveRequest(c, 0, false)
+	}
+	// The retained effects' icons are resent once the death has settled.
+	c.UpdateEffectIcons()
 	return true
 }

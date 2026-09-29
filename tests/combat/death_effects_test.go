@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -24,9 +25,14 @@ func TestDeathConsumesBlessingsAndCleansOrdinaryEffects(t *testing.T) {
 		name    string
 		cast    []int
 		wantIDs []int
+		// wantUserInfo, when set, is the victim's UserInfo count before
+		// its Die: one per appearance refresh the blessing stops send.
+		wantUserInfo int
 	}{
 		{name: "phoenix", cast: []int{1001, 1002, 1003, 1004}, wantIDs: []int{1002, 1004}},
-		{name: "noblesse", cast: []int{1001, 1003, 1004}, wantIDs: []int{1004}},
+		// The Noblesse stop refreshes once (its onExit does nothing); the
+		// Charm of Luck's onExit and its stop refresh once each.
+		{name: "noblesse", cast: []int{1001, 1003, 1004}, wantIDs: []int{1004}, wantUserInfo: 3},
 		{name: "ordinary", cast: []int{1004, 1005}, wantIDs: []int{1005}},
 	}
 
@@ -50,6 +56,16 @@ func TestDeathConsumesBlessingsAndCleansOrdinaryEffects(t *testing.T) {
 			drainUntilQuiet(t, killer)
 			drainUntilQuiet(t, victimClient)
 			killPrimaryClient(t, srv, killer, killerChar.ID, victimID)
+			if tt.wantUserInfo != 0 {
+				frames := readQuiet(victimClient)
+				die := indexOf(frames, 0, serverpackets.OpcodeDie, victimID)
+				if die < 0 {
+					t.Fatal("victim never received its own Die")
+				}
+				if got := countOpcode(frames, die, serverpackets.OpcodeUserInfo); got != tt.wantUserInfo {
+					t.Fatalf("UserInfo frames before Die = %d, want %d", got, tt.wantUserInfo)
+				}
+			}
 
 			obj, ok := srv.State.Player(victimID)
 			if !ok {

@@ -16,7 +16,7 @@ import (
 type hpWriterPlayer interface {
 	Dead() bool
 	Die(attackable.Combatant) bool
-	Revive(float64) bool
+	Revive() bool
 	CurrentHP() int
 	CurrentCP() int
 	SetCP(float64)
@@ -76,8 +76,8 @@ func TestDeadPlayerRejectsHPWriters(t *testing.T) {
 		t.Fatalf("dead player HP = %d after AddHP/SetHP, want 0", got)
 	}
 
-	if !player.Revive(0.5) || player.CurrentHP() <= 0 {
-		t.Fatalf("Revive(0.5) left HP %d, want positive", player.CurrentHP())
+	if !player.Revive() || player.CurrentHP() <= 0 {
+		t.Fatalf("Revive() left HP %d, want positive", player.CurrentHP())
 	}
 	player.SetHP(20)
 	if got := player.AddHP(1); got != 1 || player.CurrentHP() != 21 {
@@ -165,8 +165,8 @@ func TestConcurrentPlayerHPWritersCannotRaiseCorpse(t *testing.T) {
 		if got := player.CurrentHP(); got != 0 {
 			t.Fatalf("round %d: corpse HP = %d after concurrent writers, want 0", round, got)
 		}
-		if !player.Revive(1) {
-			t.Fatalf("round %d: Revive(1) = false", round)
+		if !player.Revive() {
+			t.Fatalf("round %d: Revive() = false", round)
 		}
 	}
 }

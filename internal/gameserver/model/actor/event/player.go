@@ -292,3 +292,39 @@ type ServitorSummonRequested struct{ Skill modelskill.Definition }
 
 func (PetSummonRequested) event()      {}
 func (ServitorSummonRequested) event() {}
+
+// ReviveRequested reports a resurrection offer awaiting the character's
+// answer; ReviverName is who offers it (the character itself for a Phoenix
+// Blessing).
+type ReviveRequested struct{ ReviverName string }
+
+// ReviveRefusal names why a resurrection offer was not made.
+type ReviveRefusal int
+
+const (
+	// ReviveAlreadyProposed: the same kind of offer (character or pet) is
+	// already pending.
+	ReviveAlreadyProposed ReviveRefusal = iota + 1
+	// RevivePetWhileOwnerPending: a pet offer while the owner's own is
+	// pending.
+	RevivePetWhileOwnerPending
+	// ReviveOwnerWhilePetPending: an offer for the owner while its pet's is
+	// pending.
+	ReviveOwnerWhilePetPending
+)
+
+// ReviveRefused reports to the would-be reviver that its offer was refused.
+type ReviveRefused struct{ Reason ReviveRefusal }
+
+// Revived reports a dead character standing back up, after its HP and MP
+// were restored.
+type Revived struct{}
+
+// EtcStatusChanged reports a change to the flags the client status window
+// shows (charges, penalties, charm of courage).
+type EtcStatusChanged struct{}
+
+func (ReviveRequested) event()  {}
+func (ReviveRefused) event()    {}
+func (Revived) event()          {}
+func (EtcStatusChanged) event() {}
