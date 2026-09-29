@@ -51,8 +51,8 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// Starting it now would pay its costs and broadcast MagicSkillUse (or
 	// switch a toggle) before what is in flight has finished. It replaces an
 	// attack queued behind the same cast. itemAICastBusy is the wait
-	// predicate every cast request shares; the sit/stand transition and
-	// intention-order terms it still lacks are #2191.
+	// predicate every cast request shares, the sit-down and stand-up
+	// transitions included.
 	if castable && !restoringServitor && itemAICastBusy(live) {
 		live.deferMagicSkill(req, selected)
 		if live.combat != nil {
@@ -397,10 +397,14 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 }
 
 // finishDeferredMagicSkill runs the skill request queued as the next CAST
-// intention, if any, and reports whether one was waiting.
+// intention, if any, and reports whether one was waiting. During a sit-down
+// or stand-up the request stays queued for PostureSettled.
 func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) bool {
 	if live == nil || live.detached() {
 		return false
+	}
+	if inPostureTransition(live) {
+		return live.hasDeferredMagicSkill()
 	}
 	queued := live.takeDeferredMagicSkill()
 	if queued == nil {

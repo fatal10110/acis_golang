@@ -49,19 +49,15 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 }
 
 // CanPlayerAttemptItemCast is the pre-attempt gate of an item-carried
-// skill. Such a skill waits out a cast already in flight, and a sit-down
-// still under way, instead of being refused by them: CanPlayerAttemptCast's
-// casting-now refusal is left out, and only a caster that has finished
-// sitting down counts as sitting. Every other check is the same.
+// skill. It differs from CanPlayerAttemptCast only in that a caster still
+// sitting down does not count as seated: the item waits out the sit-down
+// and is refused once it ends.
 func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def modelskill.Definition) error {
 	if caster == nil || c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
-	if c.actor.AllSkillsDisabled() {
-		return ErrAllSkillsDisabled
-	}
-	if c.actor.SkillDisabled(ReuseKey(def)) {
-		return ErrSkillDisabled
+	if err := c.canAttemptSkill(def); err != nil {
+		return err
 	}
 	return c.playerAttemptRules(caster, def, caster.Seated())
 }

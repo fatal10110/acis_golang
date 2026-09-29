@@ -351,6 +351,22 @@ func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	return req
 }
 
+// hasDeferredMagicSkill reports whether a skill request is queued as the
+// next CAST intention.
+func (p *livePlayer) hasDeferredMagicSkill() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredMagic != nil
+}
+
+// hasDeferredItemAICast reports whether an item cast is queued as the next
+// CAST intention.
+func (p *livePlayer) hasDeferredItemAICast() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredItem != nil
+}
+
 func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()

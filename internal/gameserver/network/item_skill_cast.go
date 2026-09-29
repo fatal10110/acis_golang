@@ -98,6 +98,13 @@ func itemAICastBusy(live *livePlayer) bool {
 	if live.cast != nil && live.cast.CastingNow() {
 		return true
 	}
+	return inPostureTransition(live)
+}
+
+// inPostureTransition reports whether live is still sitting down or standing
+// up. A cast queued behind a swing or cast that ends inside the transition
+// stays queued until PostureSettled runs it.
+func inPostureTransition(live *livePlayer) bool {
 	return live.SittingNow() || live.StandingNow()
 }
 
@@ -196,10 +203,14 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 // finishDeferredItemAICast runs the queued item cast, if any. It passes the
 // pre-attempt gate again first: a queued skill with no final target any
 // more is dropped silently, and one the gate now refuses is answered with
-// the reason alone.
+// the reason alone. During a sit-down or stand-up the cast stays queued for
+// PostureSettled, and it reports true: it is still the next intention.
 func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 	if live == nil || live.detached() {
 		return false
+	}
+	if inPostureTransition(live) {
+		return live.hasDeferredItemAICast()
 	}
 	itemCast := live.takeDeferredItemAICast()
 	if itemCast == nil {

@@ -227,8 +227,13 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.startLiveAutoAttack(live)
 	case event.AttackFinished:
 		l.finishDeferredPickup(live)
-		l.finishDeferredMagicSkill(live)
-		l.finishDeferredItemAICast(live)
+		magicHeld := l.finishDeferredMagicSkill(live)
+		itemHeld := l.finishDeferredItemAICast(live)
+		// A cast held for PostureSettled is still the next intention: the
+		// attack it replaced does not swing again meanwhile.
+		if (magicHeld || itemHeld) && inPostureTransition(live) {
+			return
+		}
 		live.combat.Think()
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
