@@ -455,7 +455,8 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
 	if !active || len(hits) == 0 || hits[0].Target == nil || c.actor.AlikeDead() {
 		return false
 	}
-	if !c.actor.Knows(hits[0].Target) || hits[0].Target.AlikeDead() {
+	// A fake-dead target is not dead: the hit lands and the attack goes on.
+	if !c.actor.Knows(hits[0].Target) || hits[0].Target.Dead() {
 		c.Stop()
 		return false
 	}
@@ -472,7 +473,7 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
 }
 
 func (c *Controller) deliverHit(hit Hit) {
-	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.AlikeDead() {
+	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.Dead() {
 		return
 	}
 	if !hit.Miss {

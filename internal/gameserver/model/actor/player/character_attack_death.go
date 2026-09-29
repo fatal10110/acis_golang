@@ -2,43 +2,34 @@ package player
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TakeDamage applies physical damage, broadcasts the resulting HP to nearby
 // observers, and runs the once-only death path when HP reaches zero. A hit
-// against an already-dead or invulnerable (spawn protection, GM invul,
-// mid-teleport) character is a no-op before any change (PlayerStatus.java:
-// 103-116). Otherwise the sleep/immobile-stop, stand-up, and stun-break side
-// effects always run for a live hit (PlayerStatus.java:118-134) before the
-// damage-permission check (:136-140): an attacker without damage permission
+// against a dead or invulnerable (spawn protection, GM invul, mid-teleport)
+// character is a no-op before any change; a fake-dead character is not
+// dead and takes the hit. Otherwise the sleep/immobile-stop, stand-up, and
+// stun-break side effects always run for a live hit before the
+// damage-permission check: another attacker without damage permission
 // still wakes/interrupts the target — only the HP/CP change itself is
-// dropped. A Playable attacker other than the actor itself drains CP before
-// HP (CreatureAttack.java:263 -> PlayerStatus.reduceHp,
-// PlayerStatus.java:166-184); melee never sets ignoreCP (Player.java:6154).
-// The hit's cast-break roll is the attacker's to run, through
-// BreakCastOnDamage, once the hit has landed and its reflected and absorbed
-// damage have applied.
+// dropped. A nearby servitor takes its damage-transfer share of another
+// attacker's hit, and a Playable attacker other than the actor itself
+// drains CP before HP; melee never sets ignoreCP. The hit's cast-break roll
+// is the attacker's to run, through BreakCastOnDamage, once the hit has
+// landed and its reflected and absorbed damage have applied.
 func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
-	if c.AlikeDead() || c.Invul() {
+	if c.Dead() || c.Invul() {
 		return false
 	}
 	if dmg > 0 {
 		c.applyNonConsumptionDamageEffects(false)
 	}
-	if !creature.CanDealDamage(attacker) {
+	if !c.damagePermitted(attacker) {
 		return false
 	}
-	c.vitalsMu.Lock()
-	hit := c.absorbCPThenReduceHP(float64(dmg), attacker, false)
-	c.vitalsMu.Unlock()
-	if !hit.applied {
-		return false
-	}
-	c.sendHitFeedback(float64(dmg), attacker, hit, false)
-	if hit.dead {
+	if c.landHit(float64(dmg), attacker, false, false) {
 		return c.Die(attacker)
 	}
 	return false

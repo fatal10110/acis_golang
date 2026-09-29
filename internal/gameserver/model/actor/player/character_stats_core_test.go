@@ -3091,13 +3091,57 @@ func TestReduceHPStandsUpSittingCharacterUnlessInStoreMode(t *testing.T) {
 			c := liveCharacter(1, combatTemplate(), combatItems())
 			c.SetHP(100)
 			attachTestLive(t, c)
-			c.Sit()
+			sitDownSettled(c)
 			c.SetOperating(tt.operating)
 
 			c.ReduceHP(10, nil, modelskill.Definition{})
 
 			if got := c.Standing(); got != tt.wantStanded {
 				t.Fatalf("Standing() = %v, want %v", got, tt.wantStanded)
+			}
+		})
+	}
+}
+
+// sitDownSettled sits c down and ends the sit-down at once, the way its
+// timer would.
+func sitDownSettled(c *Character) {
+	c.Sit()
+	c.stateMu.RLock()
+	gen := c.postureGen
+	c.stateMu.RUnlock()
+	c.settlePosture(gen, false)
+}
+
+// TestDamageLeavesSitDownAndFakeDeathLieDownRunning pins the stand-up gate
+// to a finished sit-down: a hit or a damage-over-time tick during the
+// sit-down or the fake-death lie-down leaves the transition running and the
+// character down, with no standing broadcast.
+func TestDamageLeavesSitDownAndFakeDeathLieDownRunning(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		down func(*Character)
+		hit  func(*Character)
+	}{
+		{"sit-down, hit", func(c *Character) { c.Sit() }, func(c *Character) { c.TakeDamage(10, nil) }},
+		{"sit-down, skill", func(c *Character) { c.Sit() }, func(c *Character) { c.ReduceHP(10, nil, modelskill.Definition{}) }},
+		{"sit-down, damage over time", func(c *Character) { c.Sit() }, func(c *Character) { c.ReduceHPByDOT(10, c, true) }},
+		{"fake-death lie-down, hit", func(c *Character) { c.StartFakeDeath() }, func(c *Character) { c.TakeDamage(10, nil) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := liveCharacter(1, combatTemplate(), combatItems())
+			c.SetHP(100)
+			attachTestLive(t, c)
+			tc.down(c)
+			rec := recordEvents(c)
+
+			tc.hit(c)
+
+			if c.Standing() || !c.SittingNow() {
+				t.Fatalf("Standing() = %v, SittingNow() = %v after damage mid-transition, want still going down", c.Standing(), c.SittingNow())
+			}
+			if got := event.Count[event.StanceChanged](rec); got != 0 {
+				t.Fatalf("stance broadcasts = %d, want none", got)
 			}
 		})
 	}
@@ -3182,7 +3226,7 @@ func TestReduceHPSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 	c.MarkDead()
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
-	c.Sit()
+	sitDownSettled(c)
 
 	c.ReduceHP(10, nil, modelskill.Definition{})
 
@@ -3201,7 +3245,7 @@ func TestReduceHPByDOTSkipsDamageEffectsOnAlreadyDeadCharacter(t *testing.T) {
 	c.MarkDead()
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
-	c.Sit()
+	sitDownSettled(c)
 
 	c.ReduceHPByDOT(10, nil, true)
 
@@ -3220,7 +3264,7 @@ func TestTakeDamageAppliesNonConsumptionDamageEffects(t *testing.T) {
 	c.SetHP(100)
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
-	c.Sit()
+	sitDownSettled(c)
 
 	c.TakeDamage(10, nil)
 
@@ -3243,7 +3287,7 @@ func TestTakeDamageSkipsDamageEffectsOnZeroDamage(t *testing.T) {
 	c.SetHP(100)
 	attachTestLive(t, c)
 	addCharacterEffect(t, c, "Sleep")
-	c.Sit()
+	sitDownSettled(c)
 
 	c.TakeDamage(0, nil)
 
@@ -3782,6 +3826,65 @@ func TestCharacterReduceHPIgnoresInvulnerableTargetAndNoDamagePermission(t *test
 	target.ReduceHP(10, caster, modelskill.Definition{})
 	if got := target.HP(); got != 100 {
 		t.Fatalf("HP after denied attacker damage = %v, want 100", got)
+	}
+}
+
+// TestSelfDamageSkipsOwnDamagePermission gives a character no damage
+// permission: its own damage — drowning, its own damage-over-time tick, a
+// hit or skill it lands on itself, each through a wrapper — still lands,
+// while another attacker's gated damage does not.
+func TestSelfDamageSkipsOwnDamagePermission(t *testing.T) {
+	tmpl := combatTemplate()
+	for _, tc := range []struct {
+		name string
+		hit  func(c *Character, attacker wrappedSelf)
+	}{
+		{"drowning", func(c *Character, a wrappedSelf) { c.ReduceHPByDOT(10, a, false) }},
+		{"damage over time", func(c *Character, a wrappedSelf) { c.ReduceHPByDOT(10, a, true) }},
+		{"skill", func(c *Character, a wrappedSelf) { c.ReduceHP(10, a, modelskill.Definition{}) }},
+		{"hit", func(c *Character, a wrappedSelf) { c.TakeDamage(10, a) }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := liveCharacter(1, tmpl, combatItems())
+			c.SetHP(100)
+			c.SetCanGiveDamage(false)
+			tc.hit(c, wrappedSelf{c})
+			if got := c.HP(); got != 90 {
+				t.Fatalf("HP after own damage without damage permission = %v, want 90", got)
+			}
+		})
+	}
+
+	other := liveCharacter(1, tmpl, combatItems())
+	c := liveCharacter(2, tmpl, combatItems())
+	c.SetHP(100)
+	other.SetCanGiveDamage(false)
+	c.ReduceHPByDOT(10, other, true)
+	c.TakeDamage(10, other)
+	if got := c.HP(); got != 100 {
+		t.Fatalf("HP after another attacker's damage without permission = %v, want 100", got)
+	}
+}
+
+// TestInvulnerableCharacterTakesOnlyItsOwnDamageOverTime makes a character
+// invulnerable: its own damage-over-time tick still lands, through a
+// wrapper; its own drowning, another attacker's tick and a fall do not.
+func TestInvulnerableCharacterTakesOnlyItsOwnDamageOverTime(t *testing.T) {
+	tmpl := combatTemplate()
+	c := liveCharacter(2, tmpl, combatItems())
+	other := liveCharacter(1, tmpl, combatItems())
+	c.SetHP(100)
+	c.SetSpawnProtection(true)
+
+	c.ReduceHPByDOT(10, wrappedSelf{c}, false)
+	c.ReduceHPByDOT(10, other, true)
+	c.ReduceHPByDOT(10, nil, true)
+	if got := c.HP(); got != 100 {
+		t.Fatalf("HP after drowning, another's tick and a fall while invulnerable = %v, want 100", got)
+	}
+	c.ReduceHPByDOT(10, wrappedSelf{c}, true)
+	if got := c.HP(); got != 90 {
+		t.Fatalf("HP after its own damage-over-time tick while invulnerable = %v, want 90", got)
 	}
 }
 

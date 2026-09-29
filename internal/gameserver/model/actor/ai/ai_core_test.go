@@ -3703,6 +3703,7 @@ type deadGateFake struct {
 }
 
 func (d *deadGateFake) AlikeDead() bool { return d.dead }
+func (d *deadGateFake) Dead() bool      { return d.dead }
 
 // A summon that cannot keep attacking its target goes idle once the swing
 // ends: back to following its owner, or standing still with follow off.
