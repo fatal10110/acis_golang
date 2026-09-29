@@ -81,6 +81,7 @@ type options struct {
 	water                  bool
 	waterNow               func() time.Time
 	disallowWater          bool
+	disableFallingDamage   bool
 	attackStance           *task.AttackStance
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
@@ -123,6 +124,7 @@ type characterSpec struct {
 	name  string
 	level int
 	sp    int
+	sex   player.Sex
 }
 
 // WithAccount sets the login account the scripted client authenticates as
@@ -192,6 +194,11 @@ func WithWater(now func() time.Time) Option {
 // keeps water zones swimming but never starts a breath countdown.
 func WithAllowWater(allowed bool) Option {
 	return func(o *options) { o.disallowWater = !allowed }
+}
+
+// WithFallingDamage sets the EnableFallingDamage server option (default true).
+func WithFallingDamage(enabled bool) Option {
+	return func(o *options) { o.disableFallingDamage = !enabled }
 }
 
 // WithAttackStance supplies the combat-stance tracker wired into the link
@@ -316,7 +323,14 @@ func WithSeed(seed func(*gamesql.CharacterStore, *gamesql.ItemStore)) Option {
 // template) through the real SQL character store before the client dials, so
 // the initial CharSelectInfo already reports it.
 func WithCharacter(name string, level, sp int) Option {
-	return func(o *options) { o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp}) }
+	return WithCharacterSex(name, level, sp, player.SexMale)
+}
+
+// WithCharacterSex seeds a selectable character with the given sex.
+func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
+	return func(o *options) {
+		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: sex})
+	}
 }
 
 // WithShortcutSeed inserts shortcut rows before the client dials.
@@ -1241,7 +1255,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
@@ -1370,7 +1384,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		if !ok {
 			t.Fatal("missing test class template")
 		}
-		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, player.SexMale)
+		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, spec.sex)
 		if err != nil {
 			t.Fatalf("seed character: %v", err)
 		}

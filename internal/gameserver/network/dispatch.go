@@ -100,7 +100,8 @@ type PlayerConfig struct {
 	WeightLimitMultiplier float64
 	// AllowWater controls whether entering a water zone starts the
 	// drowning breath-gauge countdown at all.
-	AllowWater bool
+	AllowWater          bool
+	EnableFallingDamage bool
 	// RespawnRestoreHP is the fraction of calculated max HP a non-percent
 	// revive restores.
 	RespawnRestoreHP float64

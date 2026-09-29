@@ -1,6 +1,8 @@
 package network
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -122,6 +124,13 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	// isTeleporting() — no correction packet, unlike the other two gates
 	// here which answer ActionFailed.
 	if live.Teleporting() {
+		return
+	}
+	damage, falling := live.CheckFall(reported.Z, !liveSwimming(live) && !live.Flying(), l.playerConfig.EnableFallingDamage, time.Now())
+	if damage > 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageFallDamage, int32(damage)))
+	}
+	if falling {
 		return
 	}
 	// ValidatePosition only corrects excessive divergence: a client that
