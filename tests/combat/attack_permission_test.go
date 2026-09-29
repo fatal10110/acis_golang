@@ -3,9 +3,13 @@ package combat
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -117,6 +121,79 @@ func TestKarmaPlayerCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 				t.Fatal("refused attack reached the blessed player")
 			}
 		})
+	}
+}
+
+// TestRefusedAttackKeepsPickupInFlight has the karma player click a distant
+// ground item and, mid-walk, send an attack at the blessed low-level player.
+// The refusal replaces no intention: the walk goes on and the item is still
+// picked up on arrival.
+func TestRefusedAttackKeepsPickupInFlight(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Blessed", 10, 0), gameservertest.WithWantChars(1))
+	c, victimID := srv.Client, srv.SoleObjectID(t)
+	pkID := seedPlayer(t, srv, "pk", "Pk", 30, 500)
+	adena := srv.GiveItem(t, pkID, item.AdenaID, 100)
+	pc := srv.DialClient(t, "pk", 1)
+	startInWorld(t, c)
+	startInWorld(t, pc)
+	victim, ok := srv.State.Player(victimID)
+	if !ok {
+		t.Fatal("victim missing from world state")
+	}
+	landEffect(t, victim.(effectHolder), "ProtectionBlessing")
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, pc)
+	selectPlayerTarget(t, pc, victimID)
+	drainUntilQuiet(t, pc)
+
+	x, y, z := int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z)
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
+	w.WriteInt32(adena)
+	w.WriteInt32(40)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	pc.Send(w.Bytes())
+	frame := mustRead(t, pc, "DropItem")
+	assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
+	r := wireReader(frame[1:])
+	r.ReadInt32() // dropper id
+	groundID := r.ReadInt32()
+
+	pc.Send(encodeMoveBackwardToLocation(x+200, y, z))
+	srv.AdvanceUntil(t, "walk away completed", func() bool {
+		px, _, _ := srv.PlayerPosition(t, pkID)
+		return px == int(x)+200
+	})
+	drainUntilQuiet(t, pc)
+
+	pc.Send(encodeAction(groundID, x, y, z, false))
+	assertFrameOpcode(t, mustRead(t, pc, "pickup ActionFailed"), serverpackets.OpcodeActionFailed, "pickup pending-action release")
+	pc.Send(encodeAttackRequest(victimID, x, y, z, false))
+
+	refused, getItem := false, false
+	deadline := pc.Now().Add(15 * time.Second)
+	for !getItem && pc.Now().Before(deadline) {
+		f := pc.ReadWithTimeout(500 * time.Millisecond)
+		if f == nil {
+			continue
+		}
+		switch {
+		case f[0] == serverpackets.OpcodeSystemMessage && wireReader(f[1:]).ReadInt32() == int32(serverpackets.SystemMessageTargetIncorrect):
+			refused = true
+		case f[0] == serverpackets.OpcodeGetItem:
+			if !refused {
+				t.Fatal("pickup completed before the attack was refused; the refusal did not land mid-walk")
+			}
+			getItem = true
+		}
+	}
+	if !refused {
+		t.Fatal("attack on the blessed player was not refused with TARGET_IS_INCORRECT")
+	}
+	if !getItem {
+		t.Fatal("refused attack dropped the pickup in flight: the item was never collected")
 	}
 }
 
