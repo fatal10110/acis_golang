@@ -8,6 +8,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -61,6 +63,25 @@ func TestValidatePositionFallDamage(t *testing.T) {
 	frames = validatePositionReplies(t, srv.Client, location.Location{X: x + 1_000, Y: y, Z: z - 2_000})
 	if len(frames) != 0 || character.HP() != hp-9 {
 		t.Fatalf("fall-window replies = %x, HP = %v", frames, character.HP())
+	}
+}
+
+func TestValidatePositionFallDamageUsesFallStat(t *testing.T) {
+	srv, character, objID := bootInZones(t, zone.NewIndex())
+	character.AddStatFuncs([]effect.Mod{{Stat: stat.Fall, Op: effect.OpMul, Value: 0.6}})
+	x, y, z := srv.PlayerPosition(t, objID)
+	hp := character.HP()
+
+	frames := validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - 1_000})
+	if len(frames) != 2 || frames[0][0] != serverpackets.OpcodeStatusUpdate || frames[1][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("modified fall replies = %x, want status then fall message", frames)
+	}
+	wantMessage := []byte{serverpackets.OpcodeSystemMessage, 0x28, 0x01, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 21, 0, 0, 0}
+	if !bytes.Equal(frames[1], wantMessage) {
+		t.Fatalf("modified fall message = %x, want %x", frames[1], wantMessage)
+	}
+	if got := character.HP(); got != hp-21 {
+		t.Fatalf("modified fall HP = %v, want %v", got, hp-21)
 	}
 }
 
