@@ -532,6 +532,13 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 				sendTargetCastRejection(owner, rejection, def)
 			}
 		},
+		// So is every other refused gate (reuse, costs, sight, skill
+		// conditions), with the reason message a player's own cast reads.
+		OnCastRefusal: func(err error, def modelskill.Definition) {
+			if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+				sendMagicCastFailureReason(owner, def, err)
+			}
+		},
 	}
 	// Summon.sendPacket forwards every packet to the owner (base
 	// Creature.sendPacket is a no-op), but Java only calls sendPacket

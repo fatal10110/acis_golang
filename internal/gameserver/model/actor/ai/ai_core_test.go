@@ -656,6 +656,10 @@ type recordingCast struct {
 	stopsMove  bool
 	castRange  int
 	skillType  string
+	// final, when set, is every request's final target; noFinal drops
+	// every request as having none.
+	final   attackable.Combatant
+	noFinal bool
 
 	castCalled   bool
 	castCalls    int
@@ -678,8 +682,22 @@ func (c *recordingCast) CanCast(target attackable.Combatant, ref skill.Ref) bool
 	return c.canCast
 }
 
-func (c *recordingCast) MeetsCastConditions(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
-	return true
+func (c *recordingCast) FinalTarget(target attackable.Combatant, ref skill.Ref) attackable.Combatant {
+	switch {
+	case c.noFinal:
+		return nil
+	case c.final != nil:
+		return c.final
+	}
+	return target
+}
+
+func (c *recordingCast) AttemptCast(target attackable.Combatant, ref skill.Ref) bool {
+	return c.CanAttempt(target, ref)
+}
+
+func (c *recordingCast) CanCastPlayable(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
+	return c.CanCast(target, ref)
 }
 
 func (c *recordingCast) MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) bool {
@@ -2530,6 +2548,34 @@ func TestSummonAITryToCastExecutesImmediately(t *testing.T) {
 	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want idle once the cast is dispatched", got)
+	}
+}
+
+func TestSummonAITryToCastAimsAtTheFinalTarget(t *testing.T) {
+	owner := actor(100)
+	clicked := actor(200)
+	cast := &recordingCast{canAttempt: true, canCast: true, final: owner}
+	brain := NewSummon(owner, &summonMove{}, &recordingAttack{})
+	brain.SetCastController(cast)
+
+	if !brain.TryToCast(clicked, skill.Ref{ID: 4139, Level: 8}, false) {
+		t.Fatal("TryToCast() = false, want accepted cast")
+	}
+	if cast.castedTarget != owner {
+		t.Fatalf("cast target = %v, want the final target %v", cast.castedTarget, owner)
+	}
+}
+
+func TestSummonAITryToCastWithoutFinalTargetIsDropped(t *testing.T) {
+	cast := &recordingCast{canAttempt: true, canCast: true, noFinal: true}
+	brain := NewSummon(actor(100), &summonMove{}, &recordingAttack{})
+	brain.SetCastController(cast)
+
+	if brain.TryToCast(actor(200), skill.Ref{ID: 4139, Level: 8}, false) {
+		t.Fatal("TryToCast() = true with no final target, want the request dropped")
+	}
+	if cast.castCalled || brain.CurrentIntention() != IntentionIdle {
+		t.Fatalf("dropped request cast = %v, intention = %v; want no cast, idle", cast.castCalled, brain.CurrentIntention())
 	}
 }
 
