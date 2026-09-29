@@ -550,6 +550,9 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 		c.mu.Unlock()
 		c.emitRethink()
+		if c.player != nil {
+			c.emit(event.BowShotFinished{})
+		}
 		return
 	}
 

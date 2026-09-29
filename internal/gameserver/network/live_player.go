@@ -398,10 +398,10 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 }
 
 // thinkAttack re-thinks p's attack intention from a movement-arrived,
-// swing-finished, or cast-finished hook, answering ActionFailed when the
-// think sent the intention idle.
+// swing-finished, cast-finished or wake-up hook, answering ActionFailed when
+// the think sent the intention idle or found p still busy.
 func (p *livePlayer) thinkAttack() {
-	if p.combat.Think() {
+	if p.combat != nil && p.combat.Think() {
 		p.SendFrame(serverpackets.FrameActionFailed())
 	}
 }

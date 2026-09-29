@@ -68,6 +68,11 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		if !l.attemptItemAICast(live, selected, def) {
 			continue
 		}
+		// Past the pre-attempt gate the attached skill is the CAST
+		// intention, started now or queued: it takes the attack's place.
+		if live.combat != nil {
+			live.combat.ReplaceWithCast()
+		}
 		if run != nil || itemAICastBusy(live) {
 			live.deferItemAICast(inv, inst, def, selected, ctrl)
 			sendMagicActionFailed(live)

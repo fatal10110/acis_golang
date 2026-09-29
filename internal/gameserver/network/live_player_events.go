@@ -257,12 +257,19 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishDeferredPickup(live)
 		magicHeld := l.finishDeferredMagicSkill(live)
 		itemHeld := l.finishDeferredItemAICast(live)
-		// A cast held for PostureSettled is still the next intention: the
-		// attack it replaced does not swing again meanwhile.
-		if (magicHeld || itemHeld) && inPostureTransition(live) {
+		// A queued cast took the intention the swing had when it was
+		// queued; whether it started now or is held for PostureSettled, the
+		// attack does not swing again.
+		if magicHeld || itemHeld {
 			return
 		}
 		live.thinkAttack()
+	case event.BowShotFinished:
+		// A shot's end re-thinks only an attack queued behind it; the bow
+		// reuse still running answers it with ActionFailed.
+		if live.combat != nil && live.combat.ThinkQueued() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+		}
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
@@ -285,9 +292,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.ThinkRequested:
 		// Only the attack intention re-evaluates on a think; nothing else a
 		// player holds acts on one.
-		if live.combat != nil {
-			live.combat.Think()
-		}
+		live.thinkAttack()
 	case event.CastAborted:
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:
@@ -403,17 +408,26 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if live.combat == nil {
 		return
 	}
-	if resumed, idled := live.combat.ResumeAfterCast(); resumed {
-		if idled {
+	if resumed, actionFailed := live.combat.ResumeAfterCast(); resumed {
+		if actionFailed {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
 		return
 	}
-	// A queued CAST already ran above. With no next intention, a finished
-	// CAST only re-engages the attack when the skill carries
-	// nextActionAttack; anything else goes idle.
+	live.endCastIntention(def)
+}
+
+// endCastIntention ends the CAST intention a cast of def held, with nothing
+// queued behind it: a skill carrying nextActionAttack re-engages the attack
+// it replaced; anything else, a toggle included, goes idle.
+func (live *livePlayer) endCastIntention(def modelskill.Definition) {
+	if live.combat == nil {
+		return
+	}
 	if def.NextActionIsAttack {
-		live.thinkAttack()
+		if live.combat.FollowUpAfterCast() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+		}
 		return
 	}
 	live.combat.Stop()
