@@ -3,7 +3,9 @@ package summon
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -40,12 +42,20 @@ func (a *Actor) Spoiled() bool                        { return false }
 func (a *Actor) Seeded() bool                         { return false }
 
 // AttackableBy reports whether attacker may attack a: a living summon is
-// attackable by anyone but itself, its owner included.
-//
-// The Olympiad, Blessing of Protection and cursed-weapon exemptions are not
-// applied: that state is not tracked yet, the same as for a player target.
+// attackable by anyone but itself, its owner included, unless the playable
+// attackability rules refuse a playable attacker (attackable.PlayableRefuses).
 func (a *Actor) AttackableBy(attacker skilltarget.Actor) bool {
-	return !a.Dead() && !sameObject(attacker, a)
+	if a.Dead() || sameObject(attacker, a) {
+		return false
+	}
+	other, ok := attacker.(attackable.Combatant)
+	return !ok || !attackable.PlayableRefuses(a, other)
+}
+
+// ProtectionBlessing reports whether a carries a Blessing of Protection of
+// its own.
+func (a *Actor) ProtectionBlessing() bool {
+	return a.effects.IsAffected(effect.FlagProtectionBlessing)
 }
 
 // AttackableWithoutForceBy reports whether caster may attack a without a

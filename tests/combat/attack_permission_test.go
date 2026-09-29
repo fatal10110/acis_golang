@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -43,6 +44,14 @@ func seedPlayer(t *testing.T, srv *gameservertest.Server, account, name string, 
 	return id
 }
 
+// flagPvP turns on a player's PvP flag, which makes a plain attack on it an
+// attack rather than a follow. A karma-free, unflagged player under Blessing
+// of Protection is not attackable at all by a karma player 10 or more levels
+// above it, so a forced attack on one only follows it.
+func flagPvP(p any) {
+	p.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+}
+
 // frameIndex is the index of the first frame whose opcode is op and, for a
 // system message, whose message id is msg; -1 when none.
 func frameIndex(frames [][]byte, op byte, msg int32) int {
@@ -59,8 +68,9 @@ func frameIndex(frames [][]byte, op byte, msg int32) int {
 }
 
 // TestKarmaPlayerCannotAttackBlessedLowLevelPlayer has a level-30 player
-// with karma attack a level-10 player under Blessing of Protection. Outside
-// a PvP zone the attack is refused with TARGET_IS_INCORRECT then
+// with karma attack a PvP-flagged level-10 player under Blessing of
+// Protection. The flag makes the click an attack rather than a follow.
+// Outside a PvP zone the attack is refused with TARGET_IS_INCORRECT then
 // ActionFailed, and no swing starts; inside an arena it proceeds.
 func TestKarmaPlayerCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 	t.Parallel()
@@ -91,6 +101,7 @@ func TestKarmaPlayerCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 				t.Fatal("victim missing from world state")
 			}
 			landEffect(t, victim.(effectHolder), "ProtectionBlessing")
+			flagPvP(victim)
 			drainUntilQuiet(t, c)
 			drainUntilQuiet(t, pc)
 
@@ -125,7 +136,8 @@ func TestKarmaPlayerCannotAttackBlessedLowLevelPlayer(t *testing.T) {
 }
 
 // TestRefusedAttackKeepsPickupInFlight has the karma player click a distant
-// ground item and, mid-walk, send an attack at the blessed low-level player.
+// ground item and, mid-walk, send an attack at the PvP-flagged blessed
+// low-level player.
 // The refusal replaces no intention: the walk goes on and the item is still
 // picked up on arrival.
 func TestRefusedAttackKeepsPickupInFlight(t *testing.T) {
@@ -142,6 +154,7 @@ func TestRefusedAttackKeepsPickupInFlight(t *testing.T) {
 		t.Fatal("victim missing from world state")
 	}
 	landEffect(t, victim.(effectHolder), "ProtectionBlessing")
+	flagPvP(victim)
 	drainUntilQuiet(t, c)
 	drainUntilQuiet(t, pc)
 	selectPlayerTarget(t, pc, victimID)
