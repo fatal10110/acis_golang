@@ -647,6 +647,13 @@ func (m *CreatureMove) FollowMode() FollowMode {
 	return m.followMode
 }
 
+// FollowTarget returns the object id the active follow task follows, or 0.
+func (m *CreatureMove) FollowTarget() int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.followTarget
+}
+
 // FollowInterval returns how often the active follow task should be ticked.
 func (m *CreatureMove) FollowInterval() time.Duration {
 	m.mu.Lock()

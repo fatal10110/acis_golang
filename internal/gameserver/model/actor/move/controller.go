@@ -32,6 +32,9 @@ type Actor interface {
 	// OwnsOffensiveFollowTicker reports that the actor's own AI already
 	// rechecks an offensive follow, so the controller must not track it.
 	OwnsOffensiveFollowTicker() bool
+	// MovementDisabled reports that the actor cannot start moving (rooted,
+	// immobilized, stunned, asleep, ...).
+	MovementDisabled() bool
 }
 
 type pawnFollowActor interface {
@@ -188,27 +191,51 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // reports false. A target already converged on (movement already under way
 // toward its current position) is left alone rather than re-issued.
 //
+// An actor that cannot move never starts a follow: out of range it still
+// reports true, so the caller waits instead of attacking, but no movement is
+// issued. A follow already running toward target keeps running; the effects
+// that lock movement stop it themselves.
+//
 // This does not reproduce the reference behavior's line-of-sight branch (an
-// out-of-range NPC that also can't see its target still counts it as
-// followable) — the controller has no line-of-sight input.
+// NPC already within range that can't see its target still follows it) —
+// the controller has no line-of-sight input (#2611).
 func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	// Read before mu: MovementDisabled reads the actor's effect state, and
+	// effect hooks stop this controller (taking mu) from other queues.
+	disabled := c.self.MovementDisabled()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.maybeStartFollow(target, attackRange, FollowOffensive)
+	blocked := disabled && !c.followingLocked(target, FollowOffensive)
+	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked)
 }
 
 // MaybeStartFriendlyFollow arms a friendly follow task and starts moving
 // toward target when it sits farther than offset plus both actors'
 // footprints. Friendly follow broadcasts a plain movement request; follow
-// identity stays server-side for the follow tick.
+// identity stays server-side for the follow tick. An actor that cannot move
+// starts nothing and reports false, leaving any running follow untouched; a
+// friendly follow already running toward target keeps running.
 func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
+	disabled := c.self.MovementDisabled()
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if disabled && !c.followingLocked(target, FollowFriendly) {
+		return false, nil
+	}
 	c.clearOffensiveFollow()
-	return c.maybeStartFollow(target, offset, FollowFriendly)
+	return c.maybeStartFollow(target, offset, FollowFriendly, false)
 }
 
-func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode) (bool, error) {
+// followingLocked reports whether a follow of mode toward target is already
+// running.
+func (c *Controller) followingLocked(target attackable.Combatant, mode FollowMode) bool {
+	return target != nil && c.move.FollowMode() == mode && c.move.FollowTarget() == target.ObjectID()
+}
+
+// maybeStartFollow resolves one follow request. blocked means the actor
+// cannot move and has no follow toward target running: an out-of-range
+// target then reports true without starting a follow or a move.
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool) (bool, error) {
 	if offset < 0 {
 		return false, nil
 	}
@@ -240,6 +267,9 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			c.clearOffensiveFollow()
 		}
 		return false, nil
+	}
+	if blocked {
+		return true, nil
 	}
 
 	switch mode {
@@ -423,7 +453,7 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	c.offensiveFollowElapsed = 0
-	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive)
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false)
 }
 
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {

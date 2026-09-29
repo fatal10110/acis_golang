@@ -112,6 +112,7 @@ type options struct {
 	geo                    move.Geo
 	itemTemplates          *item.Table
 	productionTickers      bool
+	handAI                 bool
 	realPool               bool
 	doors                  []*door.Template
 }
@@ -386,6 +387,11 @@ func WithGeo(geo move.Geo) Option { return func(o *options) { o.geo = geo } }
 // hand. Effects is the process-wide shared registry, so a suite using this
 // must not tick it by hand in parallel.
 func WithProductionTickers() Option { return func(o *options) { o.productionTickers = true } }
+
+// WithAITask wires the AI registry the production boot runs summons and NPCs
+// on, without starting its ticker: the suite drives each one-second AI cycle
+// itself through Server.AI.Tick.
+func WithAITask() Option { return func(o *options) { o.handAI = true } }
 
 // WithItemTemplates boots against tbl instead of the shared catalog, so a
 // suite can hand the server a catalog it also holds a reference to and edit
@@ -1164,6 +1170,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	positions := task.NewPositionUpdates(state)
 	var ai *task.AI
+	if o.handAI {
+		ai = task.NewAI(state, o.log)
+	}
 	if o.productionTickers {
 		ai = task.NewAI(state, o.log)
 		if o.attackStance == nil && o.attackStanceNow == nil {
