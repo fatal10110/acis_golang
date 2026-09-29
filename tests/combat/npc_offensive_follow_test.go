@@ -19,26 +19,47 @@ type sightGeo struct {
 
 func (g sightGeo) CanSeeActor(int, int, int, float64, int, int, int, float64) bool { return g.see }
 
-// npcActivity lets d pass in 100ms steps and reports whether the client saw
-// id move (MoveToLocation or MoveToPawn) or swing (Attack).
-func npcActivity(t *testing.T, srv *gameservertest.Server, c *scriptedClient, id int32, d time.Duration) (moved, attacked bool) {
+// npcMoves is what the client saw an NPC do over a stretch of time.
+type npcMoves struct {
+	location, pawn, attacked bool
+}
+
+// requireMoved fails unless the client saw the NPC walk with
+// MoveToLocation, the only movement packet an NPC's offensive follow sends,
+// or fails if it saw any movement packet when want is false.
+func (m npcMoves) requireMoved(t *testing.T, want bool) {
 	t.Helper()
+	if want && (!m.location || m.pawn) {
+		t.Fatalf("MoveToLocation, MoveToPawn = %v, %v; want MoveToLocation only", m.location, m.pawn)
+	}
+	if !want && (m.location || m.pawn) {
+		t.Fatalf("MoveToLocation, MoveToPawn = %v, %v; want no movement", m.location, m.pawn)
+	}
+}
+
+// npcActivity lets d pass in 100ms steps and reports which movement
+// packets (MoveToLocation, MoveToPawn) and swings (Attack) the client saw
+// id send.
+func npcActivity(t *testing.T, srv *gameservertest.Server, c *scriptedClient, id int32, d time.Duration) npcMoves {
+	t.Helper()
+	var seen npcMoves
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
 		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+			if len(frame) < 5 || wireReader(frame[1:]).ReadInt32() != id {
+				continue
+			}
 			switch frame[0] {
-			case serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeMoveToPawn:
-				if wireReader(frame[1:]).ReadInt32() == id {
-					moved = true
-				}
+			case serverpackets.OpcodeMoveToLocation:
+				seen.location = true
+			case serverpackets.OpcodeMoveToPawn:
+				seen.pawn = true
 			case serverpackets.OpcodeAttack:
-				if wireReader(frame[1:]).ReadInt32() == id {
-					attacked = true
-				}
+				seen.attacked = true
 			}
 		}
 	}
-	return moved, attacked
+	return seen
 }
 
 // TestHalishaChestNeverChasesOutOfRangePlayer pins the Halisha chest's
@@ -80,10 +101,7 @@ func TestHalishaChestNeverChasesOutOfRangePlayer(t *testing.T) {
 				t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)
 			}
 
-			moved, _ := npcActivity(t, srv, c, chest.ObjectID(), time.Second)
-			if moved != tt.chase {
-				t.Fatalf("%s moved = %v, want %v", tt.kind, moved, tt.chase)
-			}
+			npcActivity(t, srv, c, chest.ObjectID(), time.Second).requireMoved(t, tt.chase)
 			if !tt.chase {
 				if x, y, z := chest.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 					t.Fatalf("Halisha chest position = (%d,%d,%d), want %+v", x, y, z, home)
@@ -133,9 +151,10 @@ func TestNPCClosesInOnUnseenTargetInReach(t *testing.T) {
 
 			monster.AddCombatDamageHate(player, 50)
 
-			moved, attacked := npcActivity(t, srv, c, monster.ObjectID(), 2*time.Second)
-			if moved != tt.move || attacked != tt.attack {
-				t.Fatalf("moved, attacked = %v, %v; want %v, %v", moved, attacked, tt.move, tt.attack)
+			seen := npcActivity(t, srv, c, monster.ObjectID(), 2*time.Second)
+			seen.requireMoved(t, tt.move)
+			if seen.attacked != tt.attack {
+				t.Fatalf("attacked = %v, want %v", seen.attacked, tt.attack)
 			}
 		})
 	}
@@ -174,11 +193,49 @@ func TestHoldAttackDesireNeverChasesOutOfRange(t *testing.T) {
 				t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionAttack)
 			}
 
-			moved, _ := npcActivity(t, srv, c, monster.ObjectID(), time.Second)
-			if moved == hold {
-				t.Fatalf("moved = %v, want %v", moved, !hold)
-			}
+			npcActivity(t, srv, c, monster.ObjectID(), time.Second).requireMoved(t, !hold)
 		})
+	}
+}
+
+// TestIdleHoldDesireTargetFailsAggroScanWithoutChase pins the aggro scan's
+// follow gate: for an idle monster whose queued hold attack desire names an
+// out-of-reach player, the gate reads the idle current intention, which
+// never closes in, so it reports the player as still to be reached (the scan
+// rejects it) without walking toward it.
+func TestIdleHoldDesireTargetFailsAggroScanWithoutChase(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	player := liveCombatant(t, srv)
+
+	// Far beyond the monster's knowledge, so queuing the desire runs no
+	// Think: the hold desire stays queued and the current intention idle.
+	px, py, pz := player.Position()
+	home := location.Location{X: px + 20000, Y: py, Z: pz}
+	monster := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	drainUntilQuiet(t, c)
+
+	monster.AddAttackDesireHold(player, 50)
+	if got := monster.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionIdle)
+	}
+	if _, ok := monster.AI().Desires().NonMovingAttack(player); !ok {
+		t.Fatal("hold attack desire not queued")
+	}
+
+	if monster.AutoAttackTargetValid(player, 10000, true) {
+		t.Fatal("AutoAttackTargetValid() = true, want the follow gate to reject the out-of-reach hold target")
+	}
+	if monster.IsMoving() {
+		t.Fatal("monster started moving from the aggro scan's follow gate")
+	}
+	srv.Advance(t, time.Second)
+	if x, y, z := monster.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
+		t.Fatalf("monster position = (%d,%d,%d), want %+v", x, y, z, home)
 	}
 }
 
