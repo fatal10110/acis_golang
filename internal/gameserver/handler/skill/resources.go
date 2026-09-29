@@ -189,9 +189,18 @@ type cpDamagePercentHandler struct{}
 
 func (cpDamagePercentHandler) Types() []string { return []string{"CPDAMPERCENT"} }
 
-func (cpDamagePercentHandler) Use(cast Cast) {
+func (h cpDamagePercentHandler) Use(cast Cast) {
+	h.UseResult(cast)
+}
+
+// UseResult takes Power percent of each player target's CP. Per target the
+// cast break rolls first, the caster hears of the damage, the CP drops and
+// the target's status reports it, and last the target hears who dealt the
+// damage — all of it even for a target left with no CP to lose.
+func (cpDamagePercentHandler) UseResult(cast Cast) Result {
+	result := Result{messages: cast.messages}
 	if alikeDead(cast.Caster) {
-		return
+		return result
 	}
 	for _, obj := range cast.Targets {
 		target, ok := asPlayer(obj)
@@ -199,14 +208,21 @@ func (cpDamagePercentHandler) Use(cast Cast) {
 			continue
 		}
 		damage := int(target.CP() * float64(cast.Skill.Power) / 100)
-		// The cast-break roll runs before the CP reduction that follows it.
 		target.BreakCastOnDamage(float64(damage))
-		if damage > 0 {
-			target.SetCP(target.CP() - float64(damage))
+		recordDamage(&result, cast.Caster, target, damage, false, false)
+		target.SetCP(target.CP() - float64(damage))
+		if sameObject(cast.Caster, target) {
+			// A player caster's own status goes out in order among the
+			// cast's messages.
+			result.record(CasterVitalsChanged{})
+		} else {
+			target.BroadcastStatus()
 		}
+		result.record(DamageReceived{TargetID: target.ObjectID(), AttackerName: actorName(cast.Caster), Amount: int32(damage)})
 	}
 	// Spent even when no target was accepted.
 	dischargeSoulshot(cast)
+	return result
 }
 
 // balanceLifeHandler shares the living targets' pooled HP ratio after the

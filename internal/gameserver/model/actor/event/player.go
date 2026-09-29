@@ -194,6 +194,23 @@ type SkillResisted struct {
 // MagicResisted reports the target resisting AttackerName's magic.
 type MagicResisted struct{ AttackerName string }
 
+// DamageReceived reports a hit another creature dealt the character:
+// AttackerName and the full damage before CP absorbed any of it.
+type DamageReceived struct {
+	AttackerName string
+	Amount       int
+}
+
+// SkillDamageDealt reports a skill hit's damage to the attacking character,
+// for hits delivered outside a cast's own handler result. Blocked marks an
+// invulnerable target and Petrified one that is also paralyzed.
+type SkillDamageDealt struct {
+	Amount    int
+	MagicCrit bool
+	Blocked   bool
+	Petrified bool
+}
+
 // HerbConsumed reports a received herb whose carried skill must be applied.
 type HerbConsumed struct{ ItemID int32 }
 
@@ -282,6 +299,8 @@ func (EffectEnded) event()            {}
 func (AttackFailed) event()           {}
 func (SkillResisted) event()          {}
 func (MagicResisted) event()          {}
+func (DamageReceived) event()         {}
+func (SkillDamageDealt) event()       {}
 func (HerbConsumed) event()           {}
 func (AttackRequested) event()        {}
 func (FleeRequested) event()          {}

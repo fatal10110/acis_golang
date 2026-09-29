@@ -385,7 +385,16 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			deliverMagicFailure(caster, target, def, in.Failure)
 			damage := int(formulas.MagicDamage(in))
 			if damage > 0 {
-				dmgTarget.ReduceHP(float64(damage), caster, def)
+				// The cast break rolls first, then the caster hears of the
+				// damage, then the target takes it.
+				if breaker, ok := target.(earlyCastBreaker); ok {
+					breaker.BreakCastOnDamage(float64(damage))
+					deliverDamage(caster, target, damage, in.MagicCrit)
+					breaker.ReduceHPWithoutCastBreak(float64(damage), caster, def)
+				} else {
+					deliverDamage(caster, target, damage, in.MagicCrit)
+					dmgTarget.ReduceHP(float64(damage), caster, def)
+				}
 			}
 			if ct := target; ct != nil {
 				actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))

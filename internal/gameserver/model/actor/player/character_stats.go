@@ -449,6 +449,15 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	return amount
 }
 
+// hitOutcome is how one hit landed on a character's vitals.
+type hitOutcome struct {
+	// applied is false when the character was already dead.
+	applied bool
+	// cpOnly marks a hit CP absorbed whole: HP did not change.
+	cpOnly bool
+	dead   bool
+}
+
 // absorbCPThenReduceHP applies PlayerStatus.reduceHp's CP-first absorption
 // (PlayerStatus.java:166-184): a Playable attacker other than the actor
 // itself (PvP, pet/summon damage) drains CP before HP, unless ignoreCP is
@@ -461,28 +470,45 @@ func (c *Character) ReduceMP(amount float64) float64 {
 // applyNonConsumptionDamageEffects's sleep/immobile-stop, stand-up, and
 // stun-break side effects (PlayerStatus.java:118-134), which run first in
 // the reference. Already-dead is a no-op, matching PlayerStatus.reduceHp.
-func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) (dead bool) {
+func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) hitOutcome {
 	if amount < 0 {
 		amount = 0
 	}
 	if c.Dead() {
-		return false
+		return hitOutcome{}
 	}
-	if !ignoreCP && attacker != nil && attacker != attackable.Combatant(c) {
-		if attacker.Kind().Playable() {
-			if c.curCP > 0 {
-				drained := math.Min(c.curCP, amount)
-				c.curCP -= drained
-				amount -= drained
-			}
-		}
+	hit := hitOutcome{applied: true}
+	if !ignoreCP && attacker != nil && attacker != attackable.Combatant(c) && attacker.Kind().Playable() {
+		hit.cpOnly = c.curCP >= amount
+		drained := math.Min(c.curCP, amount)
+		c.curCP -= drained
+		amount -= drained
 	}
 	c.curHP -= amount
-	dead = c.curHP < creature.DeathHP
-	if dead {
+	hit.dead = c.curHP < creature.DeathHP
+	if hit.dead {
 		c.curHP = 0
 	}
-	return dead
+	return hit
+}
+
+// sendHitFeedback sends the damaged character what one applied hit owes
+// it: its status and, for a hit of at least one point another creature
+// dealt outside a damage-over-time tick, S1_GAVE_YOU_S2_DMG naming the
+// attacker with the full damage before CP absorbed any of it. The damage
+// report sits between the CP write and the HP write; only the write that
+// ends the hit reports the status, so a hit CP absorbed whole reports its
+// status first and any other hit reports it last.
+func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatant, hit hitOutcome, isDOT bool) {
+	if hit.cpOnly {
+		c.BroadcastStatus()
+	}
+	if full := int(amount); full > 0 && !isDOT && attacker != nil && attacker != attackable.Combatant(c) {
+		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
+	}
+	if !hit.cpOnly {
+		c.BroadcastStatus()
+	}
 }
 
 // ReduceHP applies skill HP damage and runs the once-only death path.
@@ -498,38 +524,30 @@ func (c *Character) ReduceHPWithoutCastBreak(amount float64, attacker attackable
 	c.reduceSkillHP(amount, attacker, skill, false)
 }
 
+// reduceSkillHP rolls a skill hit's cast break before the hit touches the
+// character, on the full damage and whatever the attacker's damage
+// permission: the break roll only exempts an invulnerable target. The
+// wake-up side effects follow, and only then does an attacker without
+// damage permission stop short of the CP and HP change.
 func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition, breakCast bool) {
-	if amount <= 0 || c.Invul() || !creature.CanDealDamage(attacker) {
+	if amount <= 0 || c.Invul() || c.Dead() {
 		return
 	}
-	rawDamage := amount
-
-	c.vitalsMu.Lock()
-	if c.Dead() {
-		c.vitalsMu.Unlock()
-		return
-	}
-	c.vitalsMu.Unlock()
-	// PlayerStatus.reduceHp runs the sleep/stand-up/stun-break block
-	// (PlayerStatus.java:118-134) before the CP-absorption/duel block
-	// (136-193), both of which run before the actual HP subtraction.
-	c.applyNonConsumptionDamageEffects(false)
-	c.vitalsMu.Lock()
-	if c.Dead() {
-		c.vitalsMu.Unlock()
-		return
-	}
-	dead := c.absorbCPThenReduceHP(amount, attacker, skill.DirectHPDamage)
-	c.vitalsMu.Unlock()
-	c.BroadcastStatus()
-	// calcCastBreak always runs on the raw pre-absorption damage in the
-	// reference (Formulas.java:725 callers pass the skill's computed
-	// damage, never a CP-reduced remainder), so breakCastOnDamage must
-	// too.
 	if breakCast {
-		c.breakCastOnDamage(rawDamage)
+		c.breakCastOnDamage(amount)
 	}
-	if dead {
+	c.applyNonConsumptionDamageEffects(false)
+	if !creature.CanDealDamage(attacker) {
+		return
+	}
+	c.vitalsMu.Lock()
+	hit := c.absorbCPThenReduceHP(amount, attacker, skill.DirectHPDamage)
+	c.vitalsMu.Unlock()
+	if !hit.applied {
+		return
+	}
+	c.sendHitFeedback(amount, attacker, hit, false)
+	if hit.dead {
 		c.Die(attacker)
 	}
 }
@@ -557,14 +575,13 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 	c.vitalsMu.Unlock()
 	c.applyNonConsumptionDamageEffects(isDOT)
 	c.vitalsMu.Lock()
-	if c.Dead() {
-		c.vitalsMu.Unlock()
+	hit := c.absorbCPThenReduceHP(amount, killer, false)
+	c.vitalsMu.Unlock()
+	if !hit.applied {
 		return
 	}
-	dead := c.absorbCPThenReduceHP(amount, killer, false)
-	c.vitalsMu.Unlock()
-	c.BroadcastStatus()
-	if dead {
+	c.sendHitFeedback(amount, killer, hit, isDOT)
+	if hit.dead {
 		c.Die(killer)
 	}
 }
