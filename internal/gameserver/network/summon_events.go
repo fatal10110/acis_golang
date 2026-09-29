@@ -327,7 +327,8 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 
 // deleteOfflineItem deletes an offline owner's item row, queued on the
 // owner's persistence lane behind every write the owner's logout queued for
-// it.
+// it. A row the owner no longer owns is left alone: the item has changed
+// hands since, and it is its new owner's now.
 func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 	if l.items == nil || l.persist == nil {
 		return
@@ -335,7 +336,7 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 	l.queueItemWrite(ownerID, l.itemWrites.Reserve(objectID), func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.items.Delete(ctx, objectID); err != nil {
+		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
 		}
 	})

@@ -25,8 +25,14 @@ func regenWolfTemplate() *npc.Template {
 // so the next call-out restores the wolf from it.
 func bootSavedWolf(t *testing.T, saved pet.State) *petWorld {
 	t.Helper()
+	return bootSavedWolfOf(t, regenWolfTemplate(), saved)
+}
+
+// bootSavedWolfOf is bootSavedWolf with the wolf built from wolf.
+func bootSavedWolfOf(t *testing.T, wolf *npc.Template, saved pet.State) *petWorld {
+	t.Helper()
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{regenWolfTemplate(), treeTemplate()})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf, treeTemplate()})),
 	})
 	if err := h.srv.Pets.Save(context.Background(), h.collarID, saved); err != nil {
 		t.Fatalf("seed pets row: %v", err)
@@ -63,6 +69,32 @@ func TestPetRegeneratesOnEachRegenTick(t *testing.T) {
 	}
 	if !hasOpcode(drainFrames(t, h.client), serverpackets.OpcodePetStatusUpdate) {
 		t.Fatal("owner got no PetStatusUpdate for the regenerated wolf")
+	}
+}
+
+// TestPetRegenGivesAtLeastOnePerTick calls out a wounded wolf whose npc
+// template regenerates less than a point a tick. Each regen tick still gives
+// it one HP and one MP, the reference's floor.
+//
+// Oracle, with the bonuses above: HP 0.3*1.58*0.99 = 0.46926 and MP
+// 0.5*1.22*0.99 = 0.6039, both raised to 1.
+func TestPetRegenGivesAtLeastOnePerTick(t *testing.T) {
+	t.Parallel()
+	slow := wolfTemplate()
+	slow.HPRegen, slow.MPRegen = 0.3, 0.5
+	h := bootSavedWolfOf(t, slow, pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal})
+	wolf, _ := h.spawnWolf(t)
+	drainUntilQuiet(t, h.client)
+	if hp, mp := wolf.HPRegenRate(), wolf.MPRegenRate(); hp >= 1 || mp >= 1 {
+		t.Fatalf("regen rates = %v HP, %v MP, want both below 1", hp, mp)
+	}
+
+	regenTick(t, h)
+	if got := wolf.HP(); got != 101 {
+		t.Fatalf("HP after a regen tick = %v, want 101", got)
+	}
+	if got := wolf.MPValue(); got != 11 {
+		t.Fatalf("MP after a regen tick = %v, want 11", got)
 	}
 }
 

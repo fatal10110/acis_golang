@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -488,4 +489,114 @@ func TestCorpseMobSkillsOnServitorCorpse(t *testing.T) {
 			assertStaticSystemMessage(t, mustRead(t, o.client, tt.name), tt.message)
 		})
 	}
+}
+
+// relogOwner logs the owner out to character select and back into the world.
+func (h *petWorld) relogOwner(t *testing.T) {
+	t.Helper()
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
+	h.client.Send(encodeRequestGameStart(0))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
+	h.client.Send(encodeEnterWorld())
+	readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
+	drainUntilQuiet(t, h.client)
+}
+
+// TestPetRestoredDeadLeavesWithItsOwner calls out a wolf whose row was saved
+// dead, as a corpse lost to a restart leaves it. Nothing will ever decay
+// that corpse, so it leaves the world with its owner, and the owner can call
+// the wolf out again after logging back in: it comes back dead from its row.
+func TestPetRestoredDeadLeavesWithItsOwner(t *testing.T) {
+	t.Parallel()
+	decay := newCorpseDecay(t)
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithDecay(decay.task), gameservertest.WithReuseDelays(0, 0),
+	})
+	decay.attach(h.srv.State)
+	if err := h.srv.Pets.Save(context.Background(), h.collarID, pet.State{
+		Level: wolfLevel, Exp: wolfLevelExp, CurHP: 0, CurMP: 10, Fed: wolfMaxMeal,
+	}); err != nil {
+		t.Fatalf("seed pets row: %v", err)
+	}
+	wolf, _ := h.spawnWolf(t)
+	if !wolf.Dead() {
+		t.Fatal("wolf saved dead restored alive")
+	}
+
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
+	if _, ok := h.srv.State.Object(wolf.ObjectID()); ok {
+		t.Fatal("restored dead wolf stayed in the world after its owner left, with no decay to remove it")
+	}
+	if _, ok := h.srv.State.Summon(h.ownerID); ok {
+		t.Fatal("restored dead wolf still holds its offline owner's summon slot")
+	}
+	decay.passAndTick(t, h.srv, 2*time.Hour)
+
+	h.client.Send(encodeRequestGameStart(0))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
+	h.client.Send(encodeEnterWorld())
+	readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
+	drainUntilQuiet(t, h.client)
+
+	again, _ := h.spawnWolf(t)
+	if !again.Dead() {
+		t.Fatal("wolf called out again came back alive, want it restored dead from its row")
+	}
+}
+
+// TestOfflinePetDecaySparesACollarThatChangedHands has an owner come back to
+// its dead pet, trade the pet's collar to another player, and log
+// out again. When the corpse then decays with its owner offline, the collar
+// is no longer the owner's to lose: the other player's collar row stays.
+func TestOfflinePetDecaySparesACollarThatChangedHands(t *testing.T) {
+	t.Parallel()
+	decay := newCorpseDecay(t)
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+		gameservertest.WithDecay(decay.task), gameservertest.WithReuseDelays(0, 0),
+	})
+	decay.attach(h.srv.State)
+	wolf, _ := h.spawnWolf(t)
+	alt, altID := joinSecondPlayer(t, h.srv)
+	drainUntilQuiet(t, h.client)
+	killPet(t, h, wolf)
+
+	h.relogOwner(t)
+	drainUntilQuiet(t, alt)
+	h.client.Send(encodeTradeRequest(altID))
+	readUntilOpcode(t, alt, serverpackets.OpcodeSendTradeRequest, "trade request")
+	alt.Send(encodeAnswerTradeRequest(1))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeTradeStart, "owner TradeStart")
+	readUntilOpcode(t, alt, serverpackets.OpcodeTradeStart, "alt TradeStart")
+	h.client.Send(encodeAddTradeItem(0, h.collarID, 1))
+	readUntilOpcode(t, alt, serverpackets.OpcodeTradeOtherAdd, "the collar offered")
+	h.client.Send(encodeTradeDone(1))
+	readUntilOpcode(t, alt, serverpackets.OpcodeTradePressOtherOk, "owner confirms")
+	alt.Send(encodeTradeDone(1))
+	h.srv.AdvanceUntil(t, "the collar changes hands", func() bool {
+		return h.ownerInventory(t).ItemByObjectID(h.collarID) == nil
+	})
+	drainUntilQuiet(t, alt)
+	drainUntilQuiet(t, h.client)
+	h.srv.FlushItems(t)
+
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
+	decay.passAndTick(t, h.srv, 1201*time.Second)
+	if _, ok := h.srv.State.Object(wolf.ObjectID()); ok {
+		t.Fatal("pet corpse still in the world after its decay")
+	}
+	h.srv.FlushPersistence(t)
+	h.srv.FlushItems(t)
+	rows, err := h.srv.Items.ListByOwner(petCtx(), altID)
+	if err != nil {
+		t.Fatalf("list alt items: %v", err)
+	}
+	for _, row := range rows {
+		if row.ObjectID == h.collarID {
+			return
+		}
+	}
+	t.Fatal("the offline owner's pet decay deleted the collar row another player now owns")
 }

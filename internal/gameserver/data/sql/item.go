@@ -170,6 +170,20 @@ func (s *ItemStore) Delete(ctx context.Context, objectID int32) error {
 	return nil
 }
 
+// DeleteOwned removes the items row identified by objectID only while
+// ownerID still owns it, and reports whether a row was deleted.
+func (s *ItemStore) DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error) {
+	res, err := s.db.ExecContext(ctx, "DELETE FROM items WHERE object_id = ? AND owner_id = ?", objectID, ownerID)
+	if err != nil {
+		return false, fmt.Errorf("delete item %d of owner %d: %w", objectID, ownerID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("delete item %d of owner %d: %w", objectID, ownerID, err)
+	}
+	return n > 0, nil
+}
+
 // DeleteByOwner removes every items row owned by ownerID and reports how
 // many rows were deleted.
 func (s *ItemStore) DeleteByOwner(ctx context.Context, ownerID int32) (int64, error) {

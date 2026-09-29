@@ -24,7 +24,9 @@ func penaltyWolfTemplate() *npc.Template {
 
 // TestPetDeathPenalty kills level-10 wolves. Level 10 spans 500 experience
 // (500 to 1000), and a pet loses 6.5-0.07*10 = 5.8 percent of its level's
-// span on death: 29 experience.
+// span on death: 29 experience. A wolf with less than that to lose keeps its
+// experience and level, as the reference's addExp refuses a change that would
+// take experience below zero.
 func TestPetDeathPenalty(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -35,6 +37,7 @@ func TestPetDeathPenalty(t *testing.T) {
 	}{
 		{"keeps its level", 700, 671, wolfLevel},
 		{"drops a level", 510, 481, wolfLevel - 1},
+		{"skips a loss below zero", 10, 10, wolfLevel},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

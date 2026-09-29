@@ -173,8 +173,13 @@ func (a *Actor) Unsummon() {
 // again on the next login until the corpse decays. A servitor's corpse gives
 // the slot up, so the owner can summon again at once. A corpse whose owner
 // already left once is not settled again.
+//
+// A corpse with no decay pending, a pet restored dead from its saved row,
+// leaves with its owner like a living summon: nothing would ever remove it,
+// and without a revive (#2679) its owner could not summon again until the
+// server restarts.
 func (a *Actor) LeaveWithOwner() {
-	if !a.Dead() {
+	if !a.Dead() || !a.HasCorpse() {
 		a.despawn(nil)
 		return
 	}

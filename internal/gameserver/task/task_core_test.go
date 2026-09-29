@@ -2516,3 +2516,49 @@ func TestWaterExitBeforeQueuedDrownSkipsDamage(t *testing.T) {
 		t.Fatalf("drowning damage after a fresh breath = %d, want 1: %v", drowns, events)
 	}
 }
+
+// decayMovingSummon is a summon whose queue moves the first time it is read,
+// the way a corpse moves to its own queue while its owner's queue closes.
+type decayMovingSummon struct {
+	id       int32
+	mu       sync.Mutex
+	current  *sim.Queue
+	moveTo   *sim.Queue
+	moveOnce bool
+}
+
+func (a *decayMovingSummon) ObjectID() int32        { return a.id }
+func (a *decayMovingSummon) OwnerStillLinked() bool { return true }
+
+func (a *decayMovingSummon) Queue() *sim.Queue {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	q := a.current
+	if !a.moveOnce {
+		a.moveOnce = true
+		a.current = a.moveTo
+		q.Close()
+	}
+	return q
+}
+
+// TestDecayFollowsCorpseToItsNewQueue reads a due corpse's queue just before
+// its owner's detach moves the corpse to a queue of its own and closes the
+// owner's. The decay the owner's queue refuses still runs, on the new queue.
+func TestDecayFollowsCorpseToItsNewQueue(t *testing.T) {
+	now := time.UnixMilli(0)
+	effects := &decayFakeEffects{}
+	decay, err := NewDecay(effects, func() time.Time { return now })
+	if err != nil {
+		t.Fatalf("NewDecay() error = %v", err)
+	}
+	corpse := &decayMovingSummon{id: 210, current: testLoop.NewQueue("owner"), moveTo: testLoop.NewQueue("corpse")}
+	decay.Add(corpse, time.Second)
+
+	now = now.Add(time.Second)
+	decay.Tick()
+	testLoop.Run()
+	if got, want := effects.take(), []string{"decay 210"}; !slices.Equal(got, want) {
+		t.Fatalf("decay after the corpse changed queues = %v, want %v", got, want)
+	}
+}
