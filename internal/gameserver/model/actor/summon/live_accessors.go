@@ -38,7 +38,7 @@ func (a *Actor) InitMovement(origin location.Location, speed float64, geo move.G
 // movement arrivals included. Call it once, before the summon is published
 // into the world.
 func (a *Actor) SetQueue(q *sim.Queue) {
-	a.queue = q
+	a.queue.Store(q)
 	a.movement.SetQueue(q)
 	a.effects.SetQueue(q)
 }
@@ -48,7 +48,7 @@ func (a *Actor) Queue() *sim.Queue {
 	if a == nil {
 		return nil
 	}
-	return a.queue
+	return a.queue.Load()
 }
 
 // Now reads the clock this summon's queue runs on.
@@ -67,10 +67,15 @@ func (a *Actor) OwnerID() int32 {
 
 // OwnerStillLinked reports whether the owner still identifies this summon as
 // their active one. DecayTaskManager cancels a tracked summon corpse when this
-// returns false, before its deadline is checked.
+// returns false, before its deadline is checked. A servitor's corpse whose
+// owner left stays linked to the session that left it, which no longer
+// changes its summon.
 func (a *Actor) OwnerStillLinked() bool {
 	if a == nil || a.world == nil {
 		return false
+	}
+	if !a.isPet && a.OwnerLeft() {
+		return true
 	}
 	active, ok := a.world.Summon(a.OwnerID())
 	if !ok {

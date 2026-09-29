@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -177,10 +178,12 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.DeathSettled:
 		l.notifyOwnerOfSummonDeath(actor)
 		if l.decay != nil {
-			l.decay.Add(actor, actor.DecayDelay())
+			actor.SetCorpseDeadline(l.decay.Add(actor, actor.DecayDelay()))
 		}
 	case event.PetCorpseDecayed:
 		l.destroyDecayedPet(actor)
+	case event.CorpseLeftBehind:
+		s.leaveCorpseBehind()
 	case event.AttackFinished:
 		s.brain.Think()
 	case event.Arrived:
@@ -193,6 +196,11 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
 	case event.Unsummoning:
+		if actor.OwnerLeft() {
+			// A corpse its owner left behind was settled when the owner
+			// left (leaveCorpseBehind) and has not acted since.
+			return
+		}
 		// Recovered like a despawn cleanup: this runs inside the summon's
 		// one-time despawn, so a panic escaping it would leave the summon in
 		// the world with no second despawn to take it out. The abort comes
@@ -203,12 +211,42 @@ func (s *summonSink) Emit(ev event.Event) {
 		}
 		s.runCleanup(func() { l.releasePet(actor) })
 	case event.SummonRemoved:
-		if owner, ok := liveSummonOwner(actor); ok {
+		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FramePetDelete(actor.SummonType(), actor.ObjectID()))
 		}
 	case event.Despawned:
 		s.runDespawn()
 	}
+}
+
+// leaveCorpseBehind settles a dead summon whose owner is leaving the world
+// while its corpse stays: a pet's items go back to the owner and its row and
+// collar are saved, as for any other departure (releasePet), and the corpse
+// moves to a queue of its own, which closes when the corpse leaves the world.
+// It runs on the leaving owner's queue, before that queue closes.
+func (s *summonSink) leaveCorpseBehind() {
+	l, actor := s.link, s.actor
+	s.runCleanup(func() { l.releasePet(actor) })
+	if l.queues == nil {
+		return
+	}
+	q := l.queues.NewQueue(fmt.Sprintf("corpse-%d", actor.ObjectID()))
+	actor.AdoptCorpseQueue(q)
+	s.onDespawn(q.Close)
+}
+
+// currentSummonOwner returns the connected player actor answers to. That is
+// its owner's session, until the owner leaves the world with actor lying
+// dead. A pet's corpse then answers to whichever session its owner comes back
+// with, and a servitor's corpse to nobody.
+func (l *GameClientLink) currentSummonOwner(actor *summon.Actor) (*livePlayer, bool) {
+	if !actor.OwnerLeft() {
+		return liveSummonOwner(actor)
+	}
+	if !actor.IsPet() {
+		return nil, false
+	}
+	return l.livePlayerByID(actor.OwnerID())
 }
 
 // notifyOwnerOfSummonDeath closes a summon's death for its owner: the
@@ -242,12 +280,36 @@ type petRowDeleter interface {
 // through the same settle as any other departure (releasePet), so its items
 // are already back with its owner and its row was saved; the delete is queued
 // on the collar's persistence lane, behind that save.
+//
+// A corpse whose owner left was settled when the owner left. The collar then
+// goes from the owner's current session, on that session's queue, or, with
+// the owner offline, straight from the items table on the owner's lane,
+// behind the rows the owner's logout wrote.
 func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 	itemObjectID := actor.ControlItemID()
-	if owner, ok := liveSummonOwner(actor); ok {
+	switch owner, ok := l.currentSummonOwner(actor); {
+	case ok && !actor.OwnerLeft():
 		if inv := owner.Inventory(); inv != nil {
 			inv.DestroyByObjectID(itemObjectID, 1)
 		}
+	case ok:
+		// A session on its way out has queued its inventory's last writes
+		// by the time it is marked detached or its queue refuses this: the
+		// owner is offline then.
+		posted := postLive(owner, func() {
+			if owner.detached() {
+				l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
+				return
+			}
+			if inv := owner.Inventory(); inv != nil {
+				inv.DestroyByObjectID(itemObjectID, 1)
+			}
+		})
+		if !posted {
+			l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
+		}
+	case actor.OwnerLeft():
+		l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
 	}
 	store, ok := l.petStore.(petRowDeleter)
 	if !ok || l.persist == nil {
@@ -263,6 +325,22 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 	})
 }
 
+// deleteOfflineItem deletes an offline owner's item row, queued on the
+// owner's persistence lane behind every write the owner's logout queued for
+// it.
+func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
+	if l.items == nil || l.persist == nil {
+		return
+	}
+	l.queueItemWrite(ownerID, l.itemWrites.Reserve(objectID), func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := l.items.Delete(ctx, objectID); err != nil {
+			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
+		}
+	})
+}
+
 // releasePet settles a pet on its way out of the world, whatever took it out:
 // its items go back to its owner, its row and collar are saved, and its
 // container is then flushed and unregistered, since nothing else will ever
@@ -271,8 +349,9 @@ func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
-// arrives with its owner's logout, its corpse's decay, or after dying
-// mid-despawn. Its container
+// arrives when its owner leaves it behind (leaveCorpseBehind), with its
+// corpse's decay while its owner is still here, or after dying mid-despawn.
+// Its container
 // is keyed by an object id no later summon reuses, so items left in it would
 // be lost for good, and skipping the row would restore it alive from an
 // older save.

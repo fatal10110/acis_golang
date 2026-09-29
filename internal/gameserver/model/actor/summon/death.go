@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -24,8 +25,8 @@ const petCorpseTime = 1200 * time.Second
 //
 // A dead pet stops eating and a dead servitor's lifetime stops (see TickPet
 // and TickServitor). The owner's side then schedules the corpse's decay
-// (DecayDelay, Decay). The pet's death penalty is not applied yet (#2439). A
-// Phoenix Blessing does not offer its revive yet (#2620).
+// (DecayDelay, Decay), and last a pet pays its death penalty. A Phoenix
+// Blessing does not offer its revive yet (#2620).
 func (a *Actor) die(killer attackable.Combatant) {
 	if a.brain != nil {
 		a.brain.AbortAll()
@@ -39,6 +40,69 @@ func (a *Actor) die(killer attackable.Combatant) {
 		a.owner.AwardSummonKillKarma(killer)
 	}
 	a.emit(event.DeathSettled{})
+	if a.isPet && a.owner != nil {
+		a.applyDeathPenalty()
+	}
+}
+
+// applyDeathPenalty takes a dead pet's death penalty off its experience:
+// (6.5 - 0.07 * level) percent of the experience its current level spans.
+// A loss that would take the experience below zero is skipped. Dropping
+// under the current level's threshold takes the level down with it, which
+// refreshes the owner's pet window and the collar's enchant; nothing else is
+// sent until the pet's next status refresh.
+//
+// Its duel and non-siege PvP-zone exemptions are not applied: duels are not
+// ported (#215), and summons have no zone membership yet (#2623).
+func (a *Actor) applyDeathPenalty() {
+	a.statusMu.Lock()
+	lost := petDeathPenalty(a.level, a.expForLevelLocked(a.level), a.expForLevelLocked(a.level+1))
+	if a.exp-lost < 0 {
+		a.statusMu.Unlock()
+		return
+	}
+	a.exp -= lost
+	leveled := a.lowerLevelToExpLocked()
+	a.statusMu.Unlock()
+	if leveled {
+		a.SyncControlItemEnchant()
+	}
+}
+
+// petDeathPenalty is the experience a pet of level loses on death, given the
+// experience its level and the next one start at.
+func petDeathPenalty(level int, levelExp, nextLevelExp int64) int64 {
+	percentLost := -0.07*float64(level) + 6.5
+	// Rounds half up, as the reference's Math.round does.
+	return int64(math.Floor(float64(nextLevelExp-levelExp)*percentLost/100 + 0.5))
+}
+
+// expForLevelLocked is the experience level starts at in a's growth table,
+// or 0 for a level the table has no row for. statusMu must be held.
+func (a *Actor) expForLevelLocked(level int) int64 {
+	if a.growth == nil {
+		return 0
+	}
+	return a.growth.Levels[level].MaxExp
+}
+
+// lowerLevelToExpLocked drops a's level until its experience reaches the
+// level's threshold, applies that level's growth row, and reports whether the
+// level changed. statusMu must be held.
+func (a *Actor) lowerLevelToExpLocked() bool {
+	if a.growth == nil {
+		return false
+	}
+	level := a.level
+	for level > 1 && a.exp < a.expForLevelLocked(level) {
+		level--
+	}
+	if level == a.level {
+		return false
+	}
+	a.level = level
+	a.refreshGrowthLocked()
+	return true
 }
 
 // DecayDelay is how long a's corpse stays in the world before it decays: 20
@@ -52,10 +116,11 @@ func (a *Actor) DecayDelay() time.Duration {
 
 // Decay removes a's corpse once its decay deadline has passed, and reports
 // whether this call removed it. A corpse that is no longer its owner's
-// summon is left alone. A pet's corpse takes the pet with it: after it has
-// left the world its owner loses the collar and the pet's saved state
-// (event.PetCorpseDecayed). The respawn hook is never used: summons do not
-// respawn.
+// summon is left alone; one its owner left behind still decays (see
+// OwnerStillLinked). A pet's corpse takes the pet with it: after it has left
+// the world its owner loses the collar and the pet's saved state
+// (event.PetCorpseDecayed), whether or not the owner is online. The respawn
+// hook is never used: summons do not respawn.
 func (a *Actor) Decay(state *world.State, _ func()) bool {
 	if !a.Dead() || !a.OwnerStillLinked() {
 		return false
@@ -68,3 +133,34 @@ func (a *Actor) Decay(state *world.State, _ func()) bool {
 	}
 	return true
 }
+
+// SetCorpseDeadline records when a's corpse decays: the deadline its decay
+// entry was scheduled with. Corpse skills measure the corpse's age from it.
+func (a *Actor) SetCorpseDeadline(deadline time.Time) {
+	a.vitals.mu.Lock()
+	defer a.vitals.mu.Unlock()
+	if a.dead {
+		a.corpseDeadline = deadline
+	}
+}
+
+// HasCorpse reports whether a lies dead with a pending decay.
+func (a *Actor) HasCorpse() bool {
+	_, ok := a.CorpseDeadline()
+	return ok
+}
+
+// CorpseDeadline returns when a's corpse decays, if it lies dead with one
+// pending.
+func (a *Actor) CorpseDeadline() (time.Time, bool) {
+	a.vitals.mu.RLock()
+	defer a.vitals.mu.RUnlock()
+	if !a.dead || a.corpseDeadline.IsZero() {
+		return time.Time{}, false
+	}
+	return a.corpseDeadline, true
+}
+
+// CorpseTime is a's npc template corpse time: how long a servitor's corpse
+// lasts. Corpse skills treat a corpse past half of it as too old.
+func (a *Actor) CorpseTime() time.Duration { return a.corpseTime }

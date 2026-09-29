@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -161,13 +162,47 @@ func (a *Actor) Unsummon() {
 	a.despawn(nil)
 }
 
-// LeaveWithOwner despawns this summon, dead or alive, because its owner is
-// leaving the world. Summons are tracked under the owner's persistent object
-// id, so a corpse left behind would still hold that owner's summon slot on
-// the next login. A corpse's pending decay is dropped with it, since the
-// summon is no longer its owner's (#2439 owns the logout rule for corpses).
+// LeaveWithOwner handles this summon's owner leaving the world. A living
+// summon leaves with it. A corpse stays where it lies until its decay removes
+// it, and its owner's session is done with it (event.CorpseLeftBehind): a
+// pet's items and row are settled now, while the owner's inventory is still
+// here to take them, and the corpse's work moves to a queue of its own
+// (AdoptCorpseQueue).
+//
+// A pet's corpse keeps its owner's summon slot, which the owner finds taken
+// again on the next login until the corpse decays. A servitor's corpse gives
+// the slot up, so the owner can summon again at once. A corpse whose owner
+// already left once is not settled again.
 func (a *Actor) LeaveWithOwner() {
-	a.despawn(nil)
+	if !a.Dead() {
+		a.despawn(nil)
+		return
+	}
+	if !a.ownerLeft.CompareAndSwap(false, true) {
+		return
+	}
+	if !a.isPet && a.world != nil {
+		a.world.RemoveSummon(a.OwnerID(), a)
+	}
+	a.emit(event.CorpseLeftBehind{})
+}
+
+// OwnerLeft reports whether this summon's owner left the world while it lay
+// dead, leaving its corpse behind.
+func (a *Actor) OwnerLeft() bool { return a.ownerLeft.Load() }
+
+// ShownAsOwnedBy reports whether playerID sees this summon as their own. A
+// pet's corpse stays its owner's across a relog; a servitor's corpse left
+// behind is nobody's, since its owner may already have summoned another.
+func (a *Actor) ShownAsOwnedBy(playerID int32) bool {
+	return a.OwnerID() == playerID && (a.isPet || !a.OwnerLeft())
+}
+
+// AdoptCorpseQueue moves the work of a corpse whose owner left onto q, a
+// queue of its own, since the owner's queue closes with the owner's session.
+// Its decay runs there. Nothing else moves: a corpse no longer acts.
+func (a *Actor) AdoptCorpseQueue(q *sim.Queue) {
+	a.queue.Store(q)
 }
 
 // despawn takes a out of the world and reports whether this call did so.
@@ -191,7 +226,7 @@ func (a *Actor) despawn(state *world.State) bool {
 		// Unsummoning aborts in-flight actions and settles a pet, while
 		// observers still know this summon.
 		a.emit(event.Unsummoning{})
-		state.RemoveSummon(a.OwnerID())
+		state.RemoveSummon(a.OwnerID(), a)
 		// The owner receives PetDelete even when outside the summon's view.
 		// Despawn's Forget callbacks then send DeleteObject to old observers.
 		a.emit(event.SummonRemoved{})

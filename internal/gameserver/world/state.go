@@ -136,8 +136,10 @@ func (s *State) Players() []Player { return s.players.appendAll(nil) }
 // owner already has one tracked.
 func (s *State) AddSummon(ownerID int32, summon Tracked) { s.summons.add(ownerID, summon) }
 
-// RemoveSummon clears ownerID's active pet or servitor, if any.
-func (s *State) RemoveSummon(ownerID int32) { s.summons.remove(ownerID) }
+// RemoveSummon clears ownerID's active pet or servitor if it is still
+// summon. A summon that is no longer its owner's active one leaves whatever
+// holds the slot now in place.
+func (s *State) RemoveSummon(ownerID int32, summon Tracked) { s.summons.removeIfSame(ownerID, summon) }
 
 // Summon returns ownerID's active pet or servitor, if any.
 func (s *State) Summon(ownerID int32) (Tracked, bool) { return s.summons.get(ownerID) }
