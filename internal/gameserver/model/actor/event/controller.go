@@ -17,6 +17,11 @@ type CastFinished struct {
 // flight.
 type CastStopAck struct{}
 
+// SkillMasteryProc reports a skill-mastery roll succeeding at cast start:
+// the cast installs no reuse delay and the caster is told the skill is
+// ready to use again.
+type SkillMasteryProc struct{}
+
 // AttackStarted reports an attack animation starting, before its hits are
 // scheduled.
 type AttackStarted struct{}
@@ -40,11 +45,12 @@ type Arrived struct{}
 // path. The receiver owes observers the stopped-cell correction.
 type MoveBlocked struct{}
 
-func (CastAborted) event()    {}
-func (CastFinished) event()   {}
-func (CastStopAck) event()    {}
-func (AttackStarted) event()  {}
-func (AttackFinished) event() {}
-func (AttackRethink) event()  {}
-func (Arrived) event()        {}
-func (MoveBlocked) event()    {}
+func (CastAborted) event()      {}
+func (CastFinished) event()     {}
+func (CastStopAck) event()      {}
+func (SkillMasteryProc) event() {}
+func (AttackStarted) event()    {}
+func (AttackFinished) event()   {}
+func (AttackRethink) event()    {}
+func (Arrived) event()          {}
+func (MoveBlocked) event()      {}

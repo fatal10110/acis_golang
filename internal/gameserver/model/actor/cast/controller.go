@@ -421,7 +421,11 @@ func (c *Controller) Start(now time.Time, target Target, def modelskill.Definiti
 		return Plan{}, ErrNotEnoughItems
 	}
 
-	if !plan.SkillMastery {
+	if plan.SkillMastery {
+		// A mastery proc tells the caster before the initial MP charge
+		// and before the caller announces the cast.
+		c.emit(event.SkillMasteryProc{})
+	} else {
 		if plan.ReuseDelay > 30*time.Second {
 			c.actor.AddSkillReuse(modelskill.Ref{ID: def.ID, Level: def.Level}, plan.ReuseKey, plan.ReuseDelay)
 		}

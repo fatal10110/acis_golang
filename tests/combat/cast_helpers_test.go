@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // readCastStartFrames consumes the packets a successful active cast emits up
@@ -46,4 +47,42 @@ func readCastStartFrames(t *testing.T, c *scriptedClient, objID, skillID, level,
 		t.Fatalf("MagicSkillLaunched = caster %d skill %d level %d count %d target %d, want %d/%d/%d/1/%d",
 			launchedCaster, launchedSkill, launchedLevel, count, launchedTarget, objID, skillID, level, targetID)
 	}
+}
+
+// assertCostStatus asserts frame is the caster's own StatusUpdate that a
+// cast's MP payment sends (PlayerStatus.broadcastStatusUpdate: CUR_HP,
+// CUR_MP, CUR_CP, MAX_CP), reporting mp as the MP left.
+func assertCostStatus(t *testing.T, frame []byte, objID int32, mp int32) {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeStatusUpdate, "cost StatusUpdate")
+	r := wireReader(frame[1:])
+	if id := r.ReadInt32(); id != objID {
+		t.Fatalf("cost StatusUpdate object = %d, want %d", id, objID)
+	}
+	if count := r.ReadInt32(); count != 4 {
+		t.Fatalf("cost StatusUpdate count = %d, want 4", count)
+	}
+	for _, want := range []serverpackets.StatusType{serverpackets.StatusCurrentHP, serverpackets.StatusCurrentMP, serverpackets.StatusCurrentCP, serverpackets.StatusMaxCP} {
+		typ, value := r.ReadInt32(), r.ReadInt32()
+		if typ != int32(want) {
+			t.Fatalf("cost StatusUpdate attribute = %d, want %d", typ, want)
+		}
+		if want == serverpackets.StatusCurrentMP && value != mp {
+			t.Fatalf("cost StatusUpdate CUR_MP = %d, want %d", value, mp)
+		}
+	}
+	if err := r.Err(); err != nil {
+		t.Fatalf("read cost StatusUpdate: %v", err)
+	}
+}
+
+// castKillSkill casts killSkillDefs' skill 42 at targetID and reads its start
+// through MagicSkillLaunched: the initial MP charge's status, then the cast
+// start frames.
+func castKillSkill(t *testing.T, srv *gameservertest.Server, c *scriptedClient, objID, targetID int32, ctrl bool) {
+	t.Helper()
+	startMP := srv.PlayerCurrentMP(t, objID)
+	c.Send(encodeRequestMagicSkillUse(42, ctrl, false))
+	assertCostStatus(t, c.Read(), objID, int32(startMP-2))
+	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, targetID)
 }

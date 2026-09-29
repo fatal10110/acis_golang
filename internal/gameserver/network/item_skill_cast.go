@@ -92,7 +92,6 @@ func itemAICastBusy(live *livePlayer) bool {
 // means the item could not be consumed after the cast had already opened
 // (the loop stops).
 func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, selected world.Tracked, def modelskill.Definition) (run func(), rejected, failed bool) {
-	beforeVitals := live.Vitals()
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
@@ -159,30 +158,20 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
 
-	targetIDs := []int32{target.ObjectID()}
+	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	var affected []skilltarget.Actor
 	return func() {
 		controller.Schedule(plan, actorcast.Hooks{
 			Launch: func() bool {
-				if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
-					sendLaunchAbort(live, reason)
-					return false
-				}
-				l.broadcastLiveFrame(live, func() wire.Frame {
-					return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
-				})
-				return true
+				var ok bool
+				affected, ok = l.launchCastTargets(live, target, def)
+				return ok
 			},
 			Hit: func() {
-				result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-				l.sendSkillHandlerResult(live, result)
-				l.syncCubicTargets(live, result, def)
-				if !live.Character.Dead() {
-					sendMagicStatusUpdate(live, beforeVitals)
-				}
+				l.applyCastHit(live, handlers, affected, def)
 			},
 			Failed: func(err error) {
 				sendMagicCastFailureReason(live, def, err)
-				sendMagicStatusUpdate(live, beforeVitals)
 			},
 		})
 	}, false, false

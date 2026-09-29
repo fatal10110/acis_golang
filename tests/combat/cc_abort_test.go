@@ -66,7 +66,9 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 	startInWorld(t, c)
 	drainUntilQuiet(t, c)
 
+	startMP := srv.PlayerCurrentMP(t, objID)
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertCostStatus(t, mustRead(t, c, "initial MP status"), objID, int32(startMP-2))
 	assertFrameOpcode(t, mustRead(t, c, "MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	assertFrameOpcode(t, mustRead(t, c, "cast message"), serverpackets.OpcodeSystemMessage, "cast message")
 	assertFrameOpcode(t, mustRead(t, c, "SetupGauge"), serverpackets.OpcodeSetupGauge, "SetupGauge")

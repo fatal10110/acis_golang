@@ -244,6 +244,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:
 		sendMagicActionFailed(live)
+	case event.SkillMasteryProc:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillReadyToUseAgain))
 	case event.CastFinished:
 		l.finishLiveCast(live, e.Skill)
 	case event.PetSummonRequested:

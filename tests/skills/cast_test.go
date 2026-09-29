@@ -102,8 +102,9 @@ func TestCastActiveSkillChargesMPAndStartsReuse(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 3, 1, 500, 60_000, objID)
-	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	assertCasterMPStatus(t, srv, c.Read(), objID, 25)
 	drainUntilQuiet(t, c)
 
 	// The reference registers an empty case for RequestSkillCoolTime:
@@ -144,8 +145,9 @@ func TestRecastSucceedsOnceReuseElapses(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 3, 1, 500, reuse, objID)
-	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	assertCasterMPStatus(t, srv, c.Read(), objID, 25)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
@@ -157,8 +159,9 @@ func TestRecastSucceedsOnceReuseElapses(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 23)
 	readCastStartFrames(t, c, objID, 3, 1, 500, reuse, objID)
-	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 20}})
+	assertCasterMPStatus(t, srv, c.Read(), objID, 20)
 	drainUntilQuiet(t, c)
 }
 
@@ -186,8 +189,9 @@ func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 3, 1, 500, 60_000, objID)
-	assertStatusAttrs(t, c.Read(), objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	assertCasterMPStatus(t, srv, c.Read(), objID, 25)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
@@ -298,6 +302,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 			def := modelskill.Definition{
 				ID: 1855, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true, SkillType: tt.skillType,
+				MPInitialConsume: 2,
 			}
 			srv := gameservertest.Boot(t,
 				gameservertest.WithCharacter("Newbie", 5, 0),
@@ -329,6 +334,13 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 			})
 
 			c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
+			// A mastery proc tells the caster first, ahead of the initial MP
+			// charge's status and the MagicSkillUse (CreatureCast.java:129-134,
+			// SKILL_READY_TO_USE_AGAIN = 2015, SystemMessageId.java:13751).
+			if tt.mastery {
+				assertStaticSystemMessage(t, c.Read(), 2015)
+			}
+			assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 			readCastStartFrames(t, c, objID, int32(def.ID), int32(def.Level), 500, 60_000, objID)
 
 			key := cast.ReuseKey(def)
@@ -445,8 +457,9 @@ func TestGroundTargetCastRecordsTargetAndAppliesBuff(t *testing.T) {
 	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
 	frame := c.Read()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 5, 1, 500, 60_000, objID)
-	icons := readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	icons := readHitStatusThenIcons(t, srv, c, objID, 25)
 	found := false
 	for _, e := range icons {
 		if e.SkillID == 5 && int32(e.Level) == 1 {
@@ -487,8 +500,9 @@ func TestGroundCastReuseRejectionDoesNotStartApproachWalk(t *testing.T) {
 
 	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
-	readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	readHitStatusThenIcons(t, srv, c, objID, 25)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestExMagicSkillUseGround(10000, 2000, 300, skillID, false, false))
@@ -578,6 +592,7 @@ func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
 	c.Send(encodeRequestExMagicSkillUseGround(groundX, groundY, groundZ, skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "ground cast stop")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast ValidateLocation")
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
 
 	casterX, casterY, casterZ := srv.PlayerPosition(t, objID)
@@ -715,6 +730,8 @@ func TestToggleActivatesThenDeactivates(t *testing.T) {
 	if hitTime, reuse := r.ReadInt32(), r.ReadInt32(); hitTime != 0 || reuse != 0 {
 		t.Fatalf("toggle MagicSkillUse timing = hit %d reuse %d, want 0/0", hitTime, reuse)
 	}
+	// The MP payment sends its own status, between the ack and the effect.
+	assertCasterMPStatus(t, srv, c.Read(), objID, 18)
 	assertAbnormalStatusUpdate(t, c, 288, 1, 0)
 	drainUntilQuiet(t, c)
 
@@ -760,6 +777,7 @@ func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStopMove, "toggle stop")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle activation")
+	assertCasterMPStatus(t, srv, c.Read(), objID, 18)
 	assertAbnormalStatusUpdate(t, c, skillID, 1, 0)
 	drainUntilQuiet(t, c)
 }
