@@ -232,7 +232,7 @@ func (a *Actor) CanReceiveKillReward(partyRange int) bool {
 	a.statusMu.RLock()
 	max, ok := int64(0), false
 	if a.growth != nil {
-		if row, found := a.growth.Levels[81]; found {
+		if row, found := a.growth.Levels[petMaxLevel]; found {
 			max, ok = row.MaxExp, true
 		}
 	}
@@ -310,17 +310,35 @@ func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	a.emit(event.ExpGained{Exp: expGain})
 }
 
+// petMaxLevel is the first level a pet can never hold, the same sentinel
+// the player level table ends on. Pet growth tables carry a row for it only
+// so the top level's experience span and the kill-reward gate have a
+// ceiling; petRealMaxLevel is the highest level a pet can reach.
+const (
+	petMaxLevel     = 81
+	petRealMaxLevel = petMaxLevel - 1
+)
+
+// refreshGrowthLocked raises a's level to the highest one its experience
+// has reached and applies that level's growth row, reporting whether the
+// level changed. Experience that reaches past petRealMaxLevel moves the level
+// not at all, even when it also crosses lower thresholds on the way: the
+// whole step is refused and the pet keeps its level. statusMu must be held.
 func (a *Actor) refreshGrowthLocked() bool {
 	if a.growth == nil {
 		return false
 	}
 	oldLevel := a.level
+	level := a.level
 	for {
-		next, ok := a.growth.Levels[a.level+1]
+		next, ok := a.growth.Levels[level+1]
 		if !ok || a.exp < next.MaxExp {
 			break
 		}
-		a.level++
+		level++
+	}
+	if level <= petRealMaxLevel {
+		a.level = level
 	}
 	row, ok := a.growth.Levels[a.level]
 	if !ok {
