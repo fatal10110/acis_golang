@@ -2946,6 +2946,48 @@ func TestPdamAndMdamDischargeTheirChargedShots(t *testing.T) {
 	}
 }
 
+// TestNPCCasterSpendsItsSpiritshot drives HEAL and MDAM from a real
+// *npc.Hostile, which exposes its charge through SpiritshotCharged and has
+// no ChargedShot: the cast spends the NPC's spiritshot, and a static-reuse
+// cast writes the bit back set, as Npc.setChargedShot does for any caster.
+func TestNPCCasterSpendsItsSpiritshot(t *testing.T) {
+	magicTarget := func() *skillTarget {
+		return &skillTarget{
+			hp:         1000,
+			magicInput: formulas.MagicDamageInput{MAtk: 100, MDef: 50, SkillPower: 20, PvPMul: 1, ElementalMul: 1},
+			magicOK:    true,
+		}
+	}
+	for _, tc := range []struct {
+		name        string
+		skill       modelskill.Definition
+		charged     bool
+		target      func() *skillTarget
+		wantCharged bool
+	}{
+		{"heal spends the charge", modelskill.Definition{SkillType: "HEAL", Power: 20}, true, func() *skillTarget {
+			return &skillTarget{hp: 10, maxHP: 1000, healEffectiveness: 100}
+		}, false},
+		{"mdam spends the charge", modelskill.Definition{SkillType: "MDAM", Power: 20}, true, magicTarget, false},
+		{"static-reuse heal writes the charge", modelskill.Definition{SkillType: "HEAL", Power: 20, StaticReuse: true}, false, func() *skillTarget {
+			return &skillTarget{hp: 10, maxHP: 1000, healEffectiveness: 100}
+		}, true},
+		{"static-reuse mdam writes the charge", modelskill.Definition{SkillType: "MDAM", Power: 20, StaticReuse: true}, false, magicTarget, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newTestHostile(t, 20001, 0)
+			caster.SetChargedShot(item.ShotSpirit, tc.charged)
+			target := tc.target()
+			if !NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tc.skill, Targets: []Actor{target}}) {
+				t.Fatalf("Use() returned false for %s", tc.skill.SkillType)
+			}
+			if got := caster.SpiritshotCharged(); got != tc.wantCharged {
+				t.Fatalf("NPC spiritshot charged = %v after %s, want %v", got, tc.name, tc.wantCharged)
+			}
+		})
+	}
+}
+
 // TestNonDamageHandlersDischargeChargedShots pins the shot each non-damage
 // handler spends after its target loop, and the static-reuse flag it writes
 // back: CPDAMPERCENT spends the soulshot; HEAL, MANAHEAL, RESURRECT and the

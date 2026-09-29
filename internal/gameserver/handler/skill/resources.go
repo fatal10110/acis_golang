@@ -72,7 +72,8 @@ func (h healHandler) UseResult(cast Cast) Result {
 			notifyRestored(obj, cast.Caster, restored, restoredHP, false)
 		}
 	}
-	// A static heal and a potion leave the caster's spiritshot charged.
+	// Heal's own discharge skips a static heal and a potion; any spend for
+	// those comes from the BUFF pass above.
 	if skillTypeKey(cast.Skill.SkillType) != "HEAL_STATIC" && !cast.Skill.Potion {
 		spendSpiritshot(cast, bsps)
 	}
