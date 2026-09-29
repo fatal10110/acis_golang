@@ -2,6 +2,7 @@
 package move
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -60,4 +61,16 @@ func (g EngineGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 
 func (g EngineGeo) Walkable(x, y, z int) bool {
 	return g.Engine.CanMoveAround(x, y, z)
+}
+
+// CanSeeActor reports actor-to-actor line of sight, the query a player's or
+// summon's sight checks take from the movement geo they are handed.
+func (g EngineGeo) CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool {
+	return g.Engine.CanSeeActor(ox, oy, oz, oCollisionHeight, tx, ty, tz, tCollisionHeight)
+}
+
+// CanSeeActorIgnoring is CanSeeActor leaving ignore, the target's own
+// geodata object, out of the query.
+func (g EngineGeo) CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool {
+	return g.Engine.CanSeeActorIgnoring(ox, oy, oz, oCollisionHeight, tx, ty, tz, tCollisionHeight, ignore)
 }

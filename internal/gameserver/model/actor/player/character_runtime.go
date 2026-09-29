@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -19,6 +20,12 @@ import (
 // terrain occlusion between two actors.
 type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
+}
+
+// LineOfSightIgnoring is the optional LineOfSight query that leaves one
+// dynamic geodata object out, used when the target is such an object.
+type LineOfSightIgnoring interface {
+	CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool
 }
 
 // MountBodies resolves a mount NPC template's collision footprint, which
@@ -357,21 +364,29 @@ func (c *Character) Knows(target attackable.Combatant) bool {
 // permissive when no line-of-sight query is attached (e.g. in tests).
 func (c *Character) CanSee(target attackable.Combatant) bool {
 	tx, ty, tz := target.Position()
-	return c.canSeePosition(tx, ty, tz, target.CollisionHeight())
+	return c.canSeeObject(target, tx, ty, tz, target.CollisionHeight())
 }
 
 // CanSeeTarget reports whether t is visible to this player for the cast
-// pipeline's launch-phase line-of-sight gate. Same geodata query as CanSee,
-// keyed to t's own eye height.
+// pipeline's line-of-sight gates. Same geodata query as CanSee, keyed to
+// t's own eye height.
 func (c *Character) CanSeeTarget(t target.Actor) bool {
 	tx, ty, tz := t.Position()
-	return c.canSeePosition(tx, ty, tz, t.CollisionHeight())
+	return c.canSeeObject(t, tx, ty, tz, t.CollisionHeight())
 }
 
-func (c *Character) canSeePosition(tx, ty, tz int, theight float64) bool {
+// canSeeObject queries sight to obj standing at (tx, ty, tz). An obj that
+// is itself a geodata object (a closed door) is left out of the query, so it
+// never hides itself.
+func (c *Character) canSeeObject(obj any, tx, ty, tz int, theight float64) bool {
 	if c.los == nil {
 		return true
 	}
 	ox, oy, oz := c.Position()
+	if geoObj, ok := obj.(dynamic.Object); ok {
+		if los, ok := c.los.(LineOfSightIgnoring); ok {
+			return los.CanSeeActorIgnoring(ox, oy, oz, c.CollisionHeight(), tx, ty, tz, theight, geoObj)
+		}
+	}
 	return c.los.CanSeeActor(ox, oy, oz, c.CollisionHeight(), tx, ty, tz, theight)
 }

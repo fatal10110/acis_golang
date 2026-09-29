@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -87,6 +88,106 @@ func TestPlayerPreAttemptGateOrderAndExemptions(t *testing.T) {
 			}
 			if tt.want != nil && !errors.Is(err, tt.want) {
 				t.Fatalf("CanPlayerAttemptCast = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
+// olympiadActor is a playable caster whose acting player may be in Olympiad
+// mode and whose skill <cond> clauses may fail.
+type olympiadActor struct {
+	testActor
+	olympiad bool
+	condFail bool
+}
+
+func (a *olympiadActor) ActingPlayerInOlympiad() bool { return a.olympiad }
+
+func (a *olympiadActor) SkillConditions(Target, modelskill.Definition) (modelskill.ConditionClause, bool) {
+	return modelskill.ConditionClause{MessageID: 113}, !a.condFail
+}
+
+// TestCanCastRefusesOlympiadSkills pins PlayableCast.canCast's Olympiad ban
+// (PlayableCast.java:72-79): while the acting player is in Olympiad mode a
+// hero skill or a RESURRECT skill is refused, after the skill's <cond>
+// clauses and before its item cost; any other skill, or a caster outside
+// Olympiad, passes the ban.
+func TestCanCastRefusesOlympiadSkills(t *testing.T) {
+	hero := modelskill.NewDefinition(395, 1, "Heroic Miracle", modelskill.DefinitionAttrs{})
+	hero.SkillType = "BUFF"
+	resurrect := modelskill.Definition{ID: 1016, Level: 1, SkillType: "RESURRECT"}
+	plain := modelskill.Definition{ID: 1011, Level: 1, SkillType: "HEAL"}
+	if !hero.HeroSkill {
+		t.Fatal("skill 395 is not a hero skill")
+	}
+	withItem := func(def modelskill.Definition) modelskill.Definition {
+		def.ItemConsumeID, def.ItemConsumeCount = 3031, 1
+		return def
+	}
+
+	for _, tt := range []struct {
+		name     string
+		def      modelskill.Definition
+		olympiad bool
+		condFail bool
+		want     error
+	}{
+		{name: "hero skill in olympiad", def: hero, olympiad: true, want: ErrOlympiadSkill},
+		{name: "resurrect in olympiad", def: resurrect, olympiad: true, want: ErrOlympiadSkill},
+		{name: "other skill in olympiad", def: plain, olympiad: true},
+		{name: "hero skill outside olympiad", def: hero},
+		{name: "resurrect outside olympiad", def: resurrect},
+		{name: "condition answers first", def: resurrect, olympiad: true, condFail: true, want: new(ConditionError)},
+		{name: "ban answers before item cost", def: withItem(resurrect), olympiad: true, want: ErrOlympiadSkill},
+		{name: "item cost outside olympiad", def: withItem(resurrect), want: ErrNotEnoughItems},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			actor := &olympiadActor{testActor: testActor{mp: 100, hp: 100}, olympiad: tt.olympiad, condFail: tt.condFail}
+			err := NewController(actor, nil).CanCast(testTarget{}, tt.def)
+			switch want := tt.want.(type) {
+			case nil:
+				if err != nil {
+					t.Fatalf("CanCast = %v, want nil", err)
+				}
+			case *ConditionError:
+				if !errors.As(err, &want) {
+					t.Fatalf("CanCast = %v, want a condition failure", err)
+				}
+			default:
+				if !errors.Is(err, want) {
+					t.Fatalf("CanCast = %v, want %v", err, want)
+				}
+			}
+		})
+	}
+}
+
+// olympiadOwner is a summon owner in Olympiad mode.
+type olympiadOwner struct{ *player.Character }
+
+func (olympiadOwner) OlympiadMode() bool { return true }
+
+// TestSummonActorAsksItsOwnerAboutOlympiad pins that a summon's Olympiad ban
+// follows its acting player, the owner: the summon itself is never in
+// Olympiad mode.
+func TestSummonActorAsksItsOwnerAboutOlympiad(t *testing.T) {
+	_, ch := newGatePlayer(t)
+	for _, tt := range []struct {
+		name  string
+		owner summon.Owner
+		want  bool
+	}{
+		{name: "owner in olympiad", owner: olympiadOwner{ch}, want: true},
+		{name: "owner outside olympiad", owner: ch},
+		{name: "no owner"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			pet, err := summon.NewPet(summon.PetConfig{ObjectID: 2, Owner: tt.owner})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := (SummonActor{Summon: pet}).ActingPlayerInOlympiad(); got != tt.want {
+				t.Fatalf("ActingPlayerInOlympiad = %t, want %t", got, tt.want)
 			}
 		})
 	}

@@ -144,7 +144,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 		return started, err
 	}
 	stopForCast(def, hooks.StopMovement)
-	if err := controller.CanCast(target, def); err != nil {
+	if err := controller.CanCastSighted(caster, target, def); err != nil {
 		started.CanCastFailure = true
 		return started, err
 	}

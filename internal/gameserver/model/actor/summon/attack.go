@@ -3,10 +3,12 @@ package summon
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -77,15 +79,38 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
+// lineOfSightIgnoring is the optional LineOfSight query that leaves one
+// dynamic geodata object out, used when the target is such an object.
+type lineOfSightIgnoring interface {
+	CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool
+}
+
+// The production geo must satisfy the optional query: canSeeObject finds it
+// by type assertion, so a signature drift would otherwise silently make a
+// target door hide itself again.
+var _ lineOfSightIgnoring = move.EngineGeo{}
+
 // CanSee reports whether target is visible through geodata, or permits the
 // check when no query is attached (such as isolated domain tests).
 func (a *Actor) CanSee(target attackable.Combatant) bool {
+	tx, ty, tz := target.Position()
+	return a.canSeeObject(target, tx, ty, tz, target.CollisionHeight())
+}
+
+// canSeeObject queries sight to obj standing at (tx, ty, tz). An obj that
+// is itself a geodata object (a closed door) is left out of the query, so it
+// never hides itself.
+func (a *Actor) canSeeObject(obj any, tx, ty, tz int, theight float64) bool {
 	if a.los == nil {
 		return true
 	}
 	ox, oy, oz := a.Position()
-	tx, ty, tz := target.Position()
-	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
+	if geoObj, ok := obj.(dynamic.Object); ok {
+		if los, ok := a.los.(lineOfSightIgnoring); ok {
+			return los.CanSeeActorIgnoring(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, theight, geoObj)
+		}
+	}
+	return a.los.CanSeeActor(ox, oy, oz, a.CollisionHeight(), tx, ty, tz, theight)
 }
 func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSpeed()) }
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }

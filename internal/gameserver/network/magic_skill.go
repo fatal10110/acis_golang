@@ -294,6 +294,8 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrCubicListFull) ||
 		errors.Is(err, actorcast.ErrNotEnoughItems) ||
 		errors.Is(err, actorcast.ErrWeaponNotAllowed) ||
+		errors.Is(err, actorcast.ErrCantSeeTarget) ||
+		errors.Is(err, actorcast.ErrOlympiadSkill) ||
 		errors.As(err, new(*actorcast.ConditionError))
 }
 
@@ -369,9 +371,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	}
 	finalTarget := handler.FinalTarget(casterCreature, selectedCreature, &def)
 	// A classified rejection keeps finalTarget so the cast stops the caster
-	// and checks costs before reporting it. Target conditions are classified
-	// here, before any cast-start line-of-sight check; line of sight is only
-	// revalidated at launch.
+	// and checks costs and line of sight before reporting it.
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
@@ -670,6 +670,8 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
 	case errors.Is(err, actorcast.ErrWeaponNotAllowed):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrOlympiadSkill):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillUnavailableForOlympiad))
 	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrAllSkillsDisabled):

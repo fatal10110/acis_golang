@@ -105,7 +105,14 @@ func (e *Engine) CanSeeWithHeightsIgnoring(ox, oy, oz int, oheight float64, tx, 
 // height, share mutual line of sight. Collision heights are converted to
 // eye height via SightHeight before the query.
 func (e *Engine) CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool {
-	return e.CanSeeWithHeights(ox, oy, oz, e.SightHeight(oCollisionHeight), tx, ty, tz, e.SightHeight(tCollisionHeight))
+	return e.CanSeeActorIgnoring(ox, oy, oz, oCollisionHeight, tx, ty, tz, tCollisionHeight, nil)
+}
+
+// CanSeeActorIgnoring is CanSeeActor with one dynamic geodata object left
+// out of the query: a target that is itself such an object (a closed door)
+// never blocks the sight line to itself.
+func (e *Engine) CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool {
+	return e.CanSeeWithHeightsIgnoring(ox, oy, oz, e.SightHeight(oCollisionHeight), tx, ty, tz, e.SightHeight(tCollisionHeight), ignore)
 }
 
 // GeoX converts a world X coordinate to geodata X.
