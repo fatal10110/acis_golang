@@ -60,9 +60,3 @@ func (a *Actor) breakCastOnDamage(damage float64) {
 		a.TryToIdle()
 	}
 }
-
-// SetRollSource replaces a's combat random source, for deterministic tests.
-// Call it before anything rolls against a.
-func (a *Actor) SetRollSource(f func(n int) int) {
-	a.roll = defaultRoll(f)
-}
