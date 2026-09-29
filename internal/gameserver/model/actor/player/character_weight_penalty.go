@@ -50,8 +50,8 @@ func (c *Character) RefreshWeightPenalty() {
 	changed := c.weightPenalty != penalty
 	c.weightPenalty = penalty
 	c.stateMu.Unlock()
-	if changed && c.Live != nil {
-		c.Move().SetSpeed(c.RunSpeed())
+	if changed {
+		c.refreshMoveSpeed()
 	}
 	if changed {
 		c.emit(event.WeightPenaltyChanged{})

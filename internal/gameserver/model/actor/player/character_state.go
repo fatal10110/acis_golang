@@ -27,12 +27,14 @@ func (c *Character) Running() bool {
 // SetRunning updates run mode and reports whether it changed.
 func (c *Character) SetRunning(running bool) bool {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	c.initStateLocked()
 	if c.running == running {
+		c.stateMu.Unlock()
 		return false
 	}
 	c.running = running
+	c.stateMu.Unlock()
+	c.refreshMoveSpeed()
 	return true
 }
 

@@ -194,8 +194,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 		w.WriteInt32(0)
 	}
 
-	w.WriteFloat64(1) // movement speed multiplier: no active haste/slow effect
-	w.WriteFloat64(1) // attack speed multiplier: no active haste/slow effect
+	w.WriteFloat64(float64(c.MovementSpeedMultiplier()))
+	w.WriteFloat64(float64(c.AttackSpeedMultiplier()))
 	w.WriteFloat64(collisionRadius)
 	w.WriteFloat64(collisionHeight)
 

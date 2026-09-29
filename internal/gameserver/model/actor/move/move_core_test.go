@@ -1871,3 +1871,47 @@ func (followTarget) Heading() int { return 0 }
 
 func (*playerFollowSelf) OwnsOffensiveFollowTicker() bool { return false }
 func (s *playerFollowSelf) MovementDisabled() bool        { return s.disabled }
+
+// TestCreatureMove_SetSpeedRetimesInFlightArrival: a speed change mid-leg
+// re-times the arrival for the distance left, so a slowed walk does not
+// snap to its destination at the old arrival time, and a stalled one (zero
+// speed) never arrives until its speed returns.
+func TestCreatureMove_SetSpeedRetimesInFlightArrival(t *testing.T) {
+	geo := &recordingGeo{canMove: true, height: 30}
+	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := newMoveClock()
+	mover.SetQueue(clock.q)
+	arrived := 0
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }})
+
+	ev, err := mover.MoveToLocation(location.Location{X: 200, Y: 0, Z: 30})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ev.Duration != 2*time.Second {
+		t.Fatalf("leg duration = %v, want 2s at speed 100", ev.Duration)
+	}
+	clock.in.Advance(time.Second)
+	mover.UpdatePosition(time.Second) // 100 units walked, 100 left
+	mover.SetSpeed(50)
+	clock.in.Advance(time.Second) // the old 2s arrival time
+	if arrived != 0 {
+		t.Fatal("slowed walk arrived at the old arrival time")
+	}
+	mover.SetSpeed(0)
+	clock.in.Advance(time.Minute)
+	if arrived != 0 || !mover.Moving() {
+		t.Fatalf("stalled walk arrived %d times, moving %v; want still moving", arrived, mover.Moving())
+	}
+	mover.SetSpeed(50)
+	clock.in.Advance(2 * time.Second)
+	if arrived != 1 {
+		t.Fatalf("arrived hook calls = %d after the remaining 100 units at speed 50, want 1", arrived)
+	}
+	if got, want := mover.Position(), (location.Location{X: 200, Y: 0, Z: 30}); got != want {
+		t.Fatalf("Position() = %+v, want %+v", got, want)
+	}
+}

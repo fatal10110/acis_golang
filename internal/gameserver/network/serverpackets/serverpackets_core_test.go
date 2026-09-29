@@ -23,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -301,12 +302,47 @@ func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
 	}
 
 	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
-	want := appendF64(nil, 1)
-	want = appendF64(want, 1)
+	want := appendF64(nil, float64(c.MovementSpeedMultiplier()))
+	want = appendF64(want, float64(c.AttackSpeedMultiplier()))
 	want = appendF64(want, tmpl.CollisionRadius)
 	want = appendF64(want, tmpl.CollisionHeight)
 	if !bytes.Contains(got, want) {
 		t.Fatalf("CharInfo missing double-width movement/collision block %x", want)
+	}
+}
+
+// TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers pins
+// CharInfo.java:102-103 and UserInfo.java:152-153: both write the live
+// movement and attack speed multipliers as doubles of their float values,
+// ahead of the collision block, so a speed buff reaches the client.
+func TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers(t *testing.T) {
+	tmpl := &player.Template{
+		DEX: 30, RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
+		CollisionRadius: 9, CollisionHeight: 23,
+	}
+	c := &player.Character{ID: 0x10000001, Name: "Observer", Race: player.RaceHuman, Sex: player.SexMale}
+	c.AttachRuntime(tmpl, nil)
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 33},
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpMul, Value: 1.2},
+	})
+	move := float32(120*statbonus.DEXBonus[tmpl.DEX]+33) / 120
+	attack := float32(1.1 * float64(c.AttackSpeed()) / 300)
+	if move <= 1 || attack <= 1.1 {
+		t.Fatalf("buffed multipliers = (%v, %v), want both above their unbuffed values", move, attack)
+	}
+	want := appendF64(nil, float64(move))
+	want = appendF64(want, float64(attack))
+	want = appendF64(want, tmpl.CollisionRadius)
+	want = appendF64(want, tmpl.CollisionHeight)
+
+	for name, got := range map[string][]byte{
+		"CharInfo": framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})),
+		"UserInfo": framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})),
+	} {
+		if !bytes.Contains(got, want) {
+			t.Fatalf("%s missing multiplier/collision block %x", name, want)
+		}
 	}
 }
 
@@ -3093,8 +3129,8 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // flying run speed
 	want = binary.LittleEndian.AppendUint32(want, 0) // flying walk speed
 
-	want = appendF64(want, 1) // movement speed multiplier
-	want = appendF64(want, 1) // attack speed multiplier
+	want = appendF64(want, float64(c.MovementSpeedMultiplier()))
+	want = appendF64(want, float64(c.AttackSpeedMultiplier()))
 	want = appendF64(want, tmpl.CollisionRadius)
 	want = appendF64(want, tmpl.CollisionHeight)
 

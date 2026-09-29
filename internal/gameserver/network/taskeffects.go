@@ -26,6 +26,7 @@ import (
 
 var (
 	_ zone.Swimmer           = (*liveZoneActor)(nil)
+	_ zone.Wader             = (*liveZoneActor)(nil)
 	_ task.WaterEffects      = (*TaskEffects)(nil)
 	_ task.ShadowItemEffects = (*TaskEffects)(nil)
 	_ task.AutosaveEffects   = (*TaskEffects)(nil)
@@ -172,6 +173,10 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
+	a.live.SetInWater(a.flags.Has(zone.FlagWater))
+	if !a.flags.Has(zone.FlagSwamp) {
+		a.live.SetSwampMoveBonus(0)
+	}
 }
 
 func (a *liveZoneActor) compassUpdate() (code int32, changed, flagPvP bool) {
@@ -396,6 +401,7 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 // AllowWater its breath countdown starts or stops.
 func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 	live := a.live
+	live.SetInWater(a.flags.Has(zone.FlagWater))
 	l := live.link
 	if l == nil {
 		return
@@ -412,6 +418,27 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	l.water.Remove(live)
+}
+
+// SwampStateChanged is the player's reaction to crossing a swamp boundary:
+// the move bonus of the first swamp at its position applies while any swamp
+// holds it, and its appearance is rebroadcast with the new speed.
+func (a *liveZoneActor) SwampStateChanged(z *zone.Swamp) {
+	live := a.live
+	bonus := 0
+	if a.flags.Has(zone.FlagSwamp) {
+		bonus = z.MoveBonus
+		if l := live.link; l != nil && l.zones != nil {
+			pos := a.Position()
+			if first, ok := zone.FindAt[*zone.Swamp](l.zones, pos.X, pos.Y, pos.Z); ok {
+				bonus = first.MoveBonus
+			}
+		}
+	}
+	live.SetSwampMoveBonus(bonus)
+	if live.link != nil {
+		live.link.broadcastCharacterInfo(live)
+	}
 }
 
 func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {

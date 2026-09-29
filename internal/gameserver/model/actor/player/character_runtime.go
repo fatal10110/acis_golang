@@ -87,6 +87,27 @@ func (c *Character) NoSummonFriendZone() bool {
 	return c.insideNoSummonFriendZone.Load()
 }
 
+// SetInWater records the live zone engine's current water membership, which
+// switches the move speed to the swim speed.
+func (c *Character) SetInWater(inside bool) {
+	if c.insideWater.Swap(inside) != inside {
+		c.refreshMoveSpeed()
+	}
+}
+
+// InWater reports whether the character currently stands in a water zone.
+func (c *Character) InWater() bool {
+	return c.insideWater.Load()
+}
+
+// SetSwampMoveBonus records the move bonus, in percent, of the swamp the
+// character stands in, or 0 outside any swamp.
+func (c *Character) SetSwampMoveBonus(bonus int) {
+	if c.swampMoveBonus.Swap(int32(bonus)) != int32(bonus) {
+		c.refreshMoveSpeed()
+	}
+}
+
 // SetGroundTarget records the last ground-click point a ground-targeted
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
 // until the next ground click overwrites it.

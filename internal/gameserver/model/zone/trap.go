@@ -141,10 +141,14 @@ type Swamp struct {
 	// MoveBonus is the movement speed adjustment applied inside, in
 	// percent (negative slows).
 	MoveBonus int
-	// AppearanceChanged rebroadcasts a player's state to observers after
-	// the slow is applied or lifted; nil until the movement layer wires
-	// it.
-	AppearanceChanged func(a Actor)
+}
+
+// Wader is an actor that reacts to entering or leaving a swamp.
+type Wader interface {
+	Actor
+	// SwampStateChanged runs after the actor's swamp flag changed at z,
+	// to apply or lift the slow and rebroadcast the actor's appearance.
+	SwampStateChanged(z *Swamp)
 }
 
 // NewSwamp builds a swamp trap zone from its data settings.
@@ -170,14 +174,14 @@ func (z *Swamp) enter(a Actor) {
 		return
 	}
 	a.ZoneFlags().Set(FlagSwamp, true)
-	if a.Class() == ClassPlayer && z.AppearanceChanged != nil {
-		z.AppearanceChanged(a)
+	if w, ok := a.(Wader); ok {
+		w.SwampStateChanged(z)
 	}
 }
 
 func (z *Swamp) exit(a Actor) {
 	a.ZoneFlags().Set(FlagSwamp, false)
-	if a.Class() == ClassPlayer && z.AppearanceChanged != nil {
-		z.AppearanceChanged(a)
+	if w, ok := a.(Wader); ok {
+		w.SwampStateChanged(z)
 	}
 }
