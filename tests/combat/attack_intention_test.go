@@ -145,3 +145,53 @@ func TestBowShotWithoutReclickSendsNoActionFailed(t *testing.T) {
 		t.Fatalf("ActionFailed between two shots = %d, want 0", got)
 	}
 }
+
+// queueItemCastMidCast uses the fixture scroll mid-cast: its skill is queued
+// behind the cast as the next CAST intention and answered with ActionFailed.
+func queueItemCastMidCast(t *testing.T, c *scriptedClient, scroll int32) {
+	t.Helper()
+	c.Send(encodeUseItem(scroll, false))
+	readUntil(t, c, serverpackets.OpcodeActionFailed, "queued item cast ActionFailed")
+}
+
+// TestQueuedItemCastDropsTheAttackClickedMidCast pins an item-carried cast
+// taking the place of an attack requested mid-cast: both casts run, and no
+// attack starts once the item cast has ended.
+func TestQueuedItemCastDropsTheAttackClickedMidCast(t *testing.T) {
+	t.Parallel()
+	srv, pc, hostileID, scroll := bootMidCastWith(t, queueLongSkillID)
+	c := srv.Client
+	key := cast.ReuseKey(queueScrollSkill())
+
+	requestAttackMidCast(t, c, hostileID)
+	queueItemCastMidCast(t, c, scroll)
+
+	srv.AdvanceUntil(t, "queued item cast start", func() bool { return pc.SkillDisabled(key) })
+	srv.AdvanceUntil(t, "queued item cast end", func() bool { return !pc.CastingNow() })
+	assertNoAttackFor(t, c, 2*time.Second, "after the queued item cast")
+}
+
+// TestFailedQueuedItemCastDoesNotFollowUpWithAttack pins the queued item
+// cast as the next intention even when its resume fails: the cast that just
+// ended carries nextActionAttack, but the item cast replaced it, so no
+// follow-up attack on the attack target starts.
+func TestFailedQueuedItemCastDoesNotFollowUpWithAttack(t *testing.T) {
+	t.Parallel()
+	srv, pc, hostileID, scroll := bootMidCastWith(t, queueFollowUpSkillID)
+	c := srv.Client
+	objID := pc.ObjectID()
+
+	requestAttackMidCast(t, c, hostileID)
+	queueItemCastMidCast(t, c, scroll)
+	// Put the queued item skill on reuse: its resume fails the pre-attempt
+	// gate.
+	pc.DisableSkill(cast.ReuseKey(queueScrollSkill()), 10*time.Minute)
+
+	srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
+	assertNoAttackFor(t, c, 2*time.Second, "after the cast ended")
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
+	assertNoAttackFor(t, c, 2*time.Second, "after the AI woke up")
+	if pc.CastingNow() {
+		t.Fatal("queued item cast on reuse started")
+	}
+}

@@ -258,8 +258,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		magicHeld := l.finishDeferredMagicSkill(live)
 		itemHeld := l.finishDeferredItemAICast(live)
 		// A queued cast took the intention the swing had when it was
-		// queued; whether it started now or is held for PostureSettled, the
-		// attack does not swing again.
+		// queued; whether it started now, was refused, or is held for
+		// PostureSettled, the attack does not swing again.
 		if magicHeld || itemHeld {
 			return
 		}
@@ -397,11 +397,12 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 
 // finishLiveCast resumes live's intentions once an in-flight cast ends.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition) {
+	// A queued item cast or skill request replaced the cast that just ended
+	// as the intention, whether it starts now or not: the ended cast's
+	// nextActionAttack follow-up does not run.
 	if l.finishDeferredItemAICast(live) {
 		return
 	}
-	// A queued skill request replaced the cast that just ended as the
-	// intention, whether it starts now or not.
 	if l.finishDeferredMagicSkill(live) {
 		return
 	}
