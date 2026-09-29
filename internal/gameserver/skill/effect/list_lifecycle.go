@@ -37,12 +37,27 @@ func (l *List) tickAt(now time.Time) {
 
 // Add inserts e and activates it when it wins its stack group.
 func (l *List) Add(e *Effect) {
+	l.addAnnounced(e, true)
+}
+
+// AddRestored is Add for an effect reinstated at login: it activates e and
+// refreshes the icons the same way, but sends the owner none of the
+// felt/disappeared/expiry system messages. The reference restores effects
+// before the player has a client, so those messages go nowhere; only the
+// later icon update reaches the client.
+func (l *List) AddRestored(e *Effect) {
+	l.addAnnounced(e, false)
+}
+
+func (l *List) addAnnounced(e *Effect, announce bool) {
 	if l == nil || e == nil {
 		return
 	}
 	var pending []func()
 	l.mu.Lock()
+	l.silent = !announce
 	l.add(e, &pending)
+	l.silent = false
 	l.mu.Unlock()
 
 	runHooks(pending)
@@ -179,7 +194,7 @@ func (l *List) notifyAbnormalUpdate() {
 // e.Skill.Toggle wins over the count check even though a toggle's schedule
 // never reaches count 0, matching the reference checking isToggle() first.
 func (l *List) notifyExpiry(e *Effect, wornOff bool, pending *[]func()) {
-	if !e.Template.Icon {
+	if !e.Template.Icon || l.silent {
 		return
 	}
 	notifier := l.owner
@@ -223,14 +238,16 @@ func appendThunk(pending *[]func(), thunk func()) {
 // result: e activates and gains its stat funcs on success, or onReject
 // runs (still under l.mu) on failure. With announce set, a successful
 // activation of an icon effect then tells the owner it feels e's effect —
-// the add path's stack-head promotion does this, the removal path's does not.
-// It does not (re)start e's tick
-// schedule: that starts once, in add, when e is first created — matching
-// L2Skill.getEffects() calling scheduleEffect() unconditionally for every
-// created effect (L2Skill.java:1188-1191) — so a promoted stack loser
-// resumes with whatever count it drained down to while displaced instead of
-// restarting from the template.
+// the add path's stack-head promotion does this (unless l.silent, read here
+// under l.mu), the removal path's does not.
+//
+// It does not (re)start e's tick schedule: that starts once, in add, when e
+// is first created — matching L2Skill.getEffects() calling scheduleEffect()
+// unconditionally for every created effect (L2Skill.java:1188-1191) — so a
+// promoted stack loser resumes with whatever count it drained down to while
+// displaced instead of restarting from the template.
 func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) func() {
+	announce = announce && !l.silent
 	return func() {
 		ok := true
 		if e.OnStart != nil {

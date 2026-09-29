@@ -22,7 +22,14 @@ func castCollectingEffectFeedback(t *testing.T, c *testsupport.ScriptedClient, s
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, skillID, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "MagicSkillLaunched")
+	return drainEffectFeedback(t, c)
+}
 
+// drainEffectFeedback reads frames until the client goes quiet and returns,
+// in arrival order, the skill-name system messages ("sm:<msg>:<skill>") and
+// icon refreshes ("icons:[...]") among them.
+func drainEffectFeedback(t *testing.T, c *testsupport.ScriptedClient) []string {
+	t.Helper()
 	var got []string
 	for i := 0; i < 100; i++ {
 		frame := c.ReadWithTimeout(300 * time.Millisecond)

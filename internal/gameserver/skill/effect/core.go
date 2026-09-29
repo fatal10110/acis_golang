@@ -369,7 +369,9 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // template.getEffect(this, this, skill) -> setCount/setTime ->
 // scheduleEffect() chain. effector and effected are both the relogging
 // character: the original caster identity is not persisted, so every
-// reinstated effect is treated as self-applied, matching the reference.
+// reinstated effect is treated as self-applied, matching the reference. The
+// replay is silent (see List.AddRestored): it activates and refreshes icons
+// but sends no stack or expiry system messages.
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
 	if list == nil {
 		return
@@ -382,7 +384,7 @@ func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		e.Effector = effector
 		e.Effected = effected
 		e.seedRestore(count, elapsedSeconds)
-		list.Add(e)
+		list.AddRestored(e)
 	}
 }
 

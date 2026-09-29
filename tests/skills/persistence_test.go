@@ -418,7 +418,8 @@ func logout(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedCli
 // every held effect, not only the active one: with cancel-lesser off, the
 // weaker same-stack buff stays held behind the stronger one, is written to
 // character_skills_save ahead of it (buff_index follows the held-list
-// order), and after relog is held again behind the restored stronger buff.
+// order), and after relog is held again behind the restored stronger buff,
+// with no stack-change system message sent for the replay.
 func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -474,8 +475,17 @@ func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
 		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
 	}
 	relogin.Send(encodeEnterWorld())
-	if icons := buffSlotIDs(drainCollectingAbnormal(t, relogin)); !slices.Equal(icons, []int32{202}) {
-		t.Fatalf("icons after relog = %v, want only restored stronger [202]", icons)
+	// The reference restores effects before the player has a client, so the
+	// restore's stack messages (felt, disappeared) never reach it: only the
+	// icon refresh does.
+	feedback := drainEffectFeedback(t, relogin)
+	for _, entry := range feedback {
+		if strings.HasPrefix(entry, "sm:") {
+			t.Fatalf("relog effect feedback = %v, want no skill system messages", feedback)
+		}
+	}
+	if len(feedback) == 0 || feedback[len(feedback)-1] != "icons:[202]" {
+		t.Fatalf("relog effect feedback = %v, want last icons:[202]", feedback)
 	}
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
 		t.Fatalf("held effects after relog = %v, want lesser held again [201 202]", ids)

@@ -3188,6 +3188,151 @@ func TestListIdenticalHerbRecastAtCapacityDropsBoth(t *testing.T) {
 	requireNames(t, list.All(), []string{})
 }
 
+// An identical recast at full buff slots still counts the retired buff, so
+// the cap eviction runs too. It walks the held buffs in order: an older
+// other buff ahead of the recast one is evicted as well, while reaching the
+// already-retired buff first uses up the eviction without retiring it again
+// (no second stop or exit hook), and the other buff survives.
+func TestListIdenticalRecastAtCapacityEvictsInHeldOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		order  []string
+		events []string
+		held   []string
+	}{
+		{
+			name:  "other buff first",
+			order: []string{"a", "b"},
+			events: []string{
+				"b:stop",
+				"b:exit",
+				"a:stop",
+				"a:exit",
+				"b2:start",
+				"owner:add",
+				"owner:remove:b",
+				"disappeared:2:0",
+				"owner:remove:a",
+				"disappeared:1:0",
+				"icons",
+			},
+			held: []string{"b2"},
+		},
+		{
+			name:  "recast buff first",
+			order: []string{"b", "a"},
+			events: []string{
+				"b:stop",
+				"b:exit",
+				"b2:start",
+				"owner:add",
+				"owner:remove:b",
+				"disappeared:2:0",
+				"icons",
+			},
+			held: []string{"a", "b2"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var events []string
+			list := newTestList(iconEventOwner{eventOwner{events: &events, maxBuff: 2}})
+			byName := map[string]*Effect{
+				"a": buffSlotEffect("a", 1, &events),
+				"b": buffSlotEffect("b", 2, &events),
+			}
+			for _, name := range tc.order {
+				byName[name].Template.Count = 5
+				list.Add(byName[name])
+			}
+			recast := buffSlotEffect("b2", 2, &events)
+			recast.Template.Count = 5
+
+			events = nil
+			list.Add(recast)
+
+			requireEvents(t, events, tc.events)
+			requireNames(t, list.All(), tc.held)
+			if byName["b"].InUse() || !recast.InUse() {
+				t.Fatal("recast did not replace the retired buff")
+			}
+		})
+	}
+}
+
+// A restored effect activates and refreshes icons like a cast one, but the
+// owner gets none of the stack-change or expiry messages: the reference
+// restores effects before the player has a client.
+func TestListAddRestoredSendsNoStackMessages(t *testing.T) {
+	t.Run("stack head change", func(t *testing.T) {
+		var events []string
+		list := newTestList(iconEventOwner{eventOwner{events: &events}}, WithEnv(Env{KeepLesser: true}))
+		weak := namedEffect("weak", 201, "speed_up", 1, false, &events)
+		weak.Template.Icon = true
+		strong := namedEffect("strong", 202, "speed_up", 2, false, &events)
+		strong.Template.Icon = true
+
+		list.AddRestored(weak)
+		list.AddRestored(strong)
+
+		requireEvents(t, events, []string{
+			"weak:start",
+			"owner:add",
+			"icons",
+			"owner:remove:weak",
+			"weak:exit",
+			"strong:start",
+			"owner:add",
+			"icons",
+		})
+		requireNames(t, list.All(), []string{"weak", "strong"})
+	})
+	t.Run("identical replacement", func(t *testing.T) {
+		var events []string
+		list := newTestList(iconEventOwner{eventOwner{events: &events}})
+		old := namedEffect("old", 1204, "none", 0, false, &events)
+		old.Template.Icon = true
+		old.Template.Count = 5
+		fresh := namedEffect("fresh", 1204, "none", 0, false, &events)
+		fresh.Template.Icon = true
+		fresh.Template.Count = 5
+
+		list.AddRestored(old)
+		events = nil
+		list.AddRestored(fresh)
+
+		requireEvents(t, events, []string{
+			"old:stop",
+			"old:exit",
+			"fresh:start",
+			"owner:add",
+			"owner:remove:old",
+			"icons",
+		})
+	})
+	t.Run("later cast still announces", func(t *testing.T) {
+		var events []string
+		list := newTestList(iconEventOwner{eventOwner{events: &events}})
+		restored := namedEffect("restored", 201, "speed_up", 1, false, &events)
+		restored.Template.Icon = true
+		cast := namedEffect("cast", 202, "speed_up", 2, false, &events)
+		cast.Template.Icon = true
+
+		list.AddRestored(restored)
+		events = nil
+		list.Add(cast)
+
+		requireEvents(t, events, []string{
+			"owner:remove:restored",
+			"restored:exit",
+			"disappeared:201:0",
+			"cast:start",
+			"owner:add",
+			"felt:202:0",
+			"icons",
+		})
+	})
+}
+
 // TestPeriodRemainingTracksCurrentTickPeriod pins the remaining-duration
 // input the debuff-cancel roll reads: the template period minus the whole
 // seconds elapsed since the current period started (EffectCancelDebuff
