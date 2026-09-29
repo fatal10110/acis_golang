@@ -419,11 +419,22 @@ func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 
 // CastStopped is FinishedCasting for a cast stopped before it completed. A
 // cast AbortAll stopped moves nothing on and reports handled false.
+//
+// A queued cast is dropped rather than started: the reference reports a
+// stopped cast to the AI before it clears its casting flag, so the queued
+// cast's think still sees a cast in flight and idles instead
+// (CreatureCast.stop, PlayableAI.thinkCast). Only a cast that completes
+// clears the flag first, so FinishedCasting still starts the queued cast.
 func (s *Summon) CastStopped(follow attackable.Combatant) (idled, handled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.aborting > 0 {
 		return false, false
+	}
+	if s.next.kind == IntentionCast {
+		s.setCurrentLocked(s.next)
+		s.idleOrFollowLocked(follow)
+		return true, true
 	}
 	return s.finishedCastingLocked(follow), true
 }
@@ -441,12 +452,18 @@ func (s *Summon) finishedCastingLocked(follow attackable.Combatant) (idled bool)
 		s.thinkLocked()
 		return false
 	}
+	s.idleOrFollowLocked(follow)
+	return true
+}
+
+// idleOrFollowLocked follows follow when it is non-nil, otherwise stands
+// the summon still.
+func (s *Summon) idleOrFollowLocked(follow attackable.Combatant) {
 	if follow != nil {
 		s.followInsteadLocked(follow)
 	} else {
 		s.idleLocked()
 	}
-	return true
 }
 
 // runNextLocked makes the queued intention current, if there is one.

@@ -3464,6 +3464,61 @@ func TestSummonAICastStoppedResumesTheReplacedAttack(t *testing.T) {
 	}
 }
 
+// TestSummonAICastStoppedDropsTheQueuedCast pins that a cast queued behind
+// a stopped cast is dropped, not started: the summon goes idle, following
+// its owner, rather than resuming the attack the first cast replaced or
+// firing the queued skill through the interrupt. Without an owner to follow
+// it stands still.
+func TestSummonAICastStoppedDropsTheQueuedCast(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		follow attackable.Combatant
+		want   Intention
+	}{
+		{name: "follows owner", follow: actor(1), want: IntentionFollow},
+		{name: "no owner", follow: nil, want: IntentionIdle},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			brain, target, strike, cast := castingAfterAttack(t)
+			if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+				t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
+			}
+			cast.casting = false
+
+			idled, handled := brain.CastStopped(tc.follow)
+			if !handled || !idled {
+				t.Fatalf("CastStopped() = (idled %v, handled %v), want (true, true)", idled, handled)
+			}
+			if cast.castCalls != 1 {
+				t.Fatalf("Cast calls = %d, want the queued cast dropped", cast.castCalls)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("DoAttack calls = %d, want no resumed swing", strike.doAttackCalls)
+			}
+			if got := brain.CurrentIntention(); got != tc.want {
+				t.Fatalf("CurrentIntention() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSummonAIFinishedCastingStartsTheQueuedCast pins the other side: a
+// cast that completes starts the cast queued behind it.
+func TestSummonAIFinishedCastingStartsTheQueuedCast(t *testing.T) {
+	brain, target, _, cast := castingAfterAttack(t)
+	if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+		t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
+	}
+	cast.casting = false
+
+	if idled := brain.FinishedCasting(actor(1)); idled {
+		t.Fatal("FinishedCasting() idled, want the queued cast started")
+	}
+	if cast.castCalls != 2 || cast.castedRef.ID != 4140 {
+		t.Fatalf("Cast calls = %d (last %v), want the queued skill 4140 cast", cast.castCalls, cast.castedRef)
+	}
+}
+
 // TestSummonAICastStoppedWithoutAttackFollowsOwner pins a stopped cast with
 // no attack to resume: the summon goes back to following its owner.
 func TestSummonAICastStoppedWithoutAttackFollowsOwner(t *testing.T) {
