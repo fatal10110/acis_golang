@@ -435,9 +435,14 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 	// Deliberate divergence from the reference (issue #2336): the reference
 	// destroys the consume item after claiming the cast and ignores a failed
 	// destroy, so a race that empties the item mid-cast still casts uncharged.
-	// CanCast already verified the count here, so ConsumeItem can only fail on
-	// that same narrow race; releasing the claim and rejecting the cast in
-	// that case is preferred over silently casting an unpaid skill.
+	// For an ordinary cast CanCast already verified the count, so ConsumeItem
+	// can only fail on that same narrow race; releasing the claim and
+	// rejecting the cast in that case is preferred over silently casting an
+	// unpaid skill. For a carried cast whose carrier is also the skill's
+	// consume item (e.g. an ItemSkills scroll whose skill consumes the
+	// scroll itself), consumeCarrier has already taken a unit, so at a stack
+	// of exactly one the failure here is deterministic: the carrier is gone
+	// and nothing is cast, where the reference still casts (#2791).
 	//
 	// The ItemConsumeCount > 0 half of this guard (and CanCast's matching
 	// check) is a second, separate divergence: the reference gates solely on

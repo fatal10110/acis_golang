@@ -176,6 +176,28 @@ func TestPetScrollTargetRefusals(t *testing.T) {
 	})
 }
 
+// TestPetScrollWithoutSkillAnswersNothing: a resurrection scroll none of
+// whose skills is registered only logs on the server, as the reference
+// does (ScrollsOfResurrection.java:77-91); the client gets no packet and
+// keeps the scroll.
+func TestPetScrollWithoutSkillAnswersNothing(t *testing.T) {
+	t.Parallel()
+	db := sqltest.SharedDB(t)
+	noScrollSkill := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable(nil), gamesql.NewCharacterSkillStore(db))
+	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{gameservertest.WithSkills(noScrollSkill)},
+		seedItem{TemplateID: gameservertest.PetResurrectionScrollID, Count: 1})
+	drainUntilQuiet(t, h.client)
+	selectObject(t, h.srv, h.client, h.ownerID, h.ownerID)
+
+	h.client.Send(encodeUseItem(h.seeded[gameservertest.PetResurrectionScrollID][0], false))
+	if frame := h.client.ReadWithTimeout(500 * time.Millisecond); frame != nil {
+		t.Fatalf("scroll without skill answered opcode %#x, want nothing", frame[0])
+	}
+	if got := liveItemCount(t, h.srv, h.ownerID, gameservertest.PetResurrectionScrollID); got != 1 {
+		t.Fatalf("scrolls = %d, want 1 kept", got)
+	}
+}
+
 // newPetScrollScene is newPetRevivalScene with a healer who also carries
 // a pet resurrection scroll.
 func newPetScrollScene(t *testing.T) (*petRevivalScene, int32) {

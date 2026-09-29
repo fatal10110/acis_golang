@@ -34,8 +34,8 @@ func (l *GameClientLink) useResurrectionScroll(live *livePlayer, inv *itemcontai
 		return true
 	}
 	if len(defs) == 0 {
+		// The reference only logs: the client gets no answer.
 		l.log.Warn().Int32("item", inst.TemplateID).Msg("resurrection scroll has no registered skill")
-		sendMagicActionFailed(live)
 		return true
 	}
 	l.castItemSkills(live, inv, nil, defs, false, false)
