@@ -2756,6 +2756,99 @@ func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
 	}
 }
 
+// TestStopFakeDeathWithoutGetUpEndsFakeDeath pins the two StopFakeDeath
+// branches that schedule no get-up and so must end fake death themselves: a
+// character killed while playing dead, which must not stay fake-dead after
+// a revive, and a character with no live runtime.
+func TestStopFakeDeathWithoutGetUpEndsFakeDeath(t *testing.T) {
+	t.Run("dead", func(t *testing.T) {
+		c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+		c.StartFakeDeath()
+		if !c.FakeDead() {
+			t.Fatal("FakeDead() = false after StartFakeDeath")
+		}
+		if !c.MarkDead() {
+			t.Fatal("MarkDead() = false, want true")
+		}
+		c.StopFakeDeath()
+		if c.FakeDead() {
+			t.Fatal("FakeDead() = true after a dead character left fake death")
+		}
+		if !c.Revive() {
+			t.Fatal("Revive() = false, want true")
+		}
+		if c.FakeDead() || c.AlikeDead() {
+			t.Fatalf("revived character FakeDead=%v AlikeDead=%v, want both false", c.FakeDead(), c.AlikeDead())
+		}
+	})
+	t.Run("no live runtime", func(t *testing.T) {
+		c := liveCharacter(1, combatTemplate(), combatItems())
+		c.Live = nil
+		c.StartFakeDeath()
+		if !c.FakeDead() {
+			t.Fatal("FakeDead() = false after StartFakeDeath")
+		}
+		c.StopFakeDeath()
+		if c.FakeDead() {
+			t.Fatal("FakeDead() = true after StopFakeDeath with no live runtime")
+		}
+	})
+}
+
+// TestRepeatFakeDeathStopOnlyDuringGetUp pins a repeated get-up request
+// (Player.stopFakeDeath during its own get-up): it re-sends the get-up and
+// revive visuals and restarts the grace, and leaves the running get-up to
+// end fake death. Outside the get-up, or once dead, it does nothing.
+func TestRepeatFakeDeathStopOnlyDuringGetUp(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	rec := recordEvents(c)
+	c.StartFakeDeath()
+	if c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true while lying down")
+	}
+	c.StopFakeDeath()
+	c.recentFakeDeathUntil = time.Time{}
+	stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec)
+	c.stateMu.RLock()
+	gen := c.postureGen
+	c.stateMu.RUnlock()
+
+	if !c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = false during the get-up")
+	}
+	if got, want := event.Count[event.StanceChanged](rec), stances+1; got != want {
+		t.Fatalf("stance broadcasts = %d, want %d", got, want)
+	}
+	if got, want := event.Count[event.FakeDeathRevived](rec), revives+1; got != want {
+		t.Fatalf("revive broadcasts = %d, want %d", got, want)
+	}
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false after a repeated get-up request")
+	}
+	c.stateMu.RLock()
+	sameGetUp := c.postureGen == gen && c.standingNow
+	c.stateMu.RUnlock()
+	if !sameGetUp || !c.FakeDead() {
+		t.Fatalf("repeated get-up request replaced the get-up (same=%v FakeDead=%v)", sameGetUp, c.FakeDead())
+	}
+
+	c.settlePosture(gen, true)
+	if c.FakeDead() {
+		t.Fatal("FakeDead() = true after the original get-up ended")
+	}
+	if c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true after the get-up ended")
+	}
+
+	d := attachIdleLive(t, liveCharacter(2, combatTemplate(), combatItems()))
+	d.StartFakeDeath()
+	d.StopFakeDeath()
+	d.MarkDead()
+	if d.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true on a dead character")
+	}
+}
+
 func TestCharacterAllSkillsDisabledUnionsCrowdControlStates(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -6437,4 +6530,56 @@ func attachIdleLive(t *testing.T, c *Character) *Character {
 	live.SetQueue(idleQueue())
 	c.Live = live
 	return c
+}
+
+// TestMovementSpeedMultiplier pins CreatureStatus.getMovementSpeedMultiplier
+// (CreatureStatus.java:784-790) on land: the modified move speed over the
+// template run or walk speed the run mode picks. Unbuffed, it is the DEX
+// run-speed bonus (FuncMoveSpeed); an armor grade penalty scales it by 0.84
+// per level and a full weight penalty stops it (PlayerStatus.java:944-952).
+func TestMovementSpeedMultiplier(t *testing.T) {
+	tmpl := combatTemplate()
+	tmpl.RunSpeed, tmpl.WalkSpeed = 120, 80
+	c := liveCharacter(1, tmpl, combatItems())
+	dex := float32(statbonus.DEXBonus[tmpl.DEX])
+	closeTo := func(got, want float32) bool { return math.Abs(float64(got-want)) < 1e-5 }
+
+	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
+		t.Fatalf("running multiplier = %v, want DEX bonus %v", got, dex)
+	}
+	c.SetRunning(false)
+	if got := c.MovementSpeedMultiplier(); !closeTo(got, dex) {
+		t.Fatalf("walking multiplier = %v, want DEX bonus %v", got, dex)
+	}
+	c.armorGradePenalty = 2
+	if got, want := c.MovementSpeedMultiplier(), dex*0.84*0.84; !closeTo(got, want) {
+		t.Fatalf("multiplier with armor penalty 2 = %v, want %v", got, want)
+	}
+	c.armorGradePenalty = 0
+	c.weightPenalty = 4
+	if got := c.MovementSpeedMultiplier(); got != 0 {
+		t.Fatalf("multiplier with full weight penalty = %v, want 0", got)
+	}
+}
+
+// TestFakeDeathDelay pins the fake-death transition times,
+// (int) (millis / multiplier) ms (Player.java:7029,7052): truncated, and a
+// zero multiplier's infinity saturating at Integer.MAX_VALUE.
+func TestFakeDeathDelay(t *testing.T) {
+	for _, tc := range []struct {
+		millis, mult float32
+		want         time.Duration
+	}{
+		{3000, 1, 3000 * time.Millisecond},
+		{2500, 1, 2500 * time.Millisecond},
+		{3000, 1.25, 2400 * time.Millisecond},
+		{2500, 0.84, 2976 * time.Millisecond},
+		{3000, 0.84, 3571 * time.Millisecond},
+		{2500, 3, 833 * time.Millisecond},
+		{3000, 0, math.MaxInt32 * time.Millisecond},
+	} {
+		if got := fakeDeathDelay(tc.millis, tc.mult); got != tc.want {
+			t.Errorf("fakeDeathDelay(%v, %v) = %v, want %v", tc.millis, tc.mult, got, tc.want)
+		}
+	}
 }
