@@ -106,14 +106,12 @@ func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
 	loaded := player.(interface {
 		CurrentWeight() int
 		WeightLimit() int
-		RefreshWeightPenalty()
 		WeightPenalty() int
 		Running() bool
 	})
 	if loaded.CurrentWeight() <= loaded.WeightLimit() {
 		t.Fatalf("restored weight %d does not exceed limit %d", loaded.CurrentWeight(), loaded.WeightLimit())
 	}
-	loaded.RefreshWeightPenalty()
 	if got := loaded.WeightPenalty(); got != 4 {
 		t.Fatalf("weight penalty = %d, want 4 (weight %d, limit %d)", got, loaded.CurrentWeight(), loaded.WeightLimit())
 	}
