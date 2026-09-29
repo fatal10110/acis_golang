@@ -228,9 +228,10 @@ func TestHealCastWithBlessedSpiritshotAddsHealSpsBonus(t *testing.T) {
 }
 
 // TestContinuousAndDisablerCastsSpendChargedSpiritshot casts a real BUFF
-// (continuous handler) and a real NEGATE (disablers handler) with a
-// spiritshot charged on the equipped weapon: each cast spends the charge it
-// found at cast start, blessed or plain.
+// (continuous handler), a real NEGATE (disablers handler) and each resource
+// type that runs the BUFF pass first with a spiritshot charged on the
+// equipped weapon: each cast spends the charge it found at cast start,
+// blessed or plain.
 func TestContinuousAndDisablerCastsSpendChargedSpiritshot(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
@@ -239,6 +240,10 @@ func TestContinuousAndDisablerCastsSpendChargedSpiritshot(t *testing.T) {
 	}{
 		{name: "buff blessed", skillType: "BUFF", shot: item.ShotBlessedSpirit},
 		{name: "negate plain", skillType: "NEGATE", shot: item.ShotSpirit},
+		{name: "heal percent blessed", skillType: "HEAL_PERCENT", shot: item.ShotBlessedSpirit},
+		{name: "mana heal percent plain", skillType: "MANAHEAL_PERCENT", shot: item.ShotSpirit},
+		{name: "combat point heal blessed", skillType: "COMBATPOINTHEAL", shot: item.ShotBlessedSpirit},
+		{name: "balance life plain", skillType: "BALANCE_LIFE", shot: item.ShotSpirit},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
