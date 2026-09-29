@@ -152,7 +152,7 @@ func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) 
 	c.runtimeTemplate = tmpl
 	c.inventory = inv
 	if inv != nil {
-		inv.SetSlotLimiter(c)
+		inv.SetLimiter(c)
 	}
 	if c.roll == nil {
 		c.roll = rand.IntN
@@ -250,6 +250,13 @@ func (c *Character) emit(e event.Event) {
 	if c.sink != nil {
 		c.sink.Emit(e)
 	}
+}
+
+// RewardItemFits reports whether count units of itemID fit in this
+// character's inventory slots, the check an auto-looted kill reward must
+// pass before AddRewardItem.
+func (c *Character) RewardItemFits(itemID int32, count int) bool {
+	return c.inventory != nil && c.inventory.ValidateCapacityByItemID(itemID, count)
 }
 
 // AddRewardItem creates and adds one kill-reward item stack to this live

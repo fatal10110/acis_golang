@@ -738,6 +738,62 @@ func TestInventory_SlotsNeededFor(t *testing.T) {
 	}
 }
 
+// TestInventory_SlotsNeededForItemIDAtSlotLimit covers every branch of the
+// by-template-id slot count auto-loot relies on, and the capacity verdict for
+// each at a full inventory (and with one slot free): a held stackable merges
+// into its stack for 0 slots and always fits, a new stackable needs 1, a
+// non-stackable needs one per unit, and an unknown template counts as
+// non-stackable.
+func TestInventory_SlotsNeededForItemIDAtSlotLimit(t *testing.T) {
+	const (
+		heldStackID int32 = 1
+		newStackID  int32 = 2
+		weaponID    int32 = 3
+		unknownID   int32 = 99
+	)
+	templates := item.NewTable([]*item.Template{
+		{ID: heldStackID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: newStackID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: weaponID, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+
+	tests := []struct {
+		name       string
+		templateID int32
+		count      int
+		wantSlots  int
+		fitsFull   bool // SlotLimit == Size()
+		fitsOneGap bool // SlotLimit == Size()+1
+	}{
+		{"held stackable merges", heldStackID, 5, 0, true, true},
+		{"new stackable opens a stack", newStackID, 5, 1, false, true},
+		{"non-stackable x1", weaponID, 1, 1, false, true},
+		{"non-stackable x3", weaponID, 3, 3, false, false},
+		{"unknown template counts per unit", unknownID, 2, 2, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inv := NewPlayerInventory(0x10000001, templates)
+			inv.AddNew(heldStackID, 10, 0x20000001)
+			inv.AddNew(weaponID, 1, 0x20000002)
+
+			if got := inv.SlotsNeededForItemID(tt.templateID, tt.count); got != tt.wantSlots {
+				t.Fatalf("SlotsNeededForItemID(%d, %d) = %d, want %d", tt.templateID, tt.count, got, tt.wantSlots)
+			}
+
+			inv.SlotLimit = inv.Size()
+			if got := inv.ValidateCapacityByItemID(tt.templateID, tt.count); got != tt.fitsFull {
+				t.Errorf("ValidateCapacityByItemID(%d, %d) at SlotLimit == Size() = %v, want %v", tt.templateID, tt.count, got, tt.fitsFull)
+			}
+
+			inv.SlotLimit = inv.Size() + 1
+			if got := inv.ValidateCapacityByItemID(tt.templateID, tt.count); got != tt.fitsOneGap {
+				t.Errorf("ValidateCapacityByItemID(%d, %d) with one free slot = %v, want %v", tt.templateID, tt.count, got, tt.fitsOneGap)
+			}
+		})
+	}
+}
+
 // TestInventory_UpdateNotifierFiresOnQueuedUpdate pins the hook every queued
 // inventory change relies on, matching the reference's Inventory.addUpdate
 // registering with InventoryUpdateTaskManager unconditionally: the batching
@@ -1812,29 +1868,38 @@ func TestRestoreMergesDuplicateStacksIntoTheFirstRowRestored(t *testing.T) {
 	}
 }
 
-// paperdollReadingLimiter is a slot limit that reads its inventory's
-// paperdoll, as an owner's stat conditions may.
+// paperdollReadingLimiter is a slot and weight limit that reads its
+// inventory's paperdoll, as an owner's stat conditions may.
 type paperdollReadingLimiter struct {
-	inv   *Inventory
-	limit int
+	inv    *Inventory
+	limit  int
+	weight int
 }
 
 func (l paperdollReadingLimiter) InventoryLimit() int {
 	return l.limit + len(l.inv.PaperdollItems())
 }
 
-// TestInventorySlotLimiterReplacesSlotLimit pins the owner-driven limit: a
-// limiter overrides SlotLimit, is asked on every check, and is read before
-// Exchange locks the inventories, so a limit that reads the paperdoll
-// cannot deadlock the settle check.
-func TestInventorySlotLimiterReplacesSlotLimit(t *testing.T) {
+func (l paperdollReadingLimiter) WeightLimit() int {
+	return l.weight + len(l.inv.PaperdollItems())
+}
+
+// TestInventoryLimiterReplacesSlotLimit pins the owner-driven limits: a
+// limiter overrides SlotLimit and WeightLimit, is asked on every check, and
+// is read before Exchange locks the inventories, so a limit that reads the
+// paperdoll cannot deadlock the settle check.
+func TestInventoryLimiterReplacesSlotLimit(t *testing.T) {
 	templates := equipTestTemplates()
 	a := NewPlayerInventory(0x10000001, templates)
 	b := NewPlayerInventory(0x10000002, templates)
 	a.SlotLimit = 100
-	limiter := &paperdollReadingLimiter{inv: a, limit: 1}
-	a.SetSlotLimiter(limiter)
+	a.WeightLimit = 1000
+	limiter := &paperdollReadingLimiter{inv: a, limit: 1, weight: 5}
+	a.SetLimiter(limiter)
 	a.AddNew(swordID, 1, 0x20000001)
+	if !a.ValidateWeight(5) || a.ValidateWeight(6) {
+		t.Fatal("ValidateWeight(5), (6) under the limiter's weight 5 = want [true false] (WeightLimit must not apply)")
+	}
 
 	if a.ValidateCapacity(1) {
 		t.Fatal("ValidateCapacity(1) at the limiter's limit = true, want false (SlotLimit must not apply)")
@@ -1844,21 +1909,24 @@ func TestInventorySlotLimiterReplacesSlotLimit(t *testing.T) {
 		t.Fatal("ValidateCapacity(1) after the limit grew = false, want true")
 	}
 
-	done := make(chan [2]bool, 1)
+	done := make(chan [4]bool, 1)
 	go Exchange(a, b, func(heldA, heldB Held) {
-		done <- [2]bool{heldA.ValidateCapacity(1), heldA.ValidateCapacity(2)}
+		done <- [4]bool{heldA.ValidateCapacity(1), heldA.ValidateCapacity(2), heldA.ValidateWeight(5), heldA.ValidateWeight(6)}
 	})
 	select {
 	case got := <-done:
-		if !got[0] || got[1] {
-			t.Fatalf("Held.ValidateCapacity(1), (2) = %v, want [true false]", got)
+		if got != [4]bool{true, false, true, false} {
+			t.Fatalf("Held.ValidateCapacity(1), (2), ValidateWeight(5), (6) = %v, want [true false true false]", got)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("Exchange deadlocked reading a paperdoll-reading slot limit")
 	}
 
-	a.SetSlotLimiter(nil)
+	a.SetLimiter(nil)
 	if !a.ValidateCapacity(99) || a.ValidateCapacity(100) {
 		t.Fatal("clearing the limiter did not restore SlotLimit")
+	}
+	if !a.ValidateWeight(1000) || a.ValidateWeight(1001) {
+		t.Fatal("clearing the limiter did not restore WeightLimit")
 	}
 }

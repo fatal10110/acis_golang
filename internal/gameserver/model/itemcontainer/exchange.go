@@ -7,10 +7,12 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 // change them meanwhile.
 type Held struct {
 	inv *Inventory
-	// slotLimit and slotBounded are inv's slot limit, read before the
-	// exchange took its locks.
-	slotLimit   int
-	slotBounded bool
+	// slotLimit/slotBounded and weightLimit/weightBounded are inv's limits,
+	// read before the exchange took its locks.
+	slotLimit     int
+	slotBounded   bool
+	weightLimit   int
+	weightBounded bool
 }
 
 // Moved is what one Held.Transfer did.
@@ -38,6 +40,8 @@ func Exchange(a, b *Inventory, fn func(a, b Held)) {
 	heldA, heldB := Held{inv: a}, Held{inv: b}
 	heldA.slotLimit, heldA.slotBounded = a.slotLimit()
 	heldB.slotLimit, heldB.slotBounded = b.slotLimit()
+	heldA.weightLimit, heldA.weightBounded = a.weightLimit()
+	heldB.weightLimit, heldB.weightBounded = b.weightLimit()
 	first, second := a, b
 	if second.OwnerID() < first.OwnerID() {
 		first, second = second, first
@@ -80,12 +84,13 @@ func (h Held) ValidateCapacity(slotCount int) bool {
 }
 
 // ValidateWeight reports whether weight more fits, as
-// Inventory.ValidateWeight does.
+// Inventory.ValidateWeight does, against the weight limit read when the
+// exchange began.
 func (h Held) ValidateWeight(weight int) bool {
-	if h.inv.WeightLimit <= 0 {
+	if !h.weightBounded {
 		return true
 	}
-	return h.inv.totalWeight+weight <= h.inv.WeightLimit
+	return h.inv.carriedWeightLocked()+weight <= h.weightLimit
 }
 
 // Transfer moves count units of objectID from h to to, the way

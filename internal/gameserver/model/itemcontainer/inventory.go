@@ -60,11 +60,12 @@ type Update struct {
 // unlimited, sourced the same way Container.SlotLimit is: this package
 // doesn't load config or read owner stats itself.
 //
-// An inventory whose owner computes its slot limit live (a player's, which
-// follows config and the inventoryLimit stat) takes that owner as its
-// SlotLimiter instead of a fixed SlotLimit.
+// An inventory whose owner computes its limits live (a player's, whose slot
+// limit follows config and the inventoryLimit stat and whose weight limit
+// follows CON, config and the weightLimit stat) takes that owner as its
+// Limiter instead of the fixed SlotLimit and WeightLimit.
 //
-// mu guards paperdoll, wornMask, totalWeight, updates and slotLimiter.
+// mu guards paperdoll, wornMask, totalWeight, updates and limiter.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
@@ -79,34 +80,50 @@ type Inventory struct {
 	totalWeight int
 	updates     []Update
 	delivery    Delivery
-	slotLimiter SlotLimiter
+	limiter     Limiter
 }
 
-// SlotLimiter reports how many item slots an inventory's owner may hold
-// right now.
-type SlotLimiter interface {
+// Limiter reports how many item slots and how much carried weight an
+// inventory's owner may hold right now. Both limits always apply: a weight
+// limit of 0 admits no weight at all.
+type Limiter interface {
 	InventoryLimit() int
+	WeightLimit() int
 }
 
-// SetSlotLimiter makes limiter the source of inv's slot limit, replacing
-// SlotLimit. A nil limiter restores SlotLimit.
-func (inv *Inventory) SetSlotLimiter(limiter SlotLimiter) {
+// SetLimiter makes limiter the source of inv's slot and weight limits,
+// replacing SlotLimit and WeightLimit. A nil limiter restores them.
+func (inv *Inventory) SetLimiter(limiter Limiter) {
 	inv.mu.Lock()
-	inv.slotLimiter = limiter
+	inv.limiter = limiter
 	inv.mu.Unlock()
+}
+
+// currentLimiter returns inv's limiter, or nil when it uses its fixed
+// limits.
+func (inv *Inventory) currentLimiter() Limiter {
+	inv.mu.Lock()
+	defer inv.mu.Unlock()
+	return inv.limiter
 }
 
 // slotLimit returns inv's current slot limit and whether it has one. It
 // asks the limiter without holding any inventory lock, so callers must not
 // hold one either: the owner's limit may read the paperdoll.
 func (inv *Inventory) slotLimit() (limit int, bounded bool) {
-	inv.mu.Lock()
-	limiter := inv.slotLimiter
-	inv.mu.Unlock()
-	if limiter != nil {
+	if limiter := inv.currentLimiter(); limiter != nil {
 		return limiter.InventoryLimit(), true
 	}
 	return inv.SlotLimit, inv.SlotLimit > 0
+}
+
+// weightLimit returns inv's current weight limit and whether it has one,
+// under the same locking rule as slotLimit.
+func (inv *Inventory) weightLimit() (limit int, bounded bool) {
+	if limiter := inv.currentLimiter(); limiter != nil {
+		return limiter.WeightLimit(), true
+	}
+	return inv.WeightLimit, inv.WeightLimit > 0
 }
 
 // ValidateCapacity reports whether adding slotCount more stacks/instances
@@ -114,6 +131,27 @@ func (inv *Inventory) slotLimit() (limit int, bounded bool) {
 func (inv *Inventory) ValidateCapacity(slotCount int) bool {
 	limit, bounded := inv.slotLimit()
 	return slotsFit(inv.Size(), slotCount, limit, bounded)
+}
+
+// SlotsNeededForItemID reports how many slots count units of templateID
+// would take once created in inv: none when a held stackable stack absorbs
+// them, one for a new stackable stack, and count for a non-stackable
+// template, which takes one slot per unit.
+func (inv *Inventory) SlotsNeededForItemID(templateID int32, count int) int {
+	tmpl, ok := inv.Templates().Get(templateID)
+	if !ok || !tmpl.Stackable {
+		return count
+	}
+	if inv.ItemByTemplateID(templateID) != nil {
+		return 0
+	}
+	return 1
+}
+
+// ValidateCapacityByItemID reports whether count new units of templateID
+// fit within inv's slot limit.
+func (inv *Inventory) ValidateCapacityByItemID(templateID int32, count int) bool {
+	return inv.ValidateCapacity(inv.SlotsNeededForItemID(templateID, count))
 }
 
 // Delivery handles a live inventory's queued updates and weight changes.
@@ -773,12 +811,7 @@ func (inv *Inventory) ClearWornSlot(slot int, inst *item.Instance) bool {
 // UpdateWeight recomputes the inventory's total carried weight and reports
 // whether it changed.
 func (inv *Inventory) UpdateWeight() bool {
-	weight := 0
-	inv.forEach(func(inst *item.Instance) {
-		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-			weight += int(tmpl.Weight) * inst.Snapshot().Count
-		}
-	})
+	weight := inv.carriedWeight()
 
 	inv.mu.Lock()
 	if inv.totalWeight == weight {
@@ -801,13 +834,34 @@ func (inv *Inventory) TotalWeight() int {
 	return inv.totalWeight
 }
 
+// carriedWeight sums the weight of every item inv holds now.
+func (inv *Inventory) carriedWeight() int {
+	inv.Container.mu.RLock()
+	defer inv.Container.mu.RUnlock()
+	return inv.carriedWeightLocked()
+}
+
+// carriedWeightLocked is carriedWeight for a caller holding Container.mu.
+func (inv *Inventory) carriedWeightLocked() int {
+	weight := 0
+	for _, inst := range inv.items {
+		if tmpl, ok := inv.templates.Get(inst.TemplateID); ok {
+			weight += int(tmpl.Weight) * inst.Snapshot().Count
+		}
+	}
+	return weight
+}
+
 // ValidateWeight reports whether adding weight more keeps the inventory
-// within WeightLimit. A WeightLimit of 0 means unlimited.
+// within its weight limit: its Limiter's, or WeightLimit, where 0 means
+// unlimited. It weighs what inv holds now rather than the last weight
+// UpdateWeight delivered, which trails item changes until the next update.
 func (inv *Inventory) ValidateWeight(weight int) bool {
-	if inv.WeightLimit <= 0 {
+	limit, bounded := inv.weightLimit()
+	if !bounded {
 		return true
 	}
-	return inv.TotalWeight()+weight <= inv.WeightLimit
+	return inv.carriedWeight()+weight <= limit
 }
 
 // SlotsNeededFor reports how many capacity slots adding inst (of template
