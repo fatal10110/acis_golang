@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -60,6 +61,36 @@ func TestValidatePositionFallDamage(t *testing.T) {
 	frames = validatePositionReplies(t, srv.Client, location.Location{X: x + 1_000, Y: y, Z: z - 2_000})
 	if len(frames) != 0 || character.HP() != hp-9 {
 		t.Fatalf("fall-window replies = %x, HP = %v", frames, character.HP())
+	}
+}
+
+func TestValidatePositionFemaleSafeFallHeight(t *testing.T) {
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacterSex("Newbie", 5, 0, player.SexFemale),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithZones(zone.NewIndex()),
+	)
+	enterWorld(t, srv.Client)
+	objID := srv.SoleObjectID(t)
+	x, y, z := srv.PlayerPosition(t, objID)
+	hp := srv.PlayerCurrentHP(t, objID)
+
+	// The human fighter's female threshold is 270, versus 250 for males.
+	for _, drop := range []int{251, 270} {
+		if frames := validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - drop}); len(frames) != 0 {
+			t.Fatalf("female drop %d replies = %x, want none", drop, frames)
+		}
+		if got := srv.PlayerCurrentHP(t, objID); got != hp {
+			t.Fatalf("female drop %d HP = %d, want %d", drop, got, hp)
+		}
+	}
+
+	frames := validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - 271})
+	if len(frames) != 2 || frames[0][0] != serverpackets.OpcodeStatusUpdate || frames[1][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("female drop 271 replies = %x, want status then fall message", frames)
+	}
+	if got := srv.PlayerCurrentHP(t, objID); got != hp-9 {
+		t.Fatalf("female drop 271 HP = %d, want %d", got, hp-9)
 	}
 }
 

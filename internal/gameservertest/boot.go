@@ -124,6 +124,7 @@ type characterSpec struct {
 	name  string
 	level int
 	sp    int
+	sex   player.Sex
 }
 
 // WithAccount sets the login account the scripted client authenticates as
@@ -322,7 +323,14 @@ func WithSeed(seed func(*gamesql.CharacterStore, *gamesql.ItemStore)) Option {
 // template) through the real SQL character store before the client dials, so
 // the initial CharSelectInfo already reports it.
 func WithCharacter(name string, level, sp int) Option {
-	return func(o *options) { o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp}) }
+	return WithCharacterSex(name, level, sp, player.SexMale)
+}
+
+// WithCharacterSex seeds a selectable character with the given sex.
+func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
+	return func(o *options) {
+		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: sex})
+	}
 }
 
 // WithShortcutSeed inserts shortcut rows before the client dials.
@@ -1376,7 +1384,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		if !ok {
 			t.Fatal("missing test class template")
 		}
-		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, player.SexMale)
+		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, spec.sex)
 		if err != nil {
 			t.Fatalf("seed character: %v", err)
 		}
