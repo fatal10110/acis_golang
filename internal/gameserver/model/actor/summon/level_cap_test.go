@@ -62,8 +62,8 @@ func socialActions(events []event.Event) []int32 {
 // reaches the level-81 threshold is kept, but the level does not move. A
 // grant from level 79 that crosses both the level-80 and level-81 thresholds
 // is refused whole, so the pet stays at 79. Neither case plays the level-up
-// animation or restores HP; the grant only refreshes status and reports the
-// exp earned.
+// animation or restores HP; the grant only reports the exp earned, with no
+// status refresh.
 func TestPetExpPastSentinelKeepsLevel(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -92,7 +92,7 @@ func TestPetExpPastSentinelKeepsLevel(t *testing.T) {
 			if got := pet.HP(); got != 100 {
 				t.Errorf("HP() = %v, want 100 (no level-up vitals reset)", got)
 			}
-			want := []event.Event{event.StatusChanged{}, event.ExpGained{Exp: tt.grant}}
+			want := []event.Event{event.ExpGained{Exp: tt.grant}}
 			if got := rec.Events(); !reflect.DeepEqual(got, want) {
 				t.Errorf("events = %+v, want %+v", got, want)
 			}

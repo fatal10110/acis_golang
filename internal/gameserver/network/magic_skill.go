@@ -260,12 +260,15 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 }
 
 // applyCastHit dispatches a player cast's effects to the affected set its
-// launch resolved. The final MP/HP costs already sent their own statuses,
-// and every change the effects make to the caster's vitals reports its own
-// status where it happens, so the hit sends none of its own. A PK kill the
-// hit made, and the flag the skill raised after it, settle before anything
-// else the hit sends.
+// launch resolved. Every summon in that set first republishes its status
+// (its owner's pet window and its observers), before any effect lands. The
+// final MP/HP costs already sent their own statuses, and every change the
+// effects make to the caster's vitals reports its own status where it
+// happens, so the hit sends none of its own. A PK kill the hit made, and
+// the flag the skill raised after it, settle before anything else the hit
+// sends.
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
+	actorcast.RefreshSummonTargets(affected)
 	handlers.Sink = l.playerMessageSink(live, nil)
 	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
 	l.settlePvPChanges(live)

@@ -4,6 +4,7 @@ import (
 	"math"
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -139,15 +140,22 @@ func cubicWithinRange(a, b Target) bool {
 // power * target's HEAL_EFFECTIVNESS / 100, with no caster stat or
 // proficiency contribution — distinct from the generic HEAL skill handler a
 // player's own heal cast goes through, which scales by the caster's own
-// MATK and healing proficiency. healed reports whether the target actually
-// received HP, so the caller knows whether to send the heal feedback packet.
+// MATK and healing proficiency. A player target whose HP actually rose is
+// sent its own status at once, as every HP restore does; a restore that
+// applied nothing sends none, and a summon or NPC target already republished
+// its status from AddHP. healed reports whether the target could be healed
+// at all, so the caller knows whether to send the heal feedback message
+// after that status.
 func ApplyCubicHeal(power float32, target Target) (healed bool) {
 	// Only an effect participant has HP to restore.
 	healable, ok := target.(effect.Actor)
 	if !ok || !healable.CanBeHealed() {
 		return false
 	}
-	healable.AddHP(float64(power) * healable.HealEffectiveness() / 100)
+	applied := healable.AddHP(float64(power) * healable.HealEffectiveness() / 100)
+	if applied > 0 && healable.Kind() == actor.KindPlayer {
+		healable.BroadcastStatus()
+	}
 	return true
 }
 
