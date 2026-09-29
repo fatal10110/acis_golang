@@ -15,8 +15,9 @@ import (
 //
 // A pet also closes its owner's pending resurrection offer, cancels its
 // corpse's decay and goes idle; its feeding and its regeneration resume, as
-// they skip only a dead pet, and a baby pet starts healing its owner again. A servitor keeps its decay: at the deadline it
-// leaves the world, alive (Decay).
+// they skip only a dead pet, and a baby pet starts healing its owner again.
+// A servitor keeps its decay: at the deadline it leaves the world, alive
+// (Decay).
 //
 // A corpse its owner left behind stays dead while its owner is away: it
 // still answers to the session that left it, whose queue is closed. A pet's

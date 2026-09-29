@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -146,6 +147,17 @@ func (s *babyScene) woundOwner(t *testing.T, share float64) {
 	drainUntilQuiet(t, s.client)
 }
 
+// holdOwnerAt brings the owner down to share of its max HP when it stands
+// above that, without draining the frames that follow, so a tick landing in
+// the meantime is not lost.
+func (s *babyScene) holdOwnerAt(t *testing.T, share float64) {
+	t.Helper()
+	maxHP := s.srv.PlayerMaxHP(t, s.ownerID)
+	if excess := s.srv.PlayerCurrentHP(t, s.ownerID) - int(float64(maxHP)*share); excess > 0 {
+		s.srv.DamagePlayerHP(t, s.ownerID, excess)
+	}
+}
+
 // framesUntil reads the owner's frames until the driven clock reaches
 // deadline, with the clock reading each one arrived at.
 func (s *babyScene) framesUntil(t *testing.T, deadline time.Time) (frames [][]byte, at []time.Time) {
@@ -157,6 +169,33 @@ func (s *babyScene) framesUntil(t *testing.T, deadline time.Time) (frames [][]by
 		}
 	}
 	return frames, at
+}
+
+// babyHeal is one PET_USES_S1 the owner read: the heal it names, and the
+// driven-clock reading it arrived at.
+type babyHeal struct {
+	skill int32
+	at    time.Time
+}
+
+// healsUntil reads the owner's frames until the driven clock reaches
+// deadline and returns every PET_USES_S1 among them, with the number of
+// MagicSkillUse the pet broadcast.
+func (s *babyScene) healsUntil(t *testing.T, deadline time.Time) (heals []babyHeal, casts int) {
+	t.Helper()
+	frames, at := s.framesUntil(t, deadline)
+	for i, f := range frames {
+		if f[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		r := wire.NewReader(f[1:])
+		if r.ReadInt32() != serverpackets.SystemMessagePetUsesS1 {
+			continue
+		}
+		_, _ = r.ReadInt32(), r.ReadInt32() // parameter count, parameter type
+		heals = append(heals, babyHeal{skill: r.ReadInt32(), at: at[i]})
+	}
+	return heals, frameCount(frames, serverpackets.OpcodeMagicSkillUse, s.baby.ObjectID())
 }
 
 // petUsesAt returns the index of the PET_USES_S1 message among frames, or -1.
@@ -278,4 +317,89 @@ func TestReturnedBabyPetStopsHealing(t *testing.T) {
 	s.returnPet(t)
 	s.woundOwner(t, 0.5)
 	s.assertNoHealFor(t, 5*time.Second, "returned")
+}
+
+// TestBabyPetLeavesUnhealableOwnerAlone: an owner who is dead, spawn
+// protected or invulnerable gets no heal and no PET_USES_S1 however wounded,
+// on the first tick and the ones after it. Once an invulnerable owner loses
+// its protection, the next tick heals it.
+func TestBabyPetLeavesUnhealableOwnerAlone(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		gate func(*player.Character)
+		lift func(*player.Character) // nil: the gate stays
+	}{
+		{name: "dead owner", gate: func(c *player.Character) { c.MarkDead() }},
+		{
+			name: "spawn-protected owner",
+			gate: func(c *player.Character) { c.SetSpawnProtection(true) },
+			lift: func(c *player.Character) { c.SetSpawnProtection(false) },
+		},
+		{
+			name: "invulnerable owner",
+			gate: func(c *player.Character) { c.SetInvul(true) },
+			lift: func(c *player.Character) { c.SetInvul(false) },
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := bootBabyPet(t, 0)
+			s.woundOwner(t, 0.5)
+			onOwnerQueue(t, s.petWorld, tt.gate)
+			s.awaitFirstHeal(t, 0)
+			s.assertNoHealFor(t, 2*time.Second, tt.name)
+			if tt.lift == nil {
+				return
+			}
+			onOwnerQueue(t, s.petWorld, tt.lift)
+			heals, _ := s.healsUntil(t, s.baby.Now().Add(1500*time.Millisecond))
+			if len(heals) == 0 || heals[0].skill != babyWeakHeal {
+				t.Fatalf("heals %+v once the owner lost its protection, want Heal Trick on the next tick", heals)
+			}
+		})
+	}
+}
+
+// TestBabyPetHealWaitsOutItsReuse: once Heal Trick is cast on the first tick
+// (3 s), it is neither cast nor announced again while its reuse runs, 8 s at
+// the pet's 333 casting speed, though the owner stays below 80% on every tick
+// in between; the first tick after the reuse ends casts it again. While it is
+// on reuse a tick falls through to Greater Heal Trick's roll, which heals an
+// owner below 15%.
+func TestBabyPetHealWaitsOutItsReuse(t *testing.T) {
+	t.Parallel()
+	t.Run("weak heal on reuse", func(t *testing.T) {
+		t.Parallel()
+		s := bootBabyPet(t, 0)
+		s.woundOwner(t, 0.5)
+		s.awaitFirstHeal(t, babyWeakHeal)
+		// The heal lands at 7 s; the owner is kept below 80% after it.
+		heals, casts := s.healsUntil(t, s.started.Add(7500*time.Millisecond))
+		s.holdOwnerAt(t, 0.5)
+		more, moreCasts := s.healsUntil(t, s.started.Add(10500*time.Millisecond))
+		if heals, casts = append(heals, more...), casts+moreCasts; len(heals) != 0 || casts != 0 {
+			t.Fatalf("while Heal Trick was on reuse: heals %+v, %d pet casts; want none", heals, casts)
+		}
+		heals, _ = s.healsUntil(t, s.started.Add(12500*time.Millisecond))
+		if len(heals) == 0 || heals[0].skill != babyWeakHeal {
+			t.Fatalf("heals %+v after the reuse ended, want Heal Trick again", heals)
+		}
+	})
+	t.Run("strong heal while the weak one is on reuse", func(t *testing.T) {
+		t.Parallel()
+		s := bootBabyPet(t, 0)
+		s.woundOwner(t, 0.5)
+		s.awaitFirstHeal(t, babyWeakHeal)
+		s.holdOwnerAt(t, 0.1)
+		heals, _ := s.healsUntil(t, s.started.Add(5500*time.Millisecond))
+		if len(heals) == 0 {
+			t.Fatal("no heal for an owner below 15% while Heal Trick was on reuse, want Greater Heal Trick")
+		}
+		for _, h := range heals {
+			if h.skill != babyStrongHeal {
+				t.Fatalf("heals %+v while Heal Trick was on reuse, want Greater Heal Trick only", heals)
+			}
+		}
+	})
 }
