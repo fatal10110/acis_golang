@@ -2,6 +2,7 @@ package summon
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -19,6 +20,13 @@ func (a *Actor) OwnerObject() (world.Tracked, bool) {
 		return nil, false
 	}
 	return a.owner, true
+}
+
+// RandomConfusionTarget returns a random confusion target known within
+// radius units of the summon, its owner included; see
+// npc.RandomConfusionTarget.
+func (a *Actor) RandomConfusionTarget(radius int) (world.Tracked, bool) {
+	return npc.RandomConfusionTarget(a.world, a, radius, a.Roll)
 }
 
 // BroadcastStatus republishes the summon's vitals to its owner's pet window
