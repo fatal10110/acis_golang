@@ -97,3 +97,40 @@ func assertLivePetMPWriters(t *testing.T, pet petMPWriter) {
 		t.Fatalf("live AddMP(5) = %v leaving MP %v, want 5 leaving %v", got, pet.MPValue(), mp-5)
 	}
 }
+
+// TestDeadPetLevelUpKeepsCorpseVitals pins that a level gained by a pet that
+// died after its kill-reward liveness check leaves its corpse HP and MP
+// alone: PetStatus.addLevel refills through setHp/setMp, which return while
+// the pet is dead. The level itself still rises.
+func TestDeadPetLevelUpKeepsCorpseVitals(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	owner, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner not in world")
+	}
+
+	if got := pet.ReduceMP(10); got != 10 {
+		t.Fatalf("live ReduceMP(10) = %v, want 10", got)
+	}
+	pet.ReduceHP(pet.MaxHPValue()*2, owner.(attackable.Combatant), modelskill.Definition{})
+	if !pet.Dead() {
+		t.Fatal("lethal hit left the pet alive")
+	}
+	level, hp, mp := pet.Level(), pet.HP(), pet.MPValue()
+	if mp >= pet.MaxMPValue() {
+		t.Fatalf("corpse MP %v is already at max %v; the fixture must leave room for a refill", mp, pet.MaxMPValue())
+	}
+
+	pet.AddExpAndSp(2*wolfNextLevelExp, 0)
+	if pet.Level() <= level {
+		t.Fatalf("dead pet level = %d after the exp grant, want above %d", pet.Level(), level)
+	}
+	if pet.HP() != hp || pet.MPValue() != mp {
+		t.Fatalf("dead pet HP/MP = %v/%v after the level-up, want corpse values %v/%v", pet.HP(), pet.MPValue(), hp, mp)
+	}
+	if !pet.Dead() {
+		t.Fatal("level-up revived the pet")
+	}
+}
