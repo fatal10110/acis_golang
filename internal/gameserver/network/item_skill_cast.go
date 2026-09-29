@@ -68,6 +68,11 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		if !l.attemptItemAICast(live, selected, def) {
 			continue
 		}
+		// Past the pre-attempt gate the attached skill is the CAST
+		// intention, started now or queued: it takes the attack's place.
+		if live.combat != nil {
+			live.combat.ReplaceWithCast()
+		}
 		if run != nil || itemAICastBusy(live) {
 			live.deferItemAICast(inv, inst, def, selected, ctrl)
 			sendMagicActionFailed(live)
@@ -200,11 +205,13 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	}, false, false
 }
 
-// finishDeferredItemAICast runs the queued item cast, if any. It passes the
-// pre-attempt gate again first: a queued skill with no final target any
-// more is dropped silently, and one the gate now refuses is answered with
-// the reason alone. During a sit-down or stand-up the cast stays queued for
-// PostureSettled, and it reports true: it is still the next intention.
+// finishDeferredItemAICast runs the queued item cast, if any, and reports
+// whether one was waiting. It passes the pre-attempt gate again first: a
+// queued skill with no final target any more is dropped silently, and one
+// the gate now refuses is answered with the reason alone. Either way the
+// queued cast was the next intention, so it still reports true: the action
+// that just ended does not resume or follow up. During a sit-down or
+// stand-up the cast stays queued for PostureSettled.
 func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 	if live == nil || live.detached() {
 		return false
@@ -216,21 +223,27 @@ func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 	if itemCast == nil {
 		return false
 	}
+	l.resumeItemAICast(live, itemCast)
+	return true
+}
+
+// resumeItemAICast starts a queued item cast taken at its action's end, if
+// it still passes the gates.
+func (l *GameClientLink) resumeItemAICast(live *livePlayer, itemCast *itemAICastIntention) {
 	target := l.skillFinalTarget(live, itemCast.selected, itemCast.skill)
 	if target == nil {
-		return false
+		return
 	}
 	if err := l.castController(live).CanPlayerAttemptItemCast(live.Character, target, itemCast.skill); err != nil {
 		sendMagicCastFailureReason(live, itemCast.skill, err)
-		return false
+		return
 	}
 	tmpl, _ := itemCast.inventory.Templates().Get(itemCast.item.TemplateID)
 	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.selected, itemCast.skill, itemCast.ctrl)
 	if failed || rejected || run == nil {
-		return false
+		return
 	}
 	run()
-	return true
 }
 
 // attemptItemAICast runs one attached skill through the pre-attempt gate

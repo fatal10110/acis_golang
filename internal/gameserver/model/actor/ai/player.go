@@ -40,9 +40,20 @@ type PlayerAttack struct {
 	attack AttackController
 	log    zerolog.Logger
 
-	mu       sync.Mutex
-	target   attackable.Combatant
+	mu     sync.Mutex
+	target attackable.Combatant
+	// deferred marks target as the next intention behind the cast in flight:
+	// it was requested mid-cast, is not thought until the cast ends, and
+	// ResumeAfterCast runs it then.
 	deferred bool
+	// queued marks the last think finding the actor busy with a swing, a bow
+	// reuse or a cast: the attack stays current and is also the next
+	// intention, which the end of a bow shot re-thinks.
+	queued bool
+	// replaced marks a CAST intention holding the slot the attack had.
+	// Target is kept only for a finished nextActionAttack skill to re-engage;
+	// no other think acts on it.
+	replaced bool
 }
 
 // NewPlayerAttack builds an idle player attack intention loop.
@@ -62,14 +73,16 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 // Start sets target as the attack intention and evaluates it once. It
 // reports false when the caller should report the action as failed
 // (the actor is disabled, sitting, the target is lost, the actor is still
-// mid-swing, or the attack was otherwise rejected) and true when the attack
-// was accepted — either a swing just started, or the actor has begun
-// closing distance and will attack once it arrives.
+// mid-swing or mid-cast, or the attack was otherwise rejected) and true when
+// the attack was accepted — either a swing just started, or the actor has
+// begun closing distance and will attack once it arrives.
 //
 // A target the playable attack gate refuses is reported to the player and
 // leaves the current intention untouched. The gate runs only when the
 // request is neither denied nor deferred behind a swing or cast, the order
-// the deny and busy checks take ahead of it.
+// the deny and busy checks take ahead of it. A request made mid-cast or
+// mid-swing is waited out without being thought: no gate, no approach, until
+// the cast or swing ends.
 func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -78,8 +91,13 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 		return false
 	}
 	p.target = target
+	p.deferred, p.queued, p.replaced = false, false, false
 	if p.actor.CastingNow() {
 		p.deferred = true
+		return false
+	}
+	if p.attack.AttackingNow() {
+		p.queued = true
 		return false
 	}
 	accepted, _, err := p.thinkLocked()
@@ -113,28 +131,44 @@ func (p *PlayerAttack) gateRefusesLocked(target attackable.Combatant) bool {
 
 // ResumeAfterCast runs an attack intention that was requested while casting.
 // It reports whether such an intention was waiting, and whether running it
-// sent the intention idle, which the caller answers with ActionFailed.
-func (p *PlayerAttack) ResumeAfterCast() (resumed, idled bool) {
+// is answered with ActionFailed.
+func (p *PlayerAttack) ResumeAfterCast() (resumed, actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.deferred {
 		return false, false
 	}
 	p.deferred = false
-	_, idled, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked()
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
-	return true, idled
+	return true, actionFailed
 }
 
-// DropResumeAfterCast forgets an attack requested while casting, without
-// touching the attack intention itself: a later request queued behind the
-// same cast has replaced it as the next intention.
-func (p *PlayerAttack) DropResumeAfterCast() {
+// ReplaceWithCast records a CAST intention taking the attack's place, current
+// or queued behind a cast: a skill request that starts now, or one queued
+// behind the swing or cast in flight. Think no longer acts on the attack; only
+// FollowUpAfterCast re-engages it. Movement is left alone: the cast owns it.
+func (p *PlayerAttack) ReplaceWithCast() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.deferred = false
+	p.deferred, p.queued = false, false
+	p.replaced = p.target != nil
+}
+
+// FollowUpAfterCast re-engages the attack a finished nextActionAttack skill
+// replaced and thinks it once, reporting whether that is answered with
+// ActionFailed.
+func (p *PlayerAttack) FollowUpAfterCast() (actionFailed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.replaced = false
+	_, actionFailed, err := p.thinkLocked()
+	if err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
+	return actionFailed
 }
 
 // Stop clears the attack intention and stops any movement toward it.
@@ -152,38 +186,60 @@ func (p *PlayerAttack) Target() attackable.Combatant {
 }
 
 // Think re-evaluates the current attack intention once. Safe to call from
-// a movement-arrived or attack-finished hook as well as from Start. It
-// reports whether the intention went idle (the actor can't act, is sitting,
-// lost the target, or can't attack it once in range), which the caller
-// answers with ActionFailed; a busy actor keeps the intention silently. Any
-// broadcast error is logged through SetLogger — Think's own callers are
-// void hooks with no return path of their own.
-func (p *PlayerAttack) Think() (idled bool) {
+// a movement-arrived, attack-finished or cast-finished hook as well as from
+// Start. It reports whether the think is answered with ActionFailed: the
+// intention went idle (the actor can't act, is sitting, lost the target, or
+// can't attack it once in range), or the actor is still busy with a swing, a
+// bow reuse or a cast and the attack waits for it. An attack waiting on a
+// cast, or replaced by one, is not current and is not thought. Any broadcast
+// error is logged through SetLogger — Think's own callers are void hooks
+// with no return path of their own.
+func (p *PlayerAttack) Think() (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	_, idled, err := p.thinkLocked()
+	if p.deferred || p.replaced {
+		return false
+	}
+	_, actionFailed, err := p.thinkLocked()
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
-	return idled
+	return actionFailed
+}
+
+// ThinkQueued re-evaluates the attack only when the last think queued it
+// behind the actor's swing, bow reuse or cast, as the end of a bow shot
+// does; otherwise nothing happens. It reports whether the think is answered
+// with ActionFailed.
+func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.queued || p.deferred || p.replaced {
+		return false
+	}
+	_, actionFailed, err := p.thinkLocked()
+	if err != nil {
+		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
+	}
+	return actionFailed
 }
 
 // thinkLocked runs the full attack-intention decision and reports whether a
-// swing started or the approach began (accepted) and whether the intention
-// was dropped (idled). Callers hold mu for its entire body so a concurrent
-// Start/Think can't interleave with it and reach DoAttack twice for the same
-// swing.
+// swing started or the approach began (accepted) and whether the think is
+// answered with ActionFailed. Callers hold mu for its entire body so a
+// concurrent Start/Think can't interleave with it and reach DoAttack twice
+// for the same swing.
 //
 // The first gate is the AI-action one, not the attack one: a flying or
 // fake-dead actor still closes distance first and only fails the attack
-// once in range, through CanAttack.
-func (p *PlayerAttack) thinkLocked() (accepted, idled bool, err error) {
+// once in range, through CanAttack. Only once in range and stopped does a
+// swing, bow reuse or cast in flight hold the attack: it stays current,
+// becomes the next intention too, and is answered with ActionFailed.
+func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
 	if p.target == nil {
 		return false, false, nil
 	}
-	if p.actor.CastingNow() {
-		return false, false, nil
-	}
+	p.queued = false
 
 	if p.actor.DenyAIAction() || !p.actor.Standing() || p.targetLost(p.target) {
 		p.stopLocked()
@@ -195,8 +251,11 @@ func (p *PlayerAttack) thinkLocked() (accepted, idled bool, err error) {
 		return true, false, err
 	}
 
-	if p.attack.BowCoolingDown() || p.attack.AttackingNow() {
-		return false, false, nil
+	p.move.Stop()
+
+	if p.attack.BowCoolingDown() || p.attack.AttackingNow() || p.actor.CastingNow() {
+		p.queued = true
+		return false, true, nil
 	}
 
 	if !p.attack.CanAttack(p.target) {
@@ -204,14 +263,13 @@ func (p *PlayerAttack) thinkLocked() (accepted, idled bool, err error) {
 		return false, true, nil
 	}
 
-	p.move.Stop()
 	p.attack.DoAttack(p.target)
 	return true, false, nil
 }
 
 func (p *PlayerAttack) stopLocked() {
 	p.target = nil
-	p.deferred = false
+	p.deferred, p.queued, p.replaced = false, false, false
 	p.move.Stop()
 }
 

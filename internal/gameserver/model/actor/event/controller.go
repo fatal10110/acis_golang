@@ -34,6 +34,12 @@ type AttackStarted struct{}
 // a swing.
 type AttackFinished struct{ BowReuse bool }
 
+// BowShotFinished reports a player's bow shot ending while the bow's reuse
+// delay still runs; AttackFinished with BowReuse follows once the reuse
+// ends. A shot with no reuse delay reports that AttackFinished alone. Only
+// player attack controllers emit it.
+type BowShotFinished struct{}
+
 // AttackRethink reports a hostile NPC's attack reaching a point where its AI
 // re-runs desire selection: the hit animation ending or a bow shot landing.
 // A finished swing reports AttackFinished instead. Only NPC attack
@@ -90,6 +96,7 @@ func (SkillMasteryProc) event()      {}
 func (AttackStarted) event()         {}
 func (AttackFinished) event()        {}
 func (AttackRethink) event()         {}
+func (BowShotFinished) event()       {}
 func (HitDealt) event()              {}
 func (HitLanded) event()             {}
 func (AttackStanceRequested) event() {}
