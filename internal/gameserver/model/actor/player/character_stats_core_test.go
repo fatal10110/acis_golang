@@ -509,6 +509,61 @@ func TestReduceHPRollsCastBreakOnZeroDamage(t *testing.T) {
 	}
 }
 
+// deniedPlayableAttacker is another playable whose damage permission is
+// revoked.
+type deniedPlayableAttacker struct {
+	reduceHPPlayableAttacker
+}
+
+func (deniedPlayableAttacker) CanGiveDamage() bool { return false }
+
+// TestReduceHPZeroDamageReportsStatusOnlyForPlayableCPHit pins which zero
+// skill hits write anything: every one ends the sleep and rolls the cast
+// break, but only another permitted playable's hit that goes through CP
+// rewrites CP unchanged and reports the status, once. An NPC's, the
+// character's own, a damage-denied attacker's and a direct-to-HP zero hit
+// leave CP and HP alone and report nothing.
+func TestReduceHPZeroDamageReportsStatusOnlyForPlayableCPHit(t *testing.T) {
+	tests := []struct {
+		name       string
+		attacker   func(c *Character) attackable.Combatant
+		def        modelskill.Definition
+		broadcasts int
+	}{
+		{"other playable", func(*Character) attackable.Combatant { return reduceHPPlayableAttacker{} }, modelskill.Definition{}, 1},
+		{"npc", func(*Character) attackable.Combatant { return &reduceHPNpcAttacker{} }, modelskill.Definition{}, 0},
+		{"direct to HP", func(*Character) attackable.Combatant { return reduceHPPlayableAttacker{} }, modelskill.Definition{DirectHPDamage: true}, 0},
+		{"self", func(c *Character) attackable.Combatant { return c }, modelskill.Definition{}, 0},
+		{"damage denied", func(*Character) attackable.Combatant { return deniedPlayableAttacker{} }, modelskill.Definition{}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := liveCharacter(1, combatTemplate(), combatItems())
+			c.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 400, MaxCP: 200, CurrentCP: 150})
+			attachTestLive(t, c)
+			addCharacterEffect(t, c, "Sleep")
+			spy := &spyCastController{casting: true, magic: true}
+			c.SetCastController(spy)
+			rec := recordEvents(c)
+
+			c.ReduceHP(0, tt.attacker(c), tt.def)
+
+			if got := countVitals(rec); got != tt.broadcasts {
+				t.Fatalf("status broadcasts = %d, want %d", got, tt.broadcasts)
+			}
+			if c.CP() != 150 || c.HP() != 400 {
+				t.Fatalf("cp/hp = %v/%v, want 150/400 unchanged", c.CP(), c.HP())
+			}
+			if c.Sleeping() {
+				t.Fatal("Sleeping() = true after a zero hit, want the sleep effect stopped")
+			}
+			if len(spy.damageCalls) != 1 || spy.damageCalls[0].damage != 0 {
+				t.Fatalf("InterruptCastOnDamage calls = %+v, want one at damage 0", spy.damageCalls)
+			}
+		})
+	}
+}
+
 // TestReduceHPWithoutCastBreakSkipsOnlyTheBreakRoll pins the one-roll-per-hit
 // contract DRAIN relies on: ReduceHP rolls the cast break once on the raw
 // damage (before CP absorbs any of it), while ReduceHPWithoutCastBreak — used
