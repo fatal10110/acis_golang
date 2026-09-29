@@ -61,6 +61,7 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 		Effects:     l.castEffects(),
 		Destroyer:   l.inventory,
 		IsPet:       true,
+		Target:      pet.CurrentTarget(),
 	})
 	defer l.broadcastPetFrame(live, pet, func() wire.Frame {
 		return serverpackets.FrameStatusUpdate(pet.ObjectID(), []serverpackets.StatusAttribute{

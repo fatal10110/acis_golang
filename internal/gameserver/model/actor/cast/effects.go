@@ -99,8 +99,10 @@ func resolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved
 	if !ok || !handler.CanCast(caster, selected, &def, false) {
 		return nil, false
 	}
+	return nonEmpty(handler.Targets(caster, selected, &def))
+}
 
-	affected := handler.Targets(caster, selected, &def)
+func nonEmpty(affected []skilltarget.Actor) ([]skilltarget.Actor, bool) {
 	if len(affected) == 0 {
 		return nil, false
 	}
@@ -118,19 +120,31 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resol
 	return dispatchEffects(handlers, caster, affected, def, item)
 }
 
-// ResolveAffected exposes the same target-resolution surface
-// applyEffectsResult uses, for a caller that must broadcast the affected
-// set (e.g. MagicSkillLaunched) at launch and then reuse that exact,
-// already-resolved list — not a fresh resolution — when Hit dispatches
-// effects, matching CreatureCast.java: onMagicLaunch assigns
+// ResolveAffected resolves def's affected set at an AI cast's launch, for a
+// caller that must broadcast it (MagicSkillLaunched) and then reuse that
+// exact list — not a fresh resolution — when Hit dispatches effects,
+// matching CreatureCast.java: onMagicLaunch assigns
 // `_targets = _skill.getTargetList(...)` once (:232) and the hit timer's
 // `callSkill(_skill, _targets, _item)` (:291, NpcCast.java:52) reuses that
-// same field rather than re-deriving it. ok is false if resolution failed
-// for any reason (unresolvable caster/target, no registered handler,
-// CanCast rejection, or an empty affected set); affected is nil in that
-// case.
+// same field rather than re-deriving it. The target conditions are not
+// judged again here: a playable caster's were checked when the cast
+// committed, with its CTRL state, and an NPC caster's are never checked.
+// ok is false if resolution failed for any reason (unresolvable
+// caster/target, no registered handler, or an empty affected set);
+// affected is nil in that case.
 func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
-	return resolveAffected(handlers, caster, resolved, def)
+	if caster == nil || handlers.Targets == nil {
+		return nil, false
+	}
+	selected, ok := resolved.(skilltarget.Actor)
+	if !ok {
+		return nil, false
+	}
+	handler, ok := handlers.Targets.Handler(def.Target)
+	if !ok {
+		return nil, false
+	}
+	return nonEmpty(handler.Targets(caster, selected, &def))
 }
 
 // ApplyResolvedEffectsResult dispatches def's effects to affected — an

@@ -11,7 +11,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // magicStrikeHitTime leaves the magic strike's interrupt window open well
@@ -168,11 +167,9 @@ func TestMonsterSkillHitBreaksPetMagicCast(t *testing.T) {
 				Offensive: true, CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 				SkillType: "PDAM", Power: 100,
 			}}))
-			// The owner's PvP flag keeps the NPC launch's target re-check
-			// from dropping the unflagged pet (#2685); the reference
-			// resolves an NPC's ONE target list with no conditions.
-			owner, _ := h.srv.State.Player(h.ownerID)
-			owner.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+			// The owner stays unflagged: the reference resolves an NPC's
+			// ONE target list with no conditions, so the strike reaches
+			// the pet regardless.
 			drainUntilQuiet(t, h.client)
 			startWolfStrike(t, h)
 

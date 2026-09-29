@@ -41,6 +41,9 @@ var (
 	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
 	// (crowd control, or Java's Duel-defeat lock once that lands).
 	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
+	// ErrCantSeeTarget means a ranged skill's caster has no line of sight to
+	// its target when the cast commits.
+	ErrCantSeeTarget = errors.New("cast: can't see target")
 	// ErrGroundTargetUnset means a GROUND skill was requested before any
 	// RequestExMagicSkillUseGround recorded a signet point, matching
 	// PlayerCast.canAttemptCast's Location.DUMMY_LOC rejection

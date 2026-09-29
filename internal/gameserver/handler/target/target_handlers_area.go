@@ -33,8 +33,9 @@ func (areaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, c
 }
 
 // areaCastRejection gates an offensive area skill on its aimed target: a
-// playable the caster may not hit offensively, or a target it may not attack
-// (without a forced attack, unless CTRL is held), is an invalid target.
+// playable the caster's acting player may not hit offensively, or a target it
+// may not attack (without a forced attack, unless CTRL is held), is an
+// invalid target.
 func areaCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	if skill == nil || !skill.Offensive {
 		return CastRejectNone
@@ -42,7 +43,7 @@ func areaCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl 
 	if !aimedAreaTarget(caster, target) {
 		return CastRejectSilent
 	}
-	if isPlayable(target) && !caster.CanCastOnPlayable(target, skill, ctrl, true) {
+	if isPlayable(target) && playableOffenseRefused(caster, target, skill, ctrl) {
 		return CastRejectInvalidTarget
 	}
 	return aimedAttackRejection(caster, target, ctrl)

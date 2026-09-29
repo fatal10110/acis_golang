@@ -111,18 +111,28 @@ func TestOwnerPetSkillOnDeadOwnerIsRefusedByName(t *testing.T) {
 	})
 }
 
-// TestOwnerPetSkillOnAnotherTargetIsInvalid aims the OWNER_PET skill at a
-// monster: the owner reads INVALID_TARGET and no cast starts.
-func TestOwnerPetSkillOnAnotherTargetIsInvalid(t *testing.T) {
+// TestOwnerPetSkillAimedElsewhereCastsOnOwner aims the OWNER_PET skill at a
+// monster. The cast intention stores the skill's final target
+// (Intention.updateAsCast -> getFinalTarget), which for OWNER_PET is the
+// owner, so the pet casts on its owner whatever was selected.
+func TestOwnerPetSkillAimedElsewhereCastsOnOwner(t *testing.T) {
 	t.Parallel()
 	h, petActor, _ := bootOwnerPetWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, h.client)
 
 	runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(ownerPetSkillID, hostile, false) })
-	assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(frame []byte) {
-		assertStaticSystemMessage(t, frame, serverpackets.SystemMessageInvalidTarget)
-	})
+	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "pet MagicSkillUse")
+	for _, frame := range frames {
+		if frame[0] == serverpackets.OpcodeSystemMessage {
+			t.Fatalf("OWNER_PET cast aimed at a monster was refused: opcodes %x", frameOpcodes(frames))
+		}
+	}
+	r := wire.NewReader(frames[len(frames)-1][1:])
+	if caster, target := r.ReadInt32(), r.ReadInt32(); caster != petActor.ObjectID() || target != h.ownerID {
+		t.Fatalf("MagicSkillUse caster/target = %d/%d, want pet %d onto owner %d", caster, target, petActor.ObjectID(), h.ownerID)
+	}
+	drainUntilQuiet(t, h.client)
 }
 
 // assertSystemMessageSkill checks a SystemMessage carrying one skill-name

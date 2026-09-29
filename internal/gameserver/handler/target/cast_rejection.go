@@ -139,13 +139,17 @@ func unlockableCastRejection(target Actor) CastRejection {
 	return CastRejectInvalidTarget
 }
 
+// oneCastRejection judges the playable relationship rules (the social
+// policy, the forced-attack relation and the Olympiad state) against the
+// caster's acting player, so a summon's cast follows its owner's.
 func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	if target == nil || skill == nil {
 		return CastRejectNone
 	}
+	player, _ := actingPlayerOf(caster)
 	if !skill.Offensive {
 		if isPlayable(target) {
-			if !caster.CanCastOnPlayable(target, skill, ctrl, false) {
+			if !player.CanCastOnPlayable(target, skill, ctrl, false) {
 				return CastRejectInvalidTarget
 			}
 			return CastRejectNone
@@ -159,13 +163,13 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		return CastRejectInvalidTarget
 	}
 	if isPlayable(target) {
-		if !caster.CanCastOnPlayable(target, skill, ctrl, true) {
+		if playableOffenseRefused(caster, target, skill, ctrl) {
 			return CastRejectInvalidTarget
 		}
-		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(caster)) {
+		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(player)) {
 			return CastRejectInvalidTarget
 		}
-		if caster.OlympiadMode() && !caster.OlympiadStarted() {
+		if player.OlympiadMode() && !player.OlympiadStarted() {
 			return CastRejectInvalidTarget
 		}
 		if caster.InPeaceZone() {
@@ -188,4 +192,16 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		}
 	}
 	return CastRejectNone
+}
+
+// playableOffenseRefused reports whether caster's acting player may not
+// affect the playable target offensively: never its own side (a summon its
+// owner, a player their own summon), whatever CTRL says, and otherwise as
+// its social policy decides.
+func playableOffenseRefused(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
+	player, _ := actingPlayerOf(caster)
+	if targetPlayer, _ := actingPlayerOf(target); sameCreature(targetPlayer, player) {
+		return true
+	}
+	return !player.CanCastOnPlayable(target, skill, ctrl, true)
 }

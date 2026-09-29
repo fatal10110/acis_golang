@@ -40,13 +40,19 @@ type SummonMoveController interface {
 }
 
 // SummonCastController is the cast controller a summon AI drives: the shared
-// AI cast gates plus the playable target conditions checked last, after the
-// cost gates.
+// AI cast gates plus the playable ones, each reporting its refusal to the
+// owner.
 type SummonCastController interface {
 	CastController
-	// MeetsCastConditions applies ref's target-type conditions against
-	// target, reporting any failure to the owner.
-	MeetsCastConditions(target attackable.Combatant, ref skill.Ref, ctrl bool) bool
+	// FinalTarget resolves the creature ref is cast on given the commanded
+	// target (nil when there is none), or nil when the skill has none.
+	FinalTarget(target attackable.Combatant, ref skill.Ref) attackable.Combatant
+	// AttemptCast is CanAttempt, reporting a refusal to the owner.
+	AttemptCast(target attackable.Combatant, ref skill.Ref) bool
+	// CanCastPlayable runs every gate checked as the cast commits (costs,
+	// line of sight, skill conditions, then the target conditions judged
+	// with ctrl), reporting the first failure to the owner.
+	CanCastPlayable(target attackable.Combatant, ref skill.Ref, ctrl bool) bool
 }
 
 // Summon drives one pet or servitor's owner-directed intentions.
@@ -157,17 +163,24 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 	return accepted
 }
 
-// TryToCast sets target/ref as the cast intention and evaluates it once,
-// mirroring TryToAttack's shape for an owner-commanded special-skill cast.
-// ctrl is the command's forced-use modifier, read by the target conditions.
+// TryToCast sets ref, aimed at its final target, as the cast intention and
+// evaluates it once, mirroring TryToAttack's shape for an owner-commanded
+// special-skill cast. target is the commanded one, nil when there is none;
+// a skill with no final target for it is dropped. ctrl is the command's
+// forced-use modifier, read by the target conditions.
+//
+// A skill still cooling down is reported to the owner here, on the command,
+// and not again by the periodic think: the reference has no periodic think
+// for a summon, so re-reporting it each tick would repeat the message.
 func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if target == nil || s.actor.DenyAIAction() || s.cast == nil {
+	if s.actor.DenyAIAction() || s.cast == nil {
 		return false
 	}
-	if !s.cast.CanAttempt(target, ref) {
+	target = s.cast.FinalTarget(target, ref)
+	if target == nil || !s.cast.AttemptCast(target, ref) {
 		return false
 	}
 	if s.busyLocked() {
@@ -496,7 +509,7 @@ func (s *Summon) thinkCastLocked() (bool, error) {
 		}
 	}
 
-	if !s.cast.CanCast(target, ref) || !s.cast.MeetsCastConditions(target, ref, s.current.ctrl) {
+	if !s.cast.CanCastPlayable(target, ref, s.current.ctrl) {
 		s.current = intention{kind: IntentionIdle}
 		if target.ObjectID() != s.actor.ObjectID() {
 			s.actor.BroadcastMoveToPawn(target)
