@@ -1079,6 +1079,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.AutoAttackStopped{},
 		event.StanceChanged{},
 		event.FakeDeathRevived{},
+		event.PostureSettled{},
 		event.EffectIconsChanged{},
 		event.AbnormalEffectChanged{},
 		event.MagicSkillUse{},
