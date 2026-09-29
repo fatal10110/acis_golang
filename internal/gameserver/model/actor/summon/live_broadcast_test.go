@@ -108,7 +108,7 @@ func TestOwnerStillLinkedReflectsActiveSummonRegistration(t *testing.T) {
 		t.Fatal("OwnerStillLinked() = false with active registration, want true")
 	}
 
-	state.RemoveSummon(owner.ObjectID())
+	state.RemoveSummon(owner.ObjectID(), actor)
 	if actor.OwnerStillLinked() {
 		t.Fatal("OwnerStillLinked() = true after owner cleared summon, want false")
 	}

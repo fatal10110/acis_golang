@@ -292,6 +292,24 @@ func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 	return nil
 }
 
+func (s *fakeItemStore) DeleteOwned(_ context.Context, ownerID, objectID int32) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for bucket, items := range s.items {
+		for i, existing := range items {
+			if existing.ObjectID != objectID {
+				continue
+			}
+			if existing.OwnerID != ownerID {
+				return false, nil
+			}
+			s.items[bucket] = append(items[:i], items[i+1:]...)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 type fakeShortcutStore struct {
 	mu             sync.Mutex
 	byOwner        map[int32][]shortcut.Shortcut

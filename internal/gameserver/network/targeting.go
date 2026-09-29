@@ -222,7 +222,7 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 	if !ok || live == nil {
 		return false
 	}
-	if s.OwnerID() == live.ObjectID() {
+	if s.ShownAsOwnedBy(live.ObjectID()) {
 		if ctrl {
 			l.attackLiveTarget(live, s)
 		} else {

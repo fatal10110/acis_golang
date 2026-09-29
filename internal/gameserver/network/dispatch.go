@@ -49,6 +49,7 @@ type itemStore interface {
 	SaveState(ctx context.Context, st item.InstanceState) error
 	UpdateState(ctx context.Context, st item.InstanceState) error
 	Delete(ctx context.Context, objectID int32) error
+	DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error)
 }
 
 type shortcutStore interface {

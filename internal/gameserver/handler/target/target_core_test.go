@@ -486,7 +486,9 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		failure CastRejection
 	}{
 		{"no corpse", &targetActor{id: 2, kind: actor.KindNPC}, &modelskill.Definition{}, false, CastRejectInvalidTarget},
-		{"playable corpse", &targetActor{id: 3, kind: actor.KindPlayer, corpse: true}, &modelskill.Definition{}, false, CastRejectInvalidTarget},
+		{"pet corpse", &targetActor{id: 3, kind: actor.KindSummon, pet: true, corpse: true}, &modelskill.Definition{}, false, CastRejectInvalidTarget},
+		{"servitor corpse", &targetActor{id: 14, kind: actor.KindSummon, corpse: true}, &modelskill.Definition{}, true, CastRejectNone},
+		{"too old servitor corpse", &targetActor{id: 15, kind: actor.KindSummon, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CastRejectCorpseTooOld},
 		{"mob corpse, default skill", &targetActor{id: 4, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{}, true, CastRejectNone},
 		{"harvest on monster corpse", &targetActor{id: 5, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CastRejectNone},
 		{"harvest on attackable guard corpse", &targetActor{id: 6, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CastRejectHarvestNotMonster},
