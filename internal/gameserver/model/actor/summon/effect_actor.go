@@ -38,12 +38,15 @@ func (a *Actor) BroadcastStatus() {
 }
 
 // AbortAll stops the summon's movement, attack and cast and sends it idle
-// (see TryToIdle), then clears its target when resetTarget is set. None of
-// it is client-visible beyond the stop broadcasts the controllers already
-// send.
+// (see TryToIdle), then clears its target when resetTarget is set. It is the
+// start of an effect taking hold, so a cast it stops that had replaced an
+// attack resumes it before that effect's flags are raised: a summon still in
+// reach swings once more (see effectHeld and ai.Summon.AbortAllForEffect).
 func (a *Actor) AbortAll(resetTarget bool) {
 	if a.brain != nil {
-		a.brain.AbortAll()
+		a.effectAborts.Add(1)
+		a.brain.AbortAllForEffect()
+		a.effectAborts.Add(-1)
 	}
 	a.TryToIdle()
 	if resetTarget {
@@ -105,6 +108,12 @@ func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
 	if a.aiDeniedBeforeEffect() {
 		return
 	}
+	// A flee asked for mid-swing (the swing a fear's abort resumes) waits
+	// for it, and by then the fear holds the summon: it never runs, and
+	// the swing's end sends it idle (see FinishedAttack).
+	if a.brain.AttackingNow() {
+		return
+	}
 	if a.MovementDisabled() {
 		a.TryToIdle()
 		return
@@ -116,10 +125,19 @@ func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
 // aiDeniedBeforeEffect is DenyAIAction limited to effects whose on-start
 // hook has completed; see effect.List.StartedAffected.
 func (a *Actor) aiDeniedBeforeEffect() bool {
-	a.stateMu.RLock()
-	paralyzed := a.paralyzed
-	a.stateMu.RUnlock()
-	return a.AlikeDead() || paralyzed || a.Teleporting() || a.effects.StartedAffected(effect.AIDenyFlags)
+	return a.AlikeDead() || a.paralyzedLock() || a.Teleporting() || a.effects.StartedAffected(effect.AIDenyFlags)
+}
+
+// effectHeld reports whether a held effect carrying any flag in mask
+// affects the summon. While AbortAll runs, only effects whose on-start hook
+// has completed count: the effect calling it raises its own flags once that
+// hook returns, so the attack a stopped cast resumes is judged as the summon
+// stood before that effect landed (see effect.List.StartedAffected).
+func (a *Actor) effectHeld(mask effect.Flag) bool {
+	if a.effectAborts.Load() > 0 {
+		return a.effects.StartedAffected(mask)
+	}
+	return a.effects.IsAffected(mask)
 }
 
 // BluffExempt reports whether bluff cannot turn the summon: siege summons

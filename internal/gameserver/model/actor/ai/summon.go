@@ -75,6 +75,10 @@ type Summon struct {
 	// caller of AbortAll settles the summon's intention itself, so a cast
 	// end it causes moves nothing on (see CastStopped).
 	aborting int
+	// effectAborting counts the AbortAllForEffect calls stopping the cast
+	// right now; the cast end they cause only resumes a replaced attack
+	// (see CastStopped).
+	effectAborting int
 }
 
 // NewSummon builds an idle summon AI loop.
@@ -300,26 +304,33 @@ func (s *Summon) StopAttack() { s.attack.Stop() }
 // AbortAll stops movement, the attack cycle and any in-flight cast, in that
 // order. Intentions are left as they are, the stopped cast's end included:
 // the caller decides where the summon goes next.
-func (s *Summon) AbortAll() {
+func (s *Summon) AbortAll() { s.abortAll(&s.aborting) }
+
+// AbortAllForEffect is AbortAll for an effect taking hold of the summon
+// (stun, sleep, fear, ...). The stopped cast's end drops any queued
+// intention and, when the cast had replaced an attack, resumes that attack
+// at once, judged by the caller as the summon stood before the effect: a
+// summon still in reach starts one more swing, which FinishedAttack ends
+// with the summon idle. Anything else is left to the caller, as AbortAll.
+func (s *Summon) AbortAllForEffect() { s.abortAll(&s.effectAborting) }
+
+func (s *Summon) abortAll(counter *int) {
 	s.mu.Lock()
 	cast := s.cast
 	s.mu.Unlock()
 	s.move.Stop()
 	s.attack.Stop()
-	if cast != nil {
-		s.stopCastAborting(cast)
+	if cast == nil {
+		return
 	}
-}
-
-// stopCastAborting stops cast with aborting raised, so the cast end it
-// reports synchronously is left alone by CastStopped.
-func (s *Summon) stopCastAborting(cast SummonCastController) {
+	// counter is raised while the cast is stopped, so the cast end it
+	// reports synchronously is handled by CastStopped as its caller asks.
 	s.mu.Lock()
-	s.aborting++
+	*counter++
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
-		s.aborting--
+		*counter--
 		s.mu.Unlock()
 	}()
 	cast.Stop()
@@ -393,10 +404,11 @@ func (s *Summon) Think() {
 
 // FinishedAttack runs the queued intention once a swing ends, replacing the
 // attack. With none queued, the current intention carries on, except an
-// attack on a target the summon cannot keep attacking: then the summon goes idle and
-// reports true: following follow when it is non-nil (as FollowInstead),
-// otherwise standing still (as TryToIdle). The idle is decided and applied
-// under one hold of mu, as in FinishedCasting.
+// attack the summon can no longer act on, or on a target it cannot keep
+// attacking: then the summon goes idle and reports true: following follow
+// when it is non-nil (as FollowInstead), otherwise standing still (as
+// TryToIdle). The idle is decided and applied under one hold of mu, as in
+// FinishedCasting.
 func (s *Summon) FinishedAttack(follow attackable.Combatant) (idled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -404,7 +416,8 @@ func (s *Summon) FinishedAttack(follow attackable.Combatant) (idled bool) {
 		s.thinkLocked()
 		return false
 	}
-	if s.current.kind != IntentionAttack || canKeepAttacking(s.actor, s.current.target) {
+	if s.current.kind != IntentionAttack ||
+		(!s.actor.DenyAIAction() && canKeepAttacking(s.actor, s.current.target)) {
 		s.thinkLocked()
 		return false
 	}
@@ -430,7 +443,11 @@ func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 }
 
 // CastStopped is FinishedCasting for a cast stopped before it completed. A
-// cast AbortAll stopped moves nothing on and reports handled false.
+// cast AbortAll stopped moves nothing on and reports handled false. A cast
+// AbortAllForEffect stopped drops the queued intention and resumes only an
+// attack the cast replaced, then reports handled false as well: the stop of
+// the attack cycle that precedes it already sent the summon idle while its
+// cast was in flight, and the effect's caller sends it idle again.
 //
 // A queued cast is dropped rather than started: the reference reports a
 // stopped cast to the AI before it clears its casting flag, so the queued
@@ -441,6 +458,14 @@ func (s *Summon) CastStopped(follow attackable.Combatant) (idled, handled bool) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.aborting > 0 {
+		return false, false
+	}
+	if s.effectAborting > 0 {
+		s.next = intention{}
+		if s.current.kind == IntentionIdle && s.previous.kind == IntentionAttack {
+			s.setCurrentLocked(s.previous)
+			s.thinkLocked()
+		}
 		return false, false
 	}
 	if s.next.kind == IntentionCast {

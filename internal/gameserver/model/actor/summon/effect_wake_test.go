@@ -22,6 +22,7 @@ func (*thinkCountingAI) FinishedCasting(attackable.Combatant) bool              
 func (*thinkCountingAI) CastStopped(attackable.Combatant) (bool, bool)             { return false, false }
 func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref, bool) bool { return false }
 func (*thinkCountingAI) AbortAll()                                                 {}
+func (*thinkCountingAI) AbortAllForEffect()                                        {}
 func (*thinkCountingAI) FollowInstead(attackable.Combatant)                        {}
 func (*thinkCountingAI) TryToMoveTo(location.Location) bool                        { return false }
 func (*thinkCountingAI) StepAside(location.Location) bool                          { return false }

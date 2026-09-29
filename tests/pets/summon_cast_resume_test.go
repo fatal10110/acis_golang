@@ -131,19 +131,61 @@ func TestBrokenPetCastWithoutAttackFollowsOwner(t *testing.T) {
 	h.requirePetCatchesUp(t, petActor, "pet following its owner once its strike broke")
 }
 
-// TestStunnedPetCastAfterAttackDoesNotResume stuns a pet whose strike
-// replaced its attack. The stun's abort sends the pet idle as it always
-// has: the stopped strike resumes nothing, and the pet stops swinging.
-func TestStunnedPetCastAfterAttackDoesNotResume(t *testing.T) {
+// TestCrowdControlledPetCastAfterAttackSwingsOnce lands a crowd-control
+// effect on a pet whose strike replaced its attack. The effect's start runs
+// Creature.abortAll before its flag is raised (EffectList.addEffectFromQueue
+// calls onStart ahead of computeEffectFlags), so the stopped strike's
+// FINISHED_CASTING resumes the attack and the pet, still in reach, starts one
+// swing: observers see the cancel animation, then that swing, whose hit
+// lands. The tryToIdle calls that follow wait the swing out; once it ends the
+// effect's flag is up, so the pet goes idle and swings no more. A fear's
+// first flee, asked for mid-swing, is queued behind it and denied by then.
+func TestCrowdControlledPetCastAfterAttackSwingsOnce(t *testing.T) {
 	t.Parallel()
-	h, petActor, _ := castAfterAttack(t, 99)
-	landOnPet(t, h, petActor, "Stun")
+	for _, name := range []string{"Stun", "Sleep", "Paralyze", "Fear"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			h, petActor, hostile := castAfterAttack(t, 99)
+			px, py, _ := petActor.Position()
+			landOnPet(t, h, petActor, name)
+			hpAtEffect := hostile.HP()
 
-	if n := petAttacks(advanceCollecting(t, h, 3*time.Second), petActor); n != 0 {
-		t.Fatalf("stunned pet swings = %d, want none", n)
-	}
-	if got := petActor.Intent(); got != summon.IntentFollowOwner {
-		t.Fatalf("pet intent = %v after the stun, want follow-owner", got)
+			frames := drainFrames(t, h.client)
+			canceled, attacked := -1, -1
+			for i, frame := range frames {
+				switch frame[0] {
+				case serverpackets.OpcodeMagicSkillCanceled:
+					if canceled < 0 && wire.NewReader(frame[1:]).ReadInt32() == petActor.ObjectID() {
+						canceled = i
+					}
+				case serverpackets.OpcodeAttack:
+					if attacked < 0 && petAttacks(frames[i:i+1], petActor) == 1 {
+						attacked = i
+					}
+				}
+			}
+			if canceled < 0 || attacked < 0 || canceled >= attacked {
+				t.Fatalf("MagicSkillCanceled at %d, pet Attack at %d; want the cancel, then one swing: opcodes %x",
+					canceled, attacked, frameOpcodes(frames))
+			}
+
+			later := advanceCollecting(t, h, 3*time.Second)
+			if n := petAttacks(frames, petActor) + petAttacks(later, petActor); n != 1 {
+				t.Fatalf("pet swings once the %s landed = %d, want exactly the resumed one", name, n)
+			}
+			if hp := hostile.HP(); hp >= hpAtEffect {
+				t.Fatalf("monster HP = %v after the resumed swing, want below %v: its hit lands", hp, hpAtEffect)
+			}
+			if petActor.IsAttackingNow() || petActor.CastingNow() {
+				t.Fatalf("pet attacking %v, casting %v after its swing; want neither", petActor.IsAttackingNow(), petActor.CastingNow())
+			}
+			if got := petActor.Intent(); got != summon.IntentFollowOwner {
+				t.Fatalf("pet intent = %v after the %s, want follow-owner", got, name)
+			}
+			if x, y, _ := petActor.Position(); x != px || y != py {
+				t.Fatalf("pet moved from (%d,%d) to (%d,%d) under the %s, want it held in place", px, py, x, y, name)
+			}
+		})
 	}
 }
 

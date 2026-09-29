@@ -44,12 +44,16 @@ type AI interface {
 	// critical section, following follow when non-nil, and reports true.
 	FinishedCasting(follow attackable.Combatant) bool
 	// CastStopped is FinishedCasting for a cast stopped before it
-	// completed. A cast AbortAll stopped moves nothing on and reports
-	// handled false.
+	// completed. A cast AbortAll stopped moves nothing on, and one
+	// AbortAllForEffect stopped only resumes the attack it replaced; both
+	// report handled false.
 	CastStopped(follow attackable.Combatant) (idled, handled bool)
 	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()
+	// AbortAllForEffect is AbortAll for an effect taking hold: a stopped
+	// cast that had replaced an attack resumes it.
+	AbortAllForEffect()
 	// FollowInstead makes following target the current intention.
 	FollowInstead(attackable.Combatant)
 	// TryToMoveTo makes walking to dest the current intention and starts
@@ -183,7 +187,9 @@ type Actor struct {
 	// followOff is set while the owner has told the summon to stop following
 	// it; the zero value follows. Atomic because an effect landing on the
 	// summon reads it from the queue of whoever applied the effect.
-	followOff          atomic.Bool
+	followOff atomic.Bool
+	// effectAborts counts the AbortAll calls in progress; see effectHeld.
+	effectAborts       atomic.Int32
 	belowUnsummonLimit bool
 
 	timeLostIdle     int
