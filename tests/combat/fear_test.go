@@ -394,8 +394,10 @@ func TestFearOnRootedPlayerIsRefusedInPlace(t *testing.T) {
 // TestImmobileUntilAttackedExitStopsItsSkillEffects pins the exit of an
 // ImmobileUntilAttacked effect: it removes every other effect its own skill
 // applied, so both icons go and each removal is announced, the expired one as
-// worn off and the one cut short as disappeared. The order of the two
-// announcements is not pinned yet (#2630).
+// worn off and the one cut short as disappeared. The worn-off message comes
+// first: the effect's own removal is announced before its exit hook stops
+// the sibling (AbstractEffect.java:308-320, EffectImmobileUntilAttacked.java
+// onActionTime removing itself before stopSkillEffects).
 func TestImmobileUntilAttackedExitStopsItsSkillEffects(t *testing.T) {
 	t.Parallel()
 	const skillID = 4501
@@ -444,10 +446,9 @@ func TestImmobileUntilAttackedExitStopsItsSkillEffects(t *testing.T) {
 	if len(player.EffectList().All()) != 0 {
 		t.Fatalf("held effects after exit = %d, want none of the skill's effects left", len(player.EffectList().All()))
 	}
-	slices.Sort(messages)
 	want := []int32{int32(serverpackets.SystemMessageS1HasWornOff), int32(serverpackets.SystemMessageEffectS1Disappeared)}
 	if !slices.Equal(messages, want) {
-		t.Fatalf("system messages = %v, want one worn off and one disappeared %v", messages, want)
+		t.Fatalf("system messages = %v, want worn off then disappeared %v", messages, want)
 	}
 }
 

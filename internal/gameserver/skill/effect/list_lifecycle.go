@@ -51,18 +51,22 @@ func (l *List) Add(e *Effect) {
 }
 
 // Remove drops e from the list and activates the next member of its stack
-// group when one exists.
+// group when one exists. The owner sees the stat removal, the next member's
+// activation and the expiry message, then the icon refresh, and only then
+// e's exit hook: an exit hook that sends packets or removes further effects
+// does so after e's own removal is announced.
 func (l *List) Remove(e *Effect) {
 	if l == nil || e == nil {
 		return
 	}
-	var pending []func()
+	var pending, exits []func()
 	l.mu.Lock()
-	l.remove(e, &pending)
+	l.remove(e, &pending, &exits)
 	l.mu.Unlock()
 
 	runHooks(pending)
 	l.notifyAbnormalUpdate()
+	runHooks(exits)
 	l.notifyActivityTransition()
 }
 
@@ -299,5 +303,5 @@ func (l *List) add(e *Effect, pending *[]func()) {
 // from stats/visibility and, if active, run through its on-exit hook.
 func (l *List) exit(e *Effect, pending *[]func()) {
 	appendThunk(pending, e.stopTaskThunk())
-	l.remove(e, pending)
+	l.remove(e, pending, pending)
 }

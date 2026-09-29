@@ -156,7 +156,13 @@ func (l *List) removeRejectedStacked(e *Effect) {
 // FINISHING (AbstractEffect.java:308-320). Mere stacking displacement (see
 // addStacked) does not call remove: a displaced member stays queued and its
 // schedule keeps draining.
-func (l *List) remove(e *Effect, pending *[]func()) {
+//
+// pending receives the list bookkeeping in order: stat removal, promotion of
+// the next stack member, then the expiry message. exits receives e's exit
+// hook. Remove runs exits only after the icon refresh that follows pending;
+// a replacement or eviction during Add passes pending for both, so the old
+// effect's exit hook runs before the newcomer activates.
+func (l *List) remove(e *Effect, pending, exits *[]func()) {
 	// wornOff must be read before stopSchedule zeroes e's remaining-tick
 	// counter, so notifyExpiry below can still tell natural exhaustion
 	// (getCount() == 0) apart from early removal.
@@ -167,7 +173,7 @@ func (l *List) remove(e *Effect, pending *[]func()) {
 		removed := l.removeFromVisible(e)
 		if removed && e.InUse() {
 			*pending = append(*pending, func() { l.removeStats(e) })
-			appendThunk(pending, e.beginExit())
+			appendThunk(exits, e.beginExit())
 		}
 		if removed {
 			l.notifyExpiry(e, wornOff, pending)
@@ -194,7 +200,7 @@ func (l *List) remove(e *Effect, pending *[]func()) {
 	queue = slices.Delete(queue, index, index+1)
 	if index == 0 {
 		*pending = append(*pending, func() { l.removeStats(e) })
-		appendThunk(pending, e.beginExit())
+		appendThunk(exits, e.beginExit())
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
 			if next != nil {
