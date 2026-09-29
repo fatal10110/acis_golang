@@ -7,7 +7,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-var _ effect.PlayerActor = (*Character)(nil)
+var (
+	_ effect.PlayerActor = (*Character)(nil)
+	_ effect.CasterActor = (*Character)(nil)
+)
 
 // AbortAll stops c's movement, attack and cast, then clears its target when
 // resetTarget is set.

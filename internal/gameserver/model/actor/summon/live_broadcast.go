@@ -7,19 +7,22 @@ import (
 )
 
 // Runtime is what a summon needs to act in the live world beyond its
-// construction config: the AI loop commands and effects drive, and the sink
-// its events reach. Both are built from the actor, so they cannot be
-// constructor config.
+// construction config: the AI loop commands and effects drive, the cast
+// controller damage and effects stop, and the sink its events reach. All are
+// built from the actor, so they cannot be constructor config.
 type Runtime struct {
 	AI   AI
+	Cast CastControl
 	Sink event.Sink
 }
 
 // Attach installs rt. Call it once, before SpawnBesideOwner publishes the
 // summon into the world; a nil Sink drops every event so domain tests need no
-// packet layer, and a nil AI leaves commands unexecuted.
+// packet layer, a nil AI leaves commands unexecuted, and a nil Cast leaves
+// nothing for damage or effects to stop.
 func (a *Actor) Attach(rt Runtime) {
 	a.brain = rt.AI
+	a.cast = rt.Cast
 	a.sink = rt.Sink
 }
 

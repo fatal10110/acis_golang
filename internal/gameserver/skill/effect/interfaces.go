@@ -94,10 +94,8 @@ type PlayerActor interface {
 	WeaponGradePenalty() bool
 	ReduceDeathPenaltyLevel() int
 
-	CastingNow() bool
+	CasterActor
 	CurrentSkillIsMagic() bool
-	InterruptCast()
-	StopCast()
 
 	Standing() bool
 	SetStanding(bool) bool
@@ -148,6 +146,23 @@ type SummonActor interface {
 	TryToFollow(world.Tracked)
 	// Think wakes the summon's AI to continue its current intention.
 	Think() error
+}
+
+// CasterActor is the cast surface of every kind that casts: players, NPCs
+// and summons.
+type CasterActor interface {
+	CastingNow() bool
+	// InterruptCast aborts the cast only while it is still inside its
+	// interrupt window; the caster's own client (a summon's owner) reads
+	// CASTING_INTERRUPTED.
+	InterruptCast()
+	// StopCast aborts the cast unconditionally.
+	StopCast()
+}
+
+func asCaster(a Actor) (CasterActor, bool) {
+	c, ok := a.(CasterActor)
+	return c, ok
 }
 
 func asPlayer(a Actor) (PlayerActor, bool) {

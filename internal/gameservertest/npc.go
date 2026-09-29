@@ -127,6 +127,7 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 	ctl.SetQueue(hostile.Queue())
 	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
+	hostile.SetCastController(ctl)
 	return hostile, aiCtl
 }
 

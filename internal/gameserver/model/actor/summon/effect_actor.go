@@ -8,7 +8,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-var _ effect.SummonActor = (*Actor)(nil)
+var (
+	_ effect.SummonActor = (*Actor)(nil)
+	_ effect.CasterActor = (*Actor)(nil)
+)
 
 // OwnerObject returns the controlling player's world object.
 func (a *Actor) OwnerObject() (world.Tracked, bool) {

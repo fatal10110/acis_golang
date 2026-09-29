@@ -213,6 +213,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			OnHitResult: castEffects.OnHitResult,
 		}
 		hostile.AI().SetCastController(aiController)
+		hostile.SetCastController(castController)
 	}
 
 	walkerRef := &walkerActorRef{Hostile: hostile, moveCtl: moveCtl, routeMove: routeMove}
