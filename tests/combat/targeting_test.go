@@ -32,7 +32,7 @@ func TestActionSelectSendsTargetPackets(t *testing.T) {
 // TestAttackRequestSelectsThenSwingsInRange pins the in-range AttackRequest
 // sequence: the first request only selects — ValidateLocation,
 // MyTargetSelected, StatusUpdate — and the repeated request attacks:
-// AutoAttackStart and Attack go out, and a hit visibly drains the monster.
+// the Attack goes out, and a hit visibly drains the monster.
 func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -53,7 +53,6 @@ func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
 	}
 
 	c.Send(encodeAttackRequest(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
 	srv.AdvanceUntil(t, "swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
@@ -76,7 +75,6 @@ func TestSecondActionClickAttacksSelectedTarget(t *testing.T) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
 	srv.AdvanceUntil(t, "second-click swing damage", func() bool { return hostile.CurrentHP() < hostile.MaxHP() })
@@ -162,7 +160,7 @@ func TestSittingPlayerCannotApproachSelectedTarget(t *testing.T) {
 }
 
 // TestAttackRequestOnDistantTargetSelectsOnly pins that the first
-// AttackRequest on a far target only selects it — no AutoAttackStart until
+// AttackRequest on a far target only selects it — no swing until
 // the actor is actually in range.
 func TestAttackRequestOnDistantTargetSelectsOnly(t *testing.T) {
 	t.Parallel()

@@ -857,7 +857,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 	}{
 		{"hostile", func(t *testing.T, state *world.State) {
 			h := newTestHostileNPC(t, 7)
-			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
+			h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state, nil)(h)})
 			state.Spawn(h, 0, 0, 0, 0)
 			h.BroadcastStop()
 		}},
@@ -918,7 +918,7 @@ func TestHostileSinkAttachedBeforeSpawnReachesOtherGoroutines(t *testing.T) {
 	observer := &retainingReceiver{id: 1}
 	state.Spawn(observer, 10, 0, 0, 0)
 	h := newTestHostileNPC(t, 7)
-	h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state)(h)})
+	h.Attach(npc.Runtime{World: state, Sink: HostileSinks(state, nil)(h)})
 	state.Spawn(h, 0, 0, 0, 0)
 
 	done := make(chan struct{})
@@ -1103,7 +1103,6 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.Relocated{},
 		event.PetSummonRequested{},
 		event.ServitorSummonRequested{},
-		event.AttackStarted{},
 		event.AttackFinished{},
 		event.Arrived{},
 		event.MoveBlocked{},

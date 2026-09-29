@@ -484,6 +484,9 @@ type Server struct {
 	effectEnv effect.Env
 	// castEffects is the link's hostile-NPC cast seam, as boot wires it.
 	castEffects actorcast.EffectHandlers
+	// stance is the stance tracker the link was wired with, nil when none
+	// was; fixture NPCs report their attack stances to it.
+	stance network.AttackStanceTracker
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
 	// zones is the zone index WithZones supplied; nil when none was.
@@ -1456,6 +1459,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:          taskEffects,
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
+		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,
 		AI:               ai,

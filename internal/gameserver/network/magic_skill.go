@@ -248,6 +248,7 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 		return nil, false
 	}
 	affected = handler.Targets(live.Character, resolvedTarget, &def)
+	l.castController(live).SetLaunchTargets(len(affected))
 	targetIDs := make([]int32, 0, len(affected))
 	for _, affectedTarget := range affected {
 		targetIDs = append(targetIDs, affectedTarget.ObjectID())

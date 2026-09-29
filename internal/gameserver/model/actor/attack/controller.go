@@ -139,10 +139,10 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 	c.queue = q
 }
 
-// Every constructor takes the sink that receives AttackStarted, as each
-// attack animation starts (before its hits are scheduled or broadcast), and
-// AttackFinished, once it finishes (the swing lands and, for non-bow weapons,
-// the actor is free to attack again). A nil sink drops both.
+// Every constructor takes the sink that receives the controller's events,
+// among them AttackStanceRequested, as each damaging hit lands, and
+// AttackFinished, once the swing finishes (the swing lands and, for non-bow
+// weapons, the actor is free to attack again). A nil sink drops them all.
 
 // NewCreature returns a base creature attack controller.
 func NewCreature(actor CreatureActor, sink event.Sink) *Controller {
@@ -258,8 +258,6 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 	if target == nil || c.actor == nil {
 		return
 	}
-
-	c.emit(event.AttackStarted{})
 
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(max(1, c.actor.AttackSpeed()))) * time.Millisecond
 	c.actor.SetHeadingTo(target)
@@ -597,9 +595,9 @@ func breakTargetCast(hit Hit) {
 	target.BreakCastOnDamage(float64(hit.Damage))
 }
 
-// attackedTarget is a hit target whose AI reacts to the hit: players and
-// summons. A hostile NPC's aggression runs from its damage path; its attack
-// stance is not modeled yet (#2730).
+// attackedTarget is a hit target whose AI reacts to the hit: players,
+// summons and hostile NPCs, which all enter their attack stance. A hostile
+// NPC's aggression runs from its damage path.
 type attackedTarget interface {
 	// NotifyAttacked reports a damaging physical hit, or an offensive
 	// skill, from attacker reaching the target.

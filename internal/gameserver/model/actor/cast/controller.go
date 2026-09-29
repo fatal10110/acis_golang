@@ -170,6 +170,10 @@ type Controller struct {
 	plan           Plan
 	startedAt      time.Time
 	interruptUntil time.Time
+	// hasTargets records that the active cast's launch resolved at least
+	// one target. A naturally finished offensive cast that had any puts its
+	// caster in attack stance.
+	hasTargets bool
 
 	// castSeq increments every time the active cast is cleared (Stop,
 	// Finish, or the start of a fresh cast), so a scheduled Launch/Hit/
@@ -200,13 +204,17 @@ type Controller struct {
 //     was in flight, matching PlayerCast.stop()'s unconditional
 //     _actor.getAI().clientActionFailed() (PlayerCast.java:381-387) that
 //     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
+//   - AttackStanceRequested, just ahead of the CastFinished of an
+//     offensive cast that finished naturally after its launch resolved at
+//     least one target (SetLaunchTargets): the caster enters or refreshes
+//     its attack stance;
 //   - CastFinished, once whenever an in-flight cast ends, aborted or
 //     completed, letting the owner apply the nextActionAttack resume gate
 //     (PlayableAI.onEvtFinishedCasting, PlayableAI.java:43-63); Broken
 //     repeats CastAborted's Interrupted for an aborted cast, for an owner
 //     that reports the interrupt only after its AI has moved on.
 //
-// A nil sink drops all three.
+// A nil sink drops them all.
 func NewController(actor Actor, sink event.Sink) *Controller {
 	return &Controller{actor: actor, sink: sink}
 }
@@ -672,12 +680,27 @@ func (c *Controller) finishLocked() func(bool) {
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
 	fusionEnd := c.fusionEnd
+	stance := current.Offensive && c.hasTargets
 	c.clearLocked()
 	return func(aborted bool) {
 		if fusionEnd != nil {
 			fusionEnd()
 		}
+		if stance && !aborted {
+			c.emit(event.AttackStanceRequested{})
+		}
 		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target})
+	}
+}
+
+// SetLaunchTargets records how many targets the active cast's launch
+// resolved. An offensive cast that resolved any enters its caster's attack
+// stance when it finishes. It does nothing when no cast is in flight.
+func (c *Controller) SetLaunchTargets(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.casting {
+		c.hasTargets = n > 0
 	}
 }
 
@@ -898,6 +921,7 @@ func (c *Controller) clearLocked() {
 	c.plan = Plan{}
 	c.startedAt = time.Time{}
 	c.interruptUntil = time.Time{}
+	c.hasTargets = false
 	c.fusionEnd = nil
 }
 

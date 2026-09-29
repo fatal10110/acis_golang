@@ -117,6 +117,8 @@ type Hostile struct {
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
+	// inCombat reports an attack stance, which the stance tracker ends.
+	inCombat atomic.Bool
 
 	// geoPathFailCount counts consecutive pathfinding moves that could
 	// not resolve a route, for walker teleport-to-start and SiegeGuard
@@ -442,7 +444,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
-		Running: h.Running(), AlikeDead: h.AlikeDead(), SummonAnimation: 2,
+		Running: h.Running(), InCombat: h.InCombat(), AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
 }

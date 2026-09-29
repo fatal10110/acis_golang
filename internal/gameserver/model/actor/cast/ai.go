@@ -292,6 +292,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				return false
 			}
 			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
+			a.Controller.SetLaunchTargets(len(launchTargets))
 			// The reference recomputes _targets = getTargetList(...) at
 			// the launch timer and broadcasts that full set
 			// (CreatureCast.java:232-234); when resolution finds no

@@ -108,14 +108,16 @@ func targetHostile(t *testing.T, c *scriptedClient, hostileID int32) int32 {
 	return maxHP
 }
 
-// assertAutoAttackStart asserts the next frame is AutoAttackStart naming the
-// given attacker.
-func assertAutoAttackStart(t *testing.T, c *scriptedClient, attackerID int32) {
+// awaitAutoAttackStart reads past the frames a landed hit sends ahead of
+// it (the attacker's damage feedback) until the AutoAttackStart naming id
+// arrives.
+func awaitAutoAttackStart(t *testing.T, c *scriptedClient, id int32) {
 	t.Helper()
-	frame := c.Read()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeAutoAttackStart, "AutoAttackStart")
-	if got := wireReader(frame[1:]).ReadInt32(); got != attackerID {
-		t.Fatalf("AutoAttackStart object id = %d, want %d", got, attackerID)
+	for {
+		frame := mustRead(t, c, "AutoAttackStart")
+		if frame[0] == serverpackets.OpcodeAutoAttackStart && wireReader(frame[1:]).ReadInt32() == id {
+			return
+		}
 	}
 }
 

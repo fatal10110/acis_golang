@@ -142,7 +142,6 @@ func TestMidSwingCastReplacesQueuedFollow(t *testing.T) {
 	drainUntilQuiet(t, p.c)
 	targetHostile(t, p.c, hostile.ObjectID())
 	p.c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, p.c, p.attackerID)
 	assertAttackBy(t, p.c, p.attackerID)
 
 	selectPlayerTarget(t, p.c, p.victimID)

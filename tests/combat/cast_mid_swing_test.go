@@ -34,7 +34,7 @@ func midSwingToggle() modelskill.Definition {
 }
 
 // bootMidSwing puts the caster in the middle of its opening swing against
-// the fixture monster: AutoAttackStart and the swing's Attack are out, and
+// the fixture monster: the swing's Attack is out, and
 // the driven clock holds the swing open until the test advances it.
 func bootMidSwing(t *testing.T) (*gameservertest.Server, *player.Character) {
 	t.Helper()
@@ -64,7 +64,6 @@ func bootMidSwing(t *testing.T) (*gameservertest.Server, *player.Character) {
 
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 	return srv, pc
 }

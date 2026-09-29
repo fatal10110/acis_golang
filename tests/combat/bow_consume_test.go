@@ -69,8 +69,6 @@ func TestBowFireConsumesArrowAndMPAndSendsGauge(t *testing.T) {
 	assertFrameOpcode(t, mustRead(t, c, "selection StatusUpdate"), serverpackets.OpcodeStatusUpdate, "selection StatusUpdate")
 
 	c.Send(encodeAttackRequest(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
-
 	status := mustRead(t, c, "bow MP StatusUpdate")
 	assertPlayerMPStatus(t, status, objID, mpBefore-bowMPConsume)
 

@@ -232,7 +232,6 @@ func TestInvulnerableHostileTakesNoMeleeDamage(t *testing.T) {
 
 	targetHostile(t, c, target.ObjectID())
 	c.Send(encodeAction(target.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
 	srv.AdvanceUntil(t, "invulnerable NPC registers attacker hate", func() bool {
@@ -265,7 +264,6 @@ func TestAttackerWithoutDamagePermissionDealsNoMeleeDamage(t *testing.T) {
 
 	targetHostile(t, c, target.ObjectID())
 	c.Send(encodeAction(target.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
-	assertAutoAttackStart(t, c, objID)
 	assertAttackBy(t, c, objID)
 
 	srv.AdvanceUntil(t, "NPC registers damage-denied attacker hate", func() bool {

@@ -257,7 +257,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
 	case event.Relocated:
 		l.revalidateZones(live, e.Previous)
-	case event.AttackStarted, event.AttackStanceRequested, event.Attacked:
+	case event.AttackStanceRequested:
+		l.startLiveAutoAttack(live)
+	case event.Attacked:
+		l.standAttackedLivePlayer(live)
 		l.startLiveAutoAttack(live)
 	case event.Evaded:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))

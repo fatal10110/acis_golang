@@ -366,7 +366,6 @@ func TestUseTwoSkillItemWhileAttackingCastsOnlyLast(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMyTargetSelected, "MyTargetSelected")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "selection StatusUpdate")
 	c.Send(encodeAttackRequest(hostile.ObjectID(), originX, originY, originZ, false))
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAutoAttackStart, "AutoAttackStart")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAttack, "Attack")
 
 	c.Send(encodeUseItem(scroll, false))
