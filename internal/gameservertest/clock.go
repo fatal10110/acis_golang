@@ -119,12 +119,8 @@ const catchUpTimeout = 5 * time.Second
 // test does not hold have run their jobs, so nothing but the clock can start
 // more work.
 func (s *Server) catchUp() error {
-	deadline := time.Now().Add(catchUpTimeout)
-	for !s.handledAll() {
-		if time.Now().After(deadline) {
-			return errBehind
-		}
-		time.Sleep(50 * time.Microsecond)
+	if err := s.awaitHandled(); err != nil {
+		return err
 	}
 	s.queues.advance(0)
 	// Database work takes no time on a driven clock: whatever the tasks
@@ -134,6 +130,20 @@ func (s *Server) catchUp() error {
 		return err
 	}
 	s.queues.advance(0)
+	return nil
+}
+
+// awaitHandled waits until the server has handled every frame a client
+// already wrote, or its connection closed, or its handler is parked on a
+// lane the test holds.
+func (s *Server) awaitHandled() error {
+	deadline := time.Now().Add(catchUpTimeout)
+	for !s.handledAll() {
+		if time.Now().After(deadline) {
+			return errBehind
+		}
+		time.Sleep(50 * time.Microsecond)
+	}
 	return nil
 }
 

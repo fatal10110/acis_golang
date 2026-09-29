@@ -941,11 +941,20 @@ func (s *Server) flushPersistence() error {
 	return s.persist.Flush(ctx)
 }
 
-// Settle waits until every task already posted to an actor queue has run: a
+// Settle waits until the server has handled every frame a client already
+// wrote, then until every task already posted to an actor queue has run: a
 // packet handler's follow-up, a timer that fired, or the per-actor work a
 // tick fanned out. Work those tasks post in turn may still be pending.
+//
+// Without the first wait a frame still crossing the socket (or waiting for
+// its connection goroutine) posts its work after the queues were checked, so
+// a Send followed by Settle would not see the frame's effect on the real
+// pool, where settling idle queues is quicker than a socket round trip.
 func (s *Server) Settle(tb testing.TB) {
 	tb.Helper()
+	if err := s.awaitHandled(); err != nil {
+		tb.Fatal(err)
+	}
 	if err := s.queues.settle(); err != nil {
 		tb.Fatal(err)
 	}
