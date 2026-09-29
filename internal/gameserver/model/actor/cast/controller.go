@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -648,6 +649,7 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	aborted := c.casting
 	current := c.current
+	target, _ := c.target.(attackable.Combatant)
 	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	if !aborted {
@@ -659,7 +661,7 @@ func (c *Controller) abortLocked() (func(bool), func(bool)) {
 			}
 			c.emit(event.CastAborted{Interrupted: interrupted})
 		}, func(interrupted bool) {
-			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current})
+			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target})
 		}
 }
 
@@ -668,13 +670,14 @@ func (c *Controller) finishLocked() func(bool) {
 		return nil
 	}
 	current := c.current
+	target, _ := c.target.(attackable.Combatant)
 	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	return func(aborted bool) {
 		if fusionEnd != nil {
 			fusionEnd()
 		}
-		c.emit(event.CastFinished{Interrupted: aborted, Skill: current})
+		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target})
 	}
 }
 

@@ -11,11 +11,13 @@ type CastAborted struct{ Interrupted bool }
 
 // CastFinished reports an in-flight cast ending, Interrupted by an abort or
 // completed naturally. Broken marks an abort that went through the
-// window-gated interrupt path, as CastAborted.Interrupted does.
+// window-gated interrupt path, as CastAborted.Interrupted does. Target is the
+// cast's final target when it is a creature, nil otherwise.
 type CastFinished struct {
 	Interrupted bool
 	Broken      bool
 	Skill       modelskill.Definition
+	Target      attackable.Combatant
 }
 
 // CastStopAck reports a cast stop request, whether or not a cast was in
