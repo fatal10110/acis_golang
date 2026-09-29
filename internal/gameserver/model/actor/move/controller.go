@@ -45,6 +45,14 @@ type offensiveFollowLeadActor interface {
 	OffensiveFollowLead() bool
 }
 
+// npcOffensiveFollowActor is an NPC's extra offensive follow input: its AI's
+// current intention decides whether it may close in at all, and a target in
+// reach but out of its sight is still approached.
+type npcOffensiveFollowActor interface {
+	IntentionMovesToTarget() bool
+	CanSee(attackable.Combatant) bool
+}
+
 type targetKnower interface {
 	Knows(attackable.Combatant) bool
 }
@@ -191,22 +199,29 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // reports false. A target already converged on (movement already under way
 // toward its current position) is left alone rather than re-issued.
 //
-// An actor that cannot move never starts a follow: out of range it still
-// reports true, so the caller waits instead of attacking, but no movement is
-// issued. A follow already running toward target keeps running; the effects
-// that lock movement stop it themselves.
+// An actor that cannot move, or an NPC whose current intention holds its
+// ground, never starts a follow: out of range it still reports true, so the
+// caller waits instead of attacking, but no movement is issued. A follow
+// already running toward target keeps running; the effects that lock
+// movement stop it themselves.
 //
-// This does not reproduce the reference behavior's line-of-sight branch (an
-// NPC already within range that can't see its target still follows it) —
-// the controller has no line-of-sight input (#2611).
+// An NPC free to close in that has target within reach but cannot see it
+// follows it anyway, down to the target's own footprint, and reports true so
+// it does not swing or cast through the obstacle.
 func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	// Read before mu: MovementDisabled reads the actor's effect state, and
 	// effect hooks stop this controller (taking mu) from other queues.
 	disabled := c.self.MovementDisabled()
+	npcActor, isNPC := c.self.(npcOffensiveFollowActor)
+	holds := isNPC && !npcActor.IntentionMovesToTarget()
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	blocked := disabled && !c.followingLocked(target, FollowOffensive)
-	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked)
+	blocked := (disabled || holds) && !c.followingLocked(target, FollowOffensive)
+	var unseen func() bool
+	if isNPC && !disabled && !holds {
+		unseen = func() bool { return !npcActor.CanSee(target) }
+	}
+	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen)
 }
 
 // MaybeStartFriendlyFollow arms a friendly follow task and starts moving
@@ -223,7 +238,7 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 		return false, nil
 	}
 	c.clearOffensiveFollow()
-	return c.maybeStartFollow(target, offset, FollowFriendly, false)
+	return c.maybeStartFollow(target, offset, FollowFriendly, false, nil)
 }
 
 // followingLocked reports whether a follow of mode toward target is already
@@ -234,8 +249,10 @@ func (c *Controller) followingLocked(target attackable.Combatant, mode FollowMod
 
 // maybeStartFollow resolves one follow request. blocked means the actor
 // cannot move and has no follow toward target running: an out-of-range
-// target then reports true without starting a follow or a move.
-func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool) (bool, error) {
+// target then reports true without starting a follow or a move. unseen,
+// when set, reports that an offensive target already in reach is out of
+// sight, so the actor still closes in to the target's footprint.
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool, unseen func() bool) (bool, error) {
 	if offset < 0 {
 		return false, nil
 	}
@@ -263,12 +280,20 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	if inRange {
 		if mode == FollowFriendly {
 			c.move.StartFriendlyFollow(target.ObjectID(), offset)
-		} else {
-			c.clearOffensiveFollow()
+			return false, nil
 		}
-		return false, nil
-	}
-	if blocked {
+		if unseen == nil || !unseen() {
+			c.clearOffensiveFollow()
+			return false, nil
+		}
+		offset = int(other.CollisionRadius())
+		if origin.In2DRadius(dest, followRange(offset, c.self.CollisionRadius(), other.CollisionRadius())) {
+			// Already pressed against the target: the follow is armed but
+			// has nowhere to walk.
+			c.startOffensiveFollow(target, offset)
+			return true, nil
+		}
+	} else if blocked {
 		return true, nil
 	}
 
@@ -276,11 +301,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	case FollowFriendly:
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)
 	case FollowOffensive:
-		c.move.StartOffensiveFollow(target.ObjectID(), offset)
-		if !c.selfOwnsOffensiveFollowTicker() {
-			c.offensiveTarget = target
-			c.offensiveRange = offset
-		}
+		c.startOffensiveFollow(target, offset)
 	default:
 		return false, nil
 	}
@@ -461,7 +482,17 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	c.offensiveFollowElapsed = 0
-	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false)
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil)
+}
+
+// startOffensiveFollow arms the offensive follow task toward target at
+// offset, tracking it for rechecks unless the actor's own AI owns them.
+func (c *Controller) startOffensiveFollow(target attackable.Combatant, offset int) {
+	c.move.StartOffensiveFollow(target.ObjectID(), offset)
+	if !c.selfOwnsOffensiveFollowTicker() {
+		c.offensiveTarget = target
+		c.offensiveRange = offset
+	}
 }
 
 func (c *Controller) selfOwnsOffensiveFollowTicker() bool {
