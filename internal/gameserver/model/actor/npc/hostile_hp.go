@@ -46,7 +46,7 @@ func (h *Hostile) CurrentMP() int {
 
 // SetCurrentMP overrides this NPC's live mana points, clamped to [0,
 // calculated MaxMP], e.g. to restore a persisted value at spawn time instead
-// of starting at MaxMP.
+// of starting at MaxMP. It has no effect once this NPC has died.
 func (h *Hostile) SetCurrentMP(mp int) {
 	if max := int(h.MaxMPValue()); mp > max {
 		mp = max
@@ -54,9 +54,7 @@ func (h *Hostile) SetCurrentMP(mp int) {
 	if mp < 0 {
 		mp = 0
 	}
-	h.mpMu.Lock()
-	defer h.mpMu.Unlock()
-	h.mp = float64(mp)
+	h.whileAliveMP(func() { h.mp = float64(mp) })
 }
 
 // TakeDamage applies dmg physical damage from attacker, clamping at zero,

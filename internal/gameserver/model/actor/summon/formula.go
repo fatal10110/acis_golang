@@ -518,7 +518,8 @@ func (a *Actor) addHP(amount float64) float64 {
 	return amount
 }
 
-// addMP is AddMP without the status republish.
+// addMP is AddMP without the status republish. Like addHP it leaves a dead
+// summon alone, under the lock the lethal drainHP holds.
 func (a *Actor) addMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
@@ -526,7 +527,7 @@ func (a *Actor) addMP(amount float64) float64 {
 	maxMP := a.MaxMPValue()
 	a.vitals.mu.Lock()
 	defer a.vitals.mu.Unlock()
-	if a.vitals.mp >= maxMP {
+	if a.dead || a.vitals.mp >= maxMP {
 		return 0
 	}
 	if a.vitals.mp+amount > maxMP {
@@ -536,14 +537,15 @@ func (a *Actor) addMP(amount float64) float64 {
 	return amount
 }
 
-// reduceMP is ReduceMP without the status republish.
+// reduceMP is ReduceMP without the status republish. A dead summon loses
+// nothing.
 func (a *Actor) reduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	a.vitals.mu.Lock()
 	defer a.vitals.mu.Unlock()
-	if a.vitals.mp <= 0 {
+	if a.dead || a.vitals.mp <= 0 {
 		return 0
 	}
 	if amount > a.vitals.mp {

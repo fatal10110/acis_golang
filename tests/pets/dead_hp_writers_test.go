@@ -40,3 +40,60 @@ func TestDeadPetRejectsHPWriters(t *testing.T) {
 		t.Fatalf("dead pet HP = %v after AddHP/SetHP, want 0", got)
 	}
 }
+
+// TestDeadPetRejectsMPWriters pins that a dead pet's MP stays where the
+// killing hit left it: a restore or cost that passed its liveness check
+// before the death is dropped, while a living or revived pet still gains and
+// spends MP.
+func TestDeadPetRejectsMPWriters(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	owner, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner not in world")
+	}
+
+	assertLivePetMPWriters(t, pet)
+
+	pet.ReduceHP(pet.MaxHPValue()*2, owner.(attackable.Combatant), modelskill.Definition{})
+	if !pet.Dead() {
+		t.Fatal("lethal hit left the pet alive")
+	}
+	mp := pet.MPValue()
+	if got := pet.AddMP(5); got != 0 {
+		t.Fatalf("dead AddMP(5) = %v, want 0", got)
+	}
+	if got := pet.ReduceMP(5); got != 0 {
+		t.Fatalf("dead ReduceMP(5) = %v, want 0", got)
+	}
+	if got := pet.MPValue(); got != mp {
+		t.Fatalf("dead pet MP = %v after the writers, want unchanged %v", got, mp)
+	}
+
+	if !pet.Revive() {
+		t.Fatal("Revive() = false for a dead pet")
+	}
+	assertLivePetMPWriters(t, pet)
+}
+
+// petMPWriter is the slice of a pet the MP writer checks drive.
+type petMPWriter interface {
+	MPValue() float64
+	AddMP(float64) float64
+	ReduceMP(float64) float64
+}
+
+func assertLivePetMPWriters(t *testing.T, pet petMPWriter) {
+	t.Helper()
+	mp := pet.MPValue()
+	if mp < 10 {
+		t.Fatalf("fixture pet MP %v leaves no room for the MP writers", mp)
+	}
+	if got := pet.ReduceMP(10); got != 10 || pet.MPValue() != mp-10 {
+		t.Fatalf("live ReduceMP(10) = %v leaving MP %v, want 10 leaving %v", got, pet.MPValue(), mp-10)
+	}
+	if got := pet.AddMP(5); got != 5 || pet.MPValue() != mp-5 {
+		t.Fatalf("live AddMP(5) = %v leaving MP %v, want 5 leaving %v", got, pet.MPValue(), mp-5)
+	}
+}

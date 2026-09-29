@@ -128,13 +128,17 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	return true
 }
 
-// ReduceCurrentMP subtracts MP and clamps at zero.
+// ReduceCurrentMP subtracts MP and clamps at zero. A dead character loses
+// nothing.
 func (c *Character) ReduceCurrentMP(amount int) {
 	if amount <= 0 {
 		return
 	}
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
+	if c.dead.Load() {
+		return
+	}
 	c.curMP -= float64(amount)
 	if c.curMP < 0 {
 		c.curMP = 0

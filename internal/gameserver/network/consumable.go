@@ -65,9 +65,8 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 			}
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(res.Skill.ID), int32(res.Skill.Level)))
 			applyItemCastCharges(live, res)
-			beforeVitals := live.Vitals()
+			// A restore the skill applies reports the user's status itself.
 			l.sendSkillHandlerResult(live, res.Apply())
-			sendMagicStatusUpdate(live, beforeVitals)
 			if res.HasShortBuff {
 				live.Character.UpdateShortBuff(res.ShortBuffSkillID, res.ShortBuffLevel, res.ShortBuffDurationSeconds)
 			}
