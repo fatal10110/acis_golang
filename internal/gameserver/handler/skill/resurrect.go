@@ -118,8 +118,8 @@ func reviveOrOfferSummon(cast Cast, obj Actor, reviver player.Reviver, power flo
 }
 
 // reviveTargets revives every dead player and summon target outright. A
-// summon revives on its own queue, and drops its decay unless its owner
-// left it behind.
+// summon revives on its own queue and drops its decay, a pet whose owner is
+// offline included; a servitor's corpse its owner left behind stays dead.
 func reviveTargets(cast Cast, power float64) {
 	for _, obj := range cast.Targets {
 		if s, ok := obj.(outrightSummonReviver); ok && obj.Kind() == actor.KindSummon {

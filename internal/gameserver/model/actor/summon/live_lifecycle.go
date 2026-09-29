@@ -170,7 +170,8 @@ func (a *Actor) Unsummon() {
 //
 // A pet's corpse keeps its owner's summon slot and is handed to the owner's
 // next session when the owner comes back (RelinkOwner); until then its decay
-// still removes it, and its items then go to its offline owner. A pet
+// still removes it, and its items then go to its offline owner, unless a
+// non-player resurrection revives it first (Revive). A pet
 // restored dead from its saved row has no decay pending and so stays until
 // its owner comes back to it. A servitor's corpse gives the slot up, so the
 // owner can summon again at once; one with no decay pending leaves with its
@@ -202,12 +203,17 @@ func (a *Actor) ShownAsOwnedBy(playerID int32) bool {
 }
 
 // AdoptCorpseQueue moves the work of a corpse whose owner left onto q, a
-// queue of its own, since the owner's queue closes with the owner's session.
-// Its decay runs there. Nothing else moves: a corpse no longer acts, and a
-// pet's corpse moves the rest of its work only when its owner comes back
-// (RelinkOwner).
+// queue of its own, since the owner's queue closes with the owner's session:
+// its decay, its movement and its effects. A pet's corpse revived while its
+// owner is away (Revive) lives on q, until its owner comes back for it
+// (RelinkOwner); the runtime moves the rest of its work there as well.
+//
+// Call it as the owner of the queue a leaves, the leaving owner's, so none
+// of a's work runs during the move.
 func (a *Actor) AdoptCorpseQueue(q *sim.Queue) {
 	a.queue.Store(q)
+	a.movement.SetQueue(q)
+	a.effects.SetQueue(q)
 }
 
 // despawn takes a out of the world and reports whether this call did so.

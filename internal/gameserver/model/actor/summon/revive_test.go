@@ -130,9 +130,11 @@ func TestResurrectOutrightRunsOnSummonQueueAndCancelsDecayFirst(t *testing.T) {
 	}
 }
 
-// TestResurrectOutrightKeepsLeftBehindCorpseDecay: a corpse its owner left
-// behind cannot be revived, so it keeps the decay that removes it.
-func TestResurrectOutrightKeepsLeftBehindCorpseDecay(t *testing.T) {
+// TestResurrectOutrightLeftBehindCorpse: a non-player resurrection revives
+// a pet's corpse its owner left behind, dropping its decay first, while a
+// servitor's corpse its owner left behind cannot be revived and keeps the
+// decay that removes it.
+func TestResurrectOutrightLeftBehindCorpse(t *testing.T) {
 	for _, pet := range []bool{false, true} {
 		f := newDeadSummon(t, pet)
 		f.summon.LeaveWithOwner()
@@ -141,11 +143,19 @@ func TestResurrectOutrightKeepsLeftBehindCorpseDecay(t *testing.T) {
 		}
 		f.summon.ResurrectOutright(100)
 		f.loop.Run()
-		if !f.summon.Dead() {
-			t.Fatalf("pet=%v: left-behind corpse revived", pet)
+		if got := !f.summon.Dead(); got != pet {
+			t.Fatalf("pet=%v: left-behind corpse revived = %v, want %v", pet, got, pet)
 		}
-		if n := event.Count[event.DecayCanceled](f.rec); n != 0 {
-			t.Fatalf("pet=%v: DecayCanceled events = %d, want 0", pet, n)
+		wantCancels := 0
+		if pet {
+			// The cancel ahead of the revive and the pet's own on revive.
+			wantCancels = 2
+		}
+		if n := event.Count[event.DecayCanceled](f.rec); n != wantCancels {
+			t.Fatalf("pet=%v: DecayCanceled events = %d, want %d", pet, n, wantCancels)
+		}
+		if !f.summon.OwnerLeft() {
+			t.Fatalf("pet=%v: revive relinked the left-behind summon to its departed owner", pet)
 		}
 	}
 }

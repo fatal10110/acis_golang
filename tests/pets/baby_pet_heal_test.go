@@ -99,12 +99,12 @@ type babyScene struct {
 
 // bootBabyPet brings an owner who knows a resurrection in the world and
 // calls out its level-45 baby pet with every heal roll fixed to roll.
-func bootBabyPet(t *testing.T, roll int) *babyScene {
+func bootBabyPet(t *testing.T, roll int, extra ...gameservertest.Option) *babyScene {
 	t.Helper()
-	srv := bootPets(t,
+	srv := bootPets(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{babyPetTemplate(), treeTemplate()})),
 		gameservertest.WithSkills(babyHealSkills(t)),
-	)
+	}, extra...)...)
 	if !srv.DrivesClock() {
 		t.Skip("timing one-second heal ticks needs the driven clock")
 	}

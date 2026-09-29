@@ -292,6 +292,24 @@ func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 	return nil
 }
 
+func (s *fakeItemStore) SetEnchantOwned(_ context.Context, ownerID, objectID int32, enchant int) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, items := range s.items {
+		for _, existing := range items {
+			if existing.ObjectID != objectID {
+				continue
+			}
+			if existing.OwnerID != ownerID {
+				return false, nil
+			}
+			existing.EnchantLevel = enchant
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (s *fakeItemStore) DeleteOwned(_ context.Context, ownerID, objectID int32) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

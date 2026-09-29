@@ -44,6 +44,11 @@ func (s slowItemStore) DeleteOwned(ctx context.Context, ownerID, objectID int32)
 	return s.ItemStore.DeleteOwned(ctx, ownerID, objectID)
 }
 
+func (s slowItemStore) SetEnchantOwned(ctx context.Context, ownerID, objectID int32, enchant int) (bool, error) {
+	time.Sleep(s.delay)
+	return s.ItemStore.SetEnchantOwned(ctx, ownerID, objectID, enchant)
+}
+
 // Save and Update are the instance-taking forms of the two writes above.
 // Nothing in the link routes through them today, but they are part of the
 // embedded store's method set, so a caller that reached them would otherwise
