@@ -54,18 +54,89 @@ func (c *Character) SetStanding(standing bool) bool {
 	return true
 }
 
-// Sit changes to the ordinary seated stance and broadcasts it.
+// sitStandDelay is how long a sit-down or a stand-up holds the character
+// before it takes control back.
+const sitStandDelay = 2500 * time.Millisecond
+
+// ChangePosture sits the character down or stands it up, starting the
+// sit/stand transition, and reports whether the posture changed. An
+// unchanged posture starts no transition.
+func (c *Character) ChangePosture(standing bool) bool {
+	if !c.SetStanding(standing) {
+		return false
+	}
+	c.beginPostureTransition(standing)
+	return true
+}
+
+// Sit changes to the ordinary seated stance, starts the sit-down transition
+// and broadcasts it.
 func (c *Character) Sit() bool {
 	changed := c.SetStanding(false)
+	c.beginPostureTransition(false)
 	c.broadcastStanceChange(event.StanceSitting)
 	return changed
 }
 
-// StandUp changes to the standing stance and broadcasts it.
+// StandUp changes to the standing stance, starts the stand-up transition
+// and broadcasts it.
 func (c *Character) StandUp() bool {
 	changed := c.SetStanding(true)
+	c.beginPostureTransition(true)
 	c.broadcastStanceChange(event.StanceStanding)
 	return changed
+}
+
+// Seated reports whether the character sits and has finished sitting down.
+func (c *Character) Seated() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.stateInit && !c.standing && !c.sittingNow
+}
+
+// SittingNow reports whether the character is still sitting down: the
+// seated posture has been taken but the sit-down transition has not ended.
+func (c *Character) SittingNow() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.sittingNow
+}
+
+// StandingNow reports whether the character is still standing up: the
+// standing posture has been taken but the stand-up transition has not ended.
+func (c *Character) StandingNow() bool {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.standingNow
+}
+
+// beginPostureTransition starts a sit-down (standing false) or stand-up
+// transition, replacing any transition still running. It ends sitStandDelay
+// later with a PostureSettled event. A character without a live runtime has
+// no queue to end it on and starts none.
+func (c *Character) beginPostureTransition(standing bool) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if c.Live == nil {
+		return
+	}
+	c.postureGen++
+	gen := c.postureGen
+	c.sittingNow, c.standingNow = !standing, standing
+	c.afterLocked(sitStandDelay, func() { c.settlePosture(gen) })
+}
+
+// settlePosture ends the transition gen started, unless a later transition
+// replaced it.
+func (c *Character) settlePosture(gen uint64) {
+	c.stateMu.Lock()
+	if gen != c.postureGen {
+		c.stateMu.Unlock()
+		return
+	}
+	c.sittingNow, c.standingNow = false, false
+	c.stateMu.Unlock()
+	c.emit(event.PostureSettled{})
 }
 
 // StartFakeDeath changes to the fake-death stance and broadcasts it.

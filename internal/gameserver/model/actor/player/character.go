@@ -176,6 +176,9 @@ type Character struct {
 	stateInit            bool
 	running              bool
 	standing             bool
+	sittingNow           bool
+	standingNow          bool
+	postureGen           uint64
 	inCombat             bool
 	autoSoulShots        map[int32]bool
 	flying               bool

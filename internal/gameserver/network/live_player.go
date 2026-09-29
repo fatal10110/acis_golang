@@ -170,6 +170,8 @@ type itemAICastIntention struct {
 	item      *item.Instance
 	skill     modelskill.Definition
 	selected  world.Tracked
+	// ctrl is the UseItem Ctrl modifier, the cast's force-use flag.
+	ctrl bool
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
@@ -349,12 +351,12 @@ func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	return req
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked) {
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredMagic = nil
-	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected}
+	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
 }
 
 func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {

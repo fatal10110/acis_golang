@@ -97,6 +97,13 @@ func (p *livePlayer) Emit(ev event.Event) {
 		})
 	case event.FakeDeathRevived:
 		l.broadcastLiveRevive(live)
+	case event.PostureSettled:
+		// A cast queued behind the sit/stand transition runs now, unless a
+		// swing or cast still holds it for its own finish.
+		if !itemAICastBusy(live) {
+			l.finishDeferredMagicSkill(live)
+			l.finishDeferredItemAICast(live)
+		}
 	case event.Died:
 		l.broadcastLiveDie(live)
 	case event.FusionCastersStopRequested:

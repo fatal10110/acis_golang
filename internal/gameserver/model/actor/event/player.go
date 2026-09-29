@@ -38,6 +38,10 @@ type StanceChanged struct{ Stance Stance }
 // FakeDeathRevived reports a character standing up out of fake death.
 type FakeDeathRevived struct{}
 
+// PostureSettled reports that a sit-down or stand-up transition ended and
+// the character takes control back.
+type PostureSettled struct{}
+
 // FusionCastersStopRequested asks that every other character channelling a
 // fusion skill on this character stop its cast.
 type FusionCastersStopRequested struct{}
@@ -240,6 +244,7 @@ func (ActionsStopRequested) event()   {}
 func (BowDrawn) event()               {}
 func (StanceChanged) event()          {}
 func (FakeDeathRevived) event()       {}
+func (PostureSettled) event()         {}
 func (DeathSettled) event()           {}
 func (EffectIconsChanged) event()     {}
 func (PositionCorrected) event()      {}

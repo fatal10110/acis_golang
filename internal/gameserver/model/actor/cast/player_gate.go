@@ -45,7 +45,31 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 	if err != nil {
 		return err
 	}
-	if err := playerStateBlocksCast(caster, def); err != nil {
+	return c.playerAttemptRules(caster, def, !caster.Standing())
+}
+
+// CanPlayerAttemptItemCast is the pre-attempt gate of an item-carried
+// skill. Such a skill waits out a cast already in flight, and a sit-down
+// still under way, instead of being refused by them: CanPlayerAttemptCast's
+// casting-now refusal is left out, and only a caster that has finished
+// sitting down counts as sitting. Every other check is the same.
+func (c *Controller) CanPlayerAttemptItemCast(caster *player.Character, target Target, def modelskill.Definition) error {
+	if caster == nil || c.actor == nil || target == nil {
+		return ErrInvalidTarget
+	}
+	if c.actor.AllSkillsDisabled() {
+		return ErrAllSkillsDisabled
+	}
+	if c.actor.SkillDisabled(ReuseKey(def)) {
+		return ErrSkillDisabled
+	}
+	return c.playerAttemptRules(caster, def, caster.Seated())
+}
+
+// playerAttemptRules is the player-only part of the pre-attempt gate;
+// sitting is whether the caster counts as seated.
+func (c *Controller) playerAttemptRules(caster *player.Character, def modelskill.Definition, sitting bool) error {
+	if err := playerStateBlocksCast(caster, def, sitting); err != nil {
 		return err
 	}
 	if err := c.groundTargetGate(def); err != nil {
@@ -65,7 +89,7 @@ func (c *Controller) CanPlayerAttemptCast(caster *player.Character, target Targe
 
 // playerStateBlocksCast rejects a cast the caster's own state forbids, in the
 // order the reference answers them.
-func playerStateBlocksCast(caster *player.Character, def modelskill.Definition) error {
+func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, sitting bool) error {
 	if caster.WearingFormalWear() {
 		return ErrFormalWear
 	}
@@ -76,7 +100,7 @@ func playerStateBlocksCast(caster *player.Character, def modelskill.Definition) 
 		return ErrObserverMode
 	}
 	fakeDead := caster.FakeDead()
-	if !caster.Standing() && !fakeDead {
+	if sitting && !fakeDead {
 		return ErrSitting
 	}
 	if fakeDead && def.ID != fakeDeathSkillID {

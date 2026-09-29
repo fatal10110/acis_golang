@@ -168,10 +168,15 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	})
 }
 
+// changeLiveWaitType sits live down or stands it up and broadcasts the new
+// posture. A queued cast is dropped: the sit or stand request takes the
+// next-intention slot it held.
 func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
-	if live == nil || live.AlikeDead() || !live.SetStanding(stand) {
+	if live == nil || live.AlikeDead() || !live.ChangePosture(stand) {
 		return false
 	}
+	live.takeDeferredMagicSkill()
+	live.takeDeferredItemAICast()
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
 	if stand {
