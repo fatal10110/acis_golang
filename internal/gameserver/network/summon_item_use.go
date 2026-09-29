@@ -92,14 +92,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			return true
 		}
 		live.move.Stop()
-		if !live.Character.Mount(summonItem.NPCID, inst.ObjectID) {
-			return true
-		}
-		l.broadcastLiveFrame(live, func() wire.Frame {
-			return serverpackets.FrameRide(live.ObjectID(), summonItem.NPCID)
-		})
-		live.Character.UpdateUserInfo()
-		live.Character.StartMountFeed()
+		l.mountWyvern(live, summonItem.NPCID, inst.ObjectID)
 		return true
 	}
 
@@ -209,5 +202,56 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	x, y, z := live.Position()
 	l.world.Spawn(decoration, x, y, z, live.Heading())
+	return true
+}
+
+// mountWyvern puts live on the wyvern npcID called by its collar
+// controlItemID. Both hands are emptied first; a weapon that cannot be taken
+// off refuses the mount with no packet, as the reference does, and a
+// use-item request leaves no client action pending. The rider is then
+// forced to run and loses its toggles before the wyvern's skill list, the
+// Ride, the speed refresh and the feed gauge go out.
+func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) {
+	if !l.disarmLive(live) {
+		return
+	}
+	l.changeLiveMoveType(live, true)
+	live.Character.EffectList().StopAllToggles()
+	if !live.Character.Mount(npcID, controlItemID) {
+		return
+	}
+	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameRide(live.ObjectID(), npcID)
+	})
+	l.broadcastCharacterInfo(live)
+	live.Character.StartMountFeed()
+}
+
+// disarmLive takes live's weapon and shield off, naming each item removed,
+// and refreshes its appearance for everyone around. It refuses, changing
+// nothing, while a cursed weapon is held. The attack in progress stops
+// either way. The grade penalty is left as it was: the reference's
+// body-slot unequip does not refresh it.
+func (l *GameClientLink) disarmLive(live *livePlayer) bool {
+	if live.Character.CursedWeaponEquipped() {
+		return false
+	}
+	if live.attack != nil {
+		live.attack.Stop()
+	}
+	live.SendFrame(serverpackets.FrameActionFailed())
+	if inv := live.Inventory(); inv != nil && l.inventory != nil {
+		for _, slot := range []item.Slot{item.SlotRHand, item.SlotLHand} {
+			res, ok := l.inventory.UnequipBodySlot(inv, int32(slot))
+			if !ok || len(res.Changed) == 0 {
+				continue
+			}
+			l.applyEquipItemStats(live, inv, res)
+			removed := res.Changed[0].Snapshot()
+			sendUnequippedMessage(live, removed.TemplateID, removed.EnchantLevel)
+		}
+	}
+	l.broadcastCharacterInfo(live)
 	return true
 }

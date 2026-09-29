@@ -4,6 +4,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -31,10 +33,8 @@ func (t mountFeedTable) MountFeed(npcID int32, level int) (player.MountFeed, boo
 }
 
 // feedMountFood has a hungry mount eat one unit of the rider's food item
-// objectID, through the food's item handler: the unit is used up, the feed
-// skill's effect plays for everyone around, and the gauge rises by the
-// skill's feed value scaled by the pet food rate. The rider is told the
-// mount ate even when the item gave nothing.
+// objectID, through the food's item handler (eatPetFood). The rider is told
+// the mount ate even when the item gave nothing.
 func (l *GameClientLink) feedMountFood(live *livePlayer, objectID int32) {
 	inv := live.Inventory()
 	if inv == nil {
@@ -44,24 +44,47 @@ func (l *GameClientLink) feedMountFood(live *livePlayer, objectID int32) {
 	if inst == nil {
 		return
 	}
-	tmpl, ok := inv.Templates().Get(inst.TemplateID)
-	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != petFoodsHandler {
+	templateID := inst.TemplateID
+	if !l.eatPetFood(live, inv, inst) {
 		return
 	}
-	templateID := inst.TemplateID
-	if l.skills != nil && l.inventory != nil {
-		if amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, templateID); ok {
-			if _, ok := l.inventory.DestroyItem(inv, objectID, 1); ok {
-				magicID := petFoodMagicIDs[templateID]
-				self := skillCastObject(live)
-				l.broadcastLiveFrame(live, func() wire.Frame {
-					return serverpackets.FrameMagicSkillUse(self, self, magicID, 1, 0, 0, false)
-				})
-				live.Character.AddMountFeed(amount)
-			}
-		}
-	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookS1BecauseHeWasHungry, templateID))
+}
+
+// eatPetFood is a player's own use of a pet-food item, and reports whether
+// inst is one. A rider whose mount eats that food uses up one unit: the feed
+// skill's effect plays for everyone around, and the gauge rises by the
+// skill's feed value scaled by the pet food rate. Anyone else is told the
+// item cannot be used. A food item with no feed skill is ignored with no
+// packet, as the reference does; a use-item request leaves no client action
+// pending.
+func (l *GameClientLink) eatPetFood(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != petFoodsHandler {
+		return false
+	}
+	templateID := inst.TemplateID
+	if l.skills == nil || l.inventory == nil {
+		return true
+	}
+	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, templateID)
+	if !ok {
+		return true
+	}
+	if !live.Character.MountEats(templateID) {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1CannotBeUsed, templateID))
+		return true
+	}
+	if _, ok := l.inventory.DestroyItem(inv, inst.ObjectID, 1); !ok {
+		return true
+	}
+	magicID := petFoodMagicIDs[templateID]
+	self := skillCastObject(live)
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillUse(self, self, magicID, 1, 0, 0, false)
+	})
+	live.Character.AddMountFeed(amount)
+	return true
 }
 
 // broadcastDismount shows a rider getting off its mount: the feed gauge

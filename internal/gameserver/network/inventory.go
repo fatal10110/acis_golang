@@ -82,6 +82,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useSummonItem(live, inv, inst) {
 		return
 	}
+	if l.eatPetFood(live, inv, inst) {
+		return
+	}
 	if l.useShotItem(live, inv, inst) {
 		return
 	}
