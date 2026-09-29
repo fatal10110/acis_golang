@@ -417,6 +417,9 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	// Attackable without a forced attack by the owner only, not by the
 	// summon itself.
 	flaggedForOwner := &targetActor{id: 68, kind: actor.KindPlayer, attackableBy: true, withoutForceBy: plainOwner.id}
+	// A summon whose own social policy refuses the target while its owner's
+	// allows it: AREA asks the summon, ONE asks the owner.
+	deniedSummon := &targetActor{id: 69, kind: actor.KindSummon, owner: plainOwner, playableCastDenied: true}
 
 	// Corpse-ally fixtures.
 	olympian := &targetActor{id: 50, kind: actor.KindPlayer, olympiad: true}
@@ -493,7 +496,9 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 
 		{"area playable the caster may not hit", modelskill.TargetArea, policyDenied, flagged, offensive, CastRejectInvalidTarget},
 		{"area summon on its own flagged owner", modelskill.TargetArea, flaggedOwnerSummon, flaggedOwner, offensive, CastRejectInvalidTarget},
-		{"area summon whose owner may not hit the target", modelskill.TargetArea, deniedOwnerSummon, flagged, offensive, CastRejectInvalidTarget},
+		{"area summon that may not hit the target itself", modelskill.TargetArea, deniedSummon, flagged, offensive, CastRejectInvalidTarget},
+		{"area summon judged by itself, not its denying owner", modelskill.TargetArea, deniedOwnerSummon, flagged, offensive, CastRejectNone},
+		{"one summon judged by its owner, not its own denial", modelskill.TargetOne, deniedSummon, flagged, offensive, CastRejectNone},
 		{"area unattackable target", modelskill.TargetArea, areaCaster, untouchable, offensive, CastRejectInvalidTarget},
 		{"area target needing a forced attack", modelskill.TargetArea, areaCaster, unflagged, offensive, CastRejectInvalidTarget},
 		{"area flagged target", modelskill.TargetArea, areaCaster, flagged, offensive, CastRejectNone},

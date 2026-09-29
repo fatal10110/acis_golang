@@ -163,7 +163,7 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		return CastRejectInvalidTarget
 	}
 	if isPlayable(target) {
-		if playableOffenseRefused(caster, target, skill, ctrl) {
+		if ownSide(caster, target) || !player.CanCastOnPlayable(target, skill, ctrl, true) {
 			return CastRejectInvalidTarget
 		}
 		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(player)) {
@@ -194,14 +194,11 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 	return CastRejectNone
 }
 
-// playableOffenseRefused reports whether caster's acting player may not
-// affect the playable target offensively: never its own side (a summon its
-// owner, a player their own summon), whatever CTRL says, and otherwise as
-// its social policy decides.
-func playableOffenseRefused(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
+// ownSide reports whether target belongs to caster's own side: the same
+// acting player drives both (a summon and its owner, a player and their own
+// summon). No offensive skill may affect its own side, whatever CTRL says.
+func ownSide(caster, target Actor) bool {
 	player, _ := actingPlayerOf(caster)
-	if targetPlayer, _ := actingPlayerOf(target); sameCreature(targetPlayer, player) {
-		return true
-	}
-	return !player.CanCastOnPlayable(target, skill, ctrl, true)
+	targetPlayer, _ := actingPlayerOf(target)
+	return sameCreature(targetPlayer, player)
 }

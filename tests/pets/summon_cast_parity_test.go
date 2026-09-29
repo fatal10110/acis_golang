@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -246,17 +247,26 @@ const (
 // TestPetItemSkillConditionJudgesThePetTarget has the pet use an ItemSkills
 // item whose skill requires its target to be the fixture monster.
 // ItemSkills.useItem checks the clause against the pet's own target
-// (playable.getTarget()): with the monster selected the pet uses the item,
-// with nothing selected the owner reads the clause's message and the pet
-// casts nothing.
+// (playable.getTarget()): with the monster selected the pet uses the item;
+// with nothing selected, or with the pet aimed at its owner while the owner
+// has the monster selected, the owner reads the clause's message and the pet
+// casts nothing. The last row pins the pet's target, not the owner's.
 func TestPetItemSkillConditionJudgesThePetTarget(t *testing.T) {
 	t.Parallel()
+	const (
+		petTargetsNothing = iota
+		petTargetsMonster
+		petTargetsOwner
+	)
 	for _, tc := range []struct {
-		name   string
-		target bool
+		name          string
+		petTarget     int
+		ownerSelected bool
+		target        bool
 	}{
-		{"monster targeted", true},
-		{"no target", false},
+		{"monster targeted", petTargetsMonster, false, true},
+		{"no target", petTargetsNothing, false, false},
+		{"wrong target", petTargetsOwner, true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -285,8 +295,20 @@ func TestPetItemSkillConditionJudgesThePetTarget(t *testing.T) {
 			drainUntilQuiet(t, h.client)
 			potionID := h.seededItem(t, petPotionID)
 			h.giveToPet(t, potionID, 2)
-			if tc.target {
+			if tc.ownerSelected {
+				h.client.Send(encodeAction(hostile.ObjectID(), hostileX, hostileY, hostileZ, false))
+				drainUntilQuiet(t, h.client)
+				owner, _ := h.srv.State.Player(h.ownerID)
+				if got := owner.(interface{ CurrentTarget() world.Tracked }).CurrentTarget(); got == nil || got.ObjectID() != hostile.ObjectID() {
+					t.Fatalf("owner target = %v, want the fixture monster", got)
+				}
+			}
+			switch tc.petTarget {
+			case petTargetsMonster:
 				runOnPetQueue(t, petActor, func() { petActor.SetTarget(hostile) })
+			case petTargetsOwner:
+				owner, _ := h.srv.State.Player(h.ownerID)
+				runOnPetQueue(t, petActor, func() { petActor.SetTarget(owner.(world.Tracked)) })
 			}
 
 			h.client.Send(encodeRequestPetUseItem(potionID))
