@@ -29,7 +29,7 @@ func (c *recordingCast) CastingNow() bool        { return c.casting }
 func (*recordingCast) CurrentSkillIsMagic() bool { return false }
 func (*recordingCast) Now() time.Time            { return time.Time{} }
 func (*recordingCast) Interrupt(time.Time) bool  { return false }
-func (*recordingCast) StopCast()                 {}
+func (*recordingCast) StopInFlight() bool        { return false }
 func (c *recordingCast) InterruptCastOnDamage(damage float64, _ int, _ func(float64) float64, roll int, immune bool) bool {
 	c.rolls = append(c.rolls, castBreakRoll{damage: damage, roll: roll, immune: immune, hp: c.a.HP()})
 	if c.breaks && !immune {
@@ -107,18 +107,14 @@ func TestSummonAutoAttackRollsCastBreakAfterHPChange(t *testing.T) {
 }
 
 // TestSummonDamageBreaksCastOnlyWhileCasting pins that a hit on a summon
-// with no cast in flight draws no cast-break roll, and a breaking roll
-// sends the summon idle.
+// with no cast in flight draws no cast-break roll. Where a broken cast
+// leaves the summon is up to its reported end (CastStopped).
 func TestSummonDamageBreaksCastOnlyWhileCasting(t *testing.T) {
 	a, c := newCastingPet(t, true)
-	a.setIntent(IntentAttackTarget)
 
 	a.ReduceHP(10, nil, modelskill.Definition{})
 	if len(c.rolls) != 1 || c.casting {
 		t.Fatalf("after the breaking hit: rolls = %+v, casting = %v; want one roll and the cast broken", c.rolls, c.casting)
-	}
-	if got := a.Intent(); got == IntentAttackTarget {
-		t.Fatal("intent still attack after the cast broke, want the summon sent idle")
 	}
 
 	a.ReduceHP(10, nil, modelskill.Definition{})

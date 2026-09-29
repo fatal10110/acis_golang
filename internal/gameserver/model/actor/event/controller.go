@@ -10,9 +10,11 @@ import (
 type CastAborted struct{ Interrupted bool }
 
 // CastFinished reports an in-flight cast ending, Interrupted by an abort or
-// completed naturally.
+// completed naturally. Broken marks an abort that went through the
+// window-gated interrupt path, as CastAborted.Interrupted does.
 type CastFinished struct {
 	Interrupted bool
+	Broken      bool
 	Skill       modelskill.Definition
 }
 

@@ -16,8 +16,9 @@ type CastControl interface {
 	// Interrupt aborts the cast only while it is still inside its interrupt
 	// window at now, and reports whether it did.
 	Interrupt(now time.Time) bool
-	// StopCast aborts the cast unconditionally.
-	StopCast()
+	// StopInFlight aborts the cast unconditionally, and reports whether
+	// one was in flight.
+	StopInFlight() bool
 	// InterruptCastOnDamage applies the damage cast-break rule with the
 	// inputs of the creature taking the damage, and reports whether it
 	// broke the cast.
@@ -35,18 +36,19 @@ func (a *Actor) CurrentSkillIsMagic() bool {
 }
 
 // InterruptCast aborts a's cast while it is still inside its interrupt
-// window, then sends a idle.
+// window. The aborted cast's end moves the AI on and sends a idle (see
+// CastStopped).
 func (a *Actor) InterruptCast() {
-	if a.cast != nil && a.cast.Interrupt(a.cast.Now()) {
-		a.TryToIdle()
+	if a.cast != nil {
+		a.cast.Interrupt(a.cast.Now())
 	}
 }
 
 // StopCast aborts a's cast unconditionally and sends a idle, whether or not
-// a cast was in flight.
+// a cast was in flight: an aborted cast's end does both (see CastStopped).
 func (a *Actor) StopCast() {
-	if a.cast != nil {
-		a.cast.StopCast()
+	if a.cast != nil && a.cast.StopInFlight() {
+		return
 	}
 	a.TryToIdle()
 }
@@ -63,17 +65,14 @@ func (a *Actor) BreakCastOnDamage(damage float64) {
 }
 
 // breakCastOnDamage rolls whether damage a takes breaks its cast, reading
-// MEN, ATTACK_CANCEL and the roll from a itself; a broken cast sends a idle.
-// An invulnerable summon is never broken, and a summon with no cast in
-// flight draws no roll.
+// MEN, ATTACK_CANCEL and the roll from a itself; a broken cast's end moves
+// the AI on and sends a idle (see CastStopped). An invulnerable summon is
+// never broken, and a summon with no cast in flight draws no roll.
 func (a *Actor) breakCastOnDamage(damage float64) {
 	if a.cast == nil || !a.cast.CastingNow() {
 		return
 	}
-	broke := a.cast.InterruptCastOnDamage(damage, a.MEN(), func(base float64) float64 {
+	a.cast.InterruptCastOnDamage(damage, a.MEN(), func(base float64) float64 {
 		return a.CalcStat(stat.AttackCancel, base)
 	}, a.Roll(100), a.Invul())
-	if broke {
-		a.TryToIdle()
-	}
 }

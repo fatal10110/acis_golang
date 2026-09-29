@@ -668,6 +668,9 @@ type recordingCast struct {
 	castedTarget attackable.Combatant
 	castedRef    skill.Ref
 	stopCalls    int
+	// onStop, when set, runs inside Stop the way a cast end reported by
+	// the controller's sink does.
+	onStop func()
 }
 
 func (c *recordingCast) Disabled() bool               { return c.disabled }
@@ -716,6 +719,9 @@ func (c *recordingCast) Cast(target attackable.Combatant, ref skill.Ref) {
 func (c *recordingCast) Stop() {
 	c.stopCalls++
 	c.casting = false
+	if c.onStop != nil {
+		c.onStop()
+	}
 }
 
 // ---- from attackable_threat_test.go ----
@@ -3416,5 +3422,150 @@ func TestSummonAISkipsGateWhileDeniedOrBusy(t *testing.T) {
 				t.Fatalf("swings = %d, want none while %s", strike.doAttackCalls, tc.name)
 			}
 		})
+	}
+}
+
+// castingAfterAttack returns a summon AI that was attacking target when its
+// owner commanded a cast on it, so the cast replaced the attack.
+func castingAfterAttack(t *testing.T) (*Summon, *fakeActor, *recordingAttack, *recordingCast) {
+	t.Helper()
+	self, target := actor(100), actor(200)
+	self.known[target.ObjectID()] = true
+	strike := &recordingAttack{canAttack: true}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(self, &summonMove{}, strike)
+	brain.SetCastController(cast)
+	if !brain.TryToAttack(target) || strike.doAttackCalls != 1 {
+		t.Fatalf("TryToAttack() did not swing (DoAttack calls %d)", strike.doAttackCalls)
+	}
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false) || cast.castCalls != 1 {
+		t.Fatal("TryToCast() did not cast")
+	}
+	cast.casting = true
+	return brain, target, strike, cast
+}
+
+// TestSummonAICastStoppedResumesTheReplacedAttack pins a stopped cast's AI
+// step: with nothing queued it resumes the attack the cast replaced and
+// reports nothing idled.
+func TestSummonAICastStoppedResumesTheReplacedAttack(t *testing.T) {
+	brain, target, strike, cast := castingAfterAttack(t)
+	cast.casting = false
+
+	idled, handled := brain.CastStopped(actor(1))
+	if !handled || idled {
+		t.Fatalf("CastStopped() = (idled %v, handled %v), want (false, true)", idled, handled)
+	}
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want the attack resumed", got)
+	}
+	if strike.doAttackCalls != 2 || strike.target != target {
+		t.Fatalf("DoAttack calls = %d on %v, want a second swing on the target", strike.doAttackCalls, strike.target)
+	}
+}
+
+// TestSummonAICastStoppedDropsTheQueuedCast pins that a cast queued behind
+// a stopped cast is dropped, not started: the summon goes idle, following
+// its owner, rather than resuming the attack the first cast replaced or
+// firing the queued skill through the interrupt. Without an owner to follow
+// it stands still.
+func TestSummonAICastStoppedDropsTheQueuedCast(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		follow attackable.Combatant
+		want   Intention
+	}{
+		{name: "follows owner", follow: actor(1), want: IntentionFollow},
+		{name: "no owner", follow: nil, want: IntentionIdle},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			brain, target, strike, cast := castingAfterAttack(t)
+			if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+				t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
+			}
+			cast.casting = false
+
+			idled, handled := brain.CastStopped(tc.follow)
+			if !handled || !idled {
+				t.Fatalf("CastStopped() = (idled %v, handled %v), want (true, true)", idled, handled)
+			}
+			if cast.castCalls != 1 {
+				t.Fatalf("Cast calls = %d, want the queued cast dropped", cast.castCalls)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("DoAttack calls = %d, want no resumed swing", strike.doAttackCalls)
+			}
+			if got := brain.CurrentIntention(); got != tc.want {
+				t.Fatalf("CurrentIntention() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestSummonAIFinishedCastingStartsTheQueuedCast pins the other side: a
+// cast that completes starts the cast queued behind it.
+func TestSummonAIFinishedCastingStartsTheQueuedCast(t *testing.T) {
+	brain, target, _, cast := castingAfterAttack(t)
+	if brain.TryToCast(target, skill.Ref{ID: 4140, Level: 1}, false); cast.castCalls != 1 {
+		t.Fatalf("TryToCast() while casting started a cast (calls %d), want it queued", cast.castCalls)
+	}
+	cast.casting = false
+
+	if idled := brain.FinishedCasting(actor(1)); idled {
+		t.Fatal("FinishedCasting() idled, want the queued cast started")
+	}
+	if cast.castCalls != 2 || cast.castedRef.ID != 4140 {
+		t.Fatalf("Cast calls = %d (last %v), want the queued skill 4140 cast", cast.castCalls, cast.castedRef)
+	}
+}
+
+// TestSummonAICastStoppedWithoutAttackFollowsOwner pins a stopped cast with
+// no attack to resume: the summon goes back to following its owner.
+func TestSummonAICastStoppedWithoutAttackFollowsOwner(t *testing.T) {
+	self, target, owner := actor(100), actor(200), actor(1)
+	self.known[target.ObjectID()] = true
+	move := &summonMove{}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewSummon(self, move, &recordingAttack{})
+	brain.SetCastController(cast)
+	if !brain.TryToCast(target, skill.Ref{ID: 4139, Level: 1}, false) {
+		t.Fatal("TryToCast() did not cast")
+	}
+
+	idled, handled := brain.CastStopped(owner)
+	if !handled || !idled {
+		t.Fatalf("CastStopped() = (idled %v, handled %v), want (true, true)", idled, handled)
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow || move.friendlyTarget != owner {
+		t.Fatalf("CurrentIntention() = %v following %v, want follow on the owner", got, move.friendlyTarget)
+	}
+}
+
+// TestSummonAIAbortAllLeavesTheStoppedCastAlone pins that a cast AbortAll
+// stops moves nothing on: the cast end it reports is left unhandled, so no
+// attack resumes before AbortAll's caller settles the summon, while a cast
+// stopped outside AbortAll afterwards is handled again.
+func TestSummonAIAbortAllLeavesTheStoppedCastAlone(t *testing.T) {
+	brain, _, strike, cast := castingAfterAttack(t)
+	var handled, called bool
+	cast.onStop = func() {
+		called = true
+		_, handled = brain.CastStopped(actor(1))
+	}
+
+	brain.AbortAll()
+	if !called || handled {
+		t.Fatalf("cast end during AbortAll: reported %v, handled %v; want reported and unhandled", called, handled)
+	}
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("DoAttack calls = %d after AbortAll, want no resumed swing", strike.doAttackCalls)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v after AbortAll, want the cast's idle left as is", got)
+	}
+
+	cast.onStop = nil
+	if _, handled := brain.CastStopped(actor(1)); !handled {
+		t.Fatal("CastStopped() after AbortAll returned unhandled, want the abort guard released")
 	}
 }

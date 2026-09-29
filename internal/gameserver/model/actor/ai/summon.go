@@ -71,6 +71,10 @@ type Summon struct {
 	// previous is the intention current last replaced; a finished cast
 	// resumes it when it was an attack.
 	previous intention
+	// aborting counts the AbortAll calls stopping the cast right now. The
+	// caller of AbortAll settles the summon's intention itself, so a cast
+	// end it causes moves nothing on (see CastStopped).
+	aborting int
 }
 
 // NewSummon builds an idle summon AI loop.
@@ -294,7 +298,8 @@ func (s *Summon) StopMove() { s.move.Stop() }
 func (s *Summon) StopAttack() { s.attack.Stop() }
 
 // AbortAll stops movement, the attack cycle and any in-flight cast, in that
-// order. Intentions are left as they are.
+// order. Intentions are left as they are, the stopped cast's end included:
+// the caller decides where the summon goes next.
 func (s *Summon) AbortAll() {
 	s.mu.Lock()
 	cast := s.cast
@@ -302,8 +307,22 @@ func (s *Summon) AbortAll() {
 	s.move.Stop()
 	s.attack.Stop()
 	if cast != nil {
-		cast.Stop()
+		s.stopCastAborting(cast)
 	}
+}
+
+// stopCastAborting stops cast with aborting raised, so the cast end it
+// reports synchronously is left alone by CastStopped.
+func (s *Summon) stopCastAborting(cast SummonCastController) {
+	s.mu.Lock()
+	s.aborting++
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.aborting--
+		s.mu.Unlock()
+	}()
+	cast.Stop()
 }
 
 // StartOffensiveFollowTicker launches the 500 ms offensive-follow recheck
@@ -395,6 +414,32 @@ func (s *Summon) FinishedAttack() {
 func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.finishedCastingLocked(follow)
+}
+
+// CastStopped is FinishedCasting for a cast stopped before it completed. A
+// cast AbortAll stopped moves nothing on and reports handled false.
+//
+// A queued cast is dropped rather than started: the reference reports a
+// stopped cast to the AI before it clears its casting flag, so the queued
+// cast's think still sees a cast in flight and idles instead
+// (CreatureCast.stop, PlayableAI.thinkCast). Only a cast that completes
+// clears the flag first, so FinishedCasting still starts the queued cast.
+func (s *Summon) CastStopped(follow attackable.Combatant) (idled, handled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.aborting > 0 {
+		return false, false
+	}
+	if s.next.kind == IntentionCast {
+		s.setCurrentLocked(s.next)
+		s.idleOrFollowLocked(follow)
+		return true, true
+	}
+	return s.finishedCastingLocked(follow), true
+}
+
+func (s *Summon) finishedCastingLocked(follow attackable.Combatant) (idled bool) {
 	if s.runNextLocked() {
 		s.thinkLocked()
 		return false
@@ -407,12 +452,18 @@ func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 		s.thinkLocked()
 		return false
 	}
+	s.idleOrFollowLocked(follow)
+	return true
+}
+
+// idleOrFollowLocked follows follow when it is non-nil, otherwise stands
+// the summon still.
+func (s *Summon) idleOrFollowLocked(follow attackable.Combatant) {
 	if follow != nil {
 		s.followInsteadLocked(follow)
 	} else {
 		s.idleLocked()
 	}
-	return true
 }
 
 // runNextLocked makes the queued intention current, if there is one.

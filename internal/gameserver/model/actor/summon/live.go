@@ -41,6 +41,10 @@ type AI interface {
 	// replaced, once a cast completes; otherwise it goes idle in the same
 	// critical section, following follow when non-nil, and reports true.
 	FinishedCasting(follow attackable.Combatant) bool
+	// CastStopped is FinishedCasting for a cast stopped before it
+	// completed. A cast AbortAll stopped moves nothing on and reports
+	// handled false.
+	CastStopped(follow attackable.Combatant) (idled, handled bool)
 	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()
