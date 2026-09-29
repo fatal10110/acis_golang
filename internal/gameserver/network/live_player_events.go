@@ -138,14 +138,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.RelationChanged:
 		l.broadcastRelations(live)
 	case event.PvPFlagged:
-		if l.pvpFlags == nil {
-			return
-		}
-		if e.UseFlaggedDuration {
-			l.pvpFlags.AddFlagged(live.Character)
-			return
-		}
-		l.pvpFlags.AddNormal(live.Character)
+		l.applyPvPFlag(live, e.UseFlaggedDuration)
 	case event.PKKarmaGained:
 		l.applyPKKarmaSideEffects(live)
 	case event.LeveledUp:

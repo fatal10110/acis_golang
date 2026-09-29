@@ -109,6 +109,13 @@ type livePlayer struct {
 	// one Discover is dropped once a later one has run.
 	petSightings atomic.Uint32
 
+	// pkSideEffectsPending counts PK side-effect tasks posted to this
+	// player's queue that have not run yet. While one is pending, a PvP
+	// flag request is posted behind it instead of applied at once, so a
+	// skill kill's re-flag lands after the flag reset its kill caused.
+	// The kill can run on another actor's queue, hence atomic.
+	pkSideEffectsPending atomic.Int32
+
 	// teleportMu serializes a teleport from its start through the position
 	// update with the Appearing that completes it. A summon-friend cast
 	// teleports this player from the caster's queue, while Appearing runs on

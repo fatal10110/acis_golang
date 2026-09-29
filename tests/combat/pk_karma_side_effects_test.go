@@ -42,14 +42,22 @@ func shippedItemTemplate(t *testing.T, id int32) *item.Template {
 	return tmpl
 }
 
-// TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag has a PvP-flagged player,
-// wearing the shipped PK-free knife, kill an innocent player. The kill makes
-// it a PKer: after the karma announcement the knife comes off through the
-// equip toggle (S1_DISARMED, the refresh, and ActionFailed for the aborted
-// attack), then the PvP flag task stops and the flag resets, which the
-// victim sees as a RelationChanged without the flag.
-func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
-	t.Parallel()
+// pkKillScene is a PvP-flagged killer wearing the shipped PK-free knife
+// next to an innocent level 1 victim, both in world with quiet clients.
+type pkKillScene struct {
+	srv             *gameservertest.Server
+	c, vc           *scriptedClient
+	objID, victimID int32
+	knifeObjID      int32
+	inv             *itemcontainer.Inventory
+	flags           *task.PvPFlags
+	killer          interface{ PvPFlagState() task.PvPFlagState }
+	karma           func() int
+	setRollSource   func(func(int) int)
+}
+
+func bootPKKillScene(t *testing.T) *pkKillScene {
+	t.Helper()
 	knife := shippedItemTemplate(t, apprenticeKnifeID)
 	if len(knife.UseConditions) != 1 || knife.UseConditions[0].MessageID != 1685 {
 		t.Fatalf("shipped knife conditions = %+v, want the one pkCount clause with message 1685", knife.UseConditions)
@@ -63,7 +71,7 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Killer", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(combatPersistence(t, killSkillDefs())),
+		gameservertest.WithSkills(combatPersistence(t, offensiveKillSkillDefs())),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithPvPFlags(flags),
 	)
@@ -87,20 +95,34 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	c.Send(encodeUseItem(knifeObjID, false))
 	srv.AdvanceUntil(t, "knife equipped", func() bool { return inv.ItemByObjectID(knifeObjID).Equipped() })
 	killer := obj.(task.PvPFlagActor)
-	done := make(chan struct{})
-	if !srv.PlayerQueue(t, objID).Post(func() { defer close(done); flags.AddNormal(killer) }) {
-		t.Fatal("killer queue closed")
+	runOnKiller := func(fn func()) {
+		done := make(chan struct{})
+		if !srv.PlayerQueue(t, objID).Post(func() { defer close(done); fn() }) {
+			t.Fatal("killer queue closed")
+		}
+		<-done
 	}
-	<-done
+	runOnKiller(func() { flags.AddNormal(killer) })
 	drainUntilQuiet(t, vc)
 	drainUntilQuiet(t, c)
+	return &pkKillScene{
+		srv: srv, c: c, vc: vc, objID: objID, victimID: victim.ID,
+		knifeObjID: knifeObjID, inv: inv, flags: flags,
+		killer: obj.(interface{ PvPFlagState() task.PvPFlagState }),
+		karma:  obj.(interface{ Karma() int }).Karma,
+		setRollSource: func(roll func(int) int) {
+			runOnKiller(func() { obj.(interface{ SetRollSource(func(int) int) }).SetRollSource(roll) })
+		},
+	}
+}
 
-	selectPlayerTarget(t, c, victim.ID)
-	castKillSkill(t, srv, c, objID, victim.ID, true)
-	assertKarmaChangeFrames(t, c, objID, 240)
-	srv.Settle(t)
-
-	frames := readQuiet(c)
+// assertKnifeTakenOff checks the killer's frames after its karma change for
+// the knife's removal through the equip toggle: S1_DISARMED, the refresh,
+// then ActionFailed for the aborted attack. It returns the frames and the
+// ActionFailed's index.
+func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
+	t.Helper()
+	frames := readQuiet(s.c)
 	disarmed := -1
 	for i, f := range frames {
 		if f[0] != serverpackets.OpcodeSystemMessage {
@@ -121,24 +143,22 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	}
 	refresh := indexOf(frames, disarmed, serverpackets.OpcodeUserInfo, -1)
 	aborted := indexOf(frames, disarmed, serverpackets.OpcodeActionFailed, -1)
-	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
-	if refresh < 0 || aborted < refresh || flagReset < 0 {
-		t.Fatalf("frames after the karma change = %x, want S1_DISARMED, UserInfo, ActionFailed, then the flag reset's UserInfo", opcodesOf(frames))
+	if refresh < 0 || aborted < refresh {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED, UserInfo, then ActionFailed", opcodesOf(frames))
 	}
-
-	if inv.ItemByObjectID(knifeObjID).Equipped() {
+	if s.inv.ItemByObjectID(s.knifeObjID).Equipped() {
 		t.Fatal("knife still equipped after the PK kill")
 	}
-	if state := obj.(interface{ PvPFlagState() task.PvPFlagState }).PvPFlagState(); state != task.PvPFlagNone {
-		t.Fatalf("killer PvP flag = %v after the PK kill, want none", state)
-	}
-	if n := flags.Len(); n != 0 {
-		t.Fatalf("PvP flag task tracks %d players after the PK kill, want none", n)
-	}
+	return frames, aborted
+}
 
+// lastVictimRelation returns the relation, karma and PvP flag of the last
+// RelationChanged the victim received for the killer.
+func (s *pkKillScene) lastVictimRelation(t *testing.T) (relation, karma, pvpFlag int32) {
+	t.Helper()
 	var last []byte
-	for _, f := range readQuiet(vc) {
-		if f[0] == serverpackets.OpcodeRelationChanged && wireReader(f[1:]).ReadInt32() == objID {
+	for _, f := range readQuiet(s.vc) {
+		if f[0] == serverpackets.OpcodeRelationChanged && wireReader(f[1:]).ReadInt32() == s.objID {
 			last = f
 		}
 	}
@@ -147,9 +167,74 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	}
 	r := wireReader(last[1:])
 	r.ReadInt32()
-	relation, _, karma := r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
-	if pvpFlag := r.ReadInt32(); relation&serverpackets.RelationPvPFlag != 0 || pvpFlag != 0 || karma != 240 {
+	relation, _, karma = r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	return relation, karma, r.ReadInt32()
+}
+
+// TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag has a PvP-flagged player,
+// wearing the shipped PK-free knife, kill an innocent player with a
+// physical attack. The hit flags the attacker before its damage lands; the
+// kill then makes it a PKer: after the karma announcement the knife comes
+// off through the equip toggle (S1_DISARMED, the refresh, and ActionFailed
+// for the aborted attack), then the PvP flag task stops and the flag
+// resets, which the victim sees as a RelationChanged without the flag.
+func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
+	t.Parallel()
+	s := bootPKKillScene(t)
+	// Every swing hits, so the scenario never waits on a lucky roll.
+	s.setRollSource(func(int) int { return 0 })
+
+	selectPlayerTarget(t, s.c, s.victimID)
+	s.c.Send(encodeAttackRequest(s.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertKarmaChangeFrames(t, s.c, s.objID, 240)
+	s.srv.Settle(t)
+
+	frames, aborted := s.assertKnifeTakenOff(t)
+	if indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1) < 0 {
+		t.Fatalf("frames after the karma change = %x, want the flag reset's UserInfo after ActionFailed", opcodesOf(frames))
+	}
+	if state := s.killer.PvPFlagState(); state != task.PvPFlagNone {
+		t.Fatalf("killer PvP flag = %v after the physical PK kill, want none", state)
+	}
+	if n := s.flags.Len(); n != 0 {
+		t.Fatalf("PvP flag task tracks %d players after the physical PK kill, want none", n)
+	}
+	if relation, karma, pvpFlag := s.lastVictimRelation(t); relation&serverpackets.RelationPvPFlag != 0 || pvpFlag != 0 || karma != 240 {
 		t.Fatalf("victim's last RelationChanged for the killer = relation %#x karma %d flag %d, want karma 240 and no flag", relation, karma, pvpFlag)
+	}
+}
+
+// TestPKSkillKillEndsWithTheKillerFlagged has the same flagged killer kill
+// the innocent player with an offensive skill. The kill's karma gain takes
+// the knife off and resets the flag as for a physical kill, but an
+// offensive skill flags its caster once its effects have run, so the killer
+// is flagged again after the reset and ends with both karma and the flag.
+func TestPKSkillKillEndsWithTheKillerFlagged(t *testing.T) {
+	t.Parallel()
+	s := bootPKKillScene(t)
+
+	selectPlayerTarget(t, s.c, s.victimID)
+	castKillSkill(t, s.srv, s.c, s.objID, s.victimID, true)
+	assertKarmaChangeFrames(t, s.c, s.objID, 240)
+	s.srv.Settle(t)
+
+	frames, aborted := s.assertKnifeTakenOff(t)
+	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
+	reflag := indexOf(frames, flagReset+1, serverpackets.OpcodeUserInfo, -1)
+	if flagReset < 0 || reflag < 0 {
+		t.Fatalf("frames after the karma change = %x, want the flag reset's UserInfo, then the re-flag's", opcodesOf(frames))
+	}
+	if karma := s.karma(); karma != 240 {
+		t.Fatalf("killer karma = %d after the skill PK kill, want 240", karma)
+	}
+	if state := s.killer.PvPFlagState(); state == task.PvPFlagNone {
+		t.Fatal("killer unflagged after the skill PK kill, want the skill's flag")
+	}
+	if n := s.flags.Len(); n != 1 {
+		t.Fatalf("PvP flag task tracks %d players after the skill PK kill, want the killer", n)
+	}
+	if relation, karma, pvpFlag := s.lastVictimRelation(t); relation&serverpackets.RelationPvPFlag == 0 || pvpFlag == 0 || karma != 240 {
+		t.Fatalf("victim's last RelationChanged for the killer = relation %#x karma %d flag %d, want karma 240 and the flag", relation, karma, pvpFlag)
 	}
 }
 
