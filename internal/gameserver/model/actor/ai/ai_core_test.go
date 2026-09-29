@@ -2934,3 +2934,77 @@ func TestSummonAIFinishedCastingWithoutFollowStandsStill(t *testing.T) {
 		t.Fatalf("Stop calls = %d, follow target = %v; want 1 stop and no follow", move.stopCount, move.friendlyTarget)
 	}
 }
+
+// latchedAttackAI returns an AI past its first periodic cycle that promoted
+// an attack on target out of idle through RunAI, so the attack is latched,
+// then lost that attack desire while keeping its hate.
+func latchedAttackAI(t *testing.T) (*Attackable, *fakeActor, *recordingAttack) {
+	t.Helper()
+	owner := actor(1)
+	owner.idleWander = true
+	target := actor(2)
+	owner.known = map[int32]bool{target.ObjectID(): true}
+	strike := &recordingAttack{canAttack: true}
+	a := NewAttackable(owner, &recordingMove{}, strike)
+	if err := a.TickThink(); err != nil {
+		t.Fatalf("spawn-cycle TickThink() error: %v", err)
+	}
+	addAttackHate(a, target, 0, 20)
+	if err := a.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("DoAttack calls after promotion = %d, want 1", strike.doAttackCalls)
+	}
+	a.Desires().Remove(IntentionAttack, target)
+	return a, owner, strike
+}
+
+func TestAttackableTickRunsLatchedAttackThenIdles(t *testing.T) {
+	a, _, strike := latchedAttackAI(t)
+	stops := strike.stopCalls
+
+	if err := a.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after the latched tick = %d, want 2", strike.doAttackCalls)
+	}
+	if strike.stopCalls <= stops {
+		t.Fatal("latched tick did not abort the attack for the empty-queue idle")
+	}
+	if got := a.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	}
+	if !a.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire missing after the latched tick's idle")
+	}
+}
+
+func TestAttackableThinkNeitherRunsNorClearsLatch(t *testing.T) {
+	a, _, strike := latchedAttackAI(t)
+
+	if err := a.Think(); err != nil {
+		t.Fatalf("Think() error: %v", err)
+	}
+	if strike.doAttackCalls != 1 {
+		t.Fatalf("DoAttack calls after Think = %d, want 1", strike.doAttackCalls)
+	}
+
+	if err := a.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	}
+	if err := a.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after the latch cleared = %d, want 2", strike.doAttackCalls)
+	}
+	if got := a.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	}
+}

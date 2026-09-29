@@ -19,10 +19,12 @@ import (
 const hitAnimationTail = 300 * time.Millisecond
 
 // startHostileSwing boots a player next to a moving monster with atkSpd
-// attack speed, has the monster run one periodic AI cycle, then gives it a
-// weak attack desire on the player over a lasting hate entry. The next
-// periodic cycle promotes the desire, and the monster's first swing starts
-// at once. It returns the monster and its swing's attack time.
+// attack speed, has the monster run one periodic AI cycle and walk in place,
+// then gives it a weak attack desire on the player over a lasting hate
+// entry. The next periodic cycle promotes the desire, and the monster's
+// first swing starts at once. Its last desire was a walk, so that swing is
+// not the one-pass latched attack. It returns the monster and its swing's
+// attack time.
 func startHostileSwing(t *testing.T, atkSpd int) (*gameservertest.Server, *npc.Hostile, time.Duration) {
 	t.Helper()
 	srv, hostile, _, attackTime := startHostileAttack(t, atkSpd, 0)
@@ -32,6 +34,35 @@ func startHostileSwing(t *testing.T, atkSpd int) (*gameservertest.Server, *npc.H
 // startHostileAttack is startHostileSwing for a monster holding the
 // rightHand item (0 for none). It also returns the player it attacks.
 func startHostileAttack(t *testing.T, atkSpd, rightHand int) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, time.Duration) {
+	t.Helper()
+	return startHostileAttackAfter(t, atkSpd, rightHand, walkInPlace)
+}
+
+// hostilePrelude runs between a monster's spawn cycle and its first attack
+// desire. It sets the desire the monster last executed, which decides
+// whether its first attack is latched.
+type hostilePrelude func(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile)
+
+// walkInPlace runs a MOVE_TO desire to the monster's own position. It
+// finishes in the same cycle with no packet, and leaves a walk as the last
+// executed desire, so the next attack is not latched.
+func walkInPlace(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile) {
+	t.Helper()
+	x, y, z := hostile.Position()
+	if !hostile.AI().AddMoveToDesire(location.Location{X: x, Y: y, Z: z}, 1) {
+		t.Fatal("AddMoveToDesire() to own position = false, want the walk queued")
+	}
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("walk-in-place TickThink() error: %v", err)
+	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("queued desires after walking in place = %d, want 0", got)
+	}
+}
+
+// startHostileAttackAfter is startHostileAttack with prelude run before the
+// monster gets its attack desire.
+func startHostileAttackAfter(t *testing.T, atkSpd, rightHand int, prelude hostilePrelude) (*gameservertest.Server, *npc.Hostile, attackable.Combatant, time.Duration) {
 	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -54,6 +85,8 @@ func startHostileAttack(t *testing.T, atkSpd, rightHand int) (*gameservertest.Se
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("spawn-cycle TickThink() error: %v", err)
 	}
+	prelude(t, srv, hostile)
+	drainUntilQuiet(t, c)
 	hostile.AddDamageHate(victim, 0, 100)
 	hostile.AddAttackDesire(victim, 5)
 	if err := hostile.TickThink(); err != nil {
