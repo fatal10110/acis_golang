@@ -112,6 +112,9 @@ const (
 	SystemMessageEnchantScrollCancelled            = 423
 	SystemMessageWeightLimitExceeded               = 422
 	SystemMessageCrystallizeLevelTooLow            = 562
+	SystemMessageCannotTradeDiscardDropInShopMode  = 1065 // no parameter
+	SystemMessageYouPickedUpS2S1                   = 29   // item-name then item-number parameter
+	SystemMessageYouPickedUpS1                     = 30   // item-name parameter
 	SystemMessageCubicSummoningFailed              = 568
 	SystemMessagePetCannotSentBackDuringBattle     = 579
 	SystemMessageDeadPetCannotBeReturned           = 589

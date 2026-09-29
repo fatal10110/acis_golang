@@ -1,6 +1,7 @@
 package itemcontainer
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -65,12 +66,21 @@ type Update struct {
 // follows CON, config and the weightLimit stat) takes that owner as its
 // Limiter instead of the fixed SlotLimit and WeightLimit.
 //
+// A player's inventory also ties its left hand to the right: a bow or
+// fishing rod leaving the right hand takes the arrows or lure out of the
+// left, and a bow put in the right hand takes its matching arrows into the
+// left. Every paperdoll mutation applies that rule, so each caller reports
+// the extra left-hand change among the instances it altered.
+//
 // mu guards paperdoll, wornMask, totalWeight, updates and limiter.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
 
 	equipLocation item.Location
+	// pairsHands turns the bow/rod left-hand rule on. It is set once at
+	// construction and never written again.
+	pairsHands bool
 
 	WeightLimit int
 
@@ -174,7 +184,9 @@ func NewInventory(ownerID int32, baseLocation, equipLocation item.Location, temp
 
 // NewPlayerInventory returns an empty player inventory for ownerID.
 func NewPlayerInventory(ownerID int32, templates *item.Table) *Inventory {
-	return NewInventory(ownerID, item.LocationInventory, item.LocationPaperdoll, templates)
+	inv := NewInventory(ownerID, item.LocationInventory, item.LocationPaperdoll, templates)
+	inv.pairsHands = true
+	return inv
 }
 
 // NewPlayerInventoryWithDelivery returns a player inventory that reports live
@@ -341,6 +353,9 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	inv.mu.Lock()
 	for i, occupant := range inv.paperdoll {
 		if occupant == inst {
+			// A worn bow or rod leaving takes the left hand with it here
+			// too; a caller that has to report that change unequips with
+			// UnequipItem before it removes.
 			inv.unequipSlotLocked(i)
 		}
 	}
@@ -599,9 +614,14 @@ func (inv *Inventory) setPaperdollItemLocked(slot int, inst *item.Instance, tmpl
 // set of formal wear clears every other equip slot, and so on). It returns
 // every instance whose equip state changed as a result (the newly equipped
 // item plus any implicitly unequipped ones).
+//
+// A bow looks its arrows up among the held items, so the equip holds
+// Container.mu for reading ahead of mu, the order Restore takes them in.
 func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*item.Instance {
+	inv.Container.mu.RLock()
 	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlocks
+	defer inv.Container.mu.RUnlock()
 	defer inv.mu.Unlock()
 	return inv.equipItemLocked(inst, tmpl)
 }
@@ -612,8 +632,10 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 // legs, feet, gloves or a helmet cannot go on at all (refused reports that,
 // with nothing changed). Its altered list includes the removed dress.
 func (inv *Inventory) EquipPlayerItem(inst *item.Instance, tmpl *item.Template) (altered []*item.Instance, refused bool) {
+	inv.Container.mu.RLock()
 	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlocks
+	defer inv.Container.mu.RUnlock()
 	defer inv.mu.Unlock()
 
 	if chest := inv.paperdoll[Chest]; chest != nil {
@@ -631,17 +653,32 @@ func (inv *Inventory) EquipPlayerItem(inst *item.Instance, tmpl *item.Template) 
 	return append(altered, inv.equipItemLocked(inst, tmpl)...), false
 }
 
+// equipItemLocked is EquipItem's body. The caller holds Container.mu (for
+// reading at least) and mu. Each instance whose equip state changed is
+// reported once, in the order the paperdoll changed it: an item the bow or
+// rod rule moved in or out of the left hand comes just before the right-hand
+// item that moved it.
 func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	var altered []*item.Instance
-	set := func(slot int) {
-		if old := inv.setPaperdollItemLocked(slot, inst, tmpl); old != nil {
-			altered = append(altered, old)
+	record := func(changed ...*item.Instance) {
+		for _, c := range changed {
+			if !slices.Contains(altered, c) {
+				altered = append(altered, c)
+			}
 		}
-		altered = append(altered, inst)
+	}
+	set := func(slot int) {
+		if old := inv.setPaperdollItemLocked(slot, inst, tmpl); old != nil && old != inst {
+			record(inv.releaseOffHandLocked(slot, old)...)
+			record(old)
+		}
+		record(inv.pullOffHandLocked(slot, inst, tmpl)...)
+		record(inst)
 	}
 	clearSlot := func(slot int) {
 		if old := inv.setPaperdollItemLocked(slot, nil, nil); old != nil {
-			altered = append(altered, old)
+			record(inv.releaseOffHandLocked(slot, old)...)
+			record(old)
 		}
 	}
 	occupantTemplate := func(slot int) *item.Template {
@@ -763,24 +800,99 @@ func (inv *Inventory) equipPaired(tmpl *item.Template, slotA, slotB int, set fun
 }
 
 // UnequipSlot clears whatever instance occupies paperdoll position slot
-// and returns it, or nil if the slot was already empty. Unlike the Java
-// reference's separate "unequip by body slot" path, this is the only
-// unequip primitive: every equipped instance already records which
-// paperdoll position it occupies (Instance.LocationData), so resolving
-// that position back through the item's body-slot bits first is
-// unnecessary — it always round-trips to the same position.
+// and returns it, or nil if the slot was already empty. Every equipped
+// instance already records which paperdoll position it occupies
+// (Instance.LocationData), so resolving that position back through the
+// item's body-slot bits first is unnecessary — it always round-trips to the
+// same position. The left hand a bow or rod held is cleared with it; use
+// UnequipItem to learn about that change too.
 func (inv *Inventory) UnequipSlot(slot int) *item.Instance {
 	inv.mu.Lock()
 	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
-	return inv.unequipSlotLocked(slot)
+	changed := inv.unequipSlotLocked(slot)
+	if len(changed) == 0 {
+		return nil
+	}
+	return changed[len(changed)-1]
 }
 
-func (inv *Inventory) unequipSlotLocked(slot int) *item.Instance {
+// UnequipItem takes inst off the paperdoll when it is still worn and
+// returns every instance whose equip state changed, in the order the
+// paperdoll changed them: a bow's or rod's arrows or lure come before the
+// bow or rod itself. It returns nil when inst is not worn.
+func (inv *Inventory) UnequipItem(inst *item.Instance) []*item.Instance {
+	if inst == nil {
+		return nil
+	}
+	inv.mu.Lock()
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	for slot, occupant := range inv.paperdoll {
+		if occupant == inst {
+			return inv.unequipSlotLocked(slot)
+		}
+	}
+	return nil
+}
+
+// unequipSlotLocked clears paperdoll position slot and returns what it
+// changed, the left hand a bow or rod held first. The caller holds mu.
+func (inv *Inventory) unequipSlotLocked(slot int) []*item.Instance {
 	if slot < 0 || slot >= item.PaperdollSlots {
 		return nil
 	}
-	return inv.setPaperdollItemLocked(slot, nil, nil)
+	old := inv.setPaperdollItemLocked(slot, nil, nil)
+	if old == nil {
+		return nil
+	}
+	return append(inv.releaseOffHandLocked(slot, old), old)
+}
+
+// releaseOffHandLocked applies the first half of the player's bow/rod rule
+// after old left paperdoll position slot: a bow or fishing rod leaving the
+// right hand clears the left hand. It returns the instance it took off, if
+// any. The caller holds mu.
+func (inv *Inventory) releaseOffHandLocked(slot int, old *item.Instance) []*item.Instance {
+	if !inv.pairsHands || slot != RHand || old == nil {
+		return nil
+	}
+	tmpl, ok := inv.Templates().Get(old.TemplateID)
+	if !ok || tmpl.Weapon == nil || (tmpl.Weapon.Type != item.WeaponBow && tmpl.Weapon.Type != item.WeaponFishingRod) {
+		return nil
+	}
+	if off := inv.setPaperdollItemLocked(LHand, nil, nil); off != nil {
+		return []*item.Instance{off}
+	}
+	return nil
+}
+
+// pullOffHandLocked applies the second half of the player's bow/rod rule
+// after inst (its template is tmpl) went into paperdoll position slot: a
+// bow in the right hand takes the held arrows of its grade into the left
+// hand. It returns what it moved: the arrows, and whatever they displaced.
+// The caller holds Container.mu (for reading at least) and mu.
+func (inv *Inventory) pullOffHandLocked(slot int, inst *item.Instance, tmpl *item.Template) []*item.Instance {
+	if !inv.pairsHands || slot != RHand || inst == nil || tmpl == nil || tmpl.Weapon == nil || tmpl.Weapon.Type != item.WeaponBow {
+		return nil
+	}
+	arrowID, ok := arrowIDForCrystal(tmpl.Crystal)
+	if !ok {
+		return nil
+	}
+	arrows := inv.Container.itemByTemplateIDLocked(arrowID)
+	if arrows == nil {
+		return nil
+	}
+	arrowTmpl, ok := inv.Templates().Get(arrowID)
+	if !ok {
+		return nil
+	}
+	var moved []*item.Instance
+	if off := inv.setPaperdollItemLocked(LHand, arrows, arrowTmpl); off != nil && off != arrows {
+		moved = append(moved, off)
+	}
+	return append(moved, arrows)
 }
 
 // ClearWornSlot drops paperdoll position slot's occupant and its wornMask

@@ -88,14 +88,45 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
+	if tmpl.Kind == item.KindEtcItem && tmpl.Slot != item.SlotNone {
+		l.useOffHandItem(live, inv, inst, tmpl)
+		return
+	}
 	switch tmpl.Slot {
 	case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
 		if live.Mounted() {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEquipItemDueToBadCondition))
 			return
 		}
+		l.tryToUseItem(live, inv, inst, tmpl)
+		return
 	}
 	l.toggleEquipItem(live, inv, inst, tmpl, false)
+}
+
+// useOffHandItem answers UseItem on arrows or a lure, the etc items that go
+// in the left hand. They are not equipment a player puts on or takes off:
+// a bow takes its arrows into the left hand by itself, and a lure only goes
+// on over a fishing rod, replacing the lure worn, with no message and no
+// toggle off. Anything else answers ActionFailed, as UseItem does for any
+// item nothing uses (the reference drops it silently).
+func (l *GameClientLink) useOffHandItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
+	if tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemLure || !wieldsFishingRod(inv) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	inv.SetPaperdollItem(itemcontainer.LHand, inst, tmpl)
+	l.broadcastEquipmentChange(live)
+}
+
+// wieldsFishingRod reports whether inv's right hand holds a fishing rod.
+func wieldsFishingRod(inv *itemcontainer.Inventory) bool {
+	worn := inv.ItemAt(itemcontainer.RHand)
+	if worn == nil {
+		return false
+	}
+	tmpl, ok := inv.Templates().Get(worn.TemplateID)
+	return ok && tmpl.Weapon != nil && tmpl.Weapon.Type == item.WeaponFishingRod
 }
 
 // toggleEquipItem puts inst on, or takes it off when it is worn, for
@@ -479,8 +510,17 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 }
 
+// crystallizeLiveItem answers RequestCrystallizeItem. A player running a
+// private store is refused first. The reference also refuses a player
+// already crystallizing, a flag that only guards this same handler against
+// itself: requests run one at a time on the player's queue, so no second
+// crystallize can start while one is under way here.
 func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
 	if live == nil || req.Count <= 0 {
+		return
+	}
+	if live.Operating() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotTradeDiscardDropInShopMode))
 		return
 	}
 	inv := live.Inventory()
@@ -504,13 +544,22 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	}
 
 	l.applyEquipStatChanges(live, inv, res.Result)
-	if len(res.Changed) > 0 {
-		sendUnequippedMessage(live, res.SourceItemID, res.Changed[0].Snapshot().EnchantLevel)
+	if res.EquipmentChanged {
+		sendUnequippedMessage(live, res.SourceItemID, res.SourceEnchantLevel)
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, res.SourceItemID))
-	if res.EquipmentChanged {
-		l.broadcastEquipmentChange(live)
+	sendPickedUpMessage(live, res.CrystalItemID, res.CrystalCount)
+	l.broadcastEquipmentChange(live)
+}
+
+// sendPickedUpMessage tells live it received count of templateID, naming
+// the count only when it is more than one.
+func sendPickedUpMessage(live *livePlayer, templateID int32, count int) {
+	if count > 1 {
+		live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageYouPickedUpS2S1, templateID, int32(count)))
+		return
 	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouPickedUpS1, templateID))
 }
 
 // broadcastEquipmentChange resends UserInfo to live (refreshing its own
