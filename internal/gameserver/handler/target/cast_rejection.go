@@ -150,7 +150,7 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 			}
 			return CastRejectNone
 		}
-		if target.MonsterKind() && !ctrl && !skillIsDamage(skill) && !skill.Debuff {
+		if target.MonsterKind() && !ctrl && !skill.IsDamage() && !skill.Debuff {
 			return CastRejectInvalidTarget
 		}
 		return CastRejectNone
@@ -177,7 +177,7 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		return CastRejectNone
 	}
 	if target.FolkOrGuard() {
-		if !ctrl || !skillIsDamage(skill) {
+		if !ctrl || !skill.IsDamage() {
 			return CastRejectInvalidTarget
 		}
 		return CastRejectNone
@@ -188,12 +188,4 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		}
 	}
 	return CastRejectNone
-}
-
-func skillIsDamage(skill *modelskill.Definition) bool {
-	switch skill.SkillType {
-	case "PDAM", "MDAM", "DRAIN", "BLOW", "CPDAMPERCENT", "DEATHLINK", "CHARGEDAM", "FATAL", "SIGNET_CASTTIME":
-		return true
-	}
-	return false
 }

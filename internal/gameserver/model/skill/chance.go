@@ -64,14 +64,3 @@ func ParseChanceCondition(chanceType string, chance int) (cond ChanceCondition, 
 func (cond ChanceCondition) Fires(trigger TriggerType, roll int) bool {
 	return cond.Trigger == trigger && (cond.Chance < 0 || roll < cond.Chance)
 }
-
-// IsDamage reports whether d is a damage skill: its landing counts as an
-// offensive-magic event for its caster's chance procs and as being attacked
-// for its target's.
-func (d Definition) IsDamage() bool {
-	switch d.SkillType {
-	case "PDAM", "MDAM", "DRAIN", "BLOW", "CPDAMPERCENT", "DEATHLINK", "CHARGEDAM", "FATAL", "SIGNET_CASTTIME":
-		return true
-	}
-	return false
-}

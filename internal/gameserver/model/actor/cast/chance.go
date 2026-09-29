@@ -1,6 +1,7 @@
 package cast
 
 import (
+	"cmp"
 	"slices"
 	"time"
 
@@ -160,19 +161,14 @@ func (p *ChanceProcs) chanceSkills(owner chanceOwner) []modelskill.Definition {
 	if !ok || p.Definitions == nil {
 		return nil
 	}
-	levels := holder.SkillLevels()
-	ids := make([]int, 0, len(levels))
-	for id := range levels {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
 	var out []modelskill.Definition
-	for _, id := range ids {
-		def, ok := p.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: levels[id]})
+	for id, level := range holder.SkillLevels() {
+		def, ok := p.Definitions.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level})
 		if ok && def.Activation == modelskill.ActivationPassive && def.ChanceType != "" {
 			out = append(out, def)
 		}
 	}
+	slices.SortFunc(out, func(a, b modelskill.Definition) int { return cmp.Compare(a.ID, b.ID) })
 	return out
 }
 

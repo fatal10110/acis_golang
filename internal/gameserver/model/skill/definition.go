@@ -461,6 +461,16 @@ func isTypeOffensive(skillType string) bool {
 	return offensiveSkillTypes[skillType]
 }
 
+// IsDamage reports whether d is a skill type that deals damage, mirroring
+// L2Skill.isDamage.
+func (d Definition) IsDamage() bool {
+	switch d.SkillType {
+	case "PDAM", "MDAM", "DRAIN", "BLOW", "CPDAMPERCENT", "DEATHLINK", "CHARGEDAM", "FATAL", "SIGNET_CASTTIME":
+		return true
+	}
+	return false
+}
+
 // defaultBaseCritRate is the BaseCritRate a level defaults to when its data
 // doesn't set one explicitly: a physical-damage or blow skill always has a
 // chance to critical, everything else has none.
