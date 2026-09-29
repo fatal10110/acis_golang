@@ -32,13 +32,14 @@ type SummonRemoved struct{}
 type PetCorpseDecayed struct{}
 
 // CorpseLeftBehind reports that a dead summon's owner left the world while
-// the corpse stays in it until it decays. Whatever the owner's session must
-// settle for the summon is settled now, while the owner is still in world
-// state.
+// the corpse stays in it until it decays (or, for a pet, is revived). Whatever
+// the owner's session must settle for the summon is settled now, while the
+// owner is still in world state, and the runtime moves the summon's work to a
+// queue of the corpse's own.
 type CorpseLeftBehind struct{}
 
-// OwnerRelinked reports that a pet corpse its owner left behind now answers
-// to the owner's new session and its work runs on that session's queue: the
+// OwnerRelinked reports that a pet its owner left behind as a corpse, dead
+// or revived since, now answers to the owner's new session and its work runs on that session's queue: the
 // runtime moves the rest of the pet's work there and gives up the queue the
 // corpse had of its own.
 type OwnerRelinked struct{}

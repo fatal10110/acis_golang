@@ -127,7 +127,7 @@ type Actor struct {
 	movement move.CreatureMove
 	// queue is the queue this summon's work runs on: its owner's, set once
 	// before the summon is published, and a queue of its own once its corpse
-	// outlives its owner's session (AdoptCorpseQueue).
+	// outlives its owner's session (AdoptCorpseQueue), revived or not.
 	queue atomic.Pointer[sim.Queue]
 
 	id int32

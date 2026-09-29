@@ -19,15 +19,22 @@ import (
 // A servitor keeps its decay: at the deadline it leaves the world, alive
 // (Decay).
 //
-// A corpse its owner left behind stays dead while its owner is away: it
-// still answers to the session that left it, whose queue is closed. A pet's
-// corpse can be revived again once its returning owner has it back
-// (RelinkOwner).
+// A pet's corpse its owner left behind revives too: it runs on the queue
+// of its own the corpse moved to (AdoptCorpseQueue), stays where it stood
+// up, since its owner is not in the world to follow, and is handed to its
+// owner's next session alive (RelinkOwner). A servitor's corpse its owner
+// left behind is nobody's and stays dead.
 func (a *Actor) Revive() bool {
-	if a.OwnerLeft() {
+	if a.leftServitor() {
 		return false
 	}
 	return a.revive()
+}
+
+// leftServitor reports whether a is a servitor's corpse its owner left
+// behind, which nothing revives.
+func (a *Actor) leftServitor() bool {
+	return !a.isPet && a.OwnerLeft()
 }
 
 // ReviveRestoringExp is a resurrection's revive at power percent: a dead pet
@@ -35,7 +42,7 @@ func (a *Actor) Revive() bool {
 // rounded half up, then revives as Revive does. A servitor has no
 // experience of its own, so power changes nothing for it.
 func (a *Actor) ReviveRestoringExp(power float64) bool {
-	if a.OwnerLeft() || !a.Dead() {
+	if a.leftServitor() || !a.Dead() {
 		return false
 	}
 	if a.isPet {
@@ -50,21 +57,23 @@ func (a *Actor) CancelDecay() {
 }
 
 // ResurrectOutright is a non-player caster's resurrection at power percent.
-// It runs on a's own queue, as every other command on a does. A summon
-// still linked to its owner drops its pending decay first, so a revived
-// servitor stays in the world, as does a living servitor a player revived
-// earlier; a dead one then revives as ReviveRestoringExp does. A corpse its
-// owner left behind cannot be revived while its owner is away and keeps its
-// decay, so it still leaves the world at its deadline.
+// It runs on a's own queue, as every other command on a does. The summon
+// drops its pending decay first, so a revived servitor stays in the world,
+// as does a living servitor a player revived earlier; a dead one then
+// revives as ReviveRestoringExp does. That includes a pet's corpse whose
+// owner is offline (Revive). A servitor's corpse its owner left behind
+// cannot be revived and keeps its decay, so it still leaves the world at its
+// deadline.
 func (a *Actor) ResurrectOutright(power float64) {
 	// A closed queue refuses the job, which is what the job would do too:
-	// the queue closes with the owner's session, when a living summon has
-	// left the world and a corpse is left behind.
+	// a summon's queue closes only once the summon has left the world. (A
+	// queue the summon moved off closes too, but Post hands the job on to
+	// the one it moved to.)
 	a.Post(func() { a.resurrectOutright(power) })
 }
 
 func (a *Actor) resurrectOutright(power float64) bool {
-	if a.OwnerLeft() {
+	if a.leftServitor() {
 		return false
 	}
 	a.CancelDecay()

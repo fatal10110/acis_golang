@@ -43,27 +43,32 @@ func (a *Actor) OwnerItemCount(templateID int32) int {
 	return inv.ItemCount(templateID, -1, true)
 }
 
-// RelinkOwner hands a pet corpse its owner left behind to that owner's new
-// session: from here on it answers to owner, reads owner's inventory for its
-// collar, and its work runs on q, owner's queue. It is then fully the new
-// session's pet again, one that can be revived and, once revived, commanded;
-// event.OwnerRelinked tells the runtime to move the rest of its work onto q.
+// RelinkOwner hands a pet its owner left behind as a corpse to that owner's
+// new session: from here on it answers to owner, reads owner's inventory for
+// its collar, and its work runs on q, owner's queue. It is then fully the new
+// session's pet again; event.OwnerRelinked tells the runtime to move the rest
+// of its work onto q. A corpse can then be revived and, once revived,
+// commanded. A pet revived while its owner was away (Revive) comes back
+// alive where it stands: its owner-heal, if it is a baby pet, carries on on
+// q, and owner's collar is lifted to the level the pet has since regained. It
+// keeps what it was doing, so it follows its new owner only once told to,
+// as a revived pet whose owner was away follows no one.
 //
 // It reports false, changing nothing, for a servitor, a summon whose owner
-// has not left, a pet that is no longer dead, one whose decay has already
-// claimed it, and an owner with another object id. A relink and a decay
-// claim take the same lock, so a corpse is either relinked or decays under
-// the session that left it, never both.
+// has not left, a corpse whose decay has already claimed it, and an owner
+// with another object id. A relink and a decay claim take the same lock, so
+// a corpse is either relinked or decays under the session that left it,
+// never both.
 //
-// Call it as the owner of the corpse's own queue (sim.RunOwned): none of the
-// corpse's work runs during the move, and work that queue accepted before it
+// Call it as the owner of the pet's own queue (sim.RunOwned): none of the
+// pet's work runs during the move, and work that queue accepted before it
 // moves on to q (Post).
 func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Queue) bool {
 	if a == nil || !a.isPet || owner == nil || q == nil || owner.ObjectID() != a.OwnerID() {
 		return false
 	}
 	a.vitals.mu.Lock()
-	if !a.dead || a.decayed || !a.ownerLeft.Load() {
+	if a.decayed || !a.ownerLeft.Load() {
 		a.vitals.mu.Unlock()
 		return false
 	}
@@ -71,15 +76,30 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 	a.vitals.mu.Unlock()
 	a.queue.Store(q)
 	a.movement.SetQueue(q)
-	// The effect list still points at the departed session's queue, closed
-	// with that session: its ticks would be refused there, and a buff the
-	// revived pet takes would never expire.
 	a.effects.SetQueue(q)
 	a.emit(event.OwnerRelinked{})
-	// Last, so nothing that waits for the owner to be back (a revive, a
-	// later logout's leave) sees it before the move is complete.
+	if !a.Dead() {
+		// The owner-heal ticked on the queue the pet leaves, which closes
+		// with the relink.
+		a.moveBabyHeal()
+		a.liftCollar(inv)
+	}
+	// Last, so nothing that waits for the owner to be back (a later
+	// logout's leave) sees it before the move is complete.
 	a.ownerLeft.Store(false)
 	return true
+}
+
+// liftCollar sets the enchant of a pet's collar in inv to the pet's level.
+// The owner's session reads its collar from its own saved row, which does
+// not hold a level the pet regained after that session left.
+func (a *Actor) liftCollar(inv *itemcontainer.Inventory) {
+	if inv == nil || a.controlItemID == 0 {
+		return
+	}
+	if inst := inv.ItemByObjectID(a.controlItemID); inst != nil && inst.Snapshot().EnchantLevel != a.Level() {
+		inv.SetEnchantLevel(inst, a.Level())
+	}
 }
 
 // Post runs fn on a's queue and reports whether a queue accepted it. A job

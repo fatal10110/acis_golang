@@ -264,7 +264,16 @@ func (s *summonSink) Emit(ev event.Event) {
 		if actor.OwnerLeft() {
 			// A corpse its owner left behind has not acted since its row was
 			// saved (leaveCorpseBehind); its items are all that is left to
-			// settle.
+			// settle. One revived since is a living pet leaving the world
+			// (a signet's unsummon): it stops what it was doing and its row
+			// is saved again first, alive, with no owner in the world to
+			// lift the collar of.
+			if !actor.Dead() {
+				if s.brain != nil {
+					s.runCleanup(s.brain.AbortAll)
+				}
+				s.runCleanup(func() { l.savePet(actor, nil) })
+			}
 			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
 		}
@@ -300,9 +309,10 @@ func (s *summonSink) broadcastHP() {
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world
 // while its corpse stays: a pet's row and collar are saved, as for any other
 // departure, and its items stay with the corpse until it decays or its owner
-// comes back for it. The corpse moves to a queue of its own, which closes
-// when the corpse leaves the world or its owner comes back. It runs on the
-// leaving owner's queue, before that queue closes.
+// comes back for it. The corpse's work moves to a queue of its own, which
+// closes when the corpse leaves the world or its owner comes back: a pet's
+// corpse revived meanwhile lives on there. It runs on the leaving owner's
+// queue, before that queue closes.
 func (s *summonSink) leaveCorpseBehind() {
 	l, actor := s.link, s.actor
 	if actor.IsPet() {
@@ -318,16 +328,26 @@ func (s *summonSink) leaveCorpseBehind() {
 	q := l.queues.NewQueue(fmt.Sprintf("corpse-%d", actor.ObjectID()))
 	s.corpseQueue.Store(q)
 	actor.AdoptCorpseQueue(q)
+	s.moveWorkTo(q)
 	s.onDespawn(q.Close)
 }
 
 // relinkToOwner moves the rest of a relinked pet's work onto its owner's
-// queue, which the pet itself already runs on (summon.Actor.RelinkOwner):
-// its attack and cast timers and its offensive-follow ticker, which stopped
-// with the queue of the session that left it. The corpse's own queue then
-// closes. It runs as that queue's owner, as the relink does.
+// queue, which the pet itself already runs on (summon.Actor.RelinkOwner).
+// The corpse's own queue then closes. It runs as that queue's owner, as the
+// relink does.
 func (s *summonSink) relinkToOwner() {
-	q := s.actor.Queue()
+	s.moveWorkTo(s.actor.Queue())
+	if corpse := s.corpseQueue.Swap(nil); corpse != nil {
+		corpse.Close()
+	}
+}
+
+// moveWorkTo moves the summon's attack and cast timers and its
+// offensive-follow ticker onto q, the queue the summon itself has just moved
+// to. The ticker on the queue it left stops when that queue closes. It runs
+// as the owner of the queue the summon left.
+func (s *summonSink) moveWorkTo(q *sim.Queue) {
 	if s.attack != nil {
 		s.attack.SetQueue(q)
 	}
@@ -337,26 +357,24 @@ func (s *summonSink) relinkToOwner() {
 	if s.brain != nil {
 		s.onDespawn(s.brain.StartOffensiveFollowTicker(q))
 	}
-	if corpse := s.corpseQueue.Swap(nil); corpse != nil {
-		corpse.Close()
-	}
 }
 
 // reclaimPetCorpse hands the pet corpse live's character left behind, if
-// any, back to live: the corpse answers to live from then on and its work
-// runs on live's queue. It runs on live's queue, so a logout of live cannot
+// any, back to live, whether it is still a corpse or was revived meanwhile:
+// the pet answers to live from then on and its work runs on live's queue. It runs on live's queue, so a logout of live cannot
 // interleave with it, and takes over the corpse's own queue for the relink,
 // so none of the corpse's work (its decay) runs meanwhile. Taking it over
 // waits only for a drain already in progress; a job the queue accepted but
 // has not started runs after the relink. The corpse's own jobs (its decay,
 // through Decay.post; anything through summon.Actor.Post) check the queue
 // they run on first and move on to live's queue. A job posted there
-// directly does not: the AI sweep's think can run once more on the corpse
-// queue, which closes but still drains what it accepted. That think runs
-// under the brain's own lock and starts nothing for a dead pet
-// (DenyAIAction), and the pet is still dead until live, now in the world,
-// revives it. Nothing on a corpse's queue waits on its owner's, so taking it
-// over from here cannot deadlock.
+// directly does not: the AI sweep's think, and for a pet revived while live
+// was away its regeneration and effect ticks, can run once more on the
+// corpse queue, which closes but still drains what it accepted. Each takes
+// the locks it needs, as a hit landing from another actor's queue does, and
+// a pet revived while its owner was away has only its departed owner to
+// follow, whom it does not know. Nothing on a corpse's queue waits on its
+// owner's, so taking it over from here cannot deadlock.
 func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
 	if l.world == nil {
 		return

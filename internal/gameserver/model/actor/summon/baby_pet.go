@@ -52,6 +52,33 @@ func (a *Actor) IsBabyPet() bool { return a.babyPet }
 // startBabyHeal starts a living baby pet's owner-heal task on its queue,
 // unless it already runs.
 func (a *Actor) startBabyHeal() {
+	// The first heal comes babyHealDelay after the start, then one every
+	// babyHealPeriod: a period ticker whose first ticks are skipped keeps
+	// the whole task on one fixed-rate grid behind a single handle.
+	a.runBabyHeal(int(babyHealDelay/babyHealPeriod) - 1)
+}
+
+// moveBabyHeal moves a running owner-heal task onto a's queue, which a has
+// just moved to: the task stops on the queue a left and carries on, at its
+// usual period, on the new one. A task that is not running stays stopped.
+func (a *Actor) moveBabyHeal() {
+	if !a.babyPet {
+		return
+	}
+	t := &a.babyHeal
+	t.mu.Lock()
+	running := t.ticker != nil
+	t.mu.Unlock()
+	if !running {
+		return
+	}
+	a.stopBabyHeal(false)
+	a.runBabyHeal(0)
+}
+
+// runBabyHeal starts the owner-heal task, its first skip ticks doing
+// nothing, unless the pet is dead, gone, or the task already runs.
+func (a *Actor) runBabyHeal(skip int) {
 	if !a.babyPet {
 		return
 	}
@@ -67,11 +94,7 @@ func (a *Actor) startBabyHeal() {
 	if q == nil {
 		return
 	}
-	// The first heal comes babyHealDelay after the start, then one every
-	// babyHealPeriod: a period ticker whose first ticks are skipped keeps
-	// the whole task on one fixed-rate grid behind a single handle. The
-	// count is touched only by this ticker's own runs, all on q.
-	skip := int(babyHealDelay/babyHealPeriod) - 1
+	// The count is touched only by this ticker's own runs, all on q.
 	t.ticker = q.Every(babyHealPeriod, func() {
 		if skip > 0 {
 			skip--
