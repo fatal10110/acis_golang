@@ -263,17 +263,60 @@ func TestUseItemOnArrowsTogglesNothing(t *testing.T) {
 
 // TestFishingRodLureGoesOnAndComesOffWithTheRod: a lure goes on only over a
 // fishing rod, with no equip message, and taking the rod off takes the lure
-// off too, the message naming the lure.
+// off too. RequestUnEquipItem names the lure, the first item it took off;
+// UseItem names the rod it was sent for.
 func TestFishingRodLureGoesOnAndComesOffWithTheRod(t *testing.T) {
 	t.Parallel()
-	srv := gameservertest.Boot(t,
+	for _, tc := range []struct {
+		name    string
+		send    func(rod int32) []byte
+		namedID int32
+	}{
+		{"RequestUnEquipItem", func(int32) []byte { return encodeRequestUnEquipItem(int32(item.SlotLRHand)) }, lureID},
+		{"UseItem", func(rod int32) []byte { return encodeUseItem(rod, false) }, fishingRodID},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv, objID, rod, lure := bootRodWithLure(t)
+			c := srv.Client
+
+			c.Send(tc.send(rod))
+			msgs := systemMessages(collectUntilQuiet(t, c))
+			if len(msgs) != 1 {
+				t.Fatalf("rod unequip system messages = %d, want one", len(msgs))
+			}
+			assertSystemMessageItem(t, msgs[0], serverpackets.SystemMessageS1Disarmed, tc.namedID)
+			off := inventoryUpdateAfterTick(t, srv, c)
+			for _, id := range []int32{rod, lure} {
+				if e, ok := off[id]; !ok || e.equipped != 0 {
+					t.Fatalf("InventoryUpdate entry for %d = %+v (present %v), want unequipped", id, e, ok)
+				}
+			}
+			if srv.PlayerInventory(t, objID).ItemAt(itemcontainer.LHand) != nil {
+				t.Fatal("left hand still holds the lure after the rod came off")
+			}
+			assertWorn(t, srv, objID, rod, -1)
+			assertWorn(t, srv, objID, lure, -1)
+			if inst := mustFindItem(t, srv, objID, lure); inst.Count != 5 {
+				t.Fatalf("lure count after the rod came off = %d, want 5", inst.Count)
+			}
+		})
+	}
+}
+
+// bootRodWithLure boots a player wearing a fishing rod with a lure over it,
+// pinning on the way that a lure is refused without a rod and goes on over
+// one with a UserInfo and no system message.
+func bootRodWithLure(t *testing.T) (srv *gameservertest.Server, objID, rod, lure int32) {
+	t.Helper()
+	srv = gameservertest.Boot(t,
 		gameservertest.WithItemTemplates(handSlotCatalog()),
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1))
 	c := srv.Client
-	objID := srv.SoleObjectID(t)
-	rod := srv.GiveItem(t, objID, fishingRodID, 1)
-	lure := srv.GiveItem(t, objID, lureID, 5)
+	objID = srv.SoleObjectID(t)
+	rod = srv.GiveItem(t, objID, fishingRodID, 1)
+	lure = srv.GiveItem(t, objID, lureID, 5)
 	startInWorld(t, c)
 
 	c.Send(encodeUseItem(lure, false))
@@ -300,20 +343,7 @@ func TestFishingRodLureGoesOnAndComesOffWithTheRod(t *testing.T) {
 	if e := inventoryUpdateAfterTick(t, srv, c)[lure]; e.equipped != 1 {
 		t.Fatalf("lure InventoryUpdate entry = %+v, want equipped", e)
 	}
-
-	c.Send(encodeRequestUnEquipItem(int32(item.SlotLRHand)))
-	msgs := systemMessages(collectUntilQuiet(t, c))
-	if len(msgs) != 1 {
-		t.Fatalf("rod unequip system messages = %d, want one", len(msgs))
-	}
-	assertSystemMessageItem(t, msgs[0], serverpackets.SystemMessageS1Disarmed, lureID)
-	off := inventoryUpdateAfterTick(t, srv, c)
-	for _, id := range []int32{rod, lure} {
-		if e, ok := off[id]; !ok || e.equipped != 0 {
-			t.Fatalf("InventoryUpdate entry for %d = %+v (present %v), want unequipped", id, e, ok)
-		}
-	}
-	assertWorn(t, srv, objID, lure, -1)
+	return srv, objID, rod, lure
 }
 
 // assertPickedUpCrystals asserts frame is YOU_PICKED_UP_S2_S1 naming count
