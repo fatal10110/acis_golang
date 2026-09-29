@@ -38,12 +38,12 @@ func petMoveDest(frames [][]byte, objectID int32) (location.Location, bool) {
 // pet's queue and waits for its start hook to finish.
 func landPetFear(t *testing.T, petActor *summon.Actor, effector effect.Actor, skillID modelskill.ID, count, period int) *effect.Effect {
 	t.Helper()
-	return landPetEffect(t, petActor, effector, "Fear", skillID, count, period)
+	return landFearPetEffect(t, petActor, effector, "Fear", skillID, count, period)
 }
 
-// landPetEffect applies the named real effect from effector to the summon on
+// landFearPetEffect applies the named real effect from effector to the summon on
 // the summon's queue and waits for its start hook to finish.
-func landPetEffect(t *testing.T, petActor *summon.Actor, effector effect.Actor, name string, skillID modelskill.ID, count, period int) *effect.Effect {
+func landFearPetEffect(t *testing.T, petActor *summon.Actor, effector effect.Actor, name string, skillID modelskill.ID, count, period int) *effect.Effect {
 	t.Helper()
 	e, err := effect.New(
 		effect.Skill{ID: skillID, Level: 1, Debuff: true},
@@ -142,7 +142,7 @@ func petMovesTo(frames [][]byte, objectID int32) bool {
 func TestRootedPetFearedStaysPutAndStaysAfraid(t *testing.T) {
 	t.Parallel()
 	h, petActor, hostile := bootWolfStriker(t)
-	landPetEffect(t, petActor, petActor, "Root", 102, 30, 1)
+	landFearPetEffect(t, petActor, petActor, "Root", 102, 30, 1)
 	if !petActor.MovementDisabled() {
 		t.Fatal("MovementDisabled() = false after Root landed, want true")
 	}
@@ -250,7 +250,7 @@ func TestSiegeSummonRejectsFearAndBluff(t *testing.T) {
 		t.Error("fear sent a flee MoveToLocation for a siege golem, want none")
 	}
 
-	bluff := landPetEffect(t, golem, hostile, "Bluff", 358, 1, 3)
+	bluff := landFearPetEffect(t, golem, hostile, "Bluff", 358, 1, 3)
 	if bluff.InUse() {
 		t.Error("siege golem holds the bluff, want it refused")
 	}
@@ -273,7 +273,7 @@ func TestOrdinaryServitorTakesBluff(t *testing.T) {
 		t.Fatalf("servitor SiegeSummon/FearImmune/BluffExempt = %v/%v/%v, want all false",
 			cat.SiegeSummon(), cat.FearImmune(), cat.BluffExempt())
 	}
-	bluff := landPetEffect(t, cat, hostile, "Bluff", 358, 1, 3)
+	bluff := landFearPetEffect(t, cat, hostile, "Bluff", 358, 1, 3)
 	if !bluff.InUse() {
 		t.Fatal("servitor refused bluff, want it held")
 	}
