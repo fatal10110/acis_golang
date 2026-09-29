@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -168,6 +169,9 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], want[i])
 		}
 		frames = append(frames, frame)
+		if want[i] == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+		}
 		i++
 	}
 	drainUntilQuiet(t, c)
@@ -232,6 +236,9 @@ func readFrameSequence(t *testing.T, c *testsupport.ScriptedClient, want []byte)
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
+		if opcode == serverpackets.OpcodeEtcStatusUpdate {
+			gameservertest.ReadInitialCompass(t, c)
+		}
 	}
 	return frames
 }
@@ -345,6 +352,27 @@ func assertStatusAttrs(t *testing.T, frame []byte, objectID int32, attrs []serve
 	}
 }
 
+// assertCasterStatus asserts frame is the caster's own full StatusUpdate,
+// the one each HP or MP payment of a cast sends
+// (PlayerStatus.broadcastStatusUpdate, PlayerStatus.java:408-416): CUR_HP,
+// CUR_MP, CUR_CP, MAX_CP.
+func assertCasterStatus(t *testing.T, srv *gameservertest.Server, frame []byte, objID int32, hp, mp int) {
+	t.Helper()
+	assertStatusAttrs(t, frame, objID, []serverpackets.StatusAttribute{
+		{Type: serverpackets.StatusCurrentHP, Value: hp},
+		{Type: serverpackets.StatusCurrentMP, Value: mp},
+		{Type: serverpackets.StatusCurrentCP, Value: srv.PlayerCurrentCP(t, objID)},
+		{Type: serverpackets.StatusMaxCP, Value: srv.PlayerMaxCP(t, objID)},
+	})
+}
+
+// assertCasterMPStatus is assertCasterStatus for an MP payment by a caster
+// whose HP the cast leaves alone.
+func assertCasterMPStatus(t *testing.T, srv *gameservertest.Server, frame []byte, objID int32, mp int) {
+	t.Helper()
+	assertCasterStatus(t, srv, frame, objID, srv.PlayerCurrentHP(t, objID), mp)
+}
+
 // abnormalStatusEntry is one decoded AbnormalStatusUpdate icon entry.
 type abnormalStatusEntry struct {
 	SkillID  int32
@@ -437,23 +465,13 @@ func encodeRequestExEnchantSkillInfo(skillID, level int32) []byte {
 	return w.Bytes()
 }
 
-// readStatusUpdateSkippingAbnormal reads frames until the character's
-// StatusUpdate arrives, skipping any AbnormalStatusUpdate refreshes the
-// effect add broadcasts alongside it, and returns those icon entries.
-func readStatusUpdateSkippingAbnormal(t *testing.T, c *testsupport.ScriptedClient, objectID int32, attrs []serverpackets.StatusAttribute) []abnormalStatusEntry {
+// readHitStatusThenIcons reads the status update the hit's final MP payment
+// sends, then the AbnormalStatusUpdate the effect it lands refreshes, and
+// returns that refresh's icon entries.
+func readHitStatusThenIcons(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objectID int32, mp int) []abnormalStatusEntry {
 	t.Helper()
-	var icons []abnormalStatusEntry
-	for i := 0; i < 6; i++ {
-		frame := c.Read()
-		if frame[0] == serverpackets.OpcodeAbnormalStatusUpdate {
-			icons = append(icons, readAbnormalStatusUpdateEntriesFromFrame(t, frame)...)
-			continue
-		}
-		assertStatusAttrs(t, frame, objectID, attrs)
-		return icons
-	}
-	t.Fatal("no StatusUpdate after cast completion")
-	return nil
+	assertCasterMPStatus(t, srv, c.Read(), objectID, mp)
+	return readAbnormalStatusUpdateEntriesFromFrame(t, c.Read())
 }
 
 func readAbnormalStatusUpdateEntriesFromFrame(t *testing.T, frame []byte) []abnormalStatusEntry {

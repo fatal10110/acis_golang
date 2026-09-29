@@ -96,8 +96,9 @@ type Player interface {
 	SetCP(float64)
 	BreakCastOnDamage(damage float64)
 	Charges() int
-	Revive(percent float64) bool
-	RestoreExp(restorePercent float64)
+	// ReviveRestoringExp restores exp and then revives, only while the
+	// player is still dead.
+	ReviveRestoringExp(restorePercent, fraction float64) bool
 	// CursedWeaponEquipped reports a cursed weapon in hand.
 	CursedWeaponEquipped() bool
 	// Summon-friend eligibility state.

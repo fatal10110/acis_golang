@@ -103,8 +103,7 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestMagicSkillUse(42, false, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
 
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
@@ -145,8 +144,7 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestMagicSkillUse(42, false, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	var sawSkillList bool
@@ -200,8 +198,7 @@ func TestKillNPCOverhitPaysBonusExp(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestMagicSkillUse(42, false, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
 
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
@@ -284,8 +281,7 @@ func TestKarmaKillNPCLowersKarma(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestMagicSkillUse(42, false, false))
-	readCastStartFrames(t, c, objID, 42, 1, 500, 60_000, hostile.ObjectID())
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	assertKarmaChangeFrames(t, c, objID, 213)

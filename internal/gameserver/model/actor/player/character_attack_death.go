@@ -66,6 +66,28 @@ func (c *Character) MarkDead() bool {
 // calculated max HP. It reports whether the player was dead and is now
 // revived; a call on a living player is a no-op.
 func (c *Character) Revive(fraction float64) bool {
+	c.reviveMu.Lock()
+	defer c.reviveMu.Unlock()
+	return c.revive(fraction)
+}
+
+// ReviveRestoringExp is a resurrection skill's revive: it restores
+// restorePercent of the exp the last death took, then revives the player
+// with fraction of max HP, in the order Player.doRevive(double) runs them.
+// It does nothing to a player that is not dead — a player who already went
+// back to town keeps the loss — and reports whether it revived.
+func (c *Character) ReviveRestoringExp(restorePercent, fraction float64) bool {
+	c.reviveMu.Lock()
+	defer c.reviveMu.Unlock()
+	if !c.dead.Load() {
+		return false
+	}
+	c.RestoreExp(restorePercent)
+	return c.revive(fraction)
+}
+
+// revive is Revive's state transition; the caller holds reviveMu.
+func (c *Character) revive(fraction float64) bool {
 	maxHP := c.ResourceValues().MaxHP
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()

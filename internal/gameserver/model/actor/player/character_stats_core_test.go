@@ -1454,6 +1454,56 @@ func TestRestoreExpNoDeathIsNoOp(t *testing.T) {
 	}
 }
 
+// TestReviveRestoringExpSkipsLivingPlayer matches Player.reviveRequest's
+// isDead gate (Player.java:6047): a player who revived at a restart point
+// before a resurrection hit landed keeps the exp loss and its snapshot.
+func TestReviveRestoringExpSkipsLivingPlayer(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	c.applyDeathExpKarmaLoss(&Character{ID: 2}) // Exp: 1500 -> 1100, ExpBeforeDeath = 1500.
+	c.MarkDead()
+	if !c.Revive(0.7) {
+		t.Fatal("restart-point Revive refused a dead player")
+	}
+
+	if c.ReviveRestoringExp(50, 50) {
+		t.Fatal("ReviveRestoringExp revived a living player")
+	}
+	if c.Exp != 1100 || c.ExpBeforeDeath != 1500 {
+		t.Fatalf("Exp/ExpBeforeDeath = %d/%d, want unchanged 1100/1500", c.Exp, c.ExpBeforeDeath)
+	}
+}
+
+// TestReviveRestoringExpRacingRestartGivesOneRevive runs a resurrection hit
+// and a restart-point revive against the same death at once. Only one
+// revive wins, and the exp comes back exactly when the resurrection wins.
+func TestReviveRestoringExpRacingRestartGivesOneRevive(t *testing.T) {
+	for range 200 {
+		c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+		c.applyDeathExpKarmaLoss(&Character{ID: 2}) // Exp: 1500 -> 1100.
+		c.MarkDead()
+
+		var restarted, resurrected bool
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		wg.Add(2)
+		go func() { defer wg.Done(); <-start; restarted = c.Revive(0.7) }()
+		go func() { defer wg.Done(); <-start; resurrected = c.ReviveRestoringExp(50, 0.5) }()
+		close(start)
+		wg.Wait()
+
+		if restarted == resurrected {
+			t.Fatalf("restart won = %v, resurrection won = %v, want exactly one", restarted, resurrected)
+		}
+		wantExp := int64(1100)
+		if resurrected {
+			wantExp = 1300
+		}
+		if c.Exp != wantExp {
+			t.Fatalf("Exp = %d with resurrection won = %v, want %d", c.Exp, resurrected, wantExp)
+		}
+	}
+}
+
 // TestDieAwardsKillerKarmaBeforeApplyingVictimsOwnDeathPenalty matches the
 // reference's ordering: Playable.doDie (Playable.java:178-183) runs
 // onKillUpdatePvPKarma — the source of awardKillerPKKarma/awardKillerPvPKill

@@ -29,8 +29,7 @@ func (neutralPlayer) MaxCPValue() float64                            { return 0 
 func (neutralPlayer) SetCP(float64)                                  {}
 func (neutralPlayer) BreakCastOnDamage(float64)                      {}
 func (neutralPlayer) Charges() int                                   { return 0 }
-func (neutralPlayer) Revive(float64) bool                            { return false }
-func (neutralPlayer) RestoreExp(float64)                             {}
+func (neutralPlayer) ReviveRestoringExp(float64, float64) bool       { return false }
 func (neutralPlayer) CursedWeaponEquipped() bool                     { return false }
 func (neutralPlayer) Operating() bool                                { return false }
 func (neutralPlayer) Rooted() bool                                   { return false }

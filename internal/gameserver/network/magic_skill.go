@@ -67,7 +67,6 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		return
 	}
 
-	beforeVitals := live.Vitals()
 	var afterCanCast func() error
 	if known && def.Target == modelskill.TargetGround {
 		afterCanCast = l.groundCastAfterCanCast(live, def)
@@ -117,6 +116,38 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	target := started.Target
 	plan := started.Plan
 
+	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
+	if def.SkillType == "FUSION" {
+		l.startFusionCast(live, controller, handlers, target, def, plan)
+		return
+	}
+
+	l.broadcastCastStart(live, target, def, plan)
+	if plan.GaugeDuration > 0 {
+		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
+	}
+
+	var affected []skilltarget.Actor
+	controller.Schedule(plan, actorcast.Hooks{
+		Launch: func() bool {
+			var ok bool
+			affected, ok = l.launchCastTargets(live, target, def)
+			return ok
+		},
+		Hit: func() {
+			l.applyCastHit(live, handlers, affected, def)
+		},
+		Failed: func(err error) {
+			// Each cost the hit already paid sent its own status, so the
+			// reason is all that is left before the abort frames.
+			sendMagicCastFailureReason(live, def, err)
+		},
+	})
+}
+
+// broadcastCastStart sends a player's cast-start MagicSkillUse to everyone
+// watching, then USE_S1 to the caster.
+func (l *GameClientLink) broadcastCastStart(live *livePlayer, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
 	casterObject := skillCastObject(live)
 	targetObject := skillCastObject(target)
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -131,67 +162,74 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 		)
 	})
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageUseS1, int32(def.ID), int32(def.Level)))
-	if plan.GaugeDuration > 0 {
-		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
-	}
-	if def.SkillType == "FUSION" {
-		live.setFusionTarget(target.ObjectID())
-		finishFusion := func() {
-			// Only a creature carries the triggered fusion effect to decrease.
-			if effected, ok := target.(attackable.Combatant); ok {
-				skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
-			}
-			live.clearFusionTarget(target.ObjectID())
-		}
-		result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-		l.sendSkillHandlerResult(live, result)
-		l.syncCubicTargets(live, result, def)
-		sendMagicStatusUpdate(live, beforeVitals)
-		if !controller.ScheduleFusion(plan, time.Second, func() bool {
-			return actorcast.FusionChannelValid(live.Character, target, def.CastRange)
-		}, finishFusion) {
-			finishFusion()
-		}
-		return
-	}
+}
 
-	controller.Schedule(plan, actorcast.Hooks{
-		Launch: func() bool {
-			if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
-				sendLaunchAbort(live, reason)
-				return false
-			}
-			handler, ok := l.targets.Handler(def.Target)
-			if !ok {
-				return false
-			}
-			resolvedTarget, ok := target.(skilltarget.Actor)
-			if !ok {
-				return false
-			}
-			affected := handler.Targets(live.Character, resolvedTarget, &def)
-			targetIDs := make([]int32, 0, len(affected))
-			for _, affectedTarget := range affected {
-				targetIDs = append(targetIDs, affectedTarget.ObjectID())
-			}
-			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
-			})
-			return true
-		},
-		Hit: func() {
-			result := actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}, live.Character, target, def)
-			l.sendSkillHandlerResult(live, result)
-			l.syncCubicTargets(live, result, def)
-			if !live.Character.Dead() {
-				sendMagicStatusUpdate(live, beforeVitals)
-			}
-		},
-		Failed: func(err error) {
-			sendMagicCastFailureReason(live, def, err)
-			sendMagicStatusUpdate(live, beforeVitals)
-		},
+// startFusionCast lands a FUSION skill's force effect on its target when the
+// channel opens, before the caster's MagicSkillUse, USE_S1 and gauge go out.
+// The gauge is sent whatever the hit time: a channel has no short-cast
+// cutoff.
+func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+	live.setFusionTarget(target.ObjectID())
+	finishFusion := func() {
+		// Only a creature carries the triggered fusion effect to decrease.
+		if effected, ok := target.(attackable.Combatant); ok {
+			skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
+		}
+		live.clearFusionTarget(target.ObjectID())
+	}
+	result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
+	l.sendSkillHandlerResult(live, result)
+	l.syncCubicTargets(live, result, def)
+
+	l.broadcastCastStart(live, target, def, plan)
+	live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.HitTime), millis(plan.HitTime)))
+	if !controller.ScheduleFusion(plan, time.Second, func() bool {
+		return actorcast.FusionChannelValid(live.Character, target, def.CastRange)
+	}, finishFusion) {
+		finishFusion()
+	}
+}
+
+// launchCastTargets runs a player cast's launch: the mid-cast revalidation,
+// then the one resolution of def's affected set, broadcast in
+// MagicSkillLaunched and returned for the hit to reuse as is. A creature
+// that dies or moves between launch and hit is left to each skill handler's
+// own per-target checks. ok is false when the cast must stop.
+func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
+	if reason := actorcast.RevalidateLaunch(live.Character, target, def); reason != actorcast.LaunchAbortNone {
+		sendLaunchAbort(live, reason)
+		return nil, false
+	}
+	handler, ok := l.targets.Handler(def.Target)
+	if !ok {
+		return nil, false
+	}
+	resolvedTarget, ok := target.(skilltarget.Actor)
+	if !ok {
+		return nil, false
+	}
+	affected = handler.Targets(live.Character, resolvedTarget, &def)
+	targetIDs := make([]int32, 0, len(affected))
+	for _, affectedTarget := range affected {
+		targetIDs = append(targetIDs, affectedTarget.ObjectID())
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
 	})
+	return affected, true
+}
+
+// applyCastHit dispatches a player cast's effects to the affected set its
+// launch resolved. The final MP/HP costs already sent their own statuses;
+// what is left is a status for any change the effects made to the caster.
+func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
+	before := live.Vitals()
+	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
+	l.sendSkillHandlerResult(live, result)
+	l.syncCubicTargets(live, result, def)
+	if !live.Character.Dead() {
+		sendMagicStatusUpdate(live, before)
+	}
 }
 
 // attemptMagicSkill runs a player's skill request through the pre-attempt
@@ -412,7 +450,6 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
 // that kills the caster sends its own packets from inside that consume.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse) {
-	beforeVitals := live.Vitals()
 	handlers := actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers}
 	def, target, activated, err := actorcast.ApplyToggle(
 		handlers,
@@ -443,9 +480,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	}
 
 	if activated {
-		if def.HPConsume > 0 && !live.Character.Dead() {
-			sendMagicStatusUpdate(live, beforeVitals)
-		}
+		// Each cost CastToggle paid already sent its own status.
 		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
 		l.sendSkillHandlerResult(live, result)
 		l.syncCubicTargets(live, result, def)

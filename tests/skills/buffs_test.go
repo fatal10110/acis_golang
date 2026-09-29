@@ -35,8 +35,9 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(4, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 4, 1, 500, 60_000, objID)
-	icons := readStatusUpdateSkippingAbnormal(t, c, objID, []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentMP, Value: 25}})
+	icons := readHitStatusThenIcons(t, srv, c, objID, 25)
 	found := false
 	for _, e := range icons {
 		if e.SkillID == 4 && int32(e.Level) == 1 {

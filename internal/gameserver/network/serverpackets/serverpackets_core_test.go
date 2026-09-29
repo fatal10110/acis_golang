@@ -1011,6 +1011,18 @@ func TestFrameExUseSharedGroupItem(t *testing.T) {
 }
 
 // ---- from exregenmax_test.go ----
+func TestFrameExSetCompassZoneCode(t *testing.T) {
+	got := framePayload(t, FrameExSetCompassZoneCode(0x0c))
+	want := []byte{0xfe, 0x32, 0x00, 0x0c, 0x00, 0x00, 0x00}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameExSetCompassZoneCode() = %x, want %x", got, want)
+	}
+	r := wire.NewReader(got[3:])
+	if code := r.ReadInt32(); code != 0x0c || r.Err() != nil || r.Remaining() != 0 {
+		t.Fatalf("decoded compass code = %#x, err = %v, trailing = %d", code, r.Err(), r.Remaining())
+	}
+}
+
 func TestFrameExRegenMax(t *testing.T) {
 	got := framePayload(t, FrameExRegenMax(14, 2, 16))
 	want := []byte{OpcodeExtended}
