@@ -429,6 +429,8 @@ type timingTarget struct {
 	landed      *[]int32
 	onDamage    func()
 	raidRelated bool
+	invul       bool
+	paralyzed   bool
 }
 
 func (t *timingTarget) ObjectID() int32   { return t.id }
@@ -702,3 +704,160 @@ func rethinks(npc bool, n int) int {
 	}
 	return 0
 }
+
+// TestControllerReportsHitFeedbackPerActorKind pins the attacker's damage
+// feedback on every resolved hit: a player reports misses, criticals and
+// the target's invulnerability; a summon reports only landed hits on
+// anyone but its owner; an NPC reports nothing. The feedback goes out
+// before the target takes the damage.
+func TestControllerReportsHitFeedbackPerActorKind(t *testing.T) {
+	owner := &timingTarget{id: 9}
+	tests := []struct {
+		name   string
+		build  func() *Controller
+		hit    Hit
+		target *timingTarget
+		want   []event.HitDealt
+	}{
+		{
+			name:  "player miss",
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:   Hit{Miss: true},
+			want:  []event.HitDealt{{Miss: true}},
+		},
+		{
+			name:  "player critical",
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:   Hit{Damage: 120, Crit: true},
+			want:  []event.HitDealt{{Damage: 120, Crit: true}},
+		},
+		{
+			name:  "player normal hit",
+			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:   Hit{Damage: 45},
+			want:  []event.HitDealt{{Damage: 45}},
+		},
+		{
+			name:   "player against invulnerable target",
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:    Hit{Damage: 45},
+			target: &timingTarget{id: 2, invul: true},
+			want:   []event.HitDealt{{Damage: 45, Blocked: true}},
+		},
+		{
+			name:   "player against petrified target",
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:    Hit{Damage: 45, Crit: true},
+			target: &timingTarget{id: 2, invul: true, paralyzed: true},
+			want:   []event.HitDealt{{Damage: 45, Crit: true, Blocked: true, Petrified: true}},
+		},
+		{
+			name:   "paralyzed but vulnerable target takes the plain message",
+			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
+			hit:    Hit{Damage: 45},
+			target: &timingTarget{id: 2, paralyzed: true},
+			want:   []event.HitDealt{{Damage: 45}},
+		},
+		{
+			name:  "summon critical on another target",
+			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			hit:   Hit{Damage: 80, Crit: true},
+			want:  []event.HitDealt{{Damage: 80, Crit: true}},
+		},
+		{
+			name:  "summon miss is silent",
+			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			hit:   Hit{Miss: true},
+		},
+		{
+			name:   "summon hitting its owner is silent",
+			build:  func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
+			hit:    Hit{Damage: 80},
+			target: &timingTarget{id: owner.id},
+		},
+		{
+			name:  "ownerless summon is silent",
+			build: func() *Controller { return NewPlayable(&timingSummon{}, nil) },
+			hit:   Hit{Damage: 80},
+		},
+		{
+			name:  "npc is silent",
+			build: func() *Controller { return NewAttackable(&timingActor{}, nil) },
+			hit:   Hit{Damage: 80, Crit: true},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := tt.build()
+			rec := &event.Recorder{}
+			ctrl.sink = rec
+			target := tt.target
+			if target == nil {
+				target = &timingTarget{id: 2}
+			}
+			reportedBeforeDamage := -1
+			target.onDamage = func() { reportedBeforeDamage = event.Count[event.HitDealt](rec) }
+			hit := tt.hit
+			hit.Target = target
+
+			ctrl.deliverHits(0, []Hit{hit})
+
+			if got := event.Of[event.HitDealt](rec); !slices.Equal(got, tt.want) {
+				t.Fatalf("HitDealt = %+v, want %+v", got, tt.want)
+			}
+			if hit.Miss {
+				if target.hits != 0 {
+					t.Fatalf("missed hit damaged the target %d times", target.hits)
+				}
+				return
+			}
+			if target.hits != 1 {
+				t.Fatalf("landed hit damaged the target %d times, want 1", target.hits)
+			}
+			if reportedBeforeDamage != len(tt.want) {
+				t.Fatalf("HitDealt reported when the damage landed = %d, want %d (feedback before damage)", reportedBeforeDamage, len(tt.want))
+			}
+		})
+	}
+}
+
+// TestControllerReportsEachPoleHit covers a pole sweep: every hit of the
+// group reports its own feedback, in landing order.
+func TestControllerReportsEachPoleHit(t *testing.T) {
+	primary := &timingTarget{id: 2, x: 40, attackable: true}
+	secondary := &timingTarget{id: 3, x: 50, attackable: true, invul: true}
+	actor := &timingPlayer{timingActor: timingActor{
+		attackType:  item.WeaponPole,
+		attackSpeed: 500,
+		poleMax:     2,
+		known:       []attackable.Combatant{secondary},
+	}}
+	clock := newTimingClock()
+	ctrl := NewPlayer(actor, nil)
+	ctrl.SetQueue(clock.q)
+	rec := &event.Recorder{}
+	ctrl.sink = rec
+
+	ctrl.DoAttack(primary)
+	clock.fire(500 * time.Millisecond)
+
+	want := []event.HitDealt{{Damage: 1}, {Damage: 1, Blocked: true}}
+	if got := event.Of[event.HitDealt](rec); !slices.Equal(got, want) {
+		t.Fatalf("pole HitDealt = %+v, want %+v", got, want)
+	}
+}
+
+type timingSummon struct {
+	timingActor
+	owner attackable.Combatant
+}
+
+func (a *timingSummon) InPeaceZone() bool                            { return false }
+func (a *timingSummon) TryToIdle()                                   {}
+func (a *timingSummon) TestCursesOnAttack(attackable.Combatant) bool { return false }
+func (a *timingSummon) Owner() (attackable.Combatant, bool) {
+	return a.owner, a.owner != nil
+}
+
+func (t *timingTarget) Invul() bool     { return t.invul }
+func (t *timingTarget) Paralyzed() bool { return t.paralyzed }

@@ -749,7 +749,7 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			}
 		case skillhandler.Damage:
 			if recipient, online := l.livePlayerByID(m.RecipientID); online {
-				sendSkillDamage(recipient, m)
+				sendDamageMessage(recipient, m)
 			}
 		case skillhandler.Resisted:
 			if live != nil {
@@ -795,10 +795,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 	}
 }
 
-// sendSkillDamage sends a skill hit's damage feedback: a player sees each
-// critical kind it rolled, a summon's owner sees one summon critical, then
-// either the blocked notice or the damage dealt.
-func sendSkillDamage(recipient *livePlayer, m skillhandler.Damage) {
+// sendDamageMessage sends a skill or auto-attack hit's damage feedback: a
+// player sees each critical kind it rolled, a summon's owner sees one summon
+// critical, then either the blocked notice or the damage dealt.
+func sendDamageMessage(recipient *livePlayer, m skillhandler.Damage) {
 	crit := m.PhysicalCrit || m.MagicCrit
 	dealt := serverpackets.SystemMessageYouDidS1Dmg
 	switch m.Source {
