@@ -179,6 +179,11 @@ type Definition struct {
 
 	Feed int
 
+	// AbsorbPart and AbsorbAbs are a DRAIN skill's HP absorb: the caster
+	// regains AbsorbAbs plus AbsorbPart of the drained HP per damaged target.
+	AbsorbPart float32
+	AbsorbAbs  int
+
 	CanBeReflected bool
 	CanBeDispelled bool
 	ClanSkill      bool
@@ -314,6 +319,9 @@ type DefinitionAttrs struct {
 
 	Feed int
 
+	AbsorbPart float32
+	AbsorbAbs  int
+
 	CanBeReflected bool
 	CanBeDispelled bool
 	ClanSkill      bool
@@ -432,6 +440,9 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		FlyCourse: a.FlyCourse,
 
 		Feed: a.Feed,
+
+		AbsorbPart: a.AbsorbPart,
+		AbsorbAbs:  a.AbsorbAbs,
 
 		CanBeReflected:   a.CanBeReflected,
 		CanBeDispelled:   a.CanBeDispelled,

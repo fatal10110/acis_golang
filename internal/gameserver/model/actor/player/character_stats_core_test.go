@@ -503,6 +503,63 @@ func TestReduceHPSkipsCastControllerOnZeroDamage(t *testing.T) {
 	}
 }
 
+// TestReduceHPWithoutCastBreakSkipsOnlyTheBreakRoll pins the one-roll-per-hit
+// contract DRAIN relies on: ReduceHP rolls the cast break once on the raw
+// damage (before CP absorbs any of it), while ReduceHPWithoutCastBreak — used
+// after the handler already rolled the break ahead of the effects — never
+// rolls it again, but still takes CP/HP and still kills on a lethal amount.
+func TestReduceHPWithoutCastBreakSkipsOnlyTheBreakRoll(t *testing.T) {
+	attacker := liveCharacter(2, combatTemplate(), combatItems())
+
+	withBreak := liveCharacter(1, combatTemplate(), combatItems())
+	withBreak.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 30})
+	withBreak.SetRollSource(zeroRoll)
+	breakSpy := &spyCastController{casting: true, magic: true}
+	withBreak.SetCastController(breakSpy)
+
+	withBreak.ReduceHP(50, attacker, modelskill.Definition{})
+
+	if len(breakSpy.damageCalls) != 1 {
+		t.Fatalf("ReduceHP InterruptCastOnDamage calls = %d, want 1", len(breakSpy.damageCalls))
+	}
+	if got := breakSpy.damageCalls[0].damage; got != 50 {
+		t.Fatalf("ReduceHP break damage = %v, want the raw 50 (not the 20 left after CP)", got)
+	}
+	if withBreak.CP() != 0 || withBreak.HP() != 480 {
+		t.Fatalf("ReduceHP cp/hp = %v/%v, want 0/480", withBreak.CP(), withBreak.HP())
+	}
+
+	noBreak := liveCharacter(3, combatTemplate(), combatItems())
+	noBreak.SetResourceValues(Resources{MaxHP: 500, CurrentHP: 500, MaxCP: 200, CurrentCP: 30})
+	noBreak.SetRollSource(zeroRoll)
+	noBreakSpy := &spyCastController{casting: true, magic: true}
+	noBreak.SetCastController(noBreakSpy)
+
+	noBreak.ReduceHPWithoutCastBreak(50, attacker, modelskill.Definition{})
+
+	if len(noBreakSpy.damageCalls) != 0 {
+		t.Fatalf("ReduceHPWithoutCastBreak InterruptCastOnDamage calls = %d, want 0", len(noBreakSpy.damageCalls))
+	}
+	if noBreak.CP() != 0 || noBreak.HP() != 480 {
+		t.Fatalf("ReduceHPWithoutCastBreak cp/hp = %v/%v, want 0/480", noBreak.CP(), noBreak.HP())
+	}
+	if noBreak.Dead() {
+		t.Fatal("ReduceHPWithoutCastBreak killed on a non-lethal hit")
+	}
+
+	noBreak.ReduceHPWithoutCastBreak(10000, attacker, modelskill.Definition{})
+
+	if len(noBreakSpy.damageCalls) != 0 {
+		t.Fatalf("lethal ReduceHPWithoutCastBreak InterruptCastOnDamage calls = %d, want 0", len(noBreakSpy.damageCalls))
+	}
+	if !noBreak.Dead() || noBreak.HP() != 0 {
+		t.Fatalf("lethal ReduceHPWithoutCastBreak dead/hp = %v/%v, want true/0", noBreak.Dead(), noBreak.HP())
+	}
+	if noBreakSpy.stopCalls != 1 {
+		t.Fatalf("StopCast calls on the lethal hit = %d, want 1 (Die ran)", noBreakSpy.stopCalls)
+	}
+}
+
 func TestTakeDamageForwardsDamageToCastController(t *testing.T) {
 	c := liveCharacter(1, combatTemplate(), combatItems())
 	c.SetHP(100)

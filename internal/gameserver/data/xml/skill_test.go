@@ -234,6 +234,32 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		t.Fatalf("Len() = %d, want %d", got, want)
 	}
 
+	t.Run("drain absorb", func(t *testing.T) {
+		// Life Drain absorbs 80% of the drain; Life Scavenge and Corpse Life
+		// Drain absorb a flat per-level amount, which an enchant route
+		// replaces; a plain damage skill absorbs nothing.
+		for _, tc := range []struct {
+			id    skill.ID
+			level int
+			part  float32
+			abs   int
+		}{
+			{1090, 1, 0.8, 0},
+			{1090, 6, 0.8, 0},
+			{46, 1, 0, 105},
+			{46, 15, 0, 243},
+			{1151, 16, 0, 758},
+			{1151, 101, 0, 682},
+			{1343, 1, 0.5, 0},
+			{1177, 1, 0, 0},
+		} {
+			d, ok := table.Get(tc.id, tc.level)
+			if !ok || d.AbsorbPart != tc.part || d.AbsorbAbs != tc.abs {
+				t.Fatalf("skill %d level %d absorb = (%v, %d) (loaded %v), want (%v, %d)", tc.id, tc.level, d.AbsorbPart, d.AbsorbAbs, ok, tc.part, tc.abs)
+			}
+		}
+	})
+
 	t.Run("servitor exp penalty", func(t *testing.T) {
 		// Summon Kat the Cat sets expPenalty 0.3; Power Strike sets none.
 		if d, ok := table.Get(1111, 1); !ok || d.ExpPenalty != float32(0.3) {

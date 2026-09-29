@@ -208,7 +208,9 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 			return
 		}
 		result := actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target)
-		l.sendSkillHandlerResult(live, result)
+		if l.sendSkillHandlerResult(live, result) {
+			beforeVitals = live.Vitals()
+		}
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }

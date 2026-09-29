@@ -251,9 +251,11 @@ type Resisted struct {
 }
 
 // MagicResist reports a player target that resisted a magic-damage cast.
+// Drain marks a DRAIN cast, which the target hears about in its own words.
 type MagicResist struct {
 	TargetID     int32
 	AttackerName string
+	Drain        bool
 }
 
 // ManaDrain reports MP drained from a player target by a MANADAM cast.
@@ -287,11 +289,18 @@ type Damage struct {
 	Petrified bool
 }
 
-// AttackFailedMessage and ManaDamageMissedMessage mark messages without data.
+// AttackFailedMessage, DrainHalfSucceededMessage, ManaDamageMissedMessage and
+// CasterVitalsChanged mark messages without data. DrainHalfSucceededMessage
+// is a DRAIN cast's half-damage magic failure, reported in place of
+// AttackFailedMessage. CasterVitalsChanged marks where a player caster's own
+// HP changed mid-cast, so its status reaches it at that point among the
+// cast's other messages.
 type (
-	AttackFailedMessage      struct{}
-	ManaDamageMissedMessage  struct{}
-	OpponentMPReducedMessage struct{ MP int32 }
+	AttackFailedMessage       struct{}
+	DrainHalfSucceededMessage struct{}
+	ManaDamageMissedMessage   struct{}
+	CasterVitalsChanged       struct{}
+	OpponentMPReducedMessage  struct{ MP int32 }
 )
 
 // Result reports player-visible outcomes produced while a skill handler ran.
@@ -372,6 +381,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		pdamHandler{},
 		chargeDamHandler{},
 		mdamHandler{magicFailures: magicFailures},
+		drainHandler{magicFailures: magicFailures},
 		blowHandler{},
 		manaDamageHandler{},
 		healHandler{buff: continuousHandler{defs: defs}, healSps: healSps},

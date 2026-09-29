@@ -241,7 +241,9 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
 	before := live.Vitals()
 	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
-	l.sendSkillHandlerResult(live, result)
+	if l.sendSkillHandlerResult(live, result) {
+		before = live.Vitals()
+	}
 	l.syncCubicTargets(live, result, def)
 	if !live.Character.Dead() {
 		sendMagicStatusUpdate(live, before)
@@ -711,10 +713,17 @@ func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
 // sendSkillHandlerResult delivers both caster-addressed messages (sent to
 // live, when connected) and target-addressed messages (resolved by ID
 // through l.livePlayerByID, independent of whether live is connected or
-// even nil) from a resolved skill-handler result.
-func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) {
+// even nil) from a resolved skill-handler result. It reports whether it sent
+// live its own status, so a caller that follows with a changed-vitals
+// StatusUpdate can measure from there instead of repeating it.
+func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) (statusSent bool) {
 	for _, message := range result.Messages {
 		switch m := message.(type) {
+		case skillhandler.CasterVitalsChanged:
+			if live != nil {
+				sendLiveStatus(live)
+				statusSent = true
+			}
 		case skillhandler.Counterattack:
 			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
@@ -768,6 +777,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 			}
+		case skillhandler.DrainHalfSucceededMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDrainHalfSuccessful))
+			}
 		case skillhandler.DoorUnlockUnableMessage:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUnableToUnlockDoor))
@@ -785,7 +798,11 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if !online {
 				continue
 			}
-			target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageResistedS1Magic, m.AttackerName))
+			id := serverpackets.SystemMessageResistedS1Magic
+			if m.Drain {
+				id = serverpackets.SystemMessageResistedS1Drain
+			}
+			target.SendFrame(serverpackets.FrameSystemMessageString(id, m.AttackerName))
 		case skillhandler.ManaDamageMissedMessage:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
@@ -802,6 +819,7 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			}
 		}
 	}
+	return statusSent
 }
 
 // sendDamageMessage sends a skill or auto-attack hit's damage feedback: a
