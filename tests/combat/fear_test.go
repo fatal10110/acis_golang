@@ -350,12 +350,16 @@ func TestFearOnRootedPlayerIsRefusedInPlace(t *testing.T) {
 	before.X, before.Y, before.Z = player.Position()
 
 	fear := landFear(t, hostile, player, curseFearSkillID, 10)
-	runAt, refusedAt := -1, -1
+	runAt, refreshAt, refusedAt := -1, -1, -1
 	for i, frame := range readFramesUntilQuiet(c) {
 		switch frame[0] {
 		case serverpackets.OpcodeChangeMoveType:
 			assertChangeMoveType(t, frame, objID, true)
 			runAt = i
+		case serverpackets.OpcodeUserInfo:
+			if runAt >= 0 && refreshAt < 0 {
+				refreshAt = i
+			}
 		case serverpackets.OpcodeActionFailed:
 			if runAt >= 0 && refusedAt < 0 {
 				refusedAt = i
@@ -368,6 +372,9 @@ func TestFearOnRootedPlayerIsRefusedInPlace(t *testing.T) {
 	}
 	if runAt < 0 {
 		t.Fatal("fear landing sent no run-stance ChangeMoveType for the walking player")
+	}
+	if refreshAt <= runAt || (refusedAt >= 0 && refreshAt >= refusedAt) {
+		t.Fatalf("fear run stance refresh at %d, ChangeMoveType at %d, ActionFailed at %d: want UserInfo between them", refreshAt, runAt, refusedAt)
 	}
 	if refusedAt < 0 {
 		t.Fatal("fear landing sent no ActionFailed after the run stance, want the refused move answered")
