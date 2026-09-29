@@ -274,7 +274,9 @@ const maxPetSP = math.MaxInt32
 // A grant where neither amount applies (negative exp, and SP that is
 // negative or meets a full SP pool) changes nothing and tells nobody.
 // Otherwise a level increase refreshes the owner, restores vitals and
-// broadcasts the level-up animation before the owner is told the exp earned.
+// publishes them as a vitals change (BroadcastStatus), then broadcasts the
+// level-up animation, before the owner is told the exp earned. A grant
+// that stays inside the level only refreshes the pet's status.
 func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	if a == nil || !a.isPet {
 		return
@@ -296,12 +298,14 @@ func (a *Actor) AddExpAndSp(rawExp int64, sp int) {
 	leveled := a.refreshGrowthLocked()
 	a.statusMu.Unlock()
 	if leveled {
+		// The level-up restores full HP through a vitals set, which also
+		// refreshes the health bar of every player targeting the pet.
 		a.resetVitals()
 		a.SyncControlItemEnchant()
-	}
-	a.UpdateStatus()
-	if leveled {
+		a.BroadcastStatus()
 		a.emit(event.SocialAction{ID: socialActionLevelUp})
+	} else {
+		a.UpdateStatus()
 	}
 	a.emit(event.ExpGained{Exp: expGain})
 }

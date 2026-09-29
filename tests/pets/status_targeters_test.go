@@ -246,3 +246,52 @@ func TestBalanceLifeOnPetPublishesItsStatusOnce(t *testing.T) {
 	got, _ := statusUpdatesFor(frames, pet.ObjectID())
 	assertCurHPUpdates(t, "watcher targeting the pet", got, curHPFixture(pet.ObjectID(), int32(wantHP)))
 }
+
+// TestPetLevelUpRefreshesTargeterBar drives a kill-reward level-up on a
+// wounded wolf. PetStatus.addLevel -> PlayableStatus.addLevel
+// (PlayableStatus.java:147-170) calls setMaxHpMp, whose setHp(getMaxHp())
+// (CreatureStatus.java:371-384) broadcasts through
+// SummonStatus.broadcastStatusUpdate: a player targeting the pet gets CUR_HP
+// at the restored max ahead of the level-up animation, and a bystander gets
+// none.
+func TestPetLevelUpRefreshesTargeterBar(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	watcher := h.joinSecondPlayer(t, "Watcher")
+	bystander := h.joinBystander(t)
+	selectPet(t, watcher.client, pet)
+	id := pet.ObjectID()
+	runOn(t, pet.Queue(), func() { pet.SetHP(pet.HP() - 150) })
+	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, watcher.client)
+	drainUntilQuiet(t, bystander)
+
+	runOn(t, pet.Queue(), func() { pet.AddExpAndSp(wolfNextLevelExp, 0) })
+	if pet.Level() != wolfNextLevel || pet.HP() != pet.MaxHPValue() {
+		t.Fatalf("after level-up: level %d HP %v, want level %d at max HP %v", pet.Level(), pet.HP(), wolfNextLevel, pet.MaxHPValue())
+	}
+
+	frames := drainFrames(t, watcher.client)
+	updates, at := statusUpdatesFor(frames, id)
+	assertCurHPUpdates(t, "watcher targeting the pet", updates, curHPFixture(id, int32(pet.MaxHPValue())))
+	_, socialAt := petSocialActions(t, frames, id)
+	if socialAt < 0 || at[0] > socialAt {
+		t.Fatalf("watcher StatusUpdate at %d, level-up SocialAction at %d; want the StatusUpdate first", at[0], socialAt)
+	}
+
+	updates, _ = statusUpdatesFor(drainFrames(t, bystander), id)
+	assertCurHPUpdates(t, "bystander", updates)
+
+	ownerFrames := drainFrames(t, h.client)
+	var vitals []petVitals
+	for _, frame := range ownerFrames {
+		if frame[0] == serverpackets.OpcodePetStatusUpdate {
+			vitals = append(vitals, readPetStatusVitals(t, frame))
+		}
+	}
+	want := petVitals{hp: int32(pet.MaxHPValue()), mp: int32(pet.MaxMPValue())}
+	if len(vitals) != 1 || vitals[0] != want {
+		t.Fatalf("owner PetStatusUpdates = %+v, want one carrying %+v", vitals, want)
+	}
+}
