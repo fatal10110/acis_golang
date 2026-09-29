@@ -133,10 +133,11 @@ func (a *Actor) DecayDelay() time.Duration {
 // hook is never used: summons do not respawn.
 //
 // A revived pet cancels its decay, and one revived after its decay fell due
-// is left alone here. A servitor a player revived keeps its decay (see
+// is left alone here; a pet this decay has claimed can no longer be revived
+// (claimCorpse). A servitor a player revived keeps its decay (see
 // ReviveRestoringExp) and leaves the world at its deadline, alive.
 func (a *Actor) Decay(state *world.State, _ func()) bool {
-	if (a.isPet && !a.Dead()) || !a.OwnerStillLinked() {
+	if !a.OwnerStillLinked() || (a.isPet && !a.claimCorpse()) {
 		return false
 	}
 	if !a.despawn(state) {
@@ -145,6 +146,20 @@ func (a *Actor) Decay(state *world.State, _ func()) bool {
 	if a.isPet {
 		a.emit(event.PetCorpseDecayed{})
 	}
+	return true
+}
+
+// claimCorpse marks a dead pet's corpse as decaying and reports whether this
+// call did; a living pet, or one already claimed, is not. A revive checks
+// the mark under the same lock, so a pet is either revived or decays, never
+// both.
+func (a *Actor) claimCorpse() bool {
+	a.vitals.mu.Lock()
+	defer a.vitals.mu.Unlock()
+	if !a.dead || a.decayed {
+		return false
+	}
+	a.decayed = true
 	return true
 }
 

@@ -85,7 +85,7 @@ func (a *Actor) revive() bool {
 	blessed := a.EffectList().IsAffected(effect.FlagPhoenixBlessing)
 	maxHP, maxMP := math.Floor(a.MaxHPValue()), math.Floor(a.MaxMPValue())
 	a.vitals.mu.Lock()
-	if !a.dead {
+	if !a.dead || a.decayed {
 		a.vitals.mu.Unlock()
 		return false
 	}

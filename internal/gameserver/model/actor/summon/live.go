@@ -139,6 +139,9 @@ type Actor struct {
 	// corpseDeadline is when this summon's corpse decays, zero while it has
 	// none; guarded by vitals.mu, with dead.
 	corpseDeadline time.Time
+	// decayed is set once a pet's corpse decay has claimed it; a revive
+	// racing that decay then loses. Guarded by vitals.mu.
+	decayed bool
 	// ownerLeft is set once this summon's owner has left the world while it
 	// lay dead; see LeaveWithOwner.
 	ownerLeft atomic.Bool
