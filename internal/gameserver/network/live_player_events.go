@@ -72,6 +72,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		})
 	case event.HitLanded:
 		l.chance.AttackHit(live.Character, e)
+	case event.ShotsRechargeRequested:
+		l.rechargeShots(live, live.Inventory(), e.Physical, e.Magic)
 	case event.Move:
 		l.broadcastLiveMoveEvent(live, e)
 	case event.Flight:

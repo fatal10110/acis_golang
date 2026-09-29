@@ -153,6 +153,12 @@ func (s *summonSink) Emit(ev event.Event) {
 		})
 	case event.HitLanded:
 		l.chance.AttackHit(actor, e)
+	case event.ShotsRechargeRequested:
+		// The summon's work runs on its owner's queue, which owns the
+		// owner's inventory and auto-use set.
+		if owner, ok := liveSummonOwner(actor); ok {
+			l.rechargeBeastShots(owner, actor, e.Physical, e.Magic)
+		}
 	case event.AttackStanceRequested, event.Attacked:
 		l.startSummonAttackStance(actor)
 	case event.CastAborted:

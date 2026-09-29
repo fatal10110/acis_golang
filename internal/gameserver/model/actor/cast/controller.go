@@ -204,6 +204,9 @@ type Controller struct {
 //     was in flight, matching PlayerCast.stop()'s unconditional
 //     _actor.getAI().clientActionFailed() (PlayerCast.java:381-387) that
 //     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
+//   - ShotsRechargeRequested, first when a cast of a skill that spends
+//     soulshots or spiritshots finishes naturally, fusion channels aside:
+//     the caster charges them again from its auto-use shots;
 //   - AttackStanceRequested, just ahead of the CastFinished of an
 //     offensive cast that finished naturally after its launch resolved at
 //     least one target (SetLaunchTargets): the caster enters or refreshes
@@ -681,10 +684,18 @@ func (c *Controller) finishLocked() func(bool) {
 	target, _ := c.target.(attackable.Combatant)
 	fusionEnd := c.fusionEnd
 	stance := current.Offensive && c.hasTargets
+	// A fusion channel closes without the finalizer that charges shots.
+	recharge := event.ShotsRechargeRequested{}
+	if fusionEnd == nil {
+		recharge = event.ShotsRechargeRequested{Physical: current.UsesSoulShot(), Magic: current.UsesSpiritShot()}
+	}
 	c.clearLocked()
 	return func(aborted bool) {
 		if fusionEnd != nil {
 			fusionEnd()
+		}
+		if !aborted && (recharge.Physical || recharge.Magic) {
+			c.emit(recharge)
 		}
 		if stance && !aborted {
 			c.emit(event.AttackStanceRequested{})

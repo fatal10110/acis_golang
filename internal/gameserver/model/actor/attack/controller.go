@@ -389,7 +389,11 @@ func (c *Controller) scheduleHitLocked(seq uint64, groups []scheduledHit, index 
 		delay -= groups[index-1].delay
 	}
 	c.scheduleLocked(delay, func() {
-		landed := c.deliverHits(seq, group.hits)
+		var onHitTimer func()
+		if index == 0 {
+			onHitTimer = c.swingHitTimer(groups)
+		}
+		landed := c.deliverHits(seq, group.hits, onHitTimer)
 
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -446,9 +450,34 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 	return flags
 }
 
+// swingHitTimer returns the shot step the first hit group of a swing runs
+// once its main target is known to still be there: a swing with any hit
+// that connects, in any group, spends the soulshot charge, and a player or
+// summon then charges its shots again from its auto-use shots. It runs once
+// per swing, ahead of the first hit's own feedback; a dual weapon's second
+// hit spends and charges nothing.
+func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
+	connects := false
+	for _, group := range groups {
+		for _, hit := range group.hits {
+			connects = connects || !hit.Miss
+		}
+	}
+	return func() {
+		if connects {
+			c.actor.SetChargedShot(item.ShotSoul, false)
+		}
+		if c.playable != nil {
+			c.emit(event.ShotsRechargeRequested{Physical: true})
+		}
+	}
+}
+
 // deliverHits lands one hit group and reports whether it got past the
 // main-target checks, whether or not the hits themselves connect.
-func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
+// onHitTimer, when set, runs as the group's first hit lands, after the
+// acting player's PvP flag.
+func (c *Controller) deliverHits(seq uint64, hits []Hit, onHitTimer func()) bool {
 	c.mu.RLock()
 	active := seq == c.attackSeq
 	c.mu.RUnlock()
@@ -467,25 +496,21 @@ func (c *Controller) deliverHits(seq uint64, hits []Hit) bool {
 		}
 	}
 	for _, hit := range hits {
-		c.deliverHit(hit)
+		c.deliverHit(hit, onHitTimer)
+		onHitTimer = nil
 	}
 	return true
 }
 
-func (c *Controller) deliverHit(hit Hit) {
+func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 	if hit.Target == nil || !c.actor.Knows(hit.Target) || hit.Target.Dead() {
 		return
 	}
-	if !hit.Miss {
-		// CreatureAttack.onHitTimer, CreatureAttack.java:134-137: a landed
-		// physical hit discharges the actor's soulshot charge, independent
-		// of actor type and of damage dealt, once the target-liveness guard
-		// above (mirroring Java's own mainTarget.isDead() check at line 115)
-		// passes.
-		c.actor.SetChargedShot(item.ShotSoul, false)
-	}
 	if c.playable != nil {
 		c.playable.NotePvPAttack(hit.Target)
+	}
+	if onHitTimer != nil {
+		onHitTimer()
 	}
 	// The target hears of a miss before the attacker's feedback goes out.
 	target, reacts := hit.Target.(attackedTarget)

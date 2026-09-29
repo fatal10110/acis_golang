@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -188,16 +189,22 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 	if !ok || tmpl.Kind != item.KindEtcItem || tmpl.EtcItem == nil {
 		return false
 	}
-	notEnoughMsg, ok := beastShotNotEnoughMessage[tmpl.EtcItem.Handler]
-	if !ok {
+	if _, ok := beastShotNotEnoughMessage[tmpl.EtcItem.Handler]; !ok {
 		return false
 	}
+	charger, chargerTarget := l.activeBeastShotSummon(live)
+	l.chargeBeastShot(live, inv, inst, tmpl, charger, chargerTarget, true)
+	return true
+}
 
-	summon, summonTarget := l.activeBeastShotSummon(live)
-
+// chargeBeastShot runs one beast shot stack of live's against charger,
+// live's active pet or servitor (nil when it has none), and sends what the
+// outcome produces; target is the same summon as the charge visual's caster.
+// clicked marks a use from the item window, as for chargeShot.
+func (l *GameClientLink) chargeBeastShot(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, charger itemhandler.BeastShotCharger, target actorcast.Target, clicked bool) {
 	res := itemhandler.UseBeastShot(itemhandler.BeastShotUseRequest{
 		Caster:    live.Character,
-		Summon:    summon,
+		Summon:    charger,
 		Inventory: inv,
 		Item:      inst,
 		Template:  tmpl,
@@ -215,17 +222,62 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 	case itemhandler.BeastShotSummonDead:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShotsNotAvailableForDeadPet))
 	case itemhandler.BeastShotNotEnoughItems:
-		l.replyShotRejection(live, res.AutoEnabled, true, notEnoughMsg)
+		// An auto-enabled stack that cannot pay turns auto use off instead
+		// of reporting the shortage.
+		if res.AutoEnabled {
+			l.disableAutoShot(live, tmpl.ID)
+		}
+		l.replyShotRejection(live, res.AutoEnabled, clicked, beastShotNotEnoughMessage[tmpl.EtcItem.Handler])
 	case itemhandler.BeastShotApplied:
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetUsesS1, tmpl.ID))
-		if res.SkillID != 0 && summonTarget != nil {
-			self := skillCastObject(summonTarget)
+		if res.SkillID != 0 && target != nil {
+			self := skillCastObject(target)
 			l.broadcastLiveFrame(live, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(self, self, res.SkillID, 1, 0, 0, false)
 			})
 		}
 	}
-	return true
+}
+
+// rechargeBeastShots charges pet, live's active pet or servitor, from
+// every beast shot stack live has set to auto-use: beast soulshots when
+// physical, beast spiritshots and blessed beast spiritshots when magic. An
+// auto-use entry whose stack is gone is dropped without a packet. Stacks
+// are tried in ascending item id order.
+func (l *GameClientLink) rechargeBeastShots(live *livePlayer, pet *summon.Actor, physical, magic bool) {
+	if live == nil || pet == nil {
+		return
+	}
+	inv := live.Inventory()
+	if inv == nil {
+		return
+	}
+	for _, itemID := range live.AutoSoulShotIDs() {
+		inst := inv.ItemByTemplateID(itemID)
+		if inst == nil {
+			live.SetAutoSoulShot(itemID, false)
+			continue
+		}
+		tmpl, ok := inv.Templates().Get(itemID)
+		if !ok || tmpl.EtcItem == nil {
+			continue
+		}
+		switch tmpl.DefaultAction {
+		case item.ActionSummonSoulshot:
+			if !physical {
+				continue
+			}
+		case item.ActionSummonSpiritshot:
+			if !magic {
+				continue
+			}
+		default:
+			continue
+		}
+		if _, ok := beastShotNotEnoughMessage[tmpl.EtcItem.Handler]; ok {
+			l.chargeBeastShot(live, inv, inst, tmpl, pet, pet, false)
+		}
+	}
 }
 
 // activeBeastShotSummon returns live's active pet or servitor as both an
