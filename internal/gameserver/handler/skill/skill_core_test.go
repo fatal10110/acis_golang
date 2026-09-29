@@ -875,6 +875,9 @@ type disablerFake struct {
 	shield                 formulas.ShieldDefense
 	level                  int
 	reflects               bool
+	name                   string
+	// failRoll makes the skill's own landing roll against d always fail.
+	failRoll bool
 
 	// shieldRolls counts ShieldDefense calls; templateLandings records the
 	// blessed-spiritshot and shield inputs of every per-template landing
@@ -913,8 +916,14 @@ func (d *disablerFake) EffectList() *effect.List { return d.list }
 func (d *disablerFake) SkillSuccessInput(caster creature.FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	d.lastBss = bss
 	d.lastShield = shield
-	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: 100, Shield: shield}, d.successOK
+	chance := 100.0
+	if d.failRoll {
+		chance = 0
+	}
+	return formulas.SkillSuccessInput{IgnoreResists: true, BaseChance: chance, Shield: shield}, d.successOK
 }
+
+func (d *disablerFake) CharacterName() string { return d.name }
 
 // ShieldDefense reports d's pre-set shield-block outcome, letting tests
 // exercise checkSkillSuccess's shield-block threading.
@@ -1065,6 +1074,81 @@ func TestControlDisablersReportFailedRollToPlayer(t *testing.T) {
 				t.Fatalf("Messages = %+v, want the resisted message in order", result.Messages)
 			}
 		})
+	}
+}
+
+// TestDisablersReportFailedRollAtCastLevel covers the Disablers types
+// whose resist names the skill with its level: a failed landing roll tells a
+// player caster each target resisted the skill at the cast level, in target
+// order, a landed roll tells it nothing, and a non-player caster hears
+// nothing either way.
+func TestDisablersReportFailedRollAtCastLevel(t *testing.T) {
+	for _, skillType := range []string{"BETRAY", "CONFUSION", "AGGREDUCE_CHAR", "AGGREMOVE", "ERASE"} {
+		t.Run(skillType, func(t *testing.T) {
+			def := modelskill.Definition{ID: 1380, Level: 7, SkillType: skillType}
+			targets := func(fail bool) []Actor {
+				var out []Actor
+				for i, name := range []string{"First", "Second"} {
+					target := newDisablerFake(int32(i + 1))
+					target.name = name
+					target.attackableFlag = true
+					target.failRoll = fail
+					out = append(out, target)
+				}
+				return out
+			}
+
+			result, ok := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{isPlayer: true}, Skill: def, Targets: targets(true)})
+			want := []Resisted{{TargetName: "First", SkillID: 1380, SkillLevel: 7}, {TargetName: "Second", SkillID: 1380, SkillLevel: 7}}
+			if !ok || !slices.Equal(result.Resisted, want) {
+				t.Fatalf("player caster, failed rolls: Resisted = %+v, handled = %t; want %+v", result.Resisted, ok, want)
+			}
+			if len(result.Messages) != 2 || result.Messages[0] != any(want[0]) || result.Messages[1] != any(want[1]) {
+				t.Fatalf("player caster, failed rolls: Messages = %+v, want the resists in target order", result.Messages)
+			}
+
+			result, _ = NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{isPlayer: true}, Skill: def, Targets: targets(false)})
+			if len(result.Resisted) != 0 || len(result.Messages) != 0 {
+				t.Fatalf("player caster, landed rolls: Resisted = %+v, Messages = %+v; want none", result.Resisted, result.Messages)
+			}
+
+			result, _ = NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{}, Skill: def, Targets: targets(true)})
+			if len(result.Resisted) != 0 || len(result.Messages) != 0 {
+				t.Fatalf("NPC caster, failed rolls: Resisted = %+v, Messages = %+v; want none", result.Resisted, result.Messages)
+			}
+		})
+	}
+}
+
+// TestConfusionOnNonNPCTellsPlayerInvalidTarget: CONFUSION rolls nothing
+// against a target that is no NPC and tells a player caster the target is
+// invalid, in target order among the cast's resists; an NPC caster hears
+// nothing.
+func TestConfusionOnNonNPCTellsPlayerInvalidTarget(t *testing.T) {
+	def := modelskill.Definition{ID: 2, Level: 3, SkillType: "CONFUSION", Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}}}
+	targets := func() (*disablerFake, *disablerFake) {
+		player := newDisablerFake(1)
+		npc := newDisablerFake(2)
+		npc.name = "Monster"
+		npc.attackableFlag = true
+		npc.failRoll = true
+		return player, npc
+	}
+
+	player, npc := targets()
+	result, ok := NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{isPlayer: true}, Skill: def, Targets: []Actor{player, npc}})
+	resisted := Resisted{TargetName: "Monster", SkillID: 2, SkillLevel: 3}
+	if !ok || len(result.Messages) != 2 || result.Messages[0] != any(InvalidTargetMessage{}) || result.Messages[1] != any(resisted) {
+		t.Fatalf("Messages = %+v, handled = %t; want invalid target, then %+v", result.Messages, ok, resisted)
+	}
+	if player.shieldRolls != 1 || len(player.list.All()) != 0 {
+		t.Fatalf("non-NPC target: shield rolls %d, effects %d; want its shield rolled and no effect", player.shieldRolls, len(player.list.All()))
+	}
+
+	player, npc = targets()
+	result, _ = NewDefaultRegistry().UseResult(Cast{Caster: &skillTarget{}, Skill: def, Targets: []Actor{player, npc}})
+	if len(result.Messages) != 0 {
+		t.Fatalf("NPC caster: Messages = %+v, want none", result.Messages)
 	}
 }
 

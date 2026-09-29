@@ -13,12 +13,10 @@ const regularUnlockKeySkillID = 2065
 
 // DoorUnlockUnableMessage reports a door the cast skill can never unlock.
 // DoorUnlockFailedMessage reports an unlock attempt on a door that failed
-// or found the door already open. UnlockInvalidTargetMessage reports an
-// unlock cast whose target is neither a door nor a chest.
+// or found the door already open.
 type (
-	DoorUnlockUnableMessage    struct{}
-	DoorUnlockFailedMessage    struct{}
-	UnlockInvalidTargetMessage struct{}
+	DoorUnlockUnableMessage struct{}
+	DoorUnlockFailedMessage struct{}
 )
 
 // doorTarget is a spawned door. Open changes its state through the door's
@@ -71,7 +69,7 @@ func (unlockHandler) Use(cast Cast) {
 		useOnChest(cast, chest)
 		return
 	}
-	cast.record(UnlockInvalidTargetMessage{})
+	cast.record(InvalidTargetMessage{})
 }
 
 func useOnDoor(cast Cast, target doorTarget) {

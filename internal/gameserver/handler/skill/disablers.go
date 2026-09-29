@@ -133,10 +133,21 @@ type landing struct {
 	bss    bool
 }
 
-// succeeds rolls cast's skill landing against effected with the resolved
-// inputs.
-func (l landing) succeeds(cast Cast, effected Creature) (succeeded, ok bool) {
-	return checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, l.bss, l.shield)
+// lands rolls cast's skill landing against effected with the resolved
+// inputs and reports whether it landed. A failed roll tells a player caster
+// that effected resisted the skill, named at level; a target with no
+// landing-rate source neither lands the skill nor reports a resist.
+func (l landing) lands(cast Cast, effected Creature, level int) bool {
+	succeeded, ok := checkSkillSuccessBSSWithShield(cast.Caster, effected, cast.Skill, l.bss, l.shield)
+	if !ok {
+		return false
+	}
+	if !succeeded {
+		if _, player := asPlayer(cast.Caster); player {
+			appendResisted(cast.resisted, effected, cast.Skill, level, false)
+		}
+	}
+	return succeeded
 }
 
 // apply lands cast's effect templates on effected with the resolved inputs.
@@ -157,8 +168,7 @@ func disableAggDamage(cast Cast, target Creature, land landing) {
 }
 
 func disableErase(cast Cast, target Creature, land landing) {
-	succeeded, ok := land.succeeds(cast, target)
-	if !ok || !succeeded {
+	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
 	servitor, ok := target.(Summon)
@@ -185,8 +195,7 @@ func reflectTarget(cast Cast, target Creature) Creature {
 }
 
 func disableWithSuccessCheck(cast Cast, target Creature, land landing) {
-	succeeded, ok := land.succeeds(cast, target)
-	if !ok || !succeeded {
+	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
 	land.apply(cast, target)
@@ -194,50 +203,43 @@ func disableWithSuccessCheck(cast Cast, target Creature, land landing) {
 
 // disableReflectable keeps the shield outcome rolled against the original
 // target even when the reflect swap turns the cast back on the caster: both
-// the landing roll and the effects use that pre-swap outcome.
+// the landing roll and the effects use that pre-swap outcome. Its resist
+// names the skill by id alone, so the message carries level 1.
 func disableReflectable(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := land.succeeds(cast, effected)
-	if !ok || !succeeded {
-		if ok {
-			if _, player := asPlayer(cast.Caster); player {
-				appendResisted(cast.resisted, effected, cast.Skill, 1, false)
-			}
-		}
+	if !land.lands(cast, effected, 1) {
 		return
 	}
 	land.apply(cast, effected)
 }
 
-// disableMute keeps the pre-swap shield outcome the way disableReflectable
-// does.
+// disableMute keeps the pre-swap shield outcome and the level-1 resist the
+// way disableReflectable does.
 func disableMute(cast Cast, target Creature, land landing) {
 	effected := reflectTarget(cast, target)
 	if effected == nil {
 		return
 	}
-	succeeded, ok := land.succeeds(cast, effected)
-	if !ok || !succeeded {
-		if ok {
-			if _, player := asPlayer(cast.Caster); player {
-				appendResisted(cast.resisted, effected, cast.Skill, 1, false)
-			}
-		}
+	if !land.lands(cast, effected, 1) {
 		return
 	}
 	stopSkillType(effected.EffectList(), skillTypeKey(cast.Skill.SkillType))
 	land.apply(cast, effected)
 }
 
+// disableConfusion only works on an NPC combat target; a player caster
+// aiming it at anything else is told the target is invalid.
 func disableConfusion(cast Cast, target Creature, land landing) {
 	if !target.Attackable() {
+		if _, player := asPlayer(cast.Caster); player {
+			cast.record(InvalidTargetMessage{})
+		}
 		return
 	}
-	succeeded, ok := land.succeeds(cast, target)
-	if !ok || !succeeded {
+	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
 	stopSkillType(target.EffectList(), skillTypeKey(cast.Skill.SkillType))
@@ -261,8 +263,7 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 }
 
 func disableAggReduceChar(cast Cast, target Creature, land landing) {
-	succeeded, ok := land.succeeds(cast, target)
-	if !ok || !succeeded {
+	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
 	if cast.Caster != nil {
@@ -276,8 +277,7 @@ func disableAggRemove(cast Cast, target Creature, land landing) {
 	if !target.Attackable() || target.RaidRelated() {
 		return
 	}
-	succeeded, ok := land.succeeds(cast, target)
-	if !ok || !succeeded {
+	if !land.lands(cast, target, cast.Skill.Level) {
 		return
 	}
 	if cast.Skill.Target == modelskill.TargetUndead {

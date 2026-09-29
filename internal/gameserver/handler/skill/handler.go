@@ -328,13 +328,17 @@ type Damage struct {
 	Petrified bool
 }
 
-// AttackFailedMessage, DrainHalfSucceededMessage, ManaDamageMissedMessage and
-// CasterVitalsChanged mark messages without data. DrainHalfSucceededMessage
-// is a DRAIN cast's half-damage magic failure, reported in place of
-// AttackFailedMessage. CasterVitalsChanged marks where a player caster's own
-// HP changed mid-cast, so its status reaches it at that point among the
-// cast's other messages.
+// AttackFailedMessage, DrainHalfSucceededMessage, ManaDamageMissedMessage,
+// InvalidTargetMessage and CasterVitalsChanged mark messages without data.
+// DrainHalfSucceededMessage is a DRAIN cast's half-damage magic failure,
+// reported in place of AttackFailedMessage. InvalidTargetMessage tells a
+// player caster the skill cannot act on a target it reached (an unlock
+// skill on neither a door nor a chest, a confusion on a non-NPC).
+// CasterVitalsChanged marks where a player caster's own HP changed
+// mid-cast, so its status reaches it at that point among the cast's other
+// messages.
 type (
+	InvalidTargetMessage      struct{}
 	AttackFailedMessage       struct{}
 	DrainHalfSucceededMessage struct{}
 	ManaDamageMissedMessage   struct{}

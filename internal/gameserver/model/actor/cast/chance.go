@@ -30,8 +30,12 @@ type ChanceProcs struct {
 	Skills      *handlerskill.Registry
 	// Deliver runs apply, which dispatches one triggered skill for caster,
 	// and delivers its result the way a finished cast of that caster
-	// delivers one. Nil runs apply and drops the result.
-	Deliver func(caster handlerskill.Creature, apply func() EffectResult)
+	// delivers one. apply hands each skill-handler message to the sink it
+	// is given the moment the handler produces it, so the message keeps its
+	// place among the frames the skill's own state changes send at once; a
+	// message the sink took is left out of the returned result. Nil runs
+	// apply without a sink and drops the result.
+	Deliver func(caster handlerskill.Creature, apply func(sink handlerskill.MessageSink) EffectResult)
 }
 
 // ChanceConditionFailed is a triggered cast refused by one of its skill's
@@ -206,7 +210,7 @@ func (p *ChanceProcs) weaponCritSkill(attackerObj, targetObj any) {
 	if !landed {
 		return
 	}
-	p.deliver(caster, func() EffectResult {
+	p.deliver(caster, func(handlerskill.MessageSink) EffectResult {
 		return handlerEffectResult(handlerskill.LandCritSkill(caster, target, def, shield))
 	})
 }
@@ -233,15 +237,15 @@ func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, 
 		}
 	}
 	if caster.Kind() == actor.KindPlayer {
-		p.deliver(caster, func() EffectResult {
+		p.deliver(caster, func(handlerskill.MessageSink) EffectResult {
 			return EffectResult{Messages: []any{WeaponSkillActivated{Skill: def}}}
 		})
 	}
 	if p.Skills == nil {
 		return
 	}
-	p.deliver(caster, func() EffectResult {
-		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}})
+	p.deliver(caster, func(sink handlerskill.MessageSink) EffectResult {
+		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: sink})
 		if !ok {
 			return EffectResult{}
 		}
@@ -316,14 +320,14 @@ func (p *ChanceProcs) castChanceSkill(owner chanceOwner, def modelskill.Definiti
 		held = h.HeldItemTypeMask()
 	}
 	if !WeaponAllowed(def, held) {
-		p.deliver(owner, func() EffectResult {
+		p.deliver(owner, func(handlerskill.MessageSink) EffectResult {
 			return EffectResult{Messages: []any{ChanceWeaponNotAllowed{Skill: def}}}
 		})
 		return
 	}
 	if caster, ok := owner.(conditions.Source); ok {
 		if clause, ok := conditions.EvaluateSkill(def, caster, target); !ok {
-			p.deliver(owner, func() EffectResult {
+			p.deliver(owner, func(handlerskill.MessageSink) EffectResult {
 				return EffectResult{Messages: []any{ChanceConditionFailed{Skill: def, Clause: clause}}}
 			})
 			return
@@ -391,8 +395,8 @@ func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, def modelskil
 	owner.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 	x, y, z := affected[0].Position()
 	owner.BroadcastSkillUse(ids[0], x, y, z, int32(def.ID), int32(def.Level), 0, 0)
-	p.deliver(caster, func() EffectResult {
-		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: castTargets})
+	p.deliver(caster, func(sink handlerskill.MessageSink) EffectResult {
+		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: castTargets, Sink: sink})
 		if !ok {
 			return EffectResult{}
 		}
@@ -400,9 +404,9 @@ func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, def modelskil
 	})
 }
 
-func (p *ChanceProcs) deliver(caster handlerskill.Creature, apply func() EffectResult) {
+func (p *ChanceProcs) deliver(caster handlerskill.Creature, apply func(handlerskill.MessageSink) EffectResult) {
 	if p.Deliver == nil {
-		apply()
+		apply(nil)
 		return
 	}
 	p.Deliver(caster, apply)

@@ -91,7 +91,7 @@ func TestUnlockNonChestTargetReportsInvalidTarget(t *testing.T) {
 	if len(result.Messages) != 1 {
 		t.Fatalf("messages = %v, want one invalid-target message", result.Messages)
 	}
-	if _, ok := result.Messages[0].(UnlockInvalidTargetMessage); !ok {
-		t.Fatalf("message = %T, want UnlockInvalidTargetMessage", result.Messages[0])
+	if _, ok := result.Messages[0].(InvalidTargetMessage); !ok {
+		t.Fatalf("message = %T, want InvalidTargetMessage", result.Messages[0])
 	}
 }
