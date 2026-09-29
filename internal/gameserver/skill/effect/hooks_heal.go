@@ -39,14 +39,17 @@ func healOverTimeStart(e *Effect) bool {
 	return true
 }
 
-// broadcastStatus republishes effected's vitals after a periodic tick
-// changed them. A periodic effect action runs outside any client request, so
-// unlike the cast and item paths — which send their own batched StatusUpdate
-// at the call site — nothing else would tell the client the tick happened.
-// Every kind follows its own status contract: a player refreshes its own
-// bars, a summon its owner's pet window, an NPC its targeters' health bar.
+// broadcastStatus refreshes a player effected's own bars after a periodic
+// tick changed its vitals. A periodic effect action runs outside any client
+// request, so unlike the cast and item paths — which send their own batched
+// StatusUpdate at the call site — nothing else would tell the player the
+// tick happened. A summon or NPC needs nothing here: its HP/MP mutators
+// already republished its status (the owner's pet window and observers, or
+// the targeters' health bar), and a second push would double the frame.
 func broadcastStatus(effected Actor) {
-	effected.BroadcastStatus()
+	if player, ok := asPlayer(effected); ok {
+		player.BroadcastStatus()
+	}
 }
 
 func manaHealStart(e *Effect) bool {

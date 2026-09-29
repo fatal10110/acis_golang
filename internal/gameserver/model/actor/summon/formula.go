@@ -461,9 +461,37 @@ func (a *Actor) RestoreDead() {
 	a.vitals.mu.Unlock()
 }
 
-// AddHP restores HP, clamped to MaxHP, and returns the applied amount. A dead
-// summon gains nothing; the check shares vitals.mu with the lethal drainHP.
+// AddHP restores HP, clamped to MaxHP, and returns the applied amount. A
+// restore that applied anything republishes a's status; one that applied
+// nothing stays silent. A dead summon gains nothing.
 func (a *Actor) AddHP(amount float64) float64 {
+	return a.publishVitals(a.addHP(amount))
+}
+
+// AddMP restores MP, clamped to MaxMP, and returns the applied amount,
+// republishing a's status as AddHP does.
+func (a *Actor) AddMP(amount float64) float64 {
+	return a.publishVitals(a.addMP(amount))
+}
+
+// ReduceMP subtracts MP, clamped at zero, and returns the applied amount,
+// republishing a's status as AddHP does.
+func (a *Actor) ReduceMP(amount float64) float64 {
+	return a.publishVitals(a.reduceMP(amount))
+}
+
+// publishVitals republishes a's status when applied is non-zero, and
+// returns applied.
+func (a *Actor) publishVitals(applied float64) float64 {
+	if applied > 0 {
+		a.UpdateStatus()
+	}
+	return applied
+}
+
+// addHP is AddHP without the status republish. The check against a dead
+// summon shares vitals.mu with the lethal drainHP.
+func (a *Actor) addHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
@@ -480,8 +508,8 @@ func (a *Actor) AddHP(amount float64) float64 {
 	return amount
 }
 
-// AddMP restores MP, clamped to MaxMP, and returns the applied amount.
-func (a *Actor) AddMP(amount float64) float64 {
+// addMP is AddMP without the status republish.
+func (a *Actor) addMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
@@ -498,8 +526,8 @@ func (a *Actor) AddMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceMP subtracts MP, clamped at zero, and returns the applied amount.
-func (a *Actor) ReduceMP(amount float64) float64 {
+// reduceMP is ReduceMP without the status republish.
+func (a *Actor) reduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}

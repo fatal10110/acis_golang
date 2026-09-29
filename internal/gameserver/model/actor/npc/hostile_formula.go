@@ -118,13 +118,37 @@ func (h *Hostile) SetHP(value float64) {
 	h.health.SetCurrent(value)
 }
 
-// AddHP restores HP, clamped to MaxHP, and returns the applied amount.
+// AddHP restores HP, clamped to MaxHP, and returns the applied amount. A
+// restore that applied anything refreshes the health bar of the players
+// targeting h; one that applied nothing stays silent.
 func (h *Hostile) AddHP(amount float64) float64 {
-	return h.health.Add(amount, h.MaxHPValue())
+	return h.publishVitals(h.health.Add(amount, h.MaxHPValue()))
 }
 
-// AddMP restores MP, clamped to MaxMP, and returns the applied amount.
+// AddMP restores MP, clamped to MaxMP, and returns the applied amount. Like
+// every vitals change it offers the targeters' health bar a refresh, which
+// the bar's own segment check usually declines since HP did not move.
 func (h *Hostile) AddMP(amount float64) float64 {
+	return h.publishVitals(h.addMP(amount))
+}
+
+// ReduceMP subtracts MP, clamped at zero, and returns the applied amount,
+// offering the targeters' health bar a refresh as AddMP does.
+func (h *Hostile) ReduceMP(amount float64) float64 {
+	return h.publishVitals(h.reduceMP(amount))
+}
+
+// publishVitals reports a vitals change when applied is non-zero, and
+// returns applied.
+func (h *Hostile) publishVitals(applied float64) float64 {
+	if applied > 0 {
+		h.BroadcastStatus()
+	}
+	return applied
+}
+
+// addMP is AddMP without the status report.
+func (h *Hostile) addMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
@@ -141,8 +165,8 @@ func (h *Hostile) AddMP(amount float64) float64 {
 	return amount
 }
 
-// ReduceMP subtracts MP, clamped at zero, and returns the applied amount.
-func (h *Hostile) ReduceMP(amount float64) float64 {
+// reduceMP is ReduceMP without the status report.
+func (h *Hostile) reduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}

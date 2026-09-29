@@ -28,11 +28,11 @@ func (h *Hostile) TickRegen() {
 	}
 	changed := false
 	if h.HP() < h.MaxHPValue() {
-		h.AddHP(math.Max(1, h.HPRegenRate()))
+		h.health.Add(math.Max(1, h.HPRegenRate()), h.MaxHPValue())
 		changed = true
 	}
 	if h.MPValue() < h.MaxMPValue() {
-		h.AddMP(math.Max(1, h.MPRegenRate()))
+		h.addMP(math.Max(1, h.MPRegenRate()))
 		changed = true
 	}
 	if !changed {

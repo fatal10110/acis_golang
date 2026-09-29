@@ -53,7 +53,8 @@ type Actor interface {
 	RechargeMP(base float64) float64
 	// BroadcastStatus republishes the actor's current vitals to whoever
 	// follows them: a player's own bars, a summon's owner pet window and
-	// observers, an NPC's targeters.
+	// observers, an NPC's targeters. A summon's and an NPC's AddHP, AddMP and
+	// ReduceMP already do this themselves; a player's do not.
 	BroadcastStatus()
 
 	AbortAll(force bool)

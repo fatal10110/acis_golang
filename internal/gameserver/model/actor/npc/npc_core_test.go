@@ -2374,3 +2374,46 @@ func TestRandomNearbyCombatantMeasuresHorizontalPointDistance(t *testing.T) {
 		})
 	}
 }
+
+// TestHostileVitalsMutatorsReportHPChangeOncePerChange pins that every HP/MP
+// restore or MP payment that changes an NPC's vitals offers its targeters'
+// health bar one refresh, and one that changes nothing stays silent.
+// Regeneration changes both resources but offers one refresh for the pair.
+func TestHostileVitalsMutatorsReportHPChangeOncePerChange(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*Hostile)
+		apply func(*Hostile) float64
+		want  int
+	}{
+		{"add hp", func(h *Hostile) { h.SetHP(h.MaxHPValue() / 2) }, func(h *Hostile) float64 { return h.AddHP(10) }, 1},
+		{"add hp at max", nil, func(h *Hostile) float64 { return h.AddHP(10) }, 0},
+		{"add mp", func(h *Hostile) { h.reduceMP(h.MPValue() / 2) }, func(h *Hostile) float64 { return h.AddMP(10) }, 1},
+		{"add mp at max", nil, func(h *Hostile) float64 { return h.AddMP(10) }, 0},
+		{"reduce mp", nil, func(h *Hostile) float64 { return h.ReduceMP(10) }, 1},
+		{"reduce empty mp", func(h *Hostile) { h.reduceMP(h.MPValue()) }, func(h *Hostile) float64 { return h.ReduceMP(10) }, 0},
+		{"regen both", func(h *Hostile) { h.SetHP(h.MaxHPValue() / 2); h.reduceMP(h.MPValue() / 2) }, func(h *Hostile) float64 { h.TickRegen(); return 1 }, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			hostile.Instance.Template.HPMax = 1000
+			hostile.Instance.Template.MPMax = 100
+			hostile.SetHP(hostile.MaxHPValue())
+			hostile.addMP(hostile.MaxMPValue())
+			if tc.setup != nil {
+				tc.setup(hostile)
+			}
+			rec := &event.Recorder{}
+			hostile.Attach(Runtime{Sink: rec})
+
+			applied := tc.apply(hostile)
+
+			if (applied > 0) != (tc.want > 0) {
+				t.Fatalf("applied = %v, want a change only when %d refreshes are expected", applied, tc.want)
+			}
+			if got := event.Count[event.HPChanged](rec); got != tc.want {
+				t.Fatalf("HP change reports = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
