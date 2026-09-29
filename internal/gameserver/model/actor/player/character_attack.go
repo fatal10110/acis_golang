@@ -223,6 +223,23 @@ func (c *Character) activeWeapon() activeWeapon {
 	return activeWeapon{tmpl: c.fistTemplate()}
 }
 
+// HeldItemTypeMask returns the item-type bits of the weapon this player
+// fights with (its class's fists when the right hand holds none) and of the
+// armor, a shield, in its left hand. A skill restricted to weapon or shield
+// types is cast only when it shares a bit with this mask.
+func (c *Character) HeldItemTypeMask() int32 {
+	mask := c.activeWeapon().attackType().Mask()
+	if c.inventory == nil {
+		return mask
+	}
+	if inst := c.inventory.ItemAt(itemcontainer.LHand); inst != nil {
+		if tmpl, ok := c.inventory.Templates().Get(inst.TemplateID); ok && tmpl != nil && tmpl.Kind == item.KindArmor && tmpl.Armor != nil {
+			mask |= tmpl.Armor.Type.Mask()
+		}
+	}
+	return mask
+}
+
 func (c *Character) fistTemplate() *item.Template {
 	tmpl := c.template()
 	if tmpl == nil || c.inventory == nil || tmpl.FistsItemID == 0 {

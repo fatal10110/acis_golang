@@ -41,6 +41,13 @@ type ChanceConditionFailed struct {
 	Clause modelskill.ConditionClause
 }
 
+// ChanceWeaponNotAllowed is a triggered cast refused because its skill
+// needs a weapon or shield type the owner does not hold. Its message goes
+// to the owner, as a failed cast's does.
+type ChanceWeaponNotAllowed struct {
+	Skill modelskill.Definition
+}
+
 // WeaponSkillActivated is a weapon's on-magic skill about to run for a
 // player caster. Its message goes to that player before the skill's own
 // results.
@@ -294,9 +301,26 @@ func (p *ChanceProcs) chanceSkills(owner chanceOwner) []modelskill.Definition {
 	return out
 }
 
+// heldItems is a creature that reports the weapon and shield it holds. One
+// that does not holds neither.
+type heldItems interface {
+	HeldItemTypeMask() int32
+}
+
 // castChanceSkill casts owner's passive chance skill def, or the skill it
-// names to trigger, on target.
+// names to trigger, on target. def must first allow the weapon and shield
+// owner holds, then pass its <cond> clauses.
 func (p *ChanceProcs) castChanceSkill(owner chanceOwner, def modelskill.Definition, target skilltarget.Actor) {
+	var held int32
+	if h, ok := owner.(heldItems); ok {
+		held = h.HeldItemTypeMask()
+	}
+	if !WeaponAllowed(def, held) {
+		p.deliver(owner, func() EffectResult {
+			return EffectResult{Messages: []any{ChanceWeaponNotAllowed{Skill: def}}}
+		})
+		return
+	}
 	if caster, ok := owner.(conditions.Source); ok {
 		if clause, ok := conditions.EvaluateSkill(def, caster, target); !ok {
 			p.deliver(owner, func() EffectResult {

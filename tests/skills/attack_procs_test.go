@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -50,10 +51,16 @@ func procWeaponCatalog(t *testing.T, tune func(*item.WeaponDetail)) *item.Table 
 // skills, and equips each of equip before returning it in world.
 func bootArmed(t *testing.T, catalog *item.Table, roll func(int) int, equip []int32, skills ...int) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
+	return bootArmedWith(t, chanceSkills(), catalog, roll, equip, skills...)
+}
+
+// bootArmedWith is bootArmed over the skill table defs.
+func bootArmedWith(t *testing.T, defs []modelskill.Definition, catalog *item.Table, roll func(int) int, equip []int32, skills ...int) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, chanceSkills())),
+		gameservertest.WithSkills(skillPersistence(t, defs)),
 		gameservertest.WithItemTemplates(catalog),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)

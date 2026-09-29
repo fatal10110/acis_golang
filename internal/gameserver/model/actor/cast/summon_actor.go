@@ -79,3 +79,11 @@ func (SummonActor) EnableAllSkills()              {}
 func (SummonActor) GroundTargetUnset() bool       { return false }
 func (SummonActor) IncreaseCharges(int, int) bool { return false }
 func (SummonActor) DecreaseCharges(int) bool      { return false }
+
+// HeldItemTypeMask is the caster's weapon and shield item-type bits.
+func (a SummonActor) HeldItemTypeMask() int32 {
+	if a.Summon == nil {
+		return 0
+	}
+	return a.Summon.HeldItemTypeMask()
+}

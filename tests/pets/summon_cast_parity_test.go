@@ -68,8 +68,9 @@ func TestSummonAreaSkillWithoutFinalTargetStartsNothing(t *testing.T) {
 // TestSummonCastRefusalReachesOwner refuses the pet's strike at the monster
 // on each commit-time gate the owner is told about: not enough MP or HP
 // (CreatureCast.meetsHpMpConditions), no line of sight
-// (CreatureCast.canCast), and a failed skill <cond> clause
-// (PlayableCast.canCast -> checkCondition). Summon.sendPacket forwards each
+// (CreatureCast.canCast), a weapon the skill does not allow
+// (CreatureCast.canCast -> getWeaponDependancy), and a failed skill <cond>
+// clause (PlayableCast.canCast -> checkCondition). Summon.sendPacket forwards each
 // message to the owner, the pet turns toward the monster, no cast starts,
 // and nothing is charged.
 func TestSummonCastRefusalReachesOwner(t *testing.T) {
@@ -109,6 +110,38 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 				d.Conditions = []modelskill.ConditionClause{{
 					Root:      modelskill.Condition{Kind: "player", Attrs: map[string]string{"hp": "50"}},
 					MessageID: serverpackets.SystemMessageS1CannotBeUsed, AddName: true,
+				}}
+			},
+			message: func(t *testing.T, f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			},
+		},
+		{
+			// A servitor or an unarmed pet holds no weapon type at all
+			// (L2Skill.getWeaponDependancy).
+			name: "weapon not held",
+			tune: func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			message: func(t *testing.T, f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			},
+		},
+		{
+			// CreatureCast.canCast checks sight before the weapon.
+			name:  "sight before weapon",
+			tune:  func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			blind: true,
+			message: func(t *testing.T, f []byte) {
+				assertStaticSystemMessage(t, f, serverpackets.SystemMessageCantSeeTarget)
+			},
+		},
+		{
+			// The weapon is checked before PlayableCast's skill conditions.
+			name: "weapon before skill condition",
+			tune: func(d *modelskill.Definition) {
+				d.WeaponsAllowed = "DAGGER"
+				d.Conditions = []modelskill.ConditionClause{{
+					Root:      modelskill.Condition{Kind: "player", Attrs: map[string]string{"hp": "50"}},
+					MessageID: serverpackets.SystemMessageNotEnoughHP,
 				}}
 			},
 			message: func(t *testing.T, f []byte) {

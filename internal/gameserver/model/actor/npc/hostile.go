@@ -160,6 +160,10 @@ type Hostile struct {
 	// resolved by Attach alongside weapon. CrystalNone when unarmed.
 	weaponCrystal item.CrystalType
 
+	// offHandMask is the armor-type bit of the shield the template holds
+	// in its left hand, resolved by Attach; zero when it holds none.
+	offHandMask int32
+
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
 	// substitute a fixed function for deterministic combat outcomes.
@@ -354,7 +358,8 @@ type Runtime struct {
 // goroutines. Items resolves the template's right-hand item id into the
 // weapon kind AttackType and WeaponReuseDelay read; a template with no
 // right-hand item id, an unknown id, or a non-weapon item leaves the NPC
-// unarmed.
+// unarmed. It resolves the left-hand item id the same way into the shield
+// HeldItemTypeMask reports.
 func (h *Hostile) Attach(rt Runtime) {
 	h.world = rt.World
 	h.los = rt.LOS
@@ -362,7 +367,15 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.rewards = rt.Rewards
 	h.sink = rt.Sink
 	h.remover = rt.Remover
-	if rt.Items == nil || h.Instance.Template.RightHand == 0 {
+	if rt.Items == nil {
+		return
+	}
+	if id := h.Instance.Template.LeftHand; id != 0 {
+		if tmpl, ok := rt.Items.Get(int32(id)); ok && tmpl.Kind == item.KindArmor && tmpl.Armor != nil {
+			h.offHandMask = tmpl.Armor.Type.Mask()
+		}
+	}
+	if h.Instance.Template.RightHand == 0 {
 		return
 	}
 	tmpl, ok := rt.Items.Get(int32(h.Instance.Template.RightHand))
@@ -371,6 +384,17 @@ func (h *Hostile) Attach(rt Runtime) {
 	}
 	h.weapon = tmpl.Weapon
 	h.weaponCrystal = tmpl.Crystal
+}
+
+// HeldItemTypeMask returns the item-type bits of this NPC's right-hand
+// weapon and of the armor, a shield, in its left hand. An unarmed NPC holds
+// no weapon bit at all, not a fist's.
+func (h *Hostile) HeldItemTypeMask() int32 {
+	mask := h.offHandMask
+	if h.weapon != nil {
+		mask |= h.weapon.Type.Mask()
+	}
+	return mask
 }
 
 func (h *Hostile) emit(e event.Event) {

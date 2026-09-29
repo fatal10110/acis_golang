@@ -233,3 +233,11 @@ func (a PlayerActor) IncreaseCharges(count, max int) bool {
 func (a PlayerActor) DecreaseCharges(count int) bool {
 	return a.Character != nil && a.Character.DecreaseCharges(count)
 }
+
+// HeldItemTypeMask is the caster's weapon and shield item-type bits.
+func (a PlayerActor) HeldItemTypeMask() int32 {
+	if a.Character == nil {
+		return 0
+	}
+	return a.Character.HeldItemTypeMask()
+}

@@ -33,6 +33,8 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply f
 		switch m := message.(type) {
 		case actorcast.ChanceConditionFailed:
 			sendSkillConditionFailure(live, m.Clause, m.Skill.ID)
+		case actorcast.ChanceWeaponNotAllowed:
+			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(m.Skill.ID), int32(m.Skill.Level)))
 		case actorcast.WeaponSkillActivated:
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasBeenActivated, int32(m.Skill.ID), int32(m.Skill.Level)))
 		}
