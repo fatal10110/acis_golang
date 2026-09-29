@@ -230,6 +230,28 @@ func (s *Summon) TryToMoveTo(dest location.Location) bool {
 	return accepted
 }
 
+// StepAside makes walking to dest the current intention, as TryToMoveTo
+// does, when the summon is idle or following and free to act; it reports
+// whether the walk started. Any other intention keeps the summon where it
+// is. A swing or cast only runs under an attack or cast intention, so an
+// idle or following summon never has one to wait out.
+func (s *Summon) StepAside(dest location.Location) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current.kind != IntentionIdle && s.current.kind != IntentionFollow {
+		return false
+	}
+	if s.actor.DenyAIAction() || s.attack.AttackingNow() || (s.cast != nil && s.cast.CastingNow()) {
+		return false
+	}
+	s.setCurrentLocked(intention{kind: IntentionMoveTo, loc: dest})
+	accepted, err := s.move.MoveToLocation(dest)
+	if err != nil {
+		s.log.Warn().Err(err).Msg("ai: summon broadcast")
+	}
+	return accepted
+}
+
 // Arrived ends a walk-to intention whose walk just finished and reports
 // whether there was one; the caller then sends the summon idle. Any other
 // intention is left for Think.

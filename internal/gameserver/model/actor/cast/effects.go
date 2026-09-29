@@ -176,6 +176,9 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 				if recorder, ok := target.(interface{ RecordAttacker(attackable.Combatant) }); ok {
 					recorder.RecordAttacker(castCaster)
 				}
+				if attacked, ok := target.(interface{ NotifyAttacked(attackable.Combatant) }); ok {
+					attacked.NotifyAttacked(castCaster)
+				}
 			}
 		}
 	}

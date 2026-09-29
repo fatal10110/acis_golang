@@ -1,6 +1,7 @@
 package attack
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -858,3 +859,74 @@ func (a *timingSummon) Owner() (attackable.Combatant, bool) {
 
 func (t *timingTarget) Invul() bool     { return t.invul }
 func (t *timingTarget) Paralyzed() bool { return t.paralyzed }
+
+// reactingTarget is a hit target whose AI reacts to hits, as players and
+// summons do. log is shared with the attacker's sink so the test can read
+// the order in which the attacker and the target heard of each hit.
+type reactingTarget struct {
+	timingTarget
+	log *[]string
+}
+
+func (t *reactingTarget) NotifyAttacked(attacker attackable.Combatant) {
+	*t.log = append(*t.log, fmt.Sprintf("attacked %d by %d", t.id, attacker.ObjectID()))
+}
+
+func (t *reactingTarget) NotifyEvaded(attacker attackable.Combatant) {
+	*t.log = append(*t.log, fmt.Sprintf("evaded %d by %d", t.id, attacker.ObjectID()))
+}
+
+// orderSink logs the attacker-side events a hit reports into the same log
+// the targets write to.
+type orderSink struct{ log *[]string }
+
+func (s orderSink) Emit(e event.Event) {
+	switch e := e.(type) {
+	case event.HitDealt:
+		*s.log = append(*s.log, fmt.Sprintf("feedback miss=%v", e.Miss))
+	case event.AttackStanceRequested:
+		*s.log = append(*s.log, "stance")
+	case event.HitLanded:
+		*s.log = append(*s.log, fmt.Sprintf("landed %d", e.Target.ObjectID()))
+	}
+}
+
+// TestControllerNotifiesHitTargets pins CreatureAttack.doHit's reactions
+// (CreatureAttack.java:223-240) for every hit of a group: a miss tells the
+// target it evaded before the attacker's feedback; a damaging hit puts the
+// attacker in stance and tells the target it was attacked, both before the
+// damage lands; a zero-damage hit does neither; a target without an AI
+// reaction is only damaged.
+func TestControllerNotifiesHitTargets(t *testing.T) {
+	var log []string
+	actor := &timingPlayer{}
+	ctrl := NewPlayer(actor, orderSink{log: &log})
+	primary := &reactingTarget{timingTarget: timingTarget{id: 2}, log: &log}
+	secondary := &reactingTarget{timingTarget: timingTarget{id: 3}, log: &log}
+	zero := &reactingTarget{timingTarget: timingTarget{id: 4}, log: &log}
+	plain := &timingTarget{id: 5}
+	for _, target := range []*reactingTarget{primary, secondary, zero} {
+		target.onDamage = func() { log = append(log, fmt.Sprintf("damage %d", target.id)) }
+	}
+	plain.onDamage = func() { log = append(log, "damage 5") }
+
+	ctrl.deliverHits(0, []Hit{
+		{Target: primary, Damage: 30},
+		{Target: secondary, Miss: true},
+		{Target: zero},
+		{Target: plain, Damage: 10},
+	})
+	// A dual weapon's second hit lands as its own group.
+	ctrl.deliverHits(0, []Hit{{Target: primary, Miss: true}})
+
+	want := []string{
+		"feedback miss=false", "stance", "attacked 2 by 1", "damage 2", "landed 2",
+		"evaded 3 by 1", "feedback miss=true",
+		"feedback miss=false",
+		"feedback miss=false", "stance", "damage 5", "landed 5",
+		"evaded 2 by 1", "feedback miss=true",
+	}
+	if !slices.Equal(log, want) {
+		t.Fatalf("hit order =\n%q\nwant\n%q", log, want)
+	}
+}
