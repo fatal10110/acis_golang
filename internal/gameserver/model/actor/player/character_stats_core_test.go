@@ -2756,6 +2756,99 @@ func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
 	}
 }
 
+// TestStopFakeDeathWithoutGetUpEndsFakeDeath pins the two StopFakeDeath
+// branches that schedule no get-up and so must end fake death themselves: a
+// character killed while playing dead, which must not stay fake-dead after
+// a revive, and a character with no live runtime.
+func TestStopFakeDeathWithoutGetUpEndsFakeDeath(t *testing.T) {
+	t.Run("dead", func(t *testing.T) {
+		c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+		c.StartFakeDeath()
+		if !c.FakeDead() {
+			t.Fatal("FakeDead() = false after StartFakeDeath")
+		}
+		if !c.MarkDead() {
+			t.Fatal("MarkDead() = false, want true")
+		}
+		c.StopFakeDeath()
+		if c.FakeDead() {
+			t.Fatal("FakeDead() = true after a dead character left fake death")
+		}
+		if !c.Revive() {
+			t.Fatal("Revive() = false, want true")
+		}
+		if c.FakeDead() || c.AlikeDead() {
+			t.Fatalf("revived character FakeDead=%v AlikeDead=%v, want both false", c.FakeDead(), c.AlikeDead())
+		}
+	})
+	t.Run("no live runtime", func(t *testing.T) {
+		c := liveCharacter(1, combatTemplate(), combatItems())
+		c.Live = nil
+		c.StartFakeDeath()
+		if !c.FakeDead() {
+			t.Fatal("FakeDead() = false after StartFakeDeath")
+		}
+		c.StopFakeDeath()
+		if c.FakeDead() {
+			t.Fatal("FakeDead() = true after StopFakeDeath with no live runtime")
+		}
+	})
+}
+
+// TestRepeatFakeDeathStopOnlyDuringGetUp pins a repeated get-up request
+// (Player.stopFakeDeath during its own get-up): it re-sends the get-up and
+// revive visuals and restarts the grace, and leaves the running get-up to
+// end fake death. Outside the get-up, or once dead, it does nothing.
+func TestRepeatFakeDeathStopOnlyDuringGetUp(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	rec := recordEvents(c)
+	c.StartFakeDeath()
+	if c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true while lying down")
+	}
+	c.StopFakeDeath()
+	c.recentFakeDeathUntil = time.Time{}
+	stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec)
+	c.stateMu.RLock()
+	gen := c.postureGen
+	c.stateMu.RUnlock()
+
+	if !c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = false during the get-up")
+	}
+	if got, want := event.Count[event.StanceChanged](rec), stances+1; got != want {
+		t.Fatalf("stance broadcasts = %d, want %d", got, want)
+	}
+	if got, want := event.Count[event.FakeDeathRevived](rec), revives+1; got != want {
+		t.Fatalf("revive broadcasts = %d, want %d", got, want)
+	}
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false after a repeated get-up request")
+	}
+	c.stateMu.RLock()
+	sameGetUp := c.postureGen == gen && c.standingNow
+	c.stateMu.RUnlock()
+	if !sameGetUp || !c.FakeDead() {
+		t.Fatalf("repeated get-up request replaced the get-up (same=%v FakeDead=%v)", sameGetUp, c.FakeDead())
+	}
+
+	c.settlePosture(gen, true)
+	if c.FakeDead() {
+		t.Fatal("FakeDead() = true after the original get-up ended")
+	}
+	if c.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true after the get-up ended")
+	}
+
+	d := attachIdleLive(t, liveCharacter(2, combatTemplate(), combatItems()))
+	d.StartFakeDeath()
+	d.StopFakeDeath()
+	d.MarkDead()
+	if d.RepeatFakeDeathStop() {
+		t.Fatal("RepeatFakeDeathStop() = true on a dead character")
+	}
+}
+
 func TestCharacterAllSkillsDisabledUnionsCrowdControlStates(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -235,3 +235,41 @@ func TestFakeDeathGetUpRefusesCastsUntilUp(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	readMatching(t, c, time.Second, "cast after get-up", isSkillUse(gateActiveSkillID))
 }
+
+// TestRestartRequestDuringFakeDeathGetUpKeepsGetUp pins a RequestRestartPoint
+// sent during the fake-death get-up (RequestRestartPoint.java:38-42 calling
+// Player.stopFakeDeath again, Player.java:7035-7056): the get-up and revive
+// visuals are sent again, but the earlier get-up task is not cancelled, so
+// fake death still ends at the first get-up's end.
+func TestRestartRequestDuringFakeDeathGetUpKeepsGetUp(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootPostureCaster(t)
+	lieDown, getUp := fakeDeathDelays(t, srv, objID)
+	startFakeDeath(t, c)
+	srv.Advance(t, lieDown)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestChangeWaitType(true))
+	readMatching(t, c, time.Second, "fake-death stop ChangeWaitType", isWaitType(serverpackets.WaitFakeDeathStop))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeRevive, "fake-death Revive")
+	standAt := c.Now()
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestRestartPoint(0))
+	readMatching(t, c, time.Second, "repeated fake-death stop ChangeWaitType", isWaitType(serverpackets.WaitFakeDeathStop))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeRevive, "repeated fake-death Revive")
+	drainUntilQuiet(t, c)
+
+	if rest := getUp - c.Now().Sub(standAt); rest > 0 {
+		srv.Advance(t, rest)
+	}
+	drainUntilQuiet(t, c)
+	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
+	readMatching(t, c, time.Second, "cast after the first get-up's end", isSkillUse(gateActiveSkillID))
+}
+
+func encodeRequestRestartPoint(requestType int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestRestartPoint)
+	w.WriteInt32(requestType)
+	return w.Bytes()
+}

@@ -209,6 +209,28 @@ func (c *Character) StopFakeDeath() bool {
 	return changed
 }
 
+// RepeatFakeDeathStop answers another get-up request made while the
+// character is already getting up out of fake death: it restarts the
+// recent-fake-death grace and sends the get-up and revive visuals again. The
+// running get-up is left alone and still ends fake death on time. It
+// reports false and does nothing outside such a get-up, or on a dead
+// character.
+func (c *Character) RepeatFakeDeathStop() bool {
+	if c.Dead() {
+		return false
+	}
+	c.stateMu.RLock()
+	gettingUp := c.fakeDeath && c.standingNow
+	c.stateMu.RUnlock()
+	if !gettingUp {
+		return false
+	}
+	c.MarkRecentFakeDeath()
+	c.broadcastStanceChange(event.StanceFakeDeathStop)
+	c.emit(event.FakeDeathRevived{})
+	return true
+}
+
 // fakeDeathDelay is millis divided by the movement speed multiplier,
 // truncated to whole milliseconds. A zero multiplier (a player too heavy to
 // move) saturates at the largest int32 millisecond count.
