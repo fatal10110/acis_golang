@@ -785,6 +785,25 @@ func (a *Actor) PetInventory() *itemcontainer.Inventory {
 	return a.petInventory
 }
 
+// HeldItemTypeMask returns the item-type bit of the weapon a pet holds in
+// its right hand. A servitor, and a pet holding none, hold no weapon; no
+// summon holds a shield.
+func (a *Actor) HeldItemTypeMask() int32 {
+	inv := a.PetInventory()
+	if inv == nil {
+		return 0
+	}
+	inst := inv.ItemAt(itemcontainer.RHand)
+	if inst == nil {
+		return 0
+	}
+	tmpl, ok := inv.Templates().Get(inst.TemplateID)
+	if !ok || tmpl == nil || tmpl.Weapon == nil {
+		return 0
+	}
+	return tmpl.Weapon.Type.Mask()
+}
+
 // Fed returns a pet's current meal gauge.
 func (a *Actor) Fed() int {
 	a.statusMu.RLock()

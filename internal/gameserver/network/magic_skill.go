@@ -291,6 +291,7 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrPhysicalMuted) ||
 		errors.Is(err, actorcast.ErrCubicListFull) ||
 		errors.Is(err, actorcast.ErrNotEnoughItems) ||
+		errors.Is(err, actorcast.ErrWeaponNotAllowed) ||
 		errors.As(err, new(*actorcast.ConditionError))
 }
 
@@ -625,6 +626,8 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrCantSeeTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
+	case errors.Is(err, actorcast.ErrWeaponNotAllowed):
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrAllSkillsDisabled):

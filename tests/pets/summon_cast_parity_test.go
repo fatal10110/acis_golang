@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -68,8 +70,9 @@ func TestSummonAreaSkillWithoutFinalTargetStartsNothing(t *testing.T) {
 // TestSummonCastRefusalReachesOwner refuses the pet's strike at the monster
 // on each commit-time gate the owner is told about: not enough MP or HP
 // (CreatureCast.meetsHpMpConditions), no line of sight
-// (CreatureCast.canCast), and a failed skill <cond> clause
-// (PlayableCast.canCast -> checkCondition). Summon.sendPacket forwards each
+// (CreatureCast.canCast), a weapon the skill does not allow
+// (CreatureCast.canCast -> getWeaponDependancy), and a failed skill <cond>
+// clause (PlayableCast.canCast -> checkCondition). Summon.sendPacket forwards each
 // message to the owner, the pet turns toward the monster, no cast starts,
 // and nothing is charged.
 func TestSummonCastRefusalReachesOwner(t *testing.T) {
@@ -115,6 +118,38 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
 			},
 		},
+		{
+			// A servitor or an unarmed pet holds no weapon type at all
+			// (L2Skill.getWeaponDependancy).
+			name: "weapon not held",
+			tune: func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			message: func(t *testing.T, f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			},
+		},
+		{
+			// CreatureCast.canCast checks sight before the weapon.
+			name:  "sight before weapon",
+			tune:  func(d *modelskill.Definition) { d.WeaponsAllowed = "DAGGER" },
+			blind: true,
+			message: func(t *testing.T, f []byte) {
+				assertStaticSystemMessage(t, f, serverpackets.SystemMessageCantSeeTarget)
+			},
+		},
+		{
+			// The weapon is checked before PlayableCast's skill conditions.
+			name: "weapon before skill condition",
+			tune: func(d *modelskill.Definition) {
+				d.WeaponsAllowed = "DAGGER"
+				d.Conditions = []modelskill.ConditionClause{{
+					Root:      modelskill.Condition{Kind: "player", Attrs: map[string]string{"hp": "50"}},
+					MessageID: serverpackets.SystemMessageNotEnoughHP,
+				}}
+			},
+			message: func(t *testing.T, f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -133,6 +168,75 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			}
 			if gotMP, gotHP := petActor.MPValue(), petActor.HP(); gotMP != mp || gotHP != hp {
 				t.Fatalf("pet MP/HP = %v/%v after the refusal, want untouched %v/%v", gotMP, gotHP, mp, hp)
+			}
+		})
+	}
+}
+
+// fixturePetWeaponID is a wolf weapon added to the suite catalog: a PET-type
+// weapon, the weapon_type every shipped pet weapon carries.
+const fixturePetWeaponID = int32(9603)
+
+// TestArmedPetCastNeedsAllowedWeapon arms the wolf with a PET weapon in its
+// right hand (Pet.getActiveWeaponItem) and casts the strike under two
+// weaponsAllowed lists (L2Skill.getWeaponDependancy): "PET" matches the held
+// weapon and the strike starts; "DAGGER" does not, and the owner reads
+// S1_CANNOT_BE_USED naming the strike, with no cast and nothing charged.
+func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		allowed string
+		casts   bool
+	}{
+		{name: "pet weapon allowed", allowed: "PET", casts: true},
+		{name: "pet weapon not allowed", allowed: "DAGGER"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			strike := wolfStrike()
+			strike.MPInitialConsume = 5
+			strike.WeaponsAllowed = tc.allowed
+			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), &item.Template{
+				ID: fixturePetWeaponID, Name: "Wolf Weapon", Kind: item.KindWeapon, Slot: item.SlotWolf,
+				Duration: -1, Destroyable: true, DefaultAction: item.ActionEquip,
+				Weapon: &item.WeaponDetail{Type: item.WeaponPet},
+			}))
+			h, petActor, hostile := bootWolfStrikerWith(t, strike, gameservertest.WithItemTemplates(catalog))
+			runOnPetQueue(t, petActor, func() {
+				inv := petActor.PetInventory()
+				inst := inv.AddNew(fixturePetWeaponID, 1, 1_900_000)
+				tmpl, _ := inv.Templates().Get(fixturePetWeaponID)
+				if inst == nil || tmpl == nil {
+					t.Error("pet weapon not added to the pet inventory")
+					return
+				}
+				inv.SetPaperdollItem(itemcontainer.RHand, inst, tmpl)
+			})
+			if got, want := petActor.HeldItemTypeMask(), item.WeaponPet.Mask(); got != want {
+				t.Fatalf("armed pet HeldItemTypeMask = %#x, want the PET weapon bit %#x", got, want)
+			}
+			drainUntilQuiet(t, h.client)
+			mp := petActor.MPValue()
+
+			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+			if tc.casts {
+				frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "armed pet strike MagicSkillUse")
+				requireSkillUseOnto(t, frames, petActor, hostile.ObjectID())
+				if !petActor.CastingNow() {
+					t.Fatal("allowed strike did not leave the pet casting")
+				}
+				drainUntilQuiet(t, h.client)
+				return
+			}
+			assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			})
+			if petActor.CastingNow() {
+				t.Fatal("refused strike left the pet casting")
+			}
+			if got := petActor.MPValue(); got != mp {
+				t.Fatalf("pet MP = %v after the refusal, want untouched %v", got, mp)
 			}
 		})
 	}

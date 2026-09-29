@@ -2972,9 +2972,12 @@ type testActor struct {
 
 	cubicFull   bool
 	allDisabled bool
+	held        int32
 }
 
 func (a *testActor) CubicListFull() bool { return a.cubicFull }
+
+func (a *testActor) HeldItemTypeMask() int32 { return a.held }
 
 func (a *testActor) AllSkillsDisabled() bool { return a.allDisabled }
 func (a *testActor) EnableAllSkills()        { a.allDisabled = false }
@@ -3308,3 +3311,38 @@ func newTestList(owner effect.StatOwner) *effect.List {
 }
 
 func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// TestCanCastWeaponDependency pins L2Skill.getWeaponDependancy as CanCast
+// runs it: a skill naming weapon or shield types casts only when the
+// caster's held weapon/shield mask shares a bit with them, an unknown name
+// restricts nothing, and a mute refusal answers first.
+func TestCanCastWeaponDependency(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name    string
+		allowed string
+		held    int32
+		muted   bool
+		want    error
+	}{
+		{"unrestricted", "", 0, false, nil},
+		{"bow skill without a bow", "BOW", item.WeaponFist.Mask(), false, ErrWeaponNotAllowed},
+		{"bow skill with a bow", "BOW", item.WeaponBow.Mask(), false, nil},
+		{"one of several types", "SWORD,BLUNT,BIGBLUNT,BIGSWORD", item.WeaponBigBlunt.Mask(), false, nil},
+		{"shield skill with a sword and shield", "SHIELD", item.WeaponSword.Mask() | item.ArmorShield.Mask(), false, nil},
+		{"shield skill with a sword alone", "SHIELD", item.WeaponSword.Mask(), false, ErrWeaponNotAllowed},
+		{"holding nothing", "DAGGER", 0, false, ErrWeaponNotAllowed},
+		{"unknown type name", "LANCE", 0, false, nil},
+		{"mute answers first", "BOW", 0, true, ErrPhysicalMuted},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			actor := &testActor{mp: 100, hp: 100, held: tt.held, physicalMuted: tt.muted}
+			ctrl := NewController(actor, nil)
+			def := modelskill.Definition{ID: 56, Level: 1, Activation: modelskill.ActivationActive, WeaponsAllowed: tt.allowed}
+			if err := ctrl.CanCast(testTarget{}, def); !errors.Is(err, tt.want) || (tt.want == nil && err != nil) {
+				t.Fatalf("CanCast = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}

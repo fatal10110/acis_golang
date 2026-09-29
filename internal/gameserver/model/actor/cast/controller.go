@@ -49,6 +49,9 @@ var (
 	// PlayerCast.canAttemptCast's Location.DUMMY_LOC rejection
 	// (PlayerCast.java:224).
 	ErrGroundTargetUnset = errors.New("cast: ground target unset")
+	// ErrWeaponNotAllowed means the skill is restricted to weapon or shield
+	// types the caster does not hold.
+	ErrWeaponNotAllowed = errors.New("cast: weapon not allowed")
 )
 
 // Actor is the owner state a cast controller reads and updates while
@@ -95,6 +98,9 @@ type Actor interface {
 	// at hit time; only players carry charges.
 	IncreaseCharges(count, max int) bool
 	DecreaseCharges(count int) bool
+	// HeldItemTypeMask is the item-type bits of the caster's weapon and
+	// shield, which a skill's weaponsAllowed list must share one bit with.
+	HeldItemTypeMask() int32
 }
 
 // Plan is the timing and reuse state for one accepted cast. Durations are
@@ -316,8 +322,9 @@ func (c *Controller) groundTargetGate(def modelskill.Definition) error {
 }
 
 // CanCast validates the reusable pre-cast checks for target, reuse, current
-// MP/HP, mute state, the skill's <cond> clauses (for a caster that evaluates
-// them), and required skill items.
+// MP/HP, mute state, the weapon or shield the skill needs, the skill's
+// <cond> clauses (for a caster that evaluates them), and required skill
+// items.
 func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
@@ -343,6 +350,9 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		}
 	} else if c.actor.PhysicalMuted() {
 		return ErrPhysicalMuted
+	}
+	if !WeaponAllowed(def, c.actor.HeldItemTypeMask()) {
+		return ErrWeaponNotAllowed
 	}
 	if gate, ok := c.actor.(conditionGate); ok {
 		if clause, ok := gate.SkillConditions(target, def); !ok {
