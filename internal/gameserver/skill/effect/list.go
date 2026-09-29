@@ -30,6 +30,9 @@ type StatOwner interface {
 	NotifyEffectWornOff(skillID modelskill.ID, level int)
 	NotifyEffectDisappeared(skillID modelskill.ID, level int)
 	NotifyEffectAborted(skillID modelskill.ID, level int)
+	// NotifyEffectFelt sends the message that accompanies an icon effect
+	// newly taking over its stack group when it is added.
+	NotifyEffectFelt(skillID modelskill.ID, level int)
 }
 
 // Option changes List behavior.

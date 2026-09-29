@@ -221,13 +221,16 @@ func appendThunk(pending *[]func(), thunk func()) {
 // beginActivate returns a thunk that runs e's on-start hook once the
 // caller's lock is released, then briefly re-acquires l.mu to apply the
 // result: e activates and gains its stat funcs on success, or onReject
-// runs (still under l.mu) on failure. It does not (re)start e's tick
+// runs (still under l.mu) on failure. With announce set, a successful
+// activation of an icon effect then tells the owner it feels e's effect —
+// the add path's stack-head promotion does this, the removal path's does not.
+// It does not (re)start e's tick
 // schedule: that starts once, in add, when e is first created — matching
 // L2Skill.getEffects() calling scheduleEffect() unconditionally for every
 // created effect (L2Skill.java:1188-1191) — so a promoted stack loser
 // resumes with whatever count it drained down to while displaced instead of
 // restarting from the template.
-func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
+func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) func() {
 	return func() {
 		ok := true
 		if e.OnStart != nil {
@@ -242,6 +245,10 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 			onReject(e)
 		}
 		l.mu.Unlock()
+
+		if ok && announce && e.Template.Icon && l.owner != nil {
+			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
+		}
 	}
 }
 
@@ -254,6 +261,14 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect)) func() {
 // identical-effect replace/reject logic below, so a same-skill-id recast
 // while the flag is already active is rejected here rather than treated as
 // a replacement.
+//
+// A buff e replaces (identical) or evicts (buff-slot cap) is retired in two
+// steps. Its stop-task and exit hooks are queued at once, but it stays held
+// — counted, stacked and positioned — for the rest of e's insertion, and its
+// list removal (stat removal, next-member promotion, expiry message) is
+// queued only after e's own activation. The owner therefore sees the old
+// exit hook, the newcomer's start, then the old removal and its message,
+// then the icon refresh.
 func (l *List) add(e *Effect, pending *[]func()) {
 	e.startSchedule(l.now())
 
@@ -262,6 +277,16 @@ func (l *List) add(e *Effect, pending *[]func()) {
 		return
 	}
 
+	var retiring []*Effect
+	l.insert(e, pending, &retiring)
+	for _, old := range retiring {
+		l.remove(old, pending, pending)
+	}
+}
+
+// insert places e in its visible list and stack group, retiring the buffs it
+// replaces or evicts into retiring (see add).
+func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 	if e.Skill.Debuff {
 		for _, existing := range l.debuffs {
 			if existing.identical(e) {
@@ -273,35 +298,41 @@ func (l *List) add(e *Effect, pending *[]func()) {
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {
-				l.exit(existing, pending)
+				retire(existing, pending, retiring)
 			}
 		}
 
 		// Herbs never evict a real buff: at or over capacity, they are
-		// simply dropped.
+		// simply dropped. A buff retired above still counts here.
 		if e.Herb && l.buffCount() >= l.maxBuffCount() {
 			appendThunk(pending, e.stopTaskThunk())
 			return
 		}
 
 		if !l.doesStack(e) && !e.Skill.sevenSigns() {
-			l.evictForCap(e, pending)
+			l.evictForCap(e, pending, retiring)
 		}
 
 		l.insertBuff(e)
 	}
 
 	if e.stackType() == "none" {
-		*pending = append(*pending, l.beginActivate(e, func(rejected *Effect) { l.removeFromVisible(rejected) }))
+		*pending = append(*pending, l.beginActivate(e, func(rejected *Effect) { l.removeFromVisible(rejected) }, false))
 		return
 	}
 
 	l.addStacked(e, pending)
 }
 
-// exit fully retires e: its scheduled task is stopped and it is detached
-// from stats/visibility and, if active, run through its on-exit hook.
-func (l *List) exit(e *Effect, pending *[]func()) {
+// retire queues e's stop-task hook and, if e is active, its exit hook, and
+// records e for removal once the insertion that retired it completes. A
+// second retirement of the same effect (a cap eviction reaching a buff the
+// identical check already retired) queues nothing more.
+func retire(e *Effect, pending *[]func(), retiring *[]*Effect) {
+	if slices.Contains(*retiring, e) {
+		return
+	}
 	appendThunk(pending, e.stopTaskThunk())
-	l.remove(e, pending, pending)
+	appendThunk(pending, e.beginExit())
+	*retiring = append(*retiring, e)
 }

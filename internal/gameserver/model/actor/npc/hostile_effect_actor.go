@@ -80,3 +80,6 @@ func (h *Hostile) NotifyEffectDisappeared(modelskill.ID, int) {}
 
 // NotifyEffectAborted does nothing: effect expiry messages go to players.
 func (h *Hostile) NotifyEffectAborted(modelskill.ID, int) {}
+
+// NotifyEffectFelt does nothing: stack-change messages go to players.
+func (h *Hostile) NotifyEffectFelt(modelskill.ID, int) {}

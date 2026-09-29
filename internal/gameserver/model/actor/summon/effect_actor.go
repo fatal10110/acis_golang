@@ -182,3 +182,6 @@ func (a *Actor) StopCharmOfLuck(*effect.Effect) { a.UpdateAbnormalEffect() }
 // StopPhoenixBlessing runs when a Phoenix Blessing ends on the summon: the
 // effect has already left its list, so only its appearance is refreshed.
 func (a *Actor) StopPhoenixBlessing(*effect.Effect) { a.UpdateAbnormalEffect() }
+
+// NotifyEffectFelt does nothing: stack-change messages go to players.
+func (a *Actor) NotifyEffectFelt(modelskill.ID, int) {}

@@ -437,6 +437,8 @@ func (*curseNPC) Kind() actor.Kind { return actor.KindNPC }
 
 func (*cursePlayable) NotifyEffectAborted(modelskill.ID, int) {}
 
+func (*cursePlayable) NotifyEffectFelt(modelskill.ID, int) {}
+
 func (*cursePlayable) NotifyEffectDisappeared(modelskill.ID, int) {}
 
 func (*cursePlayable) NotifyEffectWornOff(modelskill.ID, int) {}

@@ -220,6 +220,9 @@ const (
 	SystemMessageS1HasWornOff        = 92  // skill-name parameter
 	SystemMessageS1HasBeenAborted    = 335 // skill-name parameter
 	SystemMessageEffectS1Disappeared = 749 // skill-name parameter
+
+	// Stack-change feedback.
+	SystemMessageYouFeelS1Effect = 110 // skill-name parameter
 )
 
 // SystemMessage parameter types used by focused packet helpers.

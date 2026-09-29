@@ -160,6 +160,8 @@ func TestListUntrackDeregistersRegardlessOfContents(t *testing.T) {
 
 func (activityTestOwner) NotifyEffectAborted(modelskill.ID, int) {}
 
+func (activityTestOwner) NotifyEffectFelt(modelskill.ID, int) {}
+
 func (activityTestOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 
 func (activityTestOwner) NotifyEffectWornOff(modelskill.ID, int) {}

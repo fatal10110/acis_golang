@@ -91,6 +91,8 @@ func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 
 func (benchNoopStatOwner) NotifyEffectAborted(modelskill.ID, int) {}
 
+func (benchNoopStatOwner) NotifyEffectFelt(modelskill.ID, int) {}
+
 func (benchNoopStatOwner) NotifyEffectDisappeared(modelskill.ID, int) {}
 
 func (benchNoopStatOwner) NotifyEffectWornOff(modelskill.ID, int) {}
