@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -33,6 +34,10 @@ const (
 	wyvernBreathSkill = 4289
 	// riderToggleSkill is a toggle the rider holds when it mounts.
 	riderToggleSkill = 288
+	// gradePenaltySkill is the passive Grade Penalty skill
+	// refreshExpertisePenalty grants while an over-grade item is worn
+	// (Player.java: addSkill(SkillTable.getInstance().getInfo(4267, 1))).
+	gradePenaltySkill = 4267
 )
 
 // wyvernRiderItems is the fixture catalog plus a shield and strider food.
@@ -132,6 +137,22 @@ func skillListIDs(t *testing.T, frame []byte) map[int32]bool {
 	return ids
 }
 
+// etcStatusGradePenalty decodes the grade-penalty flag of an
+// EtcStatusUpdate frame.
+func etcStatusGradePenalty(t *testing.T, frame []byte) bool {
+	t.Helper()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeEtcStatusUpdate, "EtcStatusUpdate")
+	r := wire.NewReader(frame[1:])
+	for range 4 { // charges, weight penalty, blocked, danger area
+		r.ReadInt32()
+	}
+	gradePenalty := r.ReadInt32()
+	if err := r.Err(); err != nil {
+		t.Fatalf("read EtcStatusUpdate: %v", err)
+	}
+	return gradePenalty != 0
+}
+
 // paperdollRows reports which of templateIDs the owner's persisted rows
 // still hold on the paperdoll.
 func (h *petWorld) paperdollRows(t *testing.T, templateIDs ...int32) map[int32]bool {
@@ -155,7 +176,10 @@ func (h *petWorld) paperdollRows(t *testing.T, templateIDs ...int32) map[int32]b
 // TestWyvernMountDisarmsAndGrantsWyvernBreath pins Player.mount(int, int)
 // for the wyvern collar: disarmWeapon(true) stops the attack, takes the
 // weapon then the shield off naming each with S1_DISARMED and refreshes
-// UserInfo/CharInfo; forceRunStance switches a walking rider to run
+// UserInfo/CharInfo. The owner lacks Expertise, so the D-grade sword holds
+// the weapon grade penalty; taking it off refreshes the penalty
+// (PcInventory.unequipItemInBodySlot) ahead of its disarm message, which
+// drops Grade Penalty with a SkillList and an EtcStatusUpdate; forceRunStance switches a walking rider to run
 // (ChangeMoveType, UserInfo); stopAllToggles ends the rider's toggles;
 // setMount grants Wyvern Breath and sends the SkillList; then the Ride goes
 // to everyone around, broadcastUserInfo sends UserInfo to the rider and
@@ -183,19 +207,25 @@ func TestWyvernMountDisarmsAndGrantsWyvernBreath(t *testing.T) {
 	if _, ok := rider.EffectList().ActiveBySkillID(riderToggleSkill); !ok {
 		t.Fatal("toggle not active before the mount")
 	}
+	if !rider.WeaponGradePenalty() || rider.SkillLevel(gradePenaltySkill) != 1 {
+		t.Fatalf("before the mount: weapon grade penalty %v, Grade Penalty level %d, want true and 1",
+			rider.WeaponGradePenalty(), rider.SkillLevel(gradePenaltySkill))
+	}
 
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeSetupGauge, "feed gauge")
 
 	var seq []byte
 	var messages [][]byte
-	var skillList []byte
+	var skillLists, etcStatus [][]byte
 	for _, f := range frames {
 		switch f[0] {
 		case serverpackets.OpcodeSystemMessage:
 			messages = append(messages, f)
 		case serverpackets.OpcodeSkillList:
-			skillList = f
+			skillLists = append(skillLists, f)
+		case serverpackets.OpcodeEtcStatusUpdate:
+			etcStatus = append(etcStatus, f)
 		case serverpackets.OpcodeUserInfo, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeRide, serverpackets.OpcodeSetupGauge:
 		default:
 			continue
@@ -203,6 +233,7 @@ func TestWyvernMountDisarmsAndGrantsWyvernBreath(t *testing.T) {
 		seq = append(seq, f[0])
 	}
 	want := []byte{
+		serverpackets.OpcodeSkillList, serverpackets.OpcodeEtcStatusUpdate,
 		serverpackets.OpcodeSystemMessage, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeUserInfo,
 		serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeUserInfo,
 		serverpackets.OpcodeSystemMessage,
@@ -214,8 +245,18 @@ func TestWyvernMountDisarmsAndGrantsWyvernBreath(t *testing.T) {
 	assertSystemMessageItem(t, messages[0], serverpackets.SystemMessageS1Disarmed, riderSwordID)
 	assertSystemMessageItem(t, messages[1], serverpackets.SystemMessageS1Disarmed, riderShieldID)
 	assertSystemMessageID(t, messages[2], serverpackets.SystemMessageS1HasBeenAborted)
-	if ids := skillListIDs(t, skillList); !ids[wyvernBreathSkill] || !ids[riderToggleSkill] {
-		t.Fatalf("mount SkillList ids = %v, want Wyvern Breath and the toggle", ids)
+	if ids := skillListIDs(t, skillLists[0]); ids[gradePenaltySkill] || ids[wyvernBreathSkill] {
+		t.Fatalf("disarm SkillList ids = %v, want neither Grade Penalty nor Wyvern Breath", ids)
+	}
+	if gradePenalty := etcStatusGradePenalty(t, etcStatus[0]); gradePenalty {
+		t.Fatal("disarm EtcStatusUpdate still shows the grade penalty")
+	}
+	if ids := skillListIDs(t, skillLists[1]); !ids[wyvernBreathSkill] || !ids[riderToggleSkill] || ids[gradePenaltySkill] {
+		t.Fatalf("mount SkillList ids = %v, want Wyvern Breath and the toggle without Grade Penalty", ids)
+	}
+	if rider.WeaponGradePenalty() || rider.SkillLevel(gradePenaltySkill) != 0 {
+		t.Fatalf("after the mount: weapon grade penalty %v, Grade Penalty level %d, want false and 0",
+			rider.WeaponGradePenalty(), rider.SkillLevel(gradePenaltySkill))
 	}
 
 	if worn := h.paperdollRows(t, riderSwordID, riderShieldID); len(worn) != 0 {
@@ -242,6 +283,49 @@ func TestWyvernMountDisarmsAndGrantsWyvernBreath(t *testing.T) {
 		t.Fatal("observer saw no CharInfo for the disarm before the Ride")
 	}
 	readUntilOpcode(t, observer.client, serverpackets.OpcodeCharInfo, "observer CharInfo after the Ride")
+}
+
+// TestWyvernMountDropsPendingAttackIntention pins disarmWeapon's
+// getAttack().stop(): PlayerAttack.stop -> PlayableAttack.stop sends the
+// player's AI idle, so a rider that was still running toward a monster it
+// ordered attacked does not resume the chase on a later AI think.
+func TestWyvernMountDropsPendingAttackIntention(t *testing.T) {
+	t.Parallel()
+	h := bootWyvernOwner(t)
+	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	far := location.Location{X: x + 900, Y: y, Z: z}
+	hostile := h.srv.SpawnHostileNPCAt(t, far)
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeAction(hostile.ObjectID(), int32(far.X), int32(far.Y), int32(far.Z), false))
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeAction(hostile.ObjectID(), int32(far.X), int32(far.Y), int32(far.Z), false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeMoveToPawn, "approach MoveToPawn")
+	drainUntilQuiet(t, h.client)
+
+	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeSetupGauge, "feed gauge")
+	drainUntilQuiet(t, h.client)
+
+	// A stun wearing off, a cast finishing or an arrival wakes the AI.
+	onOwnerQueue(t, h, func(rider *player.Character) { rider.WakeAI() })
+	for _, f := range drainFrames(t, h.client) {
+		if f[0] == serverpackets.OpcodeMoveToPawn || f[0] == serverpackets.OpcodeMoveToLocation {
+			t.Fatalf("rider moved (opcode %#x) after an AI think: the mount left the attack intention pending", f[0])
+		}
+	}
+}
+
+// onOwnerQueue runs fn against the owner's live character on its own queue
+// and waits for it.
+func onOwnerQueue(t *testing.T, h *petWorld, fn func(*player.Character)) {
+	t.Helper()
+	rider := h.character(t)
+	done := make(chan struct{})
+	if !rider.Queue().Post(func() { fn(rider); close(done) }) {
+		t.Fatal("post to owner queue: queue closed")
+	}
+	<-done
 }
 
 // TestWyvernDismountRemovesWyvernBreath pins setMount(0, 0, 0) on a

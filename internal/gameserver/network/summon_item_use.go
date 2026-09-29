@@ -230,9 +230,11 @@ func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int3
 
 // disarmLive takes live's weapon and shield off, naming each item removed,
 // and refreshes its appearance for everyone around. It refuses, changing
-// nothing, while a cursed weapon is held. The attack in progress stops
-// either way. The grade penalty is left as it was: the reference's
-// body-slot unequip does not refresh it.
+// nothing, while a cursed weapon is held. Otherwise the attack in progress
+// stops and the character goes idle, dropping any attack intention it was
+// still approaching, before ActionFailed. Each hand that comes off
+// refreshes the grade penalty ahead of its disarm message, as a player's
+// body-slot unequip does.
 func (l *GameClientLink) disarmLive(live *livePlayer) bool {
 	if live.Character.CursedWeaponEquipped() {
 		return false
@@ -240,6 +242,7 @@ func (l *GameClientLink) disarmLive(live *livePlayer) bool {
 	if live.attack != nil {
 		live.attack.Stop()
 	}
+	live.tryToIdle(false)
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if inv := live.Inventory(); inv != nil && l.inventory != nil {
 		for _, slot := range []item.Slot{item.SlotRHand, item.SlotLHand} {
@@ -247,7 +250,7 @@ func (l *GameClientLink) disarmLive(live *livePlayer) bool {
 			if !ok || len(res.Changed) == 0 {
 				continue
 			}
-			l.applyEquipItemStats(live, inv, res)
+			l.applyEquipStatChanges(live, inv, res)
 			removed := res.Changed[0].Snapshot()
 			sendUnequippedMessage(live, removed.TemplateID, removed.EnchantLevel)
 		}
