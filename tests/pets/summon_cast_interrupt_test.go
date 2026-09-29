@@ -11,6 +11,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // magicStrikeHitTime leaves the magic strike's interrupt window open well
@@ -129,6 +130,68 @@ func TestMonsterHitBreaksPetMagicCast(t *testing.T) {
 			}
 			if !petActor.CastingNow() {
 				t.Fatal("pet CastingNow() = false after a non-breaking hit, want its strike running")
+			}
+			h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
+			drainUntilQuiet(t, h.client)
+		})
+	}
+}
+
+// monsterPetStrikeSkill is a casting monster's quick physical skill strike.
+const monsterPetStrikeSkill = modelskill.ID(9104)
+
+// TestMonsterSkillHitBreaksPetMagicCast lands a monster's physical skill
+// (PDAM) on a pet mid-way through a magic strike and pins the skill-damage
+// cast break for a summon target (Pdam.java: calcCastBreak before
+// reduceCurrentHp): a roll under the clamped rate breaks the strike
+// (observers see MagicSkillCanceled, the owner reads CASTING_INTERRUPTED, no
+// hit lands, the pet follows its owner again), a roll over it lets the
+// strike run on and land.
+func TestMonsterSkillHitBreaksPetMagicCast(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		roll  int
+		broke bool
+	}{
+		{name: "roll under the rate breaks", roll: 0, broke: true},
+		{name: "roll over the rate keeps casting", roll: 99},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			h, petActor, hostile := bootMagicStriker(t, tt.roll)
+			caster, aiCtl := h.srv.SpawnCastingHostileNPC(t, &npc.Template{
+				ID: 100, TemplateID: 100, Type: "Monster", Level: 1, HPMax: 1_000_000, PAtk: 10,
+				AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+			}, modelskill.NewTable([]modelskill.Definition{{
+				ID: monsterPetStrikeSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+				Offensive: true, CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
+				SkillType: "PDAM", Power: 100,
+			}}))
+			// The owner's PvP flag keeps the NPC launch's target re-check
+			// from dropping the unflagged pet (#2685); the reference
+			// resolves an NPC's ONE target list with no conditions.
+			owner, _ := h.srv.State.Player(h.ownerID)
+			owner.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+			drainUntilQuiet(t, h.client)
+			startWolfStrike(t, h)
+
+			petHP := petActor.HP()
+			if !caster.Queue().Post(func() { aiCtl.Cast(petActor, modelskill.Ref{ID: monsterPetStrikeSkill, Level: 1}) }) {
+				t.Fatal("post monster cast: queue closed")
+			}
+			h.srv.AdvanceUntil(t, "monster skill landing on the pet", func() bool { return petActor.HP() < petHP })
+
+			got := readPetCastOutcome(t, h, petActor)
+			if got.canceled != tt.broke || got.interrupted != tt.broke {
+				t.Fatalf("pet MagicSkillCanceled = %v, CASTING_INTERRUPTED = %v, want both %v", got.canceled, got.interrupted, tt.broke)
+			}
+			if tt.broke {
+				assertStrikeAborted(t, h, petActor, hostile)
+				return
+			}
+			if !petActor.CastingNow() {
+				t.Fatal("pet CastingNow() = false after a non-breaking skill hit, want its strike running")
 			}
 			h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
 			drainUntilQuiet(t, h.client)
