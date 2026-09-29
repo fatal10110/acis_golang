@@ -84,6 +84,9 @@ func bootWyvernRiderOpts(t *testing.T, extra []gameservertest.Option, seeds ...s
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), fedWyvernTemplate()})),
 		gameservertest.WithRestartPoints(mountRestartTable()),
 	}, extra...), append([]seedItem{{TemplateID: wyvernCollarID, Count: 1}}, seeds...)...)
+	if !h.srv.DrivesClock() {
+		t.Skip("counting 10-second feed ticks needs the driven clock")
+	}
 	h.client.Send(encodeUseItem(h.seededItem(t, wyvernCollarID), false))
 	return h, readUntilOpcode(t, h.client, serverpackets.OpcodeUserInfo, "mounted UserInfo")
 }
