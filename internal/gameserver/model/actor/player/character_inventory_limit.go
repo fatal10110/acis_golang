@@ -2,23 +2,36 @@ package player
 
 import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 
-// Base inventory slot counts before the inventoryLimit stat, at the shipped
-// players.properties defaults (MaximumSlotsForNoDwarf / MaximumSlotsForDwarf).
-//
-// ponytail: fixed at the shipped defaults; the config keys are not plumbed
-// and the inventory's own SlotLimit does not use this yet (#2675). Upgrade
-// when that issue wires player slot capacity.
-const (
-	baseInventoryLimit      = 80
-	baseDwarfInventoryLimit = 100
-)
+// InventorySlots is the configured base inventory slot count by race, before
+// the inventoryLimit stat. A zero field (a character never configured from
+// players.properties) falls back to the shipped default.
+type InventorySlots struct {
+	NoDwarf int
+	Dwarf   int
+}
+
+// DefaultInventorySlots is the shipped players.properties base slot count.
+var DefaultInventorySlots = InventorySlots{NoDwarf: 80, Dwarf: 100}
+
+func (s InventorySlots) withDefaults() InventorySlots {
+	if s.NoDwarf == 0 {
+		s.NoDwarf = DefaultInventorySlots.NoDwarf
+	}
+	if s.Dwarf == 0 {
+		s.Dwarf = DefaultInventorySlots.Dwarf
+	}
+	return s
+}
 
 // InventoryLimit returns how many item slots c's inventory may hold: the
-// race's base count plus the inventoryLimit stat, truncated.
+// configured base for c's race plus the inventoryLimit stat, truncated.
 func (c *Character) InventoryLimit() int {
-	base := baseInventoryLimit
+	c.stateMu.RLock()
+	slots := c.inventorySlots.withDefaults()
+	c.stateMu.RUnlock()
+	base := slots.NoDwarf
 	if c.Race == RaceDwarf {
-		base = baseDwarfInventoryLimit
+		base = slots.Dwarf
 	}
 	return base + int(c.CalcStat(stat.InvLim, 0))
 }

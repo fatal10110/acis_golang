@@ -19,12 +19,14 @@ const (
 // entry.
 func FrameExStorageMaxCount(c *player.Character) wire.Frame {
 	warehouseLimit := int32(warehouseSlotsNoDwarf)
-	inventoryLimit := int32(nonDwarfInventoryLimit)
+	inventoryLimit := int32(player.DefaultInventorySlots.NoDwarf)
 	privateLimit := int32(privateStoreSlots)
-	if c != nil && c.Race == player.RaceDwarf {
-		warehouseLimit = warehouseSlotsDwarf
-		inventoryLimit = dwarfInventoryLimit
-		privateLimit = privateStoreSlotsDwarf
+	if c != nil {
+		inventoryLimit = clampInt32(c.InventoryLimit())
+		if c.Race == player.RaceDwarf {
+			warehouseLimit = warehouseSlotsDwarf
+			privateLimit = privateStoreSlotsDwarf
+		}
 	}
 
 	w := newFrameWriter(OpcodeExtended)

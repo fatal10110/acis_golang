@@ -71,9 +71,9 @@ func cmpDesc(a, b int64) int {
 //
 // SlotLimit caps how many item stacks/instances the container can hold; 0
 // means unlimited, matching the base behavior every container has until a
-// caller sets a real limit sourced from wherever that limit eventually
-// comes from (player status, clan config, ...) — this package doesn't load
-// config itself.
+// caller sets a real limit (pet config, clan config, ...) — this package
+// doesn't load config itself. A player inventory takes its live limit from
+// its owner instead (Inventory.SetSlotLimiter).
 //
 // mu guards the membership map. Mutable item fields are guarded by
 // item.Instance once an instance is visible outside construction/restore code.
@@ -579,8 +579,11 @@ func (c *Container) Transfer(objectID int32, count int, target transferTarget, n
 // ValidateCapacity reports whether adding slotCount more stacks/instances
 // keeps the container within SlotLimit. A SlotLimit of 0 means unlimited.
 func (c *Container) ValidateCapacity(slotCount int) bool {
-	if slotCount == 0 || c.SlotLimit <= 0 {
-		return true
-	}
-	return c.Size()+slotCount <= c.SlotLimit
+	return slotsFit(c.Size(), slotCount, c.SlotLimit, c.SlotLimit > 0)
+}
+
+// slotsFit reports whether slotCount more stacks fit beside size held ones
+// under limit; an unbounded container, or adding nothing, always fits.
+func slotsFit(size, slotCount, limit int, bounded bool) bool {
+	return slotCount == 0 || !bounded || size+slotCount <= limit
 }

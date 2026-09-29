@@ -7,6 +7,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 // change them meanwhile.
 type Held struct {
 	inv *Inventory
+	// slotLimit and slotBounded are inv's slot limit, read before the
+	// exchange took its locks.
+	slotLimit   int
+	slotBounded bool
 }
 
 // Moved is what one Held.Transfer did.
@@ -31,6 +35,9 @@ type Moved struct {
 // one place two inventories are locked together. Queued update deliveries run
 // after both are released. a and b must be different inventories.
 func Exchange(a, b *Inventory, fn func(a, b Held)) {
+	heldA, heldB := Held{inv: a}, Held{inv: b}
+	heldA.slotLimit, heldA.slotBounded = a.slotLimit()
+	heldB.slotLimit, heldB.slotBounded = b.slotLimit()
 	first, second := a, b
 	if second.OwnerID() < first.OwnerID() {
 		first, second = second, first
@@ -44,7 +51,7 @@ func Exchange(a, b *Inventory, fn func(a, b Held)) {
 		defer first.mu.Unlock()
 		second.mu.Lock()
 		defer second.mu.Unlock()
-		fn(Held{inv: a}, Held{inv: b})
+		fn(heldA, heldB)
 	}()
 	a.fireDelivery()
 	b.fireDelivery()
@@ -66,12 +73,10 @@ func (h Held) Templates() *item.Table {
 }
 
 // ValidateCapacity reports whether slotCount more stacks fit, as
-// Container.ValidateCapacity does.
+// Inventory.ValidateCapacity does, against the slot limit read when the
+// exchange began.
 func (h Held) ValidateCapacity(slotCount int) bool {
-	if slotCount == 0 || h.inv.SlotLimit <= 0 {
-		return true
-	}
-	return len(h.inv.items)+slotCount <= h.inv.SlotLimit
+	return slotsFit(len(h.inv.items), slotCount, h.slotLimit, h.slotBounded)
 }
 
 // ValidateWeight reports whether weight more fits, as

@@ -144,6 +144,7 @@ type Character struct {
 	abnormalEffectMask       atomic.Int32
 	weightPenalty            int
 	weightLimitMultiplier    float64
+	inventorySlots           InventorySlots
 	maxBuffsAmount           int
 	awardPKKillPVPPoint      bool
 	roll                     func(int) int

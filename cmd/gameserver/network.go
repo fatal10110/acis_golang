@@ -100,6 +100,7 @@ func provideGameClientLink(
 		SkillEnchantSPBookNeeded: bool(gameplay.SkillEnchantSPBookNeeded),
 		AutoLearnSkills:          bool(gameplay.AutoLearnSkills),
 		WeightLimitMultiplier:    float64(gameplay.WeightLimitMultiplier),
+		InventorySlots:           gameplay.InventorySlots,
 		KarmaPlayerCanTeleport:   bool(gameplay.KarmaPlayerCanTeleport),
 		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,

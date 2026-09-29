@@ -96,6 +96,7 @@ type options struct {
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
+	inventorySlots         player.InventorySlots
 	storeSkillCooltime     bool
 	cancelLesserEffect     bool
 	magicFailures          bool
@@ -280,6 +281,12 @@ func WithRateKarmaExpLost(rate float64) Option {
 // no weight penalty band is ever computed.
 func WithWeightLimitMultiplier(m float64) Option {
 	return func(o *options) { o.weightLimitMultiplier = m }
+}
+
+// WithInventorySlots sets the players.properties MaximumSlotsForNoDwarf /
+// MaximumSlotsForDwarf base inventory slot counts (default 80/100).
+func WithInventorySlots(noDwarf, dwarf int) Option {
+	return func(o *options) { o.inventorySlots = player.InventorySlots{NoDwarf: noDwarf, Dwarf: dwarf} }
 }
 
 // WithMaxBuffsAmount sets the players.properties MaxBuffsAmount base
@@ -677,13 +684,19 @@ func (s *Server) DisablePlayerItem(tb testing.TB, objID, objectID int32, delay t
 	disabler.DisableItem(objectID, delay)
 }
 
-// SetInventorySlotLimit shrinks the live player's inventory slot limit so a
-// full-inventory rejection is reachable without seeding dozens of rows.
+// SetInventorySlotLimit pins the live player's inventory slot limit to limit,
+// replacing the character's own, so a full-inventory rejection is reachable
+// without seeding dozens of rows.
 func (s *Server) SetInventorySlotLimit(tb testing.TB, objID int32, limit int) {
 	tb.Helper()
 	holder := s.onlineCharacter(tb, objID)
-	holder.Inventory().SlotLimit = limit
+	holder.Inventory().SetSlotLimiter(fixedSlotLimit(limit))
 }
+
+// fixedSlotLimit is a slot limit that never changes.
+type fixedSlotLimit int
+
+func (l fixedSlotLimit) InventoryLimit() int { return int(l) }
 
 // PlayerInventory returns the live player's inventory so suites can stage a
 // mutation from a queue task, where no client packet can reach: the
@@ -1255,7 +1268,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

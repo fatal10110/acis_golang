@@ -86,12 +86,12 @@ type traders struct {
 	secondID int32
 }
 
-func bootTraders(t *testing.T) *traders {
+func bootTraders(t *testing.T, opts ...gameservertest.Option) *traders {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("TraderOne", 1, 0),
 		gameservertest.WithWantChars(1),
-	)
+	}, opts...)...)
 	h := &traders{
 		srv:      srv,
 		first:    srv.Client,
