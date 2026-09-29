@@ -397,6 +397,54 @@ func TestStartThatCannotConsumeItsItemPaysNothing(t *testing.T) {
 	}
 }
 
+// TestStartCarriedConsumesCarrierBeforeCosts pins the item-carried cast
+// order: the carrier goes once the cast is claimed and before the skill's
+// own item, reuse and initial MP; a carrier that cannot be consumed releases
+// the claim, charges nothing and is reported as is.
+func TestStartCarriedConsumesCarrierBeforeCosts(t *testing.T) {
+	errCarrier := errors.New("carrier gone")
+	t.Run("consumed", func(t *testing.T) {
+		ctrl, actor, def := newReentrantCostController()
+		var seen struct {
+			casting   bool
+			items, mp int
+			cooldowns int
+		}
+		if _, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error {
+			seen.casting, seen.items, seen.mp, seen.cooldowns = ctrl.CastingNow(), actor.items[57], actor.mp, len(actor.disabled)
+			return nil
+		}); err != nil {
+			t.Fatalf("StartCarried() error: %v", err)
+		}
+		if !seen.casting || seen.items != 5 || seen.mp != 100 || seen.cooldowns != 0 {
+			t.Fatalf("at carrier consume: casting=%v items=%d mp=%d cooldowns=%d, want claimed with nothing charged (true/5/100/0)", seen.casting, seen.items, seen.mp, seen.cooldowns)
+		}
+		if actor.items[57] != 4 || actor.mp != 100-7 || len(actor.disabled) != 1 {
+			t.Fatalf("after start: items=%d mp=%d disabled=%v, want 4/93/one cooldown", actor.items[57], actor.mp, actor.disabled)
+		}
+	})
+	t.Run("carrier missing", func(t *testing.T) {
+		ctrl, actor, def := newReentrantCostController()
+		rec := &event.Recorder{}
+		ctrl.sink = rec
+		if _, err := ctrl.StartCarried(time.Unix(1000, 0), testTarget{}, def, func() error { return errCarrier }); !errors.Is(err, errCarrier) {
+			t.Fatalf("StartCarried() error = %v, want the carrier's error", err)
+		}
+		if ctrl.CastingNow() {
+			t.Fatal("CastingNow() = true after a lost carrier, want the claim released")
+		}
+		if len(rec.Events()) != 0 {
+			t.Fatalf("events = %v, want none for a cast never announced", rec.Events())
+		}
+		if actor.items[57] != 5 || actor.mp != 100 || len(actor.disabled) != 0 || len(actor.reuses) != 0 {
+			t.Fatalf("items=%d mp=%d disabled=%v reuses=%v, want nothing charged", actor.items[57], actor.mp, actor.disabled, actor.reuses)
+		}
+		if _, err := ctrl.Start(time.Unix(1001, 0), testTarget{}, def); err != nil {
+			t.Fatalf("Start() after a lost carrier error: %v", err)
+		}
+	})
+}
+
 func TestPlayerActorExitSignetGroundDropsOnlyTheSignetEffect(t *testing.T) {
 	ch := &player.Character{ID: 1}
 	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, ch)

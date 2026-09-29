@@ -76,6 +76,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useItemAICast(live, inv, inst, ctrl) {
 		return
 	}
+	if l.useResurrectionScroll(live, inv, inst) {
+		return
+	}
 	if l.useSummonItem(live, inv, inst) {
 		return
 	}

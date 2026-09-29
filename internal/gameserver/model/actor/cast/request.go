@@ -27,6 +27,10 @@ type StartHooks struct {
 	// caster faces a non-self target. Ground skills use it for signet LOS,
 	// peace-zone, heading, and ValidateLocation.
 	AfterCanCast func() error
+	// ConsumeCarrier consumes the item carrying the cast, once the cast is
+	// claimed and before its start-of-cast costs (Controller.StartCarried).
+	// Nil for a cast no item carries.
+	ConsumeCarrier func() error
 }
 
 // PlayerSkillRequest is one live player skill-cast request after the network
@@ -157,7 +161,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	if now.IsZero() {
 		now = controller.Now()
 	}
-	plan, err := controller.Start(now, target, def)
+	plan, err := controller.StartCarried(now, target, def, hooks.ConsumeCarrier)
 	if err != nil {
 		return started, err
 	}

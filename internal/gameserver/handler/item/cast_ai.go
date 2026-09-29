@@ -8,9 +8,9 @@ import (
 )
 
 // ConsumeAICastItemRequest carries what's needed to consume the item
-// carrying an already-started AI cast.
+// carrying an AI cast.
 type ConsumeAICastItemRequest struct {
-	Controller *actorcast.Controller
+	Caster     SkillCaster
 	Definition modelskill.Definition
 	Inventory  *itemcontainer.Inventory
 	Item       *modelitem.Instance
@@ -28,35 +28,28 @@ type ConsumeAICastItemResult struct {
 	ReuseMillis      int
 }
 
-// ConsumeAICastItem consumes one unit of req.Item, matching how the
-// reference commits an item-driven cast's consumption up front, before
-// the cast's broadcast/hit phase, rather than only on a successful hit.
-// The caller must have already started the cast (actorcast.
-// StartItemSkill) and must call this before broadcasting any cast/launch
-// packet. On failure it stops req.Controller, since a half-open cast must
-// not linger.
+// ConsumeAICastItem consumes one unit of req.Item for a cast it carries and
+// puts the item-carried skill on its item reuse. It runs once the cast is
+// claimed and before the cast's own start-of-cast costs
+// (actorcast.StartHooks.ConsumeCarrier): the item is gone, and its reuse
+// installed, before the cast's reuse, mastery proc and initial MP are
+// charged, which may then replace that reuse with the skill's own.
 //
-// On success it also reports the shared-reuse-group HUD values the
-// reference's addItemSkillTimeStamp computes for an item-driven cast:
-// reuse is the longer of the skill's own reuse delay and the item's, used
-// as both the remaining and total time on the client's shared-reuse
-// indicator (matching the reference, which always reports the freshly
-// installed reuse as both).
+// The item reuse is the longer of the skill's own reuse delay and the
+// item's. On success it is also reported for the client's shared-reuse
+// indicator, as both the remaining and the total time. A failed destroy
+// reports ErrNotEnoughItems and changes nothing.
 func ConsumeAICastItem(req ConsumeAICastItemRequest) ConsumeAICastItemResult {
 	if _, ok := req.Destroyer.DestroyItem(req.Inventory, req.Item.ObjectID, 1); !ok {
-		req.Controller.Stop()
 		return ConsumeAICastItemResult{Err: actorcast.ErrNotEnoughItems}
 	}
 
-	reuse := req.Definition.ReuseDelay
-	if req.Template != nil && req.Template.EtcItem != nil {
-		if itemReuse := int(req.Template.EtcItem.ReuseDelay); itemReuse > reuse {
-			reuse = itemReuse
-		}
-	}
+	var itemReuse int32
 	sharedReuseGroup := int32(-1)
 	if req.Template != nil && req.Template.EtcItem != nil {
+		itemReuse = req.Template.EtcItem.ReuseDelay
 		sharedReuseGroup = req.Template.EtcItem.SharedReuseGroup
 	}
+	reuse := installItemReuse(req.Caster, req.Definition, actorcast.ReuseKey(req.Definition), itemReuse)
 	return ConsumeAICastItemResult{SharedReuseGroup: sharedReuseGroup, ReuseMillis: reuse}
 }
