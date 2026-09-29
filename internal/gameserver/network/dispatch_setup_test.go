@@ -447,6 +447,7 @@ func (testHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (boo
 }
 func (testHostileMove) MoveHome(location.Location) error { return nil }
 func (testHostileMove) Stop()                            {}
+func (testHostileMove) CancelFollow()                    {}
 
 type testHostileAttack struct{}
 

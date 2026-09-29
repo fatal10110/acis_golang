@@ -389,6 +389,14 @@ func (c *Controller) Stop() {
 	}
 }
 
+// CancelFollow drops any follow task, offensive or friendly, and leaves a
+// walk already under way running to its destination.
+func (c *Controller) CancelFollow() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearOffensiveFollow()
+}
+
 // CanMoveTo reports whether a straight-line geodata walk from the actor's
 // current origin reaches target.
 func (c *Controller) CanMoveTo(target location.Location) bool {

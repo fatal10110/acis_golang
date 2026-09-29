@@ -1746,6 +1746,7 @@ func (castHostileMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (boo
 }
 func (castHostileMove) MoveHome(location.Location) error { return nil }
 func (castHostileMove) Stop()                            {}
+func (castHostileMove) CancelFollow()                    {}
 
 type castHostileAttack struct{}
 
