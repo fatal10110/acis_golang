@@ -40,7 +40,10 @@ type AIController struct {
 	// nil-live-safe delivery hook so target-addressed messages (MagicResist,
 	// ManaDrain) still reach a real online target even though
 	// Creature.sendPacket is a no-op in the reference for caster-addressed
-	// ones (issue #2350).
+	// ones (issue #2350). Each handler message reaches it as its own
+	// one-message result the moment the handler produces it, so the message
+	// keeps its place among the frames the hit itself sends; the result
+	// that follows the hit carries the rest.
 	OnHitResult func(EffectResult)
 	// HitNeedsPresence drops the hit when the caster has left the world
 	// since launch. Set it only for casters whose every removal aborts the
@@ -323,7 +326,13 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			if a.HitNeedsPresence && !a.Caster.Knows(a.Caster) {
 				return
 			}
-			result := ApplyResolvedEffectsResult(a.Effects, a.Caster, launchTargets, def)
+			handlers := a.Effects
+			if a.OnHitResult != nil && handlers.Sink == nil {
+				handlers.Sink = func(message any) {
+					a.OnHitResult(EffectResult{Messages: []any{message}})
+				}
+			}
+			result := ApplyResolvedEffectsResult(handlers, a.Caster, launchTargets, def)
 			if a.OnHitResult != nil {
 				a.OnHitResult(result)
 			}

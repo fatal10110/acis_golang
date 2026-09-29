@@ -1193,7 +1193,7 @@ func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *te
 		Effects:   []modelskill.EffectTemplate{{Name: "Buff", Time: 600}},
 	}
 
-	result := ApplyCubicEffect(registry, caster, def, target)
+	result := ApplyCubicEffect(registry, caster, def, target, nil)
 
 	if !result.Handled {
 		t.Fatal("ApplyCubicEffect() Handled = false, want true (DEBUFF has a registered handler)")
@@ -1238,7 +1238,7 @@ func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testi
 			owner := &fakeCubicShotOwner{fakeCubicEffectCaster: fakeCubicEffectCaster{id: 1}, blessed: true}
 			target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
 
-			if result := ApplyCubicEffect(registry, owner, def, target); !result.Handled {
+			if result := ApplyCubicEffect(registry, owner, def, target, nil); !result.Handled {
 				t.Fatalf("ApplyCubicEffect(%s) Handled = false, want true", def.SkillType)
 			}
 			if !owner.blessed || len(owner.writes) != 0 {

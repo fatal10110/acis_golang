@@ -142,7 +142,7 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 			skills := handlerskill.NewDefaultRegistry()
 			var result actorcast.EffectResult
 			if cubic {
-				result = actorcast.ApplyCubicEffect(skills, caster, def, target)
+				result = actorcast.ApplyCubicEffect(skills, caster, def, target, nil)
 			} else {
 				result = actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: skilltarget.NewRegistry(nil), Skills: skills}, caster, target, def)
 			}

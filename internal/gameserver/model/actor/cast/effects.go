@@ -20,6 +20,10 @@ type EffectHandlers struct {
 	// constructor parameter because EffectHandlers is already the bundle
 	// carried from boot wiring down to the AIController that needs it.
 	OnHitResult func(EffectResult)
+	// Sink, when set, delivers each skill-handler message as the handler
+	// produces it, in place of EffectResult.Messages, so the message keeps
+	// its place among the frames the hit's own state changes send.
+	Sink handlerskill.MessageSink
 	// Chance fires the chance procs a landing skill sets off on its caster
 	// and targets; nil fires none.
 	Chance *ChanceProcs
@@ -210,6 +214,7 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		Skill:   def,
 		Targets: castTargets,
 		Item:    item,
+		Sink:    handlers.Sink,
 	})
 	if !ok {
 		return EffectResult{}

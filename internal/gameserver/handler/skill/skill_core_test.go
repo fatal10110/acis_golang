@@ -3468,6 +3468,57 @@ func TestManadamStopsSleepAndImmobileOnDrain(t *testing.T) {
 	}
 }
 
+// TestManadamStopsSleepBeforeTheDrainMessages streams a MANADAM cast's
+// messages through Cast.Sink: the target's Sleep is already gone when the
+// drain messages go out, as Manadam.java stops it before sending them, and
+// every message reaches the sink in production order instead of
+// Result.Messages (issue #2589).
+func TestManadamStopsSleepBeforeTheDrainMessages(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &skillTarget{name: "Caster", isPlayer: true}
+	target := &skillTarget{
+		name: "Target", isPlayer: true, mp: 100, maxMP: 100,
+		manaInput: formulas.ManaDamageInput{
+			MAtk: 400, MDef: 50, SkillPower: 20, TargetMaxMp: 970,
+			VulnMul: 1, Affected: true,
+		},
+		manaOK:  true,
+		effects: newTestList(noopStatOwner{}),
+	}
+	e, err := effect.New(effect.Skill{ID: 1}, modelskill.EffectTemplate{Name: "Sleep"})
+	if err != nil {
+		t.Fatalf("build Sleep effect: %v", err)
+	}
+	e.Effected = target
+	target.effects.Add(e)
+
+	var streamed []any
+	result, ok := registry.UseResult(Cast{
+		Caster: caster, Skill: modelskill.Definition{SkillType: "MANADAM"}, Targets: []Actor{target},
+		Sink: func(message any) {
+			if n := len(target.effects.All()); n != 0 {
+				t.Errorf("%T delivered while the target still has %d effects, want Sleep stopped first", message, n)
+			}
+			streamed = append(streamed, message)
+		},
+	})
+	if !ok {
+		t.Fatal("UseResult ok = false")
+	}
+	if len(result.Messages) != 0 {
+		t.Fatalf("Result.Messages = %#v, want none once a sink took them", result.Messages)
+	}
+	if len(streamed) != 2 {
+		t.Fatalf("streamed = %#v, want the target's drain then the caster's MP report", streamed)
+	}
+	if _, ok := streamed[0].(ManaDrain); !ok {
+		t.Fatalf("streamed[0] = %#v, want ManaDrain", streamed[0])
+	}
+	if _, ok := streamed[1].(OpponentMPReducedMessage); !ok {
+		t.Fatalf("streamed[1] = %#v, want OpponentMPReducedMessage", streamed[1])
+	}
+}
+
 // ---- from manor_test.go ----
 type manorFakeTarget struct {
 	neutralNPC

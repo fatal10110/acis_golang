@@ -166,7 +166,9 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // ATTACK_FAILED, not be dropped silently.
 // The cast is marked Cubic: the reference's continuous and disabler cubic
 // branches read the owner's blessed-spiritshot charge but never spend it.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target) EffectResult {
+// sink, when non-nil, delivers each handler message as it is produced, in
+// place of EffectResult.Messages.
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target, sink handlerskill.MessageSink) EffectResult {
 	if skills == nil {
 		return EffectResult{}
 	}
@@ -174,7 +176,7 @@ func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creatur
 	if !ok {
 		return EffectResult{}
 	}
-	result, ok := skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}, Cubic: true})
+	result, ok := skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}, Cubic: true, Sink: sink})
 	if !ok {
 		return EffectResult{}
 	}
