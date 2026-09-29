@@ -33,6 +33,10 @@ type PetCorpseDecayed struct{}
 // state.
 type CorpseLeftBehind struct{}
 
+// DecayCanceled reports that a summon's pending corpse decay, if any, is
+// dropped: it was revived, or is about to be.
+type DecayCanceled struct{}
+
 func (OwnerInfoChanged) event() {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
@@ -40,3 +44,4 @@ func (Unsummoning) event()      {}
 func (SummonRemoved) event()    {}
 func (PetCorpseDecayed) event() {}
 func (CorpseLeftBehind) event() {}
+func (DecayCanceled) event()    {}

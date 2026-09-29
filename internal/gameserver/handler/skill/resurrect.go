@@ -19,6 +19,12 @@ type petIdentity interface {
 	IsPet() bool
 }
 
+// summonReviver is a summon a resurrection revives outright.
+type summonReviver interface {
+	ReviveRestoringExp(power float64) bool
+	CancelDecay()
+}
+
 var (
 	_ reviveRequestTarget = (*player.Character)(nil)
 	_ player.Reviver      = (*player.Character)(nil)
@@ -31,12 +37,12 @@ func (resurrectHandler) Types() []string { return []string{"RESURRECT"} }
 // Use resurrects the resolved targets at the caster's revive power (the
 // skill's power scaled by the caster's WIT). A player caster asks first: a
 // dead player gets the offer itself, and another player's dead pet gets it
-// through its owner. Any other caster revives a dead player outright,
-// restoring the revive power's share of the lost exp.
-//
-// A player's own dead pet, a servitor, and any caster reviving a summon
-// revive it outright; summon revival is not modeled yet (#2679), so those
-// targets are left dead. The spiritshot is spent either way.
+// through its owner. The caster's own dead pet and any dead servitor are
+// revived outright, a pet getting the revive power's share of its lost exp
+// back; a servitor revived this way keeps its pending decay. Any other
+// caster revives a dead player or summon outright, restoring the revive
+// power's share of the lost exp, and drops the summon's decay first. The
+// spiritshot is spent either way.
 func (resurrectHandler) Use(cast Cast) {
 	if cast.Caster != nil {
 		power := formulas.RevivePower(statbonus.WITBonus[cast.Caster.WIT()], float64(cast.Skill.Power))
@@ -70,31 +76,46 @@ func offerRevives(cast Cast, reviver player.Reviver, power float64) {
 				target.ReviveRequest(reviver, power, false)
 			}
 		case actor.KindSummon:
-			offerPetRevive(cast, obj, reviver, power)
+			reviveOrOfferSummon(cast, obj, reviver, power)
 		}
 	}
 }
 
-// offerPetRevive sends a dead pet's resurrection offer to its owner, unless
-// the caster owns it.
-func offerPetRevive(cast Cast, obj Actor, reviver player.Reviver, power float64) {
-	pet, ok := obj.(Summon)
+// reviveOrOfferSummon revives a dead servitor or the caster's own dead pet,
+// and sends another player's dead pet's resurrection offer to its owner.
+func reviveOrOfferSummon(cast Cast, obj Actor, reviver player.Reviver, power float64) {
+	s, ok := obj.(Summon)
+	if !ok {
+		return
+	}
+	target, ok := obj.(summonReviver)
 	if !ok {
 		return
 	}
 	if identity, ok := obj.(petIdentity); !ok || !identity.IsPet() {
+		target.ReviveRestoringExp(power)
 		return
 	}
-	owner, ok := pet.SummonOwner().(reviveRequestTarget)
-	if !ok || owner.ObjectID() == cast.Caster.ObjectID() {
+	owner, ok := s.SummonOwner().(reviveRequestTarget)
+	if !ok {
+		return
+	}
+	if owner.ObjectID() == cast.Caster.ObjectID() {
+		target.ReviveRestoringExp(power)
 		return
 	}
 	owner.ReviveRequest(reviver, power, true)
 }
 
-// reviveTargets revives every dead player target outright.
+// reviveTargets revives every dead player and summon target outright. A
+// summon's decay is dropped first, whether or not it is still dead.
 func reviveTargets(cast Cast, power float64) {
 	for _, obj := range cast.Targets {
+		if s, ok := obj.(summonReviver); ok && obj.Kind() == actor.KindSummon {
+			s.CancelDecay()
+			s.ReviveRestoringExp(power)
+			continue
+		}
 		target, ok := asPlayer(obj)
 		if !ok {
 			continue

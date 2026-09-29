@@ -55,7 +55,9 @@ func (a *Actor) die(killer attackable.Combatant) {
 
 // applyDeathPenalty takes a dead pet's death penalty off its experience:
 // (6.5 - 0.07 * level) percent of the experience its current level spans.
-// A loss that would take the experience below zero is skipped. Dropping
+// The experience it had is kept for a resurrection to give back (see
+// ReviveRestoringExp), even when the loss is skipped: a loss that would
+// take the experience below zero is not taken. Dropping
 // under the current level's threshold takes the level down with it, which
 // refreshes the owner's pet window and the collar's enchant; nothing else is
 // sent until the pet's next status refresh.
@@ -64,6 +66,7 @@ func (a *Actor) die(killer attackable.Combatant) {
 func (a *Actor) applyDeathPenalty() {
 	a.statusMu.Lock()
 	lost := petDeathPenalty(a.level, a.expForLevelLocked(a.level), a.expForLevelLocked(a.level+1))
+	a.expBeforeDeath = a.exp
 	if a.exp-lost < 0 {
 		a.statusMu.Unlock()
 		return
@@ -128,8 +131,12 @@ func (a *Actor) DecayDelay() time.Duration {
 // the world its owner loses the collar and the pet's saved state
 // (event.PetCorpseDecayed), whether or not the owner is online. The respawn
 // hook is never used: summons do not respawn.
+//
+// A revived pet cancels its decay, and one revived after its decay fell due
+// is left alone here. A servitor a player revived keeps its decay (see
+// ReviveRestoringExp) and leaves the world at its deadline, alive.
 func (a *Actor) Decay(state *world.State, _ func()) bool {
-	if !a.Dead() || !a.OwnerStillLinked() {
+	if (a.isPet && !a.Dead()) || !a.OwnerStillLinked() {
 		return false
 	}
 	if !a.despawn(state) {

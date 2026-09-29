@@ -435,6 +435,7 @@ func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Effects = l.effects
 	cfg.Config = &l.petConfig
 	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
+	cfg.RespawnRestoreHP = l.playerConfig.RespawnRestoreHP
 	if cfg.SkillDefs == nil {
 		cfg.SkillDefs = l.skills
 	}

@@ -176,8 +176,8 @@ func (a *Actor) Unsummon() {
 //
 // A corpse with no decay pending, a pet restored dead from its saved row,
 // leaves with its owner like a living summon: nothing would ever remove it,
-// and without a revive (#2679) its owner could not summon again until the
-// server restarts.
+// and a corpse left behind cannot be revived by its returning owner (#2680),
+// who could then not summon again until the server restarts.
 func (a *Actor) LeaveWithOwner() {
 	if !a.Dead() || !a.HasCorpse() {
 		a.despawn(nil)

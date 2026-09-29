@@ -80,6 +80,9 @@ type Owner interface {
 	// OfferSummonRevive offers the owner the resurrection of its summon,
 	// which just died under a Phoenix Blessing.
 	OfferSummonRevive()
+	// ClearReviveOffer closes the owner's pending resurrection offer, if
+	// any, as its revived pet does.
+	ClearReviveOffer()
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.
@@ -176,14 +179,17 @@ type Actor struct {
 	growth        *npc.PetData
 	controlItemID int32
 	exp           int64
-	sp            int
-	expType       int
-	fed           int
-	maxMeal       int
-	mealInNormal  int
-	mealInBattle  int
-	food1         int32
-	food2         int32
+	// expBeforeDeath is a pet's experience before its last death penalty,
+	// until a resurrection gives some of it back; guarded by statusMu.
+	expBeforeDeath int64
+	sp             int
+	expType        int
+	fed            int
+	maxMeal        int
+	mealInNormal   int
+	mealInBattle   int
+	food1          int32
+	food2          int32
 	// foodRestore1/foodRestore2 hold the meal gauge each food item
 	// restores on auto-feed: PetFoods.java's feed skill for that item
 	// (skill.getFeed() * PET_FOOD_RATE), since food1 and food2 can map to
@@ -195,6 +201,9 @@ type Actor struct {
 	hungryLimit   float64
 	unsummonLimit float64
 	roll          func(int) int
+	// respawnRestoreHP is the share of max HP a revive restores without a
+	// Phoenix Blessing; immutable after construction.
+	respawnRestoreHP float64
 
 	stats              CombatStats
 	statCalc           summonStatCalcs
@@ -345,6 +354,9 @@ type PetConfig struct {
 	Roll           func(int) int
 	Stats          CombatStats
 	MaxBuffsAmount int
+	// RespawnRestoreHP is the share of max HP a revive restores without a
+	// Phoenix Blessing.
+	RespawnRestoreHP float64
 	// Skills maps skill id to level, from this pet's npc template. See
 	// Actor.skills.
 	Skills map[int]int
@@ -383,6 +395,9 @@ type ServitorConfig struct {
 	Roll           func(int) int
 	Stats          CombatStats
 	MaxBuffsAmount int
+	// RespawnRestoreHP is the share of max HP a revive restores without a
+	// Phoenix Blessing.
+	RespawnRestoreHP float64
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
@@ -425,6 +440,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}
+	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	return a, nil
@@ -480,6 +496,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}
+	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	return a, nil

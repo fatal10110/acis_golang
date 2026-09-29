@@ -537,3 +537,4 @@ func (*pickupTestOwner) ServitorVanished()                         {}
 func (*pickupTestOwner) PvPFlagState() task.PvPFlagState           { return task.PvPFlagNone }
 func (*pickupTestOwner) AwardSummonKillKarma(attackable.Combatant) {}
 func (*pickupTestOwner) OfferSummonRevive()                        {}
+func (*pickupTestOwner) ClearReviveOffer()                         {}
