@@ -61,6 +61,10 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 	a.vitals.mu.Unlock()
 	a.queue.Store(q)
 	a.movement.SetQueue(q)
+	// The effect list still points at the departed session's queue, closed
+	// with that session: its ticks would be refused there, and a buff the
+	// revived pet takes would never expire.
+	a.effects.SetQueue(q)
 	a.emit(event.OwnerRelinked{})
 	// Last, so nothing that waits for the owner to be back (a revive, a
 	// later logout's leave) sees it before the move is complete.

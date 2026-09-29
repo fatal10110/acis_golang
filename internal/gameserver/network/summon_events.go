@@ -336,10 +336,17 @@ func (s *summonSink) relinkToOwner() {
 // any, back to live: the corpse answers to live from then on and its work
 // runs on live's queue. It runs on live's queue, so a logout of live cannot
 // interleave with it, and takes over the corpse's own queue for the relink,
-// so none of the corpse's work (its decay) runs meanwhile; work posted there
-// earlier runs first, and work posted since moves on to live's queue.
-// Nothing on a corpse's queue waits on its owner's, so taking it over from
-// here cannot deadlock.
+// so none of the corpse's work (its decay) runs meanwhile. Taking it over
+// waits only for a drain already in progress; a job the queue accepted but
+// has not started runs after the relink. The corpse's own jobs (its decay,
+// through Decay.post; anything through summon.Actor.Post) check the queue
+// they run on first and move on to live's queue. A job posted there
+// directly does not: the AI sweep's think can run once more on the corpse
+// queue, which closes but still drains what it accepted. That think runs
+// under the brain's own lock and starts nothing for a dead pet
+// (DenyAIAction), and the pet is still dead until live, now in the world,
+// revives it. Nothing on a corpse's queue waits on its owner's, so taking it
+// over from here cannot deadlock.
 func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
 	if l.world == nil {
 		return

@@ -168,8 +168,11 @@ func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, it
 	return inv
 }
 
-// NewPetInventory returns an empty pet inventory for ownerID (the pet's
-// own world object id, not its owner's). A live pet must use
+// NewPetInventory returns an empty pet inventory for ownerID, the object id
+// of the pet's collar (not the pet's own world object id, nor its owner's).
+// The pet's world object id is transient, while its items must be found
+// again after an offline decay of its corpse and across a restart, both of
+// which leave only the collar and its pets row. A live pet must use
 // NewPetInventoryWithDelivery to send inventory updates.
 func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
 	return NewInventory(ownerID, item.LocationPet, item.LocationPetEquip, templates)
