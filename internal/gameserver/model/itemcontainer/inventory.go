@@ -526,6 +526,31 @@ func (inv *Inventory) EquipItem(inst *item.Instance, tmpl *item.Template) []*ite
 	return inv.equipItemLocked(inst, tmpl)
 }
 
+// EquipPlayerItem is EquipItem for a player's paperdoll, which first applies
+// the worn formal wear rule: while the chest slot holds a full-body dress, a
+// weapon, shield or other hand item takes the dress off before going on, and
+// legs, feet, gloves or a helmet cannot go on at all (refused reports that,
+// with nothing changed). Its altered list includes the removed dress.
+func (inv *Inventory) EquipPlayerItem(inst *item.Instance, tmpl *item.Template) (altered []*item.Instance, refused bool) {
+	inv.mu.Lock()
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+
+	if chest := inv.paperdoll[Chest]; chest != nil {
+		if chestTmpl, ok := inv.Templates().Get(chest.TemplateID); ok && chestTmpl.Slot == item.SlotAllDress {
+			switch tmpl.Slot {
+			case item.SlotLRHand, item.SlotLHand, item.SlotRHand:
+				if old := inv.setPaperdollItemLocked(Chest, nil, nil); old != nil {
+					altered = append(altered, old)
+				}
+			case item.SlotLegs, item.SlotFeet, item.SlotGloves, item.SlotHead:
+				return nil, true
+			}
+		}
+	}
+	return append(altered, inv.equipItemLocked(inst, tmpl)...), false
+}
+
 func (inv *Inventory) equipItemLocked(inst *item.Instance, tmpl *item.Template) []*item.Instance {
 	var altered []*item.Instance
 	set := func(slot int) {

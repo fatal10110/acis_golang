@@ -172,9 +172,9 @@ func TestToggleEquipItemEquipsAndUnequips(t *testing.T) {
 	inst := inv.AddNew(30, 1, 500)
 	inv.DrainUpdates()
 
-	res, ok := NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
-	if !ok {
-		t.Fatal("ToggleEquipItem equip returned ok=false")
+	res, failure := NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
+	if failure != EquipOK {
+		t.Fatalf("ToggleEquipItem equip failure = %d, want EquipOK", failure)
 	}
 	if !res.EquipmentChanged {
 		t.Fatal("ToggleEquipItem equip did not report equipment change")
@@ -186,9 +186,9 @@ func TestToggleEquipItemEquipsAndUnequips(t *testing.T) {
 		t.Fatalf("Changed = %+v, want [inst]", res.Changed)
 	}
 
-	res, ok = NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
-	if !ok {
-		t.Fatal("ToggleEquipItem unequip returned ok=false")
+	res, failure = NewService(nil).ToggleEquipItem(inv, inst.ObjectID)
+	if failure != EquipOK {
+		t.Fatalf("ToggleEquipItem unequip failure = %d, want EquipOK", failure)
 	}
 	if !res.EquipmentChanged {
 		t.Fatal("ToggleEquipItem unequip did not report equipment change")
@@ -206,8 +206,8 @@ func TestUnequipBodySlotResolvesPaperdollSlot(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, templates)
 	inst := inv.AddNew(30, 1, 500)
 	service := NewService(nil)
-	if _, ok := service.ToggleEquipItem(inv, inst.ObjectID); !ok {
-		t.Fatal("ToggleEquipItem equip returned ok=false")
+	if _, failure := service.ToggleEquipItem(inv, inst.ObjectID); failure != EquipOK {
+		t.Fatalf("ToggleEquipItem equip failure = %d, want EquipOK", failure)
 	}
 	inv.DrainUpdates()
 

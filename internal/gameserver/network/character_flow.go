@@ -529,13 +529,16 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	}
 	sort.Ints(ids)
 
+	// Worn formal wear greys out every skill. The negative-reputation clan
+	// skill flag is not modeled yet.
+	disabled := c.WearingFormalWear()
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {
 		level := levels[id]
 		if level <= 0 {
 			continue
 		}
-		entry := serverpackets.SkillListEntry{ID: int32(id), Level: int32(level)}
+		entry := serverpackets.SkillListEntry{ID: int32(id), Level: int32(level), Disabled: disabled}
 		if skills != nil {
 			if def, ok := skills.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: level}); ok {
 				entry.Passive = def.Activation == modelskill.ActivationPassive

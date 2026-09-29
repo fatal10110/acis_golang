@@ -74,33 +74,50 @@ type CrystallizeResult struct {
 	CrystalCount  int
 }
 
-// ToggleEquipItem equips objectID, or unequips it when it is already worn.
-func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) (Result, bool) {
+// EquipFailure is the non-mutating reason an equip toggle failed.
+type EquipFailure uint8
+
+const (
+	// EquipOK means the item was equipped or unequipped.
+	EquipOK EquipFailure = iota
+	// EquipNoop means the request is invalid and changed nothing.
+	EquipNoop
+	// EquipBadCondition means the paperdoll refused the item: legs, feet,
+	// gloves or a helmet while formal wear is worn.
+	EquipBadCondition
+)
+
+// ToggleEquipItem equips objectID into a player's paperdoll, or unequips it
+// when it is already worn.
+func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) (Result, EquipFailure) {
 	if inv == nil {
-		return Result{}, false
+		return Result{}, EquipNoop
 	}
 	inst := inv.ItemByObjectID(objectID)
 	if inst == nil {
-		return Result{}, false
+		return Result{}, EquipNoop
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
 	if !ok || tmpl.Slot == item.SlotNone {
-		return Result{}, false
+		return Result{}, EquipNoop
 	}
 
 	st := inst.Snapshot()
 	if st.Equipped() {
 		unequipped := inv.UnequipSlot(st.LocationData)
 		if unequipped == nil {
-			return Result{}, false
+			return Result{}, EquipNoop
 		}
-		return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, true
+		return Result{EquipmentChanged: true, Changed: []*item.Instance{unequipped}}, EquipOK
 	}
-	changed := inv.EquipItem(inst, tmpl)
+	changed, refused := inv.EquipPlayerItem(inst, tmpl)
+	if refused {
+		return Result{}, EquipBadCondition
+	}
 	if len(changed) == 0 {
-		return Result{}, false
+		return Result{}, EquipNoop
 	}
-	return Result{EquipmentChanged: true, Changed: changed}, true
+	return Result{EquipmentChanged: true, Changed: changed}, EquipOK
 }
 
 // UnequipBodySlot clears the paperdoll position represented by bodySlot.

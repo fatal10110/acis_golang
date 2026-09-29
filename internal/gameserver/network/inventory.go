@@ -85,8 +85,16 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
-	res, ok := l.inventory.ToggleEquipItem(inv, objectID)
-	if !ok {
+	res, failure := l.inventory.ToggleEquipItem(inv, objectID)
+	switch failure {
+	case invops.EquipOK:
+	case invops.EquipBadCondition:
+		// The paperdoll is unchanged, but the refusal still ends in the
+		// usual UserInfo/CharInfo refresh.
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEquipItemDueToBadCondition))
+		l.broadcastEquipmentChange(live)
+		return
+	default:
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -100,40 +108,46 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 // Unequip and equip changes for the same paperdoll slot arrive in that
 // order (the old occupant first, the new one second), mirroring the
 // reference's unequip-before-equip listener sequencing for one slot swap.
+// Putting on or taking off formal wear always resends SkillList, since
+// every entry's greyed-out flag follows it.
 func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
 	if live == nil || inv == nil {
 		return
 	}
-	if l.skills != nil {
-		var skillsChanged, timersChanged bool
-		for _, inst := range res.Changed {
-			tmpl, ok := inv.Templates().Get(inst.TemplateID)
-			if !ok {
-				continue
-			}
-			if inst.Equipped() {
-				changed, timers, err := l.skills.EquipItemStats(live.Character, inst, tmpl)
-				if err != nil {
-					l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
-				}
-				skillsChanged = skillsChanged || changed
-				timersChanged = timersChanged || timers
-				continue
-			}
-			if l.skills.UnequipItemStats(live.Character, inv, inst, tmpl) {
-				skillsChanged = true
-			}
+	var skillsChanged, timersChanged bool
+	for _, inst := range res.Changed {
+		tmpl, ok := inv.Templates().Get(inst.TemplateID)
+		if !ok {
+			continue
 		}
-		// Mirrors ItemPassiveSkillsListener: SkillList always precedes
-		// SkillCoolTime, and SkillCoolTime is only ever sent when an
-		// item-granted skill's reuse timer needs to reach the client.
-		if skillsChanged {
-			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		if tmpl.Slot == item.SlotAllDress {
+			skillsChanged = true
 		}
-		if timersChanged {
-			now := live.Now()
-			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+		if l.skills == nil {
+			continue
 		}
+		if inst.Equipped() {
+			changed, timers, err := l.skills.EquipItemStats(live.Character, inst, tmpl)
+			if err != nil {
+				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
+			}
+			skillsChanged = skillsChanged || changed
+			timersChanged = timersChanged || timers
+			continue
+		}
+		if l.skills.UnequipItemStats(live.Character, inv, inst, tmpl) {
+			skillsChanged = true
+		}
+	}
+	// Mirrors ItemPassiveSkillsListener: SkillList always precedes
+	// SkillCoolTime, and SkillCoolTime is only ever sent when an
+	// item-granted skill's reuse timer needs to reach the client.
+	if skillsChanged {
+		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+	}
+	if timersChanged {
+		now := live.Now()
+		live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
 	}
 	if l.shadowItems != nil {
 		for _, inst := range res.Changed {
