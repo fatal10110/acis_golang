@@ -700,7 +700,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			onLive(live, func() { l.useItem(live, req.ObjectID) })
+			onLive(live, func() { l.useItem(live, req.ObjectID, req.CtrlPressed) })
 
 		case clientpackets.OpcodeRequestUnEquipItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUnequipItem)

@@ -17,7 +17,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
+// useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
+// an item-carried AI cast as its force-use flag.
+func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if live == nil {
 		return
 	}
@@ -71,7 +73,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32) {
 	if l.useConsumableSkillItem(live, inv, inst) {
 		return
 	}
-	if l.useItemAICast(live, inv, inst) {
+	if l.useItemAICast(live, inv, inst, ctrl) {
 		return
 	}
 	if l.useSummonItem(live, inv, inst) {

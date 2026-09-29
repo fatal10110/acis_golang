@@ -29,9 +29,14 @@ import (
 // a later skill's reuse rejection cannot skip the first skill's timers,
 // and a zero-delay launch cannot fire before later skills are queued.
 //
+// Each skill first passes the player's pre-attempt gate, as a skill-bar
+// request does: a skill that fails it is answered and neither queued nor
+// started. ctrl is the UseItem Ctrl modifier; it is the cast's force-use
+// flag, and a queued skill keeps it.
+//
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
-func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
+func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, ctrl bool) bool {
 	if live == nil || inv == nil || inst == nil {
 		return false
 	}
@@ -60,16 +65,15 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 			return true
 		}
 		selected := live.Target()
+		if !l.attemptItemAICast(live, selected, def) {
+			continue
+		}
 		if run != nil || itemAICastBusy(live) {
-			if target, _ := l.resolveMagicSkillTarget(live.Character, selected, def, false); target == nil {
-				sendMagicActionFailed(live)
-				continue
-			}
-			live.deferItemAICast(inv, inst, def, selected)
+			live.deferItemAICast(inv, inst, def, selected, ctrl)
 			sendMagicActionFailed(live)
 			continue
 		}
-		next, rejected, failed := l.beginItemAICast(live, inv, inst, tmpl, selected, def)
+		next, rejected, failed := l.beginItemAICast(live, inv, inst, tmpl, selected, def, ctrl)
 		if failed {
 			return true
 		}
@@ -82,13 +86,26 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 }
 
 // itemAICastBusy reports whether a later attached skill must wait: an
-// in-flight swing or cast. Sit/stand transition states and scheduling a
-// CAST after the current intention type are not modeled yet: #2191.
+// in-flight swing or cast, or a sit-down or stand-up transition.
+//
+// A CAST is otherwise queued only behind a current STAND intention, which
+// lasts exactly as long as the stand-up transition, so no separate
+// intention type is tracked for it.
 func itemAICastBusy(live *livePlayer) bool {
 	if live.attack != nil && live.attack.AttackingNow() {
 		return true
 	}
-	return live.cast != nil && live.cast.CastingNow()
+	if live.cast != nil && live.cast.CastingNow() {
+		return true
+	}
+	return inPostureTransition(live)
+}
+
+// inPostureTransition reports whether live is still sitting down or standing
+// up. A cast queued behind a swing or cast that ends inside the transition
+// stays queued until PostureSettled runs it.
+func inPostureTransition(live *livePlayer) bool {
+	return live.SittingNow() || live.StandingNow()
 }
 
 // beginItemAICast starts and consumes one item-carried skill, sending its
@@ -96,7 +113,7 @@ func itemAICastBusy(live *livePlayer) bool {
 // start gates refused the skill (the attached-skill loop continues). failed
 // means the item could not be consumed after the cast had already opened
 // (the loop stops).
-func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, selected world.Tracked, def modelskill.Definition) (run func(), rejected, failed bool) {
+func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, selected world.Tracked, def modelskill.Definition, ctrl bool) (run func(), rejected, failed bool) {
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
@@ -104,6 +121,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		Selected:    selected,
 		Skill:       modelskill.Ref{ID: def.ID, Level: def.Level},
 		Definitions: l.skills,
+		Ctrl:        ctrl,
 		Hooks: actorcast.StartHooks{
 			ResolveTarget: l.resolveMagicSkillTarget,
 			StopMovement:  l.stopMovementForCast(live),
@@ -182,19 +200,70 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	}, false, false
 }
 
+// finishDeferredItemAICast runs the queued item cast, if any. It passes the
+// pre-attempt gate again first: a queued skill with no final target any
+// more is dropped silently, and one the gate now refuses is answered with
+// the reason alone. During a sit-down or stand-up the cast stays queued for
+// PostureSettled, and it reports true: it is still the next intention.
 func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 	if live == nil || live.detached() {
 		return false
+	}
+	if inPostureTransition(live) {
+		return live.hasDeferredItemAICast()
 	}
 	itemCast := live.takeDeferredItemAICast()
 	if itemCast == nil {
 		return false
 	}
+	target := l.skillFinalTarget(live, itemCast.selected, itemCast.skill)
+	if target == nil {
+		return false
+	}
+	if err := l.castController(live).CanPlayerAttemptItemCast(live.Character, target, itemCast.skill); err != nil {
+		sendMagicCastFailureReason(live, itemCast.skill, err)
+		return false
+	}
 	tmpl, _ := itemCast.inventory.Templates().Get(itemCast.item.TemplateID)
-	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.selected, itemCast.skill)
+	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, tmpl, itemCast.selected, itemCast.skill, itemCast.ctrl)
 	if failed || rejected || run == nil {
 		return false
 	}
 	run()
 	return true
+}
+
+// attemptItemAICast runs one attached skill through the pre-attempt gate
+// before it is queued or started. A dead caster and a skill with no final
+// target get a bare ActionFailed; a gate failure gets its reason and
+// ActionFailed. It reports whether the skill may go on.
+func (l *GameClientLink) attemptItemAICast(live *livePlayer, selected world.Tracked, def modelskill.Definition) bool {
+	if live.Character.Dead() {
+		sendMagicActionFailed(live)
+		return false
+	}
+	target := l.skillFinalTarget(live, selected, def)
+	if target == nil {
+		sendMagicActionFailed(live)
+		return false
+	}
+	if err := l.castController(live).CanPlayerAttemptItemCast(live.Character, target, def); err != nil {
+		sendMagicCastFailure(live, def, err)
+		return false
+	}
+	return true
+}
+
+// skillFinalTarget is the creature def would be cast on given selected,
+// before any cast condition is checked.
+func (l *GameClientLink) skillFinalTarget(live *livePlayer, selected world.Tracked, def modelskill.Definition) skilltarget.Actor {
+	if l.targets == nil {
+		return nil
+	}
+	handler, ok := l.targets.Handler(def.Target)
+	if !ok {
+		return nil
+	}
+	selectedActor, _ := selected.(skilltarget.Actor)
+	return handler.FinalTarget(live.Character, selectedActor, &def)
 }

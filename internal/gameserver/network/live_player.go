@@ -170,6 +170,8 @@ type itemAICastIntention struct {
 	item      *item.Instance
 	skill     modelskill.Definition
 	selected  world.Tracked
+	// ctrl is the UseItem Ctrl modifier, the cast's force-use flag.
+	ctrl bool
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
@@ -349,12 +351,28 @@ func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	return req
 }
 
-func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked) {
+// hasDeferredMagicSkill reports whether a skill request is queued as the
+// next CAST intention.
+func (p *livePlayer) hasDeferredMagicSkill() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredMagic != nil
+}
+
+// hasDeferredItemAICast reports whether an item cast is queued as the next
+// CAST intention.
+func (p *livePlayer) hasDeferredItemAICast() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredItem != nil
+}
+
+func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.deferredPickup = nil
 	p.deferredMagic = nil
-	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected}
+	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
 }
 
 func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {

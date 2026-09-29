@@ -98,7 +98,9 @@ type ItemSkillRequest struct {
 	Selected    world.Tracked
 	Skill       modelskill.Ref
 	Definitions Definitions
-	Hooks       StartHooks
+	// Ctrl is the item use's force-use modifier.
+	Ctrl  bool
+	Hooks StartHooks
 }
 
 // StartItemSkill validates and starts an item-carried skill cast: the same
@@ -114,7 +116,7 @@ func StartItemSkill(req ItemSkillRequest) (StartedSkill, error) {
 		return StartedSkill{}, ErrSkillUnavailable
 	}
 
-	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, false, req.Hooks)
+	return startResolvedSkill(req.Now, req.Controller, req.Caster, req.Selected, def, req.Ctrl, req.Hooks)
 }
 
 // startResolvedSkill runs the shared target-resolution and cost/reuse start
