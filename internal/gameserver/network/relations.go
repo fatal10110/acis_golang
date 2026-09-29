@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -88,9 +89,11 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 // Unlike broadcastRelations (Player.updatePvPFlag/setKarma's shared tail),
 // Summon's override only ever sends the summon's own RelationChanged to
 // nearby observers — the owner's relation hasn't changed, so it is not
-// resent here. Call after the pet is registered in world state (world.AddSummon),
-// since it must already be resolvable as live's summon.
-func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet world.Tracked) {
+// resent here. Each observer's auto-attackable flag is the summon's own
+// AttackableWithoutForceBy, which reads the summon's PvP-zone membership
+// rather than its owner's. Call after the pet is registered in world state
+// (world.AddSummon), since it must already be resolvable as live's summon.
+func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet *summon.Actor) {
 	if l.world == nil || pet == nil {
 		return
 	}
@@ -112,7 +115,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet worl
 		}
 		observer.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{
 			ObjectID: pet.ObjectID(), Relation: relation,
-			IsAutoAttackable: relationAutoAttackable(karma, pvpFlag, live.InPvPZone(), observer.InPvPZone()),
+			IsAutoAttackable: pet.AttackableWithoutForceBy(observer.Character),
 			Karma:            int32(karma), PvPFlag: int32(pvpFlag),
 		}))
 	})

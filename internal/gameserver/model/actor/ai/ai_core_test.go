@@ -534,6 +534,7 @@ type fakeActor struct {
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
+	refusals        int
 }
 
 func actor(id int32) *fakeActor {
@@ -563,6 +564,8 @@ func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
+
+func (a *fakeActor) RefuseAttackTarget() { a.refusals++ }
 
 func (a *fakeActor) BroadcastMoveToPawn(target attackable.Combatant) {
 	a.moveToPawnCalls++
@@ -3141,6 +3144,228 @@ func TestSummonAIStepAsideOnlyFromIdleOrFollow(t *testing.T) {
 				}
 			} else if len(walks) != 0 {
 				t.Fatalf("walks = %v, want none", walks)
+			}
+		})
+	}
+}
+
+// ---- playable attack gate ----
+
+// gateFake stands in for a playable on either side of the playable attack
+// gate: a player, or a summon when owner is set. It also serves as the
+// PlayerAttackActor and SummonActor driving Start and TryToAttack. The real
+// player.Character and summon.Actor reach these values only through a live
+// world (effects, zones, cursed weapons), and cursed weapons do not exist
+// yet (#225), so the gate's branches are pinned here per
+// docs/agents/test-strategy.md.
+type gateFake struct {
+	attackabletest.Combatant
+	world.Presence
+	id       int32
+	kind     modelactor.Kind
+	level    int
+	karma    int
+	blessed  bool
+	cursed   bool
+	pvp      bool
+	owner    *gateFake
+	casting  bool
+	denied   bool
+	refusals int
+}
+
+func (g *gateFake) ObjectID() int32          { return g.id }
+func (g *gateFake) Kind() modelactor.Kind    { return g.kind }
+func (g *gateFake) Level() int               { return g.level }
+func (g *gateFake) Karma() int               { return g.karma }
+func (g *gateFake) ProtectionBlessing() bool { return g.blessed }
+func (g *gateFake) CursedWeaponEquipped() bool {
+	return g.cursed
+}
+func (g *gateFake) InPvPZone() bool                          { return g.pvp }
+func (g *gateFake) CastingNow() bool                         { return g.casting }
+func (g *gateFake) DenyAIAction() bool                       { return g.denied }
+func (g *gateFake) PhysicalAttackRange() int                 { return 40 }
+func (g *gateFake) Standing() bool                           { return true }
+func (g *gateFake) SetHeadingTo(attackable.Combatant)        {}
+func (g *gateFake) BroadcastMoveToPawn(attackable.Combatant) {}
+func (g *gateFake) RefuseAttackTarget()                      { g.refusals++ }
+func (g *gateFake) Owner() (attackable.Combatant, bool) {
+	if g.owner == nil {
+		return nil, false
+	}
+	return g.owner, true
+}
+
+func gatePlayerFake(id int32, level, karma int) *gateFake {
+	return &gateFake{id: id, kind: modelactor.KindPlayer, level: level, karma: karma}
+}
+
+func gateSummonFake(id int32, owner *gateFake) *gateFake {
+	return &gateFake{id: id, kind: modelactor.KindSummon, level: 1, owner: owner}
+}
+
+func TestRefusesPlayableTarget(t *testing.T) {
+	blessed := func(g *gateFake) *gateFake { g.blessed = true; return g }
+	cursed := func(g *gateFake) *gateFake { g.cursed = true; return g }
+	inPvP := func(g *gateFake) *gateFake { g.pvp = true; return g }
+	npc := func(g *gateFake) *gateFake { g.kind = modelactor.KindNPC; return g }
+
+	tests := []struct {
+		name     string
+		attacker attackable.Combatant
+		target   attackable.Combatant
+		want     bool
+	}{
+		{"karma attacker 10 levels above a blessed target", gatePlayerFake(1, 30, 500), blessed(gatePlayerFake(2, 20, 0)), true},
+		{"karma attacker 9 levels above a blessed target", gatePlayerFake(1, 29, 500), blessed(gatePlayerFake(2, 20, 0)), false},
+		{"karma-free attacker far above a blessed target", gatePlayerFake(1, 40, 0), blessed(gatePlayerFake(2, 20, 0)), false},
+		{"blessed target inside a PvP zone, attacker outside", gatePlayerFake(1, 30, 500), inPvP(blessed(gatePlayerFake(2, 20, 0))), false},
+		{"attacker inside a PvP zone, blessed target outside", inPvP(gatePlayerFake(1, 30, 500)), blessed(gatePlayerFake(2, 20, 0)), true},
+		{"blessed attacker, karma target 10 levels above", blessed(gatePlayerFake(1, 20, 0)), gatePlayerFake(2, 30, 500), true},
+		{"blessed attacker, karma target 9 levels above", blessed(gatePlayerFake(1, 20, 0)), gatePlayerFake(2, 29, 500), false},
+		{"blessed attacker, karma-free target far above", blessed(gatePlayerFake(1, 20, 0)), gatePlayerFake(2, 40, 0), false},
+		{"blessed attacker, karma target above inside a PvP zone", blessed(gatePlayerFake(1, 20, 0)), inPvP(gatePlayerFake(2, 30, 500)), false},
+		{"level 20 attacker, cursed-weapon target", gatePlayerFake(1, 20, 0), cursed(gatePlayerFake(2, 40, 0)), true},
+		{"level 21 attacker, cursed-weapon target", gatePlayerFake(1, 21, 0), cursed(gatePlayerFake(2, 40, 0)), false},
+		{"cursed-weapon attacker, level 20 target", cursed(gatePlayerFake(1, 40, 0)), gatePlayerFake(2, 20, 0), true},
+		{"cursed-weapon attacker, level 21 target", cursed(gatePlayerFake(1, 40, 0)), gatePlayerFake(2, 21, 0), false},
+		{"cursed-weapon attacker, level 20 target inside a PvP zone", cursed(gatePlayerFake(1, 40, 0)), inPvP(gatePlayerFake(2, 20, 0)), true},
+		{"non-playable target", cursed(gatePlayerFake(1, 40, 500)), npc(blessed(gatePlayerFake(2, 1, 0))), false},
+		{"summon of a blessed player", gatePlayerFake(1, 30, 500), gateSummonFake(3, blessed(gatePlayerFake(2, 20, 0))), true},
+		{"summon of a blessed player inside a PvP zone", gatePlayerFake(1, 30, 500), inPvP(gateSummonFake(3, blessed(gatePlayerFake(2, 20, 0)))), false},
+		{"summon of a blessed player whose owner alone is in a PvP zone", gatePlayerFake(1, 30, 500), gateSummonFake(3, inPvP(blessed(gatePlayerFake(2, 20, 0)))), true},
+		{"summon of a karma player at a blessed target", gateSummonFake(3, gatePlayerFake(1, 30, 500)), blessed(gatePlayerFake(2, 20, 0)), true},
+		{"attacker with no acting player", actor(1), blessed(gatePlayerFake(2, 1, 0)), false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := refusesPlayableTarget(tc.attacker, tc.target); got != tc.want {
+				t.Fatalf("refusesPlayableTarget() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPlayerAttackRefusedTargetKeepsCurrentTarget(t *testing.T) {
+	pk := gatePlayerFake(1, 30, 500)
+	prev := gatePlayerFake(3, 30, 0)
+	blessed := &gateFake{id: 2, kind: modelactor.KindPlayer, level: 10, blessed: true}
+	strike := &recordingAttack{canAttack: true}
+	brain := NewPlayerAttack(pk, &recordingMove{}, strike)
+
+	if !brain.Start(prev) {
+		t.Fatal("Start(prev) = false, want accepted")
+	}
+	strike.attackingNow = false
+	if brain.Start(blessed) {
+		t.Fatal("Start(blessed) = true, want refused")
+	}
+	if pk.refusals != 1 {
+		t.Fatalf("refusals = %d, want 1", pk.refusals)
+	}
+	if got := brain.Target(); got != prev {
+		t.Fatalf("Target() after refusal = %v, want the previous target", got)
+	}
+	if strike.doAttackCalls != 1 || strike.target != prev {
+		t.Fatalf("swings = %d at %v, want only the one at the previous target", strike.doAttackCalls, strike.target)
+	}
+
+	if !brain.RefuseTarget(blessed) || pk.refusals != 2 {
+		t.Fatalf("RefuseTarget(blessed) refusals = %d, want refused and reported", pk.refusals)
+	}
+	if brain.RefuseTarget(prev) || pk.refusals != 2 {
+		t.Fatalf("RefuseTarget(prev) refusals = %d, want accepted silently", pk.refusals)
+	}
+	if got := brain.Target(); got != prev {
+		t.Fatalf("Target() after RefuseTarget = %v, want the previous target", got)
+	}
+}
+
+func TestPlayerAttackSkipsGateWhileDeniedOrBusy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  func(pk *gateFake, strike *recordingAttack)
+	}{
+		{"denied", func(pk *gateFake, _ *recordingAttack) { pk.denied = true }},
+		{"casting", func(pk *gateFake, _ *recordingAttack) { pk.casting = true }},
+		{"attacking", func(_ *gateFake, strike *recordingAttack) { strike.attackingNow = true }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pk := gatePlayerFake(1, 30, 500)
+			blessed := &gateFake{id: 2, kind: modelactor.KindPlayer, level: 10, blessed: true}
+			strike := &recordingAttack{canAttack: true}
+			tc.set(pk, strike)
+			brain := NewPlayerAttack(pk, &recordingMove{}, strike)
+
+			if brain.RefuseTarget(blessed) {
+				t.Fatal("RefuseTarget() = true, want the gate skipped")
+			}
+			brain.Start(blessed)
+			if pk.refusals != 0 {
+				t.Fatalf("refusals = %d, want 0 while %s", pk.refusals, tc.name)
+			}
+			if strike.doAttackCalls != 0 {
+				t.Fatalf("swings = %d, want none while %s", strike.doAttackCalls, tc.name)
+			}
+		})
+	}
+}
+
+func TestSummonAIRefusedTargetKeepsCurrentIntention(t *testing.T) {
+	owner := gatePlayerFake(1, 30, 500)
+	pet := gateSummonFake(3, owner)
+	blessed := &gateFake{id: 2, kind: modelactor.KindPlayer, level: 10, blessed: true}
+	strike := &recordingAttack{canAttack: true}
+	brain := NewSummon(pet, &summonMove{}, strike)
+
+	if !brain.TryToFollow(owner) {
+		t.Fatal("TryToFollow(owner) = false, want accepted")
+	}
+	if brain.TryToAttack(blessed) {
+		t.Fatal("TryToAttack(blessed) = true, want refused")
+	}
+	if pet.refusals != 1 {
+		t.Fatalf("refusals = %d, want 1", pet.refusals)
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() after refusal = %v, want follow", got)
+	}
+	if _, _, queued := brain.NextIntention(); queued {
+		t.Fatal("refused attack was queued as the next intention")
+	}
+	if strike.doAttackCalls != 0 {
+		t.Fatalf("swings = %d, want none", strike.doAttackCalls)
+	}
+}
+
+func TestSummonAISkipsGateWhileDeniedOrBusy(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		set    func(pet *gateFake, strike *recordingAttack)
+		queued bool
+	}{
+		{"denied", func(pet *gateFake, _ *recordingAttack) { pet.denied = true }, false},
+		{"attacking", func(_ *gateFake, strike *recordingAttack) { strike.attackingNow = true }, true},
+		{"bow cooling down", func(_ *gateFake, strike *recordingAttack) { strike.bowCooling = true }, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pet := gateSummonFake(3, gatePlayerFake(1, 30, 500))
+			blessed := &gateFake{id: 2, kind: modelactor.KindPlayer, level: 10, blessed: true}
+			strike := &recordingAttack{canAttack: true}
+			tc.set(pet, strike)
+			brain := NewSummon(pet, &summonMove{}, strike)
+
+			brain.TryToAttack(blessed)
+			if pet.refusals != 0 {
+				t.Fatalf("refusals = %d, want 0 while %s", pet.refusals, tc.name)
+			}
+			kind, next, ok := brain.NextIntention()
+			if tc.queued && (!ok || kind != IntentionAttack || next != blessed) {
+				t.Fatalf("NextIntention() = (%v,%v,%v), want the attack queued", kind, next, ok)
+			}
+			if strike.doAttackCalls != 0 {
+				t.Fatalf("swings = %d, want none while %s", strike.doAttackCalls, tc.name)
 			}
 		})
 	}

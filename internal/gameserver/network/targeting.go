@@ -507,7 +507,13 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 	// itself (chase redirect, immediate-swing move.Stop(), a rejection's
 	// stopLocked), but even the bow-cooldown branch that leaves the move
 	// untouched still replaces the intention. Clear every parked approach,
-	// or a geo close mid-chase still takes INTERACT/CAST.
+	// or a geo close mid-chase still takes INTERACT/CAST. A target the
+	// playable attack gate refuses replaces nothing, so it is answered
+	// before the clear: a pickup or pet interact still in flight completes.
+	if live.combat.RefuseTarget(combatant) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return false
+	}
 	live.clearParkedApproaches()
 	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())

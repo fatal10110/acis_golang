@@ -160,6 +160,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		sendSummonInfosToOwner(actor)
 	case event.AbnormalEffectChanged:
 		l.refreshSummonAbnormalEffect(actor)
+	case event.AttackTargetRefused:
+		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
+		}
 	case event.ExpGained:
 		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(e.Exp)))

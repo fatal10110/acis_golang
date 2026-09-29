@@ -38,6 +38,10 @@ type Stopped struct{}
 // AutoAttackStopped reports that the actor's combat stance expired.
 type AutoAttackStopped struct{}
 
+// AttackTargetRefused reports a playable's attack request refused by the
+// playable attack gate; its acting player is told the target is incorrect.
+type AttackTargetRefused struct{}
+
 // Died reports the moment the actor died.
 type Died struct{}
 
@@ -85,6 +89,7 @@ func (Attack) event()                {}
 func (Move) event()                  {}
 func (Stopped) event()               {}
 func (AutoAttackStopped) event()     {}
+func (AttackTargetRefused) event()   {}
 func (Died) event()                  {}
 func (MagicSkillUse) event()         {}
 func (AbnormalEffectChanged) event() {}

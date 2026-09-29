@@ -32,6 +32,11 @@ func (a *Actor) emit(e event.Event) {
 	}
 }
 
+// RefuseAttackTarget tells the owner an attack target was refused.
+func (a *Actor) RefuseAttackTarget() {
+	a.emit(event.AttackTargetRefused{})
+}
+
 // BroadcastAutoAttackStop reports that the owner's combat stance expired from
 // inactivity.
 func (a *Actor) BroadcastAutoAttackStop() {

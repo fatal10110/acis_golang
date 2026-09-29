@@ -17,6 +17,9 @@ type PlayerAttackActor interface {
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	Standing() bool
+	// RefuseAttackTarget tells the player an attack target was refused
+	// (TARGET_IS_INCORRECT).
+	RefuseAttackTarget()
 }
 
 // PlayerAttack drives one player's physical-attack intention: closing
@@ -62,9 +65,18 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 // mid-swing, or the attack was otherwise rejected) and true when the attack
 // was accepted — either a swing just started, or the actor has begun
 // closing distance and will attack once it arrives.
+//
+// A target the playable attack gate refuses is reported to the player and
+// leaves the current intention untouched. The gate runs only when the
+// request is neither denied nor deferred behind a swing or cast, the order
+// the deny and busy checks take ahead of it.
 func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.gateRefusesLocked(target) {
+		p.actor.RefuseAttackTarget()
+		return false
+	}
 	p.target = target
 	if p.actor.CastingNow() {
 		p.deferred = true
@@ -75,6 +87,28 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
 	return accepted
+}
+
+// RefuseTarget runs the playable attack gate Start runs for target, without
+// changing any intention. When the gate refuses, it tells the player and
+// reports true: the caller answers ActionFailed and keeps every intention it
+// holds, the way a refused attack leaves the current one in place. Callers
+// that drop other intentions for a new attack check this first.
+func (p *PlayerAttack) RefuseTarget(target attackable.Combatant) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.gateRefusesLocked(target) {
+		return false
+	}
+	p.actor.RefuseAttackTarget()
+	return true
+}
+
+// gateRefusesLocked reports whether the playable attack gate refuses target.
+// A denied request, or one deferred behind a cast or swing, is not gated
+// yet: the deny and busy checks come first.
+func (p *PlayerAttack) gateRefusesLocked(target attackable.Combatant) bool {
+	return !p.actor.DenyAIAction() && !p.actor.CastingNow() && !p.attack.AttackingNow() && refusesPlayableTarget(p.actor, target)
 }
 
 // ResumeAfterCast runs an attack intention that was requested while casting.

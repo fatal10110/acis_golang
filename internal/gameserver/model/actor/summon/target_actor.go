@@ -50,16 +50,27 @@ func (a *Actor) AttackableBy(attacker skilltarget.Actor) bool {
 
 // AttackableWithoutForceBy reports whether caster may attack a without a
 // forced attack: never by its owner or the owner's own summon, otherwise
-// only while the owner has karma or a PvP flag.
+// when a and caster both stand inside a PvP zone (each its own membership),
+// or while the owner has karma or a PvP flag.
 //
 // The Olympiad, duel, arena, party, clan, alliance and siege-side rules are
 // not applied: that state is not tracked yet, the same as for a player
-// target. Summons have no PvP-zone membership yet (#2623).
+// target.
 func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	if caster == nil || a.owner == nil || actingPlayerID(caster) == a.owner.ObjectID() {
 		return false
 	}
+	if a.InPvPZone() && inPvPZone(caster) {
+		return true
+	}
 	return a.Karma() > 0 || a.PvPFlagState() != task.PvPFlagNone
+}
+
+// inPvPZone reports whether c stands inside a PvP zone; an actor without
+// zone membership (an NPC or door) never does.
+func inPvPZone(c skilltarget.Actor) bool {
+	member, ok := c.(interface{ InPvPZone() bool })
+	return ok && member.InPvPZone()
 }
 
 // actingPlayerID is the object id of the player acting through c: c itself,

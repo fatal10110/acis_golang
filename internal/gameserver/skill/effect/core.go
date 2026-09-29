@@ -29,7 +29,9 @@ const (
 	flagNoblesseBlessing
 	// FlagSilentMove marks a target as moving without alerting nearby AI.
 	FlagSilentMove
-	flagProtectionBlessing
+	// FlagProtectionBlessing marks a target as carrying Blessing of
+	// Protection, consulted by the playable attack gates.
+	FlagProtectionBlessing
 	flagRelaxing
 	// FlagFear marks a target as feared.
 	FlagFear
@@ -258,7 +260,7 @@ var coreKinds = map[string]kind{
 	"PhoenixBless":          {typ: TypePhoenixBless, flag: FlagPhoenixBlessing},
 	"BlockBuff":             {typ: TypeBlockBuff},
 	"BlockDebuff":           {typ: TypeBlockDebuff},
-	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: flagProtectionBlessing},
+	"ProtectionBlessing":    {typ: TypeProtectionBless, flag: FlagProtectionBlessing},
 	"Recovery":              {typ: TypeRecovery},
 	"Cancel":                {typ: TypeCancel},
 	"Negate":                {typ: TypeNegate},

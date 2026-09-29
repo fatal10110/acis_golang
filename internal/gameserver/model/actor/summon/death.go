@@ -46,7 +46,9 @@ func (a *Actor) die(killer attackable.Combatant) {
 		}
 	}
 	a.emit(event.DeathSettled{})
-	if a.isPet && a.owner != nil {
+	// A pet killed inside a PvP zone keeps its experience, unless that zone
+	// is a siege battlefield.
+	if a.isPet && a.owner != nil && (!a.InPvPZone() || a.InSiegeZone()) {
 		a.applyDeathPenalty()
 	}
 }
@@ -58,8 +60,7 @@ func (a *Actor) die(killer attackable.Combatant) {
 // refreshes the owner's pet window and the collar's enchant; nothing else is
 // sent until the pet's next status refresh.
 //
-// Its duel and non-siege PvP-zone exemptions are not applied: duels are not
-// ported (#215), and summons have no zone membership yet (#2623).
+// Its duel exemption is not applied: duels are not ported (#215).
 func (a *Actor) applyDeathPenalty() {
 	a.statusMu.Lock()
 	lost := petDeathPenalty(a.level, a.expForLevelLocked(a.level), a.expForLevelLocked(a.level+1))

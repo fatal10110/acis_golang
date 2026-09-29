@@ -2020,6 +2020,7 @@ func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 type launchZoneQuery bool
 
 func (q launchZoneQuery) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
+func (q launchZoneQuery) SummonCombatZones(_, _, _ int) (pvp, siege bool)  { return false, false }
 
 func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testing.T) {
 	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer, inPeaceZone: true}

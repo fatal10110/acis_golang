@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -679,9 +680,49 @@ func (c *Character) AttackableBy(target.Actor) bool {
 	return !c.AlikeDead()
 }
 
-// AttackableWithoutForceBy reports whether caster may attack c without force.
+// AttackableWithoutForceBy reports whether caster may attack c without force:
+// never when caster is c or c's own summon, otherwise when c and caster both
+// stand inside a PvP zone (each its own membership), or while c has karma or
+// a PvP flag.
+//
+// The Olympiad, duel, arena, party, clan, alliance and siege-side rules are
+// not applied: that state is not tracked yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
-	return caster.ObjectID() != c.ID && (c.Karma() > 0 || c.PvPFlagState() != task.PvPFlagNone)
+	if caster == nil || actingPlayerID(caster) == c.ID {
+		return false
+	}
+	if c.InPvPZone() && inPvPZone(caster) {
+		return true
+	}
+	return c.Karma() > 0 || c.PvPFlagState() != task.PvPFlagNone
+}
+
+// ProtectionBlessing reports whether c carries a Blessing of Protection.
+func (c *Character) ProtectionBlessing() bool {
+	return c.EffectList().IsAffected(effect.FlagProtectionBlessing)
+}
+
+// RefuseAttackTarget tells c an attack target was refused.
+func (c *Character) RefuseAttackTarget() {
+	c.emit(event.AttackTargetRefused{})
+}
+
+// actingPlayerID is the object id of the player acting through a: a itself,
+// or the owner of a summon.
+func actingPlayerID(a target.Actor) int32 {
+	if a.Kind() == actor.KindSummon {
+		if owner, ok := a.Owner(); ok && owner != nil {
+			return owner.ObjectID()
+		}
+	}
+	return a.ObjectID()
+}
+
+// inPvPZone reports whether a stands inside a PvP zone; an actor without
+// zone membership (an NPC or door) never does.
+func inPvPZone(a target.Actor) bool {
+	member, ok := a.(interface{ InPvPZone() bool })
+	return ok && member.InPvPZone()
 }
 
 // Roll draws a uniform random integer in [0, n) from c's combat random source.
