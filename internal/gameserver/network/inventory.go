@@ -568,5 +568,5 @@ func liveItemInteractionAllowed(live *livePlayer) bool {
 
 func dropInRange(live *livePlayer, x, y, z int) bool {
 	sx, sy, sz := live.Position()
-	return location.In3DRange(sx, sy, sz, x, y, z, dropInteractionDistance)
+	return location.In3DRadius(sx, sy, sz, x, y, z, dropInteractionDistance)
 }

@@ -79,6 +79,38 @@ func TestControllerPlayerOffensiveFollowUses3DRange(t *testing.T) {
 	}
 }
 
+// TestControllerPlayerOffensiveFollowRangeIsStrict pins the boundary of the
+// player attack approach: a target exactly at the attack range is out of
+// reach and starts an approach, one unit closer does not.
+func TestControllerPlayerOffensiveFollowRangeIsStrict(t *testing.T) {
+	for _, tc := range []struct {
+		z    int
+		want bool
+	}{
+		{40, true},
+		{39, false},
+	} {
+		self := &playerFollowSelf{}
+		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mover.SetQueue(newMoveClock().q)
+		controller, err := NewController(mover, self, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		following, err := controller.MaybeStartOffensiveFollow(&followTarget{z: tc.z}, 40)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if following != tc.want {
+			t.Fatalf("target %d units away with range 40: MaybeStartOffensiveFollow() = %v, want %v", tc.z, following, tc.want)
+		}
+	}
+}
+
 func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) {
 	tests := []struct {
 		name      string

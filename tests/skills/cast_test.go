@@ -661,6 +661,38 @@ func TestGroundCastShiftOutOfRangeRejected(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestGroundCastRangeIsStrict pins the ground-cast range boundary: a signet
+// point exactly castRange away is out of range, so a shift-click refuses it
+// with the target-too-far message, while one unit closer casts in place.
+func TestGroundCastRangeIsStrict(t *testing.T) {
+	t.Parallel()
+	const castRange = 900
+	srv := gameservertest.Boot(t,
+		gameservertest.WithWantChars(1),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithSkills(skillPersistence(t,
+			[]modelskill.Definition{
+				{
+					ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+					CastRange: castRange, HitTime: 500, StaticHitTime: true, SkillType: "SIGNET",
+				},
+			},
+		)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 5, 1)
+	startInWorld(t, c)
+	x, y, z := srv.PlayerPosition(t, objID)
+
+	c.Send(encodeRequestExMagicSkillUseGround(int32(x+castRange), int32(y), int32(z), 5, false, true))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageTargetTooFar)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(int32(x+castRange-1), int32(y), int32(z), 5, false, true))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "ground cast one unit inside cast range")
+	drainUntilQuiet(t, c)
+}
+
 // TestGroundCastIgnoresNonGroundAndUnknownSkill verifies the ground-cast
 // packet stays silent for a non-ground skill and for an unlearned skill id,
 // matching the reference's silent drops.

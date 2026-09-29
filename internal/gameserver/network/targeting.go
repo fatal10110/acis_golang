@@ -276,7 +276,7 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor,
 func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 	lx, ly, lz := live.Position()
 	px, py, pz := pet.Position()
-	return location.In3DRange(lx, ly, lz, px, py, pz, radius)
+	return location.In3DRadius(lx, ly, lz, px, py, pz, radius)
 }
 
 // finishPetInteract fires once an approach walk started by showOwnedPetStatus

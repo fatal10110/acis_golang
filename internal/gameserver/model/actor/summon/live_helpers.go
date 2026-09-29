@@ -21,7 +21,7 @@ func (a *Actor) ownerWithinFollowRange() bool {
 	}
 	ax, ay, az := a.Position()
 	bx, by, bz := owner.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, 2000)
+	return location.In3DRadius(ax, ay, az, bx, by, bz, 2000)
 }
 
 func feedbackFor(outcome Outcome) Feedback {

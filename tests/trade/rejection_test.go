@@ -99,6 +99,21 @@ func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
 // SendTradeDone failure plus the canceled-trade message — and nothing is
 // transferred.
 func TestConfirmOutOfRangeCancelsTradeForBoth(t *testing.T) {
+	assertConfirmFromDistanceCancels(t, 2*tradeInteractionDistance)
+}
+
+// TestConfirmAtExactInteractionDistanceCancelsTrade pins the boundary of the
+// confirm-time check: the interaction radius is strict, so a partner standing
+// exactly tradeInteractionDistance away is already out of range.
+func TestConfirmAtExactInteractionDistanceCancelsTrade(t *testing.T) {
+	assertConfirmFromDistanceCancels(t, tradeInteractionDistance)
+}
+
+// assertConfirmFromDistanceCancels opens a trade, walks the second trader dx
+// units along X, and asserts that its confirm cancels the trade for both
+// players with nothing transferred.
+func assertConfirmFromDistanceCancels(t *testing.T, dx int32) {
+	t.Helper()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	potions := h.srv.GiveItem(t, h.secondID, 20, 3)
@@ -114,9 +129,8 @@ func TestConfirmOutOfRangeCancelsTradeForBoth(t *testing.T) {
 	assertSystemMessageText(t, h.second.Read(), serverpackets.SystemMessageS1ConfirmedTrade, "TraderOne")
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeTradePressOtherOk, "second TradePressOtherOk")
 
-	// The second trader walks far beyond the interaction radius before
-	// confirming.
-	const farX = spawnX + 2*tradeInteractionDistance
+	// The second trader walks dx units away before confirming.
+	farX := spawnX + dx
 	h.second.Send(encodeMoveBackwardToLocation(farX, spawnY, spawnZ, spawnX, spawnY, spawnZ))
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation")
 	waitForArrival(t, h, h.secondID, farX)

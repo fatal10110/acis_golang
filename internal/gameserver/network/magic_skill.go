@@ -330,7 +330,7 @@ func (l *GameClientLink) groundCastAfterCanCast(live *livePlayer, def modelskill
 func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.RequestMagicSkillUse, selected world.Tracked, castRange int) bool {
 	x, y, z := live.GroundTarget()
 	sx, sy, sz := live.Position()
-	if location.In3DRange(sx, sy, sz, x, y, z, castRange) {
+	if location.In3DRadius(sx, sy, sz, x, y, z, castRange) {
 		return false
 	}
 	if req.ShiftPressed {

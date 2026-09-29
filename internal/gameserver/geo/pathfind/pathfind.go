@@ -637,6 +637,9 @@ func withinSmoothRange(from *node, gx, gy, height int) bool {
 	return withinSmoothRangeFrom(from.gx, from.gy, from.z, gx, gy, height)
 }
 
+// withinSmoothRangeFrom bounds the search's parent-skip smoothing to
+// maxSmoothCells geodata cells. It is a search-cost cap, not a game range
+// gate, so the exact boundary stays inside.
 func withinSmoothRangeFrom(fromGX, fromGY, fromZ, toGX, toGY, toZ int) bool {
 	dx := toGX - fromGX
 	dy := toGY - fromGY

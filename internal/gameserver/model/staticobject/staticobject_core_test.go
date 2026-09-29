@@ -54,6 +54,7 @@ func TestClaimChairRequiresEligibleUserAndChair(t *testing.T) {
 		{"sitting user", testChairUser{}, &testChairObject{typ: ChairType}},
 		{"wrong type", testChairUser{standing: true}, &testChairObject{typ: 2}},
 		{"too far", testChairUser{standing: true}, &testChairObject{x: ChairInteractionDistance + 1, typ: ChairType}},
+		{"exactly at the interaction distance", testChairUser{standing: true}, &testChairObject{x: ChairInteractionDistance, typ: ChairType}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

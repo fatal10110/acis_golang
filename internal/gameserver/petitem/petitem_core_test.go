@@ -102,22 +102,33 @@ func TestGiveToPetChecksCapacityBeforeMutation(t *testing.T) {
 	}
 }
 
+// The give radius is strict: an owner exactly GiveInteractionDistance away
+// is already too far, one unit closer is in range.
 func TestGiveToPetChecksDistanceBeforeMutation(t *testing.T) {
-	templates := testTemplates()
-	playerInv := itemcontainer.NewPlayerInventory(1, templates)
-	petInv := itemcontainer.NewPetInventory(2, templates)
-	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
-	stack := playerInv.AddNew(item.AdenaID, 100, 500)
+	for _, tc := range []struct {
+		ownerX int
+		want   GiveFailure
+	}{
+		{GiveInteractionDistance + 1, GiveTooFar},
+		{GiveInteractionDistance, GiveTooFar},
+		{GiveInteractionDistance - 1, GiveOK},
+	} {
+		templates := testTemplates()
+		playerInv := itemcontainer.NewPlayerInventory(1, templates)
+		petInv := itemcontainer.NewPetInventory(2, templates)
+		pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Inventory: petInv})
+		stack := playerInv.AddNew(item.AdenaID, 100, 500)
 
-	_, failure, err := NewService(nil).GiveToPet(playerInv, petInv, pet, testOwner{x: GiveInteractionDistance + 1}, stack.ObjectID, 30)
-	if err != nil {
-		t.Fatalf("GiveToPet error = %v", err)
-	}
-	if failure != GiveTooFar {
-		t.Fatalf("GiveToPet failure = %v, want too far", failure)
-	}
-	if stack.Count != 100 || petInv.ItemByTemplateID(item.AdenaID) != nil {
-		t.Fatalf("too-far transfer mutated source=%+v petStack=%+v", stack, petInv.ItemByTemplateID(item.AdenaID))
+		_, failure, err := NewService(&testIDs{next: 900}).GiveToPet(playerInv, petInv, pet, testOwner{x: tc.ownerX}, stack.ObjectID, 30)
+		if err != nil {
+			t.Fatalf("owner at %d: GiveToPet error = %v", tc.ownerX, err)
+		}
+		if failure != tc.want {
+			t.Fatalf("owner at %d: GiveToPet failure = %v, want %v", tc.ownerX, failure, tc.want)
+		}
+		if tc.want == GiveTooFar && (stack.Count != 100 || petInv.ItemByTemplateID(item.AdenaID) != nil) {
+			t.Fatalf("owner at %d: too-far transfer mutated source=%+v petStack=%+v", tc.ownerX, stack, petInv.ItemByTemplateID(item.AdenaID))
+		}
 	}
 }
 

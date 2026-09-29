@@ -38,5 +38,5 @@ func ClaimChair(user ChairUser, chair Chair, radius int) bool {
 func inRange(a, b interface{ Position() (int, int, int) }, radius int) bool {
 	ax, ay, az := a.Position()
 	bx, by, bz := b.Position()
-	return location.In3DRange(ax, ay, az, bx, by, bz, radius)
+	return location.In3DRadius(ax, ay, az, bx, by, bz, radius)
 }
