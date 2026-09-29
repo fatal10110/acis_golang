@@ -9,6 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -166,6 +168,75 @@ func TestSummonCastRefusalReachesOwner(t *testing.T) {
 			}
 			if gotMP, gotHP := petActor.MPValue(), petActor.HP(); gotMP != mp || gotHP != hp {
 				t.Fatalf("pet MP/HP = %v/%v after the refusal, want untouched %v/%v", gotMP, gotHP, mp, hp)
+			}
+		})
+	}
+}
+
+// fixturePetWeaponID is a wolf weapon added to the suite catalog: a PET-type
+// weapon, the weapon_type every shipped pet weapon carries.
+const fixturePetWeaponID = int32(9603)
+
+// TestArmedPetCastNeedsAllowedWeapon arms the wolf with a PET weapon in its
+// right hand (Pet.getActiveWeaponItem) and casts the strike under two
+// weaponsAllowed lists (L2Skill.getWeaponDependancy): "PET" matches the held
+// weapon and the strike starts; "DAGGER" does not, and the owner reads
+// S1_CANNOT_BE_USED naming the strike, with no cast and nothing charged.
+func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		allowed string
+		casts   bool
+	}{
+		{name: "pet weapon allowed", allowed: "PET", casts: true},
+		{name: "pet weapon not allowed", allowed: "DAGGER"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			strike := wolfStrike()
+			strike.MPInitialConsume = 5
+			strike.WeaponsAllowed = tc.allowed
+			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), &item.Template{
+				ID: fixturePetWeaponID, Name: "Wolf Weapon", Kind: item.KindWeapon, Slot: item.SlotWolf,
+				Duration: -1, Destroyable: true, DefaultAction: item.ActionEquip,
+				Weapon: &item.WeaponDetail{Type: item.WeaponPet},
+			}))
+			h, petActor, hostile := bootWolfStrikerWith(t, strike, gameservertest.WithItemTemplates(catalog))
+			runOnPetQueue(t, petActor, func() {
+				inv := petActor.PetInventory()
+				inst := inv.AddNew(fixturePetWeaponID, 1, 1_900_000)
+				tmpl, _ := inv.Templates().Get(fixturePetWeaponID)
+				if inst == nil || tmpl == nil {
+					t.Error("pet weapon not added to the pet inventory")
+					return
+				}
+				inv.SetPaperdollItem(itemcontainer.RHand, inst, tmpl)
+			})
+			if got, want := petActor.HeldItemTypeMask(), item.WeaponPet.Mask(); got != want {
+				t.Fatalf("armed pet HeldItemTypeMask = %#x, want the PET weapon bit %#x", got, want)
+			}
+			drainUntilQuiet(t, h.client)
+			mp := petActor.MPValue()
+
+			runOnPetQueue(t, petActor, func() { petActor.TryUseSkill(wolfStrikeSkill, hostile, false) })
+			if tc.casts {
+				frames := readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "armed pet strike MagicSkillUse")
+				requireSkillUseOnto(t, frames, petActor, hostile.ObjectID())
+				if !petActor.CastingNow() {
+					t.Fatal("allowed strike did not leave the pet casting")
+				}
+				drainUntilQuiet(t, h.client)
+				return
+			}
+			assertSummonCastRejected(t, h, petActor, hostile.ObjectID(), func(f []byte) {
+				assertSystemMessageSkill(t, f, serverpackets.SystemMessageS1CannotBeUsed, wolfStrikeSkill, 1)
+			})
+			if petActor.CastingNow() {
+				t.Fatal("refused strike left the pet casting")
+			}
+			if got := petActor.MPValue(); got != mp {
+				t.Fatalf("pet MP = %v after the refusal, want untouched %v", got, mp)
 			}
 		})
 	}
