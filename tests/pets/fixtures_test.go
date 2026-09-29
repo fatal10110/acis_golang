@@ -259,6 +259,24 @@ func (h *petWorld) ownerItemCount(t *testing.T, templateID int32) int {
 	return count
 }
 
+// collarItemCount flushes pending item mutations and sums the stacks of one
+// template saved as the pet's items, under its collar.
+func (h *petWorld) collarItemCount(t *testing.T, templateID int32) int {
+	t.Helper()
+	h.srv.FlushItems(t)
+	rows, err := h.srv.Items.ListByOwner(petCtx(), h.collarID)
+	if err != nil {
+		t.Fatalf("list collar items: %v", err)
+	}
+	count := 0
+	for _, row := range rows {
+		if row.TemplateID == templateID && (row.Location == item.LocationPet || row.Location == item.LocationPetEquip) {
+			count += row.Count
+		}
+	}
+	return count
+}
+
 // syncOnSkillList proves the server ran everything already sent, without
 // disturbing the pending inventory updates a following tick must drain. A
 // full ItemList would not do: its snapshot discards the owner's queued

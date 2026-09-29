@@ -201,17 +201,18 @@ func AssertOwner(q *Queue) {
 // drain, if any, has returned; on a Pool that is the whole batch the drain
 // took, not one task. It is for work that must still run after
 // Post refused it: the queue is closed or its pool is stopping, but tasks it
-// accepted earlier may still be draining. A task must not call it for its
-// own queue.
+// accepted earlier may still be draining. A task may also call it to act as
+// the owner of another queue whose tasks never wait on the caller's. A task
+// must not call it for its own queue.
 func RunOwned(q *Queue, fn func()) { drainAs(q, fn) }
 
 // drainAs runs fn as q's owner: q.draining is held and, under simdebug, the
 // calling goroutine is recorded as q's drainer.
 func drainAs(q *Queue, fn func()) {
 	q.draining.Lock()
-	enterDrain(q)
+	outer := enterDrain(q)
 	defer func() {
-		exitDrain()
+		exitDrain(outer)
 		q.draining.Unlock()
 	}()
 	fn()

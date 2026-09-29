@@ -39,16 +39,17 @@ func (a *Actor) die(killer attackable.Combatant) {
 	a.BroadcastStatus()
 	a.emit(event.Died{})
 	a.idle()
-	if a.owner != nil {
-		a.owner.AwardSummonKillKarma(killer)
+	owner := a.currentOwner()
+	if owner != nil {
+		owner.AwardSummonKillKarma(killer)
 		if a.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
-			a.owner.OfferSummonRevive()
+			owner.OfferSummonRevive()
 		}
 	}
 	a.emit(event.DeathSettled{})
 	// A pet killed inside a PvP zone keeps its experience, unless that zone
 	// is a siege battlefield.
-	if a.isPet && a.owner != nil && (!a.InPvPZone() || a.InSiegeZone()) {
+	if a.isPet && owner != nil && (!a.InPvPZone() || a.InSiegeZone()) {
 		a.applyDeathPenalty()
 	}
 }

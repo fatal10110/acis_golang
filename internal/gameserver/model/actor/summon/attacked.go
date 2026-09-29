@@ -34,7 +34,7 @@ func (a *Actor) NotifyEvaded(attacker attackable.Combatant) {
 // the attacker, is not within twice avoidRadius of it or is out of attack
 // stance, or when the summon is moving, dead or unable to move.
 func (a *Actor) AvoidAttack(attacker attackable.Combatant) {
-	owner := a.owner
+	owner := a.currentOwner()
 	if owner == nil || a.brain == nil {
 		return
 	}

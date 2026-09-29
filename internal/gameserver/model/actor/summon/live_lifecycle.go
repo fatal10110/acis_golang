@@ -80,7 +80,7 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 {
 		return result
 	}
-	if a.ownerInventory == nil || a.ownerInventory.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
+	if inv := a.ownerInv(); inv == nil || inv.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
 		a.despawn(state)
 		result.Unsummoned = true
 		return result
@@ -163,23 +163,21 @@ func (a *Actor) Unsummon() {
 }
 
 // LeaveWithOwner handles this summon's owner leaving the world. A living
-// summon leaves with it. A corpse stays where it lies until its decay removes
-// it, and its owner's session is done with it (event.CorpseLeftBehind): a
-// pet's items and row are settled now, while the owner's inventory is still
-// here to take them, and the corpse's work moves to a queue of its own
-// (AdoptCorpseQueue).
+// summon leaves with it. A corpse stays where it lies, and its owner's
+// session is done with it (event.CorpseLeftBehind): a pet's row is saved now,
+// while its items stay with the corpse, and the corpse's work moves to a
+// queue of its own (AdoptCorpseQueue).
 //
-// A pet's corpse keeps its owner's summon slot, which the owner finds taken
-// again on the next login until the corpse decays. A servitor's corpse gives
-// the slot up, so the owner can summon again at once. A corpse whose owner
-// already left once is not settled again.
-//
-// A corpse with no decay pending, a pet restored dead from its saved row,
-// leaves with its owner like a living summon: nothing would ever remove it,
-// and a corpse left behind cannot be revived by its returning owner (#2680),
-// who could then not summon again until the server restarts.
+// A pet's corpse keeps its owner's summon slot and is handed to the owner's
+// next session when the owner comes back (RelinkOwner); until then its decay
+// still removes it, and its items then go to its offline owner. A pet
+// restored dead from its saved row has no decay pending and so stays until
+// its owner comes back to it. A servitor's corpse gives the slot up, so the
+// owner can summon again at once; one with no decay pending leaves with its
+// owner, since nothing would ever remove it. A corpse whose owner already
+// left is not left again.
 func (a *Actor) LeaveWithOwner() {
-	if !a.Dead() || !a.HasCorpse() {
+	if !a.Dead() || (!a.isPet && !a.HasCorpse()) {
 		a.despawn(nil)
 		return
 	}
@@ -205,7 +203,9 @@ func (a *Actor) ShownAsOwnedBy(playerID int32) bool {
 
 // AdoptCorpseQueue moves the work of a corpse whose owner left onto q, a
 // queue of its own, since the owner's queue closes with the owner's session.
-// Its decay runs there. Nothing else moves: a corpse no longer acts.
+// Its decay runs there. Nothing else moves: a corpse no longer acts, and a
+// pet's corpse moves the rest of its work only when its owner comes back
+// (RelinkOwner).
 func (a *Actor) AdoptCorpseQueue(q *sim.Queue) {
 	a.queue.Store(q)
 }
@@ -246,8 +246,9 @@ func (a *Actor) despawn(state *world.State) bool {
 
 func (a *Actor) resolveRequest(ctx CommandContext) Request {
 	ownerLevel := 0
-	if a.owner != nil {
-		ownerLevel = a.owner.LevelValue()
+	owner := a.currentOwner()
+	if owner != nil {
+		ownerLevel = owner.LevelValue()
 	}
 	a.statusMu.RLock()
 	level, belowUnsummonLimit := a.level, a.belowUnsummonLimit
@@ -263,7 +264,7 @@ func (a *Actor) resolveRequest(ctx CommandContext) Request {
 		IsAttackingNow:         a.IsAttackingNow(),
 		HasTarget:              ctx.Target != nil,
 		TargetIsSummon:         sameObject(ctx.Target, a),
-		TargetIsOwner:          sameObject(ctx.Target, a.owner),
+		TargetIsOwner:          sameObject(ctx.Target, owner),
 		TargetIsDeadCreature:   ctx.TargetIsDeadCreature,
 		IsPassiveSummon:        a.passive,
 		FollowActive:           !a.followOff.Load(),

@@ -91,6 +91,20 @@ func TestBootCleanupRestoresDatabaseIntegrity(t *testing.T) {
 	seedRow(t, db,
 		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 1, 'INVENTORY')", charID, liveItemID)
 
+	// A pet's item, saved under its collar, whose pets row stands; and one
+	// saved under an object id that is nobody's.
+	const collarID = 0x10000003
+	const petItemID = 0x10000004
+	const strayItemID = 0x10000005
+	seedRow(t, db,
+		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 2375, 1, 'INVENTORY')", charID, collarID)
+	seedRow(t, db,
+		"INSERT INTO pets (item_obj_id, name, level, curHp, curMp, exp, sp, fed) VALUES (?, '', 15, 0, 10, 0, 0, 100)", collarID)
+	seedRow(t, db,
+		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", collarID, petItemID)
+	seedRow(t, db,
+		"INSERT INTO items (owner_id, object_id, item_id, count, loc) VALUES (?, ?, 57, 40, 'PET')", 0x10000006, strayItemID)
+
 	// Orphaned by an item row that no longer exists.
 	seedRow(t, db,
 		"INSERT INTO augmentations (item_oid, attributes, skill_id, skill_level) VALUES (57391, 1, 1, 1)")
@@ -124,6 +138,20 @@ func TestBootCleanupRestoresDatabaseIntegrity(t *testing.T) {
 	}
 	if expired != 0 {
 		t.Fatalf("expired reuse timestamps survived boot: %d", expired)
+	}
+
+	var petItems, strayItems int
+	if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE object_id = ?", petItemID).Scan(&petItems); err != nil {
+		t.Fatalf("count pet item: %v", err)
+	}
+	if petItems != 1 {
+		t.Fatal("boot deleted a pet's item saved under its collar")
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM items WHERE object_id = ?", strayItemID).Scan(&strayItems); err != nil {
+		t.Fatalf("count stray item: %v", err)
+	}
+	if strayItems != 0 {
+		t.Fatal("an item row owned by nobody survived boot")
 	}
 
 	var rows int

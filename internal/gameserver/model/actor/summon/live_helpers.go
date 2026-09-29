@@ -15,11 +15,12 @@ func sameObject(a, b world.Tracked) bool {
 }
 
 func (a *Actor) ownerWithinFollowRange() bool {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return false
 	}
 	ax, ay, az := a.Position()
-	bx, by, bz := a.owner.Position()
+	bx, by, bz := owner.Position()
 	return location.In3DRange(ax, ay, az, bx, by, bz, 2000)
 }
 
@@ -60,7 +61,7 @@ func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset loca
 	if state == nil || actor == nil || owner == nil {
 		return
 	}
-	actor.owner = owner
+	actor.bindOwner(owner, actor.ownerInv())
 	actor.world = state
 	x, y, z := owner.Position()
 	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, owner.Heading())

@@ -135,11 +135,12 @@ func TestDecayedPetCorpseTakesItsCollar(t *testing.T) {
 }
 
 // TestPetCorpseLeftByItsOwnerDecaysOffline logs the owner out with a dead
-// pet carrying adena. The pet's adena and its row are settled at once, but
-// its corpse stays where it lay, in view and holding the owner's summon slot,
-// until its 20 minutes are up. It then decays with the owner still away: an
-// observer sees it go, and the collar and the pets row are deleted from the
-// database.
+// pet carrying adena. The pet's row is saved at once, but its adena stays
+// with its corpse, saved under its collar, and the corpse stays where it lay,
+// in view and holding the owner's summon slot, until its 20 minutes are up.
+// It then decays with the owner still away: an observer sees it go, the
+// adena becomes the offline owner's, and the collar and the pets row are
+// deleted from the database.
 func TestPetCorpseLeftByItsOwnerDecaysOffline(t *testing.T) {
 	t.Parallel()
 	decay := newCorpseDecay(t)
@@ -162,8 +163,11 @@ func TestPetCorpseLeftByItsOwnerDecaysOffline(t *testing.T) {
 	if sawDeleteObject(drainFrames(t, observer), pet.ObjectID()) {
 		t.Fatal("observer saw the pet corpse removed at its owner's logout")
 	}
-	if got := h.ownerItemCount(t, item.AdenaID); got != 40 {
-		t.Fatalf("owner adena after logout = %d, want the dead pet's 40 back", got)
+	if got := h.ownerItemCount(t, item.AdenaID); got != 0 {
+		t.Fatalf("owner adena after logout = %d, want the dead pet's 40 left with its corpse", got)
+	}
+	if got := h.collarItemCount(t, item.AdenaID); got != 40 {
+		t.Fatalf("adena saved under the collar after logout = %d, want the dead pet's 40", got)
 	}
 	if got := h.savedPetState(t).CurHP; got != 0 {
 		t.Fatalf("saved dead pet HP = %v, want 0", got)
@@ -187,24 +191,32 @@ func TestPetCorpseLeftByItsOwnerDecaysOffline(t *testing.T) {
 	if got := h.ownerItemCount(t, wolfCollarID); got != 0 {
 		t.Fatalf("offline owner's collar count after decay = %d, want the collar deleted", got)
 	}
+	if got := h.ownerItemCount(t, item.AdenaID); got != 40 {
+		t.Fatalf("offline owner's adena after decay = %d, want the dead pet's 40", got)
+	}
+	if got := h.collarItemCount(t, item.AdenaID); got != 0 {
+		t.Fatalf("adena still saved under the collar after decay = %d, want none", got)
+	}
 	if _, ok, err := h.srv.Pets.Get(context.Background(), h.collarID); err != nil || ok {
 		t.Fatalf("pets row after decay: present=%v err=%v, want it deleted", ok, err)
 	}
 }
 
 // TestPetCorpseWaitsForItsOwnerToComeBack logs the owner out with a dead pet
-// and back in before the corpse decays. The corpse is still the owner's pet:
-// the owner sees its pet window again and cannot call out another summon.
-// When the corpse decays, the new session loses the collar and gets the
+// carrying adena and back in before the corpse decays. The corpse is still
+// the owner's pet, adena and all: the owner sees its pet window and its
+// items again and cannot call out another summon. When the corpse decays,
+// the new session gets the adena back, loses the collar and gets the
 // PetDelete.
 func TestPetCorpseWaitsForItsOwnerToComeBack(t *testing.T) {
 	t.Parallel()
 	decay := newCorpseDecay(t)
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithDecay(decay.task), gameservertest.WithReuseDelays(0, 0),
-	})
+	}, seedItem{TemplateID: item.AdenaID, Count: 40})
 	decay.attach(h.srv.State)
 	pet, _ := h.spawnWolf(t)
+	h.giveToPet(t, h.seededItem(t, item.AdenaID), 40)
 	killPet(t, h, pet)
 
 	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
@@ -219,6 +231,15 @@ func TestPetCorpseWaitsForItsOwnerToComeBack(t *testing.T) {
 	if !sawPetInfo(frames, pet.ObjectID()) {
 		t.Fatal("returning owner got no PetInfo for its pet's corpse")
 	}
+	if !hasOpcode(frames, serverpackets.OpcodePetItemList) {
+		t.Fatal("returning owner got no PetItemList for its pet's corpse")
+	}
+	if got := petItemCount(pet, item.AdenaID); got != 40 {
+		t.Fatalf("corpse carries %d adena after its owner came back, want 40", got)
+	}
+	if got := h.ownerInventory(t).ItemByTemplateID(item.AdenaID); got != nil {
+		t.Fatalf("returning owner holds adena %+v, want it still with the corpse", got.Snapshot())
+	}
 
 	h.client.Send(encodeUseItem(h.collarID, false))
 	assertStaticSystemMessage(t, mustRead(t, h.client, "collar refusal"), serverpackets.SystemMessageSummonOnlyOne)
@@ -232,9 +253,15 @@ func TestPetCorpseWaitsForItsOwnerToComeBack(t *testing.T) {
 	if _, ok := h.srv.State.Summon(h.ownerID); ok {
 		t.Fatal("owner still holds the summon slot after the corpse decayed")
 	}
+	if inst := h.ownerInventory(t).ItemByTemplateID(item.AdenaID); inst == nil || inst.Snapshot().Count != 40 {
+		t.Fatal("returning owner did not get the decayed pet's 40 adena")
+	}
 	h.srv.FlushPersistence(t)
 	if got := h.ownerItemCount(t, wolfCollarID); got != 0 {
 		t.Fatalf("collar count after decay = %d, want the collar destroyed", got)
+	}
+	if got := h.ownerItemCount(t, item.AdenaID); got != 40 {
+		t.Fatalf("owner adena rows after decay = %d, want the pet's 40", got)
 	}
 	if _, ok, err := h.srv.Pets.Get(context.Background(), h.collarID); err != nil || ok {
 		t.Fatalf("pets row after decay: present=%v err=%v, want it deleted", ok, err)
@@ -516,11 +543,13 @@ func (h *petWorld) relogOwner(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 }
 
-// TestPetRestoredDeadLeavesWithItsOwner calls out a wolf whose row was saved
-// dead, as a corpse lost to a restart leaves it. Nothing will ever decay
-// that corpse, so it leaves the world with its owner, and the owner can call
-// the wolf out again after logging back in: it comes back dead from its row.
-func TestPetRestoredDeadLeavesWithItsOwner(t *testing.T) {
+// TestPetRestoredDeadWaitsForItsOwner calls out a wolf whose row was saved
+// dead and whose adena was saved under its collar, as a corpse lost to a
+// restart leaves them. It comes back dead, carrying its adena. No decay is
+// pending for it, so when its owner leaves, the corpse stays in the world,
+// holding the owner's summon slot, until the owner comes back: it is then the
+// owner's pet again, adena and all.
+func TestPetRestoredDeadWaitsForItsOwner(t *testing.T) {
 	t.Parallel()
 	decay := newCorpseDecay(t)
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
@@ -532,31 +561,61 @@ func TestPetRestoredDeadLeavesWithItsOwner(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed pets row: %v", err)
 	}
+	adenaID := h.srv.NewObjectID()
+	if err := h.srv.Items.Create(context.Background(), h.collarID, item.Instance{
+		ObjectID: adenaID, TemplateID: item.AdenaID, OwnerID: h.collarID, Count: 40, Location: item.LocationPet,
+	}); err != nil {
+		t.Fatalf("seed pet adena: %v", err)
+	}
 	wolf, _ := h.spawnWolf(t)
 	if !wolf.Dead() {
 		t.Fatal("wolf saved dead restored alive")
 	}
+	if got := petItemCount(wolf, item.AdenaID); got != 40 {
+		t.Fatalf("restored wolf carries %d adena, want the 40 saved under its collar", got)
+	}
 
 	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelectInfo, "CharSelectInfo")
-	if _, ok := h.srv.State.Object(wolf.ObjectID()); ok {
-		t.Fatal("restored dead wolf stayed in the world after its owner left, with no decay to remove it")
+	if _, ok := h.srv.State.Object(wolf.ObjectID()); !ok {
+		t.Fatal("restored dead wolf left the world with its owner, want it waiting for the owner")
 	}
-	if _, ok := h.srv.State.Summon(h.ownerID); ok {
-		t.Fatal("restored dead wolf still holds its offline owner's summon slot")
+	if obj, ok := h.srv.State.Summon(h.ownerID); !ok || obj.ObjectID() != wolf.ObjectID() {
+		t.Fatal("restored dead wolf gave up its offline owner's summon slot")
 	}
 	decay.passAndTick(t, h.srv, 2*time.Hour)
+	if _, ok := h.srv.State.Object(wolf.ObjectID()); !ok {
+		t.Fatal("restored dead wolf decayed with no decay pending")
+	}
+	if got := h.collarItemCount(t, item.AdenaID); got != 40 {
+		t.Fatalf("adena saved under the collar while the owner is away = %d, want 40", got)
+	}
 
 	h.client.Send(encodeRequestGameStart(0))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeCharSelected, "CharSelected")
 	h.client.Send(encodeEnterWorld())
-	readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
-	drainUntilQuiet(t, h.client)
-
-	again, _ := h.spawnWolf(t)
-	if !again.Dead() {
-		t.Fatal("wolf called out again came back alive, want it restored dead from its row")
+	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "end of the EnterWorld burst")
+	frames = append(frames, drainFrames(t, h.client)...)
+	if !sawPetInfo(frames, wolf.ObjectID()) {
+		t.Fatal("returning owner got no PetInfo for its restored dead wolf")
 	}
+	if wolf.OwnerLeft() {
+		t.Fatal("returning owner's dead wolf still answers to the session that left it")
+	}
+	if got := petItemCount(wolf, item.AdenaID); got != 40 {
+		t.Fatalf("wolf carries %d adena after its owner came back, want 40", got)
+	}
+}
+
+// petItemCount sums the stacks of one template a pet carries.
+func petItemCount(pet *summon.Actor, templateID int32) int {
+	count := 0
+	for _, inst := range pet.PetInventory().Items() {
+		if st := inst.Snapshot(); st.TemplateID == templateID {
+			count += st.Count
+		}
+	}
+	return count
 }
 
 // TestOfflinePetDecaySparesACollarThatChangedHands has an owner come back to

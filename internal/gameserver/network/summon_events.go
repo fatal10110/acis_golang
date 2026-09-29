@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -15,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -26,6 +30,14 @@ type summonSink struct {
 	// attack and arrival events re-evaluate; move is nil without geodata.
 	brain *ai.Summon
 	move  *move.Controller
+	// attack and cast are the summon's attack and cast controllers, whose
+	// timers run on the summon's queue: a pet corpse handed back to its
+	// owner's new session moves them there (relinkToOwner).
+	attack *attack.Controller
+	cast   *actorcast.Controller
+	// corpseQueue is the queue a corpse its owner left behind has of its
+	// own, until the corpse leaves the world or its owner comes back for it.
+	corpseQueue atomic.Pointer[sim.Queue]
 	// cleanupMu guards cleanup and despawned. Registration runs on the
 	// owner's queue while the summon can already be driven to Despawned
 	// from another actor's queue (a hostile Erase, a signet), so the two
@@ -211,6 +223,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.destroyDecayedPet(actor)
 	case event.CorpseLeftBehind:
 		s.leaveCorpseBehind()
+	case event.OwnerRelinked:
+		s.relinkToOwner()
 	case event.AttackFinished:
 		actor.FinishedAttack()
 	case event.CastFinished:
@@ -238,8 +252,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		s.move.BroadcastBlockedCorrection()
 	case event.Unsummoning:
 		if actor.OwnerLeft() {
-			// A corpse its owner left behind was settled when the owner
-			// left (leaveCorpseBehind) and has not acted since.
+			// A corpse its owner left behind has not acted since its row was
+			// saved (leaveCorpseBehind); its items are all that is left to
+			// settle.
+			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
 		}
 		// Recovered like a despawn cleanup: this runs inside the summon's
@@ -272,19 +288,124 @@ func (s *summonSink) broadcastHP() {
 }
 
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world
-// while its corpse stays: a pet's items go back to the owner and its row and
-// collar are saved, as for any other departure (releasePet), and the corpse
-// moves to a queue of its own, which closes when the corpse leaves the world.
-// It runs on the leaving owner's queue, before that queue closes.
+// while its corpse stays: a pet's row and collar are saved, as for any other
+// departure, and its items stay with the corpse until it decays or its owner
+// comes back for it. The corpse moves to a queue of its own, which closes
+// when the corpse leaves the world or its owner comes back. It runs on the
+// leaving owner's queue, before that queue closes.
 func (s *summonSink) leaveCorpseBehind() {
 	l, actor := s.link, s.actor
-	s.runCleanup(func() { l.releasePet(actor) })
+	if actor.IsPet() {
+		var ownerInv *itemcontainer.Inventory
+		if owner, ok := liveSummonOwner(actor); ok {
+			ownerInv = owner.Inventory()
+		}
+		s.runCleanup(func() { l.savePet(actor, ownerInv) })
+	}
 	if l.queues == nil {
 		return
 	}
 	q := l.queues.NewQueue(fmt.Sprintf("corpse-%d", actor.ObjectID()))
+	s.corpseQueue.Store(q)
 	actor.AdoptCorpseQueue(q)
 	s.onDespawn(q.Close)
+}
+
+// relinkToOwner moves the rest of a relinked pet's work onto its owner's
+// queue, which the pet itself already runs on (summon.Actor.RelinkOwner):
+// its attack and cast timers and its offensive-follow ticker, which stopped
+// with the queue of the session that left it. The corpse's own queue then
+// closes. It runs as that queue's owner, as the relink does.
+func (s *summonSink) relinkToOwner() {
+	q := s.actor.Queue()
+	if s.attack != nil {
+		s.attack.SetQueue(q)
+	}
+	if s.cast != nil {
+		s.cast.SetQueue(q)
+	}
+	if s.brain != nil {
+		s.onDespawn(s.brain.StartOffensiveFollowTicker(q))
+	}
+	if corpse := s.corpseQueue.Swap(nil); corpse != nil {
+		corpse.Close()
+	}
+}
+
+// reclaimPetCorpse hands the pet corpse live's character left behind, if
+// any, back to live: the corpse answers to live from then on and its work
+// runs on live's queue. It runs on live's queue, so a logout of live cannot
+// interleave with it, and takes over the corpse's own queue for the relink,
+// so none of the corpse's work (its decay) runs meanwhile; work posted there
+// earlier runs first, and work posted since moves on to live's queue.
+// Nothing on a corpse's queue waits on its owner's, so taking it over from
+// here cannot deadlock.
+func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
+	if l.world == nil {
+		return
+	}
+	obj, ok := l.world.Summon(live.ObjectID())
+	if !ok {
+		return
+	}
+	actor, ok := obj.(*summon.Actor)
+	if !ok || !actor.IsPet() || !actor.OwnerLeft() {
+		return
+	}
+	corpse := actor.Queue()
+	if corpse == nil {
+		return
+	}
+	sim.RunOwned(corpse, func() {
+		actor.RelinkOwner(live, live.Inventory(), live.Queue())
+	})
+}
+
+// settleLeftCorpseItems hands the items of a pet corpse its owner left
+// behind to that owner as the corpse decays. An owner back in the world
+// whose session has not taken the corpse over yet gets them in its
+// inventory, on its own queue, as for any other departure (releasePet).
+// Otherwise the owner is offline: every item becomes a row of the owner's
+// carried inventory, without a capacity check or a stack merge, since the
+// inventory of a session that left holds nothing; the owner's next login
+// merges the stacks. The rows are written on the owner's persistence lane,
+// ahead of the collar delete the decay queues next.
+func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
+	petInv := actor.PetInventory()
+	if petInv == nil {
+		return
+	}
+	ownerID := actor.OwnerID()
+	offline := func() {
+		// The pet's container stops persisting first, so the items leave
+		// it carrying no writer; the owner's rows are written below.
+		l.flushItemPersistence(petInv)
+		carried := itemcontainer.NewPlayerInventory(ownerID, petInv.Templates())
+		for _, inst := range petInv.Items() {
+			st := inst.Snapshot()
+			petInv.TransferItem(st.ObjectID, st.Count, carried, 0)
+		}
+		l.flushItemPersistence(carried)
+	}
+	owner, ok := l.livePlayerByID(ownerID)
+	if !ok {
+		offline()
+		return
+	}
+	// A session on its way out has queued its inventory's last writes by
+	// the time it is marked detached or its queue refuses this: the owner is
+	// offline then.
+	posted := postLive(owner, func() {
+		if owner.detached() {
+			offline()
+			return
+		}
+		l.transferPetInventory(actor, owner.Inventory())
+		l.flushItemPersistence(petInv)
+	})
+	if !posted {
+		offline()
+	}
 }
 
 // currentSummonOwner returns the connected player actor answers to. That is
@@ -333,10 +454,12 @@ type petRowDeleter interface {
 // are already back with its owner and its row was saved; the delete is queued
 // on the collar's persistence lane, behind that save.
 //
-// A corpse whose owner left was settled when the owner left. The collar then
-// goes from the owner's current session, on that session's queue, or, with
-// the owner offline, straight from the items table on the owner's lane,
-// behind the rows the owner's logout wrote.
+// A corpse whose owner left had its row saved when the owner left, and its
+// items went to the owner as it left the world (settleLeftCorpseItems). The
+// collar then goes from the owner's current session, on that session's queue,
+// behind the items, or, with the owner offline, straight from the items table
+// on the owner's lane, behind the rows the owner's logout and the items
+// wrote.
 func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 	itemObjectID := actor.ControlItemID()
 	switch owner, ok := l.currentSummonOwner(actor); {
@@ -402,12 +525,10 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
-// arrives when its owner leaves it behind (leaveCorpseBehind), with its
-// corpse's decay while its owner is still here, or after dying mid-despawn.
-// Its container
-// is keyed by an object id no later summon reuses, so items left in it would
-// be lost for good, and skipping the row would restore it alive from an
-// older save.
+// arrives with its corpse's decay while its owner is here, or after dying
+// mid-despawn. Its items go to the owner now, since the collar goes with the
+// decay, and skipping the row would restore it alive from an older save. A
+// corpse its owner left behind is settled apart (settleLeftCorpseItems).
 func (l *GameClientLink) releasePet(actor *summon.Actor) {
 	if !actor.IsPet() {
 		return

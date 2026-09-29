@@ -16,10 +16,11 @@ var (
 
 // OwnerObject returns the controlling player's world object.
 func (a *Actor) OwnerObject() (world.Tracked, bool) {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return nil, false
 	}
-	return a.owner, true
+	return owner, true
 }
 
 // RandomConfusionTarget returns a random confusion target known within

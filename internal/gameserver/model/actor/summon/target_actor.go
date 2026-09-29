@@ -57,7 +57,7 @@ func (a *Actor) AttackableBy(attacker skilltarget.Actor) bool {
 // not applied: that state is not tracked yet, the same as for a player
 // target.
 func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
-	if caster == nil || a.owner == nil || actingPlayerID(caster) == a.owner.ObjectID() {
+	if owner := a.currentOwner(); caster == nil || owner == nil || actingPlayerID(caster) == owner.ObjectID() {
 		return false
 	}
 	if a.InPvPZone() && inPvPZone(caster) {

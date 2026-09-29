@@ -60,10 +60,11 @@ func (a *Actor) Kind() actor.Kind { return actor.KindSummon }
 
 // OwnerID returns the owning player's world object id.
 func (a *Actor) OwnerID() int32 {
-	if a.owner == nil {
+	owner := a.currentOwner()
+	if owner == nil {
 		return 0
 	}
-	return a.owner.ObjectID()
+	return owner.ObjectID()
 }
 
 // OwnerStillLinked reports whether the owner still identifies this summon as
@@ -107,10 +108,14 @@ func (a *Actor) UpdateStatus() {
 // then persists the item through the inventory pipeline. A matching
 // enchant is a no-op.
 func (a *Actor) SyncControlItemEnchant() bool {
-	if a == nil || !a.isPet || a.ownerInventory == nil || a.controlItemID == 0 {
+	if a == nil || !a.isPet || a.controlItemID == 0 {
 		return false
 	}
-	inst := a.ownerInventory.ItemByObjectID(a.controlItemID)
+	inv := a.ownerInv()
+	if inv == nil {
+		return false
+	}
+	inst := inv.ItemByObjectID(a.controlItemID)
 	if inst == nil {
 		return false
 	}
@@ -119,7 +124,7 @@ func (a *Actor) SyncControlItemEnchant() bool {
 		return false
 	}
 	a.emit(event.OwnerInfoChanged{})
-	return a.ownerInventory.SetEnchantLevel(inst, level)
+	return inv.SetEnchantLevel(inst, level)
 }
 
 func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
@@ -226,7 +231,11 @@ func (a *Actor) ExpType() int {
 // CanReceiveKillReward reports whether this pet meets the reference's
 // maximum-experience, life, and owner-distance reward gate.
 func (a *Actor) CanReceiveKillReward(partyRange int) bool {
-	if a == nil || !a.isPet || a.Dead() || a.owner == nil {
+	if a == nil || !a.isPet || a.Dead() {
+		return false
+	}
+	owner := a.currentOwner()
+	if owner == nil {
 		return false
 	}
 	a.statusMu.RLock()
@@ -242,7 +251,7 @@ func (a *Actor) CanReceiveKillReward(partyRange int) bool {
 		return false
 	}
 	ax, ay, az := a.Position()
-	ox, oy, oz := a.owner.Position()
+	ox, oy, oz := owner.Position()
 	return location.In3DRange(ax, ay, az, ox, oy, oz, partyRange)
 }
 
@@ -423,7 +432,7 @@ func (a *Actor) SiegeSummon() bool {
 }
 
 // SummonOwner returns this summon's owning player.
-func (a *Actor) SummonOwner() Owner { return a.owner }
+func (a *Actor) SummonOwner() Owner { return a.currentOwner() }
 
 // UnSummon despawns this summon as an owner-directed removal, matching
 // Java's Summon.unSummon(Player owner) (this actor already knows its own
@@ -549,8 +558,8 @@ func (a *Actor) CanUseSkill() bool {
 		return true
 	}
 	ownerLevel := 0
-	if a.owner != nil {
-		ownerLevel = a.owner.LevelValue()
+	if owner := a.currentOwner(); owner != nil {
+		ownerLevel = owner.LevelValue()
 	}
 	return a.Level()-ownerLevel <= 20
 }
@@ -584,7 +593,8 @@ func (a *Actor) OutOfControl() bool {
 // InCombat reports the owner's attack-stance state, matching
 // Summon.isInCombat (Summon.java:302-305): _owner != null && _owner.isInCombat().
 func (a *Actor) InCombat() bool {
-	return a.owner != nil && a.owner.InCombat()
+	owner := a.currentOwner()
+	return owner != nil && owner.InCombat()
 }
 
 // IsAttackingNow reports whether this summon's own attack cycle is
@@ -663,10 +673,11 @@ func (a *Actor) goIdle() {
 // idleFollow is who an idle summon follows: its owner while follow is on,
 // otherwise nil.
 func (a *Actor) idleFollow() attackable.Combatant {
-	if a.followOff.Load() || a.owner == nil {
+	owner := a.currentOwner()
+	if a.followOff.Load() || owner == nil {
 		return nil
 	}
-	return a.owner
+	return owner
 }
 
 // FinishedAttack moves the attached AI on once a swing ends: to the queued
@@ -754,7 +765,7 @@ func (a *Actor) setFollowStatus(follow bool) {
 		return
 	}
 	a.setIntent(IntentFollowOwner)
-	a.TryToFollow(a.owner)
+	a.TryToFollow(a.currentOwner())
 }
 
 // idle cancels the attached AI's current intention without falling back to

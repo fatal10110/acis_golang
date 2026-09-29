@@ -33,6 +33,12 @@ type PetCorpseDecayed struct{}
 // state.
 type CorpseLeftBehind struct{}
 
+// OwnerRelinked reports that a pet corpse its owner left behind now answers
+// to the owner's new session and its work runs on that session's queue: the
+// runtime moves the rest of the pet's work there and gives up the queue the
+// corpse had of its own.
+type OwnerRelinked struct{}
+
 // DecayCanceled reports that a summon's pending corpse decay, if any, is
 // dropped: it was revived, or is about to be.
 type DecayCanceled struct{}
@@ -44,4 +50,5 @@ func (Unsummoning) event()      {}
 func (SummonRemoved) event()    {}
 func (PetCorpseDecayed) event() {}
 func (CorpseLeftBehind) event() {}
+func (OwnerRelinked) event()    {}
 func (DecayCanceled) event()    {}
