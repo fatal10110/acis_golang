@@ -79,17 +79,3 @@ func TestHostileTakeDamageWithoutDamagePermissionStillRollsCastBreak(t *testing.
 		t.Fatalf("cast-break rolls = %+v, want [%+v]", c.rolls, want)
 	}
 }
-
-// TestHostileKillingHitDrawsNoCastBreakRoll pins that a killing auto-attack
-// hit rolls no cast break: the death has already ended the cast.
-func TestHostileKillingHitDrawsNoCastBreakRoll(t *testing.T) {
-	h, c := newCastingHostile(t)
-	attacker := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 10, HPMax: 500})
-
-	if !h.TakeDamage(100_000, attacker) {
-		t.Fatal("TakeDamage(100000) did not kill the NPC")
-	}
-	if len(c.rolls) != 0 {
-		t.Fatalf("cast-break rolls = %+v after a killing hit, want none", c.rolls)
-	}
-}

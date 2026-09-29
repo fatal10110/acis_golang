@@ -991,18 +991,23 @@ func (s hitLandedLog) Emit(e event.Event) {
 // the target's max HP), heals ABSORB_DAMAGE_PERCENT of the damage, the
 // target's cast-break roll runs, and only then do the procs run. A bow
 // neither reflects nor absorbs; an invulnerable target reflects nothing and
-// rolls no break; a raid-related target reflects nothing onto a player more
-// than 8 levels above it.
+// rolls no break; a raid-related target reflects nothing onto a player, or
+// a summon whose owner is, more than 8 levels above it, while an NPC, which
+// attacks for no player, is always reflected; a target the hit killed rolls
+// no break.
 func TestControllerReflectAbsorbOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
+		attacker    string // "player" (default), "summon" or "npc"
 		weapon      item.WeaponType
 		damage      int
 		reflect     float64
 		maxHP       float64
 		invul       bool
 		raid        bool
+		killed      bool
 		playerLevel int
+		ownerLevel  int
 		want        []string
 	}{
 		{
@@ -1029,27 +1034,64 @@ func TestControllerReflectAbsorbOrder(t *testing.T) {
 			name: "raid 9 levels below", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 29,
 			want: []string{"damage", "absorb 29.7", "status", "landed reflected=false"},
 		},
+		{
+			name: "target killed by the hit", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, killed: true,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "status", "landed reflected=true"},
+		},
+		{
+			name: "summon, owner 8 levels above raid", attacker: "summon", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 70, ownerLevel: 28,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "landed reflected=true"},
+		},
+		{
+			name: "summon, owner 9 levels above raid", attacker: "summon", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 1, ownerLevel: 29,
+			want: []string{"damage", "absorb 29.7", "landed reflected=false"},
+		},
+		{
+			name: "npc on raid", attacker: "npc", weapon: item.WeaponSword, damage: 99, reflect: 10, maxHP: 1000, raid: true, playerLevel: 80,
+			want: []string{"damage", "reflected 9 from 2", "absorb 29.7", "landed reflected=true"},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actor := &timingPlayer{timingActor: timingActor{
-				attackType: tc.weapon,
-				level:      tc.playerLevel,
-				stats:      map[stat.Stat]float64{stat.AbsorbDamagePercent: 30},
-			}}
-			ctrl := NewPlayer(actor, hitLandedLog{events: &actor.events})
+			setup := func(a *timingActor) *[]string {
+				a.attackType = tc.weapon
+				a.level = tc.playerLevel
+				a.stats = map[stat.Stat]float64{stat.AbsorbDamagePercent: 30}
+				return &a.events
+			}
+			var (
+				ctrl   *Controller
+				events *[]string
+			)
+			switch tc.attacker {
+			case "summon":
+				actor := &timingSummon{owner: &timingActor{level: tc.ownerLevel}}
+				events = setup(&actor.timingActor)
+				ctrl = NewPlayable(actor, hitLandedLog{events: events})
+			case "npc":
+				actor := &timingActor{}
+				events = setup(actor)
+				ctrl = NewAttackable(actor, hitLandedLog{events: events})
+			default:
+				actor := &timingPlayer{}
+				events = setup(&actor.timingActor)
+				ctrl = NewPlayer(actor, hitLandedLog{events: events})
+			}
 			target := &reflectTarget{
 				timingTarget: timingTarget{id: 2, invul: tc.invul, raidRelated: tc.raid},
 				level:        20,
 				stats:        map[stat.Stat]float64{stat.ReflectDamagePercent: tc.reflect},
 				maxHP:        tc.maxHP,
-				events:       &actor.events,
+				events:       events,
 			}
-			target.onDamage = func() { actor.events = append(actor.events, "damage") }
+			target.onDamage = func() {
+				*events = append(*events, "damage")
+				target.dead = tc.killed
+			}
 
 			ctrl.deliverHit(Hit{Target: target, Damage: tc.damage})
 
-			if !slices.Equal(actor.events, tc.want) {
-				t.Fatalf("hit steps =\n%q\nwant\n%q", actor.events, tc.want)
+			if !slices.Equal(*events, tc.want) {
+				t.Fatalf("hit steps =\n%q\nwant\n%q", *events, tc.want)
 			}
 		})
 	}

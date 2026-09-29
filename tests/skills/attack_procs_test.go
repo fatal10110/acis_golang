@@ -372,14 +372,32 @@ func TestWeaponOnMagicSkillIgnoresOtherKind(t *testing.T) {
 	catalog := procWeaponCatalog(t, func(w *item.WeaponDetail) {
 		w.OnCastSkill = &item.SkillTrigger{Skill: item.SkillRef{ID: onGoodTriggered, Level: 1}, Chance: -1}
 	})
-	// The magic resist and magic critical rolls lose, so the MDAM lands.
-	srv, c, objID := bootArmed(t, catalog, func(n int) int {
-		if n == 100 {
-			return 0
-		}
-		return n - 1
-	}, []int32{fixtureSwordID}, mdamSkill)
+	srv, c, objID := bootArmed(t, catalog, mdamLandsRoll, []int32{fixtureSwordID}, mdamSkill)
 	hostile := spawnReflector(t, srv, objID, 0)
+	landMDAM(t, srv, objID, hostile)
+
+	if ids := systemMessageIDs(queueFrames(t, c)); slices.Contains(ids, int32(serverpackets.SystemMessageS1HasBeenActivated)) {
+		t.Fatalf("offensive cast set off a good on-magic skill: %v", ids)
+	}
+	if slices.Contains(liveHeldSkillIDs(t, srv, objID), onGoodTriggered) {
+		t.Fatal("offensive cast landed the good on-magic skill")
+	}
+}
+
+// mdamLandsRoll wins every chance roll (out of 100) and loses the magic
+// resist and magic critical rolls, so an MDAM lands as a plain hit.
+func mdamLandsRoll(n int) int {
+	if n == 100 {
+		return 0
+	}
+	return n - 1
+}
+
+// landMDAM targets hostile and returns once the player's MDAM has landed on
+// it and the server has settled.
+func landMDAM(t *testing.T, srv *gameservertest.Server, objID int32, hostile *npc.Hostile) {
+	t.Helper()
+	c := srv.Client
 	full := hostile.CurrentHP()
 	px, py, pz := srv.PlayerPosition(t, objID)
 	c.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
@@ -387,11 +405,50 @@ func TestWeaponOnMagicSkillIgnoresOtherKind(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(mdamSkill, false, false))
 	srv.AdvanceUntil(t, "MDAM lands", func() bool { return hostile.CurrentHP() < full })
 	srv.Settle(t)
+}
 
-	if ids := systemMessageIDs(queueFrames(t, c)); slices.Contains(ids, int32(serverpackets.SystemMessageS1HasBeenActivated)) {
-		t.Fatalf("offensive cast set off a good on-magic skill: %v", ids)
-	}
-	if slices.Contains(liveHeldSkillIDs(t, srv, objID), onGoodTriggered) {
-		t.Fatal("offensive cast landed the good on-magic skill")
+// TestWeaponOnMagicOffensiveSkillNeedsItsLandingRoll: an offensive on-magic
+// weapon skill fires on the player's offensive MDAM only once its own
+// landing roll on the monster wins. onOffensiveTriggered lands at a fixed
+// 100%: the player is told S1_HAS_BEEN_ACTIVATED and the monster holds the
+// debuff. unlandableDebuff lands at a fixed 0%: no message, no debuff.
+func TestWeaponOnMagicOffensiveSkillNeedsItsLandingRoll(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		weapon int32
+		fires  bool
+	}{
+		{"landing roll wins", onOffensiveTriggered, true},
+		{"landing roll loses", unlandableDebuff, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			catalog := procWeaponCatalog(t, func(w *item.WeaponDetail) {
+				w.OnCastSkill = &item.SkillTrigger{Skill: item.SkillRef{ID: tc.weapon, Level: 1}, Chance: 5}
+			})
+			srv, c, objID := bootArmed(t, catalog, mdamLandsRoll, []int32{fixtureSwordID}, mdamSkill)
+			hostile := spawnReflector(t, srv, objID, 0)
+			landMDAM(t, srv, objID, hostile)
+			frames := queueFrames(t, c)
+
+			activated := slices.IndexFunc(frames, func(f []byte) bool {
+				return f[0] == serverpackets.OpcodeSystemMessage &&
+					wireReader(f[1:]).ReadInt32() == serverpackets.SystemMessageS1HasBeenActivated
+			})
+			held := holds(hostile.EffectList().All(), int(tc.weapon))
+			if !tc.fires {
+				if activated >= 0 || held {
+					t.Fatalf("lost landing roll still fired the on-magic skill: message at %d, monster holds it %v", activated, held)
+				}
+				return
+			}
+			if activated < 0 {
+				t.Fatalf("no S1_HAS_BEEN_ACTIVATED among %v", systemMessageIDs(frames))
+			}
+			assertSystemMessageSkillFrame(t, frames[activated], serverpackets.SystemMessageS1HasBeenActivated, tc.weapon, 1)
+			if !held {
+				t.Fatalf("hostile effects = %v, want the on-magic %d debuff", hostile.EffectList().All(), tc.weapon)
+			}
+		})
 	}
 }
