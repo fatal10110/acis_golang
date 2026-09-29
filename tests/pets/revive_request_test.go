@@ -29,6 +29,13 @@ const petResurrectSkillID = 1016
 // resurrection, which takes any dead playable, a pet included.
 func petResurrectionTable(t *testing.T) *skillstate.Persistence {
 	t.Helper()
+	return petResurrectionTableWithPower(t, 100)
+}
+
+// petResurrectionTableWithPower is petResurrectionTable with a resurrection
+// of the given power.
+func petResurrectionTableWithPower(t *testing.T, power float32) *skillstate.Persistence {
+	t.Helper()
 	db := sqltest.SharedDB(t)
 	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
 		{
@@ -39,7 +46,7 @@ func petResurrectionTable(t *testing.T) *skillstate.Persistence {
 		{
 			ID: petResurrectSkillID, Level: 1, Activation: modelskill.ActivationActive,
 			Target: modelskill.TargetCorpsePlayer, SkillType: "RESURRECT",
-			CastRange: 400, HitTime: 500, StaticHitTime: true, Power: 100,
+			CastRange: 400, HitTime: 500, StaticHitTime: true, Power: power,
 		},
 	}), gamesql.NewCharacterSkillStore(db))
 }
@@ -178,16 +185,17 @@ func TestForeignPetResurrectionAsksItsOwner(t *testing.T) {
 		assertRefusal(t, s.healer, serverpackets.SystemMessageMasterCannotRes)
 		assertNoConfirmDlg(t, s.h.client, "owner offer while the pet's is open")
 
-		// Accepting the pet's offer closes it. Summon revival is not
-		// modeled yet (#2679), so the pet stays dead, and a new
-		// resurrection on it reaches the owner as a fresh offer.
+		// Accepting the pet's offer revives the pet and closes the offer:
+		// once the pet dies again, a new resurrection on it reaches the
+		// owner as a fresh offer.
 		drainUntilQuiet(t, s.healer)
 		s.h.client.Send(encodePetDlgAnswer(serverpackets.ConfirmDlgResurrectionRequest, 1))
 		s.h.srv.Settle(t)
-		if !s.pet.Dead() {
-			t.Fatal("accepting the pet's offer revived the pet")
+		if s.pet.Dead() {
+			t.Fatal("accepting the pet's offer left the pet dead")
 		}
-		drainUntilQuiet(t, s.h.client)
+		killPet(t, s.h, s.pet)
+		drainUntilQuiet(t, s.healer)
 		s.resurrect(t, s.pet.ObjectID())
 		readResurrectionOffer(t, s.h.client, "Healer")
 		for _, f := range drainFrames(t, s.healer) {

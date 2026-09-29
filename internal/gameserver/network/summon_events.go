@@ -199,6 +199,12 @@ func (s *summonSink) Emit(ev event.Event) {
 		if l.decay != nil {
 			actor.SetCorpseDeadline(l.decay.Add(actor, actor.DecayDelay()))
 		}
+	case event.Revived:
+		l.broadcastSummon(actor, func() wire.Frame { return serverpackets.FrameRevive(actor.ObjectID()) })
+	case event.DecayCanceled:
+		if l.decay != nil {
+			l.decay.Cancel(actor)
+		}
 	case event.PetCorpseDecayed:
 		l.destroyDecayedPet(actor)
 	case event.CorpseLeftBehind:

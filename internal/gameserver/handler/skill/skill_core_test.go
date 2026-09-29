@@ -3691,6 +3691,50 @@ func TestResurrectByNonPlayerRevivesOutright(t *testing.T) {
 	}
 }
 
+// reviveFakeSummon records how a resurrection reached a summon.
+type reviveFakeSummon struct {
+	world.Presence
+	fakeActor
+	outright []float64
+	direct   []float64
+}
+
+func (*reviveFakeSummon) Kind() actor.Kind { return actor.KindSummon }
+func (s *reviveFakeSummon) ResurrectOutright(power float64) {
+	s.outright = append(s.outright, power)
+}
+
+func (s *reviveFakeSummon) ReviveRestoringExp(power float64) bool {
+	s.direct = append(s.direct, power)
+	return true
+}
+
+// TestResurrectByNonPlayerRevivesSummonOnItsQueue: any other caster hands a
+// dead summon its revive, at the WIT-scaled power, through the summon's own
+// queued resurrection (which drops the decay first), and asks nobody.
+func TestResurrectByNonPlayerRevivesSummonOnItsQueue(t *testing.T) {
+	registry := NewDefaultRegistry()
+	caster := &reviveFakeCaster{kind: actor.KindNPC, wit: 30}
+	s := &reviveFakeSummon{}
+	p := &reviveFakeTarget{}
+
+	registry.Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "RESURRECT", Power: 40},
+		Targets: []Actor{s, p},
+	})
+	want := formulas.RevivePower(statbonus.WITBonus[30], 40)
+	if len(s.outright) != 1 || s.outright[0] != want {
+		t.Fatalf("summon outright resurrections = %v, want [%v]", s.outright, want)
+	}
+	if len(s.direct) != 0 {
+		t.Fatalf("summon revived off its queue at %v, want only the queued resurrection", s.direct)
+	}
+	if len(p.offers) != 0 || p.restoredPercent != want {
+		t.Fatalf("player offers = %+v, restore percent = %v; want no offer and %v", p.offers, p.restoredPercent, want)
+	}
+}
+
 func TestResurrectWithoutCasterIsNoop(t *testing.T) {
 	registry := NewDefaultRegistry()
 	a := &reviveFakeTarget{}

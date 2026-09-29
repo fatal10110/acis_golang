@@ -77,22 +77,28 @@ func (c *Character) OfferSummonRevive() {
 // offer (1 accepts). Nothing happens without an offer, or while whoever the
 // offer is for is no longer dead; the offer then stays open. Declining uses
 // up this character's own Phoenix Blessing. Accepting an offer for this
-// character restores the offer's share of the lost exp and revives it.
-// Either way the offer is then closed.
+// character restores the offer's share of the lost exp and revives it;
+// accepting one for its pet revives the pet the same way. Either way the
+// offer is then closed.
 //
-// Accepting an offer for the pet closes it without reviving the pet: summon
-// revival is not modeled yet (#2679).
+// The pet is revived once the offer is closed and reviveMu released: a
+// revived pet closes its owner's offer itself (ClearReviveOffer).
 func (c *Character) ReviveAnswer(answer int32) {
 	c.reviveMu.Lock()
-	defer c.reviveMu.Unlock()
 	if !c.reviveRequested {
+		c.reviveMu.Unlock()
 		return
 	}
+	var pet reviveSummon
 	if c.revivePet {
-		if summon, ok := c.summonActor(); ok && !summon.Dead() {
+		summon, ok := c.summonActor()
+		if ok && !summon.Dead() {
+			c.reviveMu.Unlock()
 			return
 		}
+		pet = summon
 	} else if !c.dead.Load() {
+		c.reviveMu.Unlock()
 		return
 	}
 
@@ -106,13 +112,35 @@ func (c *Character) ReviveAnswer(answer int32) {
 			c.revive()
 		}
 	}
+	power := c.revivePower
 	c.reviveRequested, c.revivePower = false, 0
+	c.reviveMu.Unlock()
+
+	if answer != 1 || pet == nil {
+		return
+	}
+	if power != 0 {
+		pet.ReviveRestoringExp(power)
+	} else {
+		pet.Revive()
+	}
 }
 
-// reviveSummon is the part of a summon a resurrection offer reads.
+// ClearReviveOffer closes this character's pending resurrection offer, if
+// any.
+func (c *Character) ClearReviveOffer() {
+	c.reviveMu.Lock()
+	c.reviveRequested, c.revivePower = false, 0
+	c.reviveMu.Unlock()
+}
+
+// reviveSummon is the part of a summon a resurrection offer reads and an
+// accepted one revives.
 type reviveSummon interface {
 	Dead() bool
 	EffectList() *effect.List
+	Revive() bool
+	ReviveRestoringExp(power float64) bool
 }
 
 // summonActor returns c's summon in the world, dead or alive.
