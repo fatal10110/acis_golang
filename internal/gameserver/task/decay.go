@@ -116,9 +116,24 @@ func (d *Decay) Tick() error {
 
 	d.cancelUnlinkedSummons()
 	d.tickDue(d.now(), func(actor DecayActor) {
-		actor.Queue().Post(func() { d.effects.Decay(actor) })
+		postToCurrentQueue(actor, func() { d.effects.Decay(actor) })
 	})
 	return nil
+}
+
+// postToCurrentQueue runs job on actor's queue. A corpse whose owner leaves
+// moves to a queue of its own before the owner's queue closes, so a post the
+// queue read first refuses goes to the one actor has moved to: the entry is
+// already gone, and dropping the job would leave the corpse in the world for
+// good.
+func postToCurrentQueue(actor DecayActor, job func()) {
+	q := actor.Queue()
+	if q.Post(job) {
+		return
+	}
+	if moved := actor.Queue(); moved != q {
+		moved.Post(job)
+	}
 }
 
 func (d *Decay) cancelUnlinkedSummons() {

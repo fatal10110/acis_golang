@@ -28,7 +28,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case *npc.Decoration:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
-		if o.OwnerID() == p.ObjectID() {
+		if o.ShownAsOwnedBy(p.ObjectID()) {
 			o.MarkDiscoveredByOwner()
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
@@ -113,7 +113,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 	}
 	l.world.ForEachKnown(a, func(obj world.Tracked) {
 		p, ok := obj.(*livePlayer)
-		if !ok || p.ObjectID() == a.OwnerID() {
+		if !ok || a.ShownAsOwnedBy(p.ObjectID()) {
 			return
 		}
 		if snap, ok := summonInfoSnapshot(a, p, p.npcs); ok {
@@ -124,7 +124,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 
 func (p *livePlayer) Forget(obj world.Tracked) {
 	if o, ok := obj.(*summon.Actor); ok {
-		if o.OwnerID() == p.ObjectID() {
+		if o.ShownAsOwnedBy(p.ObjectID()) {
 			p.petSightings.Add(1)
 		}
 	}

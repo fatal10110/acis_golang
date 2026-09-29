@@ -26,6 +26,9 @@ type CombatStats struct {
 	AttackRange                  int
 	AttackSpeed                  float64
 	CritRate                     float64
+	// HPRegen and MPRegen are the npc template's base regeneration per
+	// tick. A pet's growth rows carry regen values too, which nothing reads.
+	HPRegen, MPRegen float64
 }
 
 // PhysicalAttackSpeed returns this summon's physical attack speed from its NPC template.

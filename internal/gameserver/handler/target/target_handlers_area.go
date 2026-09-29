@@ -28,17 +28,59 @@ func (areaHandler) FinalTarget(caster, target Actor, _ *modelskill.Definition) A
 	return target
 }
 
-func (h areaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
+func (areaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
+	return areaCastRejection(caster, target, skill, ctrl) == CastRejectNone
+}
+
+// areaCastRejection gates an offensive area skill on its aimed target: a
+// playable the caster may not hit offensively, or a target it may not attack
+// (without a forced attack, unless CTRL is held), is an invalid target.
+func areaCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	if skill == nil || !skill.Offensive {
-		return true
+		return CastRejectNone
 	}
-	if h.FinalTarget(caster, target, skill) == nil {
-		return false
+	if !aimedAreaTarget(caster, target) {
+		return CastRejectSilent
 	}
+	if isPlayable(target) && !caster.CanCastOnPlayable(target, skill, ctrl, true) {
+		return CastRejectInvalidTarget
+	}
+	return aimedAttackRejection(caster, target, ctrl)
+}
+
+// frontAreaCastRejection is areaCastRejection without the playable policy
+// check.
+func frontAreaCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
+	if skill == nil || !skill.Offensive {
+		return CastRejectNone
+	}
+	if !aimedAreaTarget(caster, target) {
+		return CastRejectSilent
+	}
+	return aimedAttackRejection(caster, target, ctrl)
+}
+
+// aimedAreaTarget reports a target an aimed area skill can center on: a
+// living creature other than the caster. Anything else has no final target
+// and is dropped before any condition message.
+func aimedAreaTarget(caster, target Actor) bool {
+	return target != nil && !sameCreature(caster, target) && !target.Dead()
+}
+
+// aimedAttackRejection refuses a target the caster may not attack, or may
+// not attack without a forced attack unless CTRL is held. The forced-attack
+// relation is judged against the caster's acting player, so a summon's cast
+// follows its owner's.
+func aimedAttackRejection(caster, target Actor, ctrl bool) CastRejection {
 	if !target.AttackableBy(caster) {
-		return false
+		return CastRejectInvalidTarget
 	}
-	return ctrl || target.AttackableWithoutForceBy(caster)
+	if !ctrl {
+		if player, _ := actingPlayerOf(caster); !target.AttackableWithoutForceBy(player) {
+			return CastRejectInvalidTarget
+		}
+	}
+	return CastRejectNone
 }
 
 func (h areaHandler) forEachAreaTarget(caster, anchor Actor, radius int, keep func(Actor) bool, fn func(Actor)) {
@@ -84,8 +126,8 @@ func (frontAreaHandler) FinalTarget(caster, target Actor, _ *modelskill.Definiti
 	return target
 }
 
-func (h frontAreaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
-	return areaHandler(h).CanCast(caster, target, skill, ctrl)
+func (frontAreaHandler) CanCast(caster, target Actor, skill *modelskill.Definition, ctrl bool) bool {
+	return frontAreaCastRejection(caster, target, skill, ctrl) == CastRejectNone
 }
 
 type auraHandler struct {

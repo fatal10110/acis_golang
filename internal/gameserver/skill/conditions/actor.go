@@ -33,8 +33,9 @@ type Actor interface {
 	IsBehind(other Actor) bool
 	IsInFrontOf(other Actor) bool
 
-	// ActiveSkillLevel looks up a skill of id known/active on this actor,
-	// returning its level and whether it was found at all.
+	// ActiveSkillLevel looks up a skill of id this actor knows — a player's
+	// learned skills, an NPC or summon's template skills — returning its
+	// level and whether it is known at all. Effects never answer it.
 	ActiveSkillLevel(id int) (level int, ok bool)
 
 	// ActiveEffectLevel looks up the level of the skill backing the first

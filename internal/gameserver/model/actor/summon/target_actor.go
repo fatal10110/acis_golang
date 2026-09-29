@@ -1,8 +1,6 @@
 package summon
 
 import (
-	"time"
-
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -12,7 +10,8 @@ import (
 var _ skilltarget.Actor = (*Actor)(nil)
 
 // Summons hold no ground point, summon, party, clan, duel or Olympiad state
-// of their own, and the NPC, corpse and door facts never apply to them.
+// of their own, and the NPC and door facts never apply to them. Their corpse
+// facts are in death.go.
 func (a *Actor) CanSeePoint(int, int, int) bool    { return true }
 func (a *Actor) GroundTarget() (x, y, z int)       { return 0, 0, 0 }
 func (a *Actor) Summon() (skilltarget.Actor, bool) { return nil, false }
@@ -37,9 +36,6 @@ func (a *Actor) MonsterKind() bool                    { return false }
 func (a *Actor) Undead() bool                         { return false }
 func (a *Actor) Holy() bool                           { return false }
 func (a *Actor) Unlockable() bool                     { return false }
-func (a *Actor) HasCorpse() bool                      { return false }
-func (a *Actor) CorpseDeadline() (time.Time, bool)    { return time.Time{}, false }
-func (a *Actor) CorpseTime() time.Duration            { return 0 }
 func (a *Actor) Spoiled() bool                        { return false }
 func (a *Actor) Seeded() bool                         { return false }
 

@@ -24,6 +24,10 @@ type AIController struct {
 	// OnLaunchAbort sends the caster-visible result of a launch-phase gate
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
+	// OnTargetRejection sends the caster-visible result of a failed target
+	// condition (MeetsCastConditions). Network wiring owns the
+	// system-message encoding.
+	OnTargetRejection func(skilltarget.CastRejection, modelskill.Definition)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
 	// Summon casters wire it to forward the result to the owner, mirroring
 	// Summon.sendPacket's owner-forward. Hostile NPC casters wire it to a
@@ -119,6 +123,28 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 		return false
 	}
 	return a.Controller.CanCast(castTarget, def) == nil
+}
+
+// MeetsCastConditions applies ref's target-type conditions for a playable
+// caster against target, the last check before a playable's cast commits.
+// A failure is reported through OnTargetRejection.
+func (a *AIController) MeetsCastConditions(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool {
+	def, ok := a.definition(ref)
+	if !ok {
+		return false
+	}
+	aimed, ok := any(target).(skilltarget.Actor)
+	if !ok || a.Caster == nil {
+		return false
+	}
+	rejection := skilltarget.CastRejectionFor(def.Target, a.Caster, aimed, &def, ctrl)
+	if rejection == skilltarget.CastRejectNone {
+		return true
+	}
+	if a.OnTargetRejection != nil {
+		a.OnTargetRejection(rejection, def)
+	}
+	return false
 }
 
 // MeetsHPMPDisabled reports whether the actor currently has the HP/MP and is

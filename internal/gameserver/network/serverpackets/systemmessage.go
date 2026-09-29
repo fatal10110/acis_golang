@@ -17,6 +17,7 @@ const (
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48
+	SystemMessageCannotUseOnYourself               = 51
 	SystemMessageSkillReadyToUseAgain              = 2015
 	SystemMessageEarnedS2S1S                       = 53
 	SystemMessageNothingHappened                   = 61
@@ -121,6 +122,7 @@ const (
 	SystemMessageCannotDoWhileFishing              = 1471
 	SystemMessageItemCantBeEquippedForOlympiad     = 1507
 	SystemMessageItemUnavailableForOlympiad        = 1508
+	SystemMessageSkillUnavailableForOlympiad       = 1509
 	SystemMessageBlessedEnchantFailed              = 1517
 	SystemMessageResurrectPetWithin20Minutes       = 1519 // no parameter
 	SystemMessageServitorPassedAway                = 1520 // no parameter

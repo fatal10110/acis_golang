@@ -84,7 +84,7 @@ func TestPlayerStanceChangeRefreshesSelfAndObserver(t *testing.T) {
 }
 
 func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
-	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithWeightLimitMultiplier(1))
 	self := srv.Client
 	objectID := srv.SoleObjectID(t)
 	srv.GiveItem(t, objectID, 9500, 100_000) // weight penalty 4, so move speed is zero

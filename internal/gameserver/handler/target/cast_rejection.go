@@ -23,15 +23,23 @@ const (
 	CastRejectHarvestNotMonster
 	CastRejectCorpseTooOld
 	CastRejectSweepNotMonster
+	// CastRejectCannotUseOnYourself refuses a skill that must not target
+	// its caster.
+	CastRejectCannotUseOnYourself
+	// CastRejectOlympiadUnavailable refuses a skill barred during the
+	// Olympiad.
+	CastRejectOlympiadUnavailable
 )
 
-// CastRejectionFor classifies the target-handler failures for which the
-// reference sends a system message. Other failed target checks remain silent.
-// A nil target always classifies as CastRejectNone: a missing target is
-// dropped before the cast stops the caster, not rejected after it.
+// CastRejectionFor classifies a playable caster's target conditions: every
+// failure the handler's CanCast reports, with the system message the player
+// is shown, or CastRejectSilent when there is none. GROUND is checked
+// separately (GroundCastFailureFor). A nil target always classifies as
+// CastRejectNone: a missing target is dropped before the cast stops the
+// caster, not rejected after it.
 func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	switch targetType {
-	case modelskill.TargetAura, modelskill.TargetFrontAura:
+	case modelskill.TargetAura, modelskill.TargetFrontAura, modelskill.TargetAuraUndead:
 		if skill != nil && skill.Offensive && caster.InPeaceZone() {
 			return CastRejectCantAttackPeaceZone
 		}
@@ -41,6 +49,33 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 		}
 	case modelskill.TargetOne:
 		return oneCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetArea:
+		if target == nil {
+			return CastRejectNone
+		}
+		return areaCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetFrontArea:
+		if target == nil {
+			return CastRejectNone
+		}
+		return frontAreaCastRejection(caster, target, skill, ctrl)
+	case modelskill.TargetOwnerPet:
+		if target == nil {
+			return CastRejectNone
+		}
+		return ownerPetCastRejection(caster, target)
+	case modelskill.TargetPartyMember:
+		if target == nil {
+			return CastRejectNone
+		}
+		return partyMemberCastRejection(caster, target, skill)
+	case modelskill.TargetPartyOther:
+		if target == nil {
+			return CastRejectNone
+		}
+		return partyOtherCastRejection(caster, target, skill)
+	case modelskill.TargetCorpseAlly:
+		return corpseAllyCastRejection(caster)
 	case modelskill.TargetSummon:
 		// The final target is the caster's summon; a dead one is invalid.
 		if target != nil && target.Dead() {

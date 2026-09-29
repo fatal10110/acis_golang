@@ -120,8 +120,8 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 			return
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
-			// No final target, or a handler that reports its failure only
-			// as a bool: the request is dropped with ActionFailed alone.
+			// No final target: the request is dropped with ActionFailed
+			// alone.
 			sendMagicActionFailed(live)
 			return
 		}
@@ -292,7 +292,8 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrMagicMuted) ||
 		errors.Is(err, actorcast.ErrPhysicalMuted) ||
 		errors.Is(err, actorcast.ErrCubicListFull) ||
-		errors.Is(err, actorcast.ErrNotEnoughItems)
+		errors.Is(err, actorcast.ErrNotEnoughItems) ||
+		errors.As(err, new(*actorcast.ConditionError))
 }
 
 func (l *GameClientLink) stopMovementForCast(live *livePlayer) func() {
@@ -373,14 +374,7 @@ func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, select
 	if rejection := skilltarget.CastRejectionFor(def.Target, casterCreature, finalTarget, &def, ctrl); rejection != skilltarget.CastRejectNone {
 		return finalTarget, rejection
 	}
-	if finalTarget == nil {
-		return nil, skilltarget.CastRejectNone
-	}
 	// Ground LOS/peace/heading run after cost validation via AfterCanCast.
-	// handler.CanCast here would drop the caster target and skip those messages.
-	if def.Target != modelskill.TargetGround && !handler.CanCast(casterCreature, finalTarget, &def, ctrl) {
-		return nil, skilltarget.CastRejectNone
-	}
 	return finalTarget, skilltarget.CastRejectNone
 }
 
@@ -403,6 +397,10 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
 	case skilltarget.CastRejectSweepNotMonster:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	case skilltarget.CastRejectCannotUseOnYourself:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseOnYourself))
+	case skilltarget.CastRejectOlympiadUnavailable:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillUnavailableForOlympiad))
 	}
 }
 
@@ -610,7 +608,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	if live == nil {
 		return
 	}
+	var condErr *actorcast.ConditionError
 	switch {
+	case errors.As(err, &condErr):
+		sendSkillConditionFailure(live, condErr.Clause, def.ID)
 	case errors.Is(err, actorcast.ErrNotEnoughMP):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughMP))
 	case errors.Is(err, actorcast.ErrNotEnoughHP):
@@ -641,6 +642,23 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	}
+}
+
+// sendSkillConditionFailure sends the feedback a failed skill <cond> clause
+// configures: its system message, naming the skill at level 1 when the
+// clause asks for the name, or else its literal text, or nothing.
+func sendSkillConditionFailure(live *livePlayer, clause modelskill.ConditionClause, skillID modelskill.ID) {
+	if live == nil {
+		return
+	}
+	switch {
+	case clause.MessageID != 0 && clause.AddName:
+		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(clause.MessageID), int32(skillID), 1))
+	case clause.MessageID != 0:
+		live.SendFrame(serverpackets.FrameSystemMessage(int(clause.MessageID)))
+	case clause.Message != "":
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, clause.Message))
 	}
 }
 

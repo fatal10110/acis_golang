@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -50,6 +51,10 @@ func (l *GameClientLink) useItemAICast(live *livePlayer, inv *itemcontainer.Inve
 		}
 	}()
 	for _, def := range defs {
+		if failed, ok := conditions.EvaluateSkill(def, live.Character, live.Target()); !ok {
+			sendSkillConditionFailure(live, failed, def.ID)
+			return true
+		}
 		if live.SkillDisabled(actorcast.ReuseKey(def)) {
 			live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 			return true
@@ -114,8 +119,8 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 			return nil, true, false
 		}
 		if errors.Is(err, actorcast.ErrInvalidTarget) && started.Target == nil {
-			// No final target, or a handler that reports its failure only
-			// as a bool: the request is dropped with ActionFailed alone.
+			// No final target: the request is dropped with ActionFailed
+			// alone.
 			sendMagicActionFailed(live)
 			return nil, true, false
 		}

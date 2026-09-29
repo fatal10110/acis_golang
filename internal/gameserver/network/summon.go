@@ -163,7 +163,7 @@ func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpacket
 
 	target := l.summonSkillTarget(live, actor, entry.TargetKind)
 	if !doorOnlyBlocked(entry, target) {
-		if actor.TryUseSkill(entry.SkillID, target) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
+		if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
 			l.broadcastSummonFrame(actor, serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
 		}
 	}

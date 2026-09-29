@@ -3,10 +3,8 @@ package conditions
 import "slices"
 
 // npcTarget and doorTarget are the two identifiable-by-id target shapes
-// TargetNpcID checks against — an NPC (keyed by its template id) or a door
-// (keyed by its static door id). door.Object already exposes DoorID();
-// giving a world NPC instance a matching NpcID accessor is the world/NPC
-// package's call to make once it wires targets through this engine.
+// TargetNpcID checks against — an NPC's condition view (keyed by its
+// template id) or a door's (keyed by its static door id).
 type (
 	npcTarget  interface{ NpcID() int }
 	doorTarget interface{ DoorID() int }
@@ -16,8 +14,8 @@ type (
 // TargetRaceID needs it.
 type raceTarget interface{ RaceOrdinal() int }
 
-// TargetActiveSkillID requires the effected creature to currently know a
-// skill of the given id, at any level. A nil effected always fails.
+// TargetActiveSkillID requires the effected creature to know a skill of the
+// given id, at any level. A nil effected always fails.
 type TargetActiveSkillID struct{ SkillID int }
 
 func (c TargetActiveSkillID) Test(effector, effected Actor, skill Skill) bool {
@@ -45,8 +43,6 @@ func (c TargetHpMinMax) Test(effector, effected Actor, skill Skill) bool {
 type TargetNpcID struct{ IDs []int }
 
 func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
-	// The skill-condition parser does not build TargetNpcID or TargetRaceID
-	// yet, so these id checks only run in tests (#2362).
 	if npc, ok := effected.(npcTarget); ok {
 		return slices.Contains(c.IDs, npc.NpcID())
 	}
@@ -61,7 +57,6 @@ func (c TargetNpcID) Test(effector, effected Actor, skill Skill) bool {
 type TargetRaceID struct{ IDs []int }
 
 func (c TargetRaceID) Test(effector, effected Actor, skill Skill) bool {
-	// No live actor reports a template race ordinal yet; see #2362.
 	npc, ok := effected.(raceTarget)
 	if !ok {
 		return false
