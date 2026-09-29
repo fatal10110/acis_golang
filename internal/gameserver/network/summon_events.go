@@ -35,6 +35,8 @@ type summonSink struct {
 	cleanupMu sync.Mutex
 	cleanup   []func()
 	despawned bool
+	// known is the scratch known-list snapshot the health-bar update reads.
+	known world.KnownBuffer
 }
 
 // onDespawn registers fn as runtime cleanup that runs exactly once when the
@@ -156,6 +158,11 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame { return frames.SocialAction(actor.ObjectID(), e.ID) })
 	case event.StatusChanged:
 		l.broadcastSummonStatus(actor)
+	case event.HPChanged:
+		// A vitals change first updates the health bar of the players
+		// targeting the summon, then refreshes its owner and observers.
+		s.broadcastHP()
+		l.broadcastSummonStatus(actor)
 	case event.OwnerInfoChanged:
 		sendSummonInfosToOwner(actor)
 	case event.AbnormalEffectChanged:
@@ -248,6 +255,17 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.Despawned:
 		s.runDespawn()
 	}
+}
+
+// broadcastHP sends the summon's current HP to the known players targeting
+// it, its owner included.
+func (s *summonSink) broadcastHP() {
+	if s.link.world == nil || s.actor == nil {
+		return
+	}
+	known := s.known.SnapshotCopy(s.link.world, s.actor)
+	defer known.Release()
+	sendHPToWatchers(known.Tracked(), s.actor.ObjectID(), s.actor.HPStatusUpdate)
 }
 
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world

@@ -44,8 +44,9 @@ func healOverTimeStart(e *Effect) bool {
 // request, so unlike the cast and item paths — which send their own batched
 // StatusUpdate at the call site — nothing else would tell the player the
 // tick happened. A summon or NPC needs nothing here: its HP/MP mutators
-// already republished its status (the owner's pet window and observers, or
-// the targeters' health bar), and a second push would double the frame.
+// already republished its status (its targeters' health bar, and a
+// summon's pet window and observers too), and a second push would double
+// the frame.
 func broadcastStatus(effected Actor) {
 	if player, ok := asPlayer(effected); ok {
 		player.BroadcastStatus()

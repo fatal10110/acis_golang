@@ -112,14 +112,19 @@ func (s *hostileSink) broadcast(build func() wire.Frame) {
 	})
 }
 
-// broadcastHP sends the NPC's current HP to the known players targeting it,
-// the only observers that follow its health bar; a player's selection is
-// cleared when the NPC leaves its known list. The bar-segment gate runs only
-// once a watcher exists, so it never advances for an unwatched NPC.
+// broadcastHP sends the NPC's current HP to the known players targeting it.
 func (s *hostileSink) broadcastHP() {
 	known := s.known.SnapshotCopy(s.world, s.h)
 	defer known.Release()
-	id := s.h.ObjectID()
+	sendHPToWatchers(known.Tracked(), s.h.ObjectID(), s.h.HPStatusUpdate)
+}
+
+// sendHPToWatchers sends the current HP of creature id to the players in
+// known targeting it, the only observers that follow its health bar; a
+// player's selection is cleared when the creature leaves its known list.
+// The bar-segment gate status runs only once a watcher exists, so it never
+// advances for an unwatched creature.
+func sendHPToWatchers(known []world.Tracked, id int32, status func() (int, bool)) {
 	watching := func(o world.Tracked) (*livePlayer, bool) {
 		p, ok := o.(*livePlayer)
 		if !ok {
@@ -128,16 +133,16 @@ func (s *hostileSink) broadcastHP() {
 		target := p.Target()
 		return p, target != nil && target.ObjectID() == id
 	}
-	if !slices.ContainsFunc(known.Tracked(), func(o world.Tracked) bool { _, ok := watching(o); return ok }) {
+	if !slices.ContainsFunc(known, func(o world.Tracked) bool { _, ok := watching(o); return ok }) {
 		return
 	}
-	hp, ok := s.h.HPStatusUpdate()
+	hp, ok := status()
 	if !ok {
 		return
 	}
 	attrs := []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentHP, Value: hp}}
 	broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(id, attrs) }, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
+		for _, o := range known {
 			if p, ok := watching(o); ok {
 				send(p)
 			}

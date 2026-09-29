@@ -30,6 +30,14 @@ func (h *Hostile) SetCurrentHP(hp int) {
 	h.health.SetCurrent(float64(hp))
 }
 
+// HPStatusUpdate returns this NPC's current HP and whether the players
+// targeting it must be sent it. Callers invoke it only when at least one
+// player is targeting this NPC: an unwatched NPC's bar state stays where it
+// was last reported.
+func (h *Hostile) HPStatusUpdate() (int, bool) {
+	return h.hpBar.Report(h.health.Current, float64(h.MaxHP()))
+}
+
 // CurrentMP returns this NPC's live mana points, int-truncated to match the
 // persisted spawn_data.current_mp contract.
 func (h *Hostile) CurrentMP() int {

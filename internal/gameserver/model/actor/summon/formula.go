@@ -434,8 +434,8 @@ func (a *Actor) MaxMPValue() float64 {
 	return a.calcStat(stat.MaxMP, a.combatStats().MaxMP)
 }
 
-// SetHP sets current HP, clamped to [0, MaxHP]. It has no effect on a dead
-// summon.
+// SetHP sets current HP, clamped to [0, MaxHP], and republishes a's vitals
+// even when the value did not move. It has no effect on a dead summon.
 func (a *Actor) SetHP(value float64) {
 	maxHP := a.MaxHPValue()
 	if value < 0 {
@@ -445,11 +445,21 @@ func (a *Actor) SetHP(value float64) {
 		value = maxHP
 	}
 	a.vitals.mu.Lock()
-	defer a.vitals.mu.Unlock()
 	if a.dead {
+		a.vitals.mu.Unlock()
 		return
 	}
 	a.vitals.hp = value
+	a.vitals.mu.Unlock()
+	a.BroadcastStatus()
+}
+
+// HPStatusUpdate returns a's current HP and whether the players targeting a
+// must be sent it. Callers invoke it only when at least one player is
+// targeting a, so an unwatched summon's bar state stays where it was last
+// reported.
+func (a *Actor) HPStatusUpdate() (int, bool) {
+	return a.hpBar.Report(a.HP, float64(int(a.MaxHPValue())))
 }
 
 // RestoreDead marks a pet restored from a save below creature.DeathHP as
@@ -480,11 +490,11 @@ func (a *Actor) ReduceMP(amount float64) float64 {
 	return a.publishVitals(a.reduceMP(amount))
 }
 
-// publishVitals republishes a's status when applied is non-zero, and
+// publishVitals republishes a's vitals when applied is non-zero, and
 // returns applied.
 func (a *Actor) publishVitals(applied float64) float64 {
 	if applied > 0 {
-		a.UpdateStatus()
+		a.BroadcastStatus()
 	}
 	return applied
 }
@@ -649,7 +659,7 @@ func (a *Actor) drainHP(amount float64) bool {
 		killed = true
 	}
 	a.vitals.mu.Unlock()
-	a.UpdateStatus()
+	a.BroadcastStatus()
 	return killed
 }
 

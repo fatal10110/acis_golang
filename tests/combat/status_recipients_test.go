@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -241,4 +243,127 @@ func TestHostileHPStatusFramesAreOwnedPerTargeter(t *testing.T) {
 	assertStatusFrames(t, "second targeter", second, want)
 	first[0][len(first[0])-1] ^= 0xff
 	assertStatusFrames(t, "second targeter after mutating first", second, want)
+}
+
+// TestHostileSetHPRefreshesTargeterBar pins CreatureStatus.setHp
+// (CreatureStatus.java:130-162), the write BalanceLife.java:65 lands on
+// every target: it ends in broadcastStatusUpdate even when HP did not move,
+// so the NPC's targeters get CUR_HP whenever the bar gate passes, and a
+// dead NPC's setHp returns before broadcasting anything.
+//
+// Fixture max HP 440: interval 1.25, initial checks inc=440, dec=438.75.
+func TestHostileSetHPRefreshesTargeterBar(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	w := joinWatcher(t, srv)
+	hostile := srv.SpawnHostileNPC(t)
+	id := hostile.ObjectID()
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, w)
+	c.Send(encodeAction(id, hostileX, hostileY, hostileZ, false))
+	drainUntilQuiet(t, c)
+
+	// 430 <= dec 438.75: sent; checks move to dec=430, inc=431.25.
+	hostile.SetHP(430)
+	statuses, _ := statusFramesFor(t, c, id)
+	assertStatusFrames(t, "balanced down", statuses, statusFixture(id, wantCurHP, 430))
+	statuses, _ = statusFramesFor(t, w, id)
+	assertStatusFrames(t, "non-targeting observer", statuses)
+
+	// 430.5 stays inside (430, 431.25): the gate declines.
+	hostile.SetHP(430.5)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "inside segment", statuses)
+
+	// An unchanged 430.5 still re-runs the gate, which still declines;
+	// the full-HP write crosses inc=431.25 and is sent.
+	hostile.SetHP(430.5)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "unchanged value", statuses)
+	hostile.SetHP(10000)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "clamped to full", statuses, statusFixture(id, wantCurHP, 440))
+
+	hostile.ConsumeHP(440)
+	statusFramesFor(t, c, id)
+	hostile.SetHP(200)
+	statuses, _ = statusFramesFor(t, c, id)
+	assertStatusFrames(t, "dead NPC", statuses)
+	if hp := hostile.CurrentHP(); hp != 0 {
+		t.Fatalf("dead NPC HP = %d after SetHP, want 0", hp)
+	}
+}
+
+// TestHostileMPChangeReEvaluatesTargeterBar pins an MP-only change on a
+// targeted NPC: CreatureStatus.setMp (CreatureStatus.java:274-306) ends in
+// the same broadcastStatusUpdate as setHp, so the HP bar gate needHpUpdate
+// (CreatureStatus.java:428-454) is re-run against the unchanged HP. The
+// targeter gets CUR_HP only when HP sits outside the last reported segment;
+// a non-targeting observer gets nothing either way.
+//
+// Fixture max HP 440: interval 1.25, initial checks inc=440, dec=438.75.
+func TestHostileMPChangeReEvaluatesTargeterBar(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	w := joinWatcher(t, srv)
+	hostile := srv.SpawnHostileNPCTemplateAt(t, &npc.Template{
+		ID: 100, TemplateID: 100, Type: "Monster", Level: 1, HPMax: 1000, MPMax: 500,
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+	}, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	id := hostile.ObjectID()
+	if maxHP := hostile.MaxHP(); maxHP != 440 {
+		t.Fatalf("fixture max HP = %d, want 440", maxHP)
+	}
+	if hostile.MPValue() < 10 {
+		t.Fatalf("fixture MP = %v, want room for MP-only changes", hostile.MPValue())
+	}
+	drainUntilQuiet(t, c)
+	drainUntilQuiet(t, w)
+	c.Send(encodeAction(id, hostileX, hostileY, hostileZ, false))
+	drainUntilQuiet(t, c)
+
+	for _, step := range []struct {
+		name   string
+		setup  func()
+		change func()
+		want   [][]byte
+	}{
+		// Full HP 440 >= inc 440: sent; checks move to inc=441, dec=438.75.
+		{
+			name: "MP loss at the initial full-HP check", change: func() { hostile.ReduceMP(5) },
+			want: [][]byte{statusFixture(id, wantCurHP, 440)},
+		},
+		// 440 inside (438.75, 441): declined.
+		{name: "MP loss inside the segment", change: func() { hostile.ReduceMP(1) }},
+		{name: "MP gain inside the segment", change: func() { hostile.AddMP(1) }},
+		// HP moved to 401 without a report; 401 <= dec 438.75: sent, and
+		// checks move to dec=400, inc=401.25.
+		{
+			name: "MP loss after an unreported HP drop", setup: func() { hostile.SetCurrentHP(401) },
+			change: func() { hostile.ReduceMP(1) }, want: [][]byte{statusFixture(id, wantCurHP, 401)},
+		},
+		{name: "MP gain inside the new segment", change: func() { hostile.AddMP(1) }},
+		// Near-dead HP always reports.
+		{
+			name: "MP loss at 1 HP", setup: func() { hostile.SetCurrentHP(1) },
+			change: func() { hostile.ReduceMP(1) }, want: [][]byte{statusFixture(id, wantCurHP, 1)},
+		},
+		{
+			name: "MP gain at 1 HP", change: func() { hostile.AddMP(1) },
+			want: [][]byte{statusFixture(id, wantCurHP, 1)},
+		},
+	} {
+		if step.setup != nil {
+			step.setup()
+		}
+		step.change()
+		statuses, _ := statusFramesFor(t, c, id)
+		assertStatusFrames(t, step.name+": targeter", statuses, step.want...)
+		statuses, _ = statusFramesFor(t, w, id)
+		assertStatusFrames(t, step.name+": non-targeting observer", statuses)
+	}
 }
