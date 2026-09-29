@@ -251,7 +251,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if (magicHeld || itemHeld) && inPostureTransition(live) {
 			return
 		}
-		live.combat.Think()
+		live.thinkAttack()
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
@@ -262,7 +262,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishLiveGroundPickup(live)
 		l.finishPetInteract(live)
 		l.finishDeferredMagicSkill(live)
-		live.combat.Think()
+		live.thinkAttack()
 	case event.MoveBlocked:
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
@@ -392,14 +392,17 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if live.combat == nil {
 		return
 	}
-	if live.combat.ResumeAfterCast() {
+	if resumed, idled := live.combat.ResumeAfterCast(); resumed {
+		if idled {
+			live.SendFrame(serverpackets.FrameActionFailed())
+		}
 		return
 	}
 	// A queued CAST already ran above. With no next intention, a finished
 	// CAST only re-engages the attack when the skill carries
 	// nextActionAttack; anything else goes idle.
 	if def.NextActionIsAttack {
-		live.combat.Think()
+		live.thinkAttack()
 		return
 	}
 	live.combat.Stop()

@@ -397,6 +397,15 @@ func (p *livePlayer) takePetInteract() *summon.Actor {
 	return pet
 }
 
+// thinkAttack re-thinks p's attack intention from a movement-arrived,
+// swing-finished, or cast-finished hook, answering ActionFailed when the
+// think sent the intention idle.
+func (p *livePlayer) thinkAttack() {
+	if p.combat.Think() {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
 // tryToIdle drops every intention p holds, active and queued, and stops its
 // movement (combat.Stop stops the shared move controller, whatever the walk
 // was for). A character that was already unable to act keeps its intentions
