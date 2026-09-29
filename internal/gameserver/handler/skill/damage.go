@@ -43,17 +43,13 @@ func spiritshotCharges(caster Creature) (sps, bsps bool) {
 // spendSpiritshot writes the static-reuse flag onto the blessed spiritshot
 // when blessed is set, otherwise onto the plain one.
 func spendSpiritshot(cast Cast, blessed bool) {
-	caster, ok := cast.Caster.(shotCharger)
-	if !ok {
-		return
-	}
-	spendSpiritshot(cast.Caster, caster.ChargedShot(modelitem.ShotBlessedSpirit), cast.Skill.StaticReuse)
+	writeSpiritshot(cast.Caster, blessed, cast.Skill.StaticReuse)
 }
 
-// spendSpiritshot writes staticReuse to the caster's blessed spiritshot when
+// writeSpiritshot writes staticReuse to the caster's blessed spiritshot when
 // blessed, otherwise to its plain spiritshot. Handlers that sample the
 // blessed charge before their target loop pass that sample here.
-func spendSpiritshot(caster Actor, blessed, staticReuse bool) {
+func writeSpiritshot(caster Actor, blessed, staticReuse bool) {
 	charger, ok := caster.(shotCharger)
 	if !ok {
 		return

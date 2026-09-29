@@ -86,7 +86,7 @@ func (disablersHandler) Use(cast Cast) {
 	applySelfEffects(cast, cast.Skill)
 	// A cubic proc leaves its owner's spiritshot charged.
 	if !cast.Cubic {
-		spendSpiritshot(cast.Caster, bsps, cast.Skill.StaticReuse)
+		writeSpiritshot(cast.Caster, bsps, cast.Skill.StaticReuse)
 	}
 }
 

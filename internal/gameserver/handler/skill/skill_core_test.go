@@ -1985,8 +1985,6 @@ func (t *skillTarget) SetChargedShot(kind item.ShotKind, charged bool) {
 
 func (t *skillTarget) ChargedShot(kind item.ShotKind) bool { return t.charged[kind] }
 
-func (t *skillTarget) BlessedSpiritshotCharged() bool { return t.charged[item.ShotBlessedSpirit] }
-
 func (t *skillTarget) PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool) {
 	return t.physicalInput, t.physicalOK
 }
@@ -2133,7 +2131,8 @@ func TestHealLandsSkillEffectsBeforeRestoringHP(t *testing.T) {
 // TestHealSpiritshotBonusUsesHealSpsAndScaling drives a heal under each
 // spiritshot through the registry: the healSps correction (scaled by 0.41
 // for a plain shot) and the caster's M.Atk multiplier join the amount, and
-// the sampled shot is the one spent.
+// the sampled shot is the one spent: once by the BUFF pass and once by the
+// heal's own discharge, which a static heal skips.
 func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 	table, err := modelskill.NewHealSpsTable([]modelskill.HealSps{{MagicLevel: 1, Correction: 17, NeededMAtk: 6}})
 	if err != nil {
@@ -2148,11 +2147,11 @@ func TestHealSpiritshotBonusUsesHealSpsAndScaling(t *testing.T) {
 		want      float64
 		wantShots []item.ShotKind
 	}{
-		{"mage blessed", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(4*100)), []item.ShotKind{item.ShotBlessedSpirit}},
-		{"mage plain", formulas.HealShotScalingMage, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(2*100)), []item.ShotKind{item.ShotSpirit}},
-		{"fighter blessed", formulas.HealShotScalingNone, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(100)), []item.ShotKind{item.ShotBlessedSpirit}},
-		{"npc plain", formulas.HealShotScalingNPC, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(4*100)), []item.ShotKind{item.ShotSpirit}},
-		{"static keeps the shot", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL_STATIC", 20, nil},
+		{"mage blessed", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(4*100)), []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit}},
+		{"mage plain", formulas.HealShotScalingMage, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(2*100)), []item.ShotKind{item.ShotSpirit, item.ShotSpirit}},
+		{"fighter blessed", formulas.HealShotScalingNone, item.ShotBlessedSpirit, "HEAL", 20 + (17 + math.Sqrt(100)), []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit}},
+		{"npc plain", formulas.HealShotScalingNPC, item.ShotSpirit, "HEAL", 20 + (17*0.41 + math.Sqrt(4*100)), []item.ShotKind{item.ShotSpirit, item.ShotSpirit}},
+		{"static spends only in the buff pass", formulas.HealShotScalingMage, item.ShotBlessedSpirit, "HEAL_STATIC", 20, []item.ShotKind{item.ShotBlessedSpirit}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			caster := &skillTarget{
@@ -3068,7 +3067,8 @@ func TestNPCCasterSpendsItsSpiritshot(t *testing.T) {
 // handler spends after its target loop, and the static-reuse flag it writes
 // back: CPDAMPERCENT spends the soulshot; HEAL, MANAHEAL, RESURRECT and the
 // CANCEL family spend the blessed spiritshot when one is charged, otherwise
-// the plain spiritshot. A static heal and a potion leave the shot alone.
+// the plain spiritshot; a heal also spends it in its BUFF pass first, so a
+// static heal spends it once there and a potion leaves it alone.
 // The continuous handler spends the spiritshot on every cast but a potion or
 // a toggle; the disablers handler spends it unconditionally.
 func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
@@ -3106,7 +3106,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
 			healOK:    true,
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotSpirit},
+			wantShots: []item.ShotKind{item.ShotSpirit, item.ShotSpirit},
 		},
 		{
 			name:      "heal blessed spiritshot static reuse",
@@ -3114,20 +3114,21 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			blessed:   true,
 			healOK:    true,
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit, item.ShotBlessedSpirit},
 		},
 		{
 			name:      "heal without a resolvable amount",
 			skill:     modelskill.Definition{SkillType: "HEAL", Power: 20},
 			targets:   func() []Actor { return []Actor{healTarget()} },
-			wantShots: []item.ShotKind{item.ShotSpirit},
+			wantShots: []item.ShotKind{item.ShotSpirit, item.ShotSpirit},
 		},
 		{
-			name:    "heal static keeps shot",
-			skill:   modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
-			blessed: true,
-			healOK:  true,
-			targets: func() []Actor { return []Actor{healTarget()} },
+			name:      "heal static spends only in the buff pass",
+			skill:     modelskill.Definition{SkillType: "HEAL_STATIC", Power: 20},
+			blessed:   true,
+			healOK:    true,
+			targets:   func() []Actor { return []Actor{healTarget()} },
+			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
 		},
 		{
 			name:    "heal potion keeps shot",
