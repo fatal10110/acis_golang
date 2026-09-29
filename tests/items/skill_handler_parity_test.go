@@ -227,6 +227,62 @@ func TestHealCastWithBlessedSpiritshotAddsHealSpsBonus(t *testing.T) {
 	}
 }
 
+// TestContinuousAndDisablerCastsSpendChargedSpiritshot casts a real BUFF
+// (continuous handler) and a real NEGATE (disablers handler) with a
+// spiritshot charged on the equipped weapon: each cast spends the charge it
+// found at cast start, blessed or plain.
+func TestContinuousAndDisablerCastsSpendChargedSpiritshot(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		skillType string
+		shot      item.ShotKind
+	}{
+		{name: "buff blessed", skillType: "BUFF", shot: item.ShotBlessedSpirit},
+		{name: "negate plain", skillType: "NEGATE", shot: item.ShotSpirit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			const skillID = 1040
+			db := sqltest.SharedDB(t)
+			skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
+				ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+				HitTime: 500, StaticHitTime: true, ReuseDelay: 60_000, SkillType: tc.skillType,
+			}}), gamesql.NewCharacterSkillStore(db))
+			srv := gameservertest.Boot(t,
+				gameservertest.WithSkills(skills),
+				gameservertest.WithCharacter("Newbie", 5, 0),
+				gameservertest.WithWantChars(1))
+			c := srv.Client
+			objID := srv.SoleObjectID(t)
+			if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, skillID, 1); err != nil {
+				t.Fatalf("seed known skill: %v", err)
+			}
+			weapon := srv.GiveItem(t, objID, 30, 1)
+			startInWorld(t, c)
+
+			c.Send(encodeUseItem(weapon, false))
+			assertFrameOpcode(t, readSkippingEquipNoise(t, c, "equip UserInfo"), serverpackets.OpcodeUserInfo, "equip UserInfo")
+			srv.InventoryUpdates.Tick()
+			readInventoryUpdateFor(t, c, weapon, 1)
+			drainUntilQuiet(t, c)
+
+			live, ok := srv.State.Player(objID)
+			if !ok {
+				t.Fatal("caster missing from the world")
+			}
+			caster, ok := live.(shotWeapon)
+			if !ok {
+				t.Fatalf("caster %T exposes no weapon shot charge", live)
+			}
+			caster.SetChargedShot(tc.shot, true)
+
+			c.Send(encodeRequestMagicSkillUse(skillID))
+			srv.AdvanceUntil(t, "spiritshot spent by the "+tc.skillType, func() bool { return !caster.ChargedShot(tc.shot) })
+			drainUntilQuiet(t, c)
+		})
+	}
+}
+
 func encodeRequestMagicSkillUse(skillID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
 	w.WriteInt32(skillID)

@@ -2,6 +2,7 @@ package effect
 
 import (
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -239,9 +240,13 @@ func cancelDebuffStart(e *Effect) bool {
 	vuln := e.Effected.CancelVulnerability(e.ClassTag())
 
 	candidates := list.All()
-	count := cancelDebuffPass(list, candidates, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
+	if len(candidates) == 0 {
+		return true
+	}
+	now := list.now()
+	count := cancelDebuffPass(list, candidates, now, e.Skill.MagicLevel, vuln, e.Skill.MaxNegatedEffects)
 	if count != 0 {
-		cancelDebuffPass(list, candidates, e.Skill.MagicLevel, vuln, count)
+		cancelDebuffPass(list, candidates, now, e.Skill.MagicLevel, vuln, count)
 	}
 	return true
 }
@@ -249,7 +254,7 @@ func cancelDebuffStart(e *Effect) bool {
 // cancelDebuffPass runs one reverse-order sweep of candidates, stripping
 // dispellable debuffs against an independent roll each, up to count
 // removals (0 meaning unlimited); it returns the remaining count.
-func cancelDebuffPass(list *List, candidates []*Effect, cancelLvl int, vuln float64, count int) int {
+func cancelDebuffPass(list *List, candidates []*Effect, now time.Time, cancelLvl int, vuln float64, count int) int {
 	lastCanceledSkillID := modelskill.ID(0)
 	for i := len(candidates) - 1; i >= 0; i-- {
 		cand := candidates[i]
@@ -261,11 +266,7 @@ func cancelDebuffPass(list *List, candidates []*Effect, cancelLvl int, vuln floa
 			continue
 		}
 
-		// Template.Time (the candidate's full configured duration) stands in for the
-		// reference effect's remaining duration (period-elapsed): this port has no
-		// live elapsed-time tracking per effect yet, so "remaining" always reads as
-		// "full". Revisit once effects track elapsed time.
-		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.Template.Time, vuln)
+		rate := formulas.EffectCancelDebuffSuccessRate(cancelLvl, cand.Skill.MagicLevel, cand.periodRemaining(now), vuln)
 		if !formulas.CancelSucceeds(float64(rate), rnd.Get(100)) {
 			continue
 		}
