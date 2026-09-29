@@ -62,16 +62,17 @@ func TestImmobileUntilAttackedEndWakesPlayerAI(t *testing.T) {
 }
 
 // TestImmobileUntilAttackedExpiryWakesPlayerAI pins the effect's own tick,
-// which ends it and notifies THINK; the effect's exit notifies it again, as
-// the reference's onActionTime and onExit both do.
+// which ends it and wakes the player's AI exactly once. The reference's
+// onActionTime and onExit both notify THINK; a second think of the same
+// unchanged intention resumes nothing more, so the end wakes it once.
 func TestImmobileUntilAttackedExpiryWakesPlayerAI(t *testing.T) {
 	c, in, rec := wakeTestCharacter(t)
 	landSelfEffect(t, c, "ImmobileUntilAttacked", 5)
 
 	in.Advance(6 * time.Second)
 	c.EffectList().Tick()
-	if got := event.Count[event.ThinkRequested](rec); got == 0 {
-		t.Fatal("ThinkRequested after the effect expired = 0, want the player AI woken")
+	if got := event.Count[event.ThinkRequested](rec); got != 1 {
+		t.Fatalf("ThinkRequested after the effect expired = %d, want 1", got)
 	}
 	if c.ImmobileUntilAttacked() {
 		t.Fatal("ImmobileUntilAttacked() = true after the effect expired")

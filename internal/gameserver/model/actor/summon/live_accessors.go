@@ -605,12 +605,22 @@ func (a *Actor) TryToIdle() {
 // goIdle makes the summon idle at once: one that follows its owner goes
 // back to following it, and picks the walk up again once it can move.
 func (a *Actor) goIdle() {
-	if a.followOff.Load() || a.owner == nil || a.brain == nil {
+	follow := a.idleFollow()
+	if follow == nil || a.brain == nil {
 		a.idle()
 		return
 	}
 	a.setIntent(IntentFollowOwner)
-	a.brain.FollowInstead(a.owner)
+	a.brain.FollowInstead(follow)
+}
+
+// idleFollow is who an idle summon follows: its owner while follow is on,
+// otherwise nil.
+func (a *Actor) idleFollow() attackable.Combatant {
+	if a.followOff.Load() || a.owner == nil {
+		return nil
+	}
+	return a.owner
 }
 
 // FinishedAttack moves the attached AI on once a swing ends.
@@ -621,10 +631,20 @@ func (a *Actor) FinishedAttack() {
 }
 
 // FinishedCasting moves the attached AI on once a cast completes: to the
-// queued intention, back to the attack the cast replaced, or else idle.
+// queued intention, back to the attack the cast replaced, or else idle. The
+// AI applies the idle itself, in the same critical section that decides it.
 func (a *Actor) FinishedCasting() {
-	if a.brain != nil && a.brain.FinishedCasting() {
-		a.goIdle()
+	if a.brain == nil {
+		return
+	}
+	follow := a.idleFollow()
+	if !a.brain.FinishedCasting(follow) {
+		return
+	}
+	if follow != nil {
+		a.setIntent(IntentFollowOwner)
+	} else {
+		a.setIntent(IntentIdle)
 	}
 }
 

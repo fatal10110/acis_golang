@@ -23,16 +23,6 @@ func framesUntilQuiet(c *scriptedClient) [][]byte {
 	}
 }
 
-func countOpcode(frames [][]byte, opcode byte) int {
-	n := 0
-	for _, f := range frames {
-		if f[0] == opcode {
-			n++
-		}
-	}
-	return n
-}
-
 // punchOfDoomID is the skill whose StunSelf effect stuns its own caster.
 const punchOfDoomID = 81
 
@@ -101,7 +91,7 @@ func TestStunSelfStopsWalkingPlayer(t *testing.T) {
 	if got := int32(binary.LittleEndian.Uint32(stop[1:5])); got != objID {
 		t.Fatalf("StopMove object = %d, want %d", got, objID)
 	}
-	if n := countOpcode(frames, serverpackets.OpcodeActionFailed); n != 0 {
+	if n := countOpcode(frames, len(frames), serverpackets.OpcodeActionFailed); n != 0 {
 		t.Fatalf("ActionFailed frames after StunSelf = %d, want 0 for a player with nothing to wait out", n)
 	}
 }
@@ -146,7 +136,8 @@ func TestStunSelfOnStunnedPlayerAnswersActionFailed(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	landStunSelf(t, holder)
-	if n := countOpcode(framesUntilQuiet(c), serverpackets.OpcodeActionFailed); n != 1 {
+	frames := framesUntilQuiet(c)
+	if n := countOpcode(frames, len(frames), serverpackets.OpcodeActionFailed); n != 1 {
 		t.Fatalf("ActionFailed frames after StunSelf on a stunned player = %d, want 1", n)
 	}
 }

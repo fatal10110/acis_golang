@@ -18,7 +18,7 @@ func (*thinkCountingAI) TryToFollow(attackable.Combatant) bool                  
 func (*thinkCountingAI) TryToIdle()                                                {}
 func (*thinkCountingAI) WaitOutIdle() bool                                         { return false }
 func (*thinkCountingAI) FinishedAttack()                                           {}
-func (*thinkCountingAI) FinishedCasting() bool                                     { return false }
+func (*thinkCountingAI) FinishedCasting(attackable.Combatant) bool                 { return false }
 func (*thinkCountingAI) TryToCast(attackable.Combatant, modelskill.Ref, bool) bool { return false }
 func (*thinkCountingAI) AbortAll()                                                 {}
 func (*thinkCountingAI) FollowInstead(attackable.Combatant)                        {}

@@ -177,6 +177,10 @@ func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool
 func (s *Summon) TryToIdle() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.idleLocked()
+}
+
+func (s *Summon) idleLocked() {
 	s.setCurrentLocked(intention{kind: IntentionIdle})
 	s.move.Stop()
 }
@@ -201,6 +205,10 @@ func (s *Summon) WaitOutIdle() bool {
 func (s *Summon) FollowInstead(target attackable.Combatant) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.followInsteadLocked(target)
+}
+
+func (s *Summon) followInsteadLocked(target attackable.Combatant) {
 	s.setCurrentLocked(intention{kind: IntentionFollow, target: target})
 	if _, err := s.thinkFollowLocked(); err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
@@ -334,9 +342,13 @@ func (s *Summon) FinishedAttack() {
 }
 
 // FinishedCasting runs the queued intention once a cast ends. With none
-// queued, it resumes the attack the cast replaced and reports false, or
-// reports true when the summon should go idle instead.
-func (s *Summon) FinishedCasting() (idle bool) {
+// queued, it resumes the attack the cast replaced, or else goes idle and
+// reports true: following follow when it is non-nil (as FollowInstead),
+// otherwise standing still (as TryToIdle). The idle is decided and applied
+// under one hold of mu, so a Betray TryToAttack from the caster's queue lands
+// either before it (and is resumed as the attack) or after it (and replaces
+// the idle), never between the two.
+func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.runNextLocked() {
@@ -346,12 +358,17 @@ func (s *Summon) FinishedCasting() (idle bool) {
 	if s.current.kind != IntentionIdle {
 		return false
 	}
-	if s.previous.kind != IntentionAttack {
-		return true
+	if s.previous.kind == IntentionAttack {
+		s.setCurrentLocked(s.previous)
+		s.thinkLocked()
+		return false
 	}
-	s.setCurrentLocked(s.previous)
-	s.thinkLocked()
-	return false
+	if follow != nil {
+		s.followInsteadLocked(follow)
+	} else {
+		s.idleLocked()
+	}
+	return true
 }
 
 // runNextLocked makes the queued intention current, if there is one.

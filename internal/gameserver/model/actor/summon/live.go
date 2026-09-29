@@ -37,9 +37,9 @@ type AI interface {
 	// and otherwise continues the current one.
 	FinishedAttack()
 	// FinishedCasting runs the queued intention, or the attack the cast
-	// replaced, once a cast completes; it reports true when the summon
-	// should go idle instead.
-	FinishedCasting() bool
+	// replaced, once a cast completes; otherwise it goes idle in the same
+	// critical section, following follow when non-nil, and reports true.
+	FinishedCasting(follow attackable.Combatant) bool
 	TryToCast(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool
 	// AbortAll stops movement, the attack cycle and any in-flight cast.
 	AbortAll()

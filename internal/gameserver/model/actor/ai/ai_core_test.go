@@ -2888,3 +2888,49 @@ func (recordingMove) MoveToLocation(location.Location) (bool, error) { return fa
 func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
 
 func (*fakeActor) ThinkFollow(attackable.Combatant, bool) bool { return false }
+
+// TestSummonAIFinishedCastingAppliesTheFollowItself pins that a cast ending
+// with nothing to resume leaves the summon already following: the idle is
+// decided and applied in one critical section, so a Betray TryToAttack from
+// the caster's queue that lands once FinishedCasting returns keeps its attack
+// instead of being overwritten by a later follow from the owner's queue.
+func TestSummonAIFinishedCastingAppliesTheFollowItself(t *testing.T) {
+	self := actor(100)
+	owner := actor(1)
+	move := &summonMove{}
+	brain := NewSummon(self, move, &recordingAttack{canAttack: true})
+
+	if !brain.FinishedCasting(owner) {
+		t.Fatal("FinishedCasting() = false, want the summon sent idle")
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() after FinishedCasting = %v, want follow already applied", got)
+	}
+	if move.friendlyTarget != owner {
+		t.Fatalf("friendly follow target = %v, want the owner", move.friendlyTarget)
+	}
+
+	if !brain.TryToAttack(owner) {
+		t.Fatal("Betray TryToAttack(owner) = false, want accepted")
+	}
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after Betray = %v, want attack", got)
+	}
+}
+
+// TestSummonAIFinishedCastingWithoutFollowStandsStill pins the follow-off
+// idle: nothing to resume and nobody to follow stops the summon in place.
+func TestSummonAIFinishedCastingWithoutFollowStandsStill(t *testing.T) {
+	move := &summonMove{}
+	brain := NewSummon(actor(100), move, &recordingAttack{})
+
+	if !brain.FinishedCasting(nil) {
+		t.Fatal("FinishedCasting(nil) = false, want the summon sent idle")
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	}
+	if move.stopCount != 1 || move.friendlyTarget != nil {
+		t.Fatalf("Stop calls = %d, follow target = %v; want 1 stop and no follow", move.stopCount, move.friendlyTarget)
+	}
+}
