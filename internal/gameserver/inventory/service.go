@@ -166,11 +166,15 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 	if dropped == nil {
 		return DropResult{}, false, nil
 	}
-	return DropResult{
+	res := DropResult{
 		Result:   Result{EquipmentChanged: wasEquipped},
 		Dropped:  dropped,
 		Template: tmpl,
-	}, true, nil
+	}
+	if wasEquipped {
+		res.Changed = []*item.Instance{dropped}
+	}
+	return res, true, nil
 }
 
 // PickupFailure is the non-mutating reason a ground-item pickup failed.
@@ -449,12 +453,16 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
 
-	return CrystallizeResult{
+	res := CrystallizeResult{
 		Result:        Result{EquipmentChanged: wasEquipped},
 		SourceItemID:  sourceItemID,
 		CrystalItemID: crystalItemID,
 		CrystalCount:  int(crystalCount),
-	}, CrystallizeOK, nil
+	}
+	if wasEquipped {
+		res.Changed = []*item.Instance{inst}
+	}
+	return res, CrystallizeOK, nil
 }
 
 func (s *Service) nextID() (int32, bool, error) {

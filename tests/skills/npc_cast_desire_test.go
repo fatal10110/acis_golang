@@ -22,6 +22,13 @@ var npcDesiredRef = modelskill.Ref{ID: npcDesiredSkill, Level: 1}
 // does. The monster's AI then casts it on its next think.
 func bootNPCDesireCaster(t *testing.T) (*gameservertest.Server, *npc.Hostile) {
 	t.Helper()
+	return bootNPCDesireCasterWith(t, false)
+}
+
+// bootNPCDesireCasterWith is bootNPCDesireCaster whose self buff is a magic
+// skill when magic is set.
+func bootNPCDesireCasterWith(t *testing.T, magic bool) (*gameservertest.Server, *npc.Hostile) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -29,7 +36,7 @@ func bootNPCDesireCaster(t *testing.T) (*gameservertest.Server, *npc.Hostile) {
 	startInWorld(t, srv.Client)
 	defs := modelskill.NewTable([]modelskill.Definition{{
 		ID: npcDesiredSkill, Level: 1, Activation: modelskill.ActivationActive,
-		Target: modelskill.TargetSelf, SkillType: "BUFF",
+		Target: modelskill.TargetSelf, SkillType: "BUFF", Magic: magic,
 		HitTime: 2000, StaticHitTime: true, StaticReuse: true,
 	}})
 	hostile, _ := srv.SpawnCastingHostileNPC(t, &npc.Template{

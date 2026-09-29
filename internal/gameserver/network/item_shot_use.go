@@ -62,7 +62,16 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 	if !ok {
 		return false
 	}
+	l.chargeShot(live, inv, inst, tmpl, msgs, true)
+	return true
+}
 
+// chargeShot runs one shot stack against live's active weapon and sends
+// what the outcome produces. clicked marks a use from the item window,
+// whose rejections always end in ActionFailed; a server-driven recharge
+// has no pending click to release and answers a rejection with nothing
+// beyond what an auto-enabled stack already implies.
+func (l *GameClientLink) chargeShot(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, msgs shotMessageSet, clicked bool) {
 	res := itemhandler.UseShot(itemhandler.ShotUseRequest{
 		Caster:    live.Character,
 		Inventory: inv,
@@ -77,14 +86,14 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 		// something that changed: fully silent, no message, no
 		// ActionFailed.
 	case itemhandler.ShotNoCapacity:
-		l.replyShotRejection(live, res.AutoEnabled, msgs.noCapacity)
+		l.replyShotRejection(live, res.AutoEnabled, clicked, msgs.noCapacity)
 	case itemhandler.ShotGradeMismatch:
-		l.replyShotRejection(live, res.AutoEnabled, msgs.gradeMismatch)
+		l.replyShotRejection(live, res.AutoEnabled, clicked, msgs.gradeMismatch)
 	case itemhandler.ShotNotEnoughItems:
 		if res.AutoEnabled {
 			l.disableAutoShot(live, tmpl.ID)
 		}
-		l.replyShotRejection(live, res.AutoEnabled, msgs.notEnough)
+		l.replyShotRejection(live, res.AutoEnabled, clicked, msgs.notEnough)
 	case itemhandler.ShotApplied:
 		live.SendFrame(serverpackets.FrameSystemMessage(msgs.enabled))
 		if res.SkillID != 0 {
@@ -94,7 +103,42 @@ func (l *GameClientLink) useShotItem(live *livePlayer, inv *itemcontainer.Invent
 			})
 		}
 	}
-	return true
+}
+
+// rechargeShots charges live's active weapon from every shot stack it has
+// set to auto-use: soulshots when physical, spiritshots and blessed
+// spiritshots when magic. An auto-use entry whose stack is gone is dropped
+// without a packet. Stacks are tried in ascending item id order.
+func (l *GameClientLink) rechargeShots(live *livePlayer, inv *itemcontainer.Inventory, physical, magic bool) {
+	if live == nil || inv == nil {
+		return
+	}
+	for _, itemID := range live.AutoSoulShotIDs() {
+		inst := inv.ItemByTemplateID(itemID)
+		if inst == nil {
+			live.SetAutoSoulShot(itemID, false)
+			continue
+		}
+		tmpl, ok := inv.Templates().Get(itemID)
+		if !ok || tmpl.EtcItem == nil {
+			continue
+		}
+		switch tmpl.DefaultAction {
+		case item.ActionSoulshot:
+			if !physical {
+				continue
+			}
+		case item.ActionSpiritshot:
+			if !magic {
+				continue
+			}
+		default:
+			continue
+		}
+		if msgs, ok := shotMessages[tmpl.EtcItem.Handler]; ok {
+			l.chargeShot(live, inv, inst, tmpl, msgs, false)
+		}
+	}
 }
 
 // disableAutoShot turns off itemID's auto-shot flag and notifies the
@@ -113,14 +157,16 @@ func (l *GameClientLink) disableAutoShot(live *livePlayer, itemID int32) {
 
 // replyShotRejection answers a shot-charge rejection: msg unless
 // autoEnabled suppresses it (matching the reference's own suppression for
-// an AutoSoulShot-enabled item), and always ActionFailed so the client's
-// pending click resolves to something, per this codebase's
+// an AutoSoulShot-enabled item), and ActionFailed when clicked so the
+// client's pending click resolves to something, per this codebase's
 // no-silent-rejection rule.
-func (l *GameClientLink) replyShotRejection(live *livePlayer, autoEnabled bool, msg int) {
+func (l *GameClientLink) replyShotRejection(live *livePlayer, autoEnabled, clicked bool, msg int) {
 	if !autoEnabled {
 		live.SendFrame(serverpackets.FrameSystemMessage(msg))
 	}
-	live.SendFrame(serverpackets.FrameActionFailed())
+	if clicked {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
 }
 
 // beastShotNotEnoughMessage maps each beast shot handler name to the
@@ -169,7 +215,7 @@ func (l *GameClientLink) useBeastShotItem(live *livePlayer, inv *itemcontainer.I
 	case itemhandler.BeastShotSummonDead:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageShotsNotAvailableForDeadPet))
 	case itemhandler.BeastShotNotEnoughItems:
-		l.replyShotRejection(live, res.AutoEnabled, notEnoughMsg)
+		l.replyShotRejection(live, res.AutoEnabled, true, notEnoughMsg)
 	case itemhandler.BeastShotApplied:
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetUsesS1, tmpl.ID))
 		if res.SkillID != 0 && summonTarget != nil {

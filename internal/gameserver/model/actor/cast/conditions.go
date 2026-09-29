@@ -14,8 +14,8 @@ type ConditionError struct {
 func (*ConditionError) Error() string { return "cast: skill condition not met" }
 
 // conditionGate is the optional Actor capability CanCast asks before paying
-// item costs: whether def's <cond> clauses hold against target. Only a
-// player caster evaluates them; NPC casts never do.
+// item costs: whether def's <cond> clauses hold against target. Player and
+// summon casters evaluate them; NPC casts never do.
 type conditionGate interface {
 	SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool)
 }
@@ -23,4 +23,9 @@ type conditionGate interface {
 // SkillConditions evaluates def's <cond> clauses with the player as caster.
 func (a PlayerActor) SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool) {
 	return conditions.EvaluateSkill(def, a.Character, target)
+}
+
+// SkillConditions evaluates def's <cond> clauses with the summon as caster.
+func (a SummonActor) SkillConditions(target Target, def modelskill.Definition) (modelskill.ConditionClause, bool) {
+	return conditions.EvaluateSkill(def, a.Summon, target)
 }

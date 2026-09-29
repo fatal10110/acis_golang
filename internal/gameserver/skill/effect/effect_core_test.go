@@ -296,7 +296,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"PhoenixBless", TypePhoenixBless, FlagPhoenixBlessing, false, false},
 		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
 		{"BlockDebuff", TypeBlockDebuff, FlagNone, false, false},
-		{"ProtectionBlessing", TypeProtectionBless, flagProtectionBlessing, false, false},
+		{"ProtectionBlessing", TypeProtectionBless, FlagProtectionBlessing, false, false},
 		{"PolearmTargetSingle", TypePolearmTargetSingle, FlagNone, false, false},
 		{"BigHead", TypeBigHead, flagBigHead, false, false},
 		{"Spoil", TypeSpoil, FlagNone, false, false},

@@ -11,7 +11,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
-	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // magicStrikeHitTime leaves the magic strike's interrupt window open well
@@ -168,11 +167,9 @@ func TestMonsterSkillHitBreaksPetMagicCast(t *testing.T) {
 				Offensive: true, CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 				SkillType: "PDAM", Power: 100,
 			}}))
-			// The owner's PvP flag keeps the NPC launch's target re-check
-			// from dropping the unflagged pet (#2685); the reference
-			// resolves an NPC's ONE target list with no conditions.
-			owner, _ := h.srv.State.Player(h.ownerID)
-			owner.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+			// The owner stays unflagged: the reference resolves an NPC's
+			// ONE target list with no conditions, so the strike reaches
+			// the pet regardless.
 			drainUntilQuiet(t, h.client)
 			startWolfStrike(t, h)
 
@@ -233,4 +230,60 @@ func TestRemoveTargetStopsPetCast(t *testing.T) {
 			got.canceled, got.interrupted, got.launched)
 	}
 	assertStrikeAborted(t, h, petActor, hostile)
+}
+
+// TestCastStoppingEffectsStopPetCast lands Mute, PhysicalMute and
+// SilenceMagicPhysical on a pet mid-strike. EffectMute.onStart stops a magic
+// cast only, EffectPhysicalMute.onStart a physical one only, and
+// EffectSilenceMagicPhysical.onStart any cast. A stopped strike reaches
+// observers as MagicSkillCanceled with no CASTING_INTERRUPTED
+// (CreatureCast.stop), lands nothing, and the pet goes idle and follows its
+// owner again (PlayableCast.stop -> tryToIdle). A strike left alone runs on
+// and lands.
+func TestCastStoppingEffectsStopPetCast(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		effect  string
+		magic   bool
+		stopped bool
+	}{
+		{effect: "Mute", magic: true, stopped: true},
+		{effect: "Mute", magic: false},
+		{effect: "PhysicalMute", magic: false, stopped: true},
+		{effect: "PhysicalMute", magic: true},
+		{effect: "SilenceMagicPhysical", magic: true, stopped: true},
+		{effect: "SilenceMagicPhysical", magic: false, stopped: true},
+	} {
+		kind := "physical"
+		if tt.magic {
+			kind = "magic"
+		}
+		t.Run(tt.effect+" on "+kind+" strike", func(t *testing.T) {
+			t.Parallel()
+			var (
+				h        *petWorld
+				petActor *summon.Actor
+				hostile  *npc.Hostile
+			)
+			if tt.magic {
+				h, petActor, hostile = bootMagicStriker(t, 99)
+			} else {
+				h, petActor, hostile = bootWolfStriker(t)
+			}
+			startWolfStrike(t, h)
+			landOnPet(t, h, petActor, tt.effect)
+
+			got := readPetCastOutcome(t, h, petActor)
+			if got.canceled != tt.stopped || got.interrupted {
+				t.Fatalf("after %s: MagicSkillCanceled = %v, CASTING_INTERRUPTED = %v; want %v, false",
+					tt.effect, got.canceled, got.interrupted, tt.stopped)
+			}
+			if tt.stopped {
+				assertStrikeAborted(t, h, petActor, hostile)
+				return
+			}
+			h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
+			drainUntilQuiet(t, h.client)
+		})
+	}
 }

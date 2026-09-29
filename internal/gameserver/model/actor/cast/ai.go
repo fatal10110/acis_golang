@@ -25,9 +25,15 @@ type AIController struct {
 	// failure. Network wiring owns the system-message encoding.
 	OnLaunchAbort func(LaunchAbortReason)
 	// OnTargetRejection sends the caster-visible result of a failed target
-	// condition (MeetsCastConditions). Network wiring owns the
+	// condition (CanCastPlayable's last gate). Network wiring owns the
 	// system-message encoding.
 	OnTargetRejection func(skilltarget.CastRejection, modelskill.Definition)
+	// OnCastRefusal sends the caster-visible reason of a playable cast
+	// refused by AttemptCast or CanCastPlayable: the error names the failed
+	// gate (ErrSkillDisabled, ErrNotEnoughMP, ErrCantSeeTarget, a
+	// *ConditionError, ...). Network wiring owns the system-message
+	// encoding.
+	OnCastRefusal func(error, modelskill.Definition)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
 	// Summon casters wire it to forward the result to the owner, mirroring
 	// Summon.sendPacket's owner-forward. Hostile NPC casters wire it to a
@@ -125,14 +131,77 @@ func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) 
 	return a.Controller.CanCast(castTarget, def) == nil
 }
 
-// MeetsCastConditions applies ref's target-type conditions for a playable
-// caster against target, the last check before a playable's cast commits.
-// A failure is reported through OnTargetRejection.
-func (a *AIController) MeetsCastConditions(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool {
+// FinalTarget resolves the creature ref's target type aims at, given the
+// commanded target (nil when there is none): the caster itself for its
+// self-centered types, its owner for OWNER_PET, the commanded target for ONE.
+// nil means the skill has no final target, and the request is dropped.
+func (a *AIController) FinalTarget(target attackable.Combatant, ref modelskill.Ref) attackable.Combatant {
+	def, ok := a.definition(ref)
+	if !ok || a.Caster == nil || a.Effects.Targets == nil {
+		return nil
+	}
+	handler, ok := a.Effects.Targets.Handler(def.Target)
+	if !ok {
+		return nil
+	}
+	selected, _ := any(target).(skilltarget.Actor)
+	final, _ := handler.FinalTarget(a.Caster, selected, &def).(attackable.Combatant)
+	return final
+}
+
+// AttemptCast is CanAttempt for a playable caster's cast request: a skill
+// still cooling down is reported through OnCastRefusal.
+func (a *AIController) AttemptCast(target attackable.Combatant, ref modelskill.Ref) bool {
+	if a.CanAttempt(target, ref) {
+		return true
+	}
+	if def, ok := a.definition(ref); ok && a.Controller != nil && target != nil {
+		a.refuse(ErrSkillDisabled, def)
+	}
+	return false
+}
+
+// CanCastPlayable runs a playable caster's gates immediately before its cast
+// commits, in the reference order: HP/MP and mute, line of sight to the
+// target of a ranged skill, the skill's own conditions and item cost, and
+// last the target conditions judged with ctrl. The first failure is reported
+// through OnCastRefusal, or OnTargetRejection for a target condition.
+func (a *AIController) CanCastPlayable(target attackable.Combatant, ref modelskill.Ref, ctrl bool) bool {
+	if a.Controller == nil || a.Caster == nil || target == nil {
+		return false
+	}
 	def, ok := a.definition(ref)
 	if !ok {
 		return false
 	}
+	castTarget, ok := any(target).(Target)
+	if !ok {
+		return false
+	}
+	err := a.Controller.MeetsHPMPDisabled(castTarget, def)
+	if err == nil && def.CastRange > 0 && !launchCanSee(a.Caster, castTarget) {
+		err = ErrCantSeeTarget
+	}
+	if err == nil {
+		err = a.Controller.CanCast(castTarget, def)
+	}
+	if err != nil {
+		a.refuse(err, def)
+		return false
+	}
+	return a.meetsCastConditions(target, def, ctrl)
+}
+
+func (a *AIController) refuse(err error, def modelskill.Definition) {
+	if a.OnCastRefusal != nil {
+		a.OnCastRefusal(err, def)
+	}
+}
+
+// meetsCastConditions applies def's target-type conditions for a playable
+// caster against target, the last check before a playable's cast commits.
+// A failure is reported through OnTargetRejection.
+func (a *AIController) meetsCastConditions(target attackable.Combatant, def modelskill.Definition, ctrl bool) bool {
 	aimed, ok := any(target).(skilltarget.Actor)
 	if !ok || a.Caster == nil {
 		return false

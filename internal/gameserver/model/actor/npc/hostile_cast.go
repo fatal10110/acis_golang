@@ -7,6 +7,7 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 // from the controller's own event sink.
 type CastControl interface {
 	CastingNow() bool
+	CurrentSkillIsMagic() bool
 	// InterruptCast aborts the cast only while it is still inside its
 	// interrupt window.
 	InterruptCast()
@@ -34,6 +35,12 @@ func (h *Hostile) castControl() CastControl {
 func (h *Hostile) CastingNow() bool {
 	c := h.castControl()
 	return c != nil && c.CastingNow()
+}
+
+// CurrentSkillIsMagic reports whether h's cast in flight is a magic skill.
+func (h *Hostile) CurrentSkillIsMagic() bool {
+	c := h.castControl()
+	return c != nil && c.CurrentSkillIsMagic()
 }
 
 // InterruptCast aborts h's cast while it is still inside its interrupt

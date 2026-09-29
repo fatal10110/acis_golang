@@ -177,6 +177,43 @@ func (ix *Index) NPCInPeaceZone(x, y, z int) bool {
 	return false
 }
 
+// SummonCombatZones reports the combat-zone membership the zones at
+// (x, y, z) give a summon standing there, the same flags revalidating a
+// ClassSummon occupant would raise: pvp mirrors Flags.Has(FlagPvP) (an arena,
+// an active siege battlefield or a stadium with a match running, cancelled
+// by any peace hold), and siege mirrors FlagSiege. A nil index, a server
+// booted without zones, holds neither.
+func (ix *Index) SummonCombatZones(x, y, z int) (pvp, siege bool) {
+	if ix == nil {
+		return false, false
+	}
+	peace := false
+	for _, k := range ix.At(x, y) {
+		if !k.Core().ContainsPoint(x, y, z) {
+			continue
+		}
+		switch v := k.(type) {
+		case *Arena:
+			pvp = true
+		case *Siege:
+			if v.Active() {
+				pvp, siege = true, true
+			}
+		case *Olympiad:
+			if v.battleRunning() {
+				pvp = true
+			}
+		case *Peace, *DerbyTrack:
+			peace = true
+		case *Town:
+			if v.raisesPeace() {
+				peace = true
+			}
+		}
+	}
+	return pvp && !peace, siege
+}
+
 // peaceCapable reports whether k is one of the zone kinds that can suspend
 // hostilities: an explicit Peace zone, a monster-race derby track, or a
 // town whose data marks it peaceful.

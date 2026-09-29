@@ -1769,7 +1769,7 @@ func newCastHostile(t *testing.T, id int32, kind string) *npc.Hostile {
 	return hostile
 }
 
-func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
+func TestApplyEffectsAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 	caster := &effectsActor{id: 1, kind: modelactor.KindPlayer}
 	recorder := &recordingSkillHandler{}
 	handlers := newEffectHandlers(effectsKnown{}, "DUMMY", recorder)
@@ -1800,9 +1800,8 @@ func TestResolveAffectedAcceptsOnlyUnlockableRuntimeTargets(t *testing.T) {
 			if !ok {
 				t.Fatal("SelectTarget() ok = false, want true")
 			}
-			_, got := ResolveAffected(handlers, caster, selected, tc.def)
-			if got != tc.want {
-				t.Fatalf("ResolveAffected() ok = %v, want %v", got, tc.want)
+			if got := ApplyEffects(handlers, caster, selected, tc.def); got != tc.want {
+				t.Fatalf("ApplyEffects() = %v, want %v", got, tc.want)
 			}
 		})
 	}
@@ -2020,6 +2019,7 @@ func TestRevalidateLaunchSummonTargetInPeaceZone(t *testing.T) {
 type launchZoneQuery bool
 
 func (q launchZoneQuery) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
+func (q launchZoneQuery) SummonCombatZones(_, _, _ int) (pvp, siege bool)  { return false, false }
 
 func TestRevalidateLaunchPeaceZoneOnlyGatesOffensivePlayableVsPlayable(t *testing.T) {
 	caster := &launchActor{id: 1, knows: true, sees: true, kind: modelactor.KindPlayer, inPeaceZone: true}

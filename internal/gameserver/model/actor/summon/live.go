@@ -155,7 +155,7 @@ type Actor struct {
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
 	// skill shortcut, matching Java's Summon.getSkill.
 	skills map[int]int
-	zones  PeaceZoneQuery
+	zones  ZoneQuery
 
 	// followOff is set while the owner has told the summon to stop following
 	// it; the zero value follows. Atomic because an effect landing on the
@@ -352,7 +352,7 @@ type PetConfig struct {
 	// resolves them into stat funcs attached before current HP/MP seed.
 	Passives  []modelskill.Ref
 	SkillDefs skillLookup
-	Zones     PeaceZoneQuery
+	Zones     ZoneQuery
 	LOS       LineOfSight
 }
 
@@ -390,7 +390,7 @@ type ServitorConfig struct {
 	// resolves them into stat funcs attached before current HP/MP seed.
 	Passives  []modelskill.Ref
 	SkillDefs skillLookup
-	Zones     PeaceZoneQuery
+	Zones     ZoneQuery
 	LOS       LineOfSight
 }
 

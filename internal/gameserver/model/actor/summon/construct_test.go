@@ -30,6 +30,7 @@ func mustPet(t testing.TB, cfg PetConfig) *Actor {
 type peaceZoneQueryStub bool
 
 func (q peaceZoneQueryStub) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
+func (q peaceZoneQueryStub) SummonCombatZones(_, _, _ int) (pvp, siege bool)  { return false, false }
 
 func TestSummonInPeaceZoneQueriesCurrentZone(t *testing.T) {
 	pet := mustPet(t, PetConfig{ObjectID: 1, Zones: peaceZoneQueryStub(true)})

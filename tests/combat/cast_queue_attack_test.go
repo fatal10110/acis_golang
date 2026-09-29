@@ -17,11 +17,32 @@ import (
 // second one to queue behind it, both long enough that the harness's reads,
 // which move the driven clock while they wait, never reach their launch.
 const (
-	queueLongSkillID = 3
-	queueNextSkillID = 4
-	queueOneSkillID  = 5
-	queueHitTime     = 5000
+	queueLongSkillID      = 3
+	queueNextSkillID      = 4
+	queueOneSkillID       = 5
+	queueFollowUpSkillID  = 6
+	queueHitTime          = 5000
+	queueScrollTemplateID = 736  // Scroll of Escape: ItemSkills, item_skill 2013-1
+	queueScrollSkillID    = 2013 // re-typed as a harmless self cast here
 )
+
+// queueScrollSkill is the skill the fixture scroll carries: a short self
+// cast through the item AI-cast path.
+func queueScrollSkill() modelskill.Definition {
+	return modelskill.Definition{
+		ID: queueScrollSkillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, StaticHitTime: true, ReuseDelay: 5000, StaticReuse: true, SkillType: "DUMMY",
+	}
+}
+
+// queueFollowUpSkill is a long self cast carrying nextActionAttack. It is
+// not offensive, so the fixture monster never answers it with its own
+// swings.
+func queueFollowUpSkill() modelskill.Definition {
+	def := queueCastSkill(queueFollowUpSkillID)
+	def.NextActionIsAttack = true
+	return def
+}
 
 func queueCastSkill(id int) modelskill.Definition {
 	return modelskill.Definition{
@@ -43,10 +64,22 @@ func queueOneSkill() modelskill.Definition {
 // self cast, leaving the caster mid-cast with the monster still selected.
 func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Character, int32) {
 	t.Helper()
+	srv, pc, hostileID, _ := bootMidCastWith(t, queueLongSkillID)
+	return srv, pc, hostileID
+}
+
+// bootMidCastWith selects the fixture monster, then starts the long cast
+// longID, leaving the caster mid-cast with the monster still selected. It
+// also returns the object ID of a fixture scroll whose skill runs through
+// the item AI-cast path.
+func bootMidCastWith(t *testing.T, longID int32) (*gameservertest.Server, *player.Character, int32, int32) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{queueCastSkill(queueLongSkillID), queueCastSkill(queueNextSkillID), queueOneSkill()})),
+		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{
+			queueCastSkill(queueLongSkillID), queueCastSkill(queueNextSkillID), queueOneSkill(), queueFollowUpSkill(), queueScrollSkill(),
+		})),
 	)
 	if !srv.DrivesClock() {
 		t.Skip("holding a cast open needs the driven clock")
@@ -55,6 +88,8 @@ func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Cha
 	seedKnownSkill(t, srv, objID, queueLongSkillID, 1)
 	seedKnownSkill(t, srv, objID, queueNextSkillID, 1)
 	seedKnownSkill(t, srv, objID, queueOneSkillID, 1)
+	seedKnownSkill(t, srv, objID, queueFollowUpSkillID, 1)
+	scroll := srv.GiveItem(t, objID, queueScrollTemplateID, 3)
 	startInWorld(t, c)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 20, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
@@ -69,13 +104,13 @@ func bootMidCastBesideHostile(t *testing.T) (*gameservertest.Server, *player.Cha
 	}
 
 	targetHostile(t, c, hostile.ObjectID())
-	c.Send(encodeRequestMagicSkillUse(queueLongSkillID, false, false))
+	c.Send(encodeRequestMagicSkillUse(longID, false, false))
 	assertFrameOpcode(t, mustRead(t, c, "long cast MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "long cast MagicSkillUse")
 	drainUntilQuiet(t, c)
 	if !srv.PlayerCastingNow(t, objID) {
 		t.Fatal("long cast not in flight")
 	}
-	return srv, pc, hostile.ObjectID()
+	return srv, pc, hostile.ObjectID(), scroll
 }
 
 // requestAttackMidCast clicks the selected monster mid-cast: the attack

@@ -39,6 +39,8 @@ const (
 	SystemMessageNoLogoutHere                      = 778
 	SystemMessageNoRestartHere                     = 779
 	SystemMessageS1Disarmed                        = 417
+	SystemMessageS1Equipped                        = 49
+	SystemMessageS1S2Equipped                      = 368
 	SystemMessageEquipmentS1S2Removed              = 1064
 	SystemMessageRequestS1ForTrade                 = 118
 	SystemMessageS1DeniedTradeRequest              = 119

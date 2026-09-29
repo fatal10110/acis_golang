@@ -50,13 +50,13 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// is answered with ActionFailed; the swing's or cast's end runs it.
 	// Starting it now would pay its costs and broadcast MagicSkillUse (or
 	// switch a toggle) before what is in flight has finished. It replaces an
-	// attack queued behind the same cast. itemAICastBusy is the wait
-	// predicate every cast request shares, the sit-down and stand-up
-	// transitions included.
+	// attack queued behind the same cast, and the attack the swing in
+	// flight is for. itemAICastBusy is the wait predicate every cast request
+	// shares, the sit-down and stand-up transitions included.
 	if castable && !restoringServitor && itemAICastBusy(live) {
 		live.deferMagicSkill(req, selected)
 		if live.combat != nil {
-			live.combat.DropResumeAfterCast()
+			live.combat.ReplaceWithCast()
 		}
 		sendMagicActionFailed(live)
 		return
@@ -71,6 +71,12 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 // castMagicSkill starts a skill request that has cleared its request-time
 // gates, fresh or resumed, against selected.
 func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.RequestMagicSkillUse, def modelskill.Definition, known bool, selected world.Tracked) {
+	// The request is the CAST intention now, whatever its outcome: the attack
+	// intention it replaced swings again only if the cast ends with
+	// nextActionAttack.
+	if known && live.combat != nil && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle) {
+		live.combat.ReplaceWithCast()
+	}
 	if known && def.Activation == modelskill.ActivationToggle {
 		l.handleToggleSkillUse(live, req, selected)
 		return
@@ -536,11 +542,14 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live, false)
 			sendMagicActionFailed(live)
+			live.endCastIntention(def)
 			return
 		}
 		sendMagicCastFailure(live, def, err)
 		return
 	}
+	// A toggle's cast ends as soon as it has switched, with no CastFinished.
+	defer live.endCastIntention(def)
 
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
@@ -616,6 +625,8 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughHP))
 	case errors.Is(err, actorcast.ErrNotEnoughItems):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrCantSeeTarget):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantSeeTarget))
 	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrAllSkillsDisabled):

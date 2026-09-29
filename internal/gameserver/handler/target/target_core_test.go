@@ -404,6 +404,23 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	deadOwner := &targetActor{id: 42, kind: actor.KindPlayer, dead: true}
 	orphanedSummon := &targetActor{id: 43, kind: actor.KindSummon, owner: deadOwner}
 
+	// Acting-player fixtures: a summon's ONE cast is judged by its owner.
+	flaggedOwner := &targetActor{id: 60, kind: actor.KindPlayer, attackableBy: true, attackableWithoutForce: true}
+	flaggedOwnerSummon := &targetActor{id: 61, kind: actor.KindSummon, owner: flaggedOwner, attackableBy: true, attackableWithoutForce: true}
+	flaggedOwner.summon = flaggedOwnerSummon
+	deniedOwner := &targetActor{id: 62, kind: actor.KindPlayer, playableCastDenied: true}
+	deniedOwnerSummon := &targetActor{id: 63, kind: actor.KindSummon, owner: deniedOwner}
+	waitingOlympian := &targetActor{id: 64, kind: actor.KindPlayer, olympiad: true}
+	waitingOlympianSummon := &targetActor{id: 65, kind: actor.KindSummon, owner: waitingOlympian}
+	plainOwner := &targetActor{id: 66, kind: actor.KindPlayer}
+	plainOwnerSummon := &targetActor{id: 67, kind: actor.KindSummon, owner: plainOwner}
+	// Attackable without a forced attack by the owner only, not by the
+	// summon itself.
+	flaggedForOwner := &targetActor{id: 68, kind: actor.KindPlayer, attackableBy: true, withoutForceBy: plainOwner.id}
+	// A summon whose own social policy refuses the target while its owner's
+	// allows it: AREA asks the summon, ONE asks the owner.
+	deniedSummon := &targetActor{id: 69, kind: actor.KindSummon, owner: plainOwner, playableCastDenied: true}
+
 	// Corpse-ally fixtures.
 	olympian := &targetActor{id: 50, kind: actor.KindPlayer, olympiad: true}
 	olympianSummon := &targetActor{id: 51, kind: actor.KindSummon, owner: olympian}
@@ -425,6 +442,12 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"one offensive summon without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 7, kind: actor.KindSummon, attackableBy: true}, offensive, CastRejectInvalidTarget},
 		{"one offensive flagged summon without force", modelskill.TargetOne, &targetActor{id: 3, kind: actor.KindPlayer}, &targetActor{id: 7, kind: actor.KindSummon, attackableBy: true, attackableWithoutForce: true}, offensive, CastRejectNone},
 		{"one nil target", modelskill.TargetOne, caster, nil, offensive, CastRejectNone},
+		{"one offensive summon on its own flagged owner", modelskill.TargetOne, flaggedOwnerSummon, flaggedOwner, offensive, CastRejectInvalidTarget},
+		{"one offensive player on its own flagged summon", modelskill.TargetOne, flaggedOwner, flaggedOwnerSummon, offensive, CastRejectInvalidTarget},
+		{"one offensive summon whose owner may not hit the target", modelskill.TargetOne, deniedOwnerSummon, flagged, offensive, CastRejectInvalidTarget},
+		{"one beneficial summon whose owner may not help the target", modelskill.TargetOne, deniedOwnerSummon, flagged, regular, CastRejectInvalidTarget},
+		{"one offensive summon of an olympian before the match", modelskill.TargetOne, waitingOlympianSummon, flagged, offensive, CastRejectInvalidTarget},
+		{"one offensive summon judged by its owner's forced-attack relation", modelskill.TargetOne, plainOwnerSummon, flaggedForOwner, offensive, CastRejectNone},
 		{"corpse pet living", modelskill.TargetCorpsePet, caster, &targetActor{id: 4, kind: actor.KindPlayer, pet: true}, nil, CastRejectInvalidTarget},
 		{"corpse pet dead servitor", modelskill.TargetCorpsePet, caster, &targetActor{id: 5, kind: actor.KindPlayer, dead: true, owner: caster}, nil, CastRejectCannotUseSkill},
 		{"corpse pet dead pet", modelskill.TargetCorpsePet, caster, &targetActor{id: 6, kind: actor.KindPlayer, dead: true, owner: caster, pet: true}, nil, CastRejectNone},
@@ -472,6 +495,10 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 		{"aura undead outside peace", modelskill.TargetAuraUndead, areaCaster, areaCaster, offensive, CastRejectNone},
 
 		{"area playable the caster may not hit", modelskill.TargetArea, policyDenied, flagged, offensive, CastRejectInvalidTarget},
+		{"area summon on its own flagged owner", modelskill.TargetArea, flaggedOwnerSummon, flaggedOwner, offensive, CastRejectInvalidTarget},
+		{"area summon that may not hit the target itself", modelskill.TargetArea, deniedSummon, flagged, offensive, CastRejectInvalidTarget},
+		{"area summon judged by itself, not its denying owner", modelskill.TargetArea, deniedOwnerSummon, flagged, offensive, CastRejectNone},
+		{"one summon judged by its owner, not its own denial", modelskill.TargetOne, deniedSummon, flagged, offensive, CastRejectNone},
 		{"area unattackable target", modelskill.TargetArea, areaCaster, untouchable, offensive, CastRejectInvalidTarget},
 		{"area target needing a forced attack", modelskill.TargetArea, areaCaster, unflagged, offensive, CastRejectInvalidTarget},
 		{"area flagged target", modelskill.TargetArea, areaCaster, flagged, offensive, CastRejectNone},
@@ -505,9 +532,19 @@ func TestCastRejectionForPreservesHandlerMessages(t *testing.T) {
 	}
 
 	// CTRL forces the attack an unflagged target otherwise refuses.
-	for _, targetType := range []modelskill.Target{modelskill.TargetArea, modelskill.TargetFrontArea} {
+	for _, targetType := range []modelskill.Target{modelskill.TargetArea, modelskill.TargetFrontArea, modelskill.TargetOne} {
 		if got := CastRejectionFor(targetType, areaCaster, unflagged, offensive, true); got != CastRejectNone {
 			t.Fatalf("CastRejectionFor(%s, ctrl) on an unflagged target = %v, want none", targetType, got)
+		}
+	}
+	// CTRL never lets a summon strike its own owner, nor a player their own
+	// summon.
+	for _, targetType := range []modelskill.Target{modelskill.TargetOne, modelskill.TargetArea} {
+		if got := CastRejectionFor(targetType, flaggedOwnerSummon, flaggedOwner, offensive, true); got != CastRejectInvalidTarget {
+			t.Fatalf("CastRejectionFor(%s, ctrl) of a summon on its owner = %v, want invalid target", targetType, got)
+		}
+		if got := CastRejectionFor(targetType, flaggedOwner, flaggedOwnerSummon, offensive, true); got != CastRejectInvalidTarget {
+			t.Fatalf("CastRejectionFor(%s, ctrl) of a player on their summon = %v, want invalid target", targetType, got)
 		}
 	}
 }
@@ -1073,22 +1110,25 @@ type targetActor struct {
 	see                    map[int32]bool
 	attackableBy           bool
 	attackableWithoutForce bool
-	summon                 Actor
-	owner                  Actor
-	holy                   bool
-	unlockable             bool
-	undead                 bool
-	peace                  bool
-	corpse                 bool
-	monster                bool
-	folkOrGuard            bool
-	door                   bool
-	playableCastDenied     bool
-	olympiadStarted        bool
-	corpseDeadline         time.Time
-	corpseTime             time.Duration
-	spoiled                bool
-	seeded                 bool
+	// withoutForceBy, when set, limits attackableWithoutForce to the one
+	// caster with this object id.
+	withoutForceBy     int32
+	summon             Actor
+	owner              Actor
+	holy               bool
+	unlockable         bool
+	undead             bool
+	peace              bool
+	corpse             bool
+	monster            bool
+	folkOrGuard        bool
+	door               bool
+	playableCastDenied bool
+	olympiadStarted    bool
+	corpseDeadline     time.Time
+	corpseTime         time.Duration
+	spoiled            bool
+	seeded             bool
 
 	sameParty    map[int32]bool
 	sameClan     map[int32]bool
@@ -1152,7 +1192,12 @@ func (a *targetActor) CanSeeTarget(target Actor) bool {
 
 func (a *targetActor) AttackableBy(Actor) bool { return a.attackableBy }
 
-func (a *targetActor) AttackableWithoutForceBy(Actor) bool { return a.attackableWithoutForce }
+func (a *targetActor) AttackableWithoutForceBy(caster Actor) bool {
+	if a.withoutForceBy != 0 {
+		return caster != nil && caster.ObjectID() == a.withoutForceBy
+	}
+	return a.attackableWithoutForce
+}
 
 func (a *targetActor) Summon() (Actor, bool) { return a.summon, a.summon != nil }
 
