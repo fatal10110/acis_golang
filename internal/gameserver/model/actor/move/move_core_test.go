@@ -1915,3 +1915,42 @@ func TestCreatureMove_SetSpeedRetimesInFlightArrival(t *testing.T) {
 		t.Fatalf("Position() = %+v, want %+v", got, want)
 	}
 }
+
+// TestCreatureMove_StallDropsDequeuedArrival: an arrival callback already
+// dequeued when SetSpeed(0) stalls the leg (the timer fired on the owner's
+// queue while a foreign queue held mu) must not finish the stalled leg.
+func TestCreatureMove_StallDropsDequeuedArrival(t *testing.T) {
+	geo := &recordingGeo{canMove: true, height: 30}
+	mover, err := NewCreatureMove(location.Location{X: 0, Y: 0, Z: 30}, 100, geo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := newMoveClock()
+	mover.SetQueue(clock.q)
+	arrived := 0
+	mover.setOwner(&hookOwner{onArrived: func() { arrived++ }})
+
+	if _, err := mover.MoveToLocation(location.Location{X: 200, Y: 0, Z: 30}); err != nil {
+		t.Fatal(err)
+	}
+	clock.in.Advance(time.Second)
+	mover.UpdatePosition(time.Second)
+	before := mover.Position()
+
+	mover.mu.Lock()
+	staleSeq := mover.moveSeq
+	mover.mu.Unlock()
+
+	mover.SetSpeed(0)
+	mover.onArrive(staleSeq) // the arrival that was already running
+
+	if arrived != 0 {
+		t.Fatalf("stalled leg arrived %d times via a dequeued callback, want 0", arrived)
+	}
+	if !mover.Moving() {
+		t.Fatal("stalled leg stopped moving, want still moving")
+	}
+	if got := mover.Position(); got != before {
+		t.Fatalf("Position() = %+v after stale arrival, want unchanged %+v", got, before)
+	}
+}

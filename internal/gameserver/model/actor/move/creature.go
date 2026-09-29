@@ -364,16 +364,18 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive
 // duration, starts a new one that advances origin to destination and fires
-// the arrived hook once it elapses. Callers hold mu.
+// the arrived hook once it elapses. It always advances moveSeq, so an
+// arrival callback that already left the timer (Stop lost the race) is
+// dropped even when no new timer replaces it. Callers hold mu.
 func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 	if m.timer != nil {
 		m.timer.Stop()
 		m.timer = nil
 	}
+	m.moveSeq++
 	if duration <= 0 {
 		return
 	}
-	m.moveSeq++
 	seq := m.moveSeq
 	m.timer = m.queue.After(duration, func() { m.onArrive(seq) })
 }
