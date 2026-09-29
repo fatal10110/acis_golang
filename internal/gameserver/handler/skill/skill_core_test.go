@@ -3078,6 +3078,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 		skill     modelskill.Definition
 		blessed   bool
 		healOK    bool
+		cubic     bool
 		targets   func() []Actor
 		wantShots []item.ShotKind
 	}{
@@ -3224,6 +3225,20 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 			wantShots: []item.ShotKind{item.ShotBlessedSpirit},
 		},
 		{
+			name:    "cubic poison keeps the owner's shot",
+			skill:   modelskill.Definition{SkillType: "POISON", Debuff: true, Offensive: true},
+			blessed: true,
+			cubic:   true,
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
+			name:    "cubic stun keeps the owner's shot",
+			skill:   modelskill.Definition{SkillType: "STUN", Offensive: true},
+			blessed: true,
+			cubic:   true,
+			targets: func() []Actor { return []Actor{&skillTarget{}} },
+		},
+		{
 			name:      "disabler potion still spends",
 			skill:     modelskill.Definition{SkillType: "CANCEL_DEBUFF", Potion: true},
 			blessed:   true,
@@ -3237,7 +3252,7 @@ func TestNonDamageHandlersDischargeChargedShots(t *testing.T) {
 				healAmount: 10, healOK: tt.healOK,
 				charged: map[item.ShotKind]bool{item.ShotBlessedSpirit: tt.blessed, item.ShotSpirit: !tt.blessed, item.ShotSoul: true},
 			}
-			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets()})
+			NewDefaultRegistry().Use(Cast{Caster: caster, Skill: tt.skill, Targets: tt.targets(), Cubic: tt.cubic})
 			if !slices.Equal(caster.shots, tt.wantShots) {
 				t.Fatalf("discharged shots = %v, want %v", caster.shots, tt.wantShots)
 			}

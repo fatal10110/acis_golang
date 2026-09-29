@@ -125,8 +125,8 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 	}
 
 	applySelfEffects(cast, def)
-	// A potion or toggle leaves the spiritshot charged.
-	if !def.Potion && def.Activation != modelskill.ActivationToggle {
+	// A potion, toggle or cubic proc leaves the spiritshot charged.
+	if !cast.Cubic && !def.Potion && def.Activation != modelskill.ActivationToggle {
 		spendSpiritshot(cast.Caster, bsps, def.StaticReuse)
 	}
 	return result

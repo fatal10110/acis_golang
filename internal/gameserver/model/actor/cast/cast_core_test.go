@@ -1203,6 +1203,51 @@ func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *te
 	}
 }
 
+// fakeCubicShotOwner is a cubic owner holding a charged blessed spiritshot
+// and recording every shot-charge write.
+type fakeCubicShotOwner struct {
+	fakeCubicEffectCaster
+	blessed bool
+	writes  []item.ShotKind
+}
+
+func (f *fakeCubicShotOwner) BlessedSpiritshotCharged() bool { return f.blessed }
+func (f *fakeCubicShotOwner) SetChargedShot(kind item.ShotKind, charged bool) {
+	f.writes = append(f.writes, kind)
+	if kind == item.ShotBlessedSpirit {
+		f.blessed = charged
+	}
+}
+
+// TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot pins
+// that a cubic's POISON/DEBUFF/DOT and PARALYZE/STUN/ROOT/AGGDAMAGE procs
+// read the owner's blessed-spiritshot charge without spending it, although
+// the same skill types cast by a player discharge it.
+func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testing.T) {
+	registry := handlerskill.NewDefaultRegistry()
+	for _, def := range []modelskill.Definition{
+		{ID: 4052, SkillType: "POISON", Offensive: true, Debuff: true},
+		{ID: 4053, SkillType: "DEBUFF", Offensive: true, Debuff: true},
+		{ID: 4165, SkillType: "DOT", Offensive: true, Debuff: true},
+		{ID: 4164, SkillType: "PARALYZE", Offensive: true},
+		{ID: 4166, SkillType: "STUN", Offensive: true},
+		{ID: 5116, SkillType: "ROOT", Offensive: true},
+		{ID: 5115, SkillType: "AGGDAMAGE", Offensive: true},
+	} {
+		t.Run(def.SkillType, func(t *testing.T) {
+			owner := &fakeCubicShotOwner{fakeCubicEffectCaster: fakeCubicEffectCaster{id: 1}, blessed: true}
+			target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
+
+			if result := ApplyCubicEffect(registry, owner, def, target); !result.Handled {
+				t.Fatalf("ApplyCubicEffect(%s) Handled = false, want true", def.SkillType)
+			}
+			if !owner.blessed || len(owner.writes) != 0 {
+				t.Fatalf("owner blessed charge = %v, shot writes = %v; want charge kept and no writes", owner.blessed, owner.writes)
+			}
+		})
+	}
+}
+
 // fakeCubicFireOwner is a minimal CubicFireOwner + Target implementer for
 // domain-level target-selection tests.
 type fakeCubicFireOwner struct {

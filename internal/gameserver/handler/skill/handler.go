@@ -184,7 +184,12 @@ type Cast struct {
 	// Item is a genuinely heterogeneous payload with unrelated consumers
 	// (manor.go asserts it to a seed item, summon.go forwards it untouched),
 	// left untyped deliberately rather than typed against one of them.
-	Item     any
+	Item any
+	// Cubic marks a cubic's proc dispatched with its owner as Caster. A
+	// cubic reads the owner's blessed-spiritshot charge for its landing
+	// rolls but never spends it, so the Continuous and Disablers handlers
+	// skip their end-of-cast discharge for it.
+	Cubic    bool
 	resisted *Result
 	messages *[]any
 }
