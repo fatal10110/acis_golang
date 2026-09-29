@@ -177,3 +177,59 @@ func TestBoxChestNeverSwingsBack(t *testing.T) {
 		})
 	}
 }
+
+// TestQueuedAttackIdledAtCastEndAnswersActionFailed pins the cast-finished
+// resume of an attack queued mid-cast: when the caster is teleporting, or
+// the target has left the world, by the time the cast ends, the resumed
+// think drops the attack and answers exactly one ActionFailed, with no
+// swing.
+func TestQueuedAttackIdledAtCastEndAnswersActionFailed(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		idle func(t *testing.T, srv *gameservertest.Server, pc *player.Character, hostileID int32)
+	}{
+		{"caster teleporting", func(t *testing.T, _ *gameservertest.Server, pc *player.Character, _ int32) {
+			if !pc.SetTeleporting(true) {
+				t.Fatal("SetTeleporting(true) reported no change")
+			}
+		}},
+		{"target left", func(t *testing.T, srv *gameservertest.Server, _ *player.Character, hostileID int32) {
+			hostile, ok := srv.State.Object(hostileID)
+			if !ok {
+				t.Fatal("fixture monster missing from world state")
+			}
+			srv.State.Despawn(hostile)
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			srv, pc, hostileID := bootMidCastBesideHostile(t)
+			c, objID := srv.Client, pc.ObjectID()
+
+			requestAttackMidCast(t, c, hostileID)
+			tt.idle(t, srv, pc, hostileID)
+			drainUntilQuiet(t, c)
+			if !pc.CastingNow() {
+				t.Fatal("long cast ended before the queued attack was made to idle")
+			}
+
+			srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
+			failed := 0
+			for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
+				frame := c.ReadWithTimeout(300 * time.Millisecond)
+				if frame == nil {
+					continue
+				}
+				if attackFrameBy(frame, objID) {
+					t.Fatal("queued attack swung after the cast")
+				}
+				if frame[0] == serverpackets.OpcodeActionFailed {
+					failed++
+				}
+			}
+			if failed != 1 {
+				t.Fatalf("ActionFailed after the cast = %d, want 1", failed)
+			}
+		})
+	}
+}

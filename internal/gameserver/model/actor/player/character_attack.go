@@ -247,11 +247,13 @@ func (c *Character) AttackDisabled() bool {
 }
 
 // DenyAIAction reports whether this player cannot act on an intention now:
-// dead, teleporting, or held by stun, sleep, paralysis, fear, or an
-// immobile-until-attacked effect. Unlike AttackDisabled it ignores flying
-// and fake death, which fail only the attack itself, once in range.
+// dead, teleporting, observing, or held by stun, sleep, paralysis, fear, or
+// an immobile-until-attacked effect. Unlike AttackDisabled it ignores flying
+// and fake death, which fail only the attack itself, once in range. The
+// player's private-store term (buy, sell, package sell, manufacture; not
+// the manage modes) is not modeled until private stores exist (#137).
 func (c *Character) DenyAIAction() bool {
-	if c.Dead() {
+	if c.Dead() || c.ObserverMode() {
 		return true
 	}
 	live := c.liveLocked()
