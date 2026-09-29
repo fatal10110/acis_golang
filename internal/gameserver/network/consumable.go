@@ -28,7 +28,7 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 		Inventory:   inv,
 		Item:        inst,
 		Definitions: l.skills,
-		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Effects:     l.castEffects(),
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
 		Target:      live.Character.CurrentTarget(),

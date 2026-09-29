@@ -58,11 +58,13 @@ func (h *Hostile) StopEffects(t effect.Type) { h.EffectList().StopByType(t) }
 // StopSkillEffectsByID removes every effect skill id applied to the NPC.
 func (h *Hostile) StopSkillEffectsByID(id modelskill.ID) { h.EffectList().StopBySkillID(id) }
 
-// AddChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (h *Hostile) AddChanceTrigger(*effect.Effect) {}
+// AddChanceTrigger registers a started chance-skill-trigger effect as one of
+// the NPC's chance procs.
+func (h *Hostile) AddChanceTrigger(e *effect.Effect) { h.EffectList().AddChanceTrigger(e) }
 
-// RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (h *Hostile) RemoveChanceTrigger(*effect.Effect) {}
+// RemoveChanceTrigger drops an exiting chance-skill-trigger effect from the
+// NPC's chance procs.
+func (h *Hostile) RemoveChanceTrigger(e *effect.Effect) { h.EffectList().RemoveChanceTrigger(e) }
 
 // UpdateEffectIcons does nothing: NPCs show no effect icons.
 func (h *Hostile) UpdateEffectIcons() {}

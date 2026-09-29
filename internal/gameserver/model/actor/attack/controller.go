@@ -484,6 +484,7 @@ func (c *Controller) deliverHit(hit Hit) {
 		return
 	}
 	hit.Target.TakeDamage(hit.Damage, c.actor)
+	c.emit(event.HitLanded{Target: hit.Target, Crit: hit.Crit})
 }
 
 // invulTarget is the target state the attacker's damage feedback reads when

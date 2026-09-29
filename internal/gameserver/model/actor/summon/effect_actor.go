@@ -123,11 +123,13 @@ func (a *Actor) StopEffects(t effect.Type) { a.effects.StopByType(t) }
 // StopSkillEffectsByID removes every effect skill id applied to the summon.
 func (a *Actor) StopSkillEffectsByID(id modelskill.ID) { a.effects.StopBySkillID(id) }
 
-// AddChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (a *Actor) AddChanceTrigger(*effect.Effect) {}
+// AddChanceTrigger registers a started chance-skill-trigger effect as one of
+// the summon's chance procs.
+func (a *Actor) AddChanceTrigger(e *effect.Effect) { a.effects.AddChanceTrigger(e) }
 
-// RemoveChanceTrigger does nothing yet: chance skill triggers are not wired.
-func (a *Actor) RemoveChanceTrigger(*effect.Effect) {}
+// RemoveChanceTrigger drops an exiting chance-skill-trigger effect from the
+// summon's chance procs.
+func (a *Actor) RemoveChanceTrigger(e *effect.Effect) { a.effects.RemoveChanceTrigger(e) }
 
 // ValidLocation resolves a knockback destination against this summon's
 // movement geodata, the same correction a player's landing gets.

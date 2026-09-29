@@ -478,6 +478,23 @@ func (c *Character) BroadcastDie() {
 	c.emit(event.Died{})
 }
 
+// BroadcastSkillUse reports a cast-start animation from this character to
+// the target at (targetX, targetY, targetZ).
+func (c *Character) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	x, y, z := c.Position()
+	c.emit(event.MagicSkillUse{
+		CasterID: c.ObjectID(), CasterAt: location.Location{X: x, Y: y, Z: z},
+		TargetID: targetID, TargetAt: location.Location{X: targetX, Y: targetY, Z: targetZ},
+		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
+	})
+}
+
+// BroadcastSkillLaunched reports the launch of skillID at level onto
+// targetIDs.
+func (c *Character) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	c.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
+}
+
 // TryToIdle is the player attack stop hook. AI idle state is not modeled yet.
 func (c *Character) TryToIdle() {}
 

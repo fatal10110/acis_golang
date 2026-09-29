@@ -137,6 +137,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillLaunched(actor.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
+	case event.HitLanded:
+		l.chance.AttackHit(actor, e.Target, e.Crit)
 	case event.CastAborted:
 		// The cancel animation goes to every observer; an interrupt also
 		// tells the owner, since a summon's own messages reach its owner.

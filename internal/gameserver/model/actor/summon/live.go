@@ -205,8 +205,10 @@ type Actor struct {
 	// the attack launch reads the shot mask.
 	shotsMu   sync.Mutex
 	shotsMask int32
-	// disabledSkills is queue-owned: only this summon's casts, started by
-	// the owner's commands or its own AI on the owner's queue, touch it.
+	// skillsMu guards disabledSkills. It is taken from another actor's
+	// queue: a chance proc the summon sets off when that actor hits it runs
+	// in the hit's own call.
+	skillsMu       sync.Mutex
 	disabledSkills map[int32]time.Time
 }
 

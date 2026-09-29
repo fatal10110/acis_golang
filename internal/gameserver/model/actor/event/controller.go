@@ -1,6 +1,9 @@
 package event
 
-import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // CastAborted reports an in-flight cast aborted; Interrupted means the abort
 // went through the window-gated interrupt path.
@@ -50,6 +53,14 @@ type HitDealt struct {
 	Petrified bool
 }
 
+// HitLanded reports a physical hit that dealt damage to Target, after the
+// damage applied. The receiver runs the chance procs the hit sets off on the
+// attacker and on Target.
+type HitLanded struct {
+	Target attackable.Combatant
+	Crit   bool
+}
+
 // Arrived reports that movement a controller started reached its
 // destination.
 type Arrived struct{}
@@ -66,5 +77,6 @@ func (AttackStarted) event()    {}
 func (AttackFinished) event()   {}
 func (AttackRethink) event()    {}
 func (HitDealt) event()         {}
+func (HitLanded) event()        {}
 func (Arrived) event()          {}
 func (MoveBlocked) event()      {}

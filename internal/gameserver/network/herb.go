@@ -38,7 +38,7 @@ func (l *GameClientLink) consumeHerb(live *livePlayer, itemID int32) {
 		Inventory:   inv,
 		Item:        herb,
 		Definitions: l.skills,
-		Effects:     actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers},
+		Effects:     l.castEffects(),
 		Destroyer:   l.inventory,
 		Summon:      l.activeServitorTarget(live),
 		Target:      live.Character.CurrentTarget(),

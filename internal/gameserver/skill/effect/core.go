@@ -641,10 +641,3 @@ func (e *Effect) iconLevel() int {
 	}
 	return e.Level
 }
-
-// chanceTriggerTarget is implemented by an actor that tracks its own set of
-// active chance-triggered skill effects, for whatever system later reacts
-// to combat/cast events against it. No actor in this port implements it
-// yet — installing and removing the effect degrades to a no-op until one
-// does, the same graceful-degradation pattern every optional capability in
-// this file follows.
