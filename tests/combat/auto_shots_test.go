@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -55,19 +56,21 @@ func TestAutoSoulshotsRechargeEverySwing(t *testing.T) {
 	drainUntilQuiet(t, c)
 	c.Send(encodeUseItem(sword, false))
 	drainUntilQuiet(t, c)
-	if got := srv.PlayerInventory(t, objID).ItemByObjectID(shots).Count; got != 2 {
+	var got int
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { got = pc.Inventory().ItemByObjectID(shots).Count })
+	if got != 2 {
 		t.Fatalf("soulshots after the equip charge = %d, want 2", got)
 	}
 
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 30, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
-	player := livePlayer(t, srv, objID)
+	attacker := livePlayer(t, srv, objID)
 	done := make(chan struct{})
 	if !srv.PlayerQueue(t, objID).Post(func() {
 		defer close(done)
 		// Every roll at zero lands every hit, as a critical; the recharges'
 		// own draws cannot shift it into a miss.
-		player.(interface{ SetRollSource(func(int) int) }).SetRollSource(func(int) int { return 0 })
+		attacker.(interface{ SetRollSource(func(int) int) }).SetRollSource(func(int) int { return 0 })
 	}) {
 		t.Fatal("player queue closed")
 	}
@@ -90,10 +93,17 @@ func TestAutoSoulshotsRechargeEverySwing(t *testing.T) {
 			t.Fatalf("swing %d = %+v, want %+v (all swings %+v)", i+1, swings[i], want[i], swings)
 		}
 	}
-	if inst := srv.PlayerInventory(t, objID).ItemByTemplateID(autoSoulshotID); inst != nil {
-		t.Fatalf("soulshot stack still held with %d after four swings, want it spent", inst.Count)
+	held, autoOn := -1, false
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		if inst := pc.Inventory().ItemByTemplateID(autoSoulshotID); inst != nil {
+			held = inst.Count
+		}
+		autoOn = pc.AutoSoulShotEnabled(autoSoulshotID)
+	})
+	if held >= 0 {
+		t.Fatalf("soulshot stack still held with %d after four swings, want it spent", held)
 	}
-	if player.(interface{ AutoSoulShotEnabled(int32) bool }).AutoSoulShotEnabled(autoSoulshotID) {
+	if autoOn {
 		t.Fatal("auto use of the spent soulshot is still on")
 	}
 }

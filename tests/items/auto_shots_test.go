@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -68,7 +69,9 @@ func TestAutoSpiritshotsRechargeAfterEachMagicCast(t *testing.T) {
 	drainUntilQuiet(t, c)
 	c.Send(encodeUseItem(weapon, false))
 	drainUntilQuiet(t, c)
-	if got := srv.PlayerInventory(t, objID).ItemByObjectID(shots).Count; got != 2 {
+	var got int
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { got = pc.Inventory().ItemByObjectID(shots).Count })
+	if got != 2 {
 		t.Fatalf("spiritshots after the equip charge = %d, want 2", got)
 	}
 
@@ -85,25 +88,22 @@ func TestAutoSpiritshotsRechargeAfterEachMagicCast(t *testing.T) {
 		}
 	}
 
-	live, ok := srv.State.Player(objID)
-	if !ok {
-		t.Fatal("caster missing from the world")
-	}
-	caster, ok := live.(interface {
-		ChargedShot(item.ShotKind) bool
-		AutoSoulShotEnabled(int32) bool
+	charged, autoOn, held := false, false, -1
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		charged = pc.ChargedShot(item.ShotSpirit)
+		autoOn = pc.AutoSoulShotEnabled(autoSpiritshotID)
+		if inst := pc.Inventory().ItemByTemplateID(autoSpiritshotID); inst != nil {
+			held = inst.Count
+		}
 	})
-	if !ok {
-		t.Fatalf("caster %T exposes no shot state", live)
-	}
-	if caster.ChargedShot(item.ShotSpirit) {
+	if charged {
 		t.Fatal("weapon still charged after the third cast spent the last recharge")
 	}
-	if caster.AutoSoulShotEnabled(autoSpiritshotID) {
+	if autoOn {
 		t.Fatal("auto use of the spent spiritshot is still on")
 	}
-	if inst := srv.PlayerInventory(t, objID).ItemByTemplateID(autoSpiritshotID); inst != nil {
-		t.Fatalf("spiritshot stack still held with %d, want it spent", inst.Count)
+	if held >= 0 {
+		t.Fatalf("spiritshot stack still held with %d, want it spent", held)
 	}
 }
 
