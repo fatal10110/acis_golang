@@ -63,20 +63,19 @@ type FormulaActor interface {
 }
 
 // damageBlocked reports whether attacker lacks permission to deal damage.
-// Target invulnerability is deliberately not checked here: Java only gates
-// the attacker's permission before computing a skill-damage formula
-// (Formulas.java) and lets an invulnerable target's isInvul() check happen
-// inside reduceHp, after hate/party-attacked have already registered
-// (CreatureStatus.java:210-219). Gating on target.Invul() here would skip
-// the formula and the ReduceHP call entirely, dropping that hate.
+// A blocked attacker's physical-skill and magic-damage inputs still resolve
+// against the target, flagged NoDamage so the formula yields 0 and each
+// handler runs its own zero-damage branch; the blow input has no such gate
+// and deals its full amount, which the target's HP reduction then refuses.
+// Target invulnerability is deliberately not checked here: an invulnerable
+// target's refusal happens inside its HP reduction, after hate and the
+// party call have already registered. Gating on it here would skip the
+// ReduceHP call entirely, dropping that hate.
 //
-// This is not a blanket rule: MANADAM has no attacker-permission gate at
-// all in Java (issue #2339) — Manadam.java and Formulas.calcMagicAffected/
-// calcManaDam never call canGiveDamage(), unlike PDAM/MDAM/Blow's formulas
-// (Formulas.java:390,492,575) — so ResolveManaDamageInput does not call
-// damageBlocked. MANADAM does gate on target.Invul() up front instead
-// (Manadam.java:43-44), with no reduceHp-style backstop afterward, so
-// ResolveManaDamageInput applies that check itself.
+// MANADAM has no attacker-permission gate at all, so
+// ResolveManaDamageInput does not call damageBlocked. MANADAM does gate on
+// target invulnerability up front instead, with no HP-reduction-style
+// backstop afterward, so ResolveManaDamageInput applies that check itself.
 func damageBlocked(attacker attackable.Combatant) bool {
 	return !CanDealDamage(attacker)
 }
@@ -102,9 +101,6 @@ func CanDealDamage(attacker attackable.Combatant) bool {
 // has a matching attack/resistance stat pair.
 func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool, raceMul float64) (formulas.PhysicalSkillInput, bool) {
 	if attacker == nil || target == nil {
-		return formulas.PhysicalSkillInput{}, false
-	}
-	if damageBlocked(attacker) {
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -137,6 +133,7 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 		RaceMul:       raceMul,
 		WeaponVulnMul: WeaponVulnerability(target, attacker.AttackType()),
 		PvPMul:        pvpMul,
+		NoDamage:      damageBlocked(attacker),
 	}, true
 }
 
@@ -198,9 +195,6 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 	if attacker == nil || target == nil {
 		return formulas.MagicDamageInput{}, false
 	}
-	if damageBlocked(attacker) {
-		return formulas.MagicDamageInput{}, false
-	}
 	sps, bsps := SpiritshotFlags(attacker)
 	// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit must not
 	// triple the shield rate.
@@ -219,8 +213,10 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
 		Shield:          shield,
+		NoDamage:        damageBlocked(attacker),
 	}
-	if shield != formulas.ShieldPerfect && magicFailures {
+	// A blocked attacker's damage is settled at 0 before any failure roll.
+	if !in.NoDamage && shield != formulas.ShieldPerfect && magicFailures {
 		applyMagicFailure(&in, attacker, target, def)
 	}
 	return in, true
@@ -243,9 +239,6 @@ func applyMagicFailure(in *formulas.MagicDamageInput, attacker, target FormulaAc
 // ResolveBlowInput builds a blow-damage input from the caster/target pair.
 func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, pvp bool) (formulas.BlowInput, bool) {
 	if attacker == nil || target == nil {
-		return formulas.BlowInput{}, false
-	}
-	if damageBlocked(attacker) {
 		return formulas.BlowInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
@@ -312,10 +305,9 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 // computing calcManaDam or draining MP at all (Manadam.java:43-44), and no
 // ReduceMP implementation applies its own invul guard afterward.
 //
-// It does not check the attacker's damage permission at all (issue #2339):
-// Manadam.java's handler and Formulas.calcMagicAffected/calcManaDam have no
-// canGiveDamage() gate, unlike the other three resolvers' formulas
-// (Formulas.java:390,492,575). A damage-denied attacker still drains MP.
+// It does not check the attacker's damage permission at all, unlike the
+// physical-skill and magic-damage formulas: a damage-denied attacker still
+// drains MP.
 func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	if attacker == nil || target == nil {
 		return formulas.ManaDamageInput{}, false

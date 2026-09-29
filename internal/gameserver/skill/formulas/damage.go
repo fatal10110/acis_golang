@@ -110,10 +110,18 @@ type PhysicalSkillInput struct {
 	WeaponVulnMul float64
 	PvPMul        float64
 	Evaded        bool
+
+	// NoDamage marks an attacker without damage permission: the skill
+	// still resolves against the target, but deals nothing, whatever the
+	// shield outcome.
+	NoDamage bool
 }
 
 // PhysicalSkillDamage computes a physical skill's damage.
 func PhysicalSkillDamage(in PhysicalSkillInput) float64 {
+	if in.NoDamage {
+		return 0
+	}
 	if in.Shield == ShieldPerfect {
 		return 1
 	}
@@ -265,13 +273,22 @@ type MagicDamageInput struct {
 	PvPMul       float64
 	ElementalMul float64
 	Shield       ShieldDefense
+
+	// NoDamage marks an attacker without damage permission: the skill
+	// deals nothing, whatever the shield outcome, and never rolls a
+	// magic failure.
+	NoDamage bool
 }
 
 // MagicDamage computes a magic skill's damage. A resist outcome skips the
 // magic-crit multiplier and applies half / flat-1 before PvP and elemental
 // scaling, matching the live magic-damage contract. A perfect shield block
-// returns 1 before those steps.
+// returns 1 before those steps, and an attacker without damage permission
+// deals 0 before any of them.
 func MagicDamage(in MagicDamageInput) float64 {
+	if in.NoDamage {
+		return 0
+	}
 	if in.Shield == ShieldPerfect {
 		return 1
 	}

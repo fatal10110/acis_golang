@@ -8,6 +8,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // orderSkill is the caster's single-target skill in the message-order
@@ -195,5 +196,117 @@ func TestMDamBreaksTheTargetCastBeforeTheDamageReport(t *testing.T) {
 	dealt := log.index(isSystemMessage(serverpackets.SystemMessageYouDidS1Dmg))
 	if canceled < 0 || dealt < 0 || canceled > dealt {
 		t.Fatalf("caster frames: monster MagicSkillCanceled at %d, YOU_DID_S1_DMG at %d; want the cancel first", canceled, dealt)
+	}
+}
+
+// breakingMonster is a caster beside a monster mid-way through a magic cast
+// whose every combat roll comes up zero, so any damaging hit breaks it.
+type breakingMonster struct {
+	srv     *gameservertest.Server
+	c       *testsupport.ScriptedClient
+	objID   int32
+	hostile *npc.Hostile
+	maxHP   int
+}
+
+// bootBreakingMonster boots the caster knowing def, with the SignetMDam
+// effect point on file, targets the monster and starts its cast.
+func bootBreakingMonster(t *testing.T, def modelskill.Definition) *breakingMonster {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Mage", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{ID: 13018, Type: "EffectPoint", CollisionRadius: 8}})),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
+	startInWorld(t, c)
+	// The caster stands inside its own signet: invulnerability keeps it
+	// alive and its report of that strike a blocked one.
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.Live.SetInvul(true) })
+	hostile, aiCtl := srv.SpawnCastingHostileNPC(t, &npc.Template{
+		ID: 100, TemplateID: 100, Type: "Monster", Level: 1, HPMax: 1_000_000,
+		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+	}, modelskill.NewTable([]modelskill.Definition{{
+		ID: npcBreakSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		Magic: true, SkillType: "BUFF", HitTime: 10_000, StaticHitTime: true, StaticReuse: true,
+	}}))
+	onNPCQueue(t, hostile, func() { hostile.SetRollSource(func(int) int { return 0 }) })
+	drainUntilQuiet(t, c)
+	maxHP := targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+	setCasterMagicRolls(t, srv, objID, func() int { return 500 })
+	startNPCCast(t, c, hostile, aiCtl)
+	drainUntilQuiet(t, c)
+	return &breakingMonster{srv: srv, c: c, objID: objID, hostile: hostile, maxHP: maxHP}
+}
+
+// TestSignetMDamBreaksTheMonsterCastBeforeTheDamageReport ticks a SignetMDam
+// beside a casting monster under a breaking roll: the tick rolls the cast
+// break before it reports the damage, so the caster reads the monster's
+// MagicSkillCanceled before YOU_DID_S1_DMG (issue #2738).
+func TestSignetMDamBreaksTheMonsterCastBeforeTheDamageReport(t *testing.T) {
+	t.Parallel()
+	def := signetMDamSkill()
+	def.Power = 1
+	w := bootBreakingMonster(t, def)
+
+	w.c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
+	readCastStartFrames(t, w.c, w.objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), w.objID)
+	tickSignetMDamLive(t, w.srv)
+	if w.hostile.CurrentHP() >= w.maxHP {
+		t.Fatal("the signet never damaged the monster")
+	}
+
+	// The tick reports each target's damage before its MagicSkillUse on
+	// that target, so the monster's damage report is the last one ahead of
+	// its MagicSkillUse; the caster's own report may come earlier.
+	log := readFrameLog(w.c)
+	use := log.index(func(frame []byte) bool {
+		if frame[0] != serverpackets.OpcodeMagicSkillUse {
+			return false
+		}
+		r := wireReader(frame[1:])
+		caster, target := r.ReadInt32(), r.ReadInt32()
+		return caster != w.objID && target == w.hostile.ObjectID()
+	})
+	dealt := -1
+	if use > 0 {
+		dealt = log[:use].lastIndex(isSystemMessage(serverpackets.SystemMessageYouDidS1Dmg))
+	}
+	canceled := log.index(objectFrame(serverpackets.OpcodeMagicSkillCanceled, w.hostile.ObjectID()))
+	if canceled < 0 || dealt < 0 || canceled > dealt {
+		t.Fatalf("caster frames: monster MagicSkillCanceled at %d, its YOU_DID_S1_DMG at %d, signet MagicSkillUse on it at %d; want the cancel first",
+			canceled, dealt, use)
+	}
+}
+
+// TestDrainBreaksTheMonsterCastBeforeItsEffects drains a casting monster
+// under a breaking roll with an effect it always resists: DRAIN rolls the
+// cast break, reports the damage, then lands its effects, so the caster
+// reads the monster's MagicSkillCanceled, then YOU_DID_S1_DMG, then
+// S1_RESISTED_YOUR_S2 (issue #2738).
+func TestDrainBreaksTheMonsterCastBeforeItsEffects(t *testing.T) {
+	t.Parallel()
+	def := modelskill.Definition{
+		ID: orderSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
+		Offensive: true, CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
+		SkillType: "DRAIN", Power: 10, Magic: true, IgnoreResists: true, BaseLandRate: 0,
+		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+	}
+	w := bootBreakingMonster(t, def)
+
+	w.c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
+	readCastStartFrames(t, w.c, w.objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), w.hostile.ObjectID())
+	w.srv.AdvanceUntil(t, "the DRAIN landing", func() bool { return w.hostile.CurrentHP() < w.maxHP })
+
+	log := readFrameLog(w.c)
+	canceled := log.index(objectFrame(serverpackets.OpcodeMagicSkillCanceled, w.hostile.ObjectID()))
+	dealt := log.index(isSystemMessage(serverpackets.SystemMessageYouDidS1Dmg))
+	resisted := log.index(isSystemMessage(serverpackets.SystemMessageS1ResistedYourS2))
+	if canceled < 0 || dealt < 0 || resisted < 0 || canceled > dealt || dealt > resisted {
+		t.Fatalf("caster frames: monster MagicSkillCanceled at %d, YOU_DID_S1_DMG at %d, S1_RESISTED_YOUR_S2 at %d; want that order",
+			canceled, dealt, resisted)
 	}
 }
