@@ -88,6 +88,11 @@ func (c *Character) StopCharmOfLuck(*effect.Effect) { c.BroadcastAbnormalEffect(
 // observers.
 func (c *Character) StopPhoenixBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
 
+// StopProtectionBlessing runs when a Blessing of Protection loses its stack
+// group's head (a recast replacing it): the player's appearance is refreshed
+// for observers.
+func (c *Character) StopProtectionBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
+
 // stopPhoenixBlessing uses up every Phoenix Blessing c holds, then refreshes
 // its appearance once more.
 func (c *Character) stopPhoenixBlessing() {

@@ -44,6 +44,16 @@ type Effect struct {
 	landing location.Location
 
 	inUse bool
+	// startRefused marks a kind whose reference onStart always returns
+	// false while the effect stays held: EffectProtectionBlessing. The
+	// reference still marks it in use (setInUse sets _inUse before reading
+	// onStart), so its flag counts, but the failed start leaves
+	// _startConditionsCorrect false: activation adds no stat funcs and sends
+	// no felt message (EffectList.java:768-774), and ending it by expiry,
+	// dispel, death or replacement skips onExit (AbstractEffect.java:319).
+	// Only losing its stack group's head runs onExit, because setInUse(false)
+	// calls it unconditionally (AbstractEffect.java:159-166, EffectList.java:762).
+	startRefused bool
 
 	// scheduleMu guards remaining and nextAction. The caster that adds or
 	// dispels this effect starts or stops its schedule from the caster's
@@ -246,6 +256,17 @@ func (e *Effect) beginExit() func() {
 		return nil
 	}
 	return func() { e.OnExit(e) }
+}
+
+// finishExit is beginExit for an effect that is ending for good (expiry,
+// dispel, replacement, eviction). A startRefused effect runs no exit hook
+// there and stays marked in use, so a stack-head displacement in the same
+// insertion still runs it through beginExit.
+func (e *Effect) finishExit() func() {
+	if e.startRefused {
+		return nil
+	}
+	return e.beginExit()
 }
 
 // stopTaskThunk returns a thunk that fires e's on-stop-task hook, or nil

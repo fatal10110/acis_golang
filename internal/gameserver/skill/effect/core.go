@@ -534,6 +534,9 @@ func wireHooks(e *Effect) {
 		e.OnExit = charmOfLuckExit
 	case TypePhoenixBless:
 		e.OnExit = phoenixBlessExit
+	case TypeProtectionBless:
+		e.startRefused = true
+		e.OnExit = protectionBlessExit
 	case TypeCancel:
 		e.OnStart = cancelStart
 	case TypeNegate:

@@ -72,6 +72,17 @@ func phoenixBlessExit(e *Effect) {
 	}
 }
 
+// protectionBlessExit hands a Blessing of Protection that lost its stack
+// group's head to the player or summon it was on. It never runs when the
+// blessing simply ends: see Effect.startRefused.
+func protectionBlessExit(e *Effect) {
+	if target, ok := asPlayer(e.Effected); ok {
+		target.StopProtectionBlessing(e)
+	} else if target, ok := asSummon(e.Effected); ok {
+		target.StopProtectionBlessing(e)
+	}
+}
+
 // cancelStart strips a random subset of the effected actor's active
 // non-toggle, non-debuff effects, up to e.Skill.MaxNegatedEffects (0 means
 // unlimited). Each candidate rolls independently against

@@ -191,7 +191,7 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 		// by Add already ran its exit hook but still holds its stat funcs.
 		if l.removeFromVisible(e) {
 			*pending = append(*pending, func() { l.removeStats(e) })
-			appendThunk(exits, e.beginExit())
+			appendThunk(exits, e.finishExit())
 			l.notifyExpiry(e, wornOff, pending)
 		}
 		return
@@ -216,7 +216,7 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 	queue = slices.Delete(queue, index, index+1)
 	if index == 0 {
 		*pending = append(*pending, func() { l.removeStats(e) })
-		appendThunk(exits, e.beginExit())
+		appendThunk(exits, e.finishExit())
 		if len(queue) > 0 {
 			next := l.contained(queue[0])
 			if next != nil {

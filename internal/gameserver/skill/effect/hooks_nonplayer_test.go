@@ -90,14 +90,19 @@ func (s *blessedSummon) StopPhoenixBlessing(*Effect) {
 	s.stopped = append(s.stopped, "PhoenixBless")
 }
 
+func (s *blessedSummon) StopProtectionBlessing(*Effect) {
+	s.stopped = append(s.stopped, "ProtectionBlessing")
+}
+
 var _ SummonActor = (*blessedSummon)(nil)
 
-// TestBlessingExitReachesSummon pins EffectCharmOfLuck.onExit and
-// EffectPhoenixBless.onExit on a summon: the ending blessing is handed to
-// the summon's own stop (Playable.stopCharmOfLuck / stopPhoenixBlessing).
+// TestBlessingExitReachesSummon pins EffectCharmOfLuck.onExit,
+// EffectPhoenixBless.onExit and EffectProtectionBlessing.onExit on a summon:
+// the blessing is handed to the summon's own stop (Playable.stopCharmOfLuck /
+// stopPhoenixBlessing / stopProtectionBlessing).
 func TestBlessingExitReachesSummon(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"CharmOfLuck", "PhoenixBless"} {
+	for _, name := range []string{"CharmOfLuck", "PhoenixBless", "ProtectionBlessing"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			target := &blessedSummon{}
