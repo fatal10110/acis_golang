@@ -50,9 +50,9 @@ func (h *Hostile) Aggressive() bool {
 // npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
 // config flag (allowPeaceful is a caller-supplied parameter here rather
 // than the reference's own config-driven default). The follow gate's
-// distance decision reuses move.Controller.MaybeStartOffensiveFollow,
-// which doesn't reproduce CreatureMove's own line-of-sight branch (see
-// that method's doc): no geodata query is wired into a live actor yet.
+// distance decision reuses move.Controller.MaybeStartOffensiveFollow, which
+// reads the current intention's move-to-target flag, not the queued hold
+// desire's.
 func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal int, allowPeaceful bool) bool {
 	if target == nil || target.AlikeDead() {
 		return false

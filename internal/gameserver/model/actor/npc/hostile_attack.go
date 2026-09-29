@@ -29,11 +29,13 @@ func (h *Hostile) DisableCoreAI(disabled bool) {
 	h.coreAIDisabled.Store(disabled)
 }
 
-// MovementDisabled reports whether this NPC is unable to move: a
-// canMove=false template, or a crowd-control / death / teleport lock.
-// Fear is not included; it is an out-of-control state, not a movement lock.
+// MovementDisabled reports whether this NPC is unable to move: a Halisha
+// chest (never moves, whatever its template says), a canMove=false template,
+// or a crowd-control / death / teleport lock. Fear is not included; it is an
+// out-of-control state, not a movement lock.
 func (h *Hostile) MovementDisabled() bool {
-	return !h.Instance.Template.CanMove || h.AlikeDead() || h.Stunned() ||
+	return hostileKind(h.Instance) == "HalishaChest" || !h.Instance.Template.CanMove ||
+		h.AlikeDead() || h.Stunned() ||
 		h.ImmobileUntilAttacked() || h.Rooted() || h.Sleeping() ||
 		h.Paralyzed() || h.Immobilized() || h.Teleporting()
 }
@@ -62,6 +64,13 @@ func (h *Hostile) CanSee(target attackable.Combatant) bool {
 	ox, oy, oz := h.Position()
 	tx, ty, tz := target.Position()
 	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
+}
+
+// IntentionMovesToTarget reports whether this NPC's current intention may
+// close in on its target, so an offensive follow can start (see
+// ai.Attackable.CurrentIntentionMovesToTarget).
+func (h *Hostile) IntentionMovesToTarget() bool {
+	return h.brain.CurrentIntentionMovesToTarget()
 }
 
 // CanSeeTarget adapts NPC line-of-sight to the launch revalidation target

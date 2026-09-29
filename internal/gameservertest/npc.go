@@ -295,6 +295,16 @@ func (r *movingHostileLocatedRef) OffensiveFollowLead() bool {
 	return ok && h.OffensiveFollowLead()
 }
 
+func (r *movingHostileLocatedRef) IntentionMovesToTarget() bool {
+	h, ok := r.Actor.(*npc.Hostile)
+	return !ok || h.IntentionMovesToTarget()
+}
+
+func (r *movingHostileLocatedRef) CanSee(target attackable.Combatant) bool {
+	h, ok := r.Actor.(*npc.Hostile)
+	return !ok || h.CanSee(target)
+}
+
 // SpawnMovingHostileNPCAt seeds a hostile monster with the production move
 // controller wired through BroadcastMove, so leash-return and other
 // server-initiated moves emit real observer packets.
@@ -371,13 +381,18 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
-	hostile.Attach(npc.Runtime{
+	rt := npc.Runtime{
 		World: s.State,
 		Items: s.itemTable,
 		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
 		Sink: network.HostileSinks(s.State)(hostile),
-	})
+	}
+	// Production takes line of sight from the same geodata (npcs_spawn.go).
+	if los, ok := geo.(npc.LineOfSight); ok {
+		rt.LOS = los
+	}
+	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	return hostile
 }

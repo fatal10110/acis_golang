@@ -144,6 +144,9 @@ type intention struct {
 	ctrl  bool
 	loc   location.Location
 	timer int
+	// moveToTarget is an attack or cast intention's desire to close in on
+	// its target; every other kind never moves toward one.
+	moveToTarget bool
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -173,6 +176,10 @@ type Attackable struct {
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor).
 	cast atomic.Pointer[CastController]
+
+	// currentMovesToTarget mirrors current.moveToTarget for the movement
+	// controller, which reads it while Think holds mu.
+	currentMovesToTarget atomic.Bool
 
 	mu      sync.Mutex
 	current intention
@@ -445,7 +452,7 @@ func (a *Attackable) thinkIdle() {
 		cast.Stop()
 	}
 	a.actor.ForceWalkStance()
-	a.current = intention{kind: IntentionIdle}
+	a.setCurrent(intention{kind: IntentionIdle})
 }
 
 func (a *Attackable) queueIdleFollow() {
@@ -472,7 +479,7 @@ func (a *Attackable) thinkFollow() error {
 	a.followPulse++
 	if a.actor.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
 		a.desires.Remove(IntentionFollow, a.current.target)
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 	}
 	return nil
 }
@@ -577,7 +584,7 @@ func (a *Attackable) setBackToPeaceLocked() {
 	a.hates.Clear()
 	a.desires.Clear()
 	a.next = intention{}
-	a.current = intention{kind: IntentionIdle}
+	a.setCurrent(intention{kind: IntentionIdle})
 	a.wanderReady = time.Time{}
 	a.move.Stop()
 }
@@ -614,6 +621,19 @@ func (a *Attackable) CurrentIntention() Intention {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.current.kind
+}
+
+// CurrentIntentionMovesToTarget reports whether the current intention may
+// close in on its target: an attack or cast queued to move rather than
+// hold. Safe to call while the AI loop runs.
+func (a *Attackable) CurrentIntentionMovesToTarget() bool {
+	return a.currentMovesToTarget.Load()
+}
+
+// setCurrent replaces the current intention. Callers hold mu.
+func (a *Attackable) setCurrent(next intention) {
+	a.current = next
+	a.currentMovesToTarget.Store(next.moveToTarget)
 }
 
 // TopDesireTarget is the creature the currently executing attack or cast
@@ -868,7 +888,7 @@ func (a *Attackable) promoteNext(useLatch bool) bool {
 		a.next = intention{}
 	}
 	a.lastKind = a.current.kind
-	a.current = next
+	a.setCurrent(next)
 	return fromLatch
 }
 
@@ -891,9 +911,9 @@ func (a *Attackable) nextToDo(useLatch bool) (next intention, fromLatch, ok bool
 	}
 	switch desire.Kind {
 	case IntentionAttack:
-		next = intention{kind: IntentionAttack, target: desire.FinalTarget}
+		next = intention{kind: IntentionAttack, target: desire.FinalTarget, moveToTarget: desire.MoveToTarget}
 	case IntentionCast:
-		next = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill}
+		next = intention{kind: IntentionCast, target: desire.FinalTarget, skill: desire.Skill, moveToTarget: desire.MoveToTarget}
 	case IntentionFollow:
 		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
 	case IntentionWander:
@@ -1005,12 +1025,12 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 	case IntentionAttack, IntentionCast:
 		probe := &Desire{Kind: a.current.kind, FinalTarget: a.current.target, Skill: a.current.skill}
 		if !a.desires.Has(probe) {
-			a.current = intention{kind: IntentionIdle}
+			a.setCurrent(intention{kind: IntentionIdle})
 		}
 	case IntentionMoveTo:
 		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
 		if !a.desires.Has(probe) {
-			a.current = intention{kind: IntentionIdle}
+			a.setCurrent(intention{kind: IntentionIdle})
 		}
 	}
 }
@@ -1105,7 +1125,7 @@ func (a *Attackable) thinkMoveTo() {
 	}
 	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
 		a.clearCurrentDesire()
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 		return
 	}
 	_ = a.move.MoveHome(a.current.loc)
@@ -1142,7 +1162,7 @@ func (a *Attackable) clearArrivalDesire() {
 	case IntentionMoveTo, IntentionFlee, IntentionWander:
 		// IntentionFlee is dormant until promoteNext can make it current.
 		a.clearCurrentDesire()
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 	}
 }
 
@@ -1189,7 +1209,7 @@ func (a *Attackable) doWanderMove() {
 	}
 	if !a.actor.InTerritory() {
 		a.clearCurrentDesire()
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 		return
 	}
 	a.actor.MoveFromSpawnUsingRandomOffset(int(a.actor.RealMoveSpeed()) * 3)
@@ -1218,7 +1238,7 @@ func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
 // reference's isTargetLost(target, skill) rotation-target bypass.
 func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType string) bool {
 	if target == nil {
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 		return true
 	}
 	if target.AlikeDead() {
@@ -1243,7 +1263,7 @@ func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType s
 
 func (a *Attackable) clearIntentionsFor(target attackable.Combatant) {
 	if sameCombatant(a.current.target, target) {
-		a.current = intention{kind: IntentionIdle}
+		a.setCurrent(intention{kind: IntentionIdle})
 	}
 	if sameCombatant(a.next.target, target) {
 		a.next = intention{}

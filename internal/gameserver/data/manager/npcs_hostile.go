@@ -58,6 +58,19 @@ func (r *locatedRef) OffensiveFollowLead() bool {
 	return ok && actor.OffensiveFollowLead()
 }
 
+// IntentionMovesToTarget forwards the NPC's current intention's
+// move-to-target flag; an unwired ref may always close in.
+func (r *locatedRef) IntentionMovesToTarget() bool {
+	actor, ok := r.Actor.(*npc.Hostile)
+	return !ok || actor.IntentionMovesToTarget()
+}
+
+// CanSee forwards the NPC's line of sight; an unwired ref sees everything.
+func (r *locatedRef) CanSee(target attackable.Combatant) bool {
+	actor, ok := r.Actor.(*npc.Hostile)
+	return !ok || actor.CanSee(target)
+}
+
 type (
 	creatureActorRef struct{ attack.CreatureActor }
 	statOwnerRef     struct{ effect.StatOwner }
