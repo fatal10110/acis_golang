@@ -12,8 +12,8 @@ import (
 // intention loop.
 type PlayerAttackActor interface {
 	attackable.Combatant
-	AttackDisabled() bool
 	CastingNow() bool
+	DenyAIAction() bool
 	Knows(attackable.Combatant) bool
 	PhysicalAttackRange() int
 	Standing() bool
@@ -70,7 +70,7 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 		p.deferred = true
 		return false
 	}
-	accepted, err := p.thinkLocked()
+	accepted, _, err := p.thinkLocked()
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -78,18 +78,20 @@ func (p *PlayerAttack) Start(target attackable.Combatant) bool {
 }
 
 // ResumeAfterCast runs an attack intention that was requested while casting.
-// It reports whether such an intention was waiting.
-func (p *PlayerAttack) ResumeAfterCast() bool {
+// It reports whether such an intention was waiting, and whether running it
+// sent the intention idle, which the caller answers with ActionFailed.
+func (p *PlayerAttack) ResumeAfterCast() (resumed, idled bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.deferred {
-		return false
+		return false, false
 	}
 	p.deferred = false
-	if _, err := p.thinkLocked(); err != nil {
+	_, idled, err := p.thinkLocked()
+	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
-	return true
+	return true, idled
 }
 
 // DropResumeAfterCast forgets an attack requested while casting, without
@@ -116,50 +118,61 @@ func (p *PlayerAttack) Target() attackable.Combatant {
 }
 
 // Think re-evaluates the current attack intention once. Safe to call from
-// a movement-arrived or attack-finished hook as well as from Start. Any
+// a movement-arrived or attack-finished hook as well as from Start. It
+// reports whether the intention went idle (the actor can't act, is sitting,
+// lost the target, or can't attack it once in range), which the caller
+// answers with ActionFailed; a busy actor keeps the intention silently. Any
 // broadcast error is logged through SetLogger — Think's own callers are
 // void hooks with no return path of their own.
-func (p *PlayerAttack) Think() {
+func (p *PlayerAttack) Think() (idled bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if _, err := p.thinkLocked(); err != nil {
+	_, idled, err := p.thinkLocked()
+	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
+	return idled
 }
 
-// thinkLocked runs the full attack-intention decision. Callers hold mu for
-// its entire body so a concurrent Start/Think can't interleave with it and
-// reach DoAttack twice for the same swing.
-func (p *PlayerAttack) thinkLocked() (bool, error) {
+// thinkLocked runs the full attack-intention decision and reports whether a
+// swing started or the approach began (accepted) and whether the intention
+// was dropped (idled). Callers hold mu for its entire body so a concurrent
+// Start/Think can't interleave with it and reach DoAttack twice for the same
+// swing.
+//
+// The first gate is the AI-action one, not the attack one: a flying or
+// fake-dead actor still closes distance first and only fails the attack
+// once in range, through CanAttack.
+func (p *PlayerAttack) thinkLocked() (accepted, idled bool, err error) {
 	if p.target == nil {
-		return false, nil
+		return false, false, nil
 	}
 	if p.actor.CastingNow() {
-		return false, nil
+		return false, false, nil
 	}
 
-	if p.actor.AttackDisabled() || !p.actor.Standing() || p.targetLost(p.target) {
+	if p.actor.DenyAIAction() || !p.actor.Standing() || p.targetLost(p.target) {
 		p.stopLocked()
-		return false, nil
+		return false, true, nil
 	}
 
 	following, err := p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange())
 	if following {
-		return true, err
+		return true, false, err
 	}
 
 	if p.attack.BowCoolingDown() || p.attack.AttackingNow() {
-		return false, nil
+		return false, false, nil
 	}
 
 	if !p.attack.CanAttack(p.target) {
 		p.stopLocked()
-		return false, nil
+		return false, true, nil
 	}
 
 	p.move.Stop()
 	p.attack.DoAttack(p.target)
-	return true, nil
+	return true, false, nil
 }
 
 func (p *PlayerAttack) stopLocked() {

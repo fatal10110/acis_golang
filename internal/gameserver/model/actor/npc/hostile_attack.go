@@ -15,13 +15,18 @@ import (
 )
 
 // AttackDisabled reports whether this NPC is unable to start an attack:
-// dead, or held by stun, sleep, paralysis, fear, or an immobile-until-attacked
-// effect. NPCs never fly. Teleporting gates movement, not attacking.
-// The per-NPC core-AI-disabled flag (box chests, Halisha chests) is not
-// modeled yet (#2624).
+// dead, held by stun, sleep, paralysis, fear, or an immobile-until-attacked
+// effect, or with its core AI disabled. NPCs never fly. Teleporting gates
+// movement, not attacking.
 func (h *Hostile) AttackDisabled() bool {
 	return h.AlikeDead() || h.Stunned() || h.ImmobileUntilAttacked() ||
-		h.Sleeping() || h.Paralyzed() || h.Afraid()
+		h.Sleeping() || h.Paralyzed() || h.Afraid() || h.coreAIDisabled.Load()
+}
+
+// DisableCoreAI turns this NPC's regular combat behavior off or back on, for
+// scripts that spawn an NPC which must never attack on its own.
+func (h *Hostile) DisableCoreAI(disabled bool) {
+	h.coreAIDisabled.Store(disabled)
 }
 
 // MovementDisabled reports whether this NPC is unable to move: a

@@ -75,6 +75,10 @@ type Hostile struct {
 	remover Remover
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
+	// coreAIDisabled turns off this NPC's regular combat behavior; its only
+	// effect is AttackDisabled. Box chests and Halisha chests start with it
+	// set.
+	coreAIDisabled atomic.Bool
 
 	// deathMu guards dead and decayed. The killing hit latches death
 	// (TakeDamage → Die → MarkDead) on the attacker's queue.
@@ -270,6 +274,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	// RaidBoss.java/GrandBoss.java call setRaidRelated() in their
 	// constructors; minions are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())
+	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
 	h.running.Store(!inst.WalkMode)
 	h.brain = ai.NewAttackable(h, movement, attack)

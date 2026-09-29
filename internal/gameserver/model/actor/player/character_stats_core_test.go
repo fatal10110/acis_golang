@@ -851,6 +851,70 @@ func TestCharacterAttackDisabledMatchesReferenceTerms(t *testing.T) {
 	})
 }
 
+// TestCharacterDenyAIActionMatchesReferenceTerms pins the AI-action gate to
+// the reference's seven-term union (Creature.denyAiAction: stunned,
+// immobile-until-attacked, sleeping, paralyzed, teleporting, dead, afraid).
+// Flying and fake death disable attacking but must not deny the AI action;
+// rooted only gates movement.
+func TestCharacterDenyAIActionMatchesReferenceTerms(t *testing.T) {
+	effects := []struct {
+		name   string
+		denies bool
+	}{
+		{"Stun", true},
+		{"ImmobileUntilAttacked", true},
+		{"Sleep", true},
+		{"Paralyze", true},
+		{"Fear", true},
+		{"FakeDeath", false},
+		{"Root", false},
+	}
+	for _, tt := range effects {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Character{ID: 1}
+			attachTestLive(t, c)
+			if c.DenyAIAction() {
+				t.Fatal("DenyAIAction() = true with no effect active")
+			}
+			e := addCharacterEffect(t, c, tt.name)
+			if got := c.DenyAIAction(); got != tt.denies {
+				t.Fatalf("DenyAIAction() = %v with %s active, want %v", got, tt.name, tt.denies)
+			}
+			c.EffectList().Remove(e)
+			if c.DenyAIAction() {
+				t.Fatalf("DenyAIAction() = true after %s was removed", tt.name)
+			}
+		})
+	}
+
+	t.Run("teleporting", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetTeleporting(true)
+		if !c.DenyAIAction() {
+			t.Fatal("DenyAIAction() = false while teleporting")
+		}
+	})
+
+	t.Run("dead", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.MarkDead()
+		if !c.DenyAIAction() {
+			t.Fatal("DenyAIAction() = false while dead")
+		}
+	})
+
+	t.Run("flying", func(t *testing.T) {
+		c := &Character{ID: 1}
+		attachTestLive(t, c)
+		c.SetFlying(true)
+		if c.DenyAIAction() {
+			t.Fatal("DenyAIAction() = true while only flying")
+		}
+	})
+}
+
 // mountBodyTable is a one-mount NPC template lookup.
 type mountBodyTable struct {
 	npcID          int32

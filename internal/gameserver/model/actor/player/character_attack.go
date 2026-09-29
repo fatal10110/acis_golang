@@ -246,6 +246,21 @@ func (c *Character) AttackDisabled() bool {
 	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Afraid()
 }
 
+// DenyAIAction reports whether this player cannot act on an intention now:
+// dead, teleporting, or held by stun, sleep, paralysis, fear, or an
+// immobile-until-attacked effect. Unlike AttackDisabled it ignores flying
+// and fake death, which fail only the attack itself, once in range.
+func (c *Character) DenyAIAction() bool {
+	if c.Dead() {
+		return true
+	}
+	live := c.liveLocked()
+	if live == nil {
+		return false
+	}
+	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() || live.Teleporting() || live.Afraid()
+}
+
 // MovementDisabled reports whether this player is in a state where they
 // cannot move. Sit-down is immediate (`!Standing()`), matching Java's
 // sittingNow window from t=0. Stand-up is not: Java keeps
