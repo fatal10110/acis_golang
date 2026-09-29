@@ -56,7 +56,8 @@ func defaultRoll(roll func(int) int) func(int) int {
 }
 
 // SpawnBesideOwner places actor in state at owner plus offset and registers
-// it as the owner's active summon.
+// it as the owner's active summon. A living baby pet starts healing its
+// owner.
 func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset location.Location) {
 	if state == nil || actor == nil || owner == nil {
 		return
@@ -66,4 +67,5 @@ func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset loca
 	x, y, z := owner.Position()
 	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, owner.Heading())
 	state.AddSummon(owner.ObjectID(), actor)
+	actor.startBabyHeal()
 }

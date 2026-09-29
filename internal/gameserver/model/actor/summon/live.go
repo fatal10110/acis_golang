@@ -94,6 +94,11 @@ type Owner interface {
 	// NoteServitorPvPSkillTargets flags the owner for a skill its summon
 	// cast on targets.
 	NoteServitorPvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
+	// Invul reports whether the owner is invulnerable.
+	Invul() bool
+	// HP and MaxHPValue are the owner's current and maximum HP.
+	HP() float64
+	MaxHPValue() float64
 	// OfferSummonRevive offers the owner the resurrection of its summon,
 	// which just died under a Phoenix Blessing.
 	OfferSummonRevive()
@@ -134,6 +139,7 @@ type Actor struct {
 	world          *world.State
 	los            LineOfSight
 	isPet          bool
+	babyPet        bool // heals its owner (babyHeal); immutable
 	npcID          int
 	radius         float64
 	height         float64
@@ -265,6 +271,9 @@ type Actor struct {
 	// in the hit's own call.
 	skillsMu       sync.Mutex
 	disabledSkills map[int32]time.Time
+
+	// babyHeal is a baby pet's owner-heal task.
+	babyHeal babyHealTask
 }
 
 // Intent is the live action this actor is currently trying to carry out.
@@ -360,6 +369,7 @@ type PetConfig struct {
 	// than a fallback to the npc template's name; it gates RequestChangePetName's
 	// "pet is already named" rejection (Pet.getName() != null in the reference).
 	Named   bool
+	BabyPet bool // the pet heals its owner on its own
 	Level   int
 	Exp     int64
 	SP      int
@@ -487,6 +497,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		id:             cfg.ObjectID,
 		level:          cfg.Level,
 		isPet:          true,
+		babyPet:        cfg.BabyPet,
 		npcID:          cfg.NPCID,
 		radius:         cfg.CollisionRadius,
 		height:         cfg.CollisionHeight,

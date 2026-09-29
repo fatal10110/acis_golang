@@ -317,6 +317,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		CollisionHeight: npcTmpl.CollisionHeight,
 		Name:            name,
 		Named:           named,
+		BabyPet:         npcTmpl.Type == "BabyPet",
 		Level:           level,
 		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
 		Exp:             exp,
