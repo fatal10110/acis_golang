@@ -88,6 +88,19 @@ func (c *Character) NoSummonFriendZone() bool {
 	return c.insideNoSummonFriendZone.Load()
 }
 
+// SetInDangerArea records the live zone engine's current danger-zone
+// membership (zone.FlagDanger).
+func (c *Character) SetInDangerArea(inside bool) {
+	c.insideDangerArea.Store(inside)
+}
+
+// InDangerArea reports whether the character stands in a damage or effect
+// zone. It takes no lock, so status packets built under any other lock can
+// read it.
+func (c *Character) InDangerArea() bool {
+	return c.insideDangerArea.Load()
+}
+
 // SetInWater records the live zone engine's current water membership, which
 // switches the move speed to the swim speed.
 func (c *Character) SetInWater(inside bool) {

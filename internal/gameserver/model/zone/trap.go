@@ -64,9 +64,6 @@ type Damage struct {
 	// calls when a task resets the latch before its previous StartPulse
 	// invocation returns.
 	StartPulse func()
-	// DangerNotice refreshes a player's danger status display; nil until
-	// the messaging layer wires it.
-	DangerNotice func(a Actor)
 
 	pulsing atomic.Bool
 }
@@ -109,22 +106,45 @@ func (z *Damage) enter(a Actor) {
 			z.StartPulse()
 		}
 	}
-	if a.Class() == ClassPlayer {
-		a.ZoneFlags().Set(FlagDanger, true)
-		if z.DangerNotice != nil {
-			z.DangerNotice(a)
-		}
+	enterDanger(a)
+}
+
+func (z *Damage) exit(a Actor) { exitDanger(a) }
+
+// Endangered is a player that shows whether it stands in a damage or
+// effect zone. Each occupant carries its own reaction, so no zone holds
+// per-server state.
+type Endangered interface {
+	Actor
+	// DangerStateChanged runs after a danger zone raised, or released the
+	// last, hold on the actor's FlagDanger, to refresh its status display.
+	DangerStateChanged()
+}
+
+// enterDanger marks a player as in danger; every entry refreshes its
+// display, even when an overlapping danger zone already holds it.
+func enterDanger(a Actor) {
+	if a.Class() != ClassPlayer {
+		return
+	}
+	a.ZoneFlags().Set(FlagDanger, true)
+	if e, ok := a.(Endangered); ok {
+		e.DangerStateChanged()
 	}
 }
 
-func (z *Damage) exit(a Actor) {
-	if a.Class() == ClassPlayer {
-		a.ZoneFlags().Set(FlagDanger, false)
-		// Refresh the display only once the last overlapping danger zone
-		// released its hold.
-		if !a.ZoneFlags().Has(FlagDanger) && z.DangerNotice != nil {
-			z.DangerNotice(a)
-		}
+// exitDanger releases one danger hold on a player, refreshing its display
+// only once the last overlapping danger zone let go.
+func exitDanger(a Actor) {
+	if a.Class() != ClassPlayer {
+		return
+	}
+	a.ZoneFlags().Set(FlagDanger, false)
+	if a.ZoneFlags().Has(FlagDanger) {
+		return
+	}
+	if e, ok := a.(Endangered); ok {
+		e.DangerStateChanged()
 	}
 }
 
