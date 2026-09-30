@@ -15,6 +15,10 @@ import (
 
 const tradeInteractionDistance = 150
 
+// tradeChaoticRefusal answers a trade request refused because either side
+// carries karma while KarmaPlayerCanTrade is off.
+const tradeChaoticRefusal = "You cannot trade in a chaotic state."
+
 func (l *GameClientLink) tradeBook() *tradebook.Book {
 	if l.trades == nil {
 		l.trades = tradebook.NewBook(time.Now)
@@ -26,12 +30,20 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 	if live == nil || l.world == nil {
 		return
 	}
+	if !live.access.AllowTransaction {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
+		return
+	}
 	target, ok := l.livePlayerByID(req.ObjectID)
 	if !ok {
 		return
 	}
 	if target.ObjectID() == live.ObjectID() || !world.Knows(live, target) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
+		return
+	}
+	if !l.playerConfig.KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}
 
@@ -50,6 +62,12 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 
 func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpackets.AnswerTradeRequest) {
 	if live == nil {
+		return
+	}
+	// A refused answer leaves the request pending: the requester stays busy
+	// until the request expires, exactly as when the answer never came.
+	if !live.access.AllowTransaction {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
 
@@ -73,7 +91,9 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeniedTradeRequest, live.Name))
 		return
 	}
-	if !l.validTradeParticipants(requester, live) {
+	// Accepting opens the trade at any distance; the interaction radius is
+	// enforced on confirm and at settlement only.
+	if !l.tradePartnerLive(requester, live) {
 		l.tradeBook().Cancel(live.ObjectID())
 		live.SendFrame(serverpackets.FrameSendTradeDone(false))
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
@@ -121,6 +141,11 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		partner = nil
 	case !ok || !l.tradePartnerLive(live, partner):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		l.cancelTradeByID(live.ObjectID())
+		return
+	}
+	if !live.access.AllowTransaction {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
@@ -204,6 +229,9 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		}
 	case !ok || !l.tradePartnerLive(live, partner):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+		return
+	case !live.access.AllowTransaction:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	case !livePlayersInRange(live, partner, tradeInteractionDistance):
 		// The reference validates the interaction radius on every confirm

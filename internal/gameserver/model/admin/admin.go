@@ -142,6 +142,30 @@ func (d *Data) AccessLevel(level int) (AccessLevel, bool) {
 	return value, ok
 }
 
+// defaultAccessLevel is the user level the attribute defaults describe, for a
+// server running without an access-level table.
+var defaultAccessLevel = AccessLevel{AllowTransaction: true, GiveDamage: true}
+
+// Resolve returns the access level a character with the persisted level plays
+// under: every negative level reads the -1 entry, and a level the table does
+// not define falls back to the user level 0. A nil table, or one without a
+// level 0, resolves to the attribute defaults.
+func (d *Data) Resolve(level int) AccessLevel {
+	if d == nil {
+		return defaultAccessLevel
+	}
+	if level < 0 {
+		level = -1
+	}
+	if value, ok := d.accessLevels[level]; ok {
+		return value
+	}
+	if value, ok := d.accessLevels[0]; ok {
+		return value
+	}
+	return defaultAccessLevel
+}
+
 func (d *Data) Command(name string) (Command, bool) {
 	value, ok := d.commands[strings.ToLower(name)]
 	return value, ok

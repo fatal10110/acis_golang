@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -67,33 +66,6 @@ func (a *liveZoneActor) GM() bool                    { return a.live.isGM }
 func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return int32(a.live.Character.ClanID) }
-
-// resolveIsGM looks up whether accessLevel carries the accessLevels.xml
-// isGM flag, matching Player.isGM() (getAccessLevel().isGm()) rather than
-// treating every positive access level as GM.
-func resolveIsGM(data *admin.Data, accessLevel int) bool {
-	if data == nil {
-		return false
-	}
-	level, ok := data.AccessLevel(accessLevel)
-	return ok && level.IsGM
-}
-
-func resolveCanGiveDamage(data *admin.Data, accessLevel int) bool {
-	if data == nil {
-		return true
-	}
-	level, ok := data.AccessLevel(accessLevel)
-	return ok && level.GiveDamage
-}
-
-func resolveFixedRes(data *admin.Data, accessLevel int) bool {
-	if data == nil {
-		return false
-	}
-	level, ok := data.AccessLevel(accessLevel)
-	return ok && level.AllowFixedRes
-}
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.deliveryMu.Lock()

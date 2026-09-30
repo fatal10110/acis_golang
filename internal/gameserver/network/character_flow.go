@@ -408,7 +408,7 @@ func sevenSignsPeriodMessage(p sevensigns.Period) int {
 }
 
 func (l *GameClientLink) dieOptions(c *player.Character) serverpackets.DieOptions {
-	return serverpackets.DieOptions{FixedRes: resolveFixedRes(l.admin, c.AccessLevel)}
+	return serverpackets.DieOptions{FixedRes: l.admin.Resolve(c.AccessLevel).AllowFixedRes}
 }
 
 // socialActionLevelUp is the social animation id played for everyone who can
@@ -678,7 +678,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
-	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), isGM: resolveIsGM(l.admin, c.AccessLevel), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	access := l.admin.Resolve(c.AccessLevel)
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, isGM: access.IsGM, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
@@ -690,7 +691,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	attackCtl.SetQueue(creatureLive.Queue())
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
-	c.SetCanGiveDamage(resolveCanGiveDamage(l.admin, c.AccessLevel))
+	c.SetCanGiveDamage(access.GiveDamage)
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}

@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -382,7 +383,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
 	control.combat = combat
 
-	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, access: (*admin.Data)(nil).Resolve(ch.AccessLevel), attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
 }
 
 // testControllerSink receives a fixture player's attack and movement

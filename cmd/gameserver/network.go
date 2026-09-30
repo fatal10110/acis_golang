@@ -106,6 +106,7 @@ func provideGameClientLink(
 		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
 		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
 		KarmaPlayerCanUseWareHouse: gameplay.KarmaServiceGates.CanUseWareHouse,
+		KarmaPlayerCanTrade:        bool(gameplay.KarmaPlayerCanTrade),
 		AwardPKKillPVPPoint:        pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:                 cfg.AllowWater,
 		EnableFallingDamage:        cfg.EnableFallingDamage,

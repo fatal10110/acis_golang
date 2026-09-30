@@ -58,6 +58,7 @@ const (
 	SystemMessageOnceTradeConfirmedCannotMove      = 141
 	SystemMessageAlreadyTrading                    = 142
 	SystemMessageTargetIncorrect                   = 144
+	SystemMessageNotAuthorizedToDoThat             = 794
 	SystemMessageTargetNotFound                    = 145
 	SystemMessageCannotUseQuestItems               = 148
 	SystemMessageCannotPickupOrUseItemTrading      = 149

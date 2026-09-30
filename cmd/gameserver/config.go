@@ -53,6 +53,7 @@ type gameplayConfig struct {
 	StorageSlots             player.StorageSlots
 	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
 	KarmaServiceGates        karmaServiceGates
+	KarmaPlayerCanTrade      karmaPlayerCanTrade
 	AllowDelevel             allowDelevel
 	RateKarmaExpLost         rateKarmaExpLost
 	CharacterSelectDelay     characterSelectDelay
@@ -115,6 +116,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.KarmaServiceGates, err = loadKarmaServiceGates(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.KarmaPlayerCanTrade, err = loadKarmaPlayerCanTrade(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.AllowDelevel, err = loadAllowDelevel(paths); err != nil {
@@ -347,6 +351,18 @@ func loadKarmaServiceGates(paths gameServerPaths) (karmaServiceGates, error) {
 		CanUseGK:        f.Bool("KarmaPlayerCanUseGK", false),
 		CanUseWareHouse: f.Bool("KarmaPlayerCanUseWareHouse", true),
 	}, f.Err()
+}
+
+// karmaPlayerCanTrade controls whether a trade may open while either side
+// carries karma, read from players.properties.
+type karmaPlayerCanTrade bool
+
+func loadKarmaPlayerCanTrade(paths gameServerPaths) (karmaPlayerCanTrade, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return karmaPlayerCanTrade(config.NewFields(props, "karma player can trade").Bool("KarmaPlayerCanTrade", true)), nil
 }
 
 // allowDelevel controls whether a player death may cost experience/karma at
