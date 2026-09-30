@@ -30,6 +30,8 @@ type MountData struct {
 	// strider.
 	RunSpeed, SwimSpeed, FlySpeed int
 	AtkSpd                        float64
+	// PAtk and MAtk are the rider's base P.Atk. and M.Atk. while mounted.
+	PAtk, MAtk float64
 }
 
 // MountDataSource resolves a mount's pet data for a rider of level.

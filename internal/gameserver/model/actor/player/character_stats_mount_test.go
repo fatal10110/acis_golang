@@ -9,14 +9,16 @@ import (
 // Mount pet data rows from the shipped npc data
 // (aCis_datapack/data/xml/npcs/12000-12999.xml): the Wind Strider (12526)
 // at level 55 (maxMeal 4208, speedOnRide "150;150;70;70;0;0",
-// atkSpdOnRide 350.0) and the Wyvern (12621) at level 70 (maxMeal 5728,
-// speedOnRide "250;250;140;140;250;250"); both have hungryLimit 0.5. The
-// wyvern's fly speed is bumped to 260 so the tests tell it from its run
-// speed.
+// atkSpdOnRide 350.0, pAtkOnRide and mAtkOnRide 156.244534528007) and the
+// Wyvern (12621) at level 70 (maxMeal 5728, speedOnRide
+// "250;250;140;140;250;250", pAtkOnRide and mAtkOnRide 0.0); both have
+// hungryLimit 0.5. The wyvern's fly speed is bumped to 260 so the tests
+// tell it from its run speed.
 var (
 	striderLevel55 = MountData{
 		MaxMeal: 4208, MealInNormal: 40, MealInBattle: 43, HungryLimit: 0.5,
 		RunSpeed: 150, SwimSpeed: 70, AtkSpd: 350,
+		PAtk: striderRideAtk, MAtk: striderRideAtk,
 	}
 	wyvernLevel70 = MountData{
 		MaxMeal: 5728, MealInNormal: 45, MealInBattle: 47, HungryLimit: 0.5,
@@ -24,7 +26,12 @@ var (
 	}
 )
 
-const striderNPCID int32 = 12526
+const (
+	striderNPCID int32 = 12526
+	// striderRideAtk is the level 55 Wind Strider's pAtkOnRide and
+	// mAtkOnRide.
+	striderRideAtk = 156.244534528007
+)
 
 const riderDEX = 30
 
@@ -257,4 +264,111 @@ func TestRiderServerMoveSpeedFollowsEveryMountChange(t *testing.T) {
 		t.Fatal("the starved mount kept its rider")
 	}
 	wantServerSpeed(t, "thrown by the starved mount", c, foot)
+}
+
+// javaLevelMod is CreatureStatus.getLevelMod (CreatureStatus.java:831-834).
+func javaLevelMod(level int) float64 { return (100.0 - 11 + float64(level)) / 100.0 }
+
+// TestRiderAttacksFromTheMountsAtk pins PlayerStatus.getPAtk and getMAtk
+// for a rider (PlayerStatus.java:985-999, 1017-1031): the base is the
+// mount's pAtkOnRide / mAtkOnRide at the level it was mounted at, scaled by
+// 0.5 - (min(gap, 10) - 5) * 0.05 once the mount outlevels its rider by
+// more than 4, then finalized through POWER_ATTACK (FuncPAtkMod: STR bonus
+// and level mod) and MAGIC_ATTACK (FuncMAtkMod: squared INT bonus and
+// level mod) at the rider's current level. The class template and the
+// weapon play no part; getPAtk and getMAtk truncate to int.
+func TestRiderAttacksFromTheMountsAtk(t *testing.T) {
+	tmpl := combatTemplate()
+	for _, tc := range []struct {
+		gap int
+		mul float64 // the level-gap multiplier, spelled out per gap
+	}{
+		{0, 1}, {4, 1}, {5, 0.5}, {7, 0.4}, {10, 0.25}, {12, 0.25},
+	} {
+		c, _ := riderAt(t, 55)
+		if !c.Mount(striderNPCID, 88) {
+			t.Fatal("Mount(strider) = false")
+		}
+		c.CharLevel = 55 - tc.gap
+		lm := javaLevelMod(c.CharLevel)
+		base := striderRideAtk * tc.mul
+
+		wantP := base * statbonus.STRBonus[tmpl.STR] * lm
+		if got := c.PAtk(); !closeFloat(got, wantP) || int(got) != int(wantP) {
+			t.Fatalf("gap %d: PAtk() = %v, want %v (int %d)", tc.gap, got, wantP, int(wantP))
+		}
+		intMod := statbonus.INTBonus[tmpl.INT]
+		wantM := base * ((lm * lm) * (intMod * intMod))
+		if got := c.MAtk(); !closeFloat(got, wantM) || int(got) != int(wantM) {
+			t.Fatalf("gap %d: MAtk() = %v, want %v (int %d)", tc.gap, got, wantM, int(wantM))
+		}
+	}
+}
+
+// TestRiderAtkLeavesWithTheMount covers the class P.Atk./M.Atk. on foot,
+// their replacement on the mount, their return on dismount, and a wyvern
+// whose pAtkOnRide/mAtkOnRide are 0: the stat pipeline's floor of 1
+// (CreatureStatus.calcStat, cantBeNegative) is all its rider hits with.
+func TestRiderAtkLeavesWithTheMount(t *testing.T) {
+	c, _ := riderAt(t, 70)
+	footP, footM := c.PAtk(), c.MAtk()
+
+	c.Mount(striderNPCID, 88)
+	if got := c.PAtk(); got == footP {
+		t.Fatalf("strider rider PAtk() = %v, the foot value", got)
+	}
+	c.Dismount()
+	if got, gotM := c.PAtk(), c.MAtk(); got != footP || gotM != footM {
+		t.Fatalf("dismounted PAtk()/MAtk() = %v/%v, want the foot %v/%v", got, gotM, footP, footM)
+	}
+
+	c.Mount(wyvernNPCID, 77)
+	if got, gotM := c.PAtk(), c.MAtk(); got != 1 || gotM != 1 {
+		t.Fatalf("wyvern rider PAtk()/MAtk() = %v/%v, want 1/1", got, gotM)
+	}
+}
+
+// TestMountWithoutPetDataKeepsClassAtk covers a mount with no pet data row
+// for its rider's level: the rider keeps its own P.Atk., M.Atk. and cast
+// speed.
+func TestMountWithoutPetDataKeepsClassAtk(t *testing.T) {
+	c, data := riderAt(t, 55)
+	footP, footM, footC := c.PAtk(), c.MAtk(), c.MagicAttackSpeed()
+	delete(data.npcs, striderNPCID)
+	c.Mount(striderNPCID, 88)
+	if p, m, cs := c.PAtk(), c.MAtk(), c.MagicAttackSpeed(); p != footP || m != footM || cs != footC {
+		t.Fatalf("mounted without pet data PAtk/MAtk/C.Spd = %v/%v/%d, want the foot %v/%v/%d", p, m, cs, footP, footM, footC)
+	}
+}
+
+// TestHungryMountHalvesCastSpeed pins PlayerStatus.getMAtkSpd
+// (PlayerStatus.java:1002-1014): the 333 base is halved while the rider's
+// mount is hungry (fed below hungryLimit of its max meal), then goes through
+// MAGIC_ATTACK_SPEED (FuncMAtkSpeed: WIT bonus) and truncates to int. A fed
+// mount and no mount leave it whole.
+func TestHungryMountHalvesCastSpeed(t *testing.T) {
+	wit := statbonus.WITBonus[combatTemplate().WIT]
+	fed, hungry := int(333*wit), int(166.5*wit)
+	if fed == hungry {
+		t.Fatalf("fixture cannot tell fed %d from hungry %d", fed, hungry)
+	}
+	for _, npcID := range []int32{striderNPCID, wyvernNPCID} {
+		c, _ := riderAt(t, 70)
+		if got := c.MagicAttackSpeed(); got != fed {
+			t.Fatalf("npc %d: on foot MagicAttackSpeed() = %d, want %d", npcID, got, fed)
+		}
+		c.Mount(npcID, 88)
+		c.StartMountFeed()
+		if got := c.MagicAttackSpeed(); got != fed {
+			t.Fatalf("npc %d: fed mount MagicAttackSpeed() = %d, want %d", npcID, got, fed)
+		}
+		setFeed(c, 0)
+		if got := c.MagicAttackSpeed(); got != hungry {
+			t.Fatalf("npc %d: hungry mount MagicAttackSpeed() = %d, want %d", npcID, got, hungry)
+		}
+		c.Dismount()
+		if got := c.MagicAttackSpeed(); got != fed {
+			t.Fatalf("npc %d: dismounted MagicAttackSpeed() = %d, want %d", npcID, got, fed)
+		}
+	}
 }

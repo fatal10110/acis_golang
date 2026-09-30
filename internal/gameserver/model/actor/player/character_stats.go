@@ -295,8 +295,12 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 	return caster != nil && caster.AttackType() == item.WeaponBow
 }
 
-// MAtk returns the current magic attack value.
+// MAtk returns the current magic attack value. A rider casts from its
+// mount's M.Atk. instead of its class and weapon.
 func (c *Character) MAtk() float64 {
+	if m, ok := c.ridden(); ok {
+		return c.calcStat(stat.MagicAttack, m.mAtk)
+	}
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MAtk > 0 {

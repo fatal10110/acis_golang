@@ -34,6 +34,8 @@ func (t mountDataTable) MountData(npcID int32, level int) (player.MountData, boo
 		SwimSpeed:     row.MountWaterSpeed,
 		FlySpeed:      row.MountFlySpeed,
 		AtkSpd:        row.MountAtkSpd,
+		PAtk:          row.MountPAtk,
+		MAtk:          row.MountMAtk,
 	}, true
 }
 
