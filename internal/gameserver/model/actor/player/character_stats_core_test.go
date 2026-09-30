@@ -2297,6 +2297,7 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 	delivery := &rewardInventoryDelivery{}
 	inv := itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, templates, nil, delivery, nil)
 	c.AttachRuntime(&Template{}, inv)
+	rec := recordEvents(c)
 
 	if !c.AddRewardItem(57, 10, 0x30000001) {
 		t.Fatal("AddRewardItem() = false for a known stackable template")
@@ -2304,12 +2305,19 @@ func TestAddRewardItemNotifiesTheUpdateHook(t *testing.T) {
 	if delivery.calls != 1 {
 		t.Fatalf("update deliveries = %d, want 1", delivery.calls)
 	}
+	want := []event.ItemObtained{{ItemID: 57, Count: 10, Notice: event.ObtainAdena}}
+	if got := event.Of[event.ItemObtained](rec); !slices.Equal(got, want) {
+		t.Fatalf("ItemObtained events = %+v, want %+v", got, want)
+	}
 
 	if c.AddRewardItem(9999, 1, 0x30000002) {
 		t.Fatal("AddRewardItem() = true for an unknown template")
 	}
 	if delivery.calls != 1 {
 		t.Fatalf("update deliveries after a rejected add = %d, want 1", delivery.calls)
+	}
+	if got := event.Count[event.ItemObtained](rec); got != 1 {
+		t.Fatalf("ItemObtained events after a rejected add = %d, want 1", got)
 	}
 }
 
