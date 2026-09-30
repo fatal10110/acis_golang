@@ -478,6 +478,9 @@ func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
 		return true
 	}
 	if run := live.takeDeferredAction(); run != nil {
+		if live.combat != nil {
+			live.combat.Replace()
+		}
 		run()
 		return true
 	}

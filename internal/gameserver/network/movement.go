@@ -54,6 +54,11 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 }
 
 func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Location) {
+	if live.DenyAIAction() || live.MovementDisabled() {
+		live.tryToIdle(false)
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// A client-initiated walk overrides any attack-driven chase movement —
 	// otherwise the server's own MaybeStartOffensiveFollow re-think would
 	// fight the player's own steering back toward the old target.

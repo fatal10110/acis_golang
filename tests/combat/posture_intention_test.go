@@ -36,6 +36,61 @@ func TestAttackRequestWaitsForStandUp(t *testing.T) {
 	assertAttackBy(t, c, objID)
 }
 
+func TestAttackQueuedDuringStandUpKeepsOriginalTarget(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	first := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	second := srv.SpawnHostileNPCAt(t, location.Location{X: 45, Y: 25, Z: 30})
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, first.ObjectID())
+	sitPlayer(t, c)
+	srv.Advance(t, 2500*time.Millisecond)
+	c.Send(encodeRequestChangeWaitType(true))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
+	c.Send(encodeAttackRequest(first.ObjectID(), 10, 20, 30, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued attack")
+	targetHostile(t, c, second.ObjectID())
+	srv.Advance(t, 2500*time.Millisecond)
+	attack := assertAttackBy(t, c, objID)
+	r := wireReader(attack[1:])
+	r.ReadInt32()
+	if got := r.ReadInt32(); got != first.ObjectID() {
+		t.Fatalf("attack target = %d, want queued target %d", got, first.ObjectID())
+	}
+}
+
+func TestAttackRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	sitPlayer(t, c)
+	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued attack")
+	srv.Advance(t, 2500*time.Millisecond)
+	failed := false
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeAttack || frame[0] == serverpackets.OpcodeMoveToPawn {
+			t.Fatalf("seated player attacked with opcode %#x", frame[0])
+		}
+		failed = failed || frame[0] == serverpackets.OpcodeActionFailed
+	}
+	if !failed {
+		t.Fatal("queued seated attack did not answer ActionFailed at settlement")
+	}
+	actor, ok := srv.State.Player(srv.SoleObjectID(t))
+	if !ok || !actor.(interface{ Seated() bool }).Seated() {
+		t.Fatal("player did not remain seated after queued attack")
+	}
+}
+
 func TestFollowRequestWaitsForStandUp(t *testing.T) {
 	t.Parallel()
 	p := bootClickPair(t, 0)

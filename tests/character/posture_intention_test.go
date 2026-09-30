@@ -58,6 +58,86 @@ func TestMoveRequestWaitsForStandUp(t *testing.T) {
 	mustReadOpcode(t, c, serverpackets.OpcodeMoveToLocation, "queued move after stand-up")
 }
 
+func TestMoveRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	enterWorld(t, c)
+	drainQuiet(t, c)
+	c.Send(encodeRequestChangeWaitType(false))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
+	c.Send(encodeMoveBackwardToLocation(location.Location{X: 80, Y: 70, Z: 30}, spawnOrigin, 1))
+	mustReadOpcode(t, c, serverpackets.OpcodeActionFailed, "queued move")
+	srv.Advance(t, 2500*time.Millisecond)
+	failed := false
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeMoveToLocation {
+			t.Fatal("seated player started queued walk")
+		}
+		if frame[0] == serverpackets.OpcodeActionFailed {
+			failed = true
+		}
+	}
+	if !failed {
+		t.Fatal("queued seated walk did not answer ActionFailed at settlement")
+	}
+}
+
+func TestSitRequestWaitsForStandUp(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	enterWorld(t, c)
+	drainQuiet(t, c)
+	c.Send(encodeRequestChangeWaitType(false))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
+	srv.Advance(t, 2500*time.Millisecond)
+	c.Send(encodeRequestChangeWaitType(true))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand")
+	c.Send(encodeRequestChangeWaitType(false))
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeChangeWaitType || frame[0] == serverpackets.OpcodeActionFailed {
+			t.Fatalf("sit answered during stand-up with opcode %#x", frame[0])
+		}
+	}
+	srv.Advance(t, 2500*time.Millisecond)
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "queued sit")
+}
+
+func TestQueuedSitKeepsChairSelectedAtRequest(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	enterWorld(t, c)
+	drainQuiet(t, c)
+	first := spawnChair(t, srv, c, nil)
+	second := spawnChair(t, srv, c, nil)
+	c.Send(encodeRequestChangeWaitType(false))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
+	srv.Advance(t, 2500*time.Millisecond)
+	c.Send(encodeAction(first.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select first chair")
+	c.Send(encodeRequestChangeWaitType(true))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand")
+	c.Send(encodeRequestChangeWaitType(false))
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeChangeWaitType {
+			t.Fatal("queued sit ran before stand-up settled")
+		}
+	}
+	c.Send(encodeAction(second.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select second chair")
+	srv.Advance(t, 2500*time.Millisecond)
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "queued sit")
+	mustReadOpcode(t, c, serverpackets.OpcodeChairSit, "first chair sit")
+	if !first.Busy() || second.Busy() {
+		t.Fatalf("queued sit claimed first=%t second=%t, want true/false", first.Busy(), second.Busy())
+	}
+}
+
 func TestChairReleasedAfterStandUp(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
@@ -147,6 +227,33 @@ func TestChairInteractWaitsForStandUp(t *testing.T) {
 		t.Fatal("chair not claimed after queued interact")
 	}
 	mustReadOpcode(t, c, serverpackets.OpcodeChairSit, "chair sit")
+}
+
+func TestChairInteractDuringSitDownIsRejectedAtSettlement(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	enterWorld(t, c)
+	drainQuiet(t, c)
+	chair := spawnChair(t, srv, c, nil)
+	c.Send(encodeRequestChangeWaitType(false))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
+	c.Send(encodeAction(chair.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select chair")
+	c.Send(encodeAction(chair.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeActionFailed, "queued chair interact")
+	srv.Advance(t, 2500*time.Millisecond)
+	failed := false
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeChairSit {
+			t.Fatal("seated player claimed chair")
+		}
+		failed = failed || frame[0] == serverpackets.OpcodeActionFailed
+	}
+	if !failed || chair.Busy() {
+		t.Fatalf("seated chair interaction: ActionFailed=%t, chair busy=%t", failed, chair.Busy())
+	}
 }
 
 func TestStandRequestDuringFakeDeathGetUpAnswersAtSettlement(t *testing.T) {
