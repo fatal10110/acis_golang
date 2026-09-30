@@ -179,3 +179,110 @@ func TestConfusedMonsterSelectsNoHeavierDesire(t *testing.T) {
 
 	drainUntilQuiet(t, c)
 }
+
+// countAttackFrames lets n swing periods pass and counts the Attack
+// broadcasts in them.
+func countAttackFrames(t *testing.T, srv *gameservertest.Server, period time.Duration, n int) int {
+	t.Helper()
+	swings := 0
+	for range n {
+		srv.Advance(t, period)
+		for _, frame := range framesUntilQuiet(srv.Client) {
+			if frame[0] == serverpackets.OpcodeAttack {
+				swings++
+			}
+		}
+	}
+	return swings
+}
+
+// TestConfusedMonsterKeepsSwinging pins the finished swing's think past
+// runAI's out-of-control gate: runAI selects nothing for a confused
+// monster, but the finished attack's think still steps its current attack,
+// so it keeps swinging at its target for the whole confusion.
+func TestConfusedMonsterKeepsSwinging(t *testing.T) {
+	t.Parallel()
+	srv, hostile, _, attackTime := startHostileAttack(t, 300, 0)
+	landHeldEffect(t, hostile, "Confusion")
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after confusion = %v, want %v", got, ai.IntentionAttack)
+	}
+	drainUntilQuiet(t, srv.Client)
+
+	// Few enough periods that the low-level player outlives the swings.
+	const periods = 3
+	if got := countAttackFrames(t, srv, attackTime+10*time.Millisecond, periods); got < periods {
+		t.Fatalf("Attack broadcasts over %d swing periods while confused = %d, want at least %d", periods, got, periods)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after swinging while confused = %v, want %v", got, ai.IntentionAttack)
+	}
+}
+
+// TestStunnedMonsterStopsSwinging is the stun side of the finished swing's
+// think: a stunned monster's attack step does nothing, so no swing follows
+// while the stun holds, and the attack stays its intention.
+func TestStunnedMonsterStopsSwinging(t *testing.T) {
+	t.Parallel()
+	srv, hostile, _, attackTime := startHostileAttack(t, 300, 0)
+	landHeldEffect(t, hostile, "Stun")
+	drainUntilQuiet(t, srv.Client)
+
+	if got := countAttackFrames(t, srv, attackTime+10*time.Millisecond, 5); got != 0 {
+		t.Fatalf("Attack broadcasts while stunned = %d, want 0", got)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() while stunned = %v, want %v kept", got, ai.IntentionAttack)
+	}
+}
+
+// TestStunnedMonsterIdlesPastLatchAndSwingsItAfter pins the periodic idle
+// of an out-of-control monster with a latched attack: the idle runs at
+// once instead of waiting behind the latch, and the latch survives it, as
+// NpcAI.runAI's _nextDesire survives thinkIdle. The first pass after the
+// stun swings once at the latched target and the monster then stops.
+func TestStunnedMonsterIdlesPastLatchAndSwingsItAfter(t *testing.T) {
+	t.Parallel()
+	srv, hostile, _, attackTime := startHostileAttackAfter(t, latchAtkSpd, 0, wanderThenStop)
+	stun := landHeldEffect(t, hostile, "Stun")
+	decayAttackDesire(t, hostile)
+	// Running, so the idle's walk stance shows on the wire.
+	hostile.ForceRunStance()
+	drainUntilQuiet(t, srv.Client)
+
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("stunned TickThink() error: %v", err)
+	}
+	var walk []byte
+	for _, frame := range framesUntilQuiet(srv.Client) {
+		switch frame[0] {
+		case serverpackets.OpcodeAttack:
+			t.Fatal("Attack on the stunned periodic idle, want none")
+		case serverpackets.OpcodeChangeMoveType:
+			walk = frame
+		}
+	}
+	if walk == nil {
+		t.Fatal("no ChangeMoveType on the stunned periodic idle, want the walk stance")
+	}
+	assertChangeMoveType(t, walk, hostile.ObjectID(), false)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after the stunned periodic idle = %v, want %v", got, ai.IntentionIdle)
+	}
+
+	removeHeldEffect(t, hostile, stun)
+	drainUntilQuiet(t, srv.Client)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() after the stun error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() on the first pass after the stun = %v, want the latched %v", got, ai.IntentionAttack)
+	}
+	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "latched swing after the stun")
+
+	srv.Advance(t, attackTime+10*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got == ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want the latch spent", got)
+	}
+	assertNoSwingFor(t, srv, attackTime)
+}

@@ -921,6 +921,57 @@ func TestAttackableRunAIKeepsFarAttackWhenOutOfControl(t *testing.T) {
 	}
 }
 
+// TestAttackableAttackFinishedContinuesAttackWhenOutOfControl pins a
+// finished swing's think past the out-of-control gate: RunAI steps nothing,
+// but AttackFinished continues the current attack for a confused actor and
+// does nothing for one that is denied AI action.
+func TestAttackableAttackFinishedContinuesAttackWhenOutOfControl(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		set   func(*fakeActor)
+		swing bool
+	}{
+		{"denied AI action", func(a *fakeActor) { a.denyAction = true }, false},
+		{"confused", func(a *fakeActor) { a.confused = true }, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			owner := actor(1)
+			target := actor(2)
+			owner.known = map[int32]bool{target.ObjectID(): true}
+			strike := &recordingAttack{canAttack: true}
+			ai := NewAttackable(owner, &recordingMove{}, strike)
+			addAttackHate(ai, target, 0, 20)
+			if err := ai.RunAI(); err != nil {
+				t.Fatalf("RunAI() error = %v, want nil", err)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("setup DoAttack calls = %d, want 1", strike.doAttackCalls)
+			}
+			tc.set(owner)
+
+			if err := ai.RunAI(); err != nil {
+				t.Fatalf("out-of-control RunAI() error = %v, want nil", err)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("DoAttack calls after out-of-control RunAI = %d, want 1 (no selection)", strike.doAttackCalls)
+			}
+			if err := ai.AttackFinished(); err != nil {
+				t.Fatalf("AttackFinished() error = %v, want nil", err)
+			}
+			want := 1
+			if tc.swing {
+				want = 2
+			}
+			if strike.doAttackCalls != want {
+				t.Fatalf("DoAttack calls after AttackFinished = %d, want %d", strike.doAttackCalls, want)
+			}
+			if got := ai.CurrentIntention(); got != IntentionAttack {
+				t.Fatalf("CurrentIntention() = %v, want %v kept", got, IntentionAttack)
+			}
+		})
+	}
+}
+
 func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)

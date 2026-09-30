@@ -678,12 +678,15 @@ const (
 	// ending or a control effect ending; it never selects a desire and
 	// never idles on an empty queue.
 	thinkContinue thinkMode = iota
-	// thinkEvent re-runs desire selection on an event: a swing finishing,
-	// the hit animation ending, a bow shot, a completed cast or a first
-	// attack desire.
+	// thinkEvent re-runs desire selection on an event: the hit animation
+	// ending, a bow shot, a completed cast or a first attack desire.
 	thinkEvent
 	// thinkTick is the periodic AI cycle.
 	thinkTick
+	// thinkAttackFinished is a swing finishing: desire selection as on an
+	// event, then, for an out-of-control actor that selects nothing, the
+	// continue pass the finished attack's think falls back to.
+	thinkAttackFinished
 )
 
 // Think advances the current intention once, for a bow's reuse ending and
@@ -714,6 +717,15 @@ func (a *Attackable) RunAI() error {
 // or the actor is out of control.
 func (a *Attackable) TickThink() error {
 	return a.think(thinkTick)
+}
+
+// AttackFinished is a swing finishing: RunAI's desire selection, followed
+// by the finished attack's think. An in-control actor's selection already
+// stepped the current intention, so only an out-of-control one, which
+// selects nothing, takes that think as a continue pass: a confused actor
+// keeps swinging at its current target while a stunned one does nothing.
+func (a *Attackable) AttackFinished() error {
+	return a.think(thinkAttackFinished)
 }
 
 // ClearCurrentDesire drops the queued desire matching the current intention,
@@ -754,7 +766,8 @@ func (a *Attackable) think(mode thinkMode) error {
 	outOfControl := a.actor.OutOfControl()
 	a.refreshCombatMemory()
 	a.pruneDesires(outOfControl)
-	if mode == thinkEvent && !outOfControl && a.idleOnEmptyQueue() {
+	onEvent := mode == thinkEvent || mode == thinkAttackFinished
+	if onEvent && !outOfControl && a.idleOnEmptyQueue() {
 		return nil
 	}
 	if !outOfControl {
@@ -792,10 +805,14 @@ func (a *Attackable) think(mode thinkMode) error {
 	// attack latch and lastDesire stay as they are, and a queued wander
 	// takes no step. Only the periodic cycle's empty-queue idle runs, at
 	// once even with a latch set; the latch waits for the first pass after
-	// control returns.
+	// control returns. A finished swing still continues the current
+	// intention, as its think does not go through desire selection.
 	if outOfControl && mode != thinkContinue {
 		if idleAfterLatch {
 			a.idleAndRequeue()
+		}
+		if mode == thinkAttackFinished && canPromote {
+			return a.continueCurrent()
 		}
 		return nil
 	}

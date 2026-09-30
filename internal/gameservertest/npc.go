@@ -432,7 +432,9 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 			c.server.think(c.hostile)
 			return
 		}
-		c.server.runAI(c.hostile)
+		if err := c.hostile.AttackFinished(); err != nil {
+			c.server.log.Warn().Err(err).Msg("ai: hostile attack finished")
+		}
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
 	case event.AttackStanceRequested:

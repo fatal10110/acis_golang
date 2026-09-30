@@ -809,14 +809,23 @@ func (h *Hostile) Think() error {
 	return h.brain.Think()
 }
 
-// RunAI re-runs the hostile AI's desire selection on an event: a swing
-// finishing, the hit animation ending, a bow shot landing or a completed
-// cast. Unlike Think it idles an actor whose desire queue ran empty.
+// RunAI re-runs the hostile AI's desire selection on an event: the hit
+// animation ending, a bow shot landing or a completed cast. Unlike Think it idles an actor whose desire queue ran empty.
 func (h *Hostile) RunAI() error {
 	if !h.canRunAI() {
 		return nil
 	}
 	return h.brain.RunAI()
+}
+
+// AttackFinished runs the hostile AI on a finished swing: desire selection
+// as RunAI, and for an out-of-control NPC, which selects nothing, one
+// continue step of its current intention.
+func (h *Hostile) AttackFinished() error {
+	if !h.canRunAI() {
+		return nil
+	}
+	return h.brain.AttackFinished()
 }
 
 // CastFinished ends the AI's hold on a cast that completed or was aborted:
