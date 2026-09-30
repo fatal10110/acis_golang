@@ -3125,10 +3125,14 @@ func TestListStackDisplacementSilentCases(t *testing.T) {
 }
 
 // Recasting an identical stacked buff replaces the stack head: the old
-// buff's exit hook runs once, it is announced as displaced and the recast
-// as felt. With lesser effects cancelled the old buff is already gone when
-// its removal runs, so nothing more is sent; kept, it is removed and
-// announced a second time.
+// buff's exit hook runs when it is retired and again when it loses the stack
+// head, after its stat removal (#2763: AbstractEffect.scheduleEffect's
+// FINISHING pass leaves _inUse set, so EffectList.addEffectFromQueue's
+// setInUse(false) on the old head calls onExit a second time,
+// EffectList.java:624-629, 757-765). It is announced as displaced and the
+// recast as felt. With lesser effects cancelled the old buff is already gone
+// when its removal runs, so nothing more is sent; kept, it is removed and
+// announced a second time, with no third exit hook.
 func TestListIdenticalStackedRecastAnnouncesHeadChange(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -3156,6 +3160,7 @@ func TestListIdenticalStackedRecastAnnouncesHeadChange(t *testing.T) {
 				"old:stop",
 				"old:exit",
 				"owner:remove:old",
+				"old:exit",
 				"disappeared:1086:0",
 				"fresh:start",
 				"owner:add",
@@ -3197,8 +3202,11 @@ func TestListIdenticalHerbRecastAtCapacityDropsBoth(t *testing.T) {
 // An identical recast at full buff slots still counts the retired buff, so
 // the cap eviction runs too. It walks the held buffs in order: an older
 // other buff ahead of the recast one is evicted as well, while reaching the
-// already-retired buff first uses up the eviction without retiring it again
-// (no second stop or exit hook), and the other buff survives.
+// already-retired buff first uses up the eviction: it runs that buff's exit
+// hook a second time, because retirement leaves it in use, but not its
+// stop-task hook, and the other buff survives (#2763: a second exit() on an
+// effect still _inUse reruns onExit, and stopEffectTask is a no-op once the
+// task is gone, AbstractEffect.java:229-240, 310-320).
 func TestListIdenticalRecastAtCapacityEvictsInHeldOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -3229,6 +3237,7 @@ func TestListIdenticalRecastAtCapacityEvictsInHeldOrder(t *testing.T) {
 			order: []string{"b", "a"},
 			events: []string{
 				"b:stop",
+				"b:exit",
 				"b:exit",
 				"b2:start",
 				"owner:add",

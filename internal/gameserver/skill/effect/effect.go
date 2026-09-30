@@ -259,14 +259,28 @@ func (e *Effect) beginExit() func() {
 }
 
 // finishExit is beginExit for an effect that is ending for good (expiry,
-// dispel, replacement, eviction). A startRefused effect runs no exit hook
-// there and stays marked in use, so a stack-head displacement in the same
-// insertion still runs it through beginExit.
+// dispel, removal). A startRefused effect runs no exit hook there and stays
+// marked in use. A buff an insertion replaces or evicts ends through
+// retireExit instead.
 func (e *Effect) finishExit() func() {
 	if e.startRefused {
 		return nil
 	}
 	return e.beginExit()
+}
+
+// retireExit returns the exit hook one ending pass over a buff an insertion
+// replaces or evicts runs, or nil when e is inactive, start-refused or has
+// no hook. Unlike finishExit it leaves e marked in use, because the
+// insertion still holds e and every later pass over it runs the hook again
+// while e stays active: a cap eviction reaching a buff the identical check
+// already retired, then the stack-head change (beginExit), which clears the
+// flag. add clears it for good before e's list removal, which runs no hook.
+func (e *Effect) retireExit() func() {
+	if !e.inUse || e.startRefused || e.OnExit == nil {
+		return nil
+	}
+	return func() { e.OnExit(e) }
 }
 
 // stopTaskThunk returns a thunk that fires e's on-stop-task hook, or nil
