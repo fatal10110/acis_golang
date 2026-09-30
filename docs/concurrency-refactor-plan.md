@@ -216,9 +216,10 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
 - **Guarantee**: writes for one owner land in enqueue order; `Flush(ctx, owners...)` waits for
   them (the character-select barrier, `awaitPersistence`); a clean shutdown drains every lane
   (`drainItemInstances` → `Worker.Close` → retry item save → DB close), so an orderly stop that
-  reaches that hook within `gameServerStopTimeout` loses nothing. On a degraded database the
-  earlier stop hooks can spend the whole budget first, and fx then skips the drain (see the
-  shutdown budget below; tracked on #267). An **unclean stop** (`kill -9`, OOM kill, a fatal panic) loses whatever the lanes still
+  reaches that hook within `gameServerStopTimeout` loses nothing. Every stop hook that can
+  block on the database has its own bound, and `gameServerStopTimeout` is their sum, so a
+  degraded database cannot spend the budget before the drain (see the shutdown budget below).
+  An **unclean stop** (`kill -9`, OOM kill, a fatal panic) loses whatever the lanes still
   hold — normally the queue latency, up to the per-job timeouts below when the database is slow.
 - **Reference**: stores synchronously at the same points — `Player.deleteMe` → `store()`
   (character base, subclass, effects) on logout, `Summon.doUnsummon` → `store()` (the pet row) on
@@ -239,29 +240,43 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     - `knownSkillWriteTimeout` = 2 s (`skill/persistence.go`): character_skills rows.
     - `petRestoreTimeout` = 5 s (`network/summon_spawn.go`): the pets-row read a summon cast
       queues on the collar's lane.
-  - `livePlayerPersistWait` = 3 × `livePlayerDetachSaveTimeout` + `task.ItemInstanceSaveTimeout`
+  - `LivePlayerPersistWait` = 3 × `livePlayerDetachSaveTimeout` + `task.ItemInstanceSaveTimeout`
     = 16 s bounds every `awaitPersistence` wait: character select, restart, and a connection
     handler's exit after its detach. An autosave or other job queued ahead of the detach counts
     against it. A select wait that gives up is logged and refuses the selection
     (`network/client_loop.go`) rather than load unwritten rows; the restart and disconnect waits
     log and carry on.
   - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-tick save and per shutdown step.
-  - `gameServerStopTimeout` = 30 s (`cmd/gameserver/main.go`): fx's whole stop budget, shared by
-    every stop hook in reverse start order. fx checks it before each hook and skips the rest once
-    it has expired. Before the drain starts it has to cover:
+  - `shutdownSaveTimeout` = 10 s (`cmd/gameserver/main.go`): the spawn-data save
+    (`startNpcPersistence`) and the ground-item save (`startGroundItemPersistence`) each.
+  - `gameServerStopTimeout` (`cmd/gameserver/main.go`): fx's whole stop budget, shared by every
+    stop hook in reverse start order. fx checks it before each hook and skips the rest once it
+    has expired, and `App.Run` then exits the process with any running hook cut off, so a
+    step's own detached budget cannot carry it past this deadline. It is therefore the sum of
+    each step's worst case, in stop order = 93 s:
     - the listener stop, which closes every connection and waits for the handlers; each handler
-      detaches its player and waits up to `livePlayerPersistWait` (16 s, in parallel across
+      detaches its player and waits up to `LivePlayerPersistWait` (16 s, in parallel across
       handlers) for those writes;
-    - the spawn-data save (`startNpcPersistence`), which runs on what is left of fx's ctx;
+    - the debug HTTP listener's stop (`debugHTTPStopTimeout` = 2 s);
+    - the spawn-data save (`shutdownSaveTimeout`);
+    - the actor pool's stop (`simPoolStopTimeout` = 5 s);
     - the item ticker's stop, which can block up to one `ItemInstanceSaveTimeout` on an in-flight
-      tick.
+      tick;
+    - `drainItemInstances`: save → `Worker.Close` → save, each on its own
+      `ItemInstanceSaveTimeout` (30 s);
+    - the persistence worker's last close (`persistCloseTimeout` = 5 s), which gives lanes the
+      drain left backed up a little longer;
+    - the ground-item save (`shutdownSaveTimeout`);
+    - `gameServerStopSlack` = 5 s for the hooks that wait on neither the database nor other
+      goroutines' work. The pool close waits for running queries, but nothing after it writes.
 
-    Only then does `drainItemInstances` run save → `Worker.Close` → save, each step on its own
-    detached `ItemInstanceSaveTimeout`. Those budgets let a drain that has started finish past
-    fx's deadline; they do not stop fx from skipping a drain it never reached.
-    `TestItemInstanceSaveTimeoutFitsShutdownBudget` pins only `ItemInstanceSaveTimeout <
-    gameServerStopTimeout`. The reference's shutdown runs its saves in sequence with no overall
-    deadline, and its final item save always runs. The ordering gap is tracked on #267.
+    `TestGameServerStopTimeoutCoversEveryStopStep` parses `cmd/gameserver` for every registered
+    `OnStop` hook and fails on one with no recorded bound or a sum above the budget.
+    `TestSlowSpawnSaveLeavesItemDrainItsStopBudget` and
+    `TestSlowPersistCloseLeavesGroundSaveItsStopBudget` run the drain behind a hung spawn save,
+    and the ground-item save behind a backed-up persistence lane, under fx. The reference's shutdown runs its saves in sequence with no overall deadline, and
+    its final item save always runs; the process manager's stop grace period (systemd
+    `TimeoutStopSec`, Docker `stop_grace_period`) has to be at least `gameServerStopTimeout`.
 - **Hardening**: the M14 soak (#261) includes an unclean kill with players online, measuring how
   much state a crash costs at the target player count.
 
