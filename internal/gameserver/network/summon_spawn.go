@@ -692,7 +692,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if l.world == nil {
 		return
 	}
-	info, ok := summonInfoSnapshot(actor, nil, owner.npcs)
+	info, ok := summonInfoSnapshot(actor, nil, owner.npcs, l.summonInCombat(actor))
 	if !ok {
 		return
 	}

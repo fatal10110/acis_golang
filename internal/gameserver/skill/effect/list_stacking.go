@@ -71,6 +71,7 @@ func (l *List) evictForCap(e *Effect, pending *[]func(), retiring *[]*Effect) {
 }
 
 func (l *List) insertBuff(e *Effect) {
+	defer l.publishFlagsLocked()
 	if e.Skill.Toggle {
 		l.buffs = append(l.buffs, e)
 		return
@@ -117,6 +118,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			} else {
 				removeEffect(&l.buffs, victim)
 			}
+			l.publishFlagsLocked()
 		}
 	} else {
 		queue = append(queue, e)
@@ -244,6 +246,7 @@ func (l *List) contained(e *Effect) *Effect {
 }
 
 func (l *List) removeFromVisible(e *Effect) bool {
+	defer l.publishFlagsLocked()
 	if e.Skill.Debuff {
 		return removeEffect(&l.debuffs, e)
 	}

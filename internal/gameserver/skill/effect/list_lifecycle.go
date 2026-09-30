@@ -409,6 +409,7 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 			}
 		}
 		l.debuffs = append(l.debuffs, e)
+		l.publishFlagsLocked()
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {

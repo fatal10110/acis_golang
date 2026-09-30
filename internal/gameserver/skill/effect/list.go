@@ -143,6 +143,12 @@ type List struct {
 	debuffs []*Effect
 	stacks  map[string][]*Effect
 
+	// visibleFlags mirrors flagsLocked for readers that must not take mu:
+	// the info packets' abnormal-effect field is built on paths that can
+	// already run under mu (a stat change broadcast from an activation).
+	// Written under mu whenever buffs or debuffs change.
+	visibleFlags atomic.Uint32
+
 	// tracked records whether l is currently registered with the
 	// activity registry, so notifyActivityTransition can
 	// reconcile against l's own last-known state instead of a value a
@@ -239,9 +245,48 @@ func (l *List) flagsLocked() Flag {
 	return flags
 }
 
+// publishFlagsLocked refreshes visibleFlags after buffs or debuffs
+// changed. Caller must hold l.mu.
+func (l *List) publishFlagsLocked() { l.visibleFlags.Store(uint32(l.flagsLocked())) }
+
 // IsAffected reports whether any bit of flag is set in l.Flags().
 func (l *List) IsAffected(flag Flag) bool {
 	return l.Flags()&flag != 0
+}
+
+// crowdControlVisuals pairs crowd-control flags with the client
+// abnormal-visual bit (the datapack abnormal name in the comment) a creature
+// shows while any of them is set.
+var crowdControlVisuals = [...]struct {
+	flags Flag
+	mask  int
+}{
+	{FlagStunned, 0x000040},                   // stun
+	{FlagRooted, 0x000200},                    // root
+	{FlagSleep, 0x000080},                     // sleep
+	{FlagConfused | FlagFear, 0x000020},       // fear
+	{flagMuted | flagPhysicalMuted, 0x000100}, // mute
+	{FlagMeditating, 0x020000},                // floatroot
+}
+
+// CrowdControlAbnormalEffect returns the abnormal-visual bits derived from
+// the crowd-control state l currently imposes. Info packets OR them into the
+// actor's stored visual bitmask; they are never stored, so clearing a
+// stored bit cannot clear them, and they end with the effect that set them.
+// It reads visibleFlags, never mu, so it is safe on any path, including one
+// that runs while l's own lock is held.
+func (l *List) CrowdControlAbnormalEffect() int {
+	if l == nil {
+		return 0
+	}
+	flags := Flag(l.visibleFlags.Load())
+	mask := 0
+	for _, v := range crowdControlVisuals {
+		if flags&v.flags != 0 {
+			mask |= v.mask
+		}
+	}
+	return mask
 }
 
 // AIDenyFlags are the effect flags that keep an actor from taking AI actions.
