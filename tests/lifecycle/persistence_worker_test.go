@@ -75,6 +75,12 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	c.Send(encodeEnterWorld())
 	// The monster is still in range, so its NpcInfo interleaves the burst.
 	drainUntilQuiet(t, c)
+	// On the wall clock a quiet spell can end the drain before EnterWorld
+	// has put the player back in the world.
+	srv.AdvanceUntil(t, "relogged player in world", func() bool {
+		_, ok := srv.State.Player(objID)
+		return ok
+	})
 	if got := srv.PlayerCurrentHP(t, objID); got != hitHP {
 		t.Fatalf("relogged HP = %d, want %d (HP when the connection dropped)", got, hitHP)
 	}
