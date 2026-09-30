@@ -1,9 +1,6 @@
 package combat
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -18,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // apprenticeKnifeID is the shipped Apprentice Adventurer's Knife (rhand):
@@ -26,15 +24,11 @@ import (
 const apprenticeKnifeID int32 = 7818
 
 // shippedItemTemplate loads one item template from the shared datapack,
-// skipping the calling test when the datapack is not checked out next to
-// the module.
+// skipping the calling test when no parent directory of the checkout holds
+// aCis_datapack (it fails instead when ACIS_REQUIRE_DATAPACK is set).
 func shippedItemTemplate(t *testing.T, id int32) *item.Template {
 	t.Helper()
-	_, thisFile, _, _ := runtime.Caller(0)
-	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml", "items")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skip("aCis_datapack not checked out near the module root")
-	}
+	dir := datapack.Path(t, "data", "xml", "items")
 	table, err := xmldata.LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)

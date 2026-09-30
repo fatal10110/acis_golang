@@ -2,35 +2,17 @@ package xml
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// datapackPath resolves rel under the shared aCis_datapack checkout that
-// sits next to the module root (the same files the Java oracle loads), and
-// skips the calling test when the checkout is absent. Resolution is
-// relative to this source file so it works regardless of the directory
-// `go test` is invoked from.
+// datapackPath resolves rel under the shared aCis_datapack checkout (the
+// same files the reference server loads), skipping the calling test when the
+// checkout is absent.
 func datapackPath(t *testing.T, rel string) string {
 	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed to resolve test file path")
-	}
-	// this file lives at <checkout>/internal/gameserver/data/xml
-	checkout := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "..")
-	candidates := []string{
-		filepath.Join(checkout, "..", "aCis_datapack", rel),
-		filepath.Join(checkout, "..", "..", "acis_public", "aCis_datapack", rel),
-	}
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-	t.Skipf("aCis_datapack not checked out near the module root, skipping oracle comparison")
-	return ""
+	return datapack.Path(t, rel)
 }
 
 // writeXMLFixture writes a small XML fixture for parser error-path tests.

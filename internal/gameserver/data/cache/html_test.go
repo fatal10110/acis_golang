@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 func writeHTML(t *testing.T, dir, name, content string) {
@@ -88,10 +90,7 @@ func TestBypassCommands(t *testing.T) {
 }
 
 func TestLoadHTMLAgainstDatapack(t *testing.T) {
-	dir := filepath.Join("..", "..", "..", "..", "..", "aCis_datapack", "data", "html")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("aCis_datapack not checked out next to module root, skipping: %v", err)
-	}
+	dir := datapack.Path(t, "data", "html")
 
 	cache, err := LoadHTML(dir)
 	if err != nil {

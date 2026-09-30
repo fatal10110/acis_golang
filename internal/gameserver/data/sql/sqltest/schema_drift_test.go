@@ -6,13 +6,12 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 func TestSchemaMatchesDatapack(t *testing.T) {
-	dir := datapackSQLDir()
-	if dir == "" {
-		t.Skip("datapack sql directory not present; skipping schema drift check")
-	}
+	dir := datapack.Path(t, "sql")
 
 	// Drive the check from schemaStmts itself (sqltest.go), rather than a
 	// separate name-to-constant map, so a constant added there without a
@@ -41,30 +40,6 @@ func TestSchemaMatchesDatapack(t *testing.T) {
 				t.Fatalf("schema drifted from %s\n copy    = %s\n shipped = %s", file, copySchema, shipped)
 			}
 		})
-	}
-}
-
-// datapackSQLDir locates aCis_datapack/sql as a sibling of the outer
-// workspace root, walking up from the working directory to find it. The
-// primary checkout and every linked worktree sit at different depths under
-// that root, so this checks each ancestor rather than assuming one fixed
-// relative path. It returns "" when the datapack is not checked out (CI has
-// no copy of it).
-func datapackSQLDir() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
-	for {
-		sql := filepath.Join(dir, "aCis_datapack", "sql")
-		if info, err := os.Stat(sql); err == nil && info.IsDir() {
-			return sql
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return ""
-		}
-		dir = parent
 	}
 }
 

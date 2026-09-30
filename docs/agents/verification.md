@@ -118,22 +118,22 @@ force a downstream failure), because the database goes back to the pool for the 
 ### Datapack oracle tests are local-only — CI cannot run them
 
 `aCis_datapack` is a separate checkout that is never pushed, and `.github/workflows/go.yml` checks
-out only `acis_golang`. Every test that reads the shared datapack resolves its path through a helper
-that calls `t.Skip` when the datapack is absent, so **all datapack oracle tests silently skip in CI
-and a green CI run proves nothing about them.**
+out only `acis_golang`. Every test that reads the shared datapack resolves its path through
+`internal/testsupport/datapack`, which searches every ancestor of the Go checkout (so the primary
+checkout and any `acis_golang-worktrees/<task>/` resolve the same `aCis_datapack/`) and calls
+`t.Skip` when none is found. **All datapack oracle tests therefore skip in CI, and a green CI run
+proves nothing about them.** Setting `ACIS_REQUIRE_DATAPACK=1` turns that skip into a failure.
 
 This makes the local run the only gate for them. Before every push:
 
-- run the full suite from the outer `acis_public/` root, with `aCis_datapack/` present, so the
-  oracle tests actually execute;
-- confirm the run did not skip them — a skip reading `aCis_datapack not checked out near the module
-  root` means the gate did not run and completion cannot be claimed;
+- run the full suite from the outer `acis_public/` root, with `aCis_datapack/` present and
+  `ACIS_REQUIRE_DATAPACK=1` set, so a missing datapack fails the run instead of skipping the oracle
+  tests;
 - never treat a green CI check as covering a datapack-backed acceptance criterion.
 
 ```bash
-# from acis_public/, with aCis_datapack/ checked out alongside acis_golang/
-rtk go -C acis_golang test -race ./...
-rtk go -C acis_golang test -run 'Datapack|Oracle|Shipped' -v ./... | rg -i 'SKIP|FAIL'
+# from acis_public/, with aCis_datapack/ checked out; <go-root> may be a linked worktree
+ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race ./...
 ```
 
 An issue whose acceptance criteria name real datapack content is not verified until its oracle test
