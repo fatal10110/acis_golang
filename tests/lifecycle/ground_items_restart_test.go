@@ -7,6 +7,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -83,6 +84,13 @@ func TestGroundItemsRestartRoundTrip(t *testing.T) {
 	assertFrameOpcode(t, c2.Read(), serverpackets.OpcodeActionFailed, "pickup pending-action release")
 	assertFrameOpcode(t, c2.Read(), serverpackets.OpcodeGetItem, "GetItem")
 	assertFrameOpcode(t, c2.Read(), serverpackets.OpcodeDeleteObject, "pickup DeleteObject")
+	// Merged into the held adena, the pickup names its amount.
+	earned := c2.Read()
+	assertFrameOpcode(t, earned, serverpackets.OpcodeSystemMessage, "pickup EARNED_S1_ADENA")
+	er := wire.NewReader(earned[1:])
+	if id, params, kind, amount := er.ReadInt32(), er.ReadInt32(), er.ReadInt32(), er.ReadInt32(); id != serverpackets.SystemMessageEarnedS1Adena || params != 1 || kind != serverpackets.SystemMessageParamNumber || amount != 40 {
+		t.Fatalf("pickup message = id %d params %d (type %d, value %d), want EARNED_S1_ADENA with number 40", id, params, kind, amount)
+	}
 
 	srv2.InventoryUpdates.Tick()
 	readInventoryUpdateFor(t, c2, adena, 100)
