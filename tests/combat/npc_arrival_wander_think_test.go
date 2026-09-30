@@ -12,12 +12,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// TestWanderArrivalThenSleepExitRunsWanderTimer pins NpcAI.onEvtArrived
-// keeping WANDER current and the sleep exit's THINK running
-// AttackableAI.thinkWander on it: the wander timer starts at the THINK, so
-// the next random walk comes one wander timer after the sleep ends, not
-// one timer after the next wander promotion.
-func TestWanderArrivalThenSleepExitRunsWanderTimer(t *testing.T) {
+// TestWanderArrivalThenSleepExitTimesWanderFromPromotion pins
+// NpcAI.onEvtArrived keeping WANDER current and the sleep exit's THINK
+// taking no step on it (AbstractAI.onEvtThink has no WANDER case): the
+// next cycle idles the finished wander, the one after re-promotes it, and
+// the wander timer starts at that promotion, so the next random walk comes
+// one wander timer after the promotion, not one after the sleep ends.
+func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -57,7 +58,10 @@ func TestWanderArrivalThenSleepExitRunsWanderTimer(t *testing.T) {
 	if hostile.Sleeping() {
 		t.Fatal("Sleeping() = true after the sleep ended")
 	}
-	drainUntilQuiet(t, c)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after the sleep exit = %v, want %v kept", got, ai.IntentionWander)
+	}
+	assertNoWanderWalk(t, c, "the sleep exit, want no wander step on THINK")
 
 	wanderTimer := 5 * time.Second
 	srv.Advance(t, 2*time.Second)
@@ -74,15 +78,26 @@ func TestWanderArrivalThenSleepExitRunsWanderTimer(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after the promotion = %v, want %v", got, ai.IntentionWander)
 	}
-	assertNoWanderWalk(t, c, "the wander promotion, want the sleep exit's timer still running")
+	assertNoWanderWalk(t, c, "the wander promotion, want its timer armed")
 
+	// One wander timer after the sleep exit is still inside the timer the
+	// promotion armed.
 	srv.Advance(t, wanderTimer-3*time.Second)
 	if err := hostile.TickThink(); err != nil {
-		t.Fatalf("timer TickThink() error: %v", err)
+		t.Fatalf("sleep-exit timer TickThink() error: %v", err)
 	}
-	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation one wander timer after the sleep exit")
+	assertNoWanderWalk(t, c, "one wander timer after the sleep exit, want the promotion's timer still running")
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true one wander timer after the sleep exit, want it standing")
+	}
+
+	srv.Advance(t, 3*time.Second)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("promotion timer TickThink() error: %v", err)
+	}
+	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation one wander timer after the promotion")
 	if !hostile.IsMoving() {
-		t.Fatal("IsMoving() = false when the sleep exit's wander timer ran out, want the next random walk")
+		t.Fatal("IsMoving() = false when the promotion's wander timer ran out, want the next random walk")
 	}
 }
 

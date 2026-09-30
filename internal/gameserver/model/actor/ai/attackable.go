@@ -686,8 +686,9 @@ const (
 // Think advances the current intention once, for a bow's reuse ending and
 // a control effect ending; an arrival does not think. It never selects a
 // queued desire, even from idle, follow or wander, and does not run
-// empty-queue idle abort: RunAI and TickThink do both. A walk or wander an
-// arrival finished is still current, so Think steps it again. A non-nil return
+// empty-queue idle abort: RunAI and TickThink do both. A walk an arrival
+// finished is still current, so Think steps it again; a wander it finished
+// takes no step. A non-nil return
 // reports that an intention step ran but a broadcast within it failed; the
 // intention itself still advanced.
 func (a *Attackable) Think() error {
@@ -750,7 +751,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	if mode == thinkEvent && a.idleOnEmptyQueue() {
 		return nil
 	}
-	a.dropCurrentIfUnqueued()
+	a.dropCurrentIfUnqueued(mode)
 	canPromote := a.canPromote(updateTick, instantRun)
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
@@ -802,11 +803,10 @@ func (a *Attackable) think(mode thinkMode) error {
 // no desire selection, so a queued desire waits for the next RunAI or
 // TickThink. It neither takes nor updates the attack latch, leaves
 // lastDesire to desire selection, and does not re-select on a lost target.
-// Wander and walk step even when an arrival already finished them: a
-// wander arms its timer (or keeps one already running), and a walk that
-// stopped short of its destination sets off again. Idle takes no step: an
-// idle actor already went through thinkIdle, so it stands walking with
-// nothing left to abort.
+// A walk steps even when an arrival already finished it: one that stopped
+// short of its destination sets off again. Idle and wander take no step: a
+// truly idle actor already went through thinkIdle, so it stands walking
+// with nothing left to abort, and the continue pass has no wander step.
 func (a *Attackable) continueCurrent() error {
 	switch a.current.kind {
 	case IntentionAttack:
@@ -817,8 +817,6 @@ func (a *Attackable) continueCurrent() error {
 		return err
 	case IntentionFollow:
 		return a.thinkFollow()
-	case IntentionWander:
-		a.thinkWander()
 	case IntentionMoveTo:
 		a.thinkMoveTo()
 	}
@@ -1068,7 +1066,11 @@ func (a *Attackable) pruneDesires() {
 	})
 }
 
-func (a *Attackable) dropCurrentIfUnqueued() {
+// dropCurrentIfUnqueued idles an attack, cast or walk whose desire is no
+// longer queued, unless an action is in flight. The continue pass keeps a
+// desire-less walk: it steps the current walk as it stands, so one an
+// arrival left short of its destination sets off again.
+func (a *Attackable) dropCurrentIfUnqueued(mode thinkMode) {
 	if a.actor.DenyAIAction() || a.attack.AttackingNow() {
 		return
 	}
@@ -1082,6 +1084,9 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 			a.setCurrent(intention{kind: IntentionIdle})
 		}
 	case IntentionMoveTo:
+		if mode == thinkContinue {
+			return
+		}
 		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
 		if !a.desires.Has(probe) {
 			a.setCurrent(intention{kind: IntentionIdle})
@@ -1190,8 +1195,8 @@ func (a *Attackable) thinkMoveTo() {
 // finishes and leaves the intention current: the next RunAI or TickThink
 // idles it on an empty queue or promotes the next desire, and desire
 // selection never steps it again without its desire (currentQueued). A
-// Think before then (a control effect ending) steps it once more. Arrival
-// itself never thinks.
+// Think before then (a control effect ending) steps a walk once more and
+// leaves a wander alone. Arrival itself never thinks.
 // Escort FOLLOW returns without restoring spawn heading or arming the
 // out-of-territory stale-hate sweep; combat chase stays ATTACK and still
 // runs both.
