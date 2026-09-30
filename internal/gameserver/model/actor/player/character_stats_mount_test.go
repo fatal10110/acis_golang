@@ -191,3 +191,70 @@ func TestMountWithoutPetDataKeepsClassSpeeds(t *testing.T) {
 	c.Mount(wyvernNPCID, 77)
 	wantSpeeds(t, "mounted without pet data", c, riderSpeeds{115, 80, 50, dexAtkSpd(300)})
 }
+
+// wantServerSpeed checks the live movement's speed, the pace the server
+// moves the rider at, against want.
+func wantServerSpeed(t *testing.T, when string, c *Character, want float64) {
+	t.Helper()
+	if got := c.Move().Speed(); got != want {
+		t.Fatalf("%s: Move().Speed() = %v, want %v", when, got, want)
+	}
+}
+
+// TestRiderServerMoveSpeedFollowsEveryMountChange pins that the server's
+// movement is re-paced whenever the rider's base speed changes without a
+// packet asking for it: a feed tick making the mount hungry, food lifting
+// it back over its hungry limit, the rider leveling across the 9-level gap,
+// and the mount throwing its starved rider.
+func TestRiderServerMoveSpeedFollowsEveryMountChange(t *testing.T) {
+	c, _ := riderAt(t, 70)
+	attachIdleLive(t, c)
+	c.SetRunning(true)
+	c.Exp = realLevelTable(t).RequiredExpForLevel(70)
+	foot := c.RunSpeed()
+	c.refreshMoveSpeed()
+	wantServerSpeed(t, "on foot", c, foot)
+
+	c.Mount(wyvernNPCID, 77)
+	c.StartMountFeed()
+	fed := c.RunSpeed()
+	if fed == foot {
+		t.Fatalf("mounted RunSpeed() = %v, the foot speed", fed)
+	}
+	wantServerSpeed(t, "fed", c, fed)
+
+	gen := func() uint64 {
+		c.mountFeed.mu.Lock()
+		defer c.mountFeed.mu.Unlock()
+		return c.mountFeed.gen
+	}
+
+	// 2863 + 45 eaten leaves 2863, below the 2864 hungry limit.
+	setFeed(c, 2863+wyvernLevel70.MealInNormal)
+	c.tickMountFeed(gen())
+	hungry := c.RunSpeed()
+	if hungry == fed {
+		t.Fatalf("hungry RunSpeed() = %v, the fed speed", hungry)
+	}
+	wantServerSpeed(t, "after the tick that made it hungry", c, hungry)
+
+	c.AddMountFeed(1)
+	wantServerSpeed(t, "after food lifted it to the hungry limit", c, fed)
+
+	table := realLevelTable(t)
+	c.AddLevel(table, nil, -10) // 70 - 60 = 10
+	gapped := c.RunSpeed()
+	if gapped == fed {
+		t.Fatalf("RunSpeed() 10 levels below the mount = %v, the fed speed", gapped)
+	}
+	wantServerSpeed(t, "10 levels below the mount", c, gapped)
+	c.AddLevel(table, nil, 1) // 70 - 61 = 9
+	wantServerSpeed(t, "9 levels below the mount", c, fed)
+
+	setFeed(c, wyvernLevel70.MealInNormal)
+	c.tickMountFeed(gen())
+	if c.Mounted() {
+		t.Fatal("the starved mount kept its rider")
+	}
+	wantServerSpeed(t, "thrown by the starved mount", c, foot)
+}
