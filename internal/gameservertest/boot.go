@@ -98,6 +98,7 @@ type options struct {
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
 	inventorySlots         player.InventorySlots
+	storageSlots           player.StorageSlots
 	storeSkillCooltime     bool
 	cancelLesserEffect     bool
 	magicFailures          bool
@@ -298,6 +299,15 @@ func WithWeightLimitMultiplier(m float64) Option {
 func WithInventorySlots(noDwarf, dwarf int) Option {
 	return func(o *options) {
 		o.inventorySlots = player.InventorySlots{NoDwarf: noDwarf, Dwarf: dwarf, Configured: true}
+	}
+}
+
+// WithStorageSlots sets the players.properties warehouse, freight, private
+// store and recipe book base sizes (default player.DefaultStorageSlots).
+func WithStorageSlots(slots player.StorageSlots) Option {
+	return func(o *options) {
+		slots.Configured = true
+		o.storageSlots = slots
 	}
 }
 
@@ -1327,7 +1337,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
