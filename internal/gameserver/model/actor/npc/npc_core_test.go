@@ -795,6 +795,17 @@ func TestHostileLethalableExcludesReferenceExceptions(t *testing.T) {
 }
 
 // ---- from hostile_stats_golden_test.go ----
+// rawPAtk, rawPDef and rawMDef read the finalized stat before the getters
+// truncate it, so the pipeline golden stays sensitive to sub-integer float
+// drift (func insertion order, association) that truncation would hide.
+func rawPAtk(h *Hostile) float64 { return h.calcStat(stat.PowerAttack, h.Instance.Template.PAtk) }
+
+func rawPDef(h *Hostile) float64 { return h.calcStat(stat.PowerDefence, h.Instance.Template.PDef) }
+
+func rawMDef(h *Hostile) float64 {
+	return h.calcStat(stat.MagicDefence, positiveStat(h.Instance.Template.MDef))
+}
+
 // goldenHostileScenarios is npc.Hostile's half of the stat pipeline parity
 // oracle described in issue #1527: same-order funcs attached in different
 // sequences (float addition's insertion order is load-bearing), a Set
@@ -816,13 +827,13 @@ func goldenHostileScenarios(t testing.TB) map[string]float64 {
 		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
 		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		h1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
-		out["order30_forward"] = h1.PDef()
+		out["order30_forward"] = rawPDef(h1)
 
 		h2 := newCombatHostile(t, 2, tpl())
 		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		h2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
-		out["order30_reverse"] = h2.PDef()
+		out["order30_reverse"] = rawPDef(h2)
 	}
 
 	{
@@ -831,21 +842,21 @@ func goldenHostileScenarios(t testing.TB) map[string]float64 {
 			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
 			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
-		out["set_rebase_mdef"] = h.MDef()
+		out["set_rebase_mdef"] = rawMDef(h)
 	}
 
 	{
 		h := newCombatHostile(t, 4, tpl())
-		base := h.PAtk()
+		base := rawPAtk(h)
 		owner := effect.ModOwnerEffect(&effect.Effect{})
 		h.AddStatFuncs([]effect.Mod{
 			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
 			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
-		out["attach_detach_during"] = h.PAtk()
+		out["attach_detach_during"] = rawPAtk(h)
 		h.RemoveStatsByOwner(owner)
-		out["attach_detach_after"] = h.PAtk()
+		out["attach_detach_after"] = rawPAtk(h)
 	}
 
 	return out

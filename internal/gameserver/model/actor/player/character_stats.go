@@ -295,28 +295,30 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 	return caster != nil && caster.AttackType() == item.WeaponBow
 }
 
-// MAtk returns the current magic attack value. A rider casts from its
-// mount's M.Atk. instead of its class and weapon.
+// MAtk returns the current magic attack value, truncated to a whole
+// number. A rider casts from its mount's M.Atk. instead of its class and
+// weapon.
 func (c *Character) MAtk() float64 {
 	if m, ok := c.ridden(); ok {
-		return c.calcStat(stat.MagicAttack, m.mAtk)
+		return math.Trunc(c.calcStat(stat.MagicAttack, m.mAtk))
 	}
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MAtk > 0 {
 		base = tmpl.MAtk
 	}
-	return c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base))
+	return math.Trunc(c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base)))
 }
 
-// MDef returns the current magic defence value.
+// MDef returns the current magic defence value, truncated to a whole
+// number.
 func (c *Character) MDef() float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MDef > 0 {
 		base = tmpl.MDef
 	}
-	return c.calcStat(stat.MagicDefence, base)
+	return math.Trunc(c.calcStat(stat.MagicDefence, base))
 }
 
 // HP returns current HP as a floating-point skill-resource value.

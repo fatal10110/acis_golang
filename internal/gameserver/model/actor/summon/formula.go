@@ -306,24 +306,24 @@ func (a *Actor) CanGiveDamage() bool {
 // Invulnerable reports whether a ignores direct resource effects.
 func (a *Actor) Invulnerable() bool { return a.Invul() }
 
-// PAtk returns this summon's physical attack stat.
+// PAtk returns this summon's physical attack stat, truncated to a whole number.
 func (a *Actor) PAtk() float64 {
-	return a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk))
+	return math.Trunc(a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk)))
 }
 
-// PDef returns this summon's physical defence stat.
+// PDef returns this summon's physical defence stat, truncated to a whole number.
 func (a *Actor) PDef() float64 {
-	return a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef))
+	return math.Trunc(a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef)))
 }
 
-// MAtk returns this summon's magic attack stat.
+// MAtk returns this summon's magic attack stat, truncated to a whole number.
 func (a *Actor) MAtk() float64 {
-	return a.calcStat(stat.MagicAttack, positiveBase(a.combatStats().MAtk))
+	return math.Trunc(a.calcStat(stat.MagicAttack, positiveBase(a.combatStats().MAtk)))
 }
 
-// MDef returns this summon's magic defence stat.
+// MDef returns this summon's magic defence stat, truncated to a whole number.
 func (a *Actor) MDef() float64 {
-	return a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef))
+	return math.Trunc(a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef)))
 }
 
 // MagicCriticalRate returns this summon's magic critical rate.

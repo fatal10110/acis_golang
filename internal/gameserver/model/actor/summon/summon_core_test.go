@@ -618,6 +618,21 @@ func TestPetEffectListHoldsAppliedEffects(t *testing.T) {
 }
 
 // ---- from formula_golden_test.go ----
+// rawPAtk, rawPDef and rawMDef read the finalized stat before the getters
+// truncate it, so the pipeline golden stays sensitive to sub-integer float
+// drift (func insertion order, association) that truncation would hide.
+func rawPAtk(a *Actor) float64 {
+	return a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk))
+}
+
+func rawPDef(a *Actor) float64 {
+	return a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef))
+}
+
+func rawMDef(a *Actor) float64 {
+	return a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef))
+}
+
 // goldenSummonScenarios is summon.Actor's half of the stat pipeline parity
 // oracle described in issue #1527: see the player and npc packages' golden
 // tests for the same shape of coverage (same-order attach-sequence
@@ -637,13 +652,13 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		a1.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
-		out["order30_forward"] = a1.PDef()
+		out["order30_forward"] = rawPDef(a1)
 
 		a2 := mustServitor(t, ServitorConfig{ObjectID: 2, Level: 44, Stats: stats, Roll: zeroSummonRoll})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1}})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSub, Value: 1e16}})
 		a2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpAdd, Value: 1e16}})
-		out["order30_reverse"] = a2.PDef()
+		out["order30_reverse"] = rawPDef(a2)
 	}
 
 	{
@@ -652,21 +667,21 @@ func goldenSummonScenarios(t testing.TB) map[string]float64 {
 			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
 			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
-		out["set_rebase_mdef"] = a.MDef()
+		out["set_rebase_mdef"] = rawMDef(a)
 	}
 
 	{
 		a := mustPet(t, PetConfig{ObjectID: 4, Level: 44, Stats: stats, Roll: zeroSummonRoll})
-		base := a.PAtk()
+		base := rawPAtk(a)
 		owner := effect.ModOwnerEffect(&effect.Effect{})
 		a.AddStatFuncs([]effect.Mod{
 			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
 			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
-		out["attach_detach_during"] = a.PAtk()
+		out["attach_detach_during"] = rawPAtk(a)
 		a.RemoveStatsByOwner(owner)
-		out["attach_detach_after"] = a.PAtk()
+		out["attach_detach_after"] = rawPAtk(a)
 	}
 
 	return out

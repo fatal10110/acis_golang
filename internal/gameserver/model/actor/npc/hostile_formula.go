@@ -39,9 +39,9 @@ func (h *Hostile) Lethalable() bool {
 	return true
 }
 
-// PAtk returns this NPC's physical attack stat.
+// PAtk returns this NPC's physical attack stat, truncated to a whole number.
 func (h *Hostile) PAtk() float64 {
-	return h.calcStat(stat.PowerAttack, h.Instance.Template.PAtk)
+	return math.Trunc(h.calcStat(stat.PowerAttack, h.Instance.Template.PAtk))
 }
 
 // MagicCriticalRate returns this NPC's magic critical rate.

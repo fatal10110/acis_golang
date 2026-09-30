@@ -770,12 +770,12 @@ func (c *Character) ClearRecentFakeDeath() {
 // is not modeled yet, so this is a no-op.
 func (c *Character) ClientActionFailed() {}
 
-// PAtk returns the physical attack value used by the current minimal combat
-// pipeline. A rider attacks from its mount's P.Atk. instead of its class
-// and weapon.
+// PAtk returns the physical attack value, truncated to a whole number
+// before any formula reads it. A rider attacks from its mount's P.Atk.
+// instead of its class and weapon.
 func (c *Character) PAtk() float64 {
 	if m, ok := c.ridden(); ok {
-		return c.calcStat(stat.PowerAttack, m.pAtk)
+		return math.Trunc(c.calcStat(stat.PowerAttack, m.pAtk))
 	}
 	return c.pAtk(c.activeWeapon())
 }
@@ -786,17 +786,18 @@ func (c *Character) pAtk(weapon activeWeapon) float64 {
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base))
+	return math.Trunc(c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base)))
 }
 
-// PDef returns the current physical defence value.
+// PDef returns the current physical defence value, truncated to a whole
+// number.
 func (c *Character) PDef() float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PDef > 0 {
 		base = tmpl.PDef
 	}
-	return c.calcStat(stat.PowerDefence, base)
+	return math.Trunc(c.calcStat(stat.PowerDefence, base))
 }
 
 // Evasion returns this player's physical evasion rating.

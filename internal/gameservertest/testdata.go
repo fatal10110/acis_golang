@@ -94,6 +94,20 @@ func RecipeTemplates() *recipe.Table {
 	})
 }
 
+// The fixture classes keep every base attribute at 0, so a base of 1 would
+// finalize P.Atk. and M.Atk. below 1, and the getters' int truncation would
+// leave the fixture characters hitting and casting for nothing. fixturePAtk
+// and fixtureMAtk are the shipped human fighter's bases
+// (classes/humanFighter.xml), which finalize to 1 at low levels; the small
+// defence bases keep the suites' hits in the same range they had before the
+// getters truncated.
+const (
+	fixturePAtk = 4
+	fixturePDef = 4
+	fixtureMAtk = 6
+	fixtureMDef = 4
+)
+
 // ClassTemplate is the shared human-fighter class template every seeded
 // character selects, usable without a testing context.
 func ClassTemplate() *player.Template {
@@ -103,6 +117,10 @@ func ClassTemplate() *player.Template {
 		HPTable:              []float64{80},
 		MPTable:              []float64{30},
 		CPTable:              []float64{32},
+		PAtk:                 fixturePAtk,
+		PDef:                 fixturePDef,
+		MAtk:                 fixtureMAtk,
+		MDef:                 fixtureMDef,
 		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
 		RunSpeed:             120,
 		WalkSpeed:            60,
@@ -125,6 +143,10 @@ func fighterLineTemplate(id int) *player.Template {
 		HPTable:              []float64{80},
 		MPTable:              []float64{30},
 		CPTable:              []float64{32},
+		PAtk:                 fixturePAtk,
+		PDef:                 fixturePDef,
+		MAtk:                 fixtureMAtk,
+		MDef:                 fixtureMDef,
 		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
 		RunSpeed:             120,
 		WalkSpeed:            60,
@@ -144,6 +166,10 @@ func duelistTemplate() *player.Template {
 		HPTable:              []float64{80},
 		MPTable:              []float64{30},
 		CPTable:              []float64{32},
+		PAtk:                 fixturePAtk,
+		PDef:                 fixturePDef,
+		MAtk:                 fixtureMAtk,
+		MDef:                 fixtureMDef,
 		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
 		RunSpeed:             120,
 		WalkSpeed:            60,

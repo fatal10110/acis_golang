@@ -2,6 +2,7 @@ package pets
 
 import (
 	"context"
+	"math"
 	"slices"
 	"testing"
 
@@ -79,6 +80,18 @@ func (o *servitorOwner) hurtServitor(t *testing.T, servitor *summon.Actor, damag
 	drainUntilQuiet(t, o.client)
 }
 
+// healAmount is what one of the owner's group heals restores: the skill
+// power plus the square root of the caster's (whole) M.Atk.
+func (o *servitorOwner) healAmount(t *testing.T) float64 {
+	t.Helper()
+	owner, _ := o.srv.State.Player(o.id)
+	caster, ok := owner.(interface{ MAtk() float64 })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no MAtk", o.id, owner)
+	}
+	return groupTargetHealPower + math.Sqrt(caster.MAtk())
+}
+
 // launchedTargets decodes the target ids of a MagicSkillLaunched frame.
 func launchedTargets(t *testing.T, frame []byte) []int32 {
 	t.Helper()
@@ -113,8 +126,8 @@ func TestPartySkillCoversOwnersServitor(t *testing.T) {
 		t.Fatalf("party heal targets = %v, want owner then servitor %v", got, want)
 	}
 	o.srv.AdvanceUntil(t, "servitor healed", func() bool { return servitor.HP() > before })
-	if got := servitor.HP(); got != before+groupTargetHealPower {
-		t.Fatalf("servitor HP after party heal = %v, want %v", got, before+groupTargetHealPower)
+	if got, want := servitor.HP(), before+o.healAmount(t); got != want {
+		t.Fatalf("servitor HP after party heal = %v, want %v", got, want)
 	}
 	drainUntilQuiet(t, o.client)
 }
@@ -138,8 +151,8 @@ func TestSummonSkillHealsOwnServitor(t *testing.T) {
 		t.Fatalf("servitor heal targets = %v, want %v", got, want)
 	}
 	o.srv.AdvanceUntil(t, "servitor healed", func() bool { return servitor.HP() > before })
-	if got := servitor.HP(); got != before+groupTargetHealPower {
-		t.Fatalf("servitor HP after servitor heal = %v, want %v", got, before+groupTargetHealPower)
+	if got, want := servitor.HP(), before+o.healAmount(t); got != want {
+		t.Fatalf("servitor HP after servitor heal = %v, want %v", got, want)
 	}
 	drainUntilQuiet(t, o.client)
 }
