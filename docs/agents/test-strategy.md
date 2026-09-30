@@ -6,8 +6,9 @@ doc records the tier structure, the shared harness, and the remaining decision r
 fake may stand in for a real type.
 
 Current state (post #1682): the scripted client lives
-in `internal/testsupport`, the server boot harness in `internal/gameservertest`, and the MariaDB
-container helpers in `internal/gameserver/data/sql/sqltest`. The legacy per-package fixtures and
+in `internal/testsupport`, the server boot harness in `internal/gameservertest`, the shared-MariaDB
+helpers and database pool in `internal/dbtest`, and the gameserver schema with its pool in
+`internal/gameserver/data/sql/sqltest`. The legacy per-package fixtures and
 the integration build tag is gone: #1677 and its children deleted flow-covered unit tests,
 and #1682 consolidated the pure-function survivors into `<pkg>_core_test.go` files.
 

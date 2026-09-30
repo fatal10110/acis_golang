@@ -18,9 +18,10 @@ func seedRow(t *testing.T, db *sql.DB, stmt string, args ...any) {
 	}
 }
 
-// clearIDScanRows empties the ad hoc tables idScanTables creates, since they
-// aren't in sqltest's empty-between-tests list. Call it before seeding a
-// test's own rows so an earlier test's leftovers can't affect assertions.
+// clearIDScanRows empties the ad hoc tables idScanTables creates. The pool
+// lists a database's tables when it creates it, before these exist, so it
+// doesn't empty them between tests. Call it before seeding a test's own rows
+// so an earlier test's leftovers can't affect assertions.
 func clearIDScanRows(t *testing.T, db *sql.DB) {
 	t.Helper()
 	for _, table := range []string{"clan_data", "clan_subpledges", "castle", "clanhall", "auctions", "mods_wedding", "petition"} {

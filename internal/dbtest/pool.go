@@ -27,7 +27,9 @@ type PoolConfig struct {
 // database from its parent.
 //
 // A package using a Pool must run its tests through Main, which drops every
-// pooled database once the package's tests finish.
+// pooled database once the package's tests finish. Tables are emptied in no
+// particular order, so a schema with cross-table foreign keys would fail its
+// cleanup.
 type Pool struct {
 	cfg PoolConfig
 

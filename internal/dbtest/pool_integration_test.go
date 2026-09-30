@@ -48,6 +48,9 @@ func TestPoolResetsAndReusesDatabase(t *testing.T) {
 		mustExec(t, db, "UPDATE seeded SET v = 99")
 	})
 	t.Run("clean", func(t *testing.T) {
+		if first == "" {
+			t.Skip("needs the dirty subtest to run first")
+		}
 		db := testPool.DB(t)
 		if got := dbName(t, db); got != first {
 			t.Fatalf("sequential test got database %s, want reused %s", got, first)
