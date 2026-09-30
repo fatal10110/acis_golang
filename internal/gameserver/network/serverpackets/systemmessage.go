@@ -43,6 +43,7 @@ const (
 	SystemMessageCannotRestartWhileFighting        = 102
 	SystemMessageNoLogoutHere                      = 778
 	SystemMessageNoRestartHere                     = 779
+	SystemMessageNotAuthorizedToDoThat             = 794
 	SystemMessageS1Disarmed                        = 417
 	SystemMessageS1Equipped                        = 49
 	SystemMessageS1S2Equipped                      = 368

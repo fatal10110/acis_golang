@@ -85,8 +85,8 @@ func (l *GameClientLink) replacedIntention(live *livePlayer) (rerun func(), keep
 	if live.hasPickup() {
 		return func() { l.thinkLivePickup(live) }, false
 	}
-	if live.hasPetInteract() {
-		return func() { l.finishPetInteract(live) }, false
+	if live.hasInteract() {
+		return func() { l.finishInteract(live) }, false
 	}
 	if live.move != nil {
 		if target := live.move.FriendlyFollowTarget(); target != nil {

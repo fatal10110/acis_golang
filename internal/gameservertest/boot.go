@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -76,6 +77,10 @@ type options struct {
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
 	karmaPlayerCanTeleport bool
+	karmaServiceGates      [3]bool
+	htmlPages              map[string]string
+	karmaPlayerCanTrade    bool
+	admin                  *admin.Data
 	restarts               *restart.Table
 	zones                  *zone.Index
 	water                  bool
@@ -170,6 +175,37 @@ func WithCursedWeapons(tables ...*entity.CursedWeaponTable) Option {
 func WithKarmaTeleport(allowed bool) Option {
 	return func(o *options) { o.karmaPlayerCanTeleport = allowed }
 }
+
+// WithKarmaServiceGates sets the players.properties KarmaPlayerCanShop,
+// KarmaPlayerCanUseGK and KarmaPlayerCanUseWareHouse gates (default false,
+// false, true).
+func WithKarmaServiceGates(shop, gatekeeper, warehouse bool) Option {
+	return func(o *options) { o.karmaServiceGates = [3]bool{shop, gatekeeper, warehouse} }
+}
+
+// WithHTMLPages adds datapack HTML pages, keyed by their path under
+// data/html, to the link's page cache.
+func WithHTMLPages(pages map[string]string) Option {
+	return func(o *options) {
+		if o.htmlPages == nil {
+			o.htmlPages = map[string]string{}
+		}
+		for name, content := range pages {
+			o.htmlPages[name] = content
+		}
+	}
+}
+
+// WithKarmaTrade sets the players.properties KarmaPlayerCanTrade gate
+// (default true).
+func WithKarmaTrade(allowed bool) Option {
+	return func(o *options) { o.karmaPlayerCanTrade = allowed }
+}
+
+// WithAdmin supplies the access-level table characters resolve their
+// persisted access level against at login (default: none, so every
+// character plays under the attribute defaults).
+func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = data } }
 
 // WithRestartPoints supplies the restart-point table wired into the link
 // (default: none, so restart requests answer ActionFailed).
@@ -1106,6 +1142,16 @@ func (s *sequentialIDs) nextID() int32 {
 	return id
 }
 
+// pages is the link's HTML page cache content: the help tutorial page plus
+// every WithHTMLPages page.
+func (o *options) pages() map[string]string {
+	pages := map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"}
+	for name, content := range o.htmlPages {
+		pages[name] = content
+	}
+	return pages
+}
+
 // Boot starts the shared MariaDB container, wires the full gameserver stack,
 // serves it on an ephemeral port behind a real GS-LS login link, dials a
 // scripted client through ProtocolVersion/AuthLogin, and returns the server
@@ -1115,6 +1161,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	o := &options{
 		account:                "player1",
 		karmaPlayerCanTeleport: true,
+		karmaServiceGates:      [3]bool{false, false, true},
+		karmaPlayerCanTrade:    true,
 		characterSelectDelay:   3 * time.Second,
 		serverBypassDelay:      100 * time.Millisecond,
 		maxBuffsAmount:         20,
@@ -1310,7 +1358,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		HennaTable:       HennaTemplates(t),
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
-		HTML:             HTMLCache(t, map[string]string{"help/tutorial.htm": "<html><body>tutorial</body></html>"}),
+		HTML:             HTMLCache(t, o.pages()),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
@@ -1337,13 +1385,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
+		Admin:            o.admin,
 		Log:              o.log,
 	}
 	var water *task.Water

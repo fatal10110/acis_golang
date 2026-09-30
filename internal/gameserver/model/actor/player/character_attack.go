@@ -524,12 +524,23 @@ func (c *Character) moveSpeedFrom(base int) float64 {
 }
 
 // refreshMoveSpeed hands the current move speed to the live movement
-// simulation, so the server keeps pace with what the client is told.
+// simulation, so the server keeps pace with what the client is told, along
+// with the speed a move starts at.
 func (c *Character) refreshMoveSpeed() {
 	if c.Live == nil {
 		return
 	}
-	c.Move().SetSpeed(c.MoveSpeed())
+	c.Move().SetSpeeds(c.MoveSpeed(), c.moveStartSpeed())
+}
+
+// moveStartSpeed is the speed the first position updates of each move
+// advance at: the walk speed even in run mode, or the swim speed in water.
+// A flying move starts at its full speed.
+func (c *Character) moveStartSpeed() float64 {
+	if c.InWater() || c.Flying() {
+		return c.MoveSpeed()
+	}
+	return c.WalkSpeed()
 }
 
 // MovementSpeedMultiplier is the current move speed over the base run or
@@ -913,7 +924,7 @@ func actingPlayerID(a target.Actor) int32 {
 // inPvPZone reports whether a stands inside a PvP zone; an actor without
 // zone membership (an NPC or door) never does.
 func inPvPZone(a target.Actor) bool {
-	member, ok := a.(interface{ InPvPZone() bool })
+	member, ok := a.(attackable.PvPZoneMember)
 	return ok && member.InPvPZone()
 }
 
