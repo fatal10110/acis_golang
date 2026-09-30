@@ -655,8 +655,8 @@ func (r *activityRecorder) registered(l *effect.List) bool {
 
 // TestHostileDeathAndDecayStopEffects follows Creature.doDie and
 // Npc.deleteMe: death ends every effect that does not last through death,
-// running its exit hook; decay ends the rest and leaves the list registered
-// with no effect task.
+// running its exit hook; decay ends the rest and deregisters the list from
+// the effect task.
 func TestHostileDeathAndDecayStopEffects(t *testing.T) {
 	rec := &activityRecorder{active: map[*effect.List]bool{}}
 	hostile, err := NewHostile(&Instance{ObjectID: 1, Template: &Template{ID: 1, Type: "Monster"}, Kind: "Monster"},
@@ -685,6 +685,9 @@ func TestHostileDeathAndDecayStopEffects(t *testing.T) {
 	}
 	if exits[1] != 1 || exits[2] != 1 || exits[3] != 0 {
 		t.Fatalf("exit hooks after death = %v, want the buff and DoT once each", exits)
+	}
+	if !rec.registered(list) {
+		t.Fatal("corpse holding a lasting effect is not registered with the effect task")
 	}
 
 	if !hostile.Decay(nil, nil) {
