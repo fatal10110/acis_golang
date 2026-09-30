@@ -14,9 +14,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// signetIDAllocator hands out fresh world object ids for a spawned signet
-// actor.
-type signetIDAllocator interface {
+// objectIDAllocator hands out fresh world object ids: for a spawned signet
+// actor, or for an item a skill creates.
+type objectIDAllocator interface {
 	NextID() (int32, error)
 }
 
@@ -77,7 +77,7 @@ type signetHandler struct {
 	defs          Definitions
 	magicFailures bool
 	templates     signetTemplates
-	ids           signetIDAllocator
+	ids           objectIDAllocator
 	world         *world.State
 	newSink       func(*npc.EffectPoint) event.Sink
 	effects       effect.Env

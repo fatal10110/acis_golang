@@ -669,7 +669,7 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 		{"mob corpse, default skill", &targetActor{id: 4, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{}, true, CastRejectNone},
 		{"harvest on monster corpse", &targetActor{id: 5, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "HARVEST"}, true, CastRejectNone},
 		{"harvest on attackable guard corpse", &targetActor{id: 6, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "HARVEST"}, false, CastRejectHarvestNotMonster},
-		{"sweep on monster corpse", &targetActor{id: 7, kind: actor.KindNPC, corpse: true, monster: true}, &modelskill.Definition{SkillType: "SWEEP"}, true, CastRejectNone},
+		{"sweep on spoiled monster corpse", &targetActor{id: 7, kind: actor.KindNPC, corpse: true, monster: true, spoiled: true, spoiler: 1}, &modelskill.Definition{SkillType: "SWEEP"}, true, CastRejectNone},
 		{"sweep on attackable guard corpse", &targetActor{id: 8, kind: actor.KindNPC, corpse: true}, &modelskill.Definition{SkillType: "SWEEP"}, false, CastRejectSweepNotMonster},
 		{"fresh mob corpse", &targetActor{id: 10, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(10 * time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, true, CastRejectNone},
 		{"too old mob corpse", &targetActor{id: 11, kind: actor.KindNPC, corpse: true, corpseDeadline: now.Add(time.Second), corpseTime: 8 * time.Second}, &modelskill.Definition{}, false, CastRejectCorpseTooOld},
@@ -696,6 +696,43 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 	}
 	if got := ids(handler.Targets(caster, mobCorpse, &modelskill.Definition{})); !slices.Equal(got, []int32{9}) {
 		t.Fatalf("corpse mob targets = %v, want [9]", got)
+	}
+}
+
+// Reference: PlayerCast.canCast, case SWEEP: a player's non-area sweep of
+// a Monster refuses with SWEEPER_FAILED_TARGET_NOT_SPOILED when nobody
+// spoiled it and SWEEP_NOT_ALLOWED when the caster is not the spoiler (nor,
+// once parties exist, in the spoiler's party). AREA_CORPSE_MOB skips both.
+func TestSweepNeedsTheCastersOwnSpoil(t *testing.T) {
+	spoiler := &targetActor{id: 1, kind: actor.KindPlayer}
+	other := &targetActor{id: 2, kind: actor.KindPlayer}
+	servitor := &targetActor{id: 3, kind: actor.KindSummon}
+	sweep := &modelskill.Definition{SkillType: "SWEEP"}
+	unspoiled := &targetActor{id: 10, kind: actor.KindNPC, corpse: true, monster: true}
+	spoiled := &targetActor{id: 11, kind: actor.KindNPC, corpse: true, monster: true, spoiled: true, spoiler: 1}
+
+	tests := []struct {
+		name       string
+		targetType modelskill.Target
+		caster     *targetActor
+		target     *targetActor
+		skill      *modelskill.Definition
+		want       CastRejection
+	}{
+		{"spoiler sweeps own spoil", modelskill.TargetCorpseMob, spoiler, spoiled, sweep, CastRejectNone},
+		{"another player sweeps the spoil", modelskill.TargetCorpseMob, other, spoiled, sweep, CastRejectSweepNotAllowed},
+		{"sweep of an unspoiled monster", modelskill.TargetCorpseMob, spoiler, unspoiled, sweep, CastRejectSweepNotSpoiled},
+		{"area sweep of another's spoil", modelskill.TargetAreaCorpseMob, other, spoiled, sweep, CastRejectNone},
+		{"area sweep of an unspoiled monster", modelskill.TargetAreaCorpseMob, other, unspoiled, sweep, CastRejectNone},
+		{"non-player caster", modelskill.TargetCorpseMob, servitor, spoiled, sweep, CastRejectNone},
+		{"non-sweep corpse skill", modelskill.TargetCorpseMob, other, unspoiled, &modelskill.Definition{}, CastRejectNone},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CastRejectionFor(tt.targetType, tt.caster, tt.target, tt.skill, false); got != tt.want {
+				t.Fatalf("CastRejectionFor = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -1128,6 +1165,7 @@ type targetActor struct {
 	corpseDeadline     time.Time
 	corpseTime         time.Duration
 	spoiled            bool
+	spoiler            int32
 	seeded             bool
 
 	sameParty    map[int32]bool
@@ -1235,6 +1273,8 @@ func (a *targetActor) CorpseDeadline() (time.Time, bool) {
 func (a *targetActor) CorpseTime() time.Duration { return a.corpseTime }
 
 func (a *targetActor) Spoiled() bool { return a.spoiled }
+
+func (a *targetActor) SpoiledBy(objectID int32) bool { return a.spoiled && a.spoiler == objectID }
 
 func (a *targetActor) Seeded() bool { return a.seeded }
 

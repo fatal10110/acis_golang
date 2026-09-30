@@ -2,6 +2,7 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -68,22 +69,25 @@ func (h spoilHandler) Use(cast Cast) {
 	}
 }
 
-// partyDistributor optionally routes a sweep/harvest reward through the
-// caster's party split instead of directly into their own inventory.
-type partyDistributor interface {
-	InParty() bool
-	DistributeItem(itemID, count int32)
-}
-
-type sweepHandler struct{}
+type sweepHandler struct{ ids objectIDAllocator }
 
 func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 
-// Use drains every target's spoil pool into the caster's inventory (or
-// their party's split), then fully clears the pool — including its spoiler
-// marker, matching the reference container's combined reset — and applies
-// the skill's own self-targeted effects, if any.
-func (sweepHandler) Use(cast Cast) {
+// Use drains every target's spoil pool into a player caster's inventory as
+// earned items, then fully clears the pool — including its spoiler marker,
+// matching the reference container's combined reset — and applies the
+// skill's own self-targeted effects, if any. A caster that is not a player,
+// or a handler without ids to create items with, leaves every pool alone.
+// Sweeping has no slot check. Items go to the sweeper alone: splitting them
+// across a party waits for parties (#146).
+func (h sweepHandler) Use(cast Cast) {
+	if h.ids == nil || cast.Caster == nil || cast.Caster.Kind() != actor.KindPlayer {
+		return
+	}
+	sweeper, ok := cast.Caster.(earner)
+	if !ok {
+		return
+	}
 	for _, obj := range cast.Targets {
 		target, ok := asNPC(obj)
 		if !ok {
@@ -94,22 +98,10 @@ func (sweepHandler) Use(cast Cast) {
 			continue
 		}
 
-		items := pool.Sweep()
-
-		for itemID, count := range items {
-			rewardSweep(cast.Caster, itemID, count)
+		for _, swept := range pool.Sweep() {
+			sweeper.AddEarnedItem(swept.ItemID, int(swept.Count), h.ids.NextID)
 		}
 	}
 
 	applyCasterSelfEffects(cast, cast.Skill)
-}
-
-func rewardSweep(caster Actor, itemID, count int32) {
-	if pd, ok := caster.(partyDistributor); ok && pd.InParty() {
-		pd.DistributeItem(itemID, count)
-		return
-	}
-	if e, ok := caster.(earner); ok {
-		e.AddEarnedItem(itemID, int(count))
-	}
 }

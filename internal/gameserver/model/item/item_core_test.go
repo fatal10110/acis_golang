@@ -1,6 +1,7 @@
 package item
 
 import (
+	"slices"
 	"sort"
 	"testing"
 )
@@ -863,8 +864,8 @@ func TestRollKillRewardSpoilRequiresMarkedPool(t *testing.T) {
 			t.Fatalf("RollKillReward() = (%v, %v), want (nil, nil) — spoil goes to the pool", items, herbs)
 		}
 		got := pool.Sweep()
-		if got[999] != 1 {
-			t.Fatalf("pool.Sweep() = %v, want {999: 1}", got)
+		if !slices.Equal(got, []SpoilItem{{ItemID: 999, Count: 1}}) {
+			t.Fatalf("pool.Sweep() = %v, want [{999 1}]", got)
 		}
 	})
 }
@@ -1041,8 +1042,8 @@ func TestSpoilPoolLifecycle(t *testing.T) {
 	}
 
 	got := pool.Sweep()
-	want := map[int32]int32{100: 5, 200: 1}
-	if len(got) != len(want) || got[100] != want[100] || got[200] != want[200] {
+	want := []SpoilItem{{ItemID: 100, Count: 5}, {ItemID: 200, Count: 1}}
+	if !slices.Equal(got, want) {
 		t.Fatalf("Sweep() = %v, want %v", got, want)
 	}
 
@@ -1076,5 +1077,54 @@ func TestInstanceReleasePersisterIgnoresUncomparablePersister(t *testing.T) {
 	inst.AddCount(1)
 	if calls == 0 {
 		t.Error("uncomparable persister was released; it can never match")
+	}
+}
+
+// TestSpoilPoolSweepOrder pins the order a sweep hands pooled items over:
+// that of a java.util.HashMap<Integer, Integer> filled in the same order,
+// as printed by its keySet() under JDK 21. Items sharing a bucket keep the
+// order they were added in (1876 before 116, 40 before 8), and past twelve
+// items the table doubles to 32 buckets, so 16 follows 12.
+func TestSpoilPoolSweepOrder(t *testing.T) {
+	for _, tc := range []struct {
+		added, want []int32
+	}{
+		{added: []int32{1869, 1876, 1864, 116, 1872}, want: []int32{1872, 1876, 116, 1864, 1869}},
+		{added: []int32{16, 31, 40, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, want: []int32{1, 2, 3, 4, 5, 6, 7, 40, 8, 9, 10, 11, 12, 16, 31}},
+	} {
+		var pool SpoilPool
+		pool.Mark(1)
+		for _, id := range tc.added {
+			pool.Add(id, 1)
+		}
+		var got []int32
+		for _, swept := range pool.Sweep() {
+			got = append(got, swept.ItemID)
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Fatalf("Sweep() order after adding %v = %v, want %v", tc.added, got, tc.want)
+		}
+	}
+}
+
+// TestRollKillRewardFillsSpoilPoolInDropOrder: a spoil category's items
+// enter the pool in the category's drop order, which decides the sweep
+// order of two items sharing a bucket (1876 and 116).
+func TestRollKillRewardFillsSpoilPoolInDropOrder(t *testing.T) {
+	rates := Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
+	for _, order := range [][]int32{{1876, 116}, {116, 1876}} {
+		category := DropCategory{Kind: DropSpoil, Chance: 100}
+		for _, id := range order {
+			category.Drops = append(category.Drops, Drop{ItemID: id, Min: 1, Max: 1, Chance: 100})
+		}
+		for range 20 {
+			var pool SpoilPool
+			pool.Mark(1)
+			RollKillReward([]DropCategory{category}, &pool, 1, false, rates, false)
+			swept := pool.Sweep()
+			if len(swept) != 2 || swept[0].ItemID != order[0] || swept[1].ItemID != order[1] {
+				t.Fatalf("swept %v, want the drop order %v", swept, order)
+			}
+		}
 	}
 }
