@@ -45,10 +45,6 @@ func DefaultConfig() Config {
 	}
 }
 
-// enchant4SkillLevel is the enchant level from which an equipped weapon
-// grants its +4 enchant skill.
-const enchant4SkillLevel = 4
-
 type scroll struct {
 	weapon  bool
 	blessed bool
@@ -212,6 +208,12 @@ func (s *Service) UseScroll(playerID int32, inv *itemcontainer.Inventory, inst *
 	return UseScrollResult{ScrollItemID: inst.TemplateID, FirstSelect: first}, true
 }
 
+// Selected reports whether playerID has a scroll selected that inv still
+// holds — the selection the restart and logout guards refuse on.
+func (s *Service) Selected(playerID int32, inv *itemcontainer.Inventory) bool {
+	return s.selectedScroll(playerID, inv) != nil
+}
+
 // selectedScroll returns playerID's selected scroll while inv still holds
 // it. A selected scroll that has since left inv no longer counts as a
 // selection — the reference drops it the moment its item leaves the
@@ -319,7 +321,7 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 	} else {
 		// An equipped weapon at +4 or higher loses its +4 enchant skill
 		// before the failure takes its level or the item itself.
-		if st := target.Snapshot(); st.Equipped() && hasEnchant4Skill(targetTemplate) && st.EnchantLevel >= enchant4SkillLevel {
+		if st := target.Snapshot(); st.Equipped() && hasEnchant4Skill(targetTemplate) && st.EnchantLevel >= item.Enchant4SkillLevel {
 			out.Steps = append(out.Steps, Step{Kind: StepRevokeEnchantSkill, Template: targetTemplate})
 		}
 		if scrollDef.blessed {
@@ -384,7 +386,7 @@ func (s *Service) success(inv *itemcontainer.Inventory, target *item.Instance, t
 	// Reaching exactly +4 on an equipped weapon grants its +4 enchant skill.
 	// ponytail: the worn armor set's +6 skill is not granted or revoked
 	// here yet; armor sets have no runtime owner (#2952).
-	if st := target.Snapshot(); st.Equipped() && st.EnchantLevel == enchant4SkillLevel && hasEnchant4Skill(tmpl) {
+	if st := target.Snapshot(); st.Equipped() && st.EnchantLevel == item.Enchant4SkillLevel && hasEnchant4Skill(tmpl) {
 		out.Steps = append(out.Steps, Step{Kind: StepGrantEnchantSkill, Template: tmpl})
 	}
 	out.Steps = append(out.Steps, resultStep(ResultSuccess))

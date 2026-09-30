@@ -10,10 +10,11 @@ import (
 
 // ItemOwner is the owner and item enchant-data source for the stat
 // functions one equipped item instance's Modifiers contribute. Equality
-// between two ItemOwner values compares Inst and Tmpl, so RemoveStatsByOwner drops only the functions attached for
-// that specific instance even when another equipped item shares its
-// template. EnchantLevel reads Inst's live snapshot on every call rather
-// than a value captured at attach time, so a scroll of enchant used on an
+// between two ItemOwner values compares Inst and Tmpl, so
+// RemoveStatsByOwner drops only the functions attached for that specific
+// instance even when another equipped item shares its template.
+// EnchantLevel reads Inst's live snapshot on every call rather than a value
+// captured at attach time, so a scroll of enchant used on an
 // already-equipped item needs no explicit re-attach.
 type ItemOwner struct {
 	Inst *item.Instance

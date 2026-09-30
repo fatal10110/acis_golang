@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	sqltest "github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -272,27 +274,8 @@ func TestEnchantRequestGates(t *testing.T) {
 	})
 
 	t.Run("a destroyed scroll is no selection", func(t *testing.T) {
-		var templates []*item.Template
-		for _, tmpl := range gameservertest.ItemTemplates().All() {
-			if tmpl.ID == 955 {
-				destroyable := *tmpl
-				destroyable.Destroyable = true
-				tmpl = &destroyable
-			}
-			templates = append(templates, tmpl)
-		}
-		var blessed int32
-		srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { return 0 }, 0, false, func(t *testing.T, srv *gameservertest.Server, objID int32) {
-			blessed = srv.GiveItem(t, objID, 6575, 1)
-		}, gameservertest.WithItemTemplates(item.NewTable(templates)))
+		srv, objID, weapon, blessed := bootDestroyedSelection(t)
 		c := srv.Client
-		openEnchantSelection(t, c, scroll, 955)
-		c.Send(encodeRequestDestroyItem(scroll, 1))
-		drainUntilQuiet(t, c)
-		if held := srv.PlayerInventory(t, objID).ItemByObjectID(scroll); held != nil {
-			t.Fatal("the scroll is still held after the destroy")
-		}
-
 		c.Send(encodeRequestEnchantItem(weapon))
 		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
 			t.Fatalf("enchant with the selected scroll destroyed replied %x, want no reply", reply)
@@ -300,6 +283,24 @@ func TestEnchantRequestGates(t *testing.T) {
 		openEnchantSelection(t, c, blessed, 6575)
 		if inst := mustFindItem(t, srv, objID, weapon); inst.EnchantLevel != 0 {
 			t.Fatalf("weapon enchant = %d, want 0", inst.EnchantLevel)
+		}
+	})
+
+	// PcInventory.removeItem drops the selection with the scroll, so
+	// RequestRestart finds no active enchant item and lets the player out.
+	t.Run("a destroyed scroll does not block restart", func(t *testing.T) {
+		srv, _, _, _ := bootDestroyedSelection(t)
+		c := srv.Client
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+		for {
+			reply := c.Read()
+			if len(reply) == 0 || reply[0] != serverpackets.OpcodeRestartResponse {
+				continue
+			}
+			if ok := wire.NewReader(reply[1:]).ReadInt32(); ok != 1 {
+				t.Fatalf("RestartResponse result = %d, want 1 (the destroyed scroll is no selection)", ok)
+			}
+			return
 		}
 	})
 
@@ -315,6 +316,34 @@ func TestEnchantRequestGates(t *testing.T) {
 		}
 		assertEnchantResult(t, c.Read(), serverpackets.EnchantResultSuccess)
 	})
+}
+
+// bootDestroyedSelection boots an enchanter who selects their only scroll
+// 955 and then destroys it. It returns the server, the player, the weapon
+// and a held blessed scroll 6575.
+func bootDestroyedSelection(t *testing.T) (*gameservertest.Server, int32, int32, int32) {
+	t.Helper()
+	var templates []*item.Template
+	for _, tmpl := range gameservertest.ItemTemplates().All() {
+		if tmpl.ID == 955 {
+			destroyable := *tmpl
+			destroyable.Destroyable = true
+			tmpl = &destroyable
+		}
+		templates = append(templates, tmpl)
+	}
+	var blessed int32
+	srv, objID, weapon, scroll := bootEnchanter(t, func() float64 { return 0 }, 0, false, func(t *testing.T, srv *gameservertest.Server, objID int32) {
+		blessed = srv.GiveItem(t, objID, 6575, 1)
+	}, gameservertest.WithItemTemplates(item.NewTable(templates)))
+	c := srv.Client
+	openEnchantSelection(t, c, scroll, 955)
+	c.Send(encodeRequestDestroyItem(scroll, 1))
+	drainUntilQuiet(t, c)
+	if held := srv.PlayerInventory(t, objID).ItemByObjectID(scroll); held != nil {
+		t.Fatal("the scroll is still held after the destroy")
+	}
+	return srv, objID, weapon, blessed
 }
 
 // TestTeleportCancelsActiveEnchant pins Player.teleportTo dropping the

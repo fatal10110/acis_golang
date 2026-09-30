@@ -380,7 +380,7 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	// run), so none of its granted skills apply until Expertise catches up.
 	var grants []itemSkillGrant
 	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
-		if inst.Snapshot().EnchantLevel >= enchant4SkillLevel {
+		if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel {
 			g, ok, err := p.enchant4SkillGrant(tmpl)
 			if err != nil {
 				return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
@@ -399,10 +399,6 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	skillsChanged, timersChanged = p.grantItemSkills(c, grants)
 	return skillsChanged, timersChanged, nil
 }
-
-// enchant4SkillLevel is the enchant level from which a weapon grants its
-// +4 enchant skill.
-const enchant4SkillLevel = 4
 
 // enchant4SkillGrant resolves tmpl's +4 enchant skill. ok is false for a
 // non-weapon, a weapon without one, or one naming no loaded skill.
@@ -557,7 +553,7 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 	if tmpl == nil {
 		return false
 	}
-	if inst.Snapshot().EnchantLevel >= enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
+	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true
 	}
 	if inv == nil {

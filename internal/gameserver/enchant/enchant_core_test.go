@@ -35,6 +35,27 @@ func TestStateSelectAndClear(t *testing.T) {
 	}
 }
 
+// TestSelectedRequiresHeldScroll pins that a selection whose scroll has left
+// the inventory is no selection for the exit guards, and is dropped.
+func TestSelectedRequiresHeldScroll(t *testing.T) {
+	state := NewState()
+	inv := itemcontainer.NewPlayerInventory(1, testTemplates())
+	scroll := inv.AddNew(955, 1, 600)
+	inv.DrainUpdates()
+	svc := NewService(state, nil, nil, DefaultConfig())
+	state.Select(1, scroll.ObjectID)
+	if !svc.Selected(1, inv) {
+		t.Fatal("Selected = false with the scroll held, want true")
+	}
+	inv.DestroyItem(scroll, 1)
+	if svc.Selected(1, inv) {
+		t.Fatal("Selected = true after the scroll left the inventory, want false")
+	}
+	if got := state.Active(1); got != 0 {
+		t.Fatalf("active after the stale check = %d, want cleared", got)
+	}
+}
+
 func TestServiceSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	state := NewState()
 	templates := testTemplates()
