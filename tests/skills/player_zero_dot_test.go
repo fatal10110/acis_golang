@@ -77,10 +77,10 @@ func TestZeroDamageDOTTickWakesAndStandsPlayer(t *testing.T) {
 			case "sitting":
 				p.vc.Send(encodeRequestChangeWaitType(false))
 				readMatching(t, p.vc, time.Second, "sit ChangeWaitType", isWaitType(serverpackets.WaitSitting))
-				p.srv.Advance(t, sitStandDelay)
-				if !seated() {
-					t.Fatal("the Victim is not seated before the tick")
-				}
+				// Until seated rather than a fixed sitStandDelay: on the wall
+				// clock the sit-down's timer can fire just after a sleep
+				// timed from the ChangeWaitType reply.
+				p.srv.AdvanceUntil(t, "the Victim seated before the tick", seated)
 			}
 			drainUntilQuiet(t, p.vc)
 			hp, cp := p.srv.PlayerCurrentHP(t, p.victimID), p.srv.PlayerCurrentCP(t, p.victimID)
