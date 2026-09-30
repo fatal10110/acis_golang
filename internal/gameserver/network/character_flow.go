@@ -631,7 +631,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	if l.npcs != nil {
 		rt.Mounts = l.npcs
-		rt.MountFeeds = mountFeedTable{npcs: l.npcs}
+		rt.MountData = mountDataTable{npcs: l.npcs}
 	}
 	c.Configure(rt)
 	c.RefreshWeightPenalty()

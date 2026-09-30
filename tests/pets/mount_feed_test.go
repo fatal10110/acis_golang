@@ -20,10 +20,16 @@ import (
 
 // The wyvern's level-1 feeding row from the shipped npc data
 // (aCis_datapack/data/xml/npcs/12000-12999.xml, npc 12621: <petdata
-// autoFeedLimit="0.55"> <stat level="1" maxMeal="508" mealInBattle="4"
-// mealInNormal="2" mealInBattleOnRide="20" mealInNormalOnRide="10">). The
-// fixture owner is level 1, so a wyvern it mounts eats from this row.
+// autoFeedLimit="0.55" hungryLimit="0.5"> <stat level="1" maxMeal="508"
+// mealInBattle="4" mealInNormal="2" mealInBattleOnRide="20"
+// mealInNormalOnRide="10" speedOnRide="250;250;140;140;250;250">). The
+// fixture owner is level 1, so a wyvern it mounts eats from this row and
+// carries its rider at its speeds.
 const (
+	wyvernRideSpeed  = 250
+	wyvernWaterSpeed = 140
+	wyvernFlySpeed   = 250
+
 	wyvernMaxMeal          = 508
 	wyvernMealInBattle     = 4
 	wyvernMealInNormal     = 2
@@ -50,6 +56,7 @@ func fedWyvernTemplate() *npc.Template {
 		Levels: map[int]npc.PetLevelStats{1: {
 			MaxMeal: wyvernMaxMeal, MealInBattle: wyvernMealInBattle, MealInNormal: wyvernMealInNormal,
 			MountMealInBattle: wyvernRideMealInBattle, MountMealInNormal: wyvernRideMealInNormal,
+			MountBaseSpeed: wyvernRideSpeed, MountWaterSpeed: wyvernWaterSpeed, MountFlySpeed: wyvernFlySpeed,
 		}},
 	}
 	return tpl

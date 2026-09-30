@@ -137,7 +137,7 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	mounts                   MountBodies
-	mountFeeds               MountFeeds
+	mountData                MountDataSource
 	mountFeed                mountFeedState
 	insidePvPZone            atomic.Bool
 	insidePeaceZone          atomic.Bool
@@ -204,6 +204,7 @@ type Character struct {
 	mountType            int32
 	mountNPCID           int32
 	mountObjectID        int32
+	mountLevel           int
 	transformed          bool
 	spawnProtected       bool
 	damagePermissionSet  bool
