@@ -90,9 +90,6 @@ type Effect struct {
 	// calls when a task resets the latch before its previous StartPulse
 	// invocation returns.
 	StartPulse func()
-	// DangerNotice refreshes a player's danger status display; nil until
-	// the messaging layer wires it.
-	DangerNotice func(a Actor)
 
 	enabled atomic.Bool
 	pulsing atomic.Bool
@@ -167,24 +164,10 @@ func (z *Effect) enter(a Actor) {
 	if z.pulsing.CompareAndSwap(false, true) && z.StartPulse != nil {
 		z.StartPulse()
 	}
-	if a.Class() == ClassPlayer {
-		a.ZoneFlags().Set(FlagDanger, true)
-		if z.DangerNotice != nil {
-			z.DangerNotice(a)
-		}
-	}
+	enterDanger(a)
 }
 
-func (z *Effect) exit(a Actor) {
-	if a.Class() == ClassPlayer {
-		a.ZoneFlags().Set(FlagDanger, false)
-		// Refresh the display only once the last overlapping danger zone
-		// released its hold.
-		if !a.ZoneFlags().Has(FlagDanger) && z.DangerNotice != nil {
-			z.DangerNotice(a)
-		}
-	}
-}
+func (z *Effect) exit(a Actor) { exitDanger(a) }
 
 // Enabled reports whether the pulse currently applies its effects.
 func (z *Effect) Enabled() bool {
