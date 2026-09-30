@@ -331,7 +331,7 @@ func TestSignetMDamTickReportsDamageToBothSides(t *testing.T) {
 	setCasterMagicRolls(t, srv, objID, func() int { return 500 })
 
 	c.Send(encodeRequestMagicSkillUse(1419, false, false))
-	readCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
+	readSignetCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
 	tickSignetMDamLive(t, srv)
 
 	log := readFrameLog(c)

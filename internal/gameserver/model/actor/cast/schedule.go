@@ -1,6 +1,10 @@
 package cast
 
-import "time"
+import (
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+)
 
 // Hooks are the phase callbacks a scheduled cast invokes as it advances
 // through Launch, Hit and Finish, layered on top of the resource and
@@ -63,6 +67,65 @@ func (c *Controller) ScheduleFusion(plan Plan, interval time.Duration, check fun
 	}
 	c.mu.Unlock()
 	return true
+}
+
+// signetFinishDelay is how long a SIGNET_CASTTIME cast lasts past its launch,
+// whatever its hit time: it has no cool phase.
+const signetFinishDelay = 400 * time.Millisecond
+
+// ScheduleSignetCast advances a SIGNET_CASTTIME cast, whose effect already
+// landed when it started, on the fusion-cast timeline. At plan.LaunchDelay
+// launch broadcasts the launch over the targets it resolves and returns how
+// many there were; the caster then charges its shots again and pays the
+// final MP, and the cast finishes signetFinishDelay later. A caster short of
+// that MP is reported to failed and the cast stops. There is no range, sight
+// or peace-zone recheck at launch, no HP cost and no charge step.
+func (c *Controller) ScheduleSignetCast(plan Plan, launch func() int, failed func(error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.casting {
+		return
+	}
+	seq := c.castSeq
+	c.scheduleLocked(plan.LaunchDelay, func() { c.runSignetLaunch(seq, launch, failed) })
+}
+
+func (c *Controller) runSignetLaunch(seq uint64, launch func() int, failed func(error)) {
+	if !c.stillCasting(seq) {
+		return
+	}
+	def, _ := c.CurrentSkill()
+	n := 0
+	if launch != nil {
+		n = launch()
+	}
+	c.SetLaunchTargets(n)
+	if physical, magic := def.UsesSoulShot(), def.UsesSpiritShot(); physical || magic {
+		c.emit(event.ShotsRechargeRequested{Physical: physical, Magic: magic})
+	}
+	if !c.stillCasting(seq) {
+		return
+	}
+	if mp := c.actor.MPCost(def); mp > 0 {
+		if mp > c.actor.MP() {
+			if failed != nil {
+				failed(ErrNotEnoughMP)
+			}
+			c.Stop()
+			return
+		}
+		c.actor.ReduceMP(mp)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.castingLocked(seq) {
+		c.scheduleLocked(signetFinishDelay, func() {
+			if c.stillCasting(seq) {
+				c.Finish()
+			}
+		})
+	}
 }
 
 func (c *Controller) runFusionCheck(seq uint64, interval time.Duration, check func() bool) {
