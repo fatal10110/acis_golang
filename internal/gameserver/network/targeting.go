@@ -75,7 +75,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		return
 	}
 	if selected {
-		l.attackLiveTarget(live, target)
+		l.attackLiveTarget(live, target, shift)
 	}
 }
 
@@ -240,14 +240,14 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 	}
 	if s.ShownAsOwnedBy(live.ObjectID()) {
 		if ctrl {
-			l.attackLiveTarget(live, s)
+			l.attackLiveTarget(live, s, shift)
 		} else {
 			l.showOwnedPetStatus(live, s, shift)
 		}
 		return true
 	}
 	if s.AttackableWithoutForceBy(live.Character) || (ctrl && s.AttackableBy(live.Character)) {
-		l.attackLiveTarget(live, s)
+		l.attackLiveTarget(live, s, shift)
 		return true
 	}
 	l.followLiveTarget(live, s, ctrl, shift)
@@ -567,9 +567,10 @@ func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Track
 // attackLiveTarget starts (or continues) live's attack intention against
 // target: closing distance first when target is out of weapon range, then
 // swinging once in range, repeating on subsequent calls until target dies,
-// is lost, or the attack is cancelled. It reports whether the attempt was
+// is lost, or the attack is cancelled. A shift-held attack never walks: on a
+// target out of reach it goes idle. It reports whether the attempt was
 // accepted — false means the caller should report the action as failed.
-func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked) bool {
+func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked, shift bool) bool {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -596,7 +597,7 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		return false
 	}
 	live.clearParkedApproaches()
-	if !live.combat.Start(combatant) {
+	if !live.combat.Start(combatant, shift) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}

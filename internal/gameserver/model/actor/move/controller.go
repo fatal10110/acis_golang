@@ -229,6 +229,19 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen)
 }
 
+// HoldOffensiveFollow is MaybeStartOffensiveFollow for an intention that
+// may not walk (a shift-held attack): it reports whether target sits out of
+// attackRange plus both actors' footprints, and never starts a follow or a
+// movement toward it. A target within reach drops any follow task, as
+// MaybeStartOffensiveFollow does.
+func (c *Controller) HoldOffensiveFollow(target attackable.Combatant, attackRange int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Blocked, the follow returns before any follow, movement or error.
+	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, true, nil)
+	return outOfRange
+}
+
 // MaybeStartFriendlyFollow arms a friendly follow task and starts moving
 // toward target when it sits farther than offset plus both actors'
 // footprints. Friendly follow broadcasts a plain movement request; follow
