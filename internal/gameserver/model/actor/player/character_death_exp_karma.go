@@ -5,51 +5,77 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
+
+// deathLossExemption reports whether a death inside a PvP zone costs no
+// experience or karma, and whether that exemption uses up a Charm of
+// Courage. In a siege zone only the charm exempts the death, whoever the
+// killer; in any other PvP zone a death to a player or its summon is exempt.
+func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (exempt, useCharm bool) {
+	switch {
+	case !inPvP:
+		return false, false
+	case inSiege:
+		return charmOfCourage, charmOfCourage
+	default:
+		return killedByPlayable, false
+	}
+}
 
 // applyDeathExpKarmaLoss computes and applies the experience and karma cost
 // of this character's death, mirroring Player.applyDeathPenalty and
 // updateKarmaLoss (Player.java:2649-2651, 2874-2926, 2749-2757). It is a
 // no-op for an environmental death (killer == nil, Player.java:2615's
-// `if (killer != null)` guard) and while the delevel gate is closed: the
+// `if (killer != null)` guard); any other death first clears the previous
+// death's exp snapshot, so a later resurrection restores nothing unless this
+// death takes exp. The loss is skipped while the delevel gate is closed: the
 // AllowDelevel config off, or the Lucky skill still active below level 10
 // (Player.java:2650).
 //
-// Deferred pending owning subsystems, tracked so this stays linked rather
-// than silently approximated (issue #1737):
-//   - the PvP/siege-zone early return and its Charm of Courage stop, and the
-//     killed-by-playable arena exemption (Player.java:2881-2895) — the
-//     charm's effect flag isn't exported outside the effect package, and the
-//     arena/olympiad state those branches matter for isn't tracked on
-//     Character yet (#1302, #217, #215);
-//   - the mutual-clan-war halving of percentLost (Player.java:2906,
-//     `atWar`) — clan-war state isn't tracked yet (#149).
+// Inside a PvP zone two deaths cost nothing: in a siege zone, one while a
+// Charm of Courage is held, which uses the charm up; in any other PvP zone
+// (an arena), one to a player or its summon. A player killed inside a siege
+// zone without the charm still loses exp, at a quarter of the normal rate.
 //
-// The siege-zone halving (Player.java:2906) and the festival-participant
-// halving are wired: InSiegeZone and FestivalParticipant are live
-// accessors (FestivalParticipant is a permanent false stub pending #223, so
-// its branch stays dormant, not approximated).
+// Deferred pending owning subsystems: the mutual-clan-war halving of
+// percentLost (Player.java:2906, `atWar`) — clan-war state isn't tracked yet
+// (#149).
+//
+// The siege-zone and festival-participant reductions are wired: InSiegeZone
+// and FestivalParticipant are live accessors (FestivalParticipant is a
+// permanent false stub pending #223, so its branch stays dormant, not
+// approximated).
 func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if killer == nil {
 		return
 	}
+	killedByPlayable := actingCharacter(killer) != nil
 
 	c.stateMu.RLock()
 	table := c.levelTable
 	allow := c.allowDelevel
 	rate := c.rateKarmaExpLost
 	c.stateMu.RUnlock()
-	if table == nil || !allow {
-		return
-	}
 	lucky := c.HasSkill(int(skill.LuckySkillID))
 	reducedLoss := c.FestivalParticipant() || c.InSiegeZone()
+	exempt, useCharm := deathLossExemption(c.InPvPZone(), c.InSiegeZone(),
+		c.EffectList().IsAffected(effect.FlagCharmOfCourage), killedByPlayable)
 
 	var hooks progressionHooks
 	defer func() { hooks.run() }()
 	c.progressionMu.Lock()
 	defer c.progressionMu.Unlock()
-	if lucky && c.CharLevel <= 9 {
+	c.ExpBeforeDeath = 0
+	if table == nil || !allow || (lucky && c.CharLevel <= 9) {
+		return
+	}
+	if exempt {
+		if useCharm {
+			// The charm's end broadcasts the status window with the charm
+			// cleared; it runs after progressionMu is released.
+			hooks.add(func() { c.EffectList().StopByType(effect.TypeCharmOfCourage) })
+		}
 		return
 	}
 
