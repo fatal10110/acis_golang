@@ -131,9 +131,8 @@ func TestResurrectOutrightRunsOnSummonQueueAndCancelsDecayFirst(t *testing.T) {
 }
 
 // TestResurrectOutrightLeftBehindCorpse: a non-player resurrection revives
-// a pet's corpse its owner left behind, dropping its decay first, while a
-// servitor's corpse its owner left behind cannot be revived and keeps the
-// decay that removes it.
+// a corpse its owner left behind, a pet's or a servitor's, dropping its
+// decay first, and leaves it answering to the session that left it.
 func TestResurrectOutrightLeftBehindCorpse(t *testing.T) {
 	for _, pet := range []bool{false, true} {
 		f := newDeadSummon(t, pet)
@@ -143,12 +142,12 @@ func TestResurrectOutrightLeftBehindCorpse(t *testing.T) {
 		}
 		f.summon.ResurrectOutright(100)
 		f.loop.Run()
-		if got := !f.summon.Dead(); got != pet {
-			t.Fatalf("pet=%v: left-behind corpse revived = %v, want %v", pet, got, pet)
+		if f.summon.Dead() {
+			t.Fatalf("pet=%v: left-behind corpse still dead", pet)
 		}
-		wantCancels := 0
+		// The cancel ahead of the revive, and a pet's own on revive.
+		wantCancels := 1
 		if pet {
-			// The cancel ahead of the revive and the pet's own on revive.
 			wantCancels = 2
 		}
 		if n := event.Count[event.DecayCanceled](f.rec); n != wantCancels {
