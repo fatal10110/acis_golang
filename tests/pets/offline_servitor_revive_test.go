@@ -130,7 +130,8 @@ func sawPetDelete(frames [][]byte, objectID int32) bool {
 // stands it up at 70% HP for the caster to see. It keeps its decay and stays
 // nobody's: the owner's next session gets no PetInfo for it and summons a
 // new servitor at once, and at its corpse time it leaves the world, alive,
-// with no PetDelete for the owner and the new servitor's slot untouched.
+// with no PetDelete for the owner and the new servitor's slot untouched. A
+// hit that lands as it leaves puts it in no stance.
 func TestPlayerResurrectionRevivesServitorLeftBehind(t *testing.T) {
 	t.Parallel()
 	l := leaveServitorDead(t)
@@ -162,6 +163,14 @@ func TestPlayerResurrectionRevivesServitorLeftBehind(t *testing.T) {
 	}
 	if got, ok := l.srv.State.Summon(l.id); !ok || got.ObjectID() != next.ObjectID() {
 		t.Fatal("the revived servitor's departure took the owner's new servitor's slot")
+	}
+
+	// A hit that passed its Knows check as the decay despawned the servitor
+	// lands after the despawn cleanup: it leaves no stance entry behind for
+	// the closed corpse queue to refuse on every tick.
+	servitor.NotifyAttacked(nil)
+	if l.srv.AttackStance.InAttackStance(ownerKey{id: servitor.ObjectID()}) {
+		t.Fatal("a hit landing as the servitor left the world kept it in the stance tracker")
 	}
 }
 

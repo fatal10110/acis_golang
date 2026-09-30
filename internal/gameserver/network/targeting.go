@@ -652,6 +652,17 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 			l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
 		}
 		l.attackStance.Add(actor)
+		// A hit that passed its Knows check as the summon's decay
+		// despawned it can get here after the despawn cleanup's Remove
+		// (leaveCorpseBehind), and its entry would outlive the summon,
+		// its expiry refused by the closed corpse queue on every tick.
+		// The summon leaves the world before that Remove runs, so either
+		// the cleanup or this check drops the entry.
+		if l.world != nil {
+			if obj, ok := l.world.Object(actor.ObjectID()); !ok || obj != world.Tracked(actor) {
+				l.attackStance.Remove(actor)
+			}
+		}
 		return
 	}
 	owner, ok := liveSummonOwner(actor)
