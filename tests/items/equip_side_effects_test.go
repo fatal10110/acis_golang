@@ -33,8 +33,8 @@ const (
 
 // bootRiggedSword boots a character that knows Expertise and Crystallize
 // and carries the rigged sword, and returns the server and the sword's
-// object id.
-func bootRiggedSword(t *testing.T) (*gameservertest.Server, int32) {
+// object id. passive is the stat funcs of the sword's item skill.
+func bootRiggedSword(t *testing.T, passive ...modelskill.FuncTemplate) (*gameservertest.Server, int32) {
 	t.Helper()
 	var templates []*item.Template
 	for _, tmpl := range gameservertest.ItemTemplates().All() {
@@ -50,7 +50,7 @@ func bootRiggedSword(t *testing.T) (*gameservertest.Server, int32) {
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
 		{ID: expertiseSkillID, Level: 1},
 		{ID: crystallizeSkillID, Level: crystallizeSkillLevel},
-		{ID: riggedSwordSkillID, Level: 1, Activation: modelskill.ActivationPassive},
+		{ID: riggedSwordSkillID, Level: 1, Activation: modelskill.ActivationPassive, Funcs: passive},
 	}), gamesql.NewCharacterSkillStore(db))
 	srv := gameservertest.Boot(t,
 		gameservertest.WithItemTemplates(item.NewTable(templates)),

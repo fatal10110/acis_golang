@@ -67,7 +67,9 @@ func (c *Character) StatFuncsAttached(fns []effect.Mod) {
 	c.statsModified(stats)
 }
 
-// RemoveStatsByOwner drops every stat func previously added for owner.
+// RemoveStatsByOwner drops every stat func previously added for owner. An
+// effect a stop-all is ending changes the movement speed only: the stop-all's
+// caller reports the strip once, when it ends.
 func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
@@ -83,6 +85,12 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 		for range calc.RemoveOwner(owner) {
 			stats = append(stats, stat.Stat(s))
 		}
+	}
+	if owner.Stripped() {
+		if len(stats) > 0 {
+			c.refreshMoveSpeed()
+		}
+		return
 	}
 	c.statsModified(stats)
 }

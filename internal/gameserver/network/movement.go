@@ -172,11 +172,12 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 	l.broadcastCharacterInfo(live)
 }
 
-// broadcastRunSpeedChange answers a stat func change that moved RUN_SPEED:
-// the weight and grade penalty bands are refreshed, then the player and its
-// observers get its full view with the new speed multiplier. A player not in
-// the world yet sends nothing; its entry burst carries the new speed.
-func (l *GameClientLink) broadcastRunSpeedChange(live *livePlayer) {
+// broadcastFullStatus answers a stat func change that moved RUN_SPEED, and
+// the end of a stop-all that stripped the player's effects: the weight and
+// grade penalty bands are refreshed, then the player and its observers get
+// its full view with the new stats. A player not in the world yet sends
+// nothing; its entry burst carries the new values.
+func (l *GameClientLink) broadcastFullStatus(live *livePlayer) {
 	if !l.liveInWorld(live) {
 		return
 	}

@@ -356,6 +356,10 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	}
 }
 
+// Two equipped copies of a passive-granting ring apply its modifiers twice
+// but its passive once: the reference's addSkill ignores a skill already
+// known at that level, and the unequip listener keeps the skill while
+// another copy stays equipped (ItemPassiveSkillsListener.onUnequip).
 func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 	templates := itemStatsTestTemplates()
 	inv := itemcontainer.NewPlayerInventory(1, templates)
@@ -376,15 +380,84 @@ func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 		t.Fatalf("EquipItemStats(ring2) error: %v", err)
 	}
 	afterBoth := ch.MAtk()
-	if want := baseMAtk + 2*(5+8); afterBoth != want {
-		t.Fatalf("MAtk() with both rings equipped = %v, want %v", afterBoth, want)
+	if want := baseMAtk + 2*5 + 8; afterBoth != want {
+		t.Fatalf("MAtk() with both rings equipped = %v, want %v (two modifiers, one passive)", afterBoth, want)
 	}
 
 	inv.UnequipSlot(inv.ItemByObjectID(ring1.ObjectID).Snapshot().LocationData)
-	p.UnequipItemStats(ch, inv, ring1, tmpl)
+	if p.UnequipItemStats(ch, inv, ring1, tmpl) {
+		t.Fatal("UnequipItemStats(ring1) skillsChanged = true, want false while ring2 still grants the skill")
+	}
 
 	if got, want := ch.MAtk(), baseMAtk+5+8; got != want {
-		t.Fatalf("MAtk() after unequipping ring1 only = %v, want %v (ring2's own funcs must survive)", got, want)
+		t.Fatalf("MAtk() after unequipping ring1 only = %v, want %v (ring2's modifier and the passive must survive)", got, want)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(ring2.ObjectID).Snapshot().LocationData)
+	if !p.UnequipItemStats(ch, inv, ring2, tmpl) {
+		t.Fatal("UnequipItemStats(ring2) skillsChanged = false, want true for the last copy")
+	}
+	if got := ch.MAtk(); got != baseMAtk {
+		t.Fatalf("MAtk() after unequipping both rings = %v, want %v", got, baseMAtk)
+	}
+}
+
+// TestEquipItemStatsReplacesKnownPassiveAtAnotherLevel pins the item grant
+// of a passive the character already knows at another level: the known
+// level's stat functions leave before the granted level's attach, so the two
+// never stack, and unequipping removes the skill outright.
+func TestEquipItemStatsReplacesKnownPassiveAtAnotherLevel(t *testing.T) {
+	const necklaceTemplateID int32 = 43
+	const passiveID = 310
+	tmpl := &item.Template{
+		ID:             necklaceTemplateID,
+		Kind:           item.KindArmor,
+		Slot:           item.SlotNeck,
+		Armor:          &item.ArmorDetail{Type: item.ArmorLight},
+		AttachedSkills: []item.SkillRef{{ID: passiveID, Level: 2}},
+	}
+	templates := item.NewTable([]*item.Template{tmpl})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: passiveID, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncAdd, Stat: "mAtk", Value: 8},
+		}},
+		{ID: passiveID, Level: 2, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncAdd, Stat: "mAtk", Value: 13},
+		}},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, skills)
+	ch := &player.Character{ID: 1}
+	baseMAtk := ch.MAtk()
+
+	if err := p.SetKnownSkill(ch, passiveID, 1); err != nil {
+		t.Fatalf("SetKnownSkill() error: %v", err)
+	}
+	if got, want := ch.MAtk(), baseMAtk+8; got != want {
+		t.Fatalf("MAtk() with the level-1 passive learned = %v, want %v", got, want)
+	}
+
+	inst := inv.AddNew(necklaceTemplateID, 1, 100)
+	inv.EquipItem(inst, tmpl)
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if got := ch.SkillLevel(passiveID); got != 2 {
+		t.Fatalf("SkillLevel(%d) after equip = %d, want 2 (the item's level replaces the known one)", passiveID, got)
+	}
+	if got, want := ch.MAtk(), baseMAtk+13; got != want {
+		t.Fatalf("MAtk() after equip = %v, want %v (level 2 only; level 1 must not stack with it)", got, want)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(inst.ObjectID).Snapshot().LocationData)
+	if !p.UnequipItemStats(ch, inv, inst, tmpl) {
+		t.Fatal("UnequipItemStats() skillsChanged = false, want true")
+	}
+	if got := ch.SkillLevel(passiveID); got != 0 {
+		t.Fatalf("SkillLevel(%d) after unequip = %d, want 0 (the grant removes the skill outright)", passiveID, got)
+	}
+	if got := ch.MAtk(); got != baseMAtk {
+		t.Fatalf("MAtk() after unequip = %v, want base %v", got, baseMAtk)
 	}
 }
 

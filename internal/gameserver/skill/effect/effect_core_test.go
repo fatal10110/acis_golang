@@ -1132,32 +1132,44 @@ func TestItemOwnerEnchantLevelReadsLiveInstanceState(t *testing.T) {
 	}
 }
 
-func TestItemPassiveFuncsOnlyAppliesLoadedPassiveSkills(t *testing.T) {
+func TestItemEnchantSkillFuncsOnlyAppliesLoadedPassiveEnchantSkill(t *testing.T) {
 	skills := modelskill.NewTable([]modelskill.Definition{
 		{ID: 200, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
 			{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 12},
 		}},
 		{ID: 201, Level: 1, Activation: modelskill.ActivationToggle},
 	})
-	tmpl := &item.Template{
-		ID: 103,
-		AttachedSkills: []item.SkillRef{
-			{ID: 200, Level: 1}, // passive: contributes
-			{ID: 201, Level: 1}, // not passive: skipped
-			{ID: 999, Level: 1}, // unloaded: skipped
-		},
+	build := func(enchant4 *item.SkillRef) []Mod {
+		t.Helper()
+		tmpl := &item.Template{
+			ID:             103,
+			Weapon:         &item.WeaponDetail{Type: item.WeaponDual, Enchant4Skill: enchant4},
+			AttachedSkills: []item.SkillRef{{ID: 200, Level: 1}}, // granted as a skill, not built here
+		}
+		owner := ItemOwner{Inst: &item.Instance{ObjectID: 1, TemplateID: 103}, Tmpl: tmpl}
+		fns, err := ItemEnchantSkillFuncs(skills, owner)
+		if err != nil {
+			t.Fatalf("ItemEnchantSkillFuncs() error: %v", err)
+		}
+		for _, fn := range fns {
+			if fn.Owner != ModOwnerItem(owner) {
+				t.Fatalf("Owner = %v, want the weapon instance %v", fn.Owner, ModOwnerItem(owner))
+			}
+		}
+		return fns
 	}
-	owner := ItemOwner{Inst: &item.Instance{ObjectID: 1, TemplateID: 103}, Tmpl: tmpl}
 
-	fns, err := ItemPassiveFuncs(skills, owner)
-	if err != nil {
-		t.Fatalf("ItemPassiveFuncs() error: %v", err)
+	if fns := build(&item.SkillRef{ID: 200, Level: 1}); len(fns) != 1 {
+		t.Fatalf("passive +4 skill: len(fns) = %d, want 1", len(fns))
 	}
-	if len(fns) != 1 {
-		t.Fatalf("len(fns) = %d, want 1", len(fns))
+	if fns := build(&item.SkillRef{ID: 201, Level: 1}); len(fns) != 0 {
+		t.Fatalf("non-passive +4 skill: len(fns) = %d, want 0", len(fns))
 	}
-	if fns[0].Owner != ModOwnerItem(owner) {
-		t.Fatalf("Owner = %v, want %v", fns[0].Owner, ModOwnerItem(owner))
+	if fns := build(&item.SkillRef{ID: 999, Level: 1}); len(fns) != 0 {
+		t.Fatalf("unloaded +4 skill: len(fns) = %d, want 0", len(fns))
+	}
+	if fns := build(nil); len(fns) != 0 {
+		t.Fatalf("no +4 skill: len(fns) = %d, want 0", len(fns))
 	}
 }
 

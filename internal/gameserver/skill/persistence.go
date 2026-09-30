@@ -355,13 +355,15 @@ func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int)
 }
 
 // EquipItemStats attaches the stat functions inst's template contributes
-// while equipped — item.Template.AttachedSkills passives and
-// item.Template.Modifiers equip bonuses — to c's live stat calculators, and
-// grants every item.Template.AttachedSkills entry (any activation) to c's
-// known-skill set, mirroring ItemPassiveSkillsListener.onEquip. Call once
-// per instance, right after it becomes equipped. skillsChanged and
-// timersChanged report whether the caller must resend SkillList and
-// SkillCoolTime respectively.
+// while equipped and grants its attached skills, mirroring the equip
+// listeners in their order: the item's equip modifiers (and a weapon's +4
+// enchant passive, gated on the live enchant level) owned by the instance
+// first, then every item.Template.AttachedSkills entry (any activation)
+// added to c's known-skill set the way learning it would, a passive one
+// attaching its stat functions owned by the skill. Each attach reports its
+// own stat change. Call once per instance, right after it becomes equipped.
+// skillsChanged and timersChanged report whether the caller must resend
+// SkillList and SkillCoolTime respectively.
 func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) (skillsChanged, timersChanged bool, err error) {
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
@@ -371,38 +373,78 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	if err != nil {
 		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
-	var passiveFns []effect.Mod
 	// A weapon whose crystal grade the character's Expertise doesn't yet
 	// allow skips its whole item_skill loop in the reference (the grade
 	// penalty check returns before that loop runs), so neither its passive
 	// stat funcs nor any of its granted skills apply until Expertise catches
 	// up.
+	var enchantFns []effect.Mod
+	var grants []itemSkillGrant
 	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
-		passiveFns, err = effect.ItemPassiveFuncs(p.skills, owner)
+		enchantFns, err = effect.ItemEnchantSkillFuncs(p.skills, owner)
 		if err != nil {
 			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
 		}
-		skillsChanged, timersChanged = p.grantItemSkills(c, tmpl)
+		grants, err = p.itemSkillGrants(tmpl)
+		if err != nil {
+			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+		}
 	}
 	c.AddStatFuncs(modFns)
-	c.AddStatFuncs(passiveFns)
+	c.AddStatFuncs(enchantFns)
+	skillsChanged, timersChanged = p.grantItemSkills(c, grants)
 	return skillsChanged, timersChanged, nil
 }
 
-// grantItemSkills grants every tmpl.AttachedSkills entry to c's known-skill
-// set, regardless of activation type, without persisting it and without
-// attaching its stat functions (ItemPassiveFuncs already attaches a passive
-// entry's stat functions, owned by the item instance). An ACTIVE entry with
-// a positive equip delay and no already-armed reuse timer for its reuse key
-// gets one armed, matching ItemPassiveSkillsListener.onEquip:58-72.
-func (p *Persistence) grantItemSkills(c *player.Character, tmpl *item.Template) (skillsChanged, timersChanged bool) {
+// itemSkillGrant is one loaded tmpl.AttachedSkills entry and, for a passive
+// one, the stat functions it attaches, owned by the skill.
+type itemSkillGrant struct {
+	def modelskill.Definition
+	fns []effect.Mod
+}
+
+// itemSkillGrants resolves tmpl's attached skills before any is granted, so
+// a malformed passive leaves the character untouched. An entry naming no
+// loaded skill is skipped.
+func (p *Persistence) itemSkillGrants(tmpl *item.Template) ([]itemSkillGrant, error) {
+	var grants []itemSkillGrant
 	for _, ref := range tmpl.AttachedSkills {
 		def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
 		if !ok {
 			continue
 		}
-		c.SetSkillLevel(int(ref.ID), int(ref.Level))
+		g := itemSkillGrant{def: def}
+		if def.Activation == modelskill.ActivationPassive {
+			fns, err := effect.PassiveFuncs(def)
+			if err != nil {
+				return nil, fmt.Errorf("item %d passive skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
+			}
+			g.fns = fns
+		}
+		grants = append(grants, g)
+	}
+	return grants, nil
+}
+
+// grantItemSkills adds each granted skill to c's known-skill set without
+// persisting it, as learning it in memory would: a skill c already knows at
+// that level changes nothing (so two equipped items granting it
+// attach its passive stat functions once); at another level the known
+// level's stat functions are dropped before the granted level's attach. An
+// ACTIVE entry with a positive equip delay and no already-armed reuse timer
+// for its reuse key gets one armed, matching
+// ItemPassiveSkillsListener.onEquip:58-72.
+func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGrant) (skillsChanged, timersChanged bool) {
+	for _, g := range grants {
+		def := g.def
 		skillsChanged = true
+		if old := c.SkillLevel(int(def.ID)); old != def.Level {
+			c.SetSkillLevel(int(def.ID), def.Level)
+			if old > 0 {
+				c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: def.ID, Level: old}))
+			}
+			c.AddStatFuncs(g.fns)
+		}
 		if def.Activation != modelskill.ActivationActive {
 			continue
 		}
@@ -415,14 +457,18 @@ func (p *Persistence) grantItemSkills(c *player.Character, tmpl *item.Template) 
 	return skillsChanged, timersChanged
 }
 
-// UnequipItemStats removes every stat function inst previously contributed
-// via EquipItemStats, and revokes every tmpl.AttachedSkills entry from c's
-// known-skill set unless inv still has another equipped item sharing tmpl's
-// id, mirroring ItemPassiveSkillsListener.onUnequip. tmpl must be the same
-// template instance EquipItemStats was called with, so the owner identity
-// used to attach the functions matches the one used to remove them.
-// skillsChanged reports whether the caller must resend SkillList; no reuse
-// timer armed by the equip-delay grant is cleared, matching the reference.
+// UnequipItemStats removes every stat function inst contributed via
+// EquipItemStats, mirroring the unequip listeners in their order: the
+// instance's own functions first, then — unless inv still has another
+// equipped item sharing tmpl's id — every tmpl.AttachedSkills entry leaves
+// c's known-skill set with the stat functions of the level c knows it at.
+// Each removal reports its own stat change, so a passive-granting item
+// sends one refresh for the item and one for the skill. tmpl must be the
+// same template instance EquipItemStats was called with, so the owner
+// identity used to attach the functions matches the one used to remove
+// them. skillsChanged reports whether the caller must resend SkillList; no
+// reuse timer armed by the equip-delay grant is cleared, matching the
+// reference.
 func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
@@ -440,10 +486,12 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 		}
 	}
 	for _, ref := range tmpl.AttachedSkills {
-		if c.SkillLevel(int(ref.ID)) <= 0 {
+		level := c.SkillLevel(int(ref.ID))
+		if level <= 0 {
 			continue
 		}
 		c.SetSkillLevel(int(ref.ID), 0)
+		c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: level}))
 		skillsChanged = true
 	}
 	return skillsChanged

@@ -80,6 +80,11 @@ type UserInfoChanged struct{}
 // RUN_SPEED, so its own and its observers' views of it are stale.
 type RunSpeedChanged struct{}
 
+// EffectsStripped reports that a stop-all ended the character's effects
+// without reporting each one's stat change: its own and its observers'
+// full views of it are stale.
+type EffectsStripped struct{}
+
 // StatsModified reports a stat func change that left RUN_SPEED alone: the
 // character's own view is stale, and Attrs holds the new P.Atk. and cast
 // speeds, one per changed func on those stats, its observers must see.
@@ -338,6 +343,7 @@ func (PositionCorrected) event()      {}
 func (WeightPenaltyChanged) event()   {}
 func (UserInfoChanged) event()        {}
 func (RunSpeedChanged) event()        {}
+func (EffectsStripped) event()        {}
 func (StatsModified) event()          {}
 func (GradePenaltyChanged) event()    {}
 func (DeathPenaltyChanged) event()    {}

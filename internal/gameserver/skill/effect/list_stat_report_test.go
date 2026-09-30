@@ -1,6 +1,7 @@
 package effect
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -59,4 +60,50 @@ func TestListStatReportRunsOutsideListLock(t *testing.T) {
 	events = nil
 	runBounded(t, "head removal", func() { list.Remove(strong) })
 	requireEvents(t, events, []string{"owner:remove:strong", "weak:start", "owner:add", "owner:report", "worn-off:2034:0", "icons", "strong:exit"})
+}
+
+// strippedOwner records each stat removal with whether its effect owner was
+// ended by a stop-all.
+type strippedOwner struct{ iconEventOwner }
+
+func (o strippedOwner) RemoveStatsByOwner(owner ModOwner) {
+	*o.events = append(*o.events, fmt.Sprintf("owner:remove:%s:stripped=%v", owner.effect.Template.Name, owner.Stripped()))
+}
+
+// A stop-all ends each effect with its stat removal marked as stripped, so
+// the holder skips the per-effect refresh (EffectList.stopAllEffects ->
+// AbstractEffect.exit(true) -> Creature.removeStatsByOwner skipping
+// broadcastModifiedStats while cantUpdateAnymore, Creature.java:1198-1204).
+// A stack member promoted mid-strip still reports its own activation, and a
+// plain Remove or a death-surviving effect is not marked.
+func TestListStopAllMarksStatRemovalsStripped(t *testing.T) {
+	var events []string
+	list := newTestList(strippedOwner{iconEventOwner{eventOwner{events: &events}}}, WithEnv(Env{KeepLesser: true}))
+	strong := namedEffect("strong", 2034, "speed_up", 2, false, &events)
+	weak := namedEffect("weak", 2011, "speed_up", 1, false, &events)
+	plain := namedEffect("plain", 1204, "none", 0, false, &events)
+	kept := namedEffect("kept", 1323, "none", 0, false, &events)
+	kept.Skill.StayAfterDeath = true
+	removed := namedEffect("removed", 1068, "none", 0, false, &events)
+	for _, e := range []*Effect{strong, weak, plain, kept, removed} {
+		list.Add(e)
+	}
+
+	events = nil
+	list.Remove(removed)
+	requireEvents(t, events, []string{"owner:remove:removed:stripped=false", "icons", "removed:exit"})
+
+	events = nil
+	list.StopAllExceptThoseThatLastThroughDeath()
+	requireNames(t, list.All(), []string{"kept"})
+	want := []string{
+		"owner:remove:strong:stripped=true", "weak:start", "owner:add", "icons", "strong:exit",
+		"owner:remove:weak:stripped=true", "icons", "weak:exit",
+		"owner:remove:plain:stripped=true", "icons", "plain:exit",
+	}
+	requireEvents(t, events, want)
+
+	events = nil
+	list.StopAll()
+	requireEvents(t, events, []string{"owner:remove:kept:stripped=true", "icons", "kept:exit"})
 }

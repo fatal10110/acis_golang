@@ -5,12 +5,14 @@ package effect
 // the blessings themselves (Charm of Luck with them); otherwise every effect
 // that does not last through death is removed.
 //
-// It returns how many of those blessing and charm stops ran: each one is a
+// blessingStops counts the blessing and charm stops that ran: each one is a
 // stop by type the owner follows with its own appearance refresh, on top of
-// the refresh every removed effect already triggers.
-func (l *List) StopOnDeath() (blessingStops int) {
+// the refresh every removed effect already triggers. strippedAll reports
+// that the stop-all ran instead: its removals announced no stat change, so
+// the owner refreshes its view once.
+func (l *List) StopOnDeath() (blessingStops int, strippedAll bool) {
 	if l == nil {
-		return 0
+		return 0, false
 	}
 	has := func(want Type) bool {
 		for _, e := range l.All() {
@@ -29,13 +31,13 @@ func (l *List) StopOnDeath() (blessingStops int) {
 	if has(TypePhoenixBless) {
 		stop(TypeCharmOfLuck)
 		stop(TypeNoblesseBless)
-		return blessingStops
+		return blessingStops, false
 	}
 	if has(TypeNoblesseBless) {
 		stop(TypeNoblesseBless)
 		stop(TypeCharmOfLuck)
-		return blessingStops
+		return blessingStops, false
 	}
 	l.StopAllExceptThoseThatLastThroughDeath()
-	return 0
+	return 0, true
 }

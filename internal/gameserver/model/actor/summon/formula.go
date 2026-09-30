@@ -96,7 +96,9 @@ func (a *Actor) StatFuncsAttached(fns []effect.Mod) {
 	a.statsModified(runSpeed)
 }
 
-// RemoveStatsByOwner drops every stat func previously added for owner.
+// RemoveStatsByOwner drops every stat func previously added for owner. An
+// effect a stop-all is ending changes the movement speed only: the
+// stop-all's caller refreshes the owner's pet window once, when it ends.
 func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
@@ -111,7 +113,10 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 			runSpeed = runSpeed || stat.Stat(s) == stat.RunSpeed
 		}
 	}
-	if removed {
+	switch {
+	case removed && owner.Stripped():
+		a.refreshMoveSpeed()
+	case removed:
 		a.statsModified(runSpeed)
 	}
 }
