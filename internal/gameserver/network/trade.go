@@ -207,6 +207,9 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	if !ok {
 		return
 	}
+	// A confirm drops both traders' scroll-of-enchant selections: the
+	// confirmer's first, the partner's once the partner is found.
+	l.cancelActiveEnchant(live)
 	partnerID, ok := session.PartnerID(live.ObjectID())
 	if !ok {
 		// Same race shape as handleAddTradeItem: the session is here but
@@ -239,12 +242,16 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 	if !partnerLeft && !livePlayersInRange(live, partner, tradeInteractionDistance) {
+		l.cancelActiveEnchant(partner)
 		// The reference validates the interaction radius on every confirm
 		// and answers an out-of-range confirm by cancelling the whole
 		// trade for both players, not with a per-player error message.
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
+	// The partner is found (a partner who left and is back online counts):
+	// the reference drops its scroll-of-enchant selection before confirming.
+	l.cancelActiveEnchant(partner)
 
 	result := l.tradeBook().Confirm(live.ObjectID())
 	switch result.Status {

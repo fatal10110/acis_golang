@@ -164,6 +164,7 @@ const (
 	SystemMessageCannotUseSkillsWithFormalWear     = 1604
 	SystemMessageNoServitorCannotAutomateUse       = 1676
 	SystemMessageCannotEnchantWhileStore           = 1688
+	SystemMessageTradeAttemptFailed                = 1802
 	SystemMessageExchangeHasEnded                  = 1266
 	SystemMessagePetRefusingOrder                  = 1864
 	SystemMessagePetTooHighToControl               = 1918

@@ -35,6 +35,7 @@ func TestMoveLivePlayerCancelsEnchantBefore9900Reject(t *testing.T) {
 	frames := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, 1, frames)
 	gcl := &GameClientLink{log: zerolog.Nop()}
+	live.Character.Inventory().AddNew(955, 1, 600) // the selected scroll
 	if !gcl.enchantStateStore().Select(live.ObjectID(), 600) {
 		t.Fatal("Select returned false")
 	}

@@ -44,7 +44,7 @@ func TestServiceSuccessConsumesScrollAndPersistsLevel(t *testing.T) {
 	inv.DrainUpdates()
 	state.Select(1, scroll.ObjectID)
 
-	res, err := NewService(state, nil, func() float64 { return 0 }).EnchantItem(1, inv, weapon.ObjectID)
+	res, err := NewService(state, nil, func() float64 { return 0 }, DefaultConfig()).EnchantItem(Request{PlayerID: 1, Inv: inv, ObjectID: weapon.ObjectID})
 	if err != nil {
 		t.Fatalf("EnchantItem error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestConsumedScrollDeleteCarriesPreDestroyOwner(t *testing.T) {
 
 	// First enchant leaves one scroll: an update, on the owner's lane.
 	state.Select(ownerID, scroll.ObjectID)
-	res, err := NewService(state, nil, func() float64 { return 0 }).EnchantItem(ownerID, inv, weapon.ObjectID)
+	res, err := NewService(state, nil, func() float64 { return 0 }, DefaultConfig()).EnchantItem(Request{PlayerID: ownerID, Inv: inv, ObjectID: weapon.ObjectID})
 	if err != nil {
 		t.Fatalf("first EnchantItem error = %v", err)
 	}
@@ -96,7 +96,7 @@ func TestConsumedScrollDeleteCarriesPreDestroyOwner(t *testing.T) {
 	// Second enchant consumes it: the delete of the same row must name the
 	// same owner, or it lands on another lane than the update above.
 	state.Select(ownerID, scroll.ObjectID)
-	res, err = NewService(state, nil, func() float64 { return 0 }).EnchantItem(ownerID, inv, weapon.ObjectID)
+	res, err = NewService(state, nil, func() float64 { return 0 }, DefaultConfig()).EnchantItem(Request{PlayerID: ownerID, Inv: inv, ObjectID: weapon.ObjectID})
 	if err != nil {
 		t.Fatalf("second EnchantItem error = %v", err)
 	}
@@ -119,7 +119,7 @@ func TestServiceNormalFailureAddsCrystalReward(t *testing.T) {
 	inv.DrainUpdates()
 	state.Select(1, scroll.ObjectID)
 
-	res, err := NewService(state, &testIDs{next: 700}, func() float64 { return 0.99 }).EnchantItem(1, inv, weapon.ObjectID)
+	res, err := NewService(state, &testIDs{next: 700}, func() float64 { return 0.99 }, DefaultConfig()).EnchantItem(Request{PlayerID: 1, Inv: inv, ObjectID: weapon.ObjectID})
 	if err != nil {
 		t.Fatalf("EnchantItem error = %v", err)
 	}
@@ -158,4 +158,88 @@ func testTemplates() *item.Table {
 		{ID: 6575, Kind: item.KindEtcItem, Duration: -1, Stackable: true, EtcItem: &item.EtcItemDetail{Type: item.EtcItemBlessedScrollEnchantWeapon, Handler: "EnchantScrolls"}},
 		{ID: item.CrystalD.ItemID(), Kind: item.KindEtcItem, Duration: -1, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 	})
+}
+
+// TestChanceFollowsConfig pins the scroll success chance against the
+// reference formula (AbstractEnchantPacket.EnchantScroll.getChance) for the
+// shipped players.properties values and for overridden ones.
+func TestChanceFollowsConfig(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalD, Weapon: &item.WeaponDetail{Type: item.WeaponSword}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalD, Weapon: &item.WeaponDetail{Type: item.WeaponSword, Magical: true}},
+		{ID: 3, Kind: item.KindArmor, Slot: item.SlotChest, Crystal: item.CrystalD, Armor: &item.ArmorDetail{}},
+		{ID: 4, Kind: item.KindArmor, Slot: item.SlotFullArmor, Crystal: item.CrystalD, Armor: &item.ArmorDetail{}},
+	})
+	weaponScroll, armorScroll := scrolls[955], scrolls[956]
+	custom := Config{ChanceMagicWeapon: 0.5, ChanceMagicWeapon15Plus: 0.25, ChanceWeapon: 0.8, ChanceWeapon15Plus: 0.45, ChanceArmor: 0.5, MaxWeapon: 10, MaxArmor: 6, SafeMax: 5, SafeMaxFull: 7}
+	cases := []struct {
+		name     string
+		cfg      Config
+		template int32
+		level    int
+		want     float64
+	}{
+		{"weapon safe", DefaultConfig(), 1, 2, 1},
+		{"weapon +3", DefaultConfig(), 1, 3, 0.7},
+		{"weapon +15", DefaultConfig(), 1, 15, 0.35},
+		{"magic weapon +3", DefaultConfig(), 2, 3, 0.4},
+		{"magic weapon +15", DefaultConfig(), 2, 15, 0.2},
+		{"armor +3", DefaultConfig(), 3, 3, 0.66},
+		{"armor +5", DefaultConfig(), 3, 5, 0.66 * 0.66 * 0.66},
+		{"full armor +3 still safe", DefaultConfig(), 4, 3, 1},
+		{"full armor +4", DefaultConfig(), 4, 4, 0.66 * 0.66},
+		{"custom weapon safe below 5", custom, 1, 4, 1},
+		{"custom weapon +5", custom, 1, 5, 0.8},
+		{"custom weapon +15 over max", custom, 1, 15, -1},
+		{"custom magic weapon +9", custom, 2, 9, 0.5},
+		{"custom weapon at max", custom, 1, 10, -1},
+		{"custom full armor safe below 7", custom, 4, 5, 1},
+		{"custom armor +5", custom, 3, 5, 0.125},
+		{"custom armor at max", custom, 3, 6, -1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl, _ := templates.Get(tc.template)
+			inst := &item.Instance{ObjectID: 1, TemplateID: tc.template, EnchantLevel: tc.level}
+			sc := weaponScroll
+			if tmpl.Kind == item.KindArmor {
+				sc = armorScroll
+			}
+			got := sc.chance(inst, tmpl, tc.cfg)
+			if diff := got - tc.want; diff > 1e-12 || diff < -1e-12 {
+				t.Fatalf("chance = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTradeOpenedAfterScrollSpent pins the post-consumption trade check
+// (RequestEnchantItem: the scroll is destroyed, then an active trade list
+// cancels the trade and answers TRADE_ATTEMPT_FAILED): the scroll stays
+// spent, the target is untouched, no EnchantResult goes out, and the
+// selection survives while scrolls remain.
+func TestTradeOpenedAfterScrollSpent(t *testing.T) {
+	state := NewState()
+	inv := itemcontainer.NewPlayerInventory(1, testTemplates())
+	weapon := inv.AddNew(30, 1, 500)
+	scroll := inv.AddNew(955, 2, 600)
+	inv.DrainUpdates()
+	state.Select(1, scroll.ObjectID)
+
+	res, err := NewService(state, nil, func() float64 { return 0 }, DefaultConfig()).EnchantItem(Request{
+		PlayerID: 1, Inv: inv, ObjectID: weapon.ObjectID,
+		TradeActive: func() bool { return true },
+	})
+	if err != nil {
+		t.Fatalf("EnchantItem error = %v", err)
+	}
+	if !sameStepKinds(res.Steps, []StepKind{StepCancelTrade, StepSystemMessage}) || res.Steps[1].Message.Code != MessageTradeAttemptFailed {
+		t.Fatalf("steps = %+v, want the trade cancel then TRADE_ATTEMPT_FAILED", res.Steps)
+	}
+	if scroll.Count != 1 || weapon.EnchantLevel != 0 {
+		t.Fatalf("scroll count %d weapon enchant %d, want 1 and 0", scroll.Count, weapon.EnchantLevel)
+	}
+	if state.Active(1) != scroll.ObjectID {
+		t.Fatalf("active scroll = %d, want the selection kept", state.Active(1))
+	}
 }

@@ -8,10 +8,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// ItemOwner is the owner and item enchant-data source for stat
-// functions one equipped item instance contributes (its AttachedSkills
-// passives and Modifiers). Equality between two ItemOwner values compares
-// Inst and Tmpl, so RemoveStatsByOwner drops only the functions attached for
+// ItemOwner is the owner and item enchant-data source for the stat
+// functions one equipped item instance's Modifiers contribute. Equality
+// between two ItemOwner values compares Inst and Tmpl, so RemoveStatsByOwner drops only the functions attached for
 // that specific instance even when another equipped item shares its
 // template. EnchantLevel reads Inst's live snapshot on every call rather
 // than a value captured at attach time, so a scroll of enchant used on an
@@ -135,38 +134,4 @@ func itemOp(op item.FuncOp) (Op, error) {
 	default:
 		return 0, fmt.Errorf("unknown item stat modifier op %s", op)
 	}
-}
-
-// ItemEnchantSkillFuncs builds the stat functions a weapon's +4 enchant
-// passive contributes while equipped, owned by the weapon instance and gated
-// on its live enchant level. Only an id resolving to a loaded passive skill
-// definition contributes. The item's other attached skills are granted as
-// skills of their own, owned by the skill (see PassiveFuncs).
-func ItemEnchantSkillFuncs(skills *modelskill.Table, owner ItemOwner) ([]Mod, error) {
-	if owner.Tmpl == nil || skills == nil {
-		return nil, nil
-	}
-	weapon := owner.Tmpl.Weapon
-	if weapon == nil || weapon.Enchant4Skill == nil {
-		return nil, nil
-	}
-	ref := *weapon.Enchant4Skill
-	def, ok := skills.Get(modelskill.ID(ref.ID), int(ref.Level))
-	if !ok || def.Activation != modelskill.ActivationPassive {
-		return nil, nil
-	}
-	fns, err := statFuncs(ModOwnerItem(owner), def.Funcs, enchantAtLeast{owner: owner, level: 4})
-	if err != nil {
-		return nil, fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
-	}
-	return fns, nil
-}
-
-type enchantAtLeast struct {
-	owner ItemOwner
-	level int
-}
-
-func (c enchantAtLeast) Test(stat.Actor) bool {
-	return c.owner.EnchantLevel() >= c.level
 }

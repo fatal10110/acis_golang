@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // ---- from enchant_test.go ----
@@ -487,34 +488,132 @@ func TestEquipItemStatsEnchantFuncReadsLiveEnchantLevel(t *testing.T) {
 	}
 }
 
-func TestEquipItemStatsEnchant4SkillReadsLiveEnchantLevel(t *testing.T) {
+// The weapon's +4 enchant skill is a known skill of its own while granted,
+// its stat functions owned by the skill: the equip listener adds it at +4 or
+// higher, the unequip listener removes it at +4 or higher and asks for a
+// SkillList even when the Expertise gate withheld it, and the enchant path
+// grants and revokes it explicitly (ItemPassiveSkillsListener,
+// RequestEnchantItem).
+func TestEnchant4SkillIsAGrantedSkill(t *testing.T) {
 	templates := itemStatsTestTemplates()
-	inv := itemcontainer.NewPlayerInventory(1, templates)
-	p := NewPersistence(nil, itemStatsTestSkills())
-	ch := &player.Character{ID: 1}
-	ch.SetSkillLevel(239, int(item.CrystalD))
-	basePAtk := ch.PAtk()
 	tmpl, _ := templates.Get(swordTemplateID)
+	skillOwner := effect.ModOwnerSkill(modelskill.Ref{ID: 301, Level: 1})
 
-	inst := inv.AddNew(swordTemplateID, 1, 200)
-	inv.SetEnchantLevel(inst, 3)
-	inv.EquipItem(inst, tmpl)
-	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
-		t.Fatalf("EquipItemStats() error: %v", err)
-	}
-	if got, want := ch.PAtk(), basePAtk+20; got != want {
-		t.Fatalf("PAtk() at +3 = %v, want %v without the +4 skill", got, want)
-	}
+	t.Run("equip below +4 grants nothing, the enchant path adds and drops it", func(t *testing.T) {
+		inv := itemcontainer.NewPlayerInventory(1, templates)
+		p := NewPersistence(nil, itemStatsTestSkills())
+		ch := &player.Character{ID: 1}
+		ch.SetSkillLevel(239, int(item.CrystalD))
+		basePAtk := ch.PAtk()
+		inst := inv.AddNew(swordTemplateID, 1, 200)
+		inv.SetEnchantLevel(inst, 3)
+		inv.EquipItem(inst, tmpl)
+		if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+			t.Fatalf("EquipItemStats() error: %v", err)
+		}
+		if got := ch.SkillLevel(301); got != 0 {
+			t.Fatalf("SkillLevel(301) at +3 = %d, want 0", got)
+		}
+		if got, want := ch.PAtk(), basePAtk+20; got != want {
+			t.Fatalf("PAtk() at +3 = %v, want %v", got, want)
+		}
 
-	inv.SetEnchantLevel(inst, 4)
-	if got, want := ch.PAtk(), basePAtk+20+40; got != want {
-		t.Fatalf("PAtk() at +4 = %v, want %v with the +4 skill", got, want)
-	}
+		inv.SetEnchantLevel(inst, 4)
+		if got, want := ch.PAtk(), basePAtk+20; got != want {
+			t.Fatalf("PAtk() at +4 before the grant = %v, want %v (no live stat condition)", got, want)
+		}
+		if ok, err := p.GrantEnchant4Skill(ch, tmpl); err != nil || !ok {
+			t.Fatalf("GrantEnchant4Skill() = %v, %v, want true, nil", ok, err)
+		}
+		if got := ch.SkillLevel(301); got != 1 {
+			t.Fatalf("SkillLevel(301) after grant = %d, want 1", got)
+		}
+		if got, want := ch.PAtk(), basePAtk+20+40; got != want {
+			t.Fatalf("PAtk() after grant = %v, want %v", got, want)
+		}
 
-	inv.SetEnchantLevel(inst, 3)
-	if got, want := ch.PAtk(), basePAtk+20; got != want {
-		t.Fatalf("PAtk() after dropping below +4 = %v, want %v without the +4 skill", got, want)
+		if !p.RevokeEnchant4Skill(ch, tmpl) {
+			t.Fatal("RevokeEnchant4Skill() = false, want true for a loaded +4 skill")
+		}
+		if got := ch.SkillLevel(301); got != 0 {
+			t.Fatalf("SkillLevel(301) after revoke = %d, want 0", got)
+		}
+		if got, want := ch.PAtk(), basePAtk+20; got != want {
+			t.Fatalf("PAtk() after revoke = %v, want %v", got, want)
+		}
+		if !p.RevokeEnchant4Skill(ch, tmpl) {
+			t.Fatal("RevokeEnchant4Skill() of an unknown skill = false, want true (SkillList still resent)")
+		}
+	})
+
+	t.Run("equip and unequip at +4", func(t *testing.T) {
+		inv := itemcontainer.NewPlayerInventory(1, templates)
+		p := NewPersistence(nil, itemStatsTestSkills())
+		ch := &player.Character{ID: 1}
+		ch.SetSkillLevel(239, int(item.CrystalD))
+		basePAtk := ch.PAtk()
+		inst := inv.AddNew(swordTemplateID, 1, 200)
+		inv.SetEnchantLevel(inst, 4)
+		inv.EquipItem(inst, tmpl)
+		changed, timers, err := p.EquipItemStats(ch, inst, tmpl)
+		if err != nil || !changed || timers {
+			t.Fatalf("EquipItemStats() = %v, %v, %v, want true, false, nil", changed, timers, err)
+		}
+		if got := ch.SkillLevel(301); got != 1 {
+			t.Fatalf("SkillLevel(301) at +4 = %d, want 1", got)
+		}
+		if got, want := ch.PAtk(), basePAtk+20+40; got != want {
+			t.Fatalf("PAtk() at +4 = %v, want %v", got, want)
+		}
+		ch.RemoveStatsByOwner(skillOwner)
+		if got, want := ch.PAtk(), basePAtk+20; got != want {
+			t.Fatalf("PAtk() without the skill's funcs = %v, want %v (the +4 funcs must be owned by the skill)", got, want)
+		}
+		ch.AddStatFuncs(mustPassiveFuncs(t, p, 301))
+
+		inv.UnequipItem(inst)
+		if !p.UnequipItemStats(ch, inv, inst, tmpl) {
+			t.Fatal("UnequipItemStats() skillsChanged = false, want true")
+		}
+		if got := ch.SkillLevel(301); got != 0 {
+			t.Fatalf("SkillLevel(301) after unequip = %d, want 0", got)
+		}
+		if got := ch.PAtk(); got != basePAtk {
+			t.Fatalf("PAtk() after unequip = %v, want %v", got, basePAtk)
+		}
+	})
+
+	t.Run("below Expertise the equip withholds it, the unequip still asks for SkillList", func(t *testing.T) {
+		inv := itemcontainer.NewPlayerInventory(1, templates)
+		p := NewPersistence(nil, itemStatsTestSkills())
+		ch := &player.Character{ID: 1}
+		inst := inv.AddNew(swordTemplateID, 1, 200)
+		inv.SetEnchantLevel(inst, 4)
+		inv.EquipItem(inst, tmpl)
+		if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+			t.Fatalf("EquipItemStats() error: %v", err)
+		}
+		if got := ch.SkillLevel(301); got != 0 {
+			t.Fatalf("SkillLevel(301) below Expertise = %d, want 0", got)
+		}
+		inv.UnequipItem(inst)
+		if !p.UnequipItemStats(ch, inv, inst, tmpl) {
+			t.Fatal("UnequipItemStats() skillsChanged = false, want true for a +4 weapon with a loaded +4 skill")
+		}
+	})
+}
+
+func mustPassiveFuncs(t *testing.T, p *Persistence, id int) []effect.Mod {
+	t.Helper()
+	def, ok := p.Definition(modelskill.Ref{ID: modelskill.ID(id), Level: 1})
+	if !ok {
+		t.Fatalf("skill %d not loaded", id)
 	}
+	fns, err := effect.PassiveFuncs(def)
+	if err != nil {
+		t.Fatalf("PassiveFuncs(%d) error: %v", id, err)
+	}
+	return fns
 }
 
 func TestRestoreEquippedItemStatsReattachesOnRelogin(t *testing.T) {

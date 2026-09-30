@@ -10,17 +10,44 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
 
-const (
-	chanceMagicWeapon       = 0.4
-	chanceMagicWeapon15Plus = 0.2
-	chanceWeapon            = 0.7
-	chanceWeapon15Plus      = 0.35
-	chanceArmor             = 0.66
-	safeMax                 = 3
-	safeMaxFull             = 4
-	maxWeapon               = 0
-	maxArmor                = 0
-)
+// Config holds the players.properties enchant rates and limits.
+type Config struct {
+	// ChanceMagicWeapon and ChanceMagicWeapon15Plus are a magic weapon's
+	// success chance below +15 and from +15 on.
+	ChanceMagicWeapon       float64
+	ChanceMagicWeapon15Plus float64
+	// ChanceWeapon and ChanceWeapon15Plus are any other weapon's.
+	ChanceWeapon       float64
+	ChanceWeapon15Plus float64
+	// ChanceArmor is the armor and jewelry chance base, raised to the power
+	// of the enchant level minus 2.
+	ChanceArmor float64
+	// MaxWeapon and MaxArmor cap the enchant level a scroll still accepts;
+	// 0 leaves it uncapped.
+	MaxWeapon int
+	MaxArmor  int
+	// SafeMax is the level below which an enchant cannot fail; SafeMaxFull
+	// is the same for full-body armor.
+	SafeMax     int
+	SafeMaxFull int
+}
+
+// DefaultConfig returns the enchant settings players.properties ships with.
+func DefaultConfig() Config {
+	return Config{
+		ChanceMagicWeapon:       0.4,
+		ChanceMagicWeapon15Plus: 0.2,
+		ChanceWeapon:            0.7,
+		ChanceWeapon15Plus:      0.35,
+		ChanceArmor:             0.66,
+		SafeMax:                 3,
+		SafeMaxFull:             4,
+	}
+}
+
+// enchant4SkillLevel is the enchant level from which an equipped weapon
+// grants its +4 enchant skill.
+const enchant4SkillLevel = 4
 
 type scroll struct {
 	weapon  bool
@@ -71,6 +98,18 @@ const (
 	StepEnchantResult
 	// StepBroadcastEquipment means other players need equipment refreshes.
 	StepBroadcastEquipment
+	// StepGrantEnchantSkill means the equipped weapon Template reached +4:
+	// its +4 enchant skill is added and SkillList resent.
+	StepGrantEnchantSkill
+	// StepRevokeEnchantSkill means the equipped weapon Template at +4 or
+	// higher failed: its +4 enchant skill is removed and SkillList resent.
+	StepRevokeEnchantSkill
+	// StepUnequipped means a broken item left the paperdoll: Unequipped
+	// lists every instance the removal took off, whose equip side effects
+	// have to be undone.
+	StepUnequipped
+	// StepCancelTrade means the player's active trade is cancelled.
+	StepCancelTrade
 )
 
 // MessageCode identifies a system-message template without depending on packet code.
@@ -87,6 +126,8 @@ const (
 	MessageEarnedS2S1S
 	MessageEnchantmentFailedS1S2Evaporated
 	MessageEnchantmentFailedS1Evaporated
+	MessageCannotEnchantWhileStore
+	MessageTradeAttemptFailed
 )
 
 // ResultCode identifies the enchant result packet payload.
@@ -117,6 +158,11 @@ type Step struct {
 	Kind          StepKind
 	Message       Message
 	EnchantResult ResultCode
+	// Template is the weapon of a StepGrantEnchantSkill or
+	// StepRevokeEnchantSkill.
+	Template *item.Template
+	// Unequipped lists what a StepUnequipped took off the paperdoll.
+	Unequipped []*item.Instance
 }
 
 // Result carries ordered owner-visible outcomes plus persistence actions.
@@ -136,33 +182,59 @@ type Service struct {
 	state *State
 	ids   inventory.IDAllocator
 	roll  func() float64
+	cfg   Config
 }
 
-// NewService returns an enchant workflow service.
-func NewService(state *State, ids inventory.IDAllocator, roll func() float64) *Service {
+// NewService returns an enchant workflow service using cfg's rates and
+// limits.
+func NewService(state *State, ids inventory.IDAllocator, roll func() float64, cfg Config) *Service {
 	if state == nil {
 		state = NewState()
 	}
 	if roll == nil {
 		roll = func() float64 { return rnd.GetFloat(1) }
 	}
-	return &Service{state: state, ids: ids, roll: roll}
+	return &Service{state: state, ids: ids, roll: roll, cfg: cfg}
 }
 
-// UseScroll selects an enchant scroll for playerID.
-func (s *Service) UseScroll(playerID int32, inst *item.Instance) (UseScrollResult, bool) {
+// UseScroll selects the enchant scroll inst, held in inv, for playerID.
+// FirstSelect reports that no scroll was selected before, which is when the
+// selection prompt message goes out.
+func (s *Service) UseScroll(playerID int32, inv *itemcontainer.Inventory, inst *item.Instance) (UseScrollResult, bool) {
 	if inst == nil {
 		return UseScrollResult{}, false
 	}
 	if _, ok := scrolls[inst.TemplateID]; !ok {
 		return UseScrollResult{}, false
 	}
-	return UseScrollResult{ScrollItemID: inst.TemplateID, FirstSelect: s.state.Select(playerID, inst.ObjectID)}, true
+	first := s.selectedScroll(playerID, inv) == nil
+	s.state.Select(playerID, inst.ObjectID)
+	return UseScrollResult{ScrollItemID: inst.TemplateID, FirstSelect: first}, true
 }
 
-// Cancel clears an active selection and returns the cancellation steps.
-func (s *Service) Cancel(playerID int32) Result {
-	if !s.state.Clear(playerID) {
+// selectedScroll returns playerID's selected scroll while inv still holds
+// it. A selected scroll that has since left inv no longer counts as a
+// selection — the reference drops it the moment its item leaves the
+// inventory — so it is cleared here without a word to the client.
+func (s *Service) selectedScroll(playerID int32, inv *itemcontainer.Inventory) *item.Instance {
+	active := s.state.Active(playerID)
+	if active == 0 {
+		return nil
+	}
+	var scroll *item.Instance
+	if inv != nil {
+		scroll = inv.ItemByObjectID(active)
+	}
+	if scroll == nil {
+		s.state.ClearIf(playerID, active)
+	}
+	return scroll
+}
+
+// Cancel clears playerID's active selection of a scroll inv still holds and
+// returns the cancellation steps; with no such selection it returns none.
+func (s *Service) Cancel(playerID int32, inv *itemcontainer.Inventory) Result {
+	if s.selectedScroll(playerID, inv) == nil || !s.state.Clear(playerID) {
 		return Result{}
 	}
 	return Result{Steps: []Step{
@@ -171,23 +243,45 @@ func (s *Service) Cancel(playerID int32) Result {
 	}}
 }
 
-// EnchantItem applies the selected scroll to objectID.
-func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, objectID int32) (Result, error) {
+// Request is one enchant attempt: the item playerID asked to enchant, in
+// inv, with the player state the attempt is gated on.
+type Request struct {
+	PlayerID int32
+	Inv      *itemcontainer.Inventory
+	ObjectID int32
+	// Busy reports that the player runs a private store or workshop, or is
+	// tied up in a trade or a trade request.
+	Busy bool
+	// TradeActive reports, once the scroll is consumed, whether the player
+	// has an open trade window.
+	TradeActive func() bool
+}
+
+// EnchantItem applies the selected scroll to the requested item.
+func (s *Service) EnchantItem(req Request) (Result, error) {
+	playerID, inv, objectID := req.PlayerID, req.Inv, req.ObjectID
 	if inv == nil || objectID == 0 {
 		return Result{}, nil
 	}
+	if req.Busy {
+		s.state.Clear(playerID)
+		return Result{Steps: []Step{
+			messageStep(Message{Code: MessageCannotEnchantWhileStore}),
+			resultStep(ResultCancelled),
+		}}, nil
+	}
 
 	target := inv.ItemByObjectID(objectID)
-	scrollInst := inv.ItemByObjectID(s.state.Active(playerID))
+	scrollInst := s.selectedScroll(playerID, inv)
 	if target == nil || scrollInst == nil {
-		return s.Cancel(playerID), nil
+		return s.Cancel(playerID, inv), nil
 	}
 	scrollDef, ok := scrolls[scrollInst.TemplateID]
 	if !ok {
 		return Result{}, nil
 	}
 	targetTemplate, ok := inv.Templates().Get(target.TemplateID)
-	if !ok || !scrollDef.valid(target, targetTemplate) || !Enchantable(target, targetTemplate) {
+	if !ok || !scrollDef.valid(target, targetTemplate, s.cfg) || !Enchantable(target, targetTemplate) {
 		return s.failCondition(playerID), nil
 	}
 
@@ -204,7 +298,15 @@ func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, obje
 	}
 	out.Persist = append(out.Persist, inventory.DestroyedOrUpdated(scrollOwnerID, destroyedScroll))
 
-	chance := scrollDef.chance(target, targetTemplate)
+	// An open trade window stops the attempt with the scroll already spent.
+	// The selection stays, as in the reference, unless that was the last
+	// scroll.
+	if req.TradeActive != nil && req.TradeActive() {
+		out.Steps = append(out.Steps, Step{Kind: StepCancelTrade}, messageStep(Message{Code: MessageTradeAttemptFailed}))
+		return out, nil
+	}
+
+	chance := scrollDef.chance(target, targetTemplate, s.cfg)
 	if target.Snapshot().OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {
 		failed := s.failCondition(playerID)
 		failed.Persist = append(out.Persist, failed.Persist...)
@@ -213,11 +315,18 @@ func (s *Service) EnchantItem(playerID int32, inv *itemcontainer.Inventory, obje
 
 	var err error
 	if s.roll() < chance {
-		out = s.success(playerID, inv, target, out)
-	} else if scrollDef.blessed {
-		out = s.blessedFailure(playerID, inv, target, out)
+		out = s.success(inv, target, targetTemplate, out)
 	} else {
-		out, err = s.normalFailure(playerID, inv, target, targetTemplate, out)
+		// An equipped weapon at +4 or higher loses its +4 enchant skill
+		// before the failure takes its level or the item itself.
+		if st := target.Snapshot(); st.Equipped() && hasEnchant4Skill(targetTemplate) && st.EnchantLevel >= enchant4SkillLevel {
+			out.Steps = append(out.Steps, Step{Kind: StepRevokeEnchantSkill, Template: targetTemplate})
+		}
+		if scrollDef.blessed {
+			out = s.blessedFailure(inv, target, out)
+		} else {
+			out, err = s.normalFailure(playerID, inv, target, targetTemplate, out)
+		}
 	}
 	out.Steps = append(out.Steps, Step{Kind: StepBroadcastEquipment})
 	s.state.Clear(playerID)
@@ -262,7 +371,7 @@ func (s *Service) failCondition(playerID int32) Result {
 	}}
 }
 
-func (s *Service) success(playerID int32, inv *itemcontainer.Inventory, target *item.Instance, out Result) Result {
+func (s *Service) success(inv *itemcontainer.Inventory, target *item.Instance, tmpl *item.Template, out Result) Result {
 	oldLevel := target.Snapshot().EnchantLevel
 	if oldLevel == 0 {
 		out.Steps = append(out.Steps, messageStep(Message{Code: MessageS1SuccessfullyEnchanted, ItemID: target.TemplateID}))
@@ -272,11 +381,22 @@ func (s *Service) success(playerID int32, inv *itemcontainer.Inventory, target *
 	if inv.SetEnchantLevel(target, oldLevel+1) {
 		out.Persist = append(out.Persist, inventory.Update(target))
 	}
+	// Reaching exactly +4 on an equipped weapon grants its +4 enchant skill.
+	// ponytail: the worn armor set's +6 skill is not granted or revoked
+	// here yet; armor sets have no runtime owner (#2952).
+	if st := target.Snapshot(); st.Equipped() && st.EnchantLevel == enchant4SkillLevel && hasEnchant4Skill(tmpl) {
+		out.Steps = append(out.Steps, Step{Kind: StepGrantEnchantSkill, Template: tmpl})
+	}
 	out.Steps = append(out.Steps, resultStep(ResultSuccess))
 	return out
 }
 
-func (s *Service) blessedFailure(playerID int32, inv *itemcontainer.Inventory, target *item.Instance, out Result) Result {
+// hasEnchant4Skill reports whether tmpl is a weapon with a +4 enchant skill.
+func hasEnchant4Skill(tmpl *item.Template) bool {
+	return tmpl != nil && tmpl.Weapon != nil && tmpl.Weapon.Enchant4Skill != nil
+}
+
+func (s *Service) blessedFailure(inv *itemcontainer.Inventory, target *item.Instance, out Result) Result {
 	out.Steps = append(out.Steps, messageStep(Message{Code: MessageBlessedEnchantFailed}))
 	if inv.SetEnchantLevel(target, 0) {
 		out.Persist = append(out.Persist, inventory.Update(target))
@@ -292,12 +412,25 @@ func (s *Service) normalFailure(playerID int32, inv *itemcontainer.Inventory, ta
 	targetLevel := st.EnchantLevel
 	targetID := st.TemplateID
 
+	// A worn item comes off the paperdoll as it is destroyed, taking a bow's
+	// or rod's arrows or lure with it; its equip side effects are undone
+	// right there, ahead of the crystal reward.
+	var unequipped []*item.Instance
+	if st.Equipped() {
+		unequipped = inv.UnequipItem(target)
+	}
 	if inv.DestroyItem(target, st.Count) == nil {
 		s.state.Clear(playerID)
+		if len(unequipped) > 0 {
+			out.Steps = append(out.Steps, Step{Kind: StepUnequipped, Unequipped: unequipped})
+		}
 		out.Steps = append(out.Steps, resultStep(ResultCancelled))
 		return out, nil
 	}
 	out.Persist = append(out.Persist, inventory.Delete(st.OwnerID, st.ObjectID))
+	if len(unequipped) > 0 {
+		out.Steps = append(out.Steps, Step{Kind: StepUnequipped, Unequipped: unequipped})
+	}
 
 	var err error
 	if crystalID != 0 {
@@ -344,19 +477,19 @@ func resultStep(result ResultCode) Step {
 	return Step{Kind: StepEnchantResult, EnchantResult: result}
 }
 
-func (s scroll) valid(inst *item.Instance, tmpl *item.Template) bool {
+func (s scroll) valid(inst *item.Instance, tmpl *item.Template, cfg Config) bool {
 	if inst == nil || tmpl == nil {
 		return false
 	}
 	switch tmpl.Kind {
 	case item.KindWeapon:
 		enchantLevel := inst.Snapshot().EnchantLevel
-		if !s.weapon || (maxWeapon > 0 && enchantLevel >= maxWeapon) {
+		if !s.weapon || (cfg.MaxWeapon > 0 && enchantLevel >= cfg.MaxWeapon) {
 			return false
 		}
 	case item.KindArmor:
 		enchantLevel := inst.Snapshot().EnchantLevel
-		if s.weapon || (maxArmor > 0 && enchantLevel >= maxArmor) {
+		if s.weapon || (cfg.MaxArmor > 0 && enchantLevel >= cfg.MaxArmor) {
 			return false
 		}
 	default:
@@ -365,29 +498,29 @@ func (s scroll) valid(inst *item.Instance, tmpl *item.Template) bool {
 	return s.grade == tmpl.Crystal
 }
 
-func (s scroll) chance(inst *item.Instance, tmpl *item.Template) float64 {
-	if !s.valid(inst, tmpl) {
+func (s scroll) chance(inst *item.Instance, tmpl *item.Template, cfg Config) float64 {
+	if !s.valid(inst, tmpl, cfg) {
 		return -1
 	}
 	fullBody := tmpl.Slot == item.SlotFullArmor
 	enchantLevel := inst.Snapshot().EnchantLevel
-	if enchantLevel < safeMax || (fullBody && enchantLevel < safeMaxFull) {
+	if enchantLevel < cfg.SafeMax || (fullBody && enchantLevel < cfg.SafeMaxFull) {
 		return 1
 	}
 	switch tmpl.Kind {
 	case item.KindArmor:
-		return math.Pow(chanceArmor, float64(enchantLevel-2))
+		return math.Pow(cfg.ChanceArmor, float64(enchantLevel-2))
 	case item.KindWeapon:
 		if tmpl.Weapon != nil && tmpl.Weapon.Magical {
 			if enchantLevel > 14 {
-				return chanceMagicWeapon15Plus
+				return cfg.ChanceMagicWeapon15Plus
 			}
-			return chanceMagicWeapon
+			return cfg.ChanceMagicWeapon
 		}
 		if enchantLevel > 14 {
-			return chanceWeapon15Plus
+			return cfg.ChanceWeapon15Plus
 		}
-		return chanceWeapon
+		return cfg.ChanceWeapon
 	default:
 		return 0
 	}
