@@ -69,14 +69,19 @@ func provideSimPool(log zerolog.Logger) *sim.Pool {
 // Its place in the invoke list sets the stop order: fx stops in reverse, so
 // the game listener (every connection's final detach posts to its queue) and
 // the tickers invoked after this one stop first, and the pool drains before
-// startItemInstances' final item save and persistence-worker close.
+// startItemInstances' final item save and persistence-worker close. The wait
+// is bounded so a wedged task cannot spend the stop budget that save needs.
 func startSimPool(lc fx.Lifecycle, pool *sim.Pool) {
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			pool.Start(context.Background())
 			return nil
 		},
-		OnStop: pool.Stop,
+		OnStop: func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, simPoolStopTimeout)
+			defer cancel()
+			return pool.Stop(ctx)
+		},
 	})
 }
 

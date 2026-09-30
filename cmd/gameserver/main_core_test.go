@@ -3,11 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -950,39 +954,113 @@ func TestLogUnsupportedSkillEffectsStaysQuietForAnUnresolvedTableName(t *testing
 	}
 }
 
-// TestGameServerStopTimeoutCoversEveryStopStep pins fx's stop budget to the
-// sum of every stop step's own worst case, in stop order. fx checks its one
-// stop deadline before each hook and skips the rest once it has expired, and
-// Run then exits the process with any running hook cut off, so a step that
-// can outlast its share (a slow database under the spawn-data save, say)
-// would drop the final item flush and ground-item save rather than delay
-// them. Raising any of these bounds without raising gameServerStopTimeout
-// would reopen that gap.
+// TestGameServerStopTimeoutCoversEveryStopStep pins fx's stop budget against
+// the stop hooks this package actually registers. fx checks its one stop
+// deadline before each hook and skips the rest once it has expired, and Run
+// then exits the process with any running hook cut off, so one hook that can
+// wait longer than its share (a slow database under a save, a backed-up
+// persistence lane) drops every save after it.
+//
+// The hooks are found by parsing this package's source for every OnStop
+// field, keyed by the function that registers it, so a new or moved hook
+// fails here until its bound is recorded. A hook with its own budget must
+// reference that budget's constant; a hook with no bound of its own says why
+// it needs none and falls under gameServerStopSlack.
 func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
-	steps := []struct {
-		name  string
+	type stopBound struct {
 		bound time.Duration
-	}{
-		{"game listener: every connection's exit waits for its player's saves, in parallel", network.LivePlayerPersistWait},
-		{"debug http listener stop", debugHTTPStopTimeout},
-		{"spawn_data save", shutdownSaveTimeout},
-		{"item ticker finishing an in-flight save", task.ItemInstanceSaveTimeout},
-		{"item drain: first save", task.ItemInstanceSaveTimeout},
-		{"item drain: persistence-worker drain", task.ItemInstanceSaveTimeout},
-		{"item drain: retry save", task.ItemInstanceSaveTimeout},
-		{"items_on_ground save", shutdownSaveTimeout},
-		{"hooks with no database I/O", gameServerStopSlack},
+		uses  string // constant the registering function must reference; "" when the bound lives elsewhere
+		why   string
 	}
-	var sum time.Duration
-	for _, step := range steps {
-		if step.bound <= 0 {
-			t.Fatalf("%s has no bound (%s)", step.name, step.bound)
+	hooks := map[string]stopBound{
+		"startGameServer": {
+			network.LivePlayerPersistWait, "",
+			"waits for the connection handlers; each exit waits at most LivePlayerPersistWait for its player's saves, in parallel, and cancelling closes the login link so its writes fail fast",
+		},
+		"startDebugHTTP":      {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
+		"startNpcPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
+		"startSimPool":        {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
+		"startTicker": {
+			task.ItemInstanceSaveTimeout, "",
+			"StopAndWait waits for one in-flight tick; the item tick is the only one with database I/O, bounded by ItemInstanceSaveTimeout, and the rest are in-memory",
+		},
+		"startItemInstances":         {3 * task.ItemInstanceSaveTimeout, "ItemInstanceSaveTimeout", "drainItemInstances: save, persistence-worker drain, save"},
+		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
+		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
+		"startSevenSigns":            {0, "", "stops a timer under a lock the status save does not hold across its write"},
+		"provideGameServerLogger":    {0, "", "closes the log file"},
+		"provideBootContext":         {0, "", "cancels a context"},
+		"provideGameServerDatabase":  {0, "", "closes the pool; the last database step, so running past the deadline loses nothing"},
+	}
+
+	registered := stopHookRegistrars(t)
+	sum := gameServerStopSlack
+	for name, b := range hooks {
+		refs, ok := registered[name]
+		if !ok {
+			t.Errorf("%s is listed but registers no OnStop hook", name)
+			continue
 		}
-		sum += step.bound
+		if b.uses != "" && !refs[b.uses] {
+			t.Errorf("%s's stop hook does not reference %s, the bound it is budgeted for (%s)", name, b.uses, b.why)
+		}
+		sum += b.bound
+	}
+	for name := range registered {
+		if _, ok := hooks[name]; !ok {
+			t.Errorf("%s registers an OnStop hook with no recorded bound: give it its own budget and add it to gameServerStopTimeout", name)
+		}
 	}
 	if gameServerStopTimeout < sum {
-		t.Fatalf("gameServerStopTimeout = %s, below the %s its stop steps can take: %+v", gameServerStopTimeout, sum, steps)
+		t.Fatalf("gameServerStopTimeout = %s, below the %s its stop hooks can take", gameServerStopTimeout, sum)
 	}
+}
+
+// stopHookRegistrars parses this package's non-test source and returns, for
+// every function containing an OnStop field, the identifiers it references.
+func stopHookRegistrars(t *testing.T) map[string]map[string]bool {
+	t.Helper()
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fset := token.NewFileSet()
+	out := make(map[string]map[string]bool)
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok || fn.Body == nil {
+				continue
+			}
+			refs := make(map[string]bool)
+			hasStop := false
+			ast.Inspect(fn.Body, func(n ast.Node) bool {
+				switch n := n.(type) {
+				case *ast.KeyValueExpr:
+					if key, ok := n.Key.(*ast.Ident); ok && key.Name == "OnStop" {
+						hasStop = true
+					}
+				case *ast.Ident:
+					refs[n.Name] = true
+				}
+				return true
+			})
+			if hasStop {
+				out[fn.Name.Name] = refs
+			}
+		}
+	}
+	if len(out) == 0 {
+		t.Fatal("found no OnStop hooks; is the test running in cmd/gameserver?")
+	}
+	return out
 }
 
 // TestSlowSpawnSaveLeavesItemDrainItsStopBudget stops an fx app whose hooks
@@ -1027,6 +1105,52 @@ func TestSlowSpawnSaveLeavesItemDrainItsStopBudget(t *testing.T) {
 	}
 	if items.Contains(inst) {
 		t.Fatal("item still pending after shutdown")
+	}
+}
+
+// TestSlowPersistCloseLeavesGroundSaveItsStopBudget stops an fx app whose
+// hooks sit in the game server's order: the item drain, then the
+// persistence worker's last close, then the ground-item save. One lane is
+// backed up far past every budget, so both closes give up. Each close is
+// bounded, so fx still reaches the ground-item save inside the stop budget.
+// A close on fx's own stop context would wait out the whole budget, and fx
+// would skip the save; items_on_ground was cleared at boot, so every ground
+// item would be lost.
+func TestSlowPersistCloseLeavesGroundSaveItsStopBudget(t *testing.T) {
+	const budget = 100 * time.Millisecond
+	worker := persist.New(zerolog.Nop())
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	worker.Enqueue(7, func() { <-release })
+	items := task.NewItemInstances(&countingItemFlusher{}, item.NewTable(nil), worker, nil, zerolog.Nop())
+
+	var groundSaved atomic.Bool
+	app := fx.New(fx.NopLogger, fx.Invoke(func(lc fx.Lifecycle) {
+		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+			saveOnStop(ctx, budget, zerolog.Nop(), "save ground items", func(context.Context) error {
+				groundSaved.Store(true)
+				return nil
+			})
+			return nil
+		}})
+		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+			return closePersistOnStop(ctx, worker, budget)
+		}})
+		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+			return drainItemInstances(ctx, items, worker, zerolog.Nop(), budget)
+		}})
+	}))
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	stopCtx, cancel := context.WithTimeout(context.Background(), 3*budget+budget+budget+2*budget)
+	defer cancel()
+	_ = app.Stop(stopCtx) // both closes report the backed-up lane
+	if stopCtx.Err() != nil {
+		t.Fatal("stop budget ran out before the last hook")
+	}
+	if !groundSaved.Load() {
+		t.Fatal("ground-item save never ran")
 	}
 }
 

@@ -253,22 +253,28 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     stop hook in reverse start order. fx checks it before each hook and skips the rest once it
     has expired, and `App.Run` then exits the process with any running hook cut off, so a
     step's own detached budget cannot carry it past this deadline. It is therefore the sum of
-    each step's worst case, in stop order = 83 s:
+    each step's worst case, in stop order = 93 s:
     - the listener stop, which closes every connection and waits for the handlers; each handler
       detaches its player and waits up to `LivePlayerPersistWait` (16 s, in parallel across
       handlers) for those writes;
     - the debug HTTP listener's stop (`debugHTTPStopTimeout` = 2 s);
     - the spawn-data save (`shutdownSaveTimeout`);
+    - the actor pool's stop (`simPoolStopTimeout` = 5 s);
     - the item ticker's stop, which can block up to one `ItemInstanceSaveTimeout` on an in-flight
       tick;
     - `drainItemInstances`: save → `Worker.Close` → save, each on its own
       `ItemInstanceSaveTimeout` (30 s);
+    - the persistence worker's last close (`persistCloseTimeout` = 5 s), which gives lanes the
+      drain left backed up a little longer;
     - the ground-item save (`shutdownSaveTimeout`);
-    - `gameServerStopSlack` = 5 s for the hooks with no database I/O.
+    - `gameServerStopSlack` = 5 s for the hooks that wait on neither the database nor other
+      goroutines' work. The pool close waits for running queries, but nothing after it writes.
 
-    `TestGameServerStopTimeoutCoversEveryStopStep` pins the sum, and
-    `TestSlowSpawnSaveLeavesItemDrainItsStopBudget` runs the drain behind a hung spawn save
-    under fx. The reference's shutdown runs its saves in sequence with no overall deadline, and
+    `TestGameServerStopTimeoutCoversEveryStopStep` parses `cmd/gameserver` for every registered
+    `OnStop` hook and fails on one with no recorded bound or a sum above the budget.
+    `TestSlowSpawnSaveLeavesItemDrainItsStopBudget` and
+    `TestSlowPersistCloseLeavesGroundSaveItsStopBudget` run the drain behind a hung spawn save,
+    and the ground-item save behind a backed-up persistence lane, under fx. The reference's shutdown runs its saves in sequence with no overall deadline, and
     its final item save always runs; the process manager's stop grace period (systemd
     `TimeoutStopSec`, Docker `stop_grace_period`) has to be at least `gameServerStopTimeout`.
 - **Hardening**: the M14 soak (#261) includes an unclean kill with players online, measuring how
