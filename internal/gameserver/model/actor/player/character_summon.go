@@ -23,3 +23,25 @@ func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
 func (c *Character) SummonServitor(def modelskill.Definition) {
 	c.emit(event.ServitorSummonRequested{Skill: def})
 }
+
+// ControlItemInUse reports whether objectID is the control item of c's
+// summon in the world, alive or dead, or of the mount c rides. Such an item
+// is bound to a pet that is out: it may not leave c's inventory by trade,
+// drop, destroy, sale, deposit, parcel or a hand-over to the pet itself.
+func (c *Character) ControlItemInUse(objectID int32) bool {
+	if c == nil || objectID == 0 {
+		return false
+	}
+	if objectID == c.MountObjectID() {
+		return true
+	}
+	if c.world == nil {
+		return false
+	}
+	obj, ok := c.world.Summon(c.ObjectID())
+	if !ok {
+		return false
+	}
+	controlled, ok := obj.(interface{ ControlItemID() int32 })
+	return ok && controlled.ControlItemID() == objectID
+}
