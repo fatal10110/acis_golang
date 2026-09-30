@@ -73,9 +73,19 @@ func TestGameServerLinkFreshRegistrationPersistsToDB(t *testing.T) {
 }
 
 // TestGameServerLinkHostResolution drives registration with a stubbed
-// resolver: a resolved host is stored as its address, and a host that fails
-// to resolve or resolves to nothing falls back to the connection IP in both
-// the registry and the persisted gameservers row.
+// resolver: a resolved host is stored as its first IPv4 address (else its
+// first address), and a host that fails to resolve or resolves to nothing
+// falls back to the connection IP in both the registry and the persisted
+// gameservers row.
+//
+// Oracle for the address choice: aCis GameServerThread.attachGameServerInfo
+// stores InetAddress.getByName(host).getHostAddress(), and the stock launch
+// scripts (dist/startLoginServer.bat, dist/LoginServer_loop.sh) leave
+// java.net.preferIPv6Addresses at its default false. A JDK 21 probe of
+// getAllByName/getByName("localhost") on a dual-stack resolver printed
+// all=[0:0:0:0:0:0:0:1 127.0.0.1] with preferIPv6Addresses=true and
+// all=[127.0.0.1 0:0:0:0:0:0:0:1] byName=127.0.0.1 with the default, so the
+// reference advertises the IPv4 address whatever order the resolver used.
 func TestGameServerLinkHostResolution(t *testing.T) {
 	const advertised = "gs.invalid"
 	tests := []struct {
@@ -85,6 +95,9 @@ func TestGameServerLinkHostResolution(t *testing.T) {
 		wantHost string
 	}{
 		{name: "resolved", resolved: []string{"10.1.2.3", "10.1.2.4"}, wantHost: "10.1.2.3"},
+		{name: "dual stack IPv6 first", resolved: []string{"::1", "10.1.2.3"}, wantHost: "10.1.2.3"},
+		{name: "dual stack keeps IPv4 order", resolved: []string{"2001:db8::1", "10.1.2.4", "10.1.2.3"}, wantHost: "10.1.2.4"},
+		{name: "IPv6 only", resolved: []string{"2001:db8::1", "::1"}, wantHost: "2001:db8::1"},
 		{name: "lookup error", err: &net.DNSError{Err: "no such host", Name: advertised, IsNotFound: true}, wantHost: "127.0.0.1"},
 		{name: "empty result", wantHost: "127.0.0.1"},
 	}
