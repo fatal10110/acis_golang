@@ -588,21 +588,26 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			})
 
 		case clientpackets.OpcodeLogout:
-			if live != nil {
-				refused := false
-				onLive(live, func() {
-					if block := l.exitBlockReason(live); block != exitAllowed {
-						l.refuseExit(session, live, block, false)
-						refused = true
-						return
-					}
-					// LeaveWorld is the last packet: what detach sends
-					// afterwards never reaches the client.
-					session.sendLast(serverpackets.FrameLeaveWorld())
-				})
-				if refused {
-					continue
+			if live == nil {
+				// Logout from character select has no character to take out
+				// of the world: it is ignored silently and the connection
+				// stays open. The client registers no pending action for
+				// it, so there is nothing to release.
+				continue
+			}
+			refused := false
+			onLive(live, func() {
+				if block := l.exitBlockReason(live); block != exitAllowed {
+					l.refuseExit(session, live, block, false)
+					refused = true
+					return
 				}
+				// LeaveWorld is the last packet: what detach sends
+				// afterwards never reaches the client.
+				session.sendLast(serverpackets.FrameLeaveWorld())
+			})
+			if refused {
+				continue
 			}
 			return
 
