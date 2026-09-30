@@ -1552,6 +1552,11 @@ func (s *Server) ObserveSends(tb testing.TB, fn func(payload []byte)) {
 	tb.Cleanup(func() { s.sendObserver.Store(nil) })
 }
 
+// sharedRSAKeys is the GS-LS link key pool every Boot in the process shares.
+// Generating a pool costs ten RSA key generations, which dominated suite CPU
+// when each Boot made its own; the pool is read-only once built.
+var sharedRSAKeys = sync.OnceValues(manager.NewRSAKeyPool)
+
 // startLoginServerAcceptor mirrors the login-side GS-LS acceptor the network
 // package's own tests use, so Boot completes a real login handshake.
 func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
@@ -1569,7 +1574,7 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 		t.Fatalf("LoadServerNames: %v", err)
 	}
 
-	keys, err := manager.NewRSAKeyPool()
+	keys, err := sharedRSAKeys()
 	if err != nil {
 		t.Fatalf("NewRSAKeyPool: %v", err)
 	}
