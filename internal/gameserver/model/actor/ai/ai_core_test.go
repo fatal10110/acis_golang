@@ -1425,7 +1425,10 @@ func TestAttackableAIReconsiderTargetNoopWithSingleAttacker(t *testing.T) {
 }
 
 // ---- from attackable_wander_test.go ----
-func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
+// TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination pins
+// NpcAI.thinkMoveTo at the destination: the desire is dropped but MOVE_TO
+// stays current until desire selection idles it on the empty queue.
+func TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
 	move := &recordingMove{}
@@ -1444,11 +1447,24 @@ func TestAttackableAIPromotesMoveToDesireAndIdlesOnArrival(t *testing.T) {
 	}
 
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z
+	move.home = location.Location{X: -1, Y: -1, Z: -1}
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() after arrival error: %v", err)
 	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after arrival Think = %v, want %v kept", got, IntentionMoveTo)
+	}
+	if brain.Desires().Len() != 0 {
+		t.Fatalf("desires after arrival Think = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
+	}
+	if move.home == home {
+		t.Fatal("Think at the destination restarted MoveHome")
+	}
+	if err := tickThinkIdle(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after arrival = %v, want %v", got, IntentionIdle)
+		t.Fatalf("CurrentIntention() after TickThink = %v, want %v", got, IntentionIdle)
 	}
 }
 
@@ -1498,6 +1514,10 @@ func TestAttackableAIHoldsPromotionInsideHitAnimation(t *testing.T) {
 	}
 }
 
+// TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ pins that desire
+// selection idles a walk an arrival left short of its destination rather
+// than restarting it: NpcAI.runAI steps a walk only through its queued
+// desire.
 func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
@@ -1517,18 +1537,65 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
 	brain.Arrived()
 	move.home = location.Location{X: -1, Y: -1, Z: -1}
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() after Arrived error: %v", err)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() after Arrived error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after Arrived = %v, want %v", got, IntentionIdle)
+		t.Fatalf("CurrentIntention() after Arrived and RunAI = %v, want %v", got, IntentionIdle)
 	}
 	if move.home == home {
-		t.Fatal("Think after Arrived restarted MoveHome")
+		t.Fatal("RunAI after Arrived restarted MoveHome")
 	}
 }
 
-func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
+// TestAttackableAIArrivedShortThinkResumesMoveTo pins the reference THINK
+// on a MOVE_TO an arrival left short of its destination with no swing in
+// flight: AbstractAI.onEvtThink runs NpcAI.thinkMoveTo, which away from the
+// destination calls CreatureAI.thinkMoveTo and walks again. The desire-less
+// walk is not idled first.
+func TestAttackableAIArrivedShortThinkResumesMoveTo(t *testing.T) {
+	owner := actor(1)
+	owner.x, owner.y, owner.z = 100, 0, 0
+	move := &recordingMove{}
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	home := location.Location{}
+
+	brain.AddMoveToDesire(home, 1_000_000)
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
+	brain.Arrived()
+	move.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after Arrived error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after arrival Think = %v, want %v kept", got, IntentionMoveTo)
+	}
+	if move.home != home {
+		t.Fatalf("MoveHome after arrival Think = %#v, want %#v", move.home, home)
+	}
+	if brain.Desires().Len() != 0 {
+		t.Fatalf("desires after arrival Think = %d, want none re-queued", brain.Desires().Len())
+	}
+
+	move.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() after arrival Think error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionIdle)
+	}
+	if move.home == home {
+		t.Fatal("RunAI after arrival Think restarted MoveHome")
+	}
+}
+
+// TestAttackableAIArrivedBlockedThinkResumesMoveTo pins
+// NpcAI.onEvtArrivedBlocked dropping only the MOVE_TO desire: a THINK then
+// runs thinkMoveTo and walks for the destination again.
+func TestAttackableAIArrivedBlockedThinkResumesMoveTo(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
 	move := &recordingMove{}
@@ -1541,19 +1608,27 @@ func TestAttackableAIArrivedBlockedClearsMoveTo(t *testing.T) {
 	}
 
 	brain.ArrivedBlocked()
+	if brain.Desires().Len() != 0 {
+		t.Fatalf("desires after ArrivedBlocked = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
+	}
 	move.home = location.Location{X: -1, Y: -1, Z: -1}
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() after ArrivedBlocked error: %v", err)
 	}
-	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after ArrivedBlocked = %v, want %v", got, IntentionIdle)
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after ArrivedBlocked Think = %v, want %v kept", got, IntentionMoveTo)
 	}
-	if move.home == home {
-		t.Fatal("Think after ArrivedBlocked restarted MoveHome")
+	if move.home != home {
+		t.Fatalf("MoveHome after ArrivedBlocked Think = %#v, want %#v", move.home, home)
 	}
 }
 
-func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
+// TestAttackableAIArrivedKeepsMoveToWhileAttackingNow pins NpcAI.onEvtArrived:
+// an arrival short of the MOVE_TO destination drops only the desire. Desire
+// selection does not restart the finished walk, even while a swing keeps
+// dropCurrentIfUnqueued from idling it, but a THINK runs thinkMoveTo and
+// sets off for the destination again.
+func TestAttackableAIArrivedKeepsMoveToWhileAttackingNow(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
 	mv := &recordingMove{}
@@ -1571,15 +1646,24 @@ func TestAttackableAIArrivedIdlesEvenWhileAttackingNow(t *testing.T) {
 
 	owner.x, owner.y, owner.z = home.X, home.Y, home.Z-40
 	brain.Arrived()
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after Arrived = %v, want %v kept", got, IntentionMoveTo)
+	}
+	if brain.Desires().Len() != 0 {
+		t.Fatalf("desires after Arrived = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
+	}
 	mv.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() after Arrived error: %v", err)
+	}
+	if mv.home == home {
+		t.Fatal("RunAI after Arrived restarted MoveHome while attacking")
+	}
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() after Arrived error: %v", err)
 	}
-	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after Arrived while attacking = %v, want idle", got)
-	}
-	if mv.home == home {
-		t.Fatal("Think after Arrived restarted MoveHome while attacking")
+	if mv.home != home {
+		t.Fatalf("MoveHome after arrival Think = %#v, want %#v", mv.home, home)
 	}
 }
 
@@ -1962,6 +2046,7 @@ func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
 	if strike.stopCalls != stops {
 		t.Fatalf("attack Stop calls = %d on arrival Think, want %d", strike.stopCalls, stops)
 	}
+	// The finished wander is still current, but THINK has no wander step.
 	if owner.walkStanceCalls != walk {
 		t.Fatalf("walk stance calls = %d on arrival Think, want %d", owner.walkStanceCalls, walk)
 	}
@@ -3867,6 +3952,160 @@ func TestAttackableThinkFromIdleLeavesQueuedAttackForRunAI(t *testing.T) {
 	}
 	if strike.target != target {
 		t.Fatalf("attacked target after RunAI = %v, want %v", strike.target, target)
+	}
+}
+
+// wanderArrivedThenPromoted walks one wander step at clock start, arrives,
+// and has a THINK (a control effect ending), which takes no wander step.
+// The next cycles run at start+1s (lifetime), start+2s (empty-queue idle)
+// and start+3s (WANDER re-promoted, arming the wander timer). It returns
+// the brain, its actor, the promotion time and a setter for the AI clock.
+func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fakeActor, time.Time, func(time.Time)) {
+	t.Helper()
+	owner := actor(1)
+	owner.idleWander = true
+	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	brain.SetRandomWalkRate(100)
+	brain.roll = func(int) int { return 0 }
+	now := start
+	brain.now = func() time.Time { return now }
+	if err := thinkWanderOnce(brain); err != nil {
+		t.Fatalf("wander RunAI() error: %v", err)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander walks after the first wander step = %d, want 1", owner.wanderCalls)
+	}
+	brain.Arrived()
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after Arrived = %v, want %v kept", got, IntentionWander)
+	}
+	stances := owner.walkStanceCalls
+	if err := brain.Think(); err != nil {
+		t.Fatalf("arrival Think() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after arrival Think = %v, want %v kept", got, IntentionWander)
+	}
+	if owner.walkStanceCalls != stances || !brain.wanderReady.IsZero() {
+		t.Fatalf("walk stances/wanderReady after arrival Think = %d/%v, want %d/unset (no wander step)", owner.walkStanceCalls, brain.wanderReady, stances)
+	}
+
+	for i, at := range []int{1, 2, 3} {
+		now = start.Add(time.Duration(at) * time.Second)
+		if err := brain.TickThink(); err != nil {
+			t.Fatalf("TickThink() %d error: %v", i, err)
+		}
+		if at == 2 {
+			if got := brain.CurrentIntention(); got != IntentionIdle {
+				t.Fatalf("CurrentIntention() after the empty-queue cycle = %v, want %v", got, IntentionIdle)
+			}
+		}
+	}
+	promoted := now
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after the promotion = %v, want %v", got, IntentionWander)
+	}
+	if want := promoted.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
+		t.Fatalf("wanderReady after the promotion = %v, want %v", brain.wanderReady, want)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander walks after the promotion = %d, want 1", owner.wanderCalls)
+	}
+	return brain, owner, promoted, func(at time.Time) { now = at }
+}
+
+// TestAttackableArrivalThinkWanderTimerStartsAtPromotion pins that a THINK
+// after a wander arrival leaves the wander timer alone (AbstractAI.onEvtThink
+// has no WANDER case): the timer starts at the next WANDER promotion, so no
+// walk comes one timer after the THINK and the next one comes one timer
+// after the promotion.
+func TestAttackableArrivalThinkWanderTimerStartsAtPromotion(t *testing.T) {
+	start := time.Unix(1_000, 0)
+	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
+
+	setNow(start.Add(defaultWanderTimer * time.Second))
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("TickThink() one timer after the THINK error: %v", err)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander walks one timer after the THINK = %d, want 1", owner.wanderCalls)
+	}
+
+	setNow(promoted.Add(defaultWanderTimer * time.Second))
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("TickThink() one timer after the promotion error: %v", err)
+	}
+	if owner.wanderCalls != 2 {
+		t.Fatalf("wander walks one timer after the promotion = %d, want 2", owner.wanderCalls)
+	}
+}
+
+// TestAttackableWanderTimerOutlivesIdle pins AttackableAI's pending
+// _wanderTask across an idle: when a walk not taken by the wander (the
+// hostile's wander recheck step) arrives while the timer runs, the idle and
+// the next WANDER promotion keep that timer, since the running task fires
+// first and cancels the one the promotion schedules.
+func TestAttackableWanderTimerOutlivesIdle(t *testing.T) {
+	start := time.Unix(1_000, 0)
+	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
+
+	setNow(promoted.Add(time.Second))
+	brain.Arrived()
+	setNow(promoted.Add(2 * time.Second))
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("idle TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after the empty-queue cycle = %v, want %v", got, IntentionIdle)
+	}
+	setNow(promoted.Add(3 * time.Second))
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("promote TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after the re-promotion = %v, want %v", got, IntentionWander)
+	}
+	if want := promoted.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
+		t.Fatalf("wanderReady after the re-promotion = %v, want the running timer %v", brain.wanderReady, want)
+	}
+
+	setNow(promoted.Add(defaultWanderTimer * time.Second))
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("TickThink() at the running timer error: %v", err)
+	}
+	if owner.wanderCalls != 2 {
+		t.Fatalf("wander walks when the running timer ran out = %d, want 2", owner.wanderCalls)
+	}
+}
+
+// TestAttackableWanderTimerEndsWhileNotWandering pins that a wander task
+// running out while the actor is idle finds no WANDER and ends: the next
+// wander promotion arms a fresh timer instead of walking at once.
+func TestAttackableWanderTimerEndsWhileNotWandering(t *testing.T) {
+	start := time.Unix(1_000, 0)
+	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
+
+	setNow(promoted.Add(time.Second))
+	brain.Arrived()
+	late := promoted.Add(10 * time.Second)
+	setNow(late)
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("idle TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after the empty-queue cycle = %v, want %v", got, IntentionIdle)
+	}
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("promote TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after the re-promotion = %v, want %v", got, IntentionWander)
+	}
+	if owner.wanderCalls != 1 {
+		t.Fatalf("wander walks after the re-promotion = %d, want 1 (stale timer must not roll)", owner.wanderCalls)
+	}
+	if want := late.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
+		t.Fatalf("wanderReady after the re-promotion = %v, want a fresh timer %v", brain.wanderReady, want)
 	}
 }
 

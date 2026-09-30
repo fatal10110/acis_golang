@@ -25,8 +25,8 @@ func wanderThenStop(t *testing.T, _ *gameservertest.Server, hostile *npc.Hostile
 	}
 	hostile.Move().CancelMove()
 	hostile.AI().Arrived()
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the wander arrival = %v, want %v", got, ai.IntentionIdle)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after the wander arrival = %v, want %v kept", got, ai.IntentionWander)
 	}
 	if got := hostile.AI().Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after the wander arrival = %d, want 0", got)
