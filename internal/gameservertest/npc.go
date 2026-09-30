@@ -424,11 +424,9 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 	case event.Arrived:
 		c.hostile.SyncPosition(c.move.Position())
 		c.hostile.AI().Arrived()
-		c.server.think(c.hostile)
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
-		c.server.think(c.hostile)
 	case event.AttackFinished:
 		if e.BowReuse {
 			c.server.think(c.hostile)

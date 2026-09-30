@@ -289,9 +289,8 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 
 	home := location.Location{X: 100, Y: 200, Z: 0}
 	// Inside the maker polygon and the default 200-unit drift range, so
-	// the general AI's own leash-return (hostile.Think -> ReturnHome,
-	// fired automatically on every arrival, including this route arrival)
-	// leaves the route alone once the NPC settles here.
+	// the general AI's own leash-return leaves the route alone once the
+	// NPC settles here.
 	routeNode := location.Location{X: 100, Y: 350, Z: 0}
 	// Outside the maker polygon (y < 0) and the 200-unit home sphere, so
 	// a later ReturnHome() call actually triggers a leash move.
@@ -344,6 +343,10 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 	// SetXYZ reseeds position directly, so it fires no arrival hook and
 	// leaves the route's own state untouched, isolating what happens next.
 	hostile.SetXYZ(strayPoint.X, strayPoint.Y, strayPoint.Z)
+	// The stray point lies in another, player-less region: let the posted
+	// region-deactivation reset run before the leash move starts, so it
+	// cannot stop that move midway.
+	clock.Advance(10 * time.Millisecond)
 
 	// Simulate the AI loop deciding this NPC must leash home — the same
 	// call the AI loop makes via returnHomeOutsideDriftRange.

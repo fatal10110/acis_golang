@@ -3,6 +3,7 @@ package ai
 import (
 	"bytes"
 	"math"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -2906,12 +2907,57 @@ func TestAttackableIdleFollowPromotesOnThink(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionFollow)
 	}
 	if owner.thinkCalls != 0 {
-		t.Fatalf("ThinkFollow calls on first pulse = %d, want 0 (even pulse skips)", owner.thinkCalls)
+		t.Fatalf("ThinkFollow calls on the promoting pass = %d, want 0 (even AI step skips)", owner.thinkCalls)
 	}
+}
 
-	brain.Think()
-	if owner.thinkCalls != 1 {
-		t.Fatalf("ThinkFollow calls on second pulse = %d, want 1", owner.thinkCalls)
+// followTickCycles promotes an escort FOLLOW, then runs six periodic AI
+// cycles (Tick then TickThink, as the AI task does) and reports which
+// cycles, 1-based, stepped the follow. between runs after every cycle.
+func followTickCycles(t *testing.T, between func(*Attackable)) []int {
+	t.Helper()
+	owner := &followStub{fakeActor: actor(1), idleTarget: actor(9)}
+	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	if err := tickThinkPromote(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionFollow {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionFollow)
+	}
+	var moved []int
+	for cycle := 1; cycle <= 6; cycle++ {
+		before := owner.thinkCalls
+		brain.Tick()
+		if err := brain.TickThink(); err != nil {
+			t.Fatalf("cycle %d TickThink() error: %v", cycle, err)
+		}
+		if got := brain.CurrentIntention(); got != IntentionFollow {
+			t.Fatalf("cycle %d CurrentIntention() = %v, want %v", cycle, got, IntentionFollow)
+		}
+		if owner.thinkCalls > before {
+			moved = append(moved, cycle)
+		}
+		between(brain)
+	}
+	return moved
+}
+
+// The escort FOLLOW step reads the AI step counter as the periodic cycle
+// saw it before advancing it (0, 1, 2, then reset), and moves only on an
+// odd value: once every three cycles. An extra Think between cycles reads
+// the counter without advancing it, so the cycles that move do not shift.
+func TestAttackableEscortFollowCadenceIgnoresExtraThink(t *testing.T) {
+	want := []int{2, 5}
+	if got := followTickCycles(t, func(*Attackable) {}); !slices.Equal(got, want) {
+		t.Fatalf("follow cycles without extra Think = %v, want %v", got, want)
+	}
+	extra := func(brain *Attackable) {
+		if err := brain.Think(); err != nil {
+			t.Fatalf("Think() error: %v", err)
+		}
+	}
+	if got := followTickCycles(t, extra); !slices.Equal(got, want) {
+		t.Fatalf("follow cycles with an extra Think after each cycle = %v, want %v", got, want)
 	}
 }
 

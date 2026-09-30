@@ -195,9 +195,16 @@ type Attackable struct {
 	// promote, used so escort follow can tell a fresh FOLLOW from a
 	// continuing one.
 	lastKind Intention
-	// followPulse counts thinkFollow entries so escort movement runs on
-	// odd pulses (about once every two seconds at the 1s AI tick).
-	followPulse int
+	// passStep is the AI clock value the running think pass reads: for a
+	// periodic pass, step as it was before that cycle's Tick advanced it;
+	// for any other pass, step as it stands between cycles. Escort follow
+	// moves only when it is odd, so an out-of-band pass never shifts the
+	// follow rhythm.
+	passStep int
+	// tickStep is step before the latest Tick advanced it, and ticked
+	// reports that no periodic pass has consumed it yet.
+	tickStep int
+	ticked   bool
 
 	// now returns the current time, the actor's queue clock by default;
 	// tests replace it to simulate staleThreatAge elapsing without a real
@@ -474,11 +481,9 @@ func (a *Attackable) queueIdleWander() {
 }
 
 func (a *Attackable) thinkFollow() error {
-	if a.followPulse%2 == 0 {
-		a.followPulse++
+	if a.passStep%2 == 0 {
 		return nil
 	}
-	a.followPulse++
 	if a.actor.ThinkFollow(a.current.target, a.lastKind == IntentionFollow) {
 		a.desires.Remove(IntentionFollow, a.current.target)
 		a.setCurrent(intention{kind: IntentionIdle})
@@ -666,9 +671,9 @@ func (a *Attackable) NextIntention() (Intention, attackable.Combatant, bool) {
 type thinkMode uint8
 
 const (
-	// thinkContinue continues the current intention after arrival, a bow
-	// reuse ending or a control effect ending; it never selects a desire
-	// and never idles on an empty queue.
+	// thinkContinue continues the current intention after a bow reuse
+	// ending or a control effect ending; it never selects a desire and
+	// never idles on an empty queue.
 	thinkContinue thinkMode = iota
 	// thinkEvent re-runs desire selection on an event: a swing finishing,
 	// the hit animation ending, a bow shot, a completed cast or a first
@@ -678,12 +683,12 @@ const (
 	thinkTick
 )
 
-// Think advances the current intention once, for arrival, a bow's reuse
-// ending and a control effect ending. It never selects a queued desire,
-// even from idle, follow or wander, and does not run empty-queue idle
-// abort: RunAI and TickThink do both. A non-nil return reports
-// that an intention step ran but a broadcast within it failed; the intention
-// itself still advanced.
+// Think advances the current intention once, for a bow's reuse ending and
+// a control effect ending; an arrival does not think. It never selects a
+// queued desire, even from idle, follow or wander, and does not run
+// empty-queue idle abort: RunAI and TickThink do both. A non-nil return
+// reports that an intention step ran but a broadcast within it failed; the
+// intention itself still advanced.
 func (a *Attackable) Think() error {
 	return a.think(thinkContinue)
 }
@@ -733,6 +738,11 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	a.passStep = a.step
+	if updateTick && a.ticked {
+		a.passStep = a.tickStep
+		a.ticked = false
+	}
 	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
 	a.refreshCombatMemory()
 	a.pruneDesires()
@@ -791,9 +801,10 @@ func (a *Attackable) think(mode thinkMode) error {
 // no desire selection, so a queued desire waits for the next RunAI or
 // TickThink. It neither takes nor updates the attack latch, leaves
 // lastDesire to desire selection, and does not re-select on a lost target.
-// Idle and wander take no step: idle here is what an arrival leaves of a
-// finished walk or wander, which does not think, and the continue pass has
-// no wander step.
+// Idle and wander take no step: idle here may be what an arrival left of a
+// finished walk or wander, which the continue pass must not restart, and a
+// truly idle actor already went through thinkIdle, so it stands walking
+// with nothing left to abort. The continue pass has no wander step.
 func (a *Attackable) continueCurrent() error {
 	switch a.current.kind {
 	case IntentionAttack:
@@ -954,6 +965,7 @@ func (a *Attackable) Tick() {
 
 	a.tickOutOfTerritory()
 
+	a.tickStep, a.ticked = a.step, true
 	a.step++
 	if a.step%3 != 0 {
 		return
@@ -1156,7 +1168,8 @@ func (a *Attackable) thinkMoveTo() {
 // Arrived clears MOVE_TO, FLEE, and WANDER when movement finishes and
 // idles immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while an
 // attack or cast is in flight, so leaving those kinds current would
-// restart the same walk on the Think that production arrival hooks run.
+// restart the same walk on the next think pass. Arrival itself never
+// thinks: the next step waits for RunAI or TickThink.
 // Escort FOLLOW returns without restoring spawn heading or arming the
 // out-of-territory stale-hate sweep; combat chase stays ATTACK and still
 // runs both.
