@@ -49,6 +49,51 @@ func TestAttackApproachTracksMovedTarget(t *testing.T) {
 		srv.TickPositions()
 	}
 
+	reach := physicalAttackRange(t, srv, objID)
+	pos := mover.Position()
+	// One position update covers well under 30 units at the fixture's speed.
+	if !pos.In2DRadius(moved, reach) || pos.In2DRadius(moved, reach-30) {
+		t.Fatalf("approach ended at %+v, %.1f from the moved target; want the first step within the attack range %d",
+			pos, pos.Distance2D(moved), reach)
+	}
+	drainUntilQuiet(t, c)
+}
+
+// rethinkApproach boots a level-5 player (seeded with seed before it enters
+// the world), starts its attack on a stationary hostile 500 units away and
+// lets the approach walk run three position updates. It returns the
+// server, client, player id and hostile id, with the client drained.
+func rethinkApproach(t *testing.T, seed func(srv *gameservertest.Server, objID int32)) (*gameservertest.Server, *scriptedClient, int32, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithGeo(flatGeo{}),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	if seed != nil {
+		seed(srv, objID)
+	}
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertFrameOpcode(t, mustRead(t, c, "MoveToPawn"), serverpackets.OpcodeMoveToPawn, "approach")
+	for range 3 {
+		srv.TickPositions()
+	}
+	drainUntilQuiet(t, c)
+	if !srv.PlayerMove(t, objID).Moving() {
+		t.Fatal("the approach walk is no longer under way")
+	}
+	return srv, c, objID, hostile.ObjectID()
+}
+
+// physicalAttackRange reads the online player's physical attack range.
+func physicalAttackRange(t *testing.T, srv *gameservertest.Server, objID int32) int {
+	t.Helper()
 	obj, ok := srv.State.Player(objID)
 	if !ok {
 		t.Fatal("player missing from world state")
@@ -57,12 +102,67 @@ func TestAttackApproachTracksMovedTarget(t *testing.T) {
 	if !ok {
 		t.Fatalf("player %T is not an online character", obj)
 	}
-	reach := player.PhysicalAttackRange()
-	pos := mover.Position()
-	// One position update covers well under 30 units at the fixture's speed.
-	if !pos.In2DRadius(moved, reach) || pos.In2DRadius(moved, reach-30) {
-		t.Fatalf("approach ended at %+v, %.1f from the moved target; want the first step within the attack range %d",
-			pos, pos.Distance2D(moved), reach)
+	return player.PhysicalAttackRange()
+}
+
+// pawnMoveFrom finds the first MoveToPawn at or after from that moves mover
+// toward target at distance from origin, or -1.
+func pawnMoveFrom(frames [][]byte, from int, mover, target int32, distance int, origin location.Location) int {
+	for i := from; i < len(frames); i++ {
+		if frames[i][0] != serverpackets.OpcodeMoveToPawn {
+			continue
+		}
+		r := wireReader(frames[i][1:])
+		if r.ReadInt32() != mover || r.ReadInt32() != target || r.ReadInt32() != int32(distance) {
+			continue
+		}
+		if r.ReadInt32() == int32(origin.X) && r.ReadInt32() == int32(origin.Y) && r.ReadInt32() == int32(origin.Z) {
+			return i
+		}
 	}
-	drainUntilQuiet(t, c)
+	return -1
+}
+
+// TestAttackClickMidApproachResendsMoveToPawn pins a repeated attack click
+// on the target being chased (PlayableAI.tryToAttack -> doAttackIntention ->
+// PlayerAI.thinkAttack, PlayerAI.java:170-197): PlayerMove.maybeMoveToPawn
+// (PlayerMove.java:335-352) re-runs moveToPawn (PlayerMove.java:49-109),
+// which broadcasts a fresh MoveToPawn from where the player stands now,
+// although the target has not moved.
+func TestAttackClickMidApproachResendsMoveToPawn(t *testing.T) {
+	t.Parallel()
+	srv, c, objID, hostileID := rethinkApproach(t, nil)
+	here := srv.PlayerMove(t, objID).Position()
+
+	c.Send(encodeAction(hostileID, int32(here.X), int32(here.Y), int32(here.Z), false))
+	srv.Settle(t)
+	frames := readQuiet(c)
+	if pawnMoveFrom(frames, 0, objID, hostileID, physicalAttackRange(t, srv, objID), here) < 0 {
+		t.Fatalf("no fresh MoveToPawn from %+v after the repeated attack click: opcodes %v", here, opcodes(frames))
+	}
+}
+
+// TestWeaponEquipMidApproachResendsMoveToPawn puts a sword on while the
+// attack approach walks toward a stationary target (#2877):
+// PlayerAI.thinkUseItem (PlayerAI.java:505-519) equips it, then re-runs the
+// ATTACK, whose thinkAttack re-sends MoveToPawn from the current position
+// at the sword's attack range, after S1_EQUIPPED.
+func TestWeaponEquipMidApproachResendsMoveToPawn(t *testing.T) {
+	t.Parallel()
+	var sword int32
+	srv, c, objID, hostileID := rethinkApproach(t, func(srv *gameservertest.Server, objID int32) {
+		sword = srv.GiveItem(t, objID, 30, 1)
+	})
+	here := srv.PlayerMove(t, objID).Position()
+
+	c.Send(encodeUseItem(sword, false))
+	srv.Settle(t)
+	frames := readQuiet(c)
+	equipped := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageS1Equipped)
+	if equipped < 0 {
+		t.Fatalf("no S1_EQUIPPED for the sword: opcodes %v", opcodes(frames))
+	}
+	if pawnMoveFrom(frames, equipped+1, objID, hostileID, physicalAttackRange(t, srv, objID), here) < 0 {
+		t.Fatalf("no fresh MoveToPawn from %+v after S1_EQUIPPED: opcodes %v", here, opcodes(frames))
+	}
 }
