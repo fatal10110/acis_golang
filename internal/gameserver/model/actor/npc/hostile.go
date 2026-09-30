@@ -420,9 +420,11 @@ func (h *Hostile) StopAbnormalEffect(mask int) {
 	}
 }
 
-// AbnormalEffect returns this NPC's client-visible abnormal-effect bitmask.
+// AbnormalEffect returns this NPC's client-visible abnormal-effect bitmask:
+// the stored visual bits plus the ones its live crowd-control state
+// implies.
 func (h *Hostile) AbnormalEffect() int {
-	return int(h.abnormalEffect.Load())
+	return int(h.abnormalEffect.Load()) | h.EffectList().CrowdControlAbnormalEffect()
 }
 
 // NPCInfoSnapshot captures this NPC's current client-visible state.

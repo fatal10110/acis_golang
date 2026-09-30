@@ -143,9 +143,11 @@ func (c *Character) StopAbnormalEffect(mask int) {
 }
 
 // AbnormalEffect returns this character's client-visible abnormal-effect
-// bitmask.
+// bitmask: the stored visual bits plus the ones its live crowd-control
+// state implies (stun, root, sleep, fear, mute, floating root), which
+// StopAbnormalEffect never clears.
 func (c *Character) AbnormalEffect() int {
-	return int(c.abnormalEffectMask.Load())
+	return int(c.abnormalEffectMask.Load()) | c.EffectList().CrowdControlAbnormalEffect()
 }
 
 // BroadcastAbnormalEffect reports that StartAbnormalEffect/StopAbnormalEffect

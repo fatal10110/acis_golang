@@ -115,8 +115,11 @@ func (a *Actor) StopAbnormalEffect(mask int) {
 	}
 }
 
-// AbnormalEffect returns this summon's visible abnormal-effect bitmask.
-func (a *Actor) AbnormalEffect() int { return int(a.abnormalEffect.Load()) }
+// AbnormalEffect returns this summon's visible abnormal-effect bitmask: the
+// stored visual bits plus the ones its live crowd-control state implies.
+func (a *Actor) AbnormalEffect() int {
+	return int(a.abnormalEffect.Load()) | a.effects.CrowdControlAbnormalEffect()
+}
 
 // UpdateAbnormalEffect reports the current state for re-announcement once the
 // owner has discovered this summon.

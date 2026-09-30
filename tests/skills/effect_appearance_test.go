@@ -2,9 +2,12 @@ package skills
 
 import (
 	"encoding/binary"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -25,6 +28,11 @@ import (
 const (
 	abnormalBleeding      = 0x000001
 	abnormalPoison        = 0x000002
+	abnormalFear          = 0x000020
+	abnormalStun          = 0x000040
+	abnormalSleep         = 0x000080
+	abnormalMuted         = 0x000100
+	abnormalRoot          = 0x000200
 	abnormalBigHead       = 0x002000
 	abnormalFlame         = 0x004000
 	abnormalChangeTexture = 0x008000
@@ -247,17 +255,65 @@ func opcodeList(frames [][]byte) []byte {
 // player and wearing off each send UserInfo to the player and CharInfo to an
 // observer from the hook, and only the effect list's single icon refresh
 // sends an AbnormalStatusUpdate: after the UserInfo on start, before it on
-// expiry.
+// expiry. Both appearance packets carry the crowd-control visual the live
+// state implies while it lasts, and drop it on expiry (#2852;
+// Creature.getAbnormalEffect, Creature.java:944-964). Every crowd-control
+// kind whose hooks refresh a player's appearance behaves the same with its
+// own bit: FEAR for fear, MUTED for either mute, FLOATING_ROOT for
+// immobile-until-attacked. (Confusion's hooks skip players,
+// EffectConfusion.onStart.) Immobile-until-attacked is removed rather than
+// run out: running out refreshes from both its action tick and its exit
+// hook (EffectImmobileUntilAttacked.onActionTime/onExit).
 func TestPlayerStunRefreshesAppearanceNotIcons(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		kind   string
+		want   int
+		remove bool
+	}{
+		{"Stun", abnormalStun, false},
+		{"Root", abnormalRoot, false},
+		{"Sleep", abnormalSleep, false},
+		{"Fear", abnormalFear, false},
+		{"Mute", abnormalMuted, false},
+		{"PhysicalMute", abnormalMuted, false},
+		{"SilenceMagicPhysical", abnormalMuted, false},
+		{"ImmobileUntilAttacked", abnormalFloatRoot, true},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			t.Parallel()
+			p := bootAppearancePair(t)
+
+			e := p.land(t, effect.Skill{ID: appearanceSkillID, Level: 1, Debuff: true},
+				modelskill.EffectTemplate{Name: tc.kind, Count: 1, Time: 1, Icon: true})
+			p.assertAppearanceRefresh(t, tc.kind+" start", tc.want, userInfoFirst)
+
+			if tc.remove {
+				p.remove(t, e)
+			} else {
+				p.expire(t, e, tc.kind+" wearing off")
+			}
+			p.assertAppearanceRefresh(t, tc.kind+" exit", 0, iconsFirst)
+		})
+	}
+}
+
+// TestStoppingStoredVisualKeepsDerivedStunBit pins #2852's split between
+// the stored bitmask and the derived bits: BigHead ending on a stunned
+// player clears its own bit, and the stun bit stays for as long as the stun.
+func TestStoppingStoredVisualKeepsDerivedStunBit(t *testing.T) {
 	t.Parallel()
 	p := bootAppearancePair(t)
 
-	stun := p.land(t, effect.Skill{ID: appearanceSkillID, Level: 1, Debuff: true},
-		modelskill.EffectTemplate{Name: "Stun", Count: 1, Time: 1, Icon: true})
-	p.assertAppearanceRefresh(t, "stun start", 0, userInfoFirst)
+	bigHead := p.land(t, effect.Skill{ID: appearanceSkillID, Level: 1},
+		modelskill.EffectTemplate{Name: "BigHead", Count: 1, Time: 60, Icon: true})
+	p.assertAppearanceRefresh(t, "big head start", abnormalBigHead, userInfoFirst)
+	p.land(t, effect.Skill{ID: appearanceSkillID + 1, Level: 1, Debuff: true},
+		modelskill.EffectTemplate{Name: "Stun", Count: 1, Time: 60, Icon: true})
+	p.assertAppearanceRefresh(t, "stun start", abnormalBigHead|abnormalStun, userInfoFirst)
 
-	p.expire(t, stun, "stun wearing off")
-	p.assertAppearanceRefresh(t, "stun exit", 0, iconsFirst)
+	p.remove(t, bigHead)
+	p.assertAppearanceRefresh(t, "big head stop", abnormalStun, iconsFirst)
 }
 
 // TestPlayerBigHeadRefreshesAppearanceOnce pins #2842's second half: BigHead
@@ -320,7 +376,8 @@ func TestPlayerTemplateAbnormalVisual(t *testing.T) {
 
 // TestHandlerOwnedHooksIgnoreTemplateAbnormal pins the kinds whose start and
 // exit replace the base hooks: Stun ignores abnormal="dancestun" (5012), so
-// its refresh carries no dance-stun bit.
+// its refresh carries no dance-stun bit, only the stun bit its live state
+// implies.
 func TestHandlerOwnedHooksIgnoreTemplateAbnormal(t *testing.T) {
 	t.Parallel()
 	def := shippedSkill(t, 5012, 1)
@@ -332,7 +389,7 @@ func TestHandlerOwnedHooksIgnoreTemplateAbnormal(t *testing.T) {
 	p := bootAppearancePair(t)
 
 	p.land(t, effect.SkillFromDefinition(def), tmpl)
-	p.assertAppearanceRefresh(t, "dance stun start", 0, userInfoFirst)
+	p.assertAppearanceRefresh(t, "dance stun start", abnormalStun, userInfoFirst)
 }
 
 // TestShippedAbnormalNamesResolveToClientMasks is the loader oracle: every
@@ -431,5 +488,79 @@ func TestRestoredAbnormalVisualIsSilentUntilEnterWorldUserInfo(t *testing.T) {
 	frames := readEnterWorldBurstWithRestoredBuff(t, relogin)
 	if got := userInfoAbnormal(t, frames[10]); got != abnormalChangeTexture {
 		t.Fatalf("EnterWorld UserInfo abnormal = %#x, want %#x", got, abnormalChangeTexture)
+	}
+}
+
+// npcInfoAbnormal reads NpcInfo's object id and abnormal-effect field.
+// Everything after the field is fixed width (AbstractNpcInfo.NpcInfo
+// .writeImpl): 42 bytes.
+func npcInfoAbnormal(t *testing.T, frame []byte) (objectID int32, abnormal int) {
+	t.Helper()
+	if frame[0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("frame opcode %#x, want NpcInfo", frame[0])
+	}
+	objectID = int32(binary.LittleEndian.Uint32(frame[1:5]))
+	return objectID, int(binary.LittleEndian.Uint32(frame[len(frame)-46:]))
+}
+
+// TestStunnedNPCInfoCarriesStunBit pins #2852 on an NPC: a stun landing on a
+// monster refreshes its NpcInfo for the players around it with the stun bit
+// set (Npc.updateAbnormalEffect sends NpcInfo, which writes
+// getAbnormalEffect), and the refresh when it wears off clears it.
+func TestStunnedNPCInfoCarriesStunBit(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Watcher", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	px, py, pz := srv.PlayerPosition(t, objID)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
+	drainUntilQuiet(t, c)
+
+	stun, err := effect.New(effect.Skill{ID: appearanceSkillID, Level: 1, Debuff: true},
+		modelskill.EffectTemplate{Name: "Stun", Count: 1, Time: 1, Icon: true})
+	if err != nil {
+		t.Fatalf("effect.New(Stun): %v", err)
+	}
+	stun.Effector, stun.Effected = hostile, hostile
+	onHostileQueue(t, hostile, func() { hostile.EffectList().Add(stun) })
+	assertNPCInfoAbnormal(t, readQuiet(t, c), hostile.ObjectID(), "stun start", abnormalStun)
+
+	for i := 0; slices.Contains(hostile.EffectList().All(), stun); i++ {
+		if i == 10 {
+			t.Fatal("NPC stun not worn off within 10 effect ticks")
+		}
+		srv.Advance(t, 1100*time.Millisecond)
+		srv.TickEffects()
+	}
+	assertNPCInfoAbnormal(t, readQuiet(t, c), hostile.ObjectID(), "stun exit", 0)
+}
+
+func onHostileQueue(t *testing.T, hostile *npc.Hostile, fn func()) {
+	t.Helper()
+	done := make(chan struct{})
+	if !hostile.Queue().Post(func() { fn(); close(done) }) {
+		t.Fatal("post to NPC queue: queue closed")
+	}
+	<-done
+}
+
+// assertNPCInfoAbnormal checks frames hold exactly one NpcInfo of objectID,
+// carrying want.
+func assertNPCInfoAbnormal(t *testing.T, frames [][]byte, objectID int32, what string, want int) {
+	t.Helper()
+	var infos []int
+	for _, f := range framesWithOpcode(frames, serverpackets.OpcodeNPCInfo) {
+		if id, abnormal := npcInfoAbnormal(t, f); id == objectID {
+			infos = append(infos, abnormal)
+		}
+	}
+	if len(infos) != 1 {
+		t.Fatalf("%s: got %d NpcInfo frames of the NPC, want 1 (opcodes % x)", what, len(infos), opcodeList(frames))
+	}
+	if infos[0] != want {
+		t.Fatalf("%s: NpcInfo abnormal = %#x, want %#x", what, infos[0], want)
 	}
 }
