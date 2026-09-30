@@ -104,6 +104,69 @@ func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
 	}
 }
 
+// TestLogoutAtCharacterSelectKeepsConnectionOpen sends Logout before any
+// character is in the world. The reference Logout handler returns at once
+// when the client has no player: it sends nothing and leaves the socket
+// open. The next request must therefore be answered, and its reply must be
+// the first frame read, proving Logout itself produced none.
+func TestLogoutAtCharacterSelectKeepsConnectionOpen(t *testing.T) {
+	srv := gameservertest.Boot(t)
+	c := srv.Client
+
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+
+	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeCharCreateOk {
+		t.Fatalf("reply after char-select logout = %#x, want CharCreateOk (%#x)", reply[0], serverpackets.OpcodeCharCreateOk)
+	}
+	reply = c.Read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("post-create opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+}
+
+// TestLogoutAfterRestartKeepsConnectionOpen restarts back to character
+// select, where the client again has no player, and requires Logout there
+// to be ignored the same way: no frame, and the following character
+// selection is still answered.
+func TestLogoutAfterRestartKeepsConnectionOpen(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithReuseDelays(0, 0))
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+	objID := srv.SoleObjectID(t)
+
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeRestartResponse {
+		t.Fatalf("restart opcode = %#x, want RestartResponse (%#x)", reply[0], serverpackets.OpcodeRestartResponse)
+	}
+	reply = c.Read()
+	if reply[0] != serverpackets.OpcodeCharSelectInfo {
+		t.Fatalf("post-restart opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+	}
+
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))
+
+	c.Send(encodeRequestGameStart(0))
+	reply = c.Read()
+	if reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("reply after char-select logout = %#x, want SSQInfo (%#x)", reply[0], serverpackets.OpcodeSSQInfo)
+	}
+	reply = c.Read()
+	if reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("select opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
+	}
+	if _, ok := srv.State.Player(objID); ok {
+		t.Fatalf("world.Player(%d) present before EnterWorld", objID)
+	}
+}
+
 func assertPersistedPosition(t *testing.T, srv *gameservertest.Server, objID int32, want location.Location, wantHeading int) {
 	t.Helper()
 	ch := persistedCharacter(t, srv, objID)

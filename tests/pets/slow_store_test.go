@@ -311,8 +311,8 @@ func (h *petWorld) useCollarRestoreHeld(t *testing.T) (release func()) {
 	t.Helper()
 	release = h.srv.HoldPersistenceLane(t, h.collarID)
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
 	assertFrameOpcode(t, mustRead(t, h.client, "collar MagicSkillUse"), serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
 	obj, ok := h.srv.State.Player(h.ownerID)
 	if !ok {
 		t.Fatal("owner missing from world state")
