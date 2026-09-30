@@ -91,6 +91,11 @@ type ClientLink struct {
 	newKeyPair    func() *commoncrypt.LoginKeyPair
 	newSessionKey func() ([]byte, error)
 	newSessionID  func() int32
+
+	// hashPassword hashes an auto-created account's password for storage;
+	// overridden in tests with a cheaper cost, which the race detector
+	// otherwise slows past the fake client's read deadline.
+	hashPassword func(string) (string, error)
 }
 
 // NewClientLink builds a ClientLink from its collaborators. autoCreateAccounts
@@ -130,6 +135,7 @@ func NewClientLink(
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
 		newSessionID:       rand.Int32,
+		hashPassword:       model.HashPassword,
 	}
 }
 
@@ -480,7 +486,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
-		hashed, herr := model.HashPassword(req.Password)
+		hashed, herr := l.hashPassword(req.Password)
 		if herr != nil {
 			l.log.Error().Err(herr).Msg("hash password for auto-created account")
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))

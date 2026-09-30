@@ -112,6 +112,15 @@ func mustHashPassword(t *testing.T, password string) string {
 	return string(hashed)
 }
 
+// minCostHashPassword replaces model.HashPassword on test ClientLinks. The
+// production cost takes most of a second per hash under -race, which on a
+// loaded host pushes the auto-create login past the fake client's read
+// deadline; MinCost keeps the same bcrypt format and verification path.
+func minCostHashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+	return string(hashed), err
+}
+
 // --- fake login client, driving the wire protocol from the other side ---
 //
 // ClientLink.newSessionKey is overridden to a fixed key for every test
@@ -269,6 +278,7 @@ func newTestClientLink(t *testing.T, accounts *fakeAccountStore, autoCreate bool
 		newKeyPair:         func() *commoncrypt.LoginKeyPair { return keyPair },
 		newSessionKey:      func() ([]byte, error) { return testSessionKey, nil },
 		newSessionID:       func() int32 { return testInitSessionID },
+		hashPassword:       minCostHashPassword,
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -778,6 +788,23 @@ func TestClientLinkLoginUnknownAccountAutoCreateOn(t *testing.T) {
 	}
 	if _, ok := sessions.Get("newplayer"); !ok {
 		t.Fatal("expected a session to be stored for the auto-created account")
+	}
+}
+
+// Test links hash auto-created passwords at MinCost; the production
+// constructor must keep hashing at the full default cost.
+func TestNewClientLinkHashesAutoCreatedPasswordsAtDefaultCost(t *testing.T) {
+	l := NewClientLink(nil, nil, nil, nil, nil, nil, true, true, DefaultLoginTryBeforeBan, DefaultLoginBlockAfterBan, zerolog.Nop())
+	hashed, err := l.hashPassword("s3cret")
+	if err != nil {
+		t.Fatalf("hashPassword: %v", err)
+	}
+	cost, err := bcrypt.Cost([]byte(hashed))
+	if err != nil {
+		t.Fatalf("bcrypt.Cost: %v", err)
+	}
+	if cost != bcrypt.DefaultCost {
+		t.Fatalf("auto-create hash cost = %d, want %d", cost, bcrypt.DefaultCost)
 	}
 }
 
