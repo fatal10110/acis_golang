@@ -148,8 +148,12 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	plan := started.Plan
 
 	handlers := l.castEffects()
-	if def.SkillType == "FUSION" {
+	switch def.SkillType {
+	case "FUSION":
 		l.startFusionCast(live, controller, handlers, target, def, plan)
+		return
+	case "SIGNET_CASTTIME":
+		l.startSignetCast(live, controller, handlers, target, def, plan)
 		return
 	}
 
@@ -229,6 +233,30 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 	}
 }
 
+// startSignetCast runs a SIGNET_CASTTIME cast on the fusion-cast timeline:
+// its effect lands on the target when the cast starts, ahead of the
+// caster's MagicSkillUse, USE_S1 and gauge, and the gauge is sent whatever
+// the hit time. The launch broadcasts MagicSkillLaunched with no mid-cast
+// revalidation, then the controller charges shots and the final MP, and the
+// cast ends with no cool phase (Controller.ScheduleSignetCast).
+func (l *GameClientLink) startSignetCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+	if resolved, ok := target.(skilltarget.Actor); ok {
+		handlers.Sink = l.playerMessageSink(live, nil)
+		result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, []skilltarget.Actor{resolved}, def)
+		l.settlePvPChanges(live)
+		l.syncCubicTargets(live, result, def)
+	}
+
+	l.broadcastCastStart(live, target, def, plan)
+	live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.HitTime), millis(plan.HitTime)))
+	controller.ScheduleSignetCast(plan, func() int {
+		affected, _ := l.broadcastLaunchTargets(live, target, def)
+		return len(affected)
+	}, func(err error) {
+		sendMagicCastFailureReason(live, def, err)
+	})
+}
+
 // launchCastTargets runs a player cast's launch: the mid-cast revalidation,
 // then the one resolution of def's affected set, broadcast in
 // MagicSkillLaunched and returned for the hit to reuse as is. A creature
@@ -239,6 +267,17 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 		sendLaunchAbort(live, reason)
 		return nil, false
 	}
+	affected, ok = l.broadcastLaunchTargets(live, target, def)
+	if ok {
+		l.castController(live).SetLaunchTargets(len(affected))
+	}
+	return affected, ok
+}
+
+// broadcastLaunchTargets resolves def's affected set from target and
+// broadcasts it in MagicSkillLaunched. ok is false when no set can be
+// resolved.
+func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorcast.Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	handler, ok := l.targets.Handler(def.Target)
 	if !ok {
 		return nil, false
@@ -248,7 +287,6 @@ func (l *GameClientLink) launchCastTargets(live *livePlayer, target actorcast.Ta
 		return nil, false
 	}
 	affected = handler.Targets(live.Character, resolvedTarget, &def)
-	l.castController(live).SetLaunchTargets(len(affected))
 	targetIDs := make([]int32, 0, len(affected))
 	for _, affectedTarget := range affected {
 		targetIDs = append(targetIDs, affectedTarget.ObjectID())

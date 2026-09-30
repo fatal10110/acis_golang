@@ -329,7 +329,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// frame (if any effect was restored) right where the reference sends it,
 	// ahead of EtcStatusUpdate.
 	if l.skills != nil {
+		live.replayingEffects.Store(true)
 		l.skills.ReplayEffects(c)
+		live.replayingEffects.Store(false)
 	}
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
 	if l.world != nil {

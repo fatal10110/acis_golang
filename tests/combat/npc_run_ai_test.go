@@ -78,6 +78,9 @@ func startHostileAttackAfter(t *testing.T, atkSpd, rightHand int, prelude hostil
 	tmpl.AtkSpd = float64(atkSpd)
 	tmpl.PAtk = 0.25
 	tmpl.RightHand = rightHand
+	// In reach, so the promoting pass swings at once: an arrival never
+	// thinks, and a chase leg would leave the swing to a later cycle.
+	tmpl.BaseAttackRange = 40
 	at := location.Location{X: x + 20, Y: y, Z: z}
 	hostile := srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
 	drainUntilQuiet(t, c)

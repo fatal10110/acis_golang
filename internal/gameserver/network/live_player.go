@@ -71,8 +71,14 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
-	shortcuts          *shortcut.List
-	isGM               bool
+	// replayingEffects is set while EnterWorld replays the saved effects,
+	// before the player is in the world. Their start hooks change its
+	// appearance, but it has no observers yet and the EnterWorld UserInfo
+	// that follows carries the result, so the appearance refresh stays
+	// silent. Written on the owner's queue; atomic for the Emit readers.
+	replayingEffects atomic.Bool
+	shortcuts        *shortcut.List
+	isGM             bool
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.
@@ -108,8 +114,11 @@ type livePlayer struct {
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
 	deferredAction  func()
-	pickupLocked    bool
-	pickupLockGen   uint64
+	// deferredInteract is an interact with the player's own summon queued
+	// as the next intention; see showOwnedPetStatus.
+	deferredInteract *petInteractIntention
+	pickupLocked     bool
+	pickupLockGen    uint64
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.
@@ -273,6 +282,7 @@ func (p *livePlayer) Stop() {
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
+	p.takeDeferredPetInteract()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -321,14 +331,30 @@ func (p *livePlayer) stopCubics() {
 	}
 }
 
-func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
-	p.pickupMu.Lock()
-	defer p.pickupMu.Unlock()
+// clearNextIntentionLocked drops whatever is queued as the next intention:
+// the player has a single next-intention slot, so queuing one replaces the
+// others. The caller holds pickupMu.
+func (p *livePlayer) clearNextIntentionLocked() {
+	p.deferredPickup = nil
 	p.deferredMagic = nil
 	p.deferredItem = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
 	p.deferredAction = nil
+	p.deferredInteract = nil
+}
+
+// clearNextIntention drops whatever is queued as the next intention.
+func (p *livePlayer) clearNextIntention() {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
+}
+
+func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
 	p.pickup = &pickupIntention{ctx: ctx, target: target}
 }
 
@@ -343,11 +369,7 @@ func (p *livePlayer) takePickup() *pickupIntention {
 func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shift bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredMagic = nil
-	p.deferredItem = nil
-	p.deferredFollow = nil
-	p.deferredUseItem = nil
-	p.deferredAction = nil
+	p.clearNextIntentionLocked()
 	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
@@ -364,11 +386,7 @@ func (p *livePlayer) takeDeferredPickup() *pickupIntention {
 func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = nil
-	p.deferredItem = nil
-	p.deferredFollow = nil
-	p.deferredUseItem = nil
-	p.deferredAction = nil
+	p.clearNextIntentionLocked()
 	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
 }
 
@@ -399,11 +417,7 @@ func (p *livePlayer) hasDeferredItemAICast() bool {
 func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = nil
-	p.deferredMagic = nil
-	p.deferredFollow = nil
-	p.deferredUseItem = nil
-	p.deferredAction = nil
+	p.clearNextIntentionLocked()
 	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
 }
 
@@ -420,11 +434,7 @@ func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {
 func (p *livePlayer) deferFollow(target attackable.Combatant, shift bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = nil
-	p.deferredMagic = nil
-	p.deferredItem = nil
-	p.deferredUseItem = nil
-	p.deferredAction = nil
+	p.clearNextIntentionLocked()
 	p.deferredFollow = &followIntention{target: target, shift: shift}
 }
 
@@ -449,11 +459,7 @@ func (p *livePlayer) hasDeferredFollow() bool {
 func (p *livePlayer) deferUseItem(objectID int32) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = nil
-	p.deferredMagic = nil
-	p.deferredItem = nil
-	p.deferredFollow = nil
-	p.deferredAction = nil
+	p.clearNextIntentionLocked()
 	p.deferredUseItem = &useItemIntention{objectID: objectID}
 }
 
@@ -478,11 +484,7 @@ func (p *livePlayer) hasDeferredUseItem() bool {
 func (p *livePlayer) deferAction(run func()) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.deferredPickup = nil
-	p.deferredMagic = nil
-	p.deferredItem = nil
-	p.deferredFollow = nil
-	p.deferredUseItem = nil
+	p.clearNextIntentionLocked()
 	p.deferredAction = run
 }
 
@@ -498,6 +500,31 @@ func (p *livePlayer) hasDeferredAction() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.deferredAction != nil
+}
+
+// deferPetInteract stores the owner's interact with its own summon pet as
+// the next intention, replacing whatever was queued before.
+func (p *livePlayer) deferPetInteract(pet *summon.Actor, shift bool) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
+	p.deferredInteract = &petInteractIntention{pet: pet, shift: shift}
+}
+
+func (p *livePlayer) takeDeferredPetInteract() *petInteractIntention {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	interact := p.deferredInteract
+	p.deferredInteract = nil
+	return interact
+}
+
+// hasDeferredPetInteract reports whether an interact with the player's own
+// summon is queued as the next intention.
+func (p *livePlayer) hasDeferredPetInteract() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredInteract != nil
 }
 
 func (p *livePlayer) setPetInteract(pet *summon.Actor) {
@@ -555,6 +582,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
+	p.takeDeferredPetInteract()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -566,14 +594,17 @@ func (p *livePlayer) tryToIdle(denied bool) {
 
 // clearParkedApproaches drops pickup, pet-interact, and deferred-magic
 // approach slots, the follow intention, current or queued, and a queued
-// equip toggle, so a later walk or chase cannot inherit them.
+// pickup, equip toggle or summon interact, so a later walk or chase cannot
+// inherit them.
 func (p *livePlayer) clearParkedApproaches() {
 	p.takePickup()
 	p.takePetInteract()
+	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
+	p.takeDeferredPetInteract()
 	p.endFollow()
 }
 

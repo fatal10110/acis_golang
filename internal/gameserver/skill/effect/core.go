@@ -599,6 +599,73 @@ func wireHooks(e *Effect) {
 		}
 		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, magicCircleAbnormalMask) }
 	}
+	wireTemplateAbnormal(e)
+}
+
+// ownStartKinds and ownExitKinds are the kinds whose start or exit hook is
+// entirely their own: they ignore the template's abnormal visual there.
+// Every other kind shows the visual on start and clears it on exit, after
+// its own hook runs.
+var (
+	ownStartKinds = kindSet(
+		TypeAbortCast, TypeBetray, TypeBigHead, TypeBlockBuff, TypeBluff,
+		TypeCancel, TypeCancelDebuff, TypeCharmOfCourage, TypeCharmOfLuck,
+		TypeClanGate, TypeConfusion, TypeDistrust, TypeFakeDeath, TypeFear,
+		TypeGrow, TypeHeal, TypeHealOverTime, TypeImmobileUntilAttacked,
+		TypeImmobilizeEffector, TypeImmobilizePetBuff, TypeIncreaseCharges,
+		TypeManaHeal, TypeMute, TypeNegate, TypeNoblesseBless, TypeParalyze,
+		TypePetrification, TypePhoenixBless, TypePhysicalMute,
+		TypeProtectionBless, TypeRandomizeHate, TypeRecovery,
+		TypeRemoveTarget, TypeRoot, TypeSignetGround, TypeSilenceAll,
+		TypeSleep, TypeSpoil, TypeStun, TypeStunSelf, TypeTargetMe,
+		TypeThrowUp,
+	)
+	ownExitKinds = kindSet(
+		TypeBetray, TypeBigHead, TypeCharmOfCourage, TypeCharmOfLuck,
+		TypeClanGate, TypeConfusion, TypeDistrust, TypeFakeDeath, TypeFear,
+		TypeGrow, TypeImmobileUntilAttacked, TypeImmobilizeEffector,
+		TypeImmobilizePetBuff, TypeMute, TypeNoblesseBless, TypeParalyze,
+		TypePetrification, TypePhoenixBless, TypePhysicalMute,
+		TypeProtectionBless, TypeRandomizeHate, TypeRecovery,
+		TypeRemoveTarget, TypeRoot, TypeSignetGround, TypeSilenceAll,
+		TypeSleep, TypeStun, TypeStunSelf, TypeTargetMe, TypeThrowUp,
+	)
+)
+
+func kindSet(types ...Type) map[Type]bool {
+	set := make(map[Type]bool, len(types))
+	for _, t := range types {
+		set[t] = true
+	}
+	return set
+}
+
+// wireTemplateAbnormal chains the template's abnormal visual onto e's start
+// and exit hooks, unless its kind owns that hook outright.
+func wireTemplateAbnormal(e *Effect) {
+	mask := e.Template.AbnormalEffect
+	if mask == 0 {
+		return
+	}
+	if !ownStartKinds[e.Type] {
+		start := e.OnStart
+		e.OnStart = func(e *Effect) bool {
+			if start != nil && !start(e) {
+				return false
+			}
+			startAbnormalEffect(e.Effected, mask)
+			return true
+		}
+	}
+	if !ownExitKinds[e.Type] {
+		exit := e.OnExit
+		e.OnExit = func(e *Effect) {
+			if exit != nil {
+				exit(e)
+			}
+			stopAbnormalEffect(e.Effected, mask)
+		}
+	}
 }
 
 func (e *Effect) IncreaseEffect(list *List, maxLevel int, reapply func(level int)) {

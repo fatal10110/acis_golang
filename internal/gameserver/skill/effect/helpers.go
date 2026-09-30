@@ -2,28 +2,27 @@ package effect
 
 import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
-// refresh pushes target's abnormal-effect state to observers; a nil target
-// (an effect with no source) is left alone.
+// refresh re-announces target's appearance (a player's UserInfo/CharInfo, a
+// summon's or NPC's info packet); a nil target (an effect with no source) is
+// left alone.
 func refresh(target Actor) {
 	if target != nil {
 		target.UpdateAbnormalEffect()
 	}
 }
 
+// startAbnormalEffect sets mask on target's visible abnormal state and
+// re-announces its appearance once.
 func startAbnormalEffect(target Actor, mask int) {
 	target.StartAbnormalEffect(mask)
 	target.UpdateAbnormalEffect()
-	if p, ok := asPlayer(target); ok {
-		p.BroadcastAbnormalEffect()
-	}
 }
 
+// stopAbnormalEffect clears mask from target's visible abnormal state and
+// re-announces its appearance once.
 func stopAbnormalEffect(target Actor, mask int) {
 	target.StopAbnormalEffect(mask)
 	target.UpdateAbnormalEffect()
-	if p, ok := asPlayer(target); ok {
-		p.BroadcastAbnormalEffect()
-	}
 }
 
 func isPlayable(target Actor) bool {

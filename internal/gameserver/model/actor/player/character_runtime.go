@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -281,7 +282,9 @@ func (c *Character) RewardItemFits(itemID int32, count int) bool {
 }
 
 // AddRewardItem creates and adds one kill-reward item stack to this live
-// character's inventory. objectID must be allocated by the reward caller.
+// character's inventory, then runs ItemAdded's side effects: adena names
+// its amount, anything else its template and count. objectID must be
+// allocated by the reward caller.
 func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
 	if c.inventory == nil {
 		return false
@@ -289,7 +292,34 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 	if c.inventory.AddNew(itemID, count, objectID) == nil {
 		return false
 	}
+	notice := event.ObtainCreated
+	if itemID == item.AdenaID {
+		notice = event.ObtainAdena
+	}
+	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
 	return true
+}
+
+// ItemAdded runs the side effects of items already added to this
+// character's inventory, shared by every path that grants items: it names
+// them in chat, then, for arrows reaching a bow user whose left hand is
+// empty, puts the bow's matching arrows on.
+func (c *Character) ItemAdded(obtained event.ItemObtained) {
+	if obtained.Count < 1 {
+		return
+	}
+	c.emit(obtained)
+	if obtained.Notice == event.ObtainAdena || c.inventory == nil {
+		return
+	}
+	tmpl, ok := c.inventory.Templates().Get(obtained.ItemID)
+	if !ok || tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemArrow {
+		return
+	}
+	if c.AttackType() != item.WeaponBow || c.inventory.ItemAt(itemcontainer.LHand) != nil {
+		return
+	}
+	c.CheckAndEquipArrows()
 }
 
 // Inventory returns the carried item collection attached by AttachRuntime,

@@ -575,7 +575,7 @@ func TestSignetMDamHalfFailureSendsResistMessages(t *testing.T) {
 
 	before := srv.PlayerCurrentHP(t, victimID)
 	c.Send(encodeRequestMagicSkillUse(1419, false, false))
-	readCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
+	readSignetCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
 	tickSignetMDamLive(t, srv)
 	if srv.PlayerCurrentHP(t, victimID) >= before {
 		t.Fatalf("victim HP after signet tick = %d, want below %d", srv.PlayerCurrentHP(t, victimID), before)
@@ -601,7 +601,7 @@ func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
 
 	before := srv.PlayerCurrentHP(t, victimID)
 	c.Send(encodeRequestMagicSkillUse(1419, false, false))
-	readCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
+	readSignetCastStartFrames(t, c, objID, 1419, 1, 500, 60_000, objID)
 	tickSignetMDamLive(t, srv)
 	if srv.PlayerCurrentHP(t, victimID) >= before {
 		t.Fatalf("victim HP after signet tick = %d, want below %d", srv.PlayerCurrentHP(t, victimID), before)

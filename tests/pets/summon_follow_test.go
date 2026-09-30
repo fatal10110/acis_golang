@@ -290,3 +290,40 @@ func TestPetStopAfterAttackFollowsOwner(t *testing.T) {
 	}
 	drainUntilQuiet(t, h.client)
 }
+
+// TestCrowdControlledPetHoldsItsPlace lands each crowd-control effect that
+// aborts a pet on one that follows its owner. While it holds, the pet stays
+// where it is as the owner walks off; once it ends, the pet walks after the
+// owner again.
+//
+// Recorded divergence (#2832): in the reference the effect's onStart calls
+// abortAll and tryToIdle before EffectList.queueRunner computes the effect's
+// flags (EffectList.java:465-491, AbstractEffect.java:160-168), so
+// PlayableAI.tryToIdle -> SummonAI.thinkIdle -> thinkFollow ->
+// CreatureMove.maybeStartFriendlyFollow (PlayableAI.java:354-371,
+// SummonAI.java:32-46, :122-136, CreatureMove.java:421-428) arms the
+// one-second friendly-follow task while denyAiAction and isMovementDisabled
+// still read false. SummonMove.friendlyFollowTask and
+// CreatureMove.moveToLocation never recheck crowd control, so a stunned,
+// slept or paralyzed summon keeps walking after its owner for the whole
+// effect. That is an ordering artifact that makes crowd control not hold a
+// following summon, which a player could lean on to keep a pet closing on or
+// escaping with its owner; this server holds the summon in place instead.
+func TestCrowdControlledPetHoldsItsPlace(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"Stun", "Sleep", "Paralyze", "Petrification", "ImmobileUntilAttacked"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			h, petActor := bootFollowingPet(t)
+			cc := landPetEffect(t, petActor, petActor, name)
+			if got := petActor.Intent(); got != summon.IntentFollowOwner {
+				t.Fatalf("pet intent under %s = %v, want follow-owner kept", name, got)
+			}
+			h.requirePetStaysPut(t, petActor, name+" pet")
+
+			removePetEffect(t, petActor, cc)
+			h.requirePetCatchesUp(t, petActor, "pet following its owner once "+name+" ends")
+			drainUntilQuiet(t, h.client)
+		})
+	}
+}

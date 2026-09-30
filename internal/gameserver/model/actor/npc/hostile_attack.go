@@ -3,11 +3,13 @@ package npc
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -54,16 +56,39 @@ type LineOfSight interface {
 	CanSeeActor(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64) bool
 }
 
+// lineOfSightIgnoring is the optional LineOfSight query that leaves one
+// dynamic geodata object out, used when the target is such an object.
+type lineOfSightIgnoring interface {
+	CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore dynamic.Object) bool
+}
+
+// The production geo must satisfy the optional query: canSeeObject finds it
+// by type assertion, so a signature drift would otherwise silently make a
+// target door hide itself again.
+var _ lineOfSightIgnoring = move.EngineGeo{}
+
 // CanSee reports whether target is visible to this NPC: a geodata
 // line-of-sight query between the two actors' positions and eye heights, or
 // permissive when no line-of-sight query is attached (e.g. in tests).
 func (h *Hostile) CanSee(target attackable.Combatant) bool {
+	tx, ty, tz := target.Position()
+	return h.canSeeObject(target, tx, ty, tz, target.CollisionHeight())
+}
+
+// canSeeObject queries sight to obj standing at (tx, ty, tz). An obj that
+// is itself a geodata object (a closed door) is left out of the query, so it
+// never hides itself.
+func (h *Hostile) canSeeObject(obj any, tx, ty, tz int, theight float64) bool {
 	if h.los == nil {
 		return true
 	}
 	ox, oy, oz := h.Position()
-	tx, ty, tz := target.Position()
-	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
+	if geoObj, ok := obj.(dynamic.Object); ok {
+		if los, ok := h.los.(lineOfSightIgnoring); ok {
+			return los.CanSeeActorIgnoring(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight, geoObj)
+		}
+	}
+	return h.los.CanSeeActor(ox, oy, oz, h.CollisionHeight(), tx, ty, tz, theight)
 }
 
 // IntentionMovesToTarget reports whether this NPC's current intention may
@@ -73,11 +98,12 @@ func (h *Hostile) IntentionMovesToTarget() bool {
 	return h.brain.CurrentIntentionMovesToTarget()
 }
 
-// CanSeeTarget adapts NPC line-of-sight to the launch revalidation target
-// surface.
+// CanSeeTarget reports whether target is visible to this NPC for the cast
+// pipeline's line-of-sight gates. Same geodata query as CanSee, for any
+// skill target, a door included.
 func (h *Hostile) CanSeeTarget(target skilltarget.Actor) bool {
-	combatant, ok := target.(attackable.Combatant)
-	return ok && h.CanSee(combatant)
+	tx, ty, tz := target.Position()
+	return h.canSeeObject(target, tx, ty, tz, target.CollisionHeight())
 }
 
 // CollisionRadius returns this NPC's body radius, used to resolve attack

@@ -31,10 +31,16 @@ test-race:
 
 DOCKER_COMPOSE ?= $(shell command -v docker-compose >/dev/null 2>&1 && echo docker-compose || echo "docker compose")
 
+# The project name is pinned because container_name is fixed: compose would
+# otherwise name the project after the checkout directory, so `down` from a
+# different worktree would miss the container and `up` would hit a name
+# conflict.
+TEST_DB_COMPOSE = $(DOCKER_COMPOSE) -p acis-test -f docker-compose.test.yml
+
 # Start the single shared MariaDB instance used by every integration test.
 test-db-up:
-	$(DOCKER_COMPOSE) -f docker-compose.test.yml up -d --wait
+	$(TEST_DB_COMPOSE) up -d --wait
 
 # Stop and remove it.
 test-db-down:
-	$(DOCKER_COMPOSE) -f docker-compose.test.yml down
+	$(TEST_DB_COMPOSE) down

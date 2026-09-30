@@ -5,6 +5,7 @@ import (
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -503,6 +504,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	l.unequipDestroyedItem(live, inv, objectID, count)
 	res, failure := l.inventory.DestroyItemResult(inv, objectID, count)
 	if failure != invops.DestroyOK {
 		return
@@ -511,6 +513,27 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
+}
+
+// unequipDestroyedItem takes a worn item off before a destroy consumes all
+// of it, the way UseItem takes it off: the removal message ahead of the
+// paperdoll change, the weapon's shot charges, the grade penalty refresh,
+// UserInfo/CharInfo and a moved storage limit. A destroy that leaves part
+// of a worn stack behind keeps it worn.
+func (l *GameClientLink) unequipDestroyedItem(live *livePlayer, inv *itemcontainer.Inventory, objectID int32, count int) {
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	st := inst.Snapshot()
+	if !st.Equipped() || st.Count > count {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(st.TemplateID)
+	if !ok {
+		return
+	}
+	l.toggleEquipItem(live, inv, inst, tmpl, false)
 }
 
 // crystallizeLiveItem answers RequestCrystallizeItem. A player running a
@@ -551,18 +574,27 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 		sendUnequippedMessage(live, res.SourceItemID, res.SourceEnchantLevel)
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageItemCrystallized, res.SourceItemID))
-	sendPickedUpMessage(live, res.CrystalItemID, res.CrystalCount)
+	live.ItemAdded(event.ItemObtained{ItemID: res.CrystalItemID, Count: res.CrystalCount, Notice: event.ObtainCreated})
 	l.broadcastEquipmentChange(live)
 }
 
-// sendPickedUpMessage tells live it received count of templateID, naming
-// the count only when it is more than one.
-func sendPickedUpMessage(live *livePlayer, templateID int32, count int) {
-	if count > 1 {
-		live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageYouPickedUpS2S1, templateID, int32(count)))
-		return
+// itemObtainedFrame is the chat line naming items that reached a player's
+// inventory. Adena names only its amount. A picked-up item names a stack's
+// count as a plain number and a single enchanted item's enchant level; an
+// item created by id names a stack's count as an item number.
+func itemObtainedFrame(e event.ItemObtained) wire.Frame {
+	switch {
+	case e.Notice == event.ObtainAdena:
+		return serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, int32(e.Count))
+	case e.Count > 1 && e.Notice == event.ObtainPickup:
+		return serverpackets.FrameSystemMessageItemNameNumber(serverpackets.SystemMessageYouPickedUpS2S1, e.ItemID, int32(e.Count))
+	case e.Count > 1:
+		return serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageYouPickedUpS2S1, e.ItemID, int32(e.Count))
+	case e.EnchantLevel > 0 && e.Notice == event.ObtainPickup:
+		return serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageYouPickedUpAS1S2, int32(e.EnchantLevel), e.ItemID)
+	default:
+		return serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouPickedUpS1, e.ItemID)
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouPickedUpS1, templateID))
 }
 
 // broadcastEquipmentChange resends UserInfo to live (refreshing its own

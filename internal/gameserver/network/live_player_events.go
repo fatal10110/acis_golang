@@ -33,7 +33,7 @@ func (p *livePlayer) BroadcastFrame(frame wire.Frame) bool {
 // attached. Every other event keeps reaching observers after detach.
 func sessionOnly(ev event.Event) bool {
 	switch ev.(type) {
-	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed,
+	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed, event.ItemObtained,
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
 		event.RelaxHPFull, event.Restored, event.EffectEnded, event.EffectFelt, event.SpoilResult,
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
@@ -70,6 +70,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
+	case event.HitDamageApplied:
+		// The hit's own task runs on live's queue: a PK kill it just made
+		// takes its items off and resets its flag before anything else the
+		// hit sends.
+		l.settlePvPChanges(live)
 	case event.HitLanded:
 		l.chance.AttackHit(live.Character, e)
 	case event.ShotsRechargeRequested:
@@ -122,6 +127,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.finishDeferredMagicSkill(live)
 			l.finishDeferredItemAICast(live)
 			l.finishDeferredFollow(live)
+			l.finishDeferredPetInteract(live)
 			l.finishDeferredUseItem(live, resumePosture)
 		}
 	case event.ReviveRequested:
@@ -141,7 +147,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.EffectIconsChanged:
 		l.updateLiveAbnormalEffect(live)
 	case event.AbnormalEffectChanged:
-		l.broadcastCharacterInfo(live)
+		if !live.replayingEffects.Load() {
+			l.broadcastCharacterInfo(live)
+		}
 	case event.ExpSPGained:
 		live.SendFrame(expSpGainMessage(e.Exp, e.SP))
 	case event.ExpSPLost:
@@ -171,6 +179,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	case event.RunSpeedChanged:
 		l.broadcastRunSpeedChange(live)
+	case event.StatsModified:
+		l.sendModifiedStats(live, e.Attrs)
 	case event.ChargesChanged, event.EtcStatusChanged:
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 	case event.ChargeMessage:
@@ -265,6 +275,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.selectLiveTarget(live, e.Target)
 	case event.HerbConsumed:
 		l.consumeHerb(live, e.ItemID)
+	case event.ItemObtained:
+		live.SendFrame(itemObtainedFrame(e))
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
@@ -282,15 +294,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if l.finishDeferredAction(live) {
 			return
 		}
-		l.finishDeferredPickup(live)
-		magicHeld := l.finishDeferredMagicSkill(live)
-		itemHeld := l.finishDeferredItemAICast(live)
-		followHeld := l.finishDeferredFollow(live)
-		// A queued cast or follow took the intention the swing had when it
-		// was queued; whether it started now, was refused, or is held for
-		// PostureSettled, the attack does not swing again. A queued equip
-		// toggle resumes the attack itself once it has run.
-		if magicHeld || itemHeld || followHeld || l.finishDeferredUseItem(live, resumeAttack) {
+		// A queued pickup, cast, follow or summon interact took the
+		// intention the swing had when it was queued; whether it started
+		// now, was refused, or is held for PostureSettled, the attack does
+		// not swing again. A queued equip toggle resumes the attack itself
+		// once it has run.
+		if l.finishQueuedBehindAttack(live) {
 			return
 		}
 		live.finishAttack()
@@ -299,14 +308,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return
 		}
 		// A shot's end runs whatever was queued behind it, while the bow
-		// still reloads: a pickup, cast, follow or equip toggle starts now,
-		// and an attack is re-thought, which the running reuse answers with
-		// ActionFailed. The toggle re-thinks the attack itself.
-		l.finishDeferredPickup(live)
-		magicHeld := l.finishDeferredMagicSkill(live)
-		itemHeld := l.finishDeferredItemAICast(live)
-		followHeld := l.finishDeferredFollow(live)
-		if magicHeld || itemHeld || followHeld || l.finishDeferredUseItem(live, resumeAttack) {
+		// still reloads: a pickup, cast, follow, summon interact or equip
+		// toggle starts now, and an attack is re-thought, which the running
+		// reuse answers with ActionFailed. The toggle re-thinks the attack
+		// itself.
+		if l.finishQueuedBehindAttack(live) {
 			return
 		}
 		if live.combat != nil && live.combat.ThinkQueued() {
@@ -437,6 +443,18 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
 }
 
+// finishQueuedBehindAttack runs the intention queued behind a swing or a
+// bow shot that just ended, if any, and reports whether one was waiting:
+// the queue holds at most one, which replaces the attack.
+func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
+	return l.finishDeferredPickup(live) ||
+		l.finishDeferredMagicSkill(live) ||
+		l.finishDeferredItemAICast(live) ||
+		l.finishDeferredFollow(live) ||
+		l.finishDeferredPetInteract(live) ||
+		l.finishDeferredUseItem(live, resumeAttack)
+}
+
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
 // target ends.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
@@ -453,6 +471,9 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		return
 	}
 	if l.finishDeferredFollow(live) {
+		return
+	}
+	if l.finishDeferredPetInteract(live) {
 		return
 	}
 	if l.finishDeferredUseItem(live, resumeNothing) {

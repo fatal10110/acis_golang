@@ -174,9 +174,10 @@ func (a *Actor) Unsummon() {
 // non-player resurrection revives it first (Revive). A pet
 // restored dead from its saved row has no decay pending and so stays until
 // its owner comes back to it. A servitor's corpse gives the slot up, so the
-// owner can summon again at once; one with no decay pending leaves with its
-// owner, since nothing would ever remove it. A corpse whose owner already
-// left is not left again.
+// owner can summon again at once, and is nobody's from then on, even once a
+// resurrection stands it back up (Revive); one with no decay pending leaves
+// with its owner, since nothing would ever remove it. A corpse whose owner
+// already left is not left again.
 func (a *Actor) LeaveWithOwner() {
 	if !a.Dead() || (!a.isPet && !a.HasCorpse()) {
 		a.despawn(nil)
@@ -197,7 +198,8 @@ func (a *Actor) OwnerLeft() bool { return a.ownerLeft.Load() }
 
 // ShownAsOwnedBy reports whether playerID sees this summon as their own. A
 // pet's corpse stays its owner's across a relog; a servitor's corpse left
-// behind is nobody's, since its owner may already have summoned another.
+// behind is nobody's, revived or not, since its owner may already have
+// summoned another.
 func (a *Actor) ShownAsOwnedBy(playerID int32) bool {
 	return a.OwnerID() == playerID && (a.isPet || !a.OwnerLeft())
 }

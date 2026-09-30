@@ -17,25 +17,37 @@ import (
 // own state changes send at once (the target's status, death and kill
 // rewards).
 //
-// A player caster's PvP flag changes are not settled here, unlike a regular
-// cast's hit: a proc of the player that was hit runs on its attacker's
-// queue, not its own, and the settle belongs to the player's queue.
-func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, apply func(handlerskill.MessageSink) actorcast.EffectResult) {
+// A player's proc set off by its own hit or cast (ownHit) runs on its own
+// queue, so, like a regular cast's hit, it first runs the PvP flag changes
+// pending for the player before each message and before the result: a PK
+// kill the proc just made takes its items off and resets its flag before
+// anything else the proc sends. A proc of the player that was hit runs on
+// its attacker's queue, not its own, and leaves them to the player's queue.
+func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, ownHit bool, apply func(handlerskill.MessageSink) actorcast.EffectResult) {
+	var live *livePlayer
 	var deliver func(actorcast.EffectResult)
 	switch c := caster.(type) {
 	case *livePlayer:
+		live = c
 		deliver = l.chanceResultTo(c)
 	case *player.Character:
-		live, _ := l.livePlayerByID(c.ObjectID())
+		live, _ = l.livePlayerByID(c.ObjectID())
 		deliver = l.chanceResultTo(live)
 	case *summon.Actor:
 		deliver = func(result actorcast.EffectResult) { l.sendSummonSkillResult(c, result) }
 	default:
 		deliver = l.chanceResultTo(nil)
 	}
-	deliver(apply(func(message any) {
+	settle := func() {}
+	if ownHit && live != nil {
+		settle = func() { l.settlePvPChanges(live) }
+	}
+	result := apply(func(message any) {
+		settle()
 		deliver(actorcast.EffectResult{Messages: []any{message}})
-	}))
+	})
+	settle()
+	deliver(result)
 }
 
 // chanceResultTo delivers a chance-triggered skill's result for the player

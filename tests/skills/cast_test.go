@@ -33,7 +33,13 @@ func seedKnownSkill(t *testing.T, srv *gameservertest.Server, objID int32, skill
 // timing fields along the way.
 func readCastStartFrames(t *testing.T, c clientReader, objID, skillID, level, hitTime, reuse, targetID int32) {
 	t.Helper()
-	reply := c.Read()
+	readCastStartFramesFrom(t, c, c.Read(), objID, skillID, level, hitTime, reuse, targetID)
+}
+
+// readCastStartFramesFrom is readCastStartFrames for a caller that has
+// already read the cast's MagicSkillUse as reply.
+func readCastStartFramesFrom(t *testing.T, c clientReader, reply []byte, objID, skillID, level, hitTime, reuse, targetID int32) {
+	t.Helper()
 	assertFrameOpcode(t, reply, serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 	r := wireReader(reply[1:])
 	caster, gotTarget, sid, lvl := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
@@ -326,6 +332,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 				t.Fatalf("world player %d = %T, want mastery-capable player", objID, obj)
 			}
 			ch.AddStatFuncs([]effect.Mod{{Stat: stat.SkillMastery, Op: effect.OpSet, Value: tt.power}})
+			drainUntilQuiet(t, c) // the stat func change's own UserInfo
 			ch.SetFloatRollSource(func(n float64) float64 {
 				if n != 100 {
 					t.Fatalf("mastery roll bound = %g, want 100", n)

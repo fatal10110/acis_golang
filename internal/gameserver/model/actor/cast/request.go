@@ -176,7 +176,7 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	// dispatches them to doFusionCast instead (PlayerAI.java:299-301),
 	// which never calls clearRecentFakeDeath — so they're excluded here
 	// too.
-	if def.SkillType != "FUSION" && def.SkillType != "SIGNET_CASTTIME" {
+	if !FusionTimeline(def) {
 		caster.ClearRecentFakeDeath()
 	}
 	return started, nil

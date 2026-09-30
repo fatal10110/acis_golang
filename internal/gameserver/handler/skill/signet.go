@@ -346,17 +346,17 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 // finds within skill radius.
 func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Type: effect.TypeSignetGround, Effector: caster, Effected: caster}
-	var actor *npc.EffectPoint
+	var point *npc.EffectPoint
 	e.OnStart = func(*effect.Effect) bool {
 		a, ok := h.spawnActor(caster, def)
 		if !ok {
 			return false
 		}
-		actor = a
+		point = a
 		return true
 	}
 	e.OnAction = func(ef *effect.Effect) bool {
-		if actor == nil {
+		if point == nil {
 			return false
 		}
 		if ef.Remaining() >= ef.Template.Count-2 {
@@ -373,7 +373,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 		mp.ReduceMP(float64(def.MPConsume))
 
 		var ids []int32
-		h.forEachSignetTarget(actor, def.Radius, func(target Actor) {
+		h.forEachSignetTarget(point, def.Radius, func(target Actor) {
 			dmgTarget, ok := asCreature(target)
 			if !ok {
 				return
@@ -384,6 +384,11 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			}
 			deliverMagicFailure(caster, target, def, in.Failure)
 			damage := int(formulas.MagicDamage(in))
+			// A summon in the signet republishes its status on every tick,
+			// whether or not the tick then hurts it.
+			if target.Kind() == actor.KindSummon {
+				dmgTarget.BroadcastStatus()
+			}
 			if damage > 0 {
 				// The cast break rolls first, then the caster hears of the
 				// damage, then the target takes it.
@@ -397,18 +402,18 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 				}
 			}
 			if ct := target; ct != nil {
-				actor.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
+				point.BroadcastSkillUse(ct, int32(def.ID), int32(def.Level))
 				ids = append(ids, ct.ObjectID())
 			}
 		})
 		if len(ids) > 0 {
-			actor.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
+			point.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 		}
 		return true
 	}
 	e.OnExit = func(*effect.Effect) {
-		if actor != nil {
-			actor.Despawn()
+		if point != nil {
+			point.Despawn()
 		}
 	}
 	return e

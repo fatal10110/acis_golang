@@ -263,24 +263,34 @@ func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 	l.pickupLiveGroundItem(pickup.ctx, live, target)
 }
 
-func (l *GameClientLink) finishDeferredPickup(live *livePlayer) {
+// finishDeferredPickup runs the pickup queued as the next intention, if any,
+// and reports whether one was waiting. The pickup replaces the attack
+// intention whatever its outcome: the swing or shot it waited behind is not
+// followed by another. An item gone meanwhile only releases the click.
+func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	pickup := live.takeDeferredPickup()
-	if pickup == nil || pickup.target == nil {
-		return
+	if pickup == nil {
+		return false
 	}
-	target := l.resolveTarget(pickup.target.ObjectID())
-	if target != pickup.target {
-		return
+	if live.combat != nil {
+		live.combat.Replace()
 	}
-	ground, ok := target.(*grounditem.Item)
-	if !ok {
-		return
+	var ground *grounditem.Item
+	if pickup.target != nil {
+		if target := l.resolveTarget(pickup.target.ObjectID()); target == pickup.target {
+			ground, _ = target.(*grounditem.Item)
+		}
+	}
+	if ground == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
 	}
 	if blocked, deferrable := livePickupBlockedDeferrable(live); blocked {
 		l.deferOrFailPickup(pickup.ctx, live, ground, pickup.shift, deferrable)
-		return
+		return true
 	}
 	l.walkOrForwardPickup(pickup.ctx, live, ground, pickup.shift)
+	return true
 }
 
 func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
@@ -333,12 +343,58 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 	return true
 }
 
+// petInteractIntention is an owner's interact with its own summon queued
+// behind a swing or a cast.
+type petInteractIntention struct {
+	pet   *summon.Actor
+	shift bool
+}
+
 // showOwnedPetStatus is the owner's interact with its own summon: the
-// status window, after an approach walk when out of range. The interact
-// replaces the follow intention.
+// status window, after an approach walk when out of range. An owner that
+// cannot take AI actions is only answered ActionFailed. One still swinging
+// or casting queues the interact for that to end, answered ActionFailed
+// too. Otherwise the interact replaces the follow intention and runs now.
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if (live.attack != nil && live.attack.AttackingNow()) || live.CastingNow() {
+		live.deferPetInteract(pet, shift)
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	live.endFollow()
 	l.thinkOwnedPetInteract(live, pet, shift)
+}
+
+// finishDeferredPetInteract runs the summon interact queued as the next
+// intention, if any, and reports whether one was waiting. It replaces the
+// attack intention; a summon that left the world or changed owner meanwhile
+// ends it with ActionFailed. During a sit-down or stand-up the interact
+// stays queued for PostureSettled.
+func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
+	if live == nil || live.detached() {
+		return false
+	}
+	if inPostureTransition(live) {
+		return live.hasDeferredPetInteract()
+	}
+	queued := live.takeDeferredPetInteract()
+	if queued == nil {
+		return false
+	}
+	if live.combat != nil {
+		live.combat.Replace()
+	}
+	live.endFollow()
+	if l.resolveTarget(queued.pet.ObjectID()) != world.Tracked(queued.pet) || queued.pet.OwnerID() != live.ObjectID() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+	l.thinkOwnedPetInteract(live, queued.pet, queued.shift)
+	return true
 }
 
 // thinkOwnedPetInteract runs one think of the owner's interact with its own
@@ -702,7 +758,33 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 // startSummonAttackStance enters or refreshes the attack stance of actor's
 // owner, which a summon's stance is. Entering it shows the stance on actor,
 // then on its owner.
+//
+// A summon revived after its owner left the world is in a stance of its
+// own: the departed session is gone, and its object id may already be the
+// owner's next session's. Entering it shows the stance on actor, and its
+// expiry ends it on actor (attackStanceEffects).
 func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
+	if actor.OwnerLeft() {
+		if l.attackStance == nil {
+			return
+		}
+		if !l.attackStance.InAttackStance(actor) {
+			l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
+		}
+		l.attackStance.Add(actor)
+		// A hit that passed its Knows check as the summon's decay
+		// despawned it can get here after the despawn cleanup's Remove
+		// (leaveCorpseBehind), and its entry would outlive the summon,
+		// its expiry refused by the closed corpse queue on every tick.
+		// The summon leaves the world before that Remove runs, so either
+		// the cleanup or this check drops the entry.
+		if l.world != nil {
+			if obj, ok := l.world.Object(actor.ObjectID()); !ok || obj != world.Tracked(actor) {
+				l.attackStance.Remove(actor)
+			}
+		}
+		return
+	}
 	owner, ok := liveSummonOwner(actor)
 	if !ok {
 		return

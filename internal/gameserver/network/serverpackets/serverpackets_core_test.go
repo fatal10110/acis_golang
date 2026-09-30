@@ -2784,6 +2784,26 @@ func TestFrameSystemMessageTwoNumbers(t *testing.T) {
 	}
 }
 
+// TestFrameSystemMessageItemNameNumber pins the pickup form of
+// YOU_PICKED_UP_S2_S1: the count goes out as a plain number parameter
+// (type 1), unlike the item-number (type 6) form an item created by id
+// uses.
+func TestFrameSystemMessageItemNameNumber(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageItemNameNumber(SystemMessageYouPickedUpS2S1, 1060, 5))
+	want := []byte{
+		OpcodeSystemMessage,
+		0x1d, 0x00, 0x00, 0x00, // 29
+		0x02, 0x00, 0x00, 0x00, // two params
+		0x03, 0x00, 0x00, 0x00, // item-name param
+		0x24, 0x04, 0x00, 0x00, // item 1060
+		0x01, 0x00, 0x00, 0x00, // number param
+		0x05, 0x00, 0x00, 0x00, // 5
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageItemNameNumber() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageSkillName(t *testing.T) {
 	got := framePayload(t, FrameSystemMessageSkillName(SystemMessageNightSkillEffectApplies, 294, 1))
 	want := []byte{
@@ -3052,6 +3072,7 @@ func TestFrameUserInfo(t *testing.T) {
 		RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
 		CollisionRadius: 9, CollisionHeight: 23,
 	}
+	c.AttachRuntime(tmpl, nil)
 	items := []*item.Instance{
 		{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex, EnchantLevel: 200},
 	}
@@ -3072,12 +3093,12 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.STR))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.DEX))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.CON))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.INT))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.WIT))
-	want = binary.LittleEndian.AppendUint32(want, uint32(tmpl.MEN))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.STR()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.DEX()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.CON()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.INT()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.WIT()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.MEN()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxHP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.CurrentHP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxMP))
@@ -3107,16 +3128,17 @@ func TestFrameUserInfo(t *testing.T) {
 		want = binary.LittleEndian.AppendUint16(want, 0)
 	}
 
-	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.PAtk)))
-	want = binary.LittleEndian.AppendUint32(want, 0) // p.atk speed
-	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.PDef)))
-	want = binary.LittleEndian.AppendUint32(want, 0) // evasion
-	want = binary.LittleEndian.AppendUint32(want, 0) // accuracy
-	want = binary.LittleEndian.AppendUint32(want, 0) // critical rate
-	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.MAtk)))
-	want = binary.LittleEndian.AppendUint32(want, 0) // m.atk speed
-	want = binary.LittleEndian.AppendUint32(want, 0) // p.atk speed (repeated)
-	want = binary.LittleEndian.AppendUint32(want, uint32(int32(tmpl.MDef)))
+	// The live combat block; TestFrameUserInfoWritesLiveStats pins its values.
+	want = binary.LittleEndian.AppendUint32(want, uint32(int32(c.PAtk())))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.AttackSpeed()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(int32(c.PDef())))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.Evasion()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.Accuracy()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.CriticalRate()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(int32(c.MAtk())))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.MagicAttackSpeed()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.AttackSpeed()))
+	want = binary.LittleEndian.AppendUint32(want, uint32(int32(c.MDef())))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.PvPFlagState()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Karma()))
 
@@ -3190,6 +3212,113 @@ func TestFrameUserInfo(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameUserInfo mismatch:\n got  %x\n want %x", got, want)
+	}
+}
+
+// liveStatsCharacter is a level 1 fighter wearing a weapon, a chest piece
+// and a ring, with a buff-shaped stat func on every status-window stat, for
+// the UserInfo/CharInfo live stat oracles.
+func liveStatsCharacter() (*player.Character, *player.Template) {
+	tmpl := &player.Template{
+		FistsItemID: 1,
+		STR:         40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25,
+		PAtk: 4, PDef: 30, MAtk: 3, MDef: 15,
+		RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
+		CollisionRadius: 9, CollisionHeight: 23,
+	}
+	items := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponFist}},
+		{ID: 2, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{Type: item.WeaponSword}, Modifiers: []item.StatModifier{
+			{Op: item.FuncSet, Stat: "pAtk", Value: 100},
+			{Op: item.FuncSet, Stat: "mAtk", Value: 50},
+			{Op: item.FuncSet, Stat: "pAtkSpd", Value: 433},
+			{Op: item.FuncSet, Stat: "rCrit", Value: 7},
+		}},
+		{ID: 3, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{}},
+		{ID: 4, Kind: item.KindArmor, Slot: item.SlotLFinger, Armor: &item.ArmorDetail{}},
+	})
+	c := &player.Character{ID: 0x10000001, Name: "Buffed", Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1}
+	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, []*item.Instance{
+		{ObjectID: 100, TemplateID: 2, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand},
+		{ObjectID: 101, TemplateID: 3, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest},
+		{ObjectID: 102, TemplateID: 4, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.LFinger},
+	}))
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.StatSTR, Op: effect.OpAdd, Value: 2},
+		{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.2},
+		{Stat: stat.PowerDefence, Op: effect.OpBaseAdd, Value: 50},
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpMul, Value: 1.33},
+		{Stat: stat.EvasionRate, Op: effect.OpAdd, Value: 3},
+		{Stat: stat.AccuracyCombat, Op: effect.OpAdd, Value: 2},
+		{Stat: stat.CriticalRate, Op: effect.OpMul, Value: 1.5},
+		{Stat: stat.MagicAttackSpeed, Op: effect.OpMul, Value: 1.3},
+	})
+	return c, tmpl
+}
+
+// TestFrameUserInfoWritesLiveStats pins UserInfo.java:42-47 and :127-136:
+// the attributes and the combat block are the character's live values with
+// gear and stat funcs applied, truncated to int. The expected values come
+// from the reference formulas at level 1 (level mod 0.9) with the bonus
+// tables STR 42 = 1.29, DEX 30 = 1.1, INT 21 = 0.81, WIT 11 = 0.64,
+// MEN 25 = 1.28:
+//
+//	P.Atk   100 * 1.29 * 0.9 * 1.2              = 139.32 -> 139
+//	P.Spd   433 * 1.1 * 1.33                     = 633.48 -> 633
+//	P.Def   (30 + 50 - 31 chest) * 0.9           = 44.1   -> 44
+//	Evasion sqrt(30) * 6 + level 1 + 3           = 36.86  -> 36
+//	Acc     sqrt(30) * 6 + level 1 + 2           = 35.86  -> 35
+//	Crit    7 * 1.1 * 10 * 1.5                   = 115.5  -> 115
+//	M.Atk   50 * 0.9^2 * 0.81^2                  = 26.57  -> 26
+//	M.Spd   333 * 0.64 * 1.3                     = 277.06 -> 277
+//	M.Def   (15 - 5 ring) * 1.28 * 0.9           = 11.52  -> 11
+func TestFrameUserInfoWritesLiveStats(t *testing.T) {
+	c, tmpl := liveStatsCharacter()
+	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
+
+	attrs := 1 + 5*4 + (len(c.Name)+1)*2 + 4*4 + 8
+	wantAttrs := []uint32{42, 30, 43, 21, 11, 25}
+	for i, want := range wantAttrs {
+		if v := binary.LittleEndian.Uint32(got[attrs+4*i:]); v != want {
+			t.Errorf("attribute %d = %d, want %d", i, v, want)
+		}
+	}
+
+	combat := attrs + 6*4 + 8*4 + 2*len(paperdollWriteOrder)*4 + 14*2 + 4 + 12*2 + 4 + 4*2
+	wantCombat := []struct {
+		name string
+		want uint32
+	}{
+		{"P.Atk", 139},
+		{"P.Atk. speed", 633},
+		{"P.Def", 44},
+		{"evasion", 36},
+		{"accuracy", 35},
+		{"critical rate", 115},
+		{"M.Atk", 26},
+		{"M.Atk. speed", 277},
+		{"P.Atk. speed (repeated)", 633},
+		{"M.Def", 11},
+	}
+	for i, field := range wantCombat {
+		if v := binary.LittleEndian.Uint32(got[combat+4*i:]); v != field.want {
+			t.Errorf("%s = %d, want %d", field.name, v, field.want)
+		}
+	}
+}
+
+// TestFrameCharInfoWritesLiveCastAndAttackSpeed pins CharInfo.java:84-85:
+// the M.Atk. and P.Atk. speeds between the two PvP flag/karma pairs are the
+// live values.
+func TestFrameCharInfoWritesLiveCastAndAttackSpeed(t *testing.T) {
+	c, tmpl := liveStatsCharacter()
+	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	offset := 1 + 5*4 + (len(c.Name)+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2 + 2*4
+	if v := binary.LittleEndian.Uint32(got[offset:]); v != 277 {
+		t.Errorf("M.Atk. speed = %d, want 277", v)
+	}
+	if v := binary.LittleEndian.Uint32(got[offset+4:]); v != 633 {
+		t.Errorf("P.Atk. speed = %d, want 633", v)
 	}
 }
 

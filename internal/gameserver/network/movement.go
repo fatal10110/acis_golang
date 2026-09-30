@@ -192,14 +192,51 @@ func (l *GameClientLink) changeLiveMoveType(live *livePlayer, run bool) {
 // observers get its full view with the new speed multiplier. A player not in
 // the world yet sends nothing; its entry burst carries the new speed.
 func (l *GameClientLink) broadcastRunSpeedChange(live *livePlayer) {
-	if l.world != nil {
-		if current, ok := l.world.Player(live.ObjectID()); !ok || current != live {
-			return
-		}
+	if !l.liveInWorld(live) {
+		return
 	}
 	live.RefreshWeightPenalty()
 	live.RefreshExpertisePenalty()
 	l.broadcastCharacterInfo(live)
+}
+
+// sendModifiedStats answers any other stat func change: the weight and grade
+// penalty bands are refreshed and the player gets its own UserInfo, then a
+// changed P.Atk. or cast speed reaches the player and its observers as one
+// StatusUpdate. A player not in the world yet sends nothing; its entry burst
+// carries the new values.
+func (l *GameClientLink) sendModifiedStats(live *livePlayer, attrs []event.StatusAttr) {
+	if !l.liveInWorld(live) {
+		return
+	}
+	live.RefreshWeightPenalty()
+	live.RefreshExpertisePenalty()
+	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	if len(attrs) == 0 {
+		return
+	}
+	status := make([]serverpackets.StatusAttribute, len(attrs))
+	for i, attr := range attrs {
+		typ := serverpackets.StatusAttackSpeed
+		if attr.Kind == event.StatusMagicSpeed {
+			typ = serverpackets.StatusCastSpeed
+		}
+		status[i] = serverpackets.StatusAttribute{Type: typ, Value: attr.Value}
+	}
+	l.broadcastLiveFrame(live, func() wire.Frame {
+		return serverpackets.FrameStatusUpdate(live.ObjectID(), status)
+	})
+}
+
+// liveInWorld reports whether live is the player the world currently holds
+// under its object id, the gate for server-initiated view refreshes that the
+// entry burst otherwise carries.
+func (l *GameClientLink) liveInWorld(live *livePlayer) bool {
+	if l.world == nil {
+		return true
+	}
+	current, ok := l.world.Player(live.ObjectID())
+	return ok && current == live
 }
 
 // changeLiveWaitType sits live down or stands it up and broadcasts the new
@@ -213,6 +250,7 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	live.takeDeferredItemAICast()
 	live.takeDeferredFollow()
 	live.takeDeferredUseItem()
+	live.takeDeferredPetInteract()
 	live.endFollow()
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting

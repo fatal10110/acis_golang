@@ -161,6 +161,15 @@ func startDistantAttackChase(t *testing.T, srv *gameservertest.Server, objID int
 
 func bootBlockedGroundCast(t *testing.T, geo *gameservertest.GateGeo) *gameservertest.Server {
 	t.Helper()
+	srv := bootBlockedGroundCastOffline(t, geo)
+	startInWorld(t, srv.Client)
+	return srv
+}
+
+// bootBlockedGroundCastOffline is bootBlockedGroundCast before the
+// character enters the world, so a caller can seed inventory rows first.
+func bootBlockedGroundCastOffline(t *testing.T, geo *gameservertest.GateGeo) *gameservertest.Server {
+	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -171,8 +180,6 @@ func bootBlockedGroundCast(t *testing.T, geo *gameservertest.GateGeo) *gameserve
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
 		}})),
 	)
-	c, objID := srv.Client, srv.SoleObjectID(t)
-	seedKnownSkill(t, srv, objID, 5, 1)
-	startInWorld(t, c)
+	seedKnownSkill(t, srv, srv.SoleObjectID(t), 5, 1)
 	return srv
 }

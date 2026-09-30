@@ -730,6 +730,10 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 			content: skillFixture(`<for><effect name="Buff" val="0" count="oops"/></for>`),
 		},
 		{
+			name:    "unknown effect abnormal visual",
+			content: skillFixture(`<for><effect name="Buff" val="0" abnormal="NULL"/></for>`),
+		},
+		{
 			name:    "stat func without a value",
 			content: skillFixture(`<for><add stat="runSpd"/></for>`),
 		},

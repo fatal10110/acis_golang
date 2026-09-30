@@ -57,19 +57,9 @@ func bootBowShooter(t *testing.T) bowShooter {
 	equipAndFlush(t, srv, c, bow)
 	equipAndFlush(t, srv, c, arrows)
 
-	x, y, z := int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z)
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
-	w.WriteInt32(adena)
-	w.WriteInt32(40)
-	w.WriteInt32(x)
-	w.WriteInt32(y)
-	w.WriteInt32(z)
-	c.Send(w.Bytes())
-	drop := readUntil(t, c, serverpackets.OpcodeDropItem, "DropItem")[0]
-	r := wireReader(drop[1:])
-	r.ReadInt32() // dropper id
-	groundID := r.ReadInt32()
+	groundID := dropAdenaAtFeet(t, c, adena)
 
+	x, y, z := int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 20, Y: hostileY, Z: hostileZ})
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
@@ -79,6 +69,31 @@ func bootBowShooter(t *testing.T) bowShooter {
 	readUntilSlow(t, c, serverpackets.OpcodeAttack, "second bow shot")
 	second := c.Now()
 	return bowShooter{srv: srv, c: c, objID: objID, groundID: groundID, period: second.Sub(first), shotAt: second}
+}
+
+// dropAdenaAtFeet drops 40 of the adena stack adena at the player's
+// origin and returns the ground item's object id.
+func dropAdenaAtFeet(t *testing.T, c *scriptedClient, adena int32) int32 {
+	t.Helper()
+	return dropAdenaBehind(t, c, adena, 0)
+}
+
+// dropAdenaBehind drops 40 of the adena stack adena back units behind the
+// player's origin, away from the fixture monster, and returns the ground
+// item's object id.
+func dropAdenaBehind(t *testing.T, c *scriptedClient, adena int32, back int) int32 {
+	t.Helper()
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestDropItem)
+	w.WriteInt32(adena)
+	w.WriteInt32(40)
+	w.WriteInt32(int32(playerOrigin.X - back))
+	w.WriteInt32(int32(playerOrigin.Y))
+	w.WriteInt32(int32(playerOrigin.Z))
+	c.Send(w.Bytes())
+	drop := readUntil(t, c, serverpackets.OpcodeDropItem, "DropItem")[0]
+	r := wireReader(drop[1:])
+	r.ReadInt32() // dropper id
+	return r.ReadInt32()
 }
 
 // readUntilSlow is readUntil for streams with gaps longer than its one
@@ -121,7 +136,10 @@ func TestBowMidShotSkillStartsAtShotEnd(t *testing.T) {
 }
 
 // TestBowMidShotPickupRunsAtShotEnd is the same for a ground-item pickup
-// clicked mid-shot: the item is picked up when the shot ends.
+// clicked mid-shot: the item is picked up when the shot ends. The pickup
+// replaced the attack (PlayableAI.onEvtFinishedAttack runs the next
+// intention through doIntention), so once the reuse ends the bow does not
+// fire again (PlayerAI.onEvtBowAttackReuse finds no ATTACK intention).
 func TestBowMidShotPickupRunsAtShotEnd(t *testing.T) {
 	t.Parallel()
 	b := bootBowShooter(t)
@@ -131,4 +149,5 @@ func TestBowMidShotPickupRunsAtShotEnd(t *testing.T) {
 	readUntilSlow(t, b.c, serverpackets.OpcodeActionFailed, "queued pickup ActionFailed")
 	readUntilSlow(t, b.c, serverpackets.OpcodeGetItem, "queued pickup GetItem")
 	b.assertBeforeReuseEnd(t, b.c.Now(), "queued pickup GetItem")
+	assertNoSwingBy(t, b.c, b.objID, 2*b.period, "after the queued pickup")
 }

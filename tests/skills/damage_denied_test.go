@@ -211,7 +211,7 @@ func TestDamageDeniedSignetMDamStillShowsItsStrike(t *testing.T) {
 	maxHP := hostile.CurrentHP()
 
 	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
-	readCastStartFrames(t, c, objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), objID)
+	readSignetCastStartFrames(t, c, objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), objID)
 	tickSignetMDamLive(t, srv)
 
 	log := readFrameLog(c)

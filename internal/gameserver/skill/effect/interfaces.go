@@ -27,6 +27,8 @@ type Actor interface {
 	// CancelVulnerability is the resolved vulnerability multiplier for a
 	// cancel classification tag; 1 when unmodified.
 	CancelVulnerability(classification string) float64
+	// UpdateAbnormalEffect re-announces the actor's appearance (its
+	// abnormal visual bits among them) to itself and its observers.
 	UpdateAbnormalEffect()
 	StartAbnormalEffect(mask int)
 	StopAbnormalEffect(mask int)
@@ -108,7 +110,6 @@ type PlayerActor interface {
 	MarkRecentFakeDeath()
 	HPFull() bool
 
-	BroadcastAbnormalEffect()
 	SendRegenMax(count, period int32, hpRegen float64)
 	NotifyEffectRemovedDueLackHP(*Effect)
 	NotifyEffectRemovedDueLackMP(*Effect)
