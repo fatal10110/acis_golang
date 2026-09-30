@@ -460,14 +460,22 @@ func TestCanSee(t *testing.T) {
 // into the next cell with block.getIndexBelow then block.getHeight, and
 // BlockNull (geoengine/geodata/BlockNull.java) answers getIndexBelow = 0 and
 // getHeight = 0 for any input, while getHeightNearest echoes (short) worldZ.
-// Unloaded regions hold that same BlockNull (GeoEngine.loadNullBlocks), and
-// a region file's null block entries do too, so both layouts are covered.
+// In the reference BlockNull only ever fills a whole region
+// (GeoEngine.loadNullBlocks, for a missing or unreadable region file); region
+// files never carry single null blocks. Go answers that case with regionBlock
+// (region == nil). Go's Region also answers its empty (null) entries the same
+// way through its default branches; that layout is reachable only through
+// NewRegion/NewRegionFromBlocks, but both null paths are covered here.
 //
 // Loaded ground sits at -3000 so the snap to 0 cannot be confused with the
 // walker keeping its own Z. canMove's final check compares the walked
 // height (0) against getHeight(tx, ty, tz) = (short) tz on the null target.
 // canSee's walk reads the null cell as ground at 0, above the sight line
 // from -3000 (losz = -3000 + MaxObstacleHeight 32), and fails.
+//
+// CanSee is mutual, and the return cast starting on null fails on its own,
+// so the forward cast is also asserted alone: only it proves the step into
+// null snaps to 0.
 func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 	const ground = -3000
 
@@ -479,11 +487,11 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 		engine           func(t *testing.T, height int16) *Engine
 	}{
 		{
-			name:    "null block inside a loaded region",
+			name:    "empty entry inside a loaded region",
 			originX: 6,
 			targetX: 9,
 			engine: func(t *testing.T, height int16) *Engine {
-				// Block (0,0) covers geoX 0..7; block (1,0) is null.
+				// Block (0,0) covers geoX 0..7; block (1,0) is empty.
 				return newTestEngine(t, block.NewFlat(height))
 			},
 		},
@@ -528,6 +536,9 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 			if e.CanSee(ox, oy, ground, tx, ty, ground) {
 				t.Error("CanSee(loaded -3000 -> null at -3000) = true, want false: null ground reads as 0, above the sight line")
 			}
+			if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil) {
+				t.Error("forward canSee(loaded -3000 -> null at -3000) = true, want false: the step into null must read ground at 0")
+			}
 
 			flat := l.engine(t, 0)
 			if !flat.CanSee(ox, oy, 0, tx, ty, 0) {
@@ -538,6 +549,28 @@ func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
 			}
 		})
 	}
+
+	// A null strip between two loaded blocks at -3000: the sight line never
+	// ends on null, so only the step into the strip (ground 0 > losz -2968)
+	// can block it. Blocks (0,0) and (2,0) are loaded, (1,0) is empty.
+	t.Run("null strip between loaded ground", func(t *testing.T) {
+		e := New()
+		region := block.NewRegion()
+		region.SetFlat(0, ground)
+		region.SetFlat(2*block.RegionBlocksY, ground)
+		if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+			t.Fatalf("SetRegion(): %v", err)
+		}
+		ox, oy := worldX(6), worldY(0)
+		tx, ty := worldX(17), worldY(0)
+
+		if e.canSee(ox, oy, ground, 0, tx, ty, ground, 0, nil) {
+			t.Error("forward canSee(-3000 across null strip -> -3000) = true, want false: null ground reads as 0")
+		}
+		if e.CanSee(ox, oy, ground, tx, ty, ground) {
+			t.Error("CanSee(-3000 across null strip -> -3000) = true, want false: null ground reads as 0")
+		}
+	})
 }
 
 func TestSightHeight(t *testing.T) {
