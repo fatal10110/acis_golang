@@ -517,7 +517,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Character:          live.Character,
 		Template:           live.template,
 		Items:              live.inventoryItems(),
-		IsGM:               live.isGM,
+		IsGM:               live.access.IsGM,
 		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
 	}
 }
@@ -679,7 +679,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	setWaterSurface(creatureLive.Move(), l.zones)
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
-	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, isGM: access.IsGM, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)

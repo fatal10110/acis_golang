@@ -2,10 +2,15 @@ package trade
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -19,19 +24,73 @@ const testGMLevel = 2
 // chaoticTradeRefusal is the S1 text a karma-refused trade request answers.
 const chaoticTradeRefusal = "You cannot trade in a chaotic state."
 
-// shippedAccessLevels mirrors the transaction-relevant rows of the shipped
-// accessLevels.xml: level 0 "User" (allowTransaction="true") and level 2
-// "Test GM" (allowTransaction="false", giveDamage="false").
-func shippedAccessLevels(t *testing.T) *admin.Data {
+// fallbackAccessLevels copies the transaction-relevant rows of the shipped
+// accessLevels.xml for runs without the datapack checkout (CI): level 0
+// "User" (allowTransaction="true") and level 2 "Test GM"
+// (allowTransaction="false", giveDamage="false").
+// TestFallbackAccessLevelsMatchDatapack keeps the copy honest.
+func fallbackAccessLevels(t *testing.T) *admin.Data {
 	t.Helper()
 	data, err := admin.NewData([]admin.AccessLevel{
-		{Level: 0, Name: "User", AllowTransaction: true, GiveDamage: true},
-		{Level: testGMLevel, Name: "Test GM", AllowFixedRes: true, AllowAltG: true, ChildLevel: 1},
+		{Level: 0, Name: "User", NameColor: "FFFFFF", TitleColor: "FFFF77", AllowTransaction: true, GiveDamage: true},
+		{Level: testGMLevel, Name: "Test GM", NameColor: "FFFFFF", TitleColor: "FFFF77", ChildLevel: 1, AllowFixedRes: true, AllowAltG: true},
 	}, nil)
 	if err != nil {
 		t.Fatalf("admin.NewData: %v", err)
 	}
 	return data
+}
+
+// datapackAccessLevels loads the real accessLevels.xml the server reads, or
+// returns nil when the datapack is not checked out next to the module.
+var datapackAccessLevels = sync.OnceValues(func() (*admin.Data, error) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml")
+	if _, err := os.Stat(filepath.Join(root, "accessLevels.xml")); err != nil {
+		return nil, nil
+	}
+	return xmldata.LoadAdminData(root)
+})
+
+// shippedAccessLevels is the access table the gate tests boot with: the
+// datapack's own accessLevels.xml when it is checked out, else the copy.
+func shippedAccessLevels(t *testing.T) *admin.Data {
+	t.Helper()
+	data, err := datapackAccessLevels()
+	if err != nil {
+		t.Fatalf("load datapack access levels: %v", err)
+	}
+	if data != nil {
+		return data
+	}
+	return fallbackAccessLevels(t)
+}
+
+// TestFallbackAccessLevelsMatchDatapack pins the CI copy against the shipped
+// rows it stands in for, so a datapack change cannot leave the gate tests
+// passing against stale data.
+func TestFallbackAccessLevelsMatchDatapack(t *testing.T) {
+	shipped, err := datapackAccessLevels()
+	if err != nil {
+		t.Fatalf("load datapack access levels: %v", err)
+	}
+	if shipped == nil {
+		t.Skip("aCis_datapack not checked out near the module root")
+	}
+	fallback := fallbackAccessLevels(t)
+	for _, level := range []int{0, testGMLevel} {
+		want, ok := shipped.AccessLevel(level)
+		if !ok {
+			t.Fatalf("shipped accessLevels.xml has no level %d", level)
+		}
+		got, _ := fallback.AccessLevel(level)
+		if got != want {
+			t.Fatalf("fallback level %d = %+v, shipped %+v", level, got, want)
+		}
+	}
+	if !shipped.Resolve(0).AllowTransaction || shipped.Resolve(testGMLevel).AllowTransaction {
+		t.Fatal("shipped levels no longer split transaction rights between level 0 and the test GM level")
+	}
 }
 
 // setCharacterColumn rewrites one persisted character column before the
