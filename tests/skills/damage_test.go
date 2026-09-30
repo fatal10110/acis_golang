@@ -166,7 +166,8 @@ func TestPunchOfDoomHostsItsStunSelfEffectOnTheCaster(t *testing.T) {
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
 			ID: 81, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			SkillType: "PDAM", Power: 1_000_000,
+			// A light hit: a killed monster would lose the Buff at death.
+			SkillType: "PDAM", Power: 1,
 			Effects: []modelskill.EffectTemplate{
 				{Name: "StunSelf", Time: 9, EffectPower: 100, EffectPowerSet: true},
 				{Name: "Buff", Time: 9},
@@ -216,7 +217,8 @@ func TestReflectedPunchOfDoomHostsItsStunSelfOnTheReflector(t *testing.T) {
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
 			ID: 81, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 40, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			SkillType: "PDAM", Power: 1_000_000, CanBeReflected: true,
+			// A light hit: a killed monster would lose its StunSelf at death.
+			SkillType: "PDAM", Power: 1, CanBeReflected: true,
 			Effects: []modelskill.EffectTemplate{
 				{Name: "StunSelf", Time: 9},
 				{Name: "Buff", Time: 9},
