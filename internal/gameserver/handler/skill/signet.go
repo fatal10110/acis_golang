@@ -340,8 +340,8 @@ func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta
 
 // newSignetMDamEffect builds the effect whose onStart spawns the carrying
 // actor at caster's position; each of its first two ticks does nothing,
-// and every tick after pays the skill's MP cost (dropping the effect when
-// the caster can't afford it) then deals magic damage, using the skill's
+// and every tick after pays the skill's MP cost (dropping the effect, and
+// telling the caster so, when it can't afford it) then deals magic damage, using the skill's
 // own formula inputs, to every living, non-peace-zone creature the actor
 // finds within skill radius.
 func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate) *effect.Effect {
@@ -368,6 +368,9 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 			return false
 		}
 		if float64(def.MPConsume) > mp.MPValue() {
+			if n, ok := caster.(lackMPNotifier); ok {
+				n.NotifyEffectRemovedDueLackMP(ef)
+			}
 			return false
 		}
 		mp.ReduceMP(float64(def.MPConsume))
@@ -424,6 +427,12 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 type mpPayer interface {
 	MPValue() float64
 	ReduceMP(float64) float64
+}
+
+// lackMPNotifier is implemented by a caster told that its SignetMDam
+// effect ended because a tick could not pay its MP cost.
+type lackMPNotifier interface {
+	NotifyEffectRemovedDueLackMP(*effect.Effect)
 }
 
 // forEachSignetTarget calls fn for every living, non-peace-zone object
