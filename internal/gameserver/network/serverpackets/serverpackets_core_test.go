@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -1808,7 +1809,7 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	got := framePayload(t, FrameServerObjectInfo(NPCInfoSnapshot{
 		ObjectID: 0x01020304, TemplateID: 123, Name: "Goblin", Attackable: true,
 		X: -1, Y: 2, Z: -3, Heading: 4, CollisionRadius: 5.5, CollisionHeight: 6.5,
-		CurrentHP: 70, MaxHP: 100,
+		CurrentHP: 70, MaxHP: 100, MoveMultiplier: 1.5, AtkSpdMultiplier: 0.9,
 	}))
 	want := []byte{OpcodeServerObjectInfo}
 	for _, value := range []uint32{0x01020304, 1000123} {
@@ -1820,7 +1821,8 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	for _, value := range []uint32{1, 0xffffffff, 2, 0xfffffffd, 4} {
 		want = binary.LittleEndian.AppendUint32(want, value)
 	}
-	for _, value := range []float64{1, 1.1, 5.5, 6.5} {
+	// Both speed multipliers are a literal 1.0, whatever the snapshot's.
+	for _, value := range []float64{1, 1, 5.5, 6.5} {
 		want = binary.LittleEndian.AppendUint64(want, math.Float64bits(value))
 	}
 	for _, value := range []uint32{70, 100, 1, 0} {
@@ -1842,11 +1844,22 @@ func TestFrameNPCInfoWritesMovementSpeedMultiplier(t *testing.T) {
 	}
 }
 
+// TestFrameNPCInfoWritesAttackSpeedMultiplier pins the attack speed
+// multiplier the client scales the attack animation by:
+// (float) (1.1 * P.Atk.Spd / base), written as a double. A 300-base NPC
+// slowed to 229 carries float32(0.83966666) widened, not 0.83966666.
 func TestFrameNPCInfoWritesAttackSpeedMultiplier(t *testing.T) {
-	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{}))
+	want := npcinfo.AttackSpeedMultiplier(229, 300)
+	if want != float64(float32(1.1*229.0/300)) || want == 1.1*229.0/300 {
+		t.Fatalf("AttackSpeedMultiplier(229, 300) = %v, want the float32-rounded quotient", want)
+	}
+	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{PAtkSpd: 229, AtkSpdMultiplier: want}))
 	const multiplierOffset = 1 + 18*4
-	if got := math.Float64frombits(binary.LittleEndian.Uint64(payload[multiplierOffset+8:])); got != 1.1 {
-		t.Fatalf("attack speed multiplier = %v, want 1.1", got)
+	if got := math.Float64frombits(binary.LittleEndian.Uint64(payload[multiplierOffset+8:])); got != want {
+		t.Fatalf("attack speed multiplier = %v, want %v", got, want)
+	}
+	if got := npcinfo.AttackSpeedMultiplier(229, 0); got != 0 {
+		t.Fatalf("AttackSpeedMultiplier with a zero base = %v, want 0", got)
 	}
 }
 
@@ -2039,7 +2052,8 @@ func TestFramePetInfo(t *testing.T) {
 		X: 100, Y: 200, Z: -50, Heading: 123,
 		MAtkSpd: 333, PAtkSpd: 300,
 		RunSpd: 120, WalkSpd: 60, MoveMultiplier: float64(float32(132) / 120),
-		CollisionRadius: 8, CollisionHeight: 20,
+		AtkSpdMultiplier: float64(float32(1.1 * 300.0 / 278)),
+		CollisionRadius:  8, CollisionHeight: 20,
 		InCombat: true, AlikeDead: false,
 		Name: "Wolf", Title: "",
 		PvpFlag: 0, Karma: 5,
@@ -2076,7 +2090,7 @@ func TestFramePetInfo(t *testing.T) {
 		want = appendPetInfoInt32(want, int32(s.WalkSpd))
 	}
 	want = appendPetInfoFloat64(want, s.MoveMultiplier)
-	want = appendPetInfoFloat64(want, 1)
+	want = appendPetInfoFloat64(want, s.AtkSpdMultiplier)
 	want = appendPetInfoFloat64(want, s.CollisionRadius)
 	want = appendPetInfoFloat64(want, s.CollisionHeight)
 	want = appendPetInfoInt32(want, 0)

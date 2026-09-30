@@ -13,7 +13,8 @@ const (
 
 // PetInfoSnapshot is everything PetInfo needs for one live pet or servitor,
 // sent only to its owner (a non-owner observer gets SummonInfo instead,
-// tracked separately).
+// tracked separately). AtkSpdMultiplier is npcinfo.AttackSpeedMultiplier of
+// PAtkSpd.
 type PetInfoSnapshot struct {
 	SummonType        int
 	ObjectID          int32
@@ -22,6 +23,7 @@ type PetInfoSnapshot struct {
 	MAtkSpd, PAtkSpd  int
 	RunSpd, WalkSpd   int
 	MoveMultiplier    float64
+	AtkSpdMultiplier  float64
 	CollisionRadius   float64
 	CollisionHeight   float64
 	InCombat          bool
@@ -102,7 +104,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.WalkSpd))
 
 	w.WriteFloat64(s.MoveMultiplier)
-	w.WriteFloat64(1) // attack speed multiplier
+	w.WriteFloat64(s.AtkSpdMultiplier)
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
 	w.WriteInt32(0) // weapon: Summon.getWeapon() is always 0 (base class, no override)

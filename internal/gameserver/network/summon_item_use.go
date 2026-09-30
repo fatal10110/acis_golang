@@ -209,7 +209,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return true
 	}
-	decoration, err := npc.NewDecoration(instance, live.Character.Name)
+	decoration, err := npc.NewDecoration(instance, live.Character.Name, l.skills)
 	if err != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return true

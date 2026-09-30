@@ -3,7 +3,9 @@ package npcinfo
 
 // Snapshot is everything an NPCInfo packet needs for one visible NPC.
 // MoveMultiplier is the current move speed over the base speed the stance
-// picks; the client scales RunSpd/WalkSpd by it.
+// picks; the client scales RunSpd/WalkSpd by it. AtkSpdMultiplier is
+// the value AttackSpeedMultiplier returns for PAtkSpd; the client scales its
+// attack animation by it.
 type Snapshot struct {
 	ObjectID                     int32
 	TemplateID                   int
@@ -13,6 +15,7 @@ type Snapshot struct {
 	MAtkSpd, PAtkSpd             int
 	RunSpd, WalkSpd              int
 	MoveMultiplier               float64
+	AtkSpdMultiplier             float64
 	CurrentHP, MaxHP             int
 	CollisionRadius              float64
 	CollisionHeight              float64
@@ -28,6 +31,16 @@ type Snapshot struct {
 	EnchantEffect                int
 	Flying                       bool
 	Name, Title                  string
+}
+
+// AttackSpeedMultiplier is 1.1 times the live P.Atk. speed pAtkSpd over
+// the template's base P.Atk. speed, at float32 precision, or 0 for a
+// template whose base is 0.
+func AttackSpeedMultiplier(pAtkSpd int, base float64) float64 {
+	if base == 0 {
+		return 0
+	}
+	return float64(float32(1.1 * float64(pAtkSpd) / base))
 }
 
 // StatusType is a client-visible StatusUpdate attribute identifier.

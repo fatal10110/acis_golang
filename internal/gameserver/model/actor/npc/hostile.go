@@ -445,11 +445,13 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	if tmpl.UsingServerSideTitle {
 		title = tmpl.Title
 	}
+	pAtkSpd := h.AttackSpeed()
 	return npcinfo.Snapshot{
 		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
 		X: x, Y: y, Z: z, Heading: h.Heading(),
-		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: h.AttackSpeed(),
-		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed), MoveMultiplier: float64(h.MovementSpeedMultiplier()),
+		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
+		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
+		MoveMultiplier: float64(h.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,

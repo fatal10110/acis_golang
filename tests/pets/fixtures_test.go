@@ -91,10 +91,12 @@ func wolfLevelStats(maxExp int64) npc.PetLevelStats {
 	}
 }
 
-// treeTemplate builds the decorative Christmas-Tree NPC template.
+// treeTemplate builds the decorative Christmas-Tree NPC template, with the
+// shipped trees' DEX 30 and WIT 20.
 func treeTemplate() *npc.Template {
 	return &npc.Template{
 		ID: treeNPCID, TemplateID: treeNPCID, Type: "ChristmasTree", Name: "Tree",
+		DEX: 30, WIT: 20,
 		AtkSpd: 300, WalkSpeed: 30, RunSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
 	}
 }

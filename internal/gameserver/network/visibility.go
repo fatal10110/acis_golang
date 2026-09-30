@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -213,13 +214,15 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()
 	}
+	pAtkSpd := int(a.PAtkSpd(tmpl.AtkSpd))
 	return serverpackets.NPCInfoSnapshot{
 		ObjectID: a.ObjectID(), TemplateID: tmpl.TemplateID,
 		X: x, Y: y, Z: z, Heading: a.Heading(),
-		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: int(a.PAtkSpd(tmpl.AtkSpd)),
+		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: pAtkSpd,
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
-		MoveMultiplier:  float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
-		CollisionRadius: a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
+		MoveMultiplier:   float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
+		AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
+		CollisionRadius:  a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		Running: true, InCombat: inCombat, AlikeDead: a.AlikeDead(),
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
@@ -271,6 +274,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		curFed, maxFed = lifetime.TimeRemaining, lifetime.TotalLifeTime
 	}
 
+	pAtkSpd := int(a.PAtkSpd(tmpl.AtkSpd))
 	return serverpackets.PetInfoSnapshot{
 		SummonType:        a.SummonType(),
 		ObjectID:          a.ObjectID(),
@@ -280,10 +284,11 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		Z:                 z,
 		Heading:           a.Heading(),
 		MAtkSpd:           int(a.MAtkSpd()),
-		PAtkSpd:           int(a.PAtkSpd(tmpl.AtkSpd)),
+		PAtkSpd:           pAtkSpd,
 		RunSpd:            int(tmpl.RunSpeed),
 		WalkSpd:           int(tmpl.WalkSpeed),
 		MoveMultiplier:    float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
+		AtkSpdMultiplier:  npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
 		CollisionRadius:   tmpl.CollisionRadius,
 		CollisionHeight:   tmpl.CollisionHeight,
 		InCombat:          owner.InCombat(),

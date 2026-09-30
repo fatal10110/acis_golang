@@ -2,6 +2,7 @@ package combat
 
 import (
 	"math"
+	"slices"
 	"testing"
 	"time"
 
@@ -173,4 +174,95 @@ func TestRunSpeedDebuffSlowsChasingNPC(t *testing.T) {
 	clientRun, _ = npcInfoSpeeds(t, c, hostile.ObjectID())
 	requireClientPace(t, "run after the slow ends", clientRun, speedTestRun)
 	requireCovered(t, "chasing after the slow ends", coveredInOneSecond(t, srv, hostile), speedTestRun)
+}
+
+// npcInfoAttackSpeed returns the P.Atk. speed and attack speed multiplier
+// of the last NpcInfo for objectID among frames.
+func npcInfoAttackSpeed(t *testing.T, frames [][]byte, objectID int32) (pAtkSpd int32, multiplier float64, seen bool) {
+	t.Helper()
+	for _, frame := range frames {
+		if frame[0] != serverpackets.OpcodeNPCInfo {
+			continue
+		}
+		r := wire.NewReader(frame[1:])
+		if r.ReadInt32() != objectID {
+			continue
+		}
+		for range 8 { // template, attackable, x, y, z, heading, 0, cast speed
+			r.ReadInt32()
+		}
+		pAtkSpd = r.ReadInt32()
+		for range 8 { // run/walk speed pairs
+			r.ReadInt32()
+		}
+		r.ReadFloat64() // movement speed multiplier
+		multiplier = r.ReadFloat64()
+		if err := r.Err(); err != nil {
+			t.Fatalf("read NpcInfo: %v", err)
+		}
+		seen = true
+	}
+	return pAtkSpd, multiplier, seen
+}
+
+// TestAttackSpeedDebuffShowsInMonsterNpcInfo pins the attack speed
+// multiplier a monster is shown with: (float) (1.1 * P.Atk.Spd / template
+// base) (CreatureStatus.getAttackSpeedMultiplier, AbstractNpcInfo.NpcInfo).
+// The monster's 300 base times its DEX 30 bonus 1.1 is 330 (1.21).
+//
+// A P.Atk.Spd-only debuff sends the observers a StatusUpdate, not NpcInfo
+// (Creature.broadcastModifiedStats resends NpcInfo only for RUN_SPEED).
+// A debuff that also slows the monster down resends NpcInfo, which then
+// carries the halved 165 and its multiplier 0.605; removing it restores
+// 330 and 1.21.
+func TestAttackSpeedDebuffShowsInMonsterNpcInfo(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	at := location.Location{X: hostileX, Y: hostileY + 200, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCTemplate(t, speedTestTemplate(), at, at)
+
+	multiplier := func(pAtkSpd, base float64) float64 { return float64(float32(1.1 * pAtkSpd / base)) }
+	requireNpcInfo := func(what string, frames [][]byte, wantSpd int32) {
+		t.Helper()
+		spd, got, ok := npcInfoAttackSpeed(t, frames, hostile.ObjectID())
+		if want := multiplier(float64(wantSpd), 300); !ok || spd != wantSpd || got != want {
+			t.Fatalf("%s: NpcInfo P.Atk.Spd/multiplier = %d/%v (seen %v), want %d/%v", what, spd, got, ok, wantSpd, want)
+		}
+	}
+	requireNpcInfo("spawn", readFramesUntilQuiet(c), 330)
+
+	debuff := func(name, stack string, funcs ...modelskill.FuncTemplate) *effect.Effect {
+		e, err := effect.New(effect.Skill{ID: 102, Level: 1, Debuff: true}, modelskill.EffectTemplate{
+			Name: "Debuff", Time: 30, StackType: stack, StackOrder: 1, Funcs: funcs,
+		})
+		if err != nil {
+			t.Fatalf("effect.New(%s): %v", name, err)
+		}
+		e.Effector, e.Effected = hostile, hostile
+		return e
+	}
+	atkSlow := debuff("attack slow", "attack_time_up", modelskill.FuncTemplate{Op: modelskill.FuncMul, Stat: "pAtkSpd", Value: 0.5})
+	onHostileQueue(t, hostile, func() { hostile.EffectList().Add(atkSlow) })
+	frames := readFramesUntilQuiet(c)
+	if _, _, ok := npcInfoAttackSpeed(t, frames, hostile.ObjectID()); ok {
+		t.Fatal("P.Atk.Spd-only debuff resent NpcInfo, want a StatusUpdate")
+	}
+	if !slices.ContainsFunc(frames, func(f []byte) bool { return f[0] == serverpackets.OpcodeStatusUpdate }) {
+		t.Fatal("P.Atk.Spd-only debuff sent no StatusUpdate")
+	}
+	onHostileQueue(t, hostile, func() { hostile.EffectList().Remove(atkSlow) })
+	readFramesUntilQuiet(c)
+
+	slow := debuff("slow", "speed_down",
+		modelskill.FuncTemplate{Op: modelskill.FuncMul, Stat: "pAtkSpd", Value: 0.5},
+		modelskill.FuncTemplate{Op: modelskill.FuncMul, Stat: "runSpd", Value: 0.5})
+	onHostileQueue(t, hostile, func() { hostile.EffectList().Add(slow) })
+	requireNpcInfo("slow landing", readFramesUntilQuiet(c), 165)
+	onHostileQueue(t, hostile, func() { hostile.EffectList().Remove(slow) })
+	requireNpcInfo("slow ending", readFramesUntilQuiet(c), 330)
 }

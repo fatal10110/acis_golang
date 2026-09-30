@@ -82,18 +82,14 @@ func (a *Actor) AttachStatFuncs(fns []effect.Mod) {
 }
 
 // StatFuncsAttached reports the stat change of attached fns: the movement
-// takes the new move speed, and a RUN_SPEED change republishes the pet
-// window and the observers' NpcInfo. The effect list calls it after
-// releasing its lock, since those packets read the list back.
+// takes the new move speed, and the pet window and the observers' NpcInfo
+// are republished. The effect list calls it after releasing its lock, since
+// those packets read the list back.
 func (a *Actor) StatFuncsAttached(fns []effect.Mod) {
 	if len(fns) == 0 {
 		return
 	}
-	runSpeed := false
-	for _, fn := range fns {
-		runSpeed = runSpeed || fn.Stat == stat.RunSpeed
-	}
-	a.statsModified(runSpeed)
+	a.statsModified()
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner. An
@@ -106,29 +102,29 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	a.statCalc.mu.RLock()
 	calcs := a.statCalc.calcs
 	a.statCalc.mu.RUnlock()
-	removed, runSpeed := false, false
-	for s, calc := range calcs {
+	removed := false
+	for _, calc := range calcs {
 		if calc != nil && calc.RemoveOwner(owner) > 0 {
 			removed = true
-			runSpeed = runSpeed || stat.Stat(s) == stat.RunSpeed
 		}
 	}
 	switch {
 	case removed && owner.Stripped():
 		a.refreshMoveSpeed()
 	case removed:
-		a.statsModified(runSpeed)
+		a.statsModified()
 	}
 }
 
 // statsModified follows a stat func change: every position update reads
-// the live move speed, so the movement gets the new one. A RUN_SPEED change
-// also changes the movement speed multiplier the client scales the base
-// speeds by, so the owner's pet window and every observer's NpcInfo are
-// republished before the client falls out of step with the server's pace.
-func (a *Actor) statsModified(runSpeed bool) {
+// the live move speed, so the movement gets the new one. Whatever stat
+// changed, a summon its owner has seen then republishes its full view: the
+// owner's pet window, its status and every observer's NpcInfo, which carry
+// its P.Atk./P.Def./Max HP and the attack and movement speed multipliers
+// the client animates it by.
+func (a *Actor) statsModified() {
 	a.refreshMoveSpeed()
-	if runSpeed && a.ownerDiscovered.Load() {
+	if a.ownerDiscovered.Load() {
 		a.emit(event.OwnerInfoChanged{})
 		a.UpdateStatus()
 	}

@@ -55,6 +55,17 @@ func TestFolkIsShownAsNotAttackableNpcInfo(t *testing.T) {
 	if mAtkSpd != 126 || pAtkSpd != 212 || runSpd != 120 || walkSpd != 50 {
 		t.Fatalf("NpcInfo speeds = matk %d patk %d run %d walk %d, want 126/212/120/50", mAtkSpd, pAtkSpd, runSpd, walkSpd)
 	}
+	for range 6 { // the other three run/walk pairs
+		r.ReadInt32()
+	}
+	// The movement multiplier is the running speed 120 * 0.84 over the base
+	// 120; the attack speed multiplier is (float) (1.1 * 212 / 253).
+	run, dexBonus, patk, base := 120.0, 0.84, 212.0, 253.0
+	wantMove := float64(float32(run*dexBonus) / float32(run))
+	wantAttack := float64(float32(1.1 * patk / base))
+	if move, attack := r.ReadFloat64(), r.ReadFloat64(); move != wantMove || attack != wantAttack {
+		t.Fatalf("NpcInfo multipliers = move %v attack %v, want %v/%v", move, attack, wantMove, wantAttack)
+	}
 }
 
 // TestFolkClickSelectsThenTalks pins the reference click flow on a civilian
