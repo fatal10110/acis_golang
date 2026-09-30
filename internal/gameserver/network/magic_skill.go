@@ -1039,11 +1039,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			}
 		case skillhandler.RecipeBookOpened:
 			if live != nil {
-				sendRecipeBook(live, m.Dwarven)
+				send(live, recipeBookFrame(live, m.Dwarven))
 			}
 		case skillhandler.CraftWhileOperatingMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotCreateWhileTrading))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotCreateWhileTrading))
 			}
 		case skillhandler.SlotsFullMessage:
 			if live != nil {

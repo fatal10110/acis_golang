@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -55,8 +56,13 @@ func (l *GameClientLink) openRecipeBook(live *livePlayer, req clientpackets.Requ
 
 // sendRecipeBook sends live the dwarven or common page of its recipe book.
 func sendRecipeBook(live *livePlayer, dwarven bool) {
+	live.SendFrame(recipeBookFrame(live, dwarven))
+}
+
+// recipeBookFrame builds the dwarven or common page of live's recipe book.
+func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
 	maxMP := int32(live.ResourceValues().MaxMP)
-	live.SendFrame(serverpackets.FrameRecipeBookItemList(dwarven, maxMP, live.RecipeBook().Recipes(dwarven)))
+	return serverpackets.FrameRecipeBookItemList(dwarven, maxMP, live.RecipeBook().Recipes(dwarven))
 }
 
 // destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
