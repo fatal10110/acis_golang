@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
@@ -52,8 +53,20 @@ func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, 
 // (item flush, the game listener's detach saves) stops before the drain.
 func providePersist(lc fx.Lifecycle, _ *sql.DB, log zerolog.Logger) *persist.Worker {
 	worker := persist.New(log)
-	lc.Append(fx.Hook{OnStop: worker.Close})
+	lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+		return closePersistOnStop(ctx, worker, persistCloseTimeout)
+	}})
 	return worker
+}
+
+// closePersistOnStop waits at most budget of the stop context for the
+// persistence worker to drain. Lanes a slow database has backed up would
+// otherwise hold the rest of the stop budget, and fx would then skip the
+// ground-item save that stops after this hook.
+func closePersistOnStop(ctx context.Context, worker *persist.Worker, budget time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, budget)
+	defer cancel()
+	return worker.Close(ctx)
 }
 
 // provideItemWriteOrder builds the ordering both writers of the items table

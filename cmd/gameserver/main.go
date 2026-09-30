@@ -10,15 +10,48 @@ import (
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 const (
-	// gameServerStopTimeout bounds the whole shutdown sequence, which runs every
-	// stop hook in turn: draining connections, persisting ground items and npcs,
-	// and finally flushing pending item rows. fx's 15s default leaves that last
-	// flush able to be cut short by the process exiting rather than by its own
-	// item-instance save timeout budget.
-	gameServerStopTimeout = 30 * time.Second
+	// shutdownSaveTimeout bounds each single-table save a stop hook runs
+	// (spawn_data, items_on_ground), so a slow database spends at most this
+	// much of gameServerStopTimeout on it.
+	shutdownSaveTimeout = 10 * time.Second
+	// debugHTTPStopTimeout bounds the debug listener's graceful stop, so an
+	// in-flight profile request cannot hold up the shutdown.
+	debugHTTPStopTimeout = 2 * time.Second
+	// simPoolStopTimeout bounds the wait for the actor pool's workers to
+	// finish their queued, in-memory tasks.
+	simPoolStopTimeout = 5 * time.Second
+	// persistCloseTimeout bounds the persistence worker's last close, which
+	// gives lanes the item drain's own close left backed up a little longer.
+	// The ground-item save and the database close still follow it.
+	persistCloseTimeout = 5 * time.Second
+	// gameServerStopSlack covers the stop hooks that neither wait on the
+	// database nor on other goroutines' work: in-memory tickers finishing a
+	// tick, stopping a timer, closing the logger. Closing the database pool
+	// also waits for queries already running, but it is the last database
+	// step, so running past the deadline there loses nothing.
+	gameServerStopSlack = 5 * time.Second
+	// gameServerStopTimeout bounds the whole shutdown sequence. fx runs every
+	// stop hook in turn under this one deadline; once it expires fx skips
+	// every hook it has not reached, and Run exits the process with any
+	// running hook cut off. A step's own detached budget therefore cannot
+	// carry it past this deadline, so the deadline is the sum of every
+	// step's worst case, in stop order. A slow database then cannot spend
+	// the budget before the final item flush and the ground-item save run.
+	// TestGameServerStopTimeoutCoversEveryStopStep checks every registered
+	// stop hook against this sum.
+	gameServerStopTimeout = network.LivePlayerPersistWait + // listener: each connection's exit waits for its player's saves, in parallel
+		debugHTTPStopTimeout +
+		shutdownSaveTimeout + // spawn_data
+		simPoolStopTimeout +
+		task.ItemInstanceSaveTimeout + // item ticker finishing an in-flight save
+		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
+		persistCloseTimeout +
+		shutdownSaveTimeout + // items_on_ground
+		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
 	// before fx.StartTimeout applies and before Run installs signal handling,

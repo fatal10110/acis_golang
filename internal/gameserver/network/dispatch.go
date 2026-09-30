@@ -312,7 +312,7 @@ type GameClientLinkConfig struct {
 	// shares it, since it writes the same rows.
 	ItemWrites *persist.Order
 	// PersistWait bounds how long a connection waits for queued saves before
-	// reading rows back; zero means livePlayerPersistWait.
+	// reading rows back; zero means LivePlayerPersistWait.
 	PersistWait time.Duration
 	// Queues creates each live player's queue, which its in-world packet
 	// handlers, timers and periodic ticks run on. Required.
