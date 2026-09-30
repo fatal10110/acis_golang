@@ -11,12 +11,14 @@ type boatRouteFile struct {
 	Itineraries []boatItineraryElement `xml:"itinerary"`
 }
 
+// boatItineraryElement is one <itinerary>. heading is required; item1 and
+// item2 (the ticket item for each leg) are optional and default to 0.
 type boatItineraryElement struct {
 	Dock1   string             `xml:"dock1,attr"`
 	Dock2   string             `xml:"dock2,attr"`
-	Item1   int                `xml:"item1,attr"`
-	Item2   int                `xml:"item2,attr"`
-	Heading int                `xml:"heading,attr"`
+	Item1   coord32            `xml:"item1,attr"`
+	Item2   coord32            `xml:"item2,attr"`
+	Heading *coord32           `xml:"heading,attr"`
 	Routes  []boatRouteElement `xml:"route"`
 }
 
@@ -47,9 +49,12 @@ func buildBoatItinerary(el boatItineraryElement) (route.BoatItinerary, error) {
 	if err != nil {
 		return route.BoatItinerary{}, err
 	}
+	if el.Heading == nil {
+		return route.BoatItinerary{}, fmt.Errorf("boat itinerary %s: heading is required", el.Dock1)
+	}
 	routeCount := 1
 	docks := []route.Dock{dock1}
-	items := []int{el.Item1}
+	items := []int{int(el.Item1)}
 	if el.Dock2 != "" {
 		dock2, err := route.ParseDock(el.Dock2)
 		if err != nil {
@@ -57,7 +62,7 @@ func buildBoatItinerary(el boatItineraryElement) (route.BoatItinerary, error) {
 		}
 		routeCount = 2
 		docks = append(docks, dock2)
-		items = append(items, el.Item2)
+		items = append(items, int(el.Item2))
 	}
 	if len(el.Routes) != routeCount {
 		return route.BoatItinerary{}, fmt.Errorf("boat itinerary %s: got %d routes, want %d", el.Dock1, len(el.Routes), routeCount)
@@ -75,7 +80,7 @@ func buildBoatItinerary(el boatItineraryElement) (route.BoatItinerary, error) {
 		}
 		routes = append(routes, route.BoatRoute{Dock: docks[i], ItemID: items[i], Nodes: nodes})
 	}
-	return route.BoatItinerary{Heading: el.Heading, Routes: routes}, nil
+	return route.BoatItinerary{Heading: int(*el.Heading), Routes: routes}, nil
 }
 
 type walkerRouteFile struct {
