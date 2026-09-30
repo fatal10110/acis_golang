@@ -24,8 +24,8 @@ import (
 const apprenticeKnifeID int32 = 7818
 
 // shippedItemTemplate loads one item template from the shared datapack,
-// skipping the calling test when the datapack is not checked out next to
-// the module.
+// skipping the calling test when no parent directory of the checkout holds
+// aCis_datapack (it fails instead when ACIS_REQUIRE_DATAPACK is set).
 func shippedItemTemplate(t *testing.T, id int32) *item.Template {
 	t.Helper()
 	dir := datapack.Path(t, "data", "xml", "items")

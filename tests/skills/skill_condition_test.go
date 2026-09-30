@@ -26,8 +26,9 @@ var shippedSkillTable = sync.OnceValue(func() *modelskill.Table {
 	return table
 })
 
-// shippedSkill returns one shipped skill level, skipping the test when the
-// datapack is not checked out next to the module.
+// shippedSkill returns one shipped skill level, skipping the test when no
+// parent directory of the checkout holds aCis_datapack (it fails instead
+// when ACIS_REQUIRE_DATAPACK is set).
 func shippedSkill(t *testing.T, id modelskill.ID, level int) modelskill.Definition {
 	t.Helper()
 	datapack.Require(t)

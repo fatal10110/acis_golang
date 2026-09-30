@@ -578,8 +578,8 @@ func TestChanceSkillConditionGatesProc(t *testing.T) {
 }
 
 // shippedSkillDefinitions loads the shared datapack's skill definitions,
-// skipping the calling test when the datapack is not checked out next to
-// the module.
+// skipping the calling test when no parent directory of the checkout holds
+// aCis_datapack (it fails instead when ACIS_REQUIRE_DATAPACK is set).
 func shippedSkillDefinitions(t *testing.T) []modelskill.Definition {
 	t.Helper()
 	dir := datapack.Path(t, "data", "xml", "skills")
