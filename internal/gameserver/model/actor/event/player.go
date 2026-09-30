@@ -419,10 +419,15 @@ type Revived struct{}
 // shows (charges, penalties, charm of courage).
 type EtcStatusChanged struct{}
 
-func (ReviveRequested) event()  {}
-func (ReviveRefused) event()    {}
-func (Revived) event()          {}
-func (EtcStatusChanged) event() {}
+// EtcStatusBroadcast reports a change to those flags that the character's
+// observers are told about as well.
+type EtcStatusBroadcast struct{}
+
+func (ReviveRequested) event()    {}
+func (ReviveRefused) event()      {}
+func (Revived) event()            {}
+func (EtcStatusChanged) event()   {}
+func (EtcStatusBroadcast) event() {}
 
 // MountFeedGauge reports the ridden mount's feed gauge, in the client's
 // gauge units.

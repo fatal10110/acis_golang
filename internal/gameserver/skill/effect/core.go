@@ -19,7 +19,9 @@ type Flag uint32
 const (
 	// FlagNone is the default effect flag mask.
 	FlagNone Flag = 1 << iota
-	flagCharmOfCourage
+	// FlagCharmOfCourage marks a player as carrying Charm of Courage, shown
+	// in its status window.
+	FlagCharmOfCourage
 	// FlagCharmOfLuck marks a target as carrying Charm of Luck, consulted by
 	// systems that exempt a lucky death from raising its own penalties.
 	FlagCharmOfLuck
@@ -255,7 +257,7 @@ var coreKinds = map[string]kind{
 	"IncreaseCharges":       {typ: TypeIncreaseCharges},
 	"TargetMe":              {typ: TypeTargetMe},
 	"Bluff":                 {typ: TypeBluff},
-	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: flagCharmOfCourage},
+	"CharmOfCourage":        {typ: TypeCharmOfCourage, flag: FlagCharmOfCourage},
 	"CharmOfLuck":           {typ: TypeCharmOfLuck, flag: FlagCharmOfLuck},
 	"PhoenixBless":          {typ: TypePhoenixBless, flag: FlagPhoenixBlessing},
 	"BlockBuff":             {typ: TypeBlockBuff},
@@ -530,6 +532,7 @@ func wireHooks(e *Effect) {
 		e.OnStart = bluffStart
 	case TypeCharmOfCourage:
 		e.OnStart = charmOfCourageStart
+		e.OnExit = charmOfCourageExit
 	case TypeCharmOfLuck:
 		e.OnExit = charmOfLuckExit
 	case TypePhoenixBless:

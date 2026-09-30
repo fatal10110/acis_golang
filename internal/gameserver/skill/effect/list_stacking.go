@@ -131,6 +131,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 	// A stack-head change on the add path tells the owner which effect
 	// left and which took over.
 	if deactivate != nil {
+		l.holdExit(deactivate)
 		*pending = append(*pending, func() { l.removeStats(deactivate) })
 		appendThunk(pending, deactivate.beginExit())
 		l.notifyDisplaced(deactivate, pending)

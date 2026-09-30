@@ -118,7 +118,8 @@ func (l *List) emptyLocked() bool {
 }
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, silent, and callbacks
+// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, silent, exiting,
+// dropHeld, and callbacks
 // into owner. Other actors add and dispel effects synchronously from their own
 // queues while the owner's effect tick runs.
 type List struct {
@@ -140,10 +141,18 @@ type List struct {
 	tracked bool
 	// untracked records that Untrack ran; l never registers again.
 	untracked bool
-	// silent is set only for the duration of one AddRestored's l.mu hold.
+	// silent is set only for the duration of an AddRestored's l.mu holds.
 	// The owner-message helpers read it while queueing, so the messages
 	// that insertion would queue are left out.
 	silent bool
+
+	// exiting collects, during one add's l.mu hold, the held effects whose
+	// exit hook that insertion queued (a replaced, evicted or displaced
+	// buff). dropHeld maps each of them, until that Add's hooks have run, to
+	// whether its exit hook asked Drop for it: such a drop waits for the
+	// insertion to finish.
+	exiting  []*Effect
+	dropHeld map[*Effect]bool
 
 	// queue is the owner's queue: periodic effect actions run on it and
 	// effect periods are measured on its clock. Set before the owner is

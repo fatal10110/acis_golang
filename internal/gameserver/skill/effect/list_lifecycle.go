@@ -58,11 +58,81 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.silent = !announce
 	l.add(e, &pending)
 	l.silent = false
+	exiting := l.exiting
+	l.exiting = nil
 	l.mu.Unlock()
 
 	runHooks(pending)
+	exits := l.dropDeferred(exiting, announce)
 	l.notifyAbnormalUpdate()
+	runHooks(exits)
 	l.notifyActivityTransition()
+}
+
+// Drop removes e, which its own exit hook is ending, when l still holds it —
+// as a displaced stack member does with cancel-lesser off. An effect that
+// already left the list is ignored. When an Add in progress ran that exit
+// hook, the removal waits until the Add's own hooks have run, so the owner
+// sees e's removal after the newcomer took its place, and one icon refresh
+// covers both.
+func (l *List) Drop(e *Effect) {
+	if l == nil || e == nil {
+		return
+	}
+	l.mu.Lock()
+	if _, ok := l.dropHeld[e]; ok {
+		l.dropHeld[e] = true
+		l.mu.Unlock()
+		return
+	}
+	held := l.holdsLocked(e)
+	l.mu.Unlock()
+	if held {
+		l.Remove(e)
+	}
+}
+
+// holdExit records that the add in progress queued held effect e's exit
+// hook, so a Drop from that hook waits for the add to finish.
+func (l *List) holdExit(e *Effect) {
+	if l.dropHeld == nil {
+		l.dropHeld = make(map[*Effect]bool)
+	}
+	l.dropHeld[e] = false
+	l.exiting = append(l.exiting, e)
+}
+
+// dropDeferred releases the effects an add held for its exit hooks and
+// removes those whose hook asked for a Drop. It runs their list bookkeeping
+// and returns their exit hooks, to run after the icon refresh. A restored
+// add's drops send no system messages, as the add itself sends none.
+func (l *List) dropDeferred(exiting []*Effect, announce bool) []func() {
+	if len(exiting) == 0 {
+		return nil
+	}
+	var pending, exits []func()
+	l.mu.Lock()
+	l.silent = !announce
+	for _, e := range exiting {
+		requested, ok := l.dropHeld[e]
+		if !ok {
+			continue
+		}
+		delete(l.dropHeld, e)
+		if requested {
+			l.remove(e, &pending, &exits)
+		}
+	}
+	l.silent = false
+	l.mu.Unlock()
+	runHooks(pending)
+	return exits
+}
+
+// holdsLocked reports whether e is still in l's visible lists or a stack
+// queue. Caller must hold l.mu.
+func (l *List) holdsLocked(e *Effect) bool {
+	return l.contained(e) != nil || slices.Contains(l.stacks[e.stackType()], e)
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -315,6 +385,7 @@ func (l *List) add(e *Effect, pending *[]func()) {
 	var retiring []*Effect
 	l.insert(e, pending, &retiring)
 	for _, old := range retiring {
+		l.holdExit(old)
 		l.remove(old, pending, pending)
 	}
 }

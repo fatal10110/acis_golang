@@ -6,6 +6,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -175,7 +176,13 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.StatsModified:
 		l.sendModifiedStats(live, e.Attrs)
 	case event.ChargesChanged, event.EtcStatusChanged:
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
+	case event.EtcStatusBroadcast:
+		// The saved effects EnterWorld replays have no observers yet, and
+		// the EnterWorld EtcStatusUpdate that follows carries their flags.
+		if !live.replayingEffects.Load() {
+			l.broadcastLiveFrame(live, func() wire.Frame { return serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)) })
+		}
 	case event.ChargeMessage:
 		if e.Maxed {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageForceMaxLevelReached))
@@ -184,7 +191,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageForceIncreasedToS1, int32(e.Charges)))
 	case event.GradePenaltyChanged:
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 		l.refreshLiveItemStats(live)
 	case event.WeightPenaltyChanged:
 		l.sendLiveWeightPenalty(live)
@@ -394,7 +401,7 @@ func (l *GameClientLink) refreshLiveItemStats(live *livePlayer) {
 func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 	if l.world == nil {
 		return
 	}
@@ -417,7 +424,8 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 			l.log.Error().Err(err).Int32("object_id", live.ID).Msg("update death-penalty passive stats")
 		}
 	}
-	etc := serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(e.New)}
+	etc := etcStatus(live.Character)
+	etc.DeathPenaltyLevel = int32(e.New)
 	if e.Raised {
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(e.New)))
@@ -545,5 +553,16 @@ func reviveRefusalMessage(reason event.ReviveRefusal) int {
 		return serverpackets.SystemMessageMasterCannotRes
 	default:
 		return serverpackets.SystemMessageResHasAlreadyBeenProposed
+	}
+}
+
+// etcStatus is c's status-window flags as EtcStatusUpdate reports them.
+func etcStatus(c *player.Character) serverpackets.EtcStatus {
+	return serverpackets.EtcStatus{
+		Charges:           int32(c.Charges()),
+		WeightPenalty:     int32(c.WeightPenalty()),
+		GradePenalty:      c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0,
+		CharmOfCourage:    c.CharmOfCourage(),
+		DeathPenaltyLevel: int32(c.DeathPenaltyLevel()),
 	}
 }

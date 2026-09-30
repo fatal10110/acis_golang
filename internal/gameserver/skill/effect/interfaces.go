@@ -94,9 +94,15 @@ type PlayerActor interface {
 	TryToAttack(world.Tracked)
 	// WakeAI re-evaluates the player's current intention once.
 	WakeAI()
+	// StopCharmOfLuck, StopPhoenixBlessing and StopProtectionBlessing run
+	// when that blessing ends on the player; observers see its appearance
+	// refreshed.
 	StopCharmOfLuck(*Effect)
 	StopPhoenixBlessing(*Effect)
 	StopProtectionBlessing(*Effect)
+	// BroadcastEtcStatus sends the player's status-window flags to the
+	// player and its observers.
+	BroadcastEtcStatus()
 	WeaponGradePenalty() bool
 	ReduceDeathPenaltyLevel() int
 
@@ -154,8 +160,7 @@ type SummonActor interface {
 	// Think wakes the summon's AI to continue its current intention.
 	Think() error
 	// StopCharmOfLuck and StopPhoenixBlessing run when that blessing ends
-	// on the summon: the effect is already off its list, and observers
-	// see its appearance refreshed.
+	// on the summon; observers see its appearance refreshed.
 	StopCharmOfLuck(*Effect)
 	StopPhoenixBlessing(*Effect)
 	// StopProtectionBlessing runs when a Blessing of Protection loses its

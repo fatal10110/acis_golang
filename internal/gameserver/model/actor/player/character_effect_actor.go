@@ -79,19 +79,32 @@ func (c *Character) AddChanceTrigger(e *effect.Effect) { c.EffectList().AddChanc
 // chance procs.
 func (c *Character) RemoveChanceTrigger(e *effect.Effect) { c.EffectList().RemoveChanceTrigger(e) }
 
-// StopCharmOfLuck runs when a Charm of Luck ends: the effect has already
-// left the list, so only the player's appearance is refreshed for observers.
+// StopCharmOfLuck runs when a Charm of Luck ends: the player's appearance is
+// refreshed for observers.
 func (c *Character) StopCharmOfLuck(*effect.Effect) { c.BroadcastAbnormalEffect() }
 
-// StopPhoenixBlessing runs when a Phoenix Blessing ends: the effect has
-// already left the list, so only the player's appearance is refreshed for
-// observers.
+// StopPhoenixBlessing runs when a Phoenix Blessing ends: the player's
+// appearance is refreshed for observers.
 func (c *Character) StopPhoenixBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
 
 // StopProtectionBlessing runs when a Blessing of Protection loses its stack
-// group's head (a recast replacing it): the player's appearance is refreshed
-// for observers.
+// group's head: the player's appearance is refreshed for observers.
 func (c *Character) StopProtectionBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
+
+// BroadcastEtcStatus refreshes whether c holds a Charm of Courage from its
+// effect list, then sends c's status-window flags to c and every player that
+// sees it. The Charm of Courage hooks call it outside the effect list's lock.
+func (c *Character) BroadcastEtcStatus() {
+	c.charmMu.Lock()
+	c.charmOfCourage.Store(c.EffectList().IsAffected(effect.FlagCharmOfCourage))
+	c.charmMu.Unlock()
+	c.emit(event.EtcStatusBroadcast{})
+}
+
+// CharmOfCourage reports whether c held a Charm of Courage when its last
+// one started or ended. It never takes the effect list's lock, so status
+// packets built from inside a stat callback can read it.
+func (c *Character) CharmOfCourage() bool { return c.charmOfCourage.Load() }
 
 // stopPhoenixBlessing uses up every Phoenix Blessing c holds, then refreshes
 // its appearance once more.

@@ -291,7 +291,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"ManaHeal", TypeManaHeal, FlagNone, false, false},
 		{"TargetMe", TypeTargetMe, FlagNone, false, false},
 		{"Bluff", TypeBluff, FlagNone, false, false},
-		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false, false},
+		{"CharmOfCourage", TypeCharmOfCourage, FlagCharmOfCourage, false, false},
 		{"CharmOfLuck", TypeCharmOfLuck, FlagCharmOfLuck, false, false},
 		{"PhoenixBless", TypePhoenixBless, FlagPhoenixBlessing, false, false},
 		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
@@ -884,6 +884,10 @@ func (t *liveEffectTarget) StopPhoenixBlessing(*Effect) {
 
 func (t *liveEffectTarget) StopProtectionBlessing(*Effect) {
 	t.events = append(t.events, "stop-protection-bless")
+}
+
+func (t *liveEffectTarget) BroadcastEtcStatus() {
+	t.events = append(t.events, "etc-status")
 }
 
 func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
@@ -2835,6 +2839,7 @@ func (playerStubs) WakeAI()                              {}
 func (playerStubs) StopCharmOfLuck(*Effect)              {}
 func (playerStubs) StopPhoenixBlessing(*Effect)          {}
 func (playerStubs) StopProtectionBlessing(*Effect)       {}
+func (playerStubs) BroadcastEtcStatus()                  {}
 func (playerStubs) WeaponGradePenalty() bool             { return false }
 func (playerStubs) ReduceDeathPenaltyLevel() int         { return 0 }
 func (playerStubs) CastingNow() bool                     { return false }
