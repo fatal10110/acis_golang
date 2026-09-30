@@ -6886,6 +6886,52 @@ func TestRunSpeedStatFuncsRefreshLiveSpeed(t *testing.T) {
 	}
 }
 
+// TestStatFuncsReportModifiedStats pins the non-RUN_SPEED branch of
+// Creature.broadcastModifiedStats (Creature.java:1213-1261): any other stat
+// func change reports the self view stale, with one P.Atk./cast speed value
+// per changed func on those stats, read at change time; a batch touching
+// RUN_SPEED reports only the full refresh. Fist P.Atk. speed 300 * DEX 30
+// bonus 1.1 = 330, * 1.33 = 438.9; cast speed 333 * WIT 11 bonus 0.64 =
+// 213.12, * 1.2 = 255.74.
+func TestStatFuncsReportModifiedStats(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	rec := recordEvents(c)
+	might := effect.ModOwnerSkill(modelskill.Ref{ID: 1068, Level: 1})
+	haste := effect.ModOwnerSkill(modelskill.Ref{ID: 1086, Level: 1})
+	windWalk := effect.ModOwnerSkill(modelskill.Ref{ID: 1204, Level: 1})
+
+	c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.2, Owner: might}})
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpMul, Value: 1.33, Owner: haste},
+		{Stat: stat.MagicAttackSpeed, Op: effect.OpMul, Value: 1.2, Owner: haste},
+	})
+	c.RemoveStatsByOwner(haste)
+	c.RemoveStatsByOwner(haste)
+	c.AddStatFuncs(nil)
+
+	got := event.Of[event.StatsModified](rec)
+	want := []event.StatsModified{
+		{},
+		{Attrs: []event.StatusAttr{{Kind: event.StatusPhysicalSpeed, Value: 438}, {Kind: event.StatusMagicSpeed, Value: 255}}},
+		{Attrs: []event.StatusAttr{{Kind: event.StatusPhysicalSpeed, Value: 330}, {Kind: event.StatusMagicSpeed, Value: 213}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("StatsModified = %+v, want %+v", got, want)
+	}
+
+	c.AddStatFuncs([]effect.Mod{
+		{Stat: stat.PowerAttackSpeed, Op: effect.OpMul, Value: 1.33, Owner: windWalk},
+		{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 33, Owner: windWalk},
+	})
+	c.RemoveStatsByOwner(windWalk)
+	if n := event.Count[event.StatsModified](rec); n != len(want) {
+		t.Fatalf("StatsModified after RUN_SPEED batches = %d, want still %d", n, len(want))
+	}
+	if n := event.Count[event.RunSpeedChanged](rec); n != 2 {
+		t.Fatalf("RunSpeedChanged = %d, want 2", n)
+	}
+}
+
 // TestAttackSpeedMultiplier pins CreatureStatus.getAttackSpeedMultiplier
 // (CreatureStatus.java:795-801): (float) (1.1 * P.Atk. speed / 300), the
 // player templates' base P.Atk. speed.

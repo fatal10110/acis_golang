@@ -164,6 +164,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	case event.RunSpeedChanged:
 		l.broadcastRunSpeedChange(live)
+	case event.StatsModified:
+		l.sendModifiedStats(live, e.Attrs)
 	case event.ChargesChanged, event.EtcStatusChanged:
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
 	case event.ChargeMessage:

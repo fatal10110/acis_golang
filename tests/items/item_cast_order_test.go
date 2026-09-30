@@ -69,6 +69,8 @@ func forceSkillMastery(t *testing.T, srv *gameservertest.Server, objID int32) ma
 	}
 	p.AddStatFuncs([]effect.Mod{{Stat: stat.SkillMastery, Op: effect.OpSet, Value: 1000}})
 	p.SetFloatRollSource(func(float64) float64 { return 99.5 })
+	// The stat func change refreshes the player's own UserInfo.
+	drainUntilQuiet(t, srv.Client)
 	return p
 }
 

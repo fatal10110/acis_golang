@@ -80,6 +80,11 @@ type UserInfoChanged struct{}
 // RUN_SPEED, so its own and its observers' views of it are stale.
 type RunSpeedChanged struct{}
 
+// StatsModified reports a stat func change that left RUN_SPEED alone: the
+// character's own view is stale, and Attrs holds the new P.Atk. and cast
+// speeds, one per changed func on those stats, its observers must see.
+type StatsModified struct{ Attrs []StatusAttr }
+
 // GradePenaltyChanged reports a change of the equipment grade penalty.
 type GradePenaltyChanged struct{}
 
@@ -329,6 +334,7 @@ func (PositionCorrected) event()      {}
 func (WeightPenaltyChanged) event()   {}
 func (UserInfoChanged) event()        {}
 func (RunSpeedChanged) event()        {}
+func (StatsModified) event()          {}
 func (GradePenaltyChanged) event()    {}
 func (DeathPenaltyChanged) event()    {}
 func (ExpSPGained) event()            {}

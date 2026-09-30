@@ -1,6 +1,7 @@
 package player
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -44,12 +45,12 @@ func (c *Character) MaxBuffCount() int {
 // must serialize at a higher level (see effect.List, which does this for
 // effect-driven adds).
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
-	runSpeed := false
-	for _, fn := range fns {
+	stats := make([]stat.Stat, len(fns))
+	for i, fn := range fns {
 		c.statCalcOrCreate(fn.Stat).AddMod(fn)
-		runSpeed = runSpeed || fn.Stat == stat.RunSpeed
+		stats[i] = fn.Stat
 	}
-	c.statsModified(len(fns) > 0, runSpeed)
+	c.statsModified(stats)
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
@@ -60,27 +61,43 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	c.statMu.RLock()
 	calcs := c.statCalcs
 	c.statMu.RUnlock()
-	modified, runSpeed := false, false
+	var stats []stat.Stat
 	for s, calc := range calcs {
-		if calc != nil && calc.RemoveOwner(owner) {
-			modified = true
-			runSpeed = runSpeed || stat.Stat(s) == stat.RunSpeed
+		if calc == nil {
+			continue
+		}
+		for range calc.RemoveOwner(owner) {
+			stats = append(stats, stat.Stat(s))
 		}
 	}
-	c.statsModified(modified, runSpeed)
+	c.statsModified(stats)
 }
 
-// statsModified follows a stat func change: the movement simulation takes
-// the new move speed, and a RUN_SPEED change reports the full appearance
-// as stale, since the client derives its move speed from it.
-func (c *Character) statsModified(modified, runSpeed bool) {
-	if !modified {
+// statsModified follows a stat func change on stats, one entry per changed
+// func: the movement simulation takes the new move speed, then a RUN_SPEED
+// change reports the full appearance as stale, since the client derives its
+// move speed from it. Any other change reports the self view as stale, with
+// the new P.Atk. and cast speeds for each changed func on those stats, read
+// before any penalty refresh the report triggers.
+func (c *Character) statsModified(stats []stat.Stat) {
+	if len(stats) == 0 {
 		return
 	}
 	c.refreshMoveSpeed()
-	if runSpeed {
+	if slices.Contains(stats, stat.RunSpeed) {
 		c.emit(event.RunSpeedChanged{})
+		return
 	}
+	var attrs []event.StatusAttr
+	for _, s := range stats {
+		switch s {
+		case stat.PowerAttackSpeed:
+			attrs = append(attrs, event.StatusAttr{Kind: event.StatusPhysicalSpeed, Value: c.AttackSpeed()})
+		case stat.MagicAttackSpeed:
+			attrs = append(attrs, event.StatusAttr{Kind: event.StatusMagicSpeed, Value: c.MagicAttackSpeed()})
+		}
+	}
+	c.emit(event.StatsModified{Attrs: attrs})
 }
 
 // Invul reports whether c is currently invulnerable.

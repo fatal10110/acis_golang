@@ -95,13 +95,14 @@ func assertSkillListDisabled(t *testing.T, frames [][]byte, want uint8) {
 			}
 			skillList = i
 		case serverpackets.OpcodeUserInfo:
-			if userInfo < 0 {
-				userInfo = i
-			}
+			userInfo = i
 		}
 	}
+	// A stat func change of the swapped items sends its own UserInfo ahead
+	// of the item-skill listener's SkillList; the SkillList still precedes
+	// the closing UserInfo refresh.
 	if skillList < 0 || userInfo < 0 || skillList > userInfo {
-		t.Fatalf("SkillList at frame %d, UserInfo at %d: want a SkillList before UserInfo", skillList, userInfo)
+		t.Fatalf("SkillList at frame %d, last UserInfo at %d: want a SkillList before the closing UserInfo", skillList, userInfo)
 	}
 	entries := readSkillList(t, frames[skillList])
 	seeded := false

@@ -70,6 +70,7 @@ func TestValidatePositionFallDamage(t *testing.T) {
 func TestValidatePositionFallDamageUsesFallStat(t *testing.T) {
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	character.AddStatFuncs([]effect.Mod{{Stat: stat.Fall, Op: effect.OpMul, Value: 0.6}})
+	drainQuiet(t, srv.Client) // the stat func change's own UserInfo
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()
 

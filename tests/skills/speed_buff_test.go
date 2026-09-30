@@ -21,6 +21,23 @@ type userInfoSpeeds struct {
 
 func decodeUserInfoSpeeds(t *testing.T, frame []byte) userInfoSpeeds {
 	t.Helper()
+	r := userInfoCombatReader(t, frame)
+	for range 12 { // combat stats, PvP flag, karma
+		r.ReadInt32()
+	}
+	var s userInfoSpeeds
+	s.runSpd = r.ReadInt32()
+	for range 7 { // walk, swim x2, unused x2, fly x2
+		r.ReadInt32()
+	}
+	s.moveMult, s.attackMult = r.ReadFloat64(), r.ReadFloat64()
+	return s
+}
+
+// userInfoCombatReader returns a reader over a UserInfo frame positioned at
+// its combat block, the P.Atk field.
+func userInfoCombatReader(t *testing.T, frame []byte) *wire.Reader {
+	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeUserInfo, "UserInfo")
 	r := wire.NewReader(frame[1:])
 	for range 5 { // x, y, z, heading, object id
@@ -42,16 +59,7 @@ func decodeUserInfoSpeeds(t *testing.T, frame []byte) userInfoSpeeds {
 			r.ReadInt32()
 		}
 	}
-	for range 12 { // combat stats, PvP flag, karma
-		r.ReadInt32()
-	}
-	var s userInfoSpeeds
-	s.runSpd = r.ReadInt32()
-	for range 7 { // walk, swim x2, unused x2, fly x2
-		r.ReadInt32()
-	}
-	s.moveMult, s.attackMult = r.ReadFloat64(), r.ReadFloat64()
-	return s
+	return r
 }
 
 // lastUserInfoSpeeds decodes the last UserInfo among frames.

@@ -35,7 +35,7 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	var modified []stat.Stat
 	for s, calc := range calcs {
 		if calc != nil {
-			if calc.RemoveOwner(owner) {
+			if calc.RemoveOwner(owner) > 0 {
 				modified = append(modified, stat.Stat(s))
 			}
 		}

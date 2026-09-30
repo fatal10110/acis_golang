@@ -2159,7 +2159,9 @@ func TestCalculatorRemoveOwner(t *testing.T) {
 	c.AddMod(Mod{Stat: stat.MagicAttack, Op: OpAdd, Value: 7, Owner: ownerB})
 	c.AddMod(Mod{Stat: stat.CriticalRate, Op: OpAdd, Value: 1, Owner: ownerA})
 
-	c.RemoveOwner(ownerA)
+	if got := c.RemoveOwner(ownerA); got != 2 {
+		t.Fatalf("RemoveOwner(ownerA) = %d, want 2 removed mods", got)
+	}
 	if c.Size() != 1 {
 		t.Fatalf("Size() = %d, want 1", c.Size())
 	}
