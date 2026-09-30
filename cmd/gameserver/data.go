@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -77,6 +78,7 @@ type gameData struct {
 	Finder        *pathfind.Finder
 	Hennas        *henna.Table
 	HealSps       *skill.HealSpsTable
+	Recipes       *recipe.Table
 }
 
 type geodata struct {
@@ -163,11 +165,15 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	recipes, err := gamexml.LoadRecipes(filepath.Join(xmlRoot, "recipes.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Msg("game data loaded")
 	return &gameData{
 		Players:       players,
 		Levels:        levels,
@@ -188,6 +194,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Finder:        geo.Finder,
 		Hennas:        hennas,
 		HealSps:       healSps,
+		Recipes:       recipes,
 	}, nil
 }
 

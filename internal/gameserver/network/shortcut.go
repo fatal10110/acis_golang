@@ -29,6 +29,13 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	if !ok {
 		return
 	}
+	// A recipe the book does not hold still shows on the bar, but is
+	// neither kept nor saved: the reference answers ShortCutRegister
+	// before its integrity check drops the entry.
+	if sc.Type == shortcut.Recipe && !live.RecipeBook().Has(int(sc.ID)) {
+		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
+		return
+	}
 	live.shortcuts.Register(sc)
 	l.saveShortcut(live, sc, "register shortcut")
 	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))

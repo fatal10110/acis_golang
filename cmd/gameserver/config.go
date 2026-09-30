@@ -59,6 +59,8 @@ type gameplayConfig struct {
 	RateKarmaExpLost         rateKarmaExpLost
 	CharacterSelectDelay     characterSelectDelay
 	ServerBypassDelay        serverBypassDelay
+	ManufactureDelay         manufactureDelay
+	CraftingEnabled          craftingEnabled
 	SpawnMultiplier          spawnMultiplier
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
@@ -133,6 +135,12 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.ServerBypassDelay, err = loadServerBypassDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ManufactureDelay, err = loadManufactureDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.CraftingEnabled, err = loadCraftingEnabled(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
@@ -443,6 +451,30 @@ func loadServerBypassDelay(paths gameServerPaths) (serverBypassDelay, error) {
 		return 0, err
 	}
 	return serverBypassDelay(time.Duration(config.NewFields(props, "server bypass reuse delay").Int("ServerBypassTime", 100)) * time.Millisecond), nil
+}
+
+// manufactureDelay is the reuse delay between two crafts on one client
+// session, read from server.properties.
+type manufactureDelay time.Duration
+
+func loadManufactureDelay(paths gameServerPaths) (manufactureDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return manufactureDelay(time.Duration(config.NewFields(props, "manufacture reuse delay").Int("ManufactureTime", 300)) * time.Millisecond), nil
+}
+
+// craftingEnabled switches recipe registration and crafting on, read from
+// players.properties.
+type craftingEnabled bool
+
+func loadCraftingEnabled(paths gameServerPaths) (craftingEnabled, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return craftingEnabled(config.NewFields(props, "crafting enabled").Bool("CraftingEnabled", true)), nil
 }
 
 // loadPetConfig takes the process logger for the same reason as

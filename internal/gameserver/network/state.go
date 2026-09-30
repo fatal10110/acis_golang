@@ -126,6 +126,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9d: true, // request skill reuse timers
 		0x9e: true, // package sendable item list
 		0x9f: true, // package send
+		0xac: true, // open recipe book
+		0xad: true, // delete a recipe
+		0xae: true, // recipe craft window
+		0xaf: true, // craft a recipe
 		0xc5: true, // dialog answer
 		0xca: true, // game guard reply
 		0xcd: true, // show mini map

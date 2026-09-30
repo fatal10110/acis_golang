@@ -6,6 +6,7 @@
 package gameservertest
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"net"
@@ -37,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -118,6 +120,10 @@ type options struct {
 	summonItems            *item.SummonItemTable
 	wantChars              int
 	enchantRoll            func() float64
+	recipes                *recipe.Table
+	craftingDisabled       bool
+	manufactureDelay       time.Duration
+	craftRoll              func(n int) int
 	enchantConfig          *enchant.Config
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
@@ -438,6 +444,29 @@ func WithEnchantConfig(cfg enchant.Config) Option {
 	return func(o *options) { o.enchantConfig = &cfg }
 }
 
+// WithRecipes replaces the recipe table the link loads (default:
+// RecipeTemplates).
+func WithRecipes(table *recipe.Table) Option {
+	return func(o *options) { o.recipes = table }
+}
+
+// WithCraftingDisabled boots with players.properties CraftingEnabled off.
+func WithCraftingDisabled() Option {
+	return func(o *options) { o.craftingDisabled = true }
+}
+
+// WithManufactureDelay sets the reuse delay between two crafts on one
+// client (default 0: every craft request is taken).
+func WithManufactureDelay(d time.Duration) Option {
+	return func(o *options) { o.manufactureDelay = d }
+}
+
+// WithCraftRoll supplies the craft success roll in [0,n) (default: the
+// random source), so craft outcomes are deterministic.
+func WithCraftRoll(roll func(n int) int) Option {
+	return func(o *options) { o.craftRoll = roll }
+}
+
 // WithEnchantRoll supplies the enchant dice roll source wired into the link
 // (default: the random source), so enchant outcomes are deterministic.
 func WithEnchantRoll(roll func() float64) Option {
@@ -525,6 +554,7 @@ type Server struct {
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
 	Hennas           *gamesql.HennaStore
+	RecipeBooks      *gamesql.RecipeBookStore
 	KnownSkills      *gamesql.CharacterSkillStore
 	Pets             *gamesql.PetStore
 	InventoryUpdates *task.InventoryUpdates
@@ -953,6 +983,13 @@ func (s *Server) PlayerMaxCP(tb testing.TB, objID int32) int {
 	return int(reader.MaxCPValue())
 }
 
+// PlayerMaxMP reports the live player's calculated max MP.
+func (s *Server) PlayerMaxMP(tb testing.TB, objID int32) int {
+	tb.Helper()
+	reader := s.onlineCharacter(tb, objID)
+	return int(reader.MaxMPValue())
+}
+
 // FlushItems persists every pending item mutation the way the production
 // lazy-persistence tick does, so suites can assert the items rows mid-test.
 // It then waits for the persistence worker, which carries both the tick's own
@@ -1194,6 +1231,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	items := gamesql.NewItemStore(db)
 	shortcuts := gamesql.NewShortcutStore(db)
 	hennas := gamesql.NewHennaStore(db)
+	recipeBooks := gamesql.NewRecipeBookStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
@@ -1364,6 +1402,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,
 		HennaTable:       HennaTemplates(t),
+		RecipeBooks:      recipeBooks,
+		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
+		CraftRoll:        o.craftRoll,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
@@ -1393,7 +1434,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
@@ -1571,6 +1612,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Items:            items,
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,
+		RecipeBooks:      recipeBooks,
 		KnownSkills:      knownSkills,
 		Pets:             petStore,
 		InventoryUpdates: inventoryUpdates,

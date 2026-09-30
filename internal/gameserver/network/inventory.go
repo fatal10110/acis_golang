@@ -92,6 +92,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
+	if l.useRecipeItem(live, inst, tmpl) {
+		return
+	}
 	if tmpl.Kind == item.KindEtcItem && tmpl.Slot != item.SlotNone {
 		l.useOffHandItem(live, inv, inst, tmpl)
 		return

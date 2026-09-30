@@ -456,6 +456,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		seedHandler{},
 		continuousHandler{defs: defs},
 		fusionHandler{defs: defs},
+		craftHandler{},
 	)
 }
 

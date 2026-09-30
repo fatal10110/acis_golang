@@ -37,6 +37,13 @@ import (
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
 // tests/character asserts that silence and the open connection.
+//
+// RequestRecipeBookDestroy, RequestRecipeItemMakeInfo and
+// RequestRecipeItemMakeSelf naming an unknown recipe, and a craft of a recipe
+// the book does not hold, are absent too: the reference drops each without an
+// answer (an unknown recipe's craft window is a packet with no bytes), and
+// none of them registers a pending client action — the recipe windows only
+// ask again on the next click. tests/items asserts that silence.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -71,6 +78,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 	}
 
 	for _, tc := range cases {
@@ -106,5 +114,11 @@ func encodeActionOn(objectID int32, shift bool) []byte {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	w.WriteUint8(wire.BoolByte(shift))
+	return w.Bytes()
+}
+
+func encodeRequestRecipeBookOpen(typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestRecipeBookOpen)
+	w.WriteInt32(typ)
 	return w.Bytes()
 }

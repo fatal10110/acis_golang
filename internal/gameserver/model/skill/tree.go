@@ -94,6 +94,10 @@ const (
 // can learn dwarven-only fishing skills.
 const CreateDwarvenSkillID ID = 172
 
+// CreateCommonSkillID is Create Common Item; its level caps the common
+// recipes a character may register and craft.
+const CreateCommonSkillID ID = 1320
+
 // LuckySkillID is the newbie Lucky skill. It is granted for free at low
 // level and taken away again once the character reaches LuckySkillMaxLevel.
 const LuckySkillID ID = 194

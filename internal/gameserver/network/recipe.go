@@ -1,0 +1,217 @@
+package network
+
+import (
+	"context"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+)
+
+// craftingDisabledText and registerDisabledText are the plain chat lines a
+// craft and a recipe registration answer while crafting is switched off.
+const (
+	craftingDisabledText = "Item creation is currently disabled."
+	registerDisabledText = "Crafting is disabled, you cannot register this recipe."
+)
+
+// restoreRecipeBook fills c's recipe book from its saved rows before c
+// enters the world. A row naming a recipe that is no longer loaded is
+// skipped, and a failed read leaves the book empty; both are logged.
+func (l *GameClientLink) restoreRecipeBook(ctx context.Context, c *player.Character) {
+	if l.recipeBooks == nil {
+		return
+	}
+	ids, err := l.recipeBooks.ListByOwner(ctx, c.ID)
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: list recipe book")
+		return
+	}
+	book := c.RecipeBook()
+	for _, id := range ids {
+		r, ok := l.craft.Recipe(id)
+		if !ok {
+			l.log.Error().Int32("object_id", c.ID).Int("recipe_id", id).Msg("enter world: recipe book row names no loaded recipe")
+			continue
+		}
+		book.Put(r)
+	}
+}
+
+// openRecipeBook answers RequestRecipeBookOpen, which the craft window's
+// back button sends: the page it names, unless live is casting or cannot
+// use skills.
+func (l *GameClientLink) openRecipeBook(live *livePlayer, req clientpackets.RequestRecipeBookOpen) {
+	if live.CastingNow() || live.AllSkillsDisabled() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoRecipeBookWhileCasting))
+		return
+	}
+	sendRecipeBook(live, req.Dwarven)
+}
+
+// sendRecipeBook sends live the dwarven or common page of its recipe book.
+func sendRecipeBook(live *livePlayer, dwarven bool) {
+	maxMP := int32(live.ResourceValues().MaxMP)
+	live.SendFrame(serverpackets.FrameRecipeBookItemList(dwarven, maxMP, live.RecipeBook().Recipes(dwarven)))
+}
+
+// destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
+// book together with every shortcut pointing at it, then live sees the
+// deletion and its page again. An unknown recipe id is dropped without a
+// word, as the reference does; the book window stays as it was and no
+// client action waits on the answer.
+func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.RequestRecipeBookDestroy) {
+	r, ok := l.craft.Forget(live.Character, int(req.RecipeID))
+	if !ok {
+		return
+	}
+	l.deleteRecipeShortcuts(live, r.ID)
+	if l.recipeBooks != nil {
+		recipeID := r.ID
+		l.queueRowWrite(live.ObjectID(), "delete recipe", func(ctx context.Context, ownerID int32) error {
+			return l.recipeBooks.Delete(ctx, ownerID, recipeID)
+		})
+	}
+	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1HasBeenDeleted, r.ItemID))
+	sendRecipeBook(live, r.Dwarven)
+}
+
+// deleteRecipeShortcuts removes every RECIPE shortcut pointing at
+// recipeID. Each removal deletes its row and tells the client, then
+// re-announces every active automatic shot, as any shortcut deletion does.
+func (l *GameClientLink) deleteRecipeShortcuts(live *livePlayer, recipeID int) {
+	if live.shortcuts == nil {
+		return
+	}
+	for _, sc := range live.shortcuts.DeleteTarget(shortcut.Recipe, int32(recipeID)) {
+		if l.shortcuts != nil {
+			slot, page := sc.Slot, sc.Page
+			l.queueRowWrite(live.ObjectID(), "delete recipe shortcut", func(ctx context.Context, ownerID int32) error {
+				return l.shortcuts.Delete(ctx, ownerID, slot, page)
+			})
+		}
+		live.SendFrame(serverpackets.FrameShortCutDelete(sc.Slot, sc.Page))
+		for _, shotID := range live.AutoSoulShotIDs() {
+			live.SendFrame(serverpackets.FrameExAutoSoulShot(shotID, true))
+		}
+	}
+}
+
+// sendRecipeItemMakeInfo answers RequestRecipeItemMakeInfo with the craft
+// window of any loaded recipe, whether or not live holds it. An unknown
+// recipe id gets nothing: the reference answers it with a packet carrying
+// no bytes at all, which the client has nothing to read from, and the
+// request leaves no client action waiting.
+func (l *GameClientLink) sendRecipeItemMakeInfo(live *livePlayer, req clientpackets.RequestRecipeItemMakeInfo) {
+	r, ok := l.craft.Recipe(int(req.RecipeID))
+	if !ok {
+		return
+	}
+	sendRecipeMakeInfo(live, r, serverpackets.RecipeMakeInfoNone)
+}
+
+func sendRecipeMakeInfo(live *livePlayer, r recipe.Recipe, status int32) {
+	res := live.ResourceValues()
+	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, int32(res.CurrentMP), int32(res.MaxMP), status))
+}
+
+// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request the reference
+// drops without a word stays silent here too: an unknown recipe, or one not
+// on the matching page of live's book. The craft window only asks again on
+// the player's next click, so nothing waits on those.
+func (l *GameClientLink) makeRecipeSelf(live *livePlayer, req clientpackets.RequestRecipeItemMakeSelf) {
+	busy := l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
+	attempt := l.craft.MakeSelf(live.Character, int(req.RecipeID), busy)
+	sendCraftNotices(live, attempt.Notices)
+	if !attempt.Made {
+		return
+	}
+	status := serverpackets.RecipeMakeInfoFailed
+	if attempt.Success {
+		status = serverpackets.RecipeMakeInfoSuccess
+	}
+	sendRecipeMakeInfo(live, attempt.Recipe, status)
+}
+
+// useRecipeItem answers UseItem on a recipe item: its recipe goes into the
+// book when live may take it. It reports false for any other item.
+func (l *GameClientLink) useRecipeItem(live *livePlayer, inst *item.Instance, tmpl *item.Template) bool {
+	reg, ok := l.craft.Register(live.Character, inst, tmpl)
+	if !ok {
+		return false
+	}
+	sendCraftNotices(live, reg.Notices)
+	if reg.Registered == nil {
+		return true
+	}
+	if l.recipeBooks != nil {
+		recipeID := reg.Registered.ID
+		l.queueRowWrite(live.ObjectID(), "store recipe", func(ctx context.Context, ownerID int32) error {
+			return l.recipeBooks.Insert(ctx, ownerID, recipeID)
+		})
+	}
+	sendRecipeBook(live, reg.Registered.Dwarven)
+	return true
+}
+
+// queueRowWrite queues one row write on ownerID's persistence lane, where
+// character selection waits for it before reading the rows back. Nothing
+// waits for it here: the reference writes the row after changing the book
+// and only logs a failed write, so the client's answer never depends on it.
+func (l *GameClientLink) queueRowWrite(ownerID int32, op string, write func(ctx context.Context, ownerID int32) error) {
+	l.persist.Enqueue(ownerID, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := write(ctx, ownerID); err != nil {
+			l.log.Error().Err(err).Int32("object_id", ownerID).Msg(op)
+		}
+	})
+}
+
+// sendCraftNotices sends each craft or registration notice as its message.
+func sendCraftNotices(live *livePlayer, notices []any) {
+	for _, n := range notices {
+		switch n := n.(type) {
+		case craft.ActionFailed:
+			live.SendFrame(serverpackets.FrameActionFailed())
+		case craft.InCombat:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantOperateStoreDuringCombat))
+		case craft.MissingMaterial:
+			live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageMissingS2S1ToCreate, n.ItemID, int32(n.Count)))
+		case craft.NotEnoughMP:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughMP))
+		case craft.CraftingDisabled:
+			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, craftingDisabledText))
+		case craft.MaterialConsumed:
+			if n.Count > 1 {
+				live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageS2S1Disappeared, n.ItemID, int32(n.Count)))
+			} else {
+				live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disappeared, n.ItemID))
+			}
+		case craft.ProductEarned:
+			if n.Count > 1 {
+				live.SendFrame(serverpackets.FrameSystemMessageItemNameNumber(serverpackets.SystemMessageEarnedS2S1S, n.ItemID, int32(n.Count)))
+			} else {
+				live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, n.ItemID))
+			}
+		case craft.MixingFailed:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMixingFailed))
+		case craft.RegisterDisabled:
+			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, registerDisabledText))
+		case craft.AlreadyRegistered:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRecipeAlreadyRegistered))
+		case craft.NoCraftAbility:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantRegisterNoAbilityToCraft))
+		case craft.LevelTooLow:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCreateLvlTooLowToRegister))
+		case craft.BookFull:
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageUpToS1RecipesCanRegister, int32(n.Limit)))
+		case craft.RecipeAdded:
+			live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Added, n.ItemID))
+		}
+	}
+}

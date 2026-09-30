@@ -1488,3 +1488,31 @@ func sameItemRequests(a, b []ItemRequest) bool {
 	}
 	return true
 }
+
+// TestDecodeRecipeBookRequests pins the four recipe book requests: one
+// little-endian int32 each after the opcode. RequestRecipeBookOpen reads a
+// type of 0 as the dwarven page and anything else as the common one.
+func TestDecodeRecipeBookRequests(t *testing.T) {
+	id := []byte{0xae, 0x02, 0x00, 0x00} // 686
+	if got, err := DecodeRequestRecipeBookDestroy(append([]byte{0xad}, id...)); err != nil || got.RecipeID != 686 {
+		t.Fatalf("DecodeRequestRecipeBookDestroy = %+v, %v", got, err)
+	}
+	if got, err := DecodeRequestRecipeItemMakeInfo(append([]byte{0xae}, id...)); err != nil || got.RecipeID != 686 {
+		t.Fatalf("DecodeRequestRecipeItemMakeInfo = %+v, %v", got, err)
+	}
+	if got, err := DecodeRequestRecipeItemMakeSelf(append([]byte{0xaf}, id...)); err != nil || got.RecipeID != 686 {
+		t.Fatalf("DecodeRequestRecipeItemMakeSelf = %+v, %v", got, err)
+	}
+	for _, tc := range []struct {
+		typ  byte
+		want bool
+	}{{0, true}, {1, false}, {7, false}} {
+		got, err := DecodeRequestRecipeBookOpen([]byte{0xac, tc.typ, 0, 0, 0})
+		if err != nil || got.Dwarven != tc.want {
+			t.Fatalf("DecodeRequestRecipeBookOpen(type %d) = %+v, %v; want dwarven %v", tc.typ, got, err, tc.want)
+		}
+	}
+	if _, err := DecodeRequestRecipeItemMakeSelf([]byte{0xaf, 1, 0}); err == nil {
+		t.Fatal("DecodeRequestRecipeItemMakeSelf: want error on short payload")
+	}
+}

@@ -125,14 +125,21 @@ func (t *Table) Len() int {
 	return len(t.byID)
 }
 
-// Find returns the recipe with id.
+// Find returns the recipe with id. A nil table holds none.
 func (t *Table) Find(id int) (Recipe, bool) {
+	if t == nil {
+		return Recipe{}, false
+	}
 	r, ok := t.byID[id]
 	return r, ok
 }
 
-// FindByItemID returns the recipe attached to recipe item id.
+// FindByItemID returns the recipe attached to recipe item id. A nil table
+// holds none.
 func (t *Table) FindByItemID(itemID int32) (Recipe, bool) {
+	if t == nil {
+		return Recipe{}, false
+	}
 	r, ok := t.byItemID[itemID]
 	return r, ok
 }

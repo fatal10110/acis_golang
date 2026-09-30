@@ -371,6 +371,33 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 	if tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb {
 		return c.ConsumeHerb(itemID)
 	}
+	count = c.addByTemplate(tmpl, count, nextID)
+	if count == 0 {
+		return false
+	}
+	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
+	return true
+}
+
+// AddCraftedItem puts count units of itemID into this character's
+// inventory the way a finished craft hands over its product: straight into
+// the inventory, with no chat line and no arrow auto-equip. nextID allocates
+// each new instance's object id. It reports how many units were added.
+func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32, error)) int {
+	if c.inventory == nil || count < 1 || nextID == nil {
+		return 0
+	}
+	tmpl, ok := c.inventory.Templates().Get(itemID)
+	if !ok {
+		return 0
+	}
+	return c.addByTemplate(tmpl, count, nextID)
+}
+
+// addByTemplate adds count units of tmpl: a stackable joins the held stack
+// or starts one, and a non-stackable arrives as one instance per unit. It
+// returns how many units were added.
+func (c *Character) addByTemplate(tmpl *item.Template, count int, nextID func() (int32, error)) int {
 	instances := 1
 	if !tmpl.Stackable {
 		instances = count
@@ -378,19 +405,15 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 	added := 0
 	for range instances {
 		id, err := nextID()
-		if err != nil || c.inventory.AddNew(itemID, count, id) == nil {
+		if err != nil || c.inventory.AddNew(tmpl.ID, count, id) == nil {
 			break
 		}
 		added++
 	}
-	if added == 0 {
-		return false
+	if tmpl.Stackable && added > 0 {
+		return count
 	}
-	if !tmpl.Stackable {
-		count = added
-	}
-	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
-	return true
+	return added
 }
 
 // ItemAdded runs the side effects of items already added to this
