@@ -1,7 +1,6 @@
 package skill
 
 import (
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -26,13 +25,6 @@ var (
 	_ expSPTarget = (*player.Character)(nil)
 	_ expSPTarget = (*summon.Actor)(nil)
 )
-
-type realDamageTarget interface {
-	Actor
-	HP() float64
-	SetHP(float64)
-	Die(killer attackable.Combatant)
-}
 
 // healHandler restores HP after landing the skill's effects through the
 // BUFF handler, so a heal's heal-over-time, negate or buff reaches its
@@ -305,21 +297,27 @@ type realDamageHandler struct{}
 
 func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
+// Use takes the skill's power straight off each live creature target's HP.
+// It is not a hit: CP, invulnerability, damage permission, hate and the
+// wake-up side effects of damage play no part. A target the loss leaves at
+// or below zero HP dies to the caster; any other target has its HP set and
+// its status reported.
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
-		// Inert until the damage path is ported: the reference applies this to
-		// every creature, but only player.Character has a matching death
-		// (with a bool result this contract drops), and summons have no
-		// death sequence yet; see #2362.
-		target, ok := obj.(realDamageTarget)
+		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue
 		}
 		hpLeft := target.HP() - float64(cast.Skill.Power)
 		if hpLeft <= 0 {
-			target.Die(cast.Caster)
+			target.Kill(cast.Caster)
 			continue
 		}
 		target.SetHP(hpLeft)
+		// A summon's or NPC's SetHP reports its own status; a player's does
+		// not.
+		if p, ok := asPlayer(target); ok {
+			p.BroadcastStatus()
+		}
 	}
 }

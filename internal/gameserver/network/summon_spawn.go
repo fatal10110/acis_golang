@@ -186,13 +186,13 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 		}
 		if err != nil {
 			link.log.Error().Err(err).Int32("item_obj_id", controlItem.ObjectID).Msg("summon: pet restore failed")
-			if !postLive(live, func() { s.endRestore(releaseFinish) }) {
+			if !postLive(live, func() { s.endRestoreOnQueue(releaseFinish) }) {
 				s.endRestore(releaseFinish)
 			}
 			return
 		}
 		posted := postLive(live, func() {
-			defer s.endRestore(releaseFinish)
+			defer s.endRestoreOnQueue(releaseFinish)
 			s.spawnRestoredPet(controlItem, summonItem, npcTmpl, state, hasSaved, items)
 		})
 		if !posted {
@@ -213,6 +213,14 @@ func (s *gameSummonSpawner) endRestore(releaseFinish func()) {
 		s.live.petRestoreInFlight.Store(false)
 	}
 	releaseFinish()
+}
+
+// endRestoreOnQueue is endRestore run on the owner's queue: once the summon
+// slot reopens, a servitor request that waited on the read runs, if no swing
+// or cast holds it for its own end.
+func (s *gameSummonSpawner) endRestoreOnQueue(releaseFinish func()) {
+	s.endRestore(releaseFinish)
+	s.link.resumeServitorAfterRestore(s.live)
 }
 
 // spawnRestoredPet builds and publishes the pet from its resolved pets-row
@@ -445,15 +453,15 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if link == nil || live == nil || owner == nil || def.NpcID == 0 {
 		return false
 	}
-	// A pet restore still in flight owns the slot even though world.Summon
-	// cannot show it yet: past the hold ceiling this cast could otherwise
-	// take the slot and the inbound pet would be dropped at
-	// spawnRestoredPet's re-check. The restoringSummon half is an unreachable
-	// backstop: every summon entry, handleMagicSkillUse included, refuses to
-	// start while it holds, and a cast in flight blocks the collar that would
-	// begin a read.
-	if link.hasActiveSummon(live) || link.restoringSummon(live) {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+	// The cast's own pre-cast gate already answered for a summon out or a
+	// mount, so a caster that reaches the hit dead, playing dead, mounted or
+	// with a summon out gets no spawn and no packet. A pet restore still in
+	// flight owns the slot even though world.Summon cannot show it yet:
+	// otherwise this cast could take the slot and the inbound pet would be
+	// dropped at spawnRestoredPet's re-check. That half is a backstop: a
+	// servitor request waits out the read before it starts, and a cast in
+	// flight blocks the collar that would begin a read.
+	if live.Character.AlikeDead() || live.Character.Mounted() || link.hasActiveSummon(live) || link.restoringSummon(live) {
 		return false
 	}
 	npcTmpl, ok := link.npcs.Get(def.NpcID)

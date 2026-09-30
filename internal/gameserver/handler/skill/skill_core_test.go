@@ -2136,9 +2136,13 @@ func (t *skillTarget) SetCP(v float64) {
 
 func (t *skillTarget) AddExpAndSp(_ int64, sp int) { t.sp += sp }
 
-func (t *skillTarget) Die(killer attackable.Combatant) {
+func (t *skillTarget) Kill(killer attackable.Combatant) bool {
+	if t.dead {
+		return false
+	}
 	t.dead = true
 	t.diedBy = killer
+	return true
 }
 
 func (t *skillTarget) ReduceHP(v float64, attacker attackable.Combatant, skill modelskill.Definition) {

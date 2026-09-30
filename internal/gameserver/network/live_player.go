@@ -71,11 +71,12 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
-	// replayingEffects is set while EnterWorld replays the saved effects,
-	// before the player is in the world. Their start hooks change its
-	// appearance, but it has no observers yet and the EnterWorld UserInfo
-	// that follows carries the result, so the appearance refresh stays
-	// silent. Written on the owner's queue; atomic for the Emit readers.
+	// replayingEffects is set while EnterWorld replays the saved effects
+	// and then decides the weight penalty band, before the player is in the
+	// world. The effects' start hooks change its appearance and the band
+	// may move, but it has no observers yet and the EnterWorld frames that
+	// follow carry the result, so both refreshes stay silent. Written on the
+	// owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	isGM             bool
@@ -411,6 +412,17 @@ func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	return req
 }
 
+// deferredMagicSkillID reports the skill id of the request queued as the
+// next CAST intention, if any.
+func (p *livePlayer) deferredMagicSkillID() (int32, bool) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.deferredMagic == nil {
+		return 0, false
+	}
+	return p.deferredMagic.req.SkillID, true
+}
+
 // hasDeferredMagicSkill reports whether a skill request is queued as the
 // next CAST intention.
 func (p *livePlayer) hasDeferredMagicSkill() bool {
@@ -686,7 +698,11 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 // with live as the sink its abort, stop and finish events reach.
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
-		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
+		actor := actorcast.PlayerActor{Character: live.Character}
+		if live.attack != nil {
+			actor.Attack = live.attack
+		}
+		live.cast = actorcast.NewController(actor, live)
 		live.cast.SetQueue(live.Queue())
 		live.Character.SetCastController(live.cast)
 	}
