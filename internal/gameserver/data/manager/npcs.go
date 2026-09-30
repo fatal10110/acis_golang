@@ -24,9 +24,8 @@ import (
 // slotInfo is the static definition of one spawn slot: the entry it was
 // declared under, and (when non-empty) the persisted state row backing it.
 // A slot with a non-empty dbName is the only kind restored across restarts
-// and forced to a single live instance, matching the reference server's
-// "a database-tracked spawn ignores its total and only ever has one
-// instance" rule.
+// and forced to a single live instance: a database-tracked spawn ignores
+// its declared total and only ever has one instance.
 type slotInfo struct {
 	key      string
 	maker    *spawn.Maker
