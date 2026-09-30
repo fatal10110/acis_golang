@@ -168,8 +168,16 @@ func (b *Book) ProcessingTransaction(playerID int32) bool {
 	return b.processingTransactionLocked(playerID)
 }
 
-// AddItem adds an item to a player's active direct-trade offer.
-func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, objectID int32, count int) AddResult {
+// BoundItems tells which of a participant's items are bound where they are
+// and may not change hands whatever their own state: the control item of a
+// pet that is out. A nil BoundItems binds nothing.
+type BoundItems interface {
+	ControlItemInUse(objectID int32) bool
+}
+
+// AddItem adds an item to a player's active direct-trade offer. bound is
+// that player's.
+func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, bound BoundItems, objectID int32, count int) AddResult {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -188,7 +196,7 @@ func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, objectID in
 	if inv == nil {
 		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
 	}
-	inst, ok := itemForOffer(inv, playerID, objectID, count)
+	inst, ok := itemForOffer(inv, bound, playerID, objectID, count)
 	if !ok {
 		return AddResult{Status: AddInvalidItem, PartnerID: partnerID}
 	}
@@ -329,10 +337,11 @@ type Holdings interface {
 }
 
 // Check re-validates a ready session against both participants' inventories
-// as they stand when it settles: every offered item still tradeable, then
-// the partner's offer within each receiver's weight and slots.
-func (s Session) Check(first, second Holdings) SettlementStatus {
-	if !ValidOfferItems(first, s.FirstID, s.FirstOffer) || !ValidOfferItems(second, s.SecondID, s.SecondOffer) {
+// and bound items as they stand when it settles: every offered item still
+// tradeable, then the partner's offer within each receiver's weight and
+// slots.
+func (s Session) Check(first, second Holdings, firstBound, secondBound BoundItems) SettlementStatus {
+	if !ValidOfferItems(first, firstBound, s.FirstID, s.FirstOffer) || !ValidOfferItems(second, secondBound, s.SecondID, s.SecondOffer) {
 		return SettlementInvalidItems
 	}
 	switch s.ReceiverStatus(first, second) {
@@ -375,10 +384,11 @@ func (o Offer) Entries(inv *itemcontainer.Inventory) []ItemUpdateEntry {
 	return entries
 }
 
-// ValidOfferItems reports whether every item in offer is still tradeable in inv.
-func ValidOfferItems(inv Holdings, ownerID int32, offer Offer) bool {
+// ValidOfferItems reports whether every item in offer is still tradeable in
+// inv and none of them is bound.
+func ValidOfferItems(inv Holdings, bound BoundItems, ownerID int32, offer Offer) bool {
 	for _, row := range offer.Items {
-		if _, ok := itemForOffer(inv, ownerID, row.Snapshot.ObjectID, row.Count); !ok {
+		if _, ok := itemForOffer(inv, bound, ownerID, row.Snapshot.ObjectID, row.Count); !ok {
 			return false
 		}
 	}
@@ -519,7 +529,7 @@ func (b *Book) processingTransactionLocked(objectID int32) bool {
 	return ok
 }
 
-func itemForOffer(inv Holdings, ownerID, objectID int32, count int) (*item.Instance, bool) {
+func itemForOffer(inv Holdings, bound BoundItems, ownerID, objectID int32, count int) (*item.Instance, bool) {
 	if count <= 0 {
 		return nil, false
 	}
@@ -529,6 +539,9 @@ func itemForOffer(inv Holdings, ownerID, objectID int32, count int) (*item.Insta
 	}
 	st := inst.Snapshot()
 	if st.OwnerID != ownerID || st.Equipped() || st.Count < count {
+		return nil, false
+	}
+	if bound != nil && bound.ControlItemInUse(objectID) {
 		return nil, false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)

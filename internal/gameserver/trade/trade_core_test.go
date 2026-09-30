@@ -50,7 +50,7 @@ func TestBookRejectsAddAfterSelfConfirm(t *testing.T) {
 	inv := newTradeInventory(1)
 	inst := inv.AddNew(item.AdenaID, 100, 500)
 
-	res := book.AddItem(1, inv, inst.ObjectID, 10)
+	res := book.AddItem(1, inv, nil, inst.ObjectID, 10)
 	if res.Status != AddSelfConfirmed {
 		t.Fatalf("Add status = %v, want self confirmed", res.Status)
 	}
@@ -85,7 +85,7 @@ func TestBookConfirmReturnsCommitSnapshot(t *testing.T) {
 
 	book.Request(1, 2)
 	book.Answer(2, true)
-	if res := book.AddItem(1, first, stack.ObjectID, 40); res.Status != AddAccepted {
+	if res := book.AddItem(1, first, nil, stack.ObjectID, 40); res.Status != AddAccepted {
 		t.Fatalf("Add status = %v, want accepted", res.Status)
 	}
 	if res := book.Confirm(1); res.Status != DoneConfirmed {
