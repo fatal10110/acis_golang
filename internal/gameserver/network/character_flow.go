@@ -355,14 +355,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	// Restored rows leave the carried weight at 0, so this first recompute is
-	// what sends the login StatusUpdate(CUR_LOAD) and, when the load crosses
-	// into a penalty band, that band's refresh. Both go out after the burst's
-	// UserInfo and ahead of the ItemList, where the full inventory snapshot
-	// settles the weight on every send.
-	if inv := c.Inventory(); inv != nil {
-		inv.UpdateWeight()
-	}
+	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.shortcuts.All())))
 	if c.Dead() {
@@ -371,6 +364,25 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
+}
+
+// sendLoginWeight reports the restored load between the login burst's
+// UserInfo and its ItemList: StatusUpdate(CUR_LOAD) for any carried weight,
+// then the penalty band's refresh (UserInfo, EtcStatusUpdate, CharInfo to
+// every player that already sees live) when that load sits in a band.
+// attachLivePlayer computed both silently, so every earlier login frame
+// already carries them and this is the client's first report of the change.
+func (l *GameClientLink) sendLoginWeight(live *livePlayer) {
+	weight := live.CurrentWeight()
+	if weight == 0 {
+		return
+	}
+	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{{
+		Type: serverpackets.StatusCurrentLoad, Value: weight,
+	}}))
+	if live.WeightPenalty() != 0 {
+		l.sendLiveWeightPenalty(live)
+	}
 }
 
 // sevenSignsPeriodMessage maps a Seven Signs period onto the system message
@@ -641,6 +653,15 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		rt.MountData = mountDataTable{npcs: l.npcs}
 	}
 	c.Configure(rt)
+	// Restored rows leave the carried weight at 0. Compute it and its penalty
+	// band here, while the inventory has no live delivery target and the
+	// character no event sink, so both stay silent: every login frame (the
+	// first EtcStatusUpdate, the spawn CharInfo, the burst UserInfo) carries
+	// the real load and band, and finishEnterWorld reports the change itself
+	// between UserInfo and ItemList.
+	if inv := c.Inventory(); inv != nil {
+		inv.UpdateWeight()
+	}
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 
