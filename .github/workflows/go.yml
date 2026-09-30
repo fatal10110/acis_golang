@@ -97,7 +97,9 @@ jobs:
 
       # Behavior suites run on sim.Inline with a test-driven clock by
       # default; this keeps their run on the real pool, with real
-      # interleavings.
+      # interleavings. On the wall clock most of a test is spent waiting out
+      # cast, swing and stand-up times, so far more tests than GOMAXPROCS
+      # run at once.
       - name: Test (real pool)
         if: matrix.shard.pool != ''
         env:
@@ -105,7 +107,7 @@ jobs:
           PKGS: ${{ matrix.shard.pool }}
         run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race $PKGS
+          go test -race -parallel 16 $PKGS
 
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'

@@ -99,13 +99,15 @@ func fakeDeathDelays(t *testing.T, srv *gameservertest.Server, objID int32) (lie
 	return time.Duration(int32(3000/mult)) * time.Millisecond, time.Duration(int32(2500/mult)) * time.Millisecond
 }
 
-// startFakeDeath switches Fake Death on from the skill bar and returns when
-// the lie-down began.
+// startFakeDeath switches Fake Death on from the skill bar and returns the
+// time just before the request left: the lie-down begins no earlier, so a
+// "not before the lie-down ends" check measures from it.
 func startFakeDeath(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 	t.Helper()
+	sent := c.Now()
 	c.Send(encodeRequestMagicSkillUse(fakeDeathSkillID, false, false))
 	readMatching(t, c, time.Second, "fake-death start ChangeWaitType", isWaitType(serverpackets.WaitFakeDeathStart))
-	return c.Now()
+	return sent
 }
 
 // assertSittingRefusal expects CANT_MOVE_SITTING then ActionFailed, and no
@@ -130,9 +132,9 @@ func TestSkillBarCastDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 	srv, c, objID := bootPostureCaster(t)
 	mpBefore := srv.PlayerCurrentMP(t, objID)
 
+	sitAt := c.Now() // before the request, as for the stand-up below
 	c.Send(encodeRequestChangeWaitType(false))
 	readMatching(t, c, time.Second, "sit ChangeWaitType", isWaitType(serverpackets.WaitSitting))
-	sitAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued skill-bar cast")
 
@@ -160,14 +162,16 @@ func TestSkillBarCastDuringStandUpRunsWhenUp(t *testing.T) {
 	srv.Advance(t, sitStandDelay)
 	drainUntilQuiet(t, c)
 
+	// Measured from before the request: the server starts the stand-up no
+	// earlier, while the ChangeWaitType reply arrives after it did.
+	standSent := c.Now()
 	c.Send(encodeRequestChangeWaitType(true))
 	readMatching(t, c, time.Second, "stand ChangeWaitType", isWaitType(serverpackets.WaitStanding))
-	standAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued skill-bar cast")
 
 	readMatching(t, c, 2*sitStandDelay, "queued skill-bar cast", isSkillUse(gateActiveSkillID))
-	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+	if elapsed := c.Now().Sub(standSent); elapsed < sitStandDelay {
 		t.Fatalf("queued skill-bar cast ran %v after stand-up, want no earlier than %v", elapsed, sitStandDelay)
 	}
 }
