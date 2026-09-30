@@ -277,6 +277,14 @@ func (c *Controller) CancelFriendlyFollow() {
 	}
 }
 
+// FriendlyFollowTarget returns the target a player's friendly follow task
+// follows, or nil when none runs.
+func (c *Controller) FriendlyFollowTarget() attackable.Combatant {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.friendlyTarget
+}
+
 // startPawnFriendlyFollow arms a player's friendly follow task toward
 // target and runs its first tick at once. The task then ticks every
 // FollowInterval on the position updates: it walks toward target only when

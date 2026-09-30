@@ -180,3 +180,53 @@ func TestOwnedPetInteractApproachArrivalOpensStatus(t *testing.T) {
 		t.Fatalf("arrival MoveToPawn target %d distance %d, want %d/150", targetID, distance, pet.ObjectID())
 	}
 }
+
+// TestOwnedPetInteractApproachRerunsAfterWeaponToggle pins a sword put on
+// mid-way into the approach walk (#2877): PlayerAI.thinkUseItem
+// (PlayerAI.java:505-519) toggles it, then runs the INTERACT it replaced
+// again (doIntention(_previousIntention)), whose thinkInteract
+// (PlayerAI.java:413-462) answers ActionFailed and walks toward the pet
+// afresh with MoveToPawn. The arrival still opens the status window.
+func TestOwnedPetInteractApproachRerunsAfterWeaponToggle(t *testing.T) {
+	t.Parallel()
+	const swordTemplateID = int32(30)
+	h := bootOwnerWithCollar(t, seedItem{swordTemplateID, 1})
+	sword := h.seededItem(t, swordTemplateID)
+	pet, _ := h.spawnWolf(t)
+	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
+	placePet(t, pet, location.Location{X: px + 300, Y: py, Z: pz})
+	drainUntilQuiet(t, h.client)
+
+	frames := clickOwnedPet(t, h, pet, false)
+	if !hasOpcode(frames, serverpackets.OpcodeMoveToPawn) {
+		t.Fatalf("click at 300 = opcodes %x, want an approach", frameOpcodes(frames))
+	}
+	h.client.Send(encodeUseItem(sword, false))
+	frames = drainFrames(t, h.client)
+	var order []byte
+	for _, f := range frames {
+		switch f[0] {
+		case serverpackets.OpcodeSystemMessage:
+			if wire.NewReader(f[1:]).ReadInt32() == serverpackets.SystemMessageS1Equipped {
+				order = append(order, f[0])
+			}
+		case serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodePetStatusShow:
+			order = append(order, f[0])
+		}
+	}
+	want := []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn}
+	if string(order) != string(want) {
+		t.Fatalf("mid-approach toggle order = %x, want S1_EQUIPPED, ActionFailed, MoveToPawn (all opcodes %x)", order, frameOpcodes(frames))
+	}
+	frame, _ := firstOpcode(frames, serverpackets.OpcodeMoveToPawn)
+	if objectID, targetID, distance, _ := moveToPawnFields(t, frame); objectID != h.ownerID || targetID != pet.ObjectID() || distance != 100 {
+		t.Fatalf("fresh approach MoveToPawn = mover %d target %d distance %d, want %d/%d/100", objectID, targetID, distance, h.ownerID, pet.ObjectID())
+	}
+
+	mover := h.srv.PlayerMove(t, h.ownerID)
+	h.srv.AdvanceUntil(t, "approach arrival", func() bool { return !mover.Moving() })
+	h.srv.Advance(t, 100*time.Millisecond)
+	if !hasOpcode(drainFrames(t, h.client), serverpackets.OpcodePetStatusShow) {
+		t.Fatal("the re-run approach arrived without opening the status window")
+	}
+}

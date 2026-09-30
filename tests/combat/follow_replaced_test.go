@@ -183,3 +183,40 @@ func TestConfusedForcedClickOnDeadPlayerDoesNotFollow(t *testing.T) {
 		t.Fatalf("confused attacker walked to x=%d", x)
 	}
 }
+
+// TestWeaponToggleRestartsFollow has a following player put a sword on
+// (#2877). PlayerAI.thinkUseItem (PlayerAI.java:505-519) toggles it, then
+// runs the FOLLOW it replaced again: thinkFollow (PlayableAI.java:158-183)
+// answers ActionFailed and restarts the follow task, so the player still
+// walks after the followed one.
+func TestWeaponToggleRestartsFollow(t *testing.T) {
+	t.Parallel()
+	var sword int32
+	p := bootClickPairSeeded(t, 0, func(srv *gameservertest.Server, attackerID int32) {
+		sword = srv.GiveItem(t, attackerID, 30, 1)
+	})
+	p.startFollowing(t)
+
+	p.c.Send(encodeUseItem(sword, false))
+	p.srv.Settle(t)
+	frames := readQuiet(p.c)
+	equipped := -1
+	for i, f := range frames {
+		if f[0] == serverpackets.OpcodeSystemMessage && wireReader(f[1:]).ReadInt32() == serverpackets.SystemMessageS1Equipped {
+			equipped = i
+			break
+		}
+	}
+	if equipped < 0 {
+		t.Fatalf("no S1_EQUIPPED for the sword: opcodes %v", opcodes(frames))
+	}
+	if indexOf(frames, equipped, serverpackets.OpcodeActionFailed, -1) < 0 {
+		t.Fatalf("no ActionFailed from the re-run follow after the equip: opcodes %v", opcodes(frames))
+	}
+
+	p.walkVictimAway(t, 400)
+	p.tickFor(t, 3*time.Second)
+	if frames := readQuiet(p.c); followMoveIndex(frames, p.attackerID, p.victimID) < 0 {
+		t.Fatalf("the follow ended with the sword toggle: opcodes %v", opcodes(frames))
+	}
+}

@@ -325,6 +325,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishDeferredMagicSkill(live)
 		l.finishDeferredItemAICast(live)
 		live.thinkAttack()
+		l.arriveHeldIntention(live)
 	case event.MoveBlocked:
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
@@ -334,9 +335,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.IdleRequested:
 		live.tryToIdle(e.AIDenied)
 	case event.ThinkRequested:
-		// Only the attack intention re-evaluates on a think; nothing else a
-		// player holds acts on one.
-		live.thinkAttack()
+		l.thinkCurrentIntention(live)
 	case event.CastAborted:
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:
