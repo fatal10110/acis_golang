@@ -140,8 +140,11 @@ func TestPetPickupGroundItem(t *testing.T) {
 }
 
 // TestPetPickupAttentionAnnouncedToObservers pins SummonAI.java:214-222:
-// a pet looting armor or a weapon announces 1535 to nearby other clients
-// with the owner name; the owner never receives the attention packet.
+// a pet looting armor or a weapon announces 1535 with the owner name through
+// the owner's Player.broadcastPacketInRadius (Player.java:2229-2234), so the
+// owner reads it first, then every nearby client. It follows the loot's
+// ItemInstance.pickupMe (ItemInstance.java:798-820): each viewer reads the
+// item's DeleteObject before the attention line.
 func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -176,16 +179,13 @@ func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
 			ownerFrames := drainFrames(t, h.client)
 			observerFrames := drainFrames(t, observer)
 
-			msg := findSystemMessage(t, observerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2)
-			if msg == nil {
-				t.Fatalf("%s pet pickup produced no attention 1535 for the observer", tc.name)
-			}
-			assertPetPickupPlainParams(t, msg, "Owner", tc.templateID)
-			if got := findSystemMessage(t, ownerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2); got != nil {
-				t.Fatal("owner received pet pickup attention message")
-			}
-			if got := findSystemMessage(t, ownerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3); got != nil {
-				t.Fatal("owner received enchanted pet pickup attention message")
+			for who, frames := range map[string][][]byte{"owner": ownerFrames, "observer": observerFrames} {
+				msg := findSystemMessage(t, frames, serverpackets.SystemMessageAttentionS1PetPickedUpS2)
+				if msg == nil {
+					t.Fatalf("%s pet pickup produced no attention 1535 for the %s", tc.name, who)
+				}
+				assertPetPickupPlainParams(t, msg, "Owner", tc.templateID)
+				assertDeletedBeforeAttention(t, who, frames, groundID)
 			}
 		})
 	}
@@ -226,13 +226,16 @@ func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
 
 	h.client.Send(encodeRequestPetGetItem(groundID))
 	assertFrameOpcode(t, mustRead(t, h.client, "GetItem"), serverpackets.OpcodeGetItem, "GetItem")
+	ownerFrames := drainFrames(t, h.client)
 	observerFrames := drainFrames(t, observer)
 
-	msg := findSystemMessage(t, observerFrames, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3)
-	if msg == nil {
-		t.Fatal("enchanted weapon pet pickup produced no attention 1536 for the observer")
+	for who, frames := range map[string][][]byte{"owner": ownerFrames, "observer": observerFrames} {
+		msg := findSystemMessage(t, frames, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3)
+		if msg == nil {
+			t.Fatalf("enchanted weapon pet pickup produced no attention 1536 for the %s", who)
+		}
+		assertPetPickupEnchantParams(t, msg, "Owner", 7, 30)
 	}
-	assertPetPickupEnchantParams(t, msg, "Owner", 7, 30)
 }
 
 func TestPetPickupAttentionSkippedForEtcItems(t *testing.T) {
@@ -325,6 +328,24 @@ func systemMessageID(t *testing.T, frame []byte) int {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeSystemMessage, "SystemMessage")
 	return int(wire.NewReader(frame[1:]).ReadInt32())
+}
+
+// assertDeletedBeforeAttention requires the looted item's DeleteObject to
+// reach who before the pet pickup attention line.
+func assertDeletedBeforeAttention(t *testing.T, who string, frames [][]byte, groundID int32) {
+	t.Helper()
+	deleted := false
+	for _, f := range frames {
+		switch {
+		case f[0] == serverpackets.OpcodeDeleteObject && wire.NewReader(f[1:]).ReadInt32() == groundID:
+			deleted = true
+		case f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageAttentionS1PetPickedUpS2:
+			if !deleted {
+				t.Fatalf("%s received the pet pickup attention before the item's DeleteObject", who)
+			}
+			return
+		}
+	}
 }
 
 func findSystemMessage(t *testing.T, frames [][]byte, messageID int) []byte {
