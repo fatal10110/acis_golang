@@ -42,14 +42,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// itemStore writes single item rows from a state the caller copied while it
-// owned the instance: the write runs on a persistence lane, after the queue
-// task that produced it has moved on (applyPersistActions).
+// itemStore writes item rows from states the caller copied while it owned
+// the instances: the write runs on a persistence lane, after the queue task
+// that produced it has moved on (applyPersistActions). WriteBatch lands all
+// of its rows in one transaction or none of them.
 type itemStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error)
-	SaveState(ctx context.Context, st item.InstanceState) error
-	UpdateState(ctx context.Context, st item.InstanceState) error
-	Delete(ctx context.Context, objectID int32) error
+	WriteBatch(ctx context.Context, batch item.FlushBatch) error
 	DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error)
 	SetEnchantOwned(ctx context.Context, ownerID, objectID int32, enchant int) (bool, error)
 }

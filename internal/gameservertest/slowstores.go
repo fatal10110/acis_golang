@@ -39,6 +39,11 @@ func (s slowItemStore) Delete(ctx context.Context, objectID int32) error {
 	return s.ItemStore.Delete(ctx, objectID)
 }
 
+func (s slowItemStore) WriteBatch(ctx context.Context, batch item.FlushBatch) error {
+	time.Sleep(s.delay)
+	return s.ItemStore.WriteBatch(ctx, batch)
+}
+
 func (s slowItemStore) DeleteOwned(ctx context.Context, ownerID, objectID int32) (bool, error) {
 	time.Sleep(s.delay)
 	return s.ItemStore.DeleteOwned(ctx, ownerID, objectID)

@@ -43,7 +43,7 @@ func TestFlushWaitsForARequeuedItemWrite(t *testing.T) {
 	<-held
 
 	var wrote atomic.Bool
-	link.queueItemWrite(ownerID, order.Reserve(objectID), func() { wrote.Store(true) })
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) { wrote.Store(true) }, ownerID)
 
 	flushed := make(chan error, 1)
 	go func() { flushed <- worker.Flush(context.Background(), ownerID) }()
@@ -85,7 +85,7 @@ func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
 	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
 
 	const ownerID, objectID int32 = 1, 910
-	link.queueItemWrite(ownerID, order.Reserve(objectID), func() { panic("store driver blew up") })
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) { panic("store driver blew up") }, ownerID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -95,11 +95,61 @@ func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
 
 	// The row the panicking write held must be free for the next one.
 	landed := false
-	link.queueItemWrite(ownerID, order.Reserve(objectID), func() { landed = true })
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) { landed = true }, ownerID)
 	if err := worker.Flush(ctx, ownerID); err != nil {
 		t.Fatalf("flush after the following write: %v", err)
 	}
 	if !landed {
 		t.Fatal("a later write of the same row never ran")
+	}
+}
+
+// TestFlushWaitsForAWriteOwedByAnotherLane pins the owners a multi-owner item
+// write is owed to. A trade's rows are written as one transaction on the lane
+// of one participant, but a login of the other participant waits only on its
+// own lane before reading the items table; that wait has to cover the write
+// too, or the login restores rows from before the trade.
+func TestFlushWaitsForAWriteOwedByAnotherLane(t *testing.T) {
+	order := persist.NewOrder()
+	worker := persist.New(zerolog.Nop())
+	t.Cleanup(func() {
+		if err := worker.Close(context.Background()); err != nil {
+			t.Errorf("close persistence worker: %v", err)
+		}
+	})
+	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
+
+	// Owners 1 and 2 map to different lanes.
+	const writer, other, objectID int32 = 1, 2, 920
+	started, release := make(chan struct{}), make(chan struct{})
+	worker.Enqueue(writer, func() {
+		close(started)
+		<-release
+	})
+	<-started
+
+	var wrote atomic.Bool
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) { wrote.Store(true) }, writer, other)
+
+	flushed := make(chan error, 1)
+	go func() { flushed <- worker.Flush(context.Background(), other) }()
+	select {
+	case err := <-flushed:
+		close(release)
+		t.Fatalf("flush of the other owner's lane returned (%v) before the write it is owed ran", err)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case err := <-flushed:
+		if err != nil {
+			t.Fatalf("flush: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("flush never returned after the writer's lane was released")
+	}
+	if !wrote.Load() {
+		t.Fatal("flush returned before the write landed")
 	}
 }

@@ -111,14 +111,16 @@ type blockingItemStore struct {
 	held     atomic.Bool
 }
 
-// SaveState holds only the first write of the watched row, so a later write
+// WriteBatch holds only the first write of the watched row, so a later write
 // of the same row is free to reach the database while that one waits.
-func (s *blockingItemStore) SaveState(ctx context.Context, st item.InstanceState) error {
-	if st.ObjectID == s.objectID && s.held.CompareAndSwap(false, true) {
-		close(s.entered)
-		<-s.release
+func (s *blockingItemStore) WriteBatch(ctx context.Context, batch item.FlushBatch) error {
+	for _, st := range batch.Saves {
+		if st.ObjectID == s.objectID && s.held.CompareAndSwap(false, true) {
+			close(s.entered)
+			<-s.release
+		}
 	}
-	return s.itemStore.SaveState(ctx, st)
+	return s.itemStore.WriteBatch(ctx, batch)
 }
 
 // TestInFlightItemWriteCannotRevertAnOwnershipTransfer is the same invariant

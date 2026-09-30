@@ -590,13 +590,13 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 	if l.items == nil || l.persist == nil {
 		return
 	}
-	l.queueItemWrite(ownerID, l.itemWrites.Reserve(objectID), func() {
+	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
 		}
-	})
+	}, ownerID)
 }
 
 // setOfflineItemEnchant sets the enchant of item row objectID, while
@@ -606,13 +606,13 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 	if l.items == nil || l.persist == nil {
 		return
 	}
-	l.queueItemWrite(ownerID, l.itemWrites.Reserve(objectID), func() {
+	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if _, err := l.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("set offline item enchant")
 		}
-	})
+	}, ownerID)
 }
 
 // releasePet settles a pet on its way out of the world, whatever took it out:

@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -177,16 +178,23 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // worker instead of writing them here: this runs on an actor queue, where a
 // slow database would hold a pool worker and stall unrelated actors.
 //
-// Each write carries the state this queue produced it with, and takes its
-// place in that row's write order before it is queued (persist.Order). The
-// lane it runs on is the row owner's at that moment, so one owner's writes of
-// one row also keep their order; the reservation is what covers the rest,
-// because a row does not stay with one owner. An item that changes hands has
-// its next write queued on the new owner's lane, a destroyed item's delete
-// comes from the persistence tick's own lane, and a dropped item is picked up
-// as a new instance carrying the same object id — in each case a second lane
-// writes the row this one is about to, and only the reservation decides which
-// of them the row keeps.
+// The rows one operation changed are written as one transaction
+// (itemStore.WriteBatch), so they land together or not at all. A trade moves
+// items between two inventories: written row by row, a failure or crash
+// between the giver's rows and the receiver's leaves the stack in both
+// inventories or in neither, and the next login restores that. Rows the write
+// skips because a later write of theirs already landed are no exception — the
+// database holds their newer state already.
+//
+// Each row's state is the one this queue produced, and takes its place in
+// that row's write order before it is queued (persist.Order). An item that
+// changes hands has its next write queued on the new owner's lane, a
+// destroyed item's delete comes from the persistence tick's own lane, and a
+// dropped item is picked up as a new instance carrying the same object id —
+// in each case a second lane writes the row this one is about to, and only
+// the reservation decides which of them the row keeps. The write runs on one
+// owner's lane but is owed on every owner's whose rows it carries, so a login
+// waiting on any of those lanes waits for it (queueItemWrite).
 //
 // Both a new row and a changed one are written as the same upsert, which is
 // what the persistence tick's own batch does for every live item
@@ -199,42 +207,89 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // collar's own lane (task.ItemInstances.laneKey); the item-row delete queued
 // here touches no pets row, and both deletes are idempotent, so it stays on
 // the owner's lane with everything else.
+//
+// A failed write is logged and left to the persistence tick, which still has
+// every mutated instance pending and writes their current state.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return
 	}
+	// A row can be named twice — a stack that gives on one leg of a trade and
+	// receives on the other — and a write may reserve each row once. Its last
+	// action decides whether it is saved or deleted.
+	type rowAction struct {
+		inst    *item.Instance
+		ownerID int32
+		remove  bool
+	}
+	rows := make(map[int32]rowAction, len(actions))
+	order := make([]int32, 0, len(actions))
 	for _, action := range actions {
+		var row rowAction
+		var objectID int32
 		switch action.Action {
 		case invops.PersistSave, invops.PersistUpdate:
 			if action.Item == nil {
 				continue
 			}
+			row, objectID = rowAction{inst: action.Item}, action.Item.ObjectID
+		case invops.PersistDelete:
+			row, objectID = rowAction{ownerID: action.OwnerID, remove: true}, action.ObjectID
+		default:
+			continue
+		}
+		if _, seen := rows[objectID]; !seen {
+			order = append(order, objectID)
+		}
+		rows[objectID] = row
+	}
+	if len(order) == 0 {
+		return
+	}
+
+	var batch item.FlushBatch
+	owners := make([]int32, 0, 2)
+	reserved := l.itemWrites.Begin()
+	for _, objectID := range order {
+		row := rows[objectID]
+		if row.remove {
+			reserved.Add(objectID)
+			batch.Deletes = append(batch.Deletes, objectID)
+		} else {
 			// The state and its place are taken together, under the
 			// instance, so no mutation can land between them and leave this
 			// write holding a place that does not match what it will write.
-			var st item.InstanceState
-			reserved := l.itemWrites.Begin()
-			action.Item.WithState(func(s item.InstanceState) {
-				st = s
+			row.inst.WithState(func(s item.InstanceState) {
 				reserved.Add(s.ObjectID)
-			})
-			l.queueItemWrite(st.OwnerID, reserved, func() {
-				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-				defer cancel()
-				if err := l.items.SaveState(ctx, st); err != nil {
-					l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("save item")
-				}
-			})
-		case invops.PersistDelete:
-			objectID := action.ObjectID
-			l.queueItemWrite(action.OwnerID, l.itemWrites.Reserve(objectID), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-				defer cancel()
-				if err := l.items.Delete(ctx, objectID); err != nil {
-					l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete item")
-				}
+				batch.Saves = append(batch.Saves, s)
+				row.ownerID = s.OwnerID
 			})
 		}
+		if !slices.Contains(owners, row.ownerID) {
+			owners = append(owners, row.ownerID)
+		}
+	}
+	l.queueItemWrite(reserved, func(keep []int32) {
+		batch := keptRows(batch, keep)
+		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
+		defer cancel()
+		if err := l.items.WriteBatch(ctx, batch); err != nil {
+			l.log.Error().Err(err).Int("saves", len(batch.Saves)).Int("deletes", len(batch.Deletes)).
+				Msg("write item rows")
+		}
+	}, owners[0], owners[1:]...)
+}
+
+// keptRows narrows batch to the rows in keep, which is sorted ascending: the
+// rows no later write has landed on yet (persist.Write.Run).
+func keptRows(batch item.FlushBatch, keep []int32) item.FlushBatch {
+	kept := func(id int32) bool {
+		_, found := slices.BinarySearch(keep, id)
+		return found
+	}
+	return item.FlushBatch{
+		Saves:   slices.DeleteFunc(slices.Clone(batch.Saves), func(s item.InstanceState) bool { return !kept(s.ObjectID) }),
+		Deletes: slices.DeleteFunc(slices.Clone(batch.Deletes), func(id int32) bool { return !kept(id) }),
 	}
 }
 
@@ -244,11 +299,15 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 // paid by re-queueing, not by sitting on the lane.
 const itemWriteRowWait = 20 * time.Millisecond
 
-// queueItemWrite runs write on ownerID's persistence lane once reserved's row
-// is free. A lane serves every owner that maps to it (persist.Lanes of them
-// for the whole world), so a write that simply waited for its row would stall
-// the character, shortcut, skill and pet writes queued behind it — and the
-// row can be held by the persistence tick's chunk for its whole transaction.
+// queueItemWrite runs write on laneOwner's persistence lane once every row
+// reserved holds is free, handing it the rows still worth writing
+// (persist.Write.Run). The write is owed on laneOwner's lane and on the lane
+// of every owner in alsoOwed, so waiting on any of them waits for it.
+//
+// A lane serves every owner that maps to it (persist.Lanes of them for the
+// whole world), so a write that simply waited for its rows would stall the
+// character, shortcut, skill and pet writes queued behind it — and a row can
+// be held by the persistence tick's chunk for its whole transaction.
 // This comes back to the lane instead, which keeps the lane draining and
 // still lands the write in its reserved place.
 //
@@ -267,30 +326,38 @@ const itemWriteRowWait = 20 * time.Millisecond
 // every later flush of it, so this follows the row release in persist.Order:
 // the worker recovers a panicking job, so a write that panics has to leave
 // the bookkeeping as it found it.
-func (l *GameClientLink) queueItemWrite(ownerID int32, reserved *persist.Write, write func()) {
-	owed := l.persist.Owe(ownerID)
+func (l *GameClientLink) queueItemWrite(reserved *persist.Write, write func(keep []int32), laneOwner int32, alsoOwed ...int32) {
+	owed := []persist.Owed{l.persist.Owe(laneOwner)}
+	for _, ownerID := range alsoOwed {
+		owed = append(owed, l.persist.Owe(ownerID))
+	}
+	settleAll := func() {
+		for _, o := range owed {
+			o.Settle()
+		}
+	}
 	var attempt func()
 	attempt = func() {
 		settle := true
 		defer func() {
 			if settle {
-				owed.Settle()
+				settleAll()
 			}
 		}()
-		if reserved.TryRun(itemWriteRowWait, func([]int32) { write() }) {
+		if reserved.TryRun(itemWriteRowWait, write) {
 			return
 		}
-		if l.persist.Enqueue(ownerID, attempt) {
+		if l.persist.Enqueue(laneOwner, attempt) {
 			settle = false // Still owed: whichever attempt ends it settles.
 			return
 		}
 		// Shutdown: nothing will come back for this, so take the wait here
 		// rather than dropping a write the row is still owed.
-		reserved.Run(func([]int32) { write() })
+		reserved.Run(write)
 	}
-	if !l.persist.Enqueue(ownerID, attempt) {
+	if !l.persist.Enqueue(laneOwner, attempt) {
 		reserved.Cancel()
-		owed.Settle()
+		settleAll()
 	}
 }
 

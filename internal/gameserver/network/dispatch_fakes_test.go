@@ -248,26 +248,23 @@ func (s *fakeItemStore) Save(_ context.Context, inst *item.Instance) error {
 }
 
 func (s *fakeItemStore) SaveState(_ context.Context, st item.InstanceState) error {
-	cp := item.Instance{
-		ObjectID: st.ObjectID, TemplateID: st.TemplateID, OwnerID: st.OwnerID,
-		Count: st.Count, EnchantLevel: st.EnchantLevel,
-		Location: st.Location, LocationData: st.LocationData,
-		CustomType1: st.CustomType1, CustomType2: st.CustomType2,
-		ManaLeft: st.ManaLeft, Time: st.Time, ShotsMask: st.ShotsMask,
-		Augmentation: st.Augmentation,
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.saveLocked(st)
+	return nil
+}
+
+func (s *fakeItemStore) saveLocked(st item.InstanceState) {
+	cp := st.Instance()
 	for ownerID, items := range s.items {
 		for i, existing := range items {
 			if existing.ObjectID == cp.ObjectID {
-				s.items[ownerID][i] = &cp
-				return nil
+				s.items[ownerID][i] = cp
+				return
 			}
 		}
 	}
-	s.items[cp.OwnerID] = append(s.items[cp.OwnerID], &cp)
-	return nil
+	s.items[cp.OwnerID] = append(s.items[cp.OwnerID], cp)
 }
 
 func (s *fakeItemStore) Update(ctx context.Context, inst *item.Instance) error {
@@ -281,13 +278,31 @@ func (s *fakeItemStore) UpdateState(ctx context.Context, st item.InstanceState) 
 func (s *fakeItemStore) Delete(_ context.Context, objectID int32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.deleteLocked(objectID)
+	return nil
+}
+
+func (s *fakeItemStore) deleteLocked(objectID int32) {
 	for ownerID, items := range s.items {
 		for i, existing := range items {
 			if existing.ObjectID == objectID {
 				s.items[ownerID] = append(items[:i], items[i+1:]...)
-				return nil
+				return
 			}
 		}
+	}
+}
+
+// WriteBatch applies batch's saves, then its deletes, under one hold of the
+// store, so no reader sees part of it.
+func (s *fakeItemStore) WriteBatch(_ context.Context, batch item.FlushBatch) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, st := range batch.Saves {
+		s.saveLocked(st)
+	}
+	for _, id := range batch.Deletes {
+		s.deleteLocked(id)
 	}
 	return nil
 }

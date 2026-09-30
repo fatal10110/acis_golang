@@ -46,31 +46,28 @@ func (f *recordingFlusher) Flush(ctx context.Context, batch item.FlushBatch) err
 	return nil
 }
 
-// recordingItemStore records the single-row writes a handler makes, into the
-// same log as the flusher's batches, so the log is every write of the row in
-// the order it landed.
+// recordingItemStore records the batches a handler writes, into the same log
+// as the flusher's batches, so the log is every write of the row in the order
+// it landed.
 type recordingItemStore struct {
 	itemStore
 	log   *recordingFlusher
 	watch int32
 }
 
-func (s recordingItemStore) SaveState(ctx context.Context, st item.InstanceState) error {
-	if err := s.itemStore.SaveState(ctx, st); err != nil {
+func (s recordingItemStore) WriteBatch(ctx context.Context, batch item.FlushBatch) error {
+	if err := s.itemStore.WriteBatch(ctx, batch); err != nil {
 		return err
 	}
-	if st.ObjectID == s.watch {
-		s.log.record(fmt.Sprintf("save(%d)", st.Count))
+	for _, st := range batch.Saves {
+		if st.ObjectID == s.watch {
+			s.log.record(fmt.Sprintf("save(%d)", st.Count))
+		}
 	}
-	return nil
-}
-
-func (s recordingItemStore) Delete(ctx context.Context, objectID int32) error {
-	if err := s.itemStore.Delete(ctx, objectID); err != nil {
-		return err
-	}
-	if objectID == s.watch {
-		s.log.record("delete")
+	for _, id := range batch.Deletes {
+		if id == s.watch {
+			s.log.record("delete")
+		}
 	}
 	return nil
 }
