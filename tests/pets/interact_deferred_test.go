@@ -53,13 +53,12 @@ func clickPetQueued(t *testing.T, h *petWorld, pet *summon.Actor, what string) {
 	}
 }
 
-// TestOwnedPetInteractMidSwingRunsAtSwingEnd pins PlayableAI.tryToInteract
-// (PlayableAI.java:373-390) for a swing in flight: the owner's click on its
-// pet is answered ActionFailed and kept as the next intention, and
-// PlayableAI.onEvtFinishedAttack runs it once the swing ends, in place of
-// the attack, which does not swing again.
-func TestOwnedPetInteractMidSwingRunsAtSwingEnd(t *testing.T) {
-	t.Parallel()
+// queuePetInteractMidSwing summons the owner's wolf next to it, starts the
+// owner swinging at an adjacent monster, and clicks the pet twice while the
+// first swing is in flight: once to select it, then the interact the swing
+// holds queued.
+func queuePetInteractMidSwing(t *testing.T) (*petWorld, *summon.Actor) {
+	t.Helper()
 	h := bootOwnerWithCollar(t)
 	if !h.srv.DrivesClock() {
 		t.Skip("holding a swing open needs the driven clock")
@@ -84,6 +83,17 @@ func TestOwnedPetInteractMidSwingRunsAtSwingEnd(t *testing.T) {
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
 	readImmediate(h.client)
 	clickPetQueued(t, h, pet, "mid-swing")
+	return h, pet
+}
+
+// TestOwnedPetInteractMidSwingRunsAtSwingEnd pins PlayableAI.tryToInteract
+// (PlayableAI.java:373-390) for a swing in flight: the owner's click on its
+// pet is answered ActionFailed and kept as the next intention, and
+// PlayableAI.onEvtFinishedAttack runs it once the swing ends, in place of
+// the attack, which does not swing again.
+func TestOwnedPetInteractMidSwingRunsAtSwingEnd(t *testing.T) {
+	t.Parallel()
+	h, pet := queuePetInteractMidSwing(t)
 
 	for i := 0; ; i++ {
 		frame := h.client.ReadWithTimeout(5 * time.Second)
@@ -144,5 +154,55 @@ func TestOwnedPetInteractMidCastRunsAtCastEnd(t *testing.T) {
 	want := []byte{serverpackets.OpcodeMagicSkillLaunched, serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodePetStatusShow}
 	if string(order) != string(want) {
 		t.Fatalf("cast end order = %x, want %x (all opcodes %x)", order, want, frameOpcodes(frames))
+	}
+}
+
+// TestOwnedPetInteractQueuedForReturnedPetEndsTheAttack: a pet sent back to
+// its collar while the owner's interact with it waits behind a swing is a
+// lost target when the swing ends. PlayerAI.thinkInteract
+// (PlayerAI.java:413-428) releases the click with ActionFailed and goes idle
+// (AbstractAI.isTargetLost, AbstractAI.java:586-595): no approach, no status
+// window, and no further swing at the monster.
+func TestOwnedPetInteractQueuedForReturnedPetEndsTheAttack(t *testing.T) {
+	t.Parallel()
+	h, pet := queuePetInteractMidSwing(t)
+
+	h.client.Send(encodeRequestActionUse(19, false))
+	for {
+		frame := mustRead(t, h.client, "PetDelete")
+		if frame[0] == serverpackets.OpcodePetDelete {
+			break
+		}
+		if frame[0] == serverpackets.OpcodeAttack && wire.NewReader(frame[1:]).ReadInt32() == h.ownerID {
+			t.Fatal("the swing ended before the pet was returned")
+		}
+	}
+	if _, ok := h.srv.State.Object(pet.ObjectID()); ok {
+		t.Fatal("the returned pet is still in the world")
+	}
+	// The rest of the return's own answer; the swing is still in flight.
+	for _, frame := range readImmediate(h.client) {
+		if isOwnerInteractFrame(frame, h.ownerID, pet) {
+			t.Fatalf("the queued interact ran against the returned pet: opcode %#x", frame[0])
+		}
+	}
+
+	released := false
+	for end := h.client.Now().Add(3 * time.Second); h.client.Now().Before(end); {
+		frame := h.client.ReadWithTimeout(end.Sub(h.client.Now()))
+		if frame == nil {
+			break
+		}
+		switch {
+		case isOwnerInteractFrame(frame, h.ownerID, pet):
+			t.Fatalf("the queued interact ran against the returned pet: opcode %#x", frame[0])
+		case frame[0] == serverpackets.OpcodeAttack && wire.NewReader(frame[1:]).ReadInt32() == h.ownerID:
+			t.Fatal("the owner swung again after its queued interact's pet was returned")
+		case frame[0] == serverpackets.OpcodeActionFailed:
+			released = true
+		}
+	}
+	if !released {
+		t.Fatal("the swing's end never released the queued interact with ActionFailed")
 	}
 }

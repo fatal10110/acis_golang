@@ -690,6 +690,24 @@ func (s *Server) SeedGroundItem(tb testing.TB, ownerID, templateID, count int32,
 	s.GroundItems.Drop(ground, task.DropOptions{X: x, Y: y, Z: z})
 }
 
+// DespawnGroundItem takes the ground item objectID out of the world the way
+// the cleanup tick expires one: claimed, untracked, then despawned, so
+// every player that saw it is sent DeleteObject. Suites use it for an item
+// that vanishes while a pickup of it waits.
+func (s *Server) DespawnGroundItem(tb testing.TB, objectID int32) {
+	tb.Helper()
+	obj, _ := s.State.Object(objectID)
+	ground, ok := obj.(*grounditem.Item)
+	if !ok {
+		tb.Fatalf("world.Object(%d) = %T, want a ground item", objectID, obj)
+	}
+	if !ground.Claim() {
+		tb.Fatalf("ground item %d is held by a pickup in flight", objectID)
+	}
+	s.GroundItems.Remove(ground)
+	s.State.Despawn(ground)
+}
+
 // SetPlayerFlying toggles the live player's transport mode, the precondition
 // of the datapack's flying use conditions no single packet reaches.
 func (s *Server) SetPlayerFlying(tb testing.TB, objID int32, flying bool) {

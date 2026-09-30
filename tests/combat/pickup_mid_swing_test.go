@@ -13,6 +13,7 @@ import (
 // midSwingPickup is a player swinging bare-handed at the fixture monster
 // with 40 adena lying at its feet.
 type midSwingPickup struct {
+	srv       *gameservertest.Server
 	c         *scriptedClient
 	objID     int32
 	groundID  int32
@@ -41,7 +42,7 @@ func bootMidSwingPickup(t *testing.T, back int) midSwingPickup {
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	readUntil(t, c, serverpackets.OpcodeAttack, "first swing")
-	return midSwingPickup{c: c, objID: objID, groundID: groundID, hostileID: hostile.ObjectID()}
+	return midSwingPickup{srv: srv, c: c, objID: objID, groundID: groundID, hostileID: hostile.ObjectID()}
 }
 
 // assertNoSwingBy fails when attackerID starts a swing within d. The
@@ -127,5 +128,43 @@ func TestMidSwingAttackReplacesQueuedPickup(t *testing.T) {
 	}
 	if !swung {
 		t.Fatal("the attack queued behind the swing never swung")
+	}
+}
+
+// TestMidSwingPickupOfVanishedItemEndsTheAttack: the queued pickup still
+// replaces the ATTACK intention when its item left the ground before the
+// swing ended. PlayableAI.thinkPickUp (PlayableAI.java:199-214) releases the
+// click with ActionFailed and, the target lost, goes idle: nothing is picked
+// up and no further swing follows.
+func TestMidSwingPickupOfVanishedItemEndsTheAttack(t *testing.T) {
+	t.Parallel()
+	s := bootMidSwingPickup(t, 0)
+
+	s.c.Send(encodeAction(s.groundID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertFrameOpcode(t, s.c.Read(), serverpackets.OpcodeActionFailed, "queued pickup ActionFailed")
+	s.srv.DespawnGroundItem(t, s.groundID)
+
+	deleted, released := false, false
+	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
+		frame := s.c.ReadWithTimeout(end.Sub(s.c.Now()))
+		if frame == nil {
+			break
+		}
+		switch {
+		case frame[0] == serverpackets.OpcodeDeleteObject && wireReader(frame[1:]).ReadInt32() == s.groundID:
+			deleted = true
+		case frame[0] == serverpackets.OpcodeActionFailed && deleted:
+			released = true
+		case frame[0] == serverpackets.OpcodeGetItem:
+			t.Fatal("a vanished item was picked up")
+		case frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == s.objID:
+			t.Fatal("the player swung again after its queued pickup's item vanished")
+		}
+	}
+	if !deleted {
+		t.Fatal("the vanished item's DeleteObject never arrived")
+	}
+	if !released {
+		t.Fatal("the swing's end never released the queued pickup with ActionFailed")
 	}
 }
