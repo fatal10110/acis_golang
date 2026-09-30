@@ -47,5 +47,7 @@ func (o *Object) CorpseTime() time.Duration            { return 0 }
 func (o *Object) Spoiled() bool                        { return false }
 func (o *Object) Seeded() bool                         { return false }
 
-// CollisionHeight reports 0: line of sight to a door uses its base.
-func (o *Object) CollisionHeight() float64 { return 0 }
+// CollisionHeight is half the door's blocking height, the way every other
+// creature reports half its body: line of sight to a door ends at the
+// configured share of its full height above its Z.
+func (o *Object) CollisionHeight() float64 { return float64(o.height) / 2 }
