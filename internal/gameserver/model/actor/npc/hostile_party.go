@@ -59,7 +59,7 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 }
 
 // registerHit records hate, the shot-recharge roll, and the party/minion
-// attacked call for a live hit with positive amount — the block
+// attacked call for a live hit, whatever its amount — the block
 // TakeDamage, ReduceHP, and ReduceHPByDOT all run unconditionally one layer
 // above the invul/damage-permission guard, matching Npc.reduceCurrentHp
 // (Npc.java:390-464). isDOT selects ReduceHPByDOT's zero-weight hate call
