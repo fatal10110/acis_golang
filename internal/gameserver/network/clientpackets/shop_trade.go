@@ -16,11 +16,6 @@ const (
 	shopBuyRowSize         = 2 * 4
 	shopSellRowSize        = 3 * 4
 	shopHeaderSize         = 2 * 4
-
-	// maxShopItemInPacket mirrors Config.MAX_ITEM_IN_PACKET (see
-	// warehouse.go's maxItemInPacket): max(INVENTORY_MAXIMUM_NO_DWARF,
-	// INVENTORY_MAXIMUM_DWARF), effectively 100.
-	maxShopItemInPacket = 100
 )
 
 // TradeRequest asks another player to open a direct trade.
@@ -170,15 +165,15 @@ type RequestBuyItem struct {
 }
 
 // DecodeRequestBuyItem parses a raw RequestBuyItem payload (opcode byte
-// included).
-func DecodeRequestBuyItem(payload []byte) (RequestBuyItem, error) {
+// included) of at most maxItems rows (player.InventorySlots.MaxItemInPacket).
+func DecodeRequestBuyItem(payload []byte, maxItems int) (RequestBuyItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < shopHeaderSize {
 		return RequestBuyItem{}, fmt.Errorf("clientpackets: RequestBuyItem: need at least %d bytes, got %d: %w", shopHeaderSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestBuyItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
-	if err := validateShopRows("RequestBuyItem", count, shopBuyRowSize, r.Remaining()); err != nil {
+	if err := validateShopRows("RequestBuyItem", count, maxItems, shopBuyRowSize, r.Remaining()); err != nil {
 		return RequestBuyItem{}, err
 	}
 	req.Items = make([]BuyItemRequest, count)
@@ -211,15 +206,15 @@ type RequestSellItem struct {
 }
 
 // DecodeRequestSellItem parses a raw RequestSellItem payload (opcode byte
-// included).
-func DecodeRequestSellItem(payload []byte) (RequestSellItem, error) {
+// included) of at most maxItems rows (player.InventorySlots.MaxItemInPacket).
+func DecodeRequestSellItem(payload []byte, maxItems int) (RequestSellItem, error) {
 	r := newReader(payload)
 	if r.Remaining() < shopHeaderSize {
 		return RequestSellItem{}, fmt.Errorf("clientpackets: RequestSellItem: need at least %d bytes, got %d: %w", shopHeaderSize, r.Remaining(), wire.ErrShortPacket)
 	}
 	req := RequestSellItem{ListID: r.ReadInt32()}
 	count := r.ReadInt32()
-	if err := validateShopRows("RequestSellItem", count, shopSellRowSize, r.Remaining()); err != nil {
+	if err := validateShopRows("RequestSellItem", count, maxItems, shopSellRowSize, r.Remaining()); err != nil {
 		return RequestSellItem{}, err
 	}
 	req.Items = make([]SellItemRequest, count)
@@ -240,14 +235,14 @@ func DecodeRequestSellItem(payload []byte) (RequestSellItem, error) {
 	return req, nil
 }
 
-func validateShopRows(name string, count int32, rowSize, remaining int) error {
+func validateShopRows(name string, count int32, maxItems, rowSize, remaining int) error {
 	if count <= 0 {
 		return fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
 	// Mirrors RequestBuyItem.java:32 / RequestSellItem.java:26's
 	// "count > Config.MAX_ITEM_IN_PACKET" guard.
-	if count > maxShopItemInPacket {
-		return fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxShopItemInPacket)
+	if int(count) > maxItems {
+		return fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxItems)
 	}
 	// A row-count/remaining-length mismatch mirrors the reference's silent
 	// readImpl() return (RequestBuyItem/RequestSellItem: "count * BATCH_LENGTH
