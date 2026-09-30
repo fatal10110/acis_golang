@@ -197,11 +197,7 @@ func TestArmedPetCastNeedsAllowedWeapon(t *testing.T) {
 			strike := wolfStrike()
 			strike.MPInitialConsume = 5
 			strike.WeaponsAllowed = tc.allowed
-			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), &item.Template{
-				ID: fixturePetWeaponID, Name: "Wolf Weapon", Kind: item.KindWeapon, Slot: item.SlotWolf,
-				Duration: -1, Destroyable: true, DefaultAction: item.ActionEquip,
-				Weapon: &item.WeaponDetail{Type: item.WeaponPet},
-			}))
+			catalog := item.NewTable(append(gameservertest.ItemTemplates().All(), petWeaponTemplate()))
 			h, petActor, hostile := bootWolfStrikerWith(t, strike, gameservertest.WithItemTemplates(catalog))
 			runOnPetQueue(t, petActor, func() {
 				inv := petActor.PetInventory()

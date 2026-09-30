@@ -173,3 +173,67 @@ func assertConfirmFromDistanceCancels(t *testing.T, dx int32) {
 		t.Fatalf("persisted second rows after canceled trade = %+v, want potion count 3", secondRows)
 	}
 }
+
+// TestAddTradeItemToleratesPartnerOutOfRange pins that offering an item has
+// no distance gate: AddTradeItem checks the partner's presence, access and
+// confirm state, never range. With the partner walked twice the interaction
+// radius away, the offer is answered on both sides as usual and the session
+// stays open, so once the partner walks back both confirms settle the trade.
+// Only the confirm-time check (TestConfirmOutOfRangeCancelsTradeForBoth)
+// measures distance.
+func TestAddTradeItemToleratesPartnerOutOfRange(t *testing.T) {
+	h := bootTraders(t)
+	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
+	h.enterAll(t)
+	h.startTrade(t)
+
+	farX := int32(spawnX + 2*tradeInteractionDistance)
+	h.second.Send(encodeMoveBackwardToLocation(farX, spawnY, spawnZ, spawnX, spawnY, spawnZ))
+	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation")
+	waitForArrival(t, h, h.secondID, farX)
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+
+	h.first.Send(encodeAddTradeItem(0, adena, 40))
+	assertOwnOfferFrames(t, h.first.Read(), h.first.Read(), h.first.Read(), adena, item.AdenaID, 40, 60)
+	frame := h.second.Read()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeTradeOtherAdd, "out-of-range partner TradeOtherAdd")
+	assertTradeAddRow(t, frame, serverpackets.OpcodeTradeOtherAdd, item.AdenaID, 40)
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+
+	h.second.Send(encodeMoveBackwardToLocation(spawnX, spawnY, spawnZ, farX, spawnY, spawnZ))
+	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation back")
+	waitForArrival(t, h, h.secondID, spawnX)
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+
+	h.first.Send(encodeTradeDone(1))
+	assertFrameOpcode(t, h.first.Read(), serverpackets.OpcodeTradePressOwnOk, "first TradePressOwnOk")
+	assertSystemMessageText(t, h.second.Read(), serverpackets.SystemMessageS1ConfirmedTrade, "TraderOne")
+	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeTradePressOtherOk, "second TradePressOtherOk")
+	h.second.Send(encodeTradeDone(1))
+	for _, who := range []struct {
+		name   string
+		client *testsupport.ScriptedClient
+	}{{"first", h.first}, {"second", h.second}} {
+		frame := who.client.Read()
+		assertFrameOpcode(t, frame, serverpackets.OpcodeSendTradeDone, who.name+" SendTradeDone")
+		if got := wire.NewReader(frame[1:]).ReadInt32(); got != 1 {
+			t.Fatalf("%s SendTradeDone success = %d, want 1", who.name, got)
+		}
+		assertStaticSystemMessage(t, who.client.Read(), serverpackets.SystemMessageTradeSuccessful)
+	}
+
+	h.srv.InventoryUpdates.Tick()
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+	h.srv.FlushItems(t)
+	rows, err := h.srv.Items.ListByOwner(context.Background(), h.secondID)
+	if err != nil {
+		t.Fatalf("list second items: %v", err)
+	}
+	if len(rows) != 1 || rows[0].TemplateID != item.AdenaID || rows[0].Count != 40 {
+		t.Fatalf("persisted second rows after the settled trade = %+v, want the 40 offered adena", rows)
+	}
+}
