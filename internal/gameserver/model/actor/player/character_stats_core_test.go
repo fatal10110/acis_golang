@@ -3248,6 +3248,44 @@ func TestDamageLeavesSitDownAndFakeDeathLieDownRunning(t *testing.T) {
 	}
 }
 
+// TestReduceHPByToggleUpkeepSparesSleepAndSitting mirrors
+// PlayerStatus.reduceHp with isHPConsumption = skill.isToggle(): a toggle's
+// own upkeep tick skips the whole wake-up block, so a seated, sleeping,
+// immobile-until-attacked character stays that way while the HP comes off,
+// invulnerability included, since it is the character's own tick.
+func TestReduceHPByToggleUpkeepSparesSleepAndSitting(t *testing.T) {
+	for _, invul := range []bool{false, true} {
+		t.Run(fmt.Sprintf("invul=%v", invul), func(t *testing.T) {
+			c := liveCharacter(1, combatTemplate(), combatItems())
+			c.SetHP(100)
+			attachTestLive(t, c)
+			sitDownSettled(c)
+			addCharacterEffect(t, c, "Sleep")
+			addCharacterEffect(t, c, "ImmobileUntilAttacked")
+			c.SetInvul(invul)
+			rec := recordEvents(c)
+
+			c.ReduceHPByToggleUpkeep(10, c)
+
+			if got := c.HP(); got != 90 {
+				t.Fatalf("HP() = %v after the upkeep tick, want 90", got)
+			}
+			if !c.Seated() {
+				t.Fatal("Seated() = false after the upkeep tick, want still seated")
+			}
+			if got := event.Count[event.StanceChanged](rec); got != 0 {
+				t.Fatalf("stance broadcasts = %d, want none", got)
+			}
+			if !c.Sleeping() {
+				t.Fatal("Sleeping() = false after the upkeep tick, want the sleep effect kept")
+			}
+			if !c.EffectList().IsAffected(effect.FlagMeditating) {
+				t.Fatal("IMMOBILE_UNTIL_ATTACKED stopped by the upkeep tick, want it kept")
+			}
+		})
+	}
+}
+
 // TestReduceHPBreaksStunOnOneInTenRollForNonDOTDamage mirrors
 // !isDOT && isStunned() && Rnd.get(10) == 0.
 func TestReduceHPBreaksStunOnOneInTenRollForNonDOTDamage(t *testing.T) {

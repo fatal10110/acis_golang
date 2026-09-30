@@ -19,7 +19,14 @@ func damageOverTimeAction(e *Effect) bool {
 		// reference (Creature.reduceCurrentHpByDOT hardcodes it), unlike
 		// drowning's periodic damage, which reduceCurrentHp (isDOT=false)
 		// routes through the same Go method (see taskeffects.go's Drown).
-		target.ReduceHPByDOT(result.Damage, e.Effector, true)
+		// A toggle's own upkeep tick on a player is HP consumption, not a
+		// hit: it leaves sleep, immobile-until-attacked and sitting alone.
+		// Every other creature already skips those for any DOT tick.
+		if player, ok := asPlayer(target); ok && e.Skill.Toggle {
+			player.ReduceHPByToggleUpkeep(result.Damage, e.Effector)
+		} else {
+			target.ReduceHPByDOT(result.Damage, e.Effector, true)
+		}
 	}
 	return result.Continue
 }

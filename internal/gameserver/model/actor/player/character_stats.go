@@ -704,6 +704,21 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 // another playable's tick through CP, which rewrites CP unchanged and
 // reports the status, as reduceSkillHP does for a zero skill hit.
 func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
+	c.reducePeriodicHP(amount, attacker, isDOT, false)
+}
+
+// ReduceHPByToggleUpkeep applies a toggle skill's own damage-over-time
+// upkeep tick. It is ReduceHPByDOT's real DOT tick, except the HP counts as
+// spent rather than taken in a hit: the wake-up side effects never run, so
+// the tick leaves SLEEP, IMMOBILE_UNTIL_ATTACKED and a seated character
+// alone. Invulnerability still lets it through, as it is c's own tick.
+func (c *Character) ReduceHPByToggleUpkeep(amount float64, effector effect.Actor) {
+	c.reducePeriodicHP(amount, effector, true, true)
+}
+
+// reducePeriodicHP is ReduceHPByDOT and ReduceHPByToggleUpkeep's shared
+// path; hpConsumption skips the wake-up side effects.
+func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDOT, hpConsumption bool) {
 	killer, _ := attacker.(attackable.Combatant)
 	if amount < 0 {
 		amount = 0
@@ -711,7 +726,9 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 	if c.Dead() || c.invulnerableTo(killer, isDOT) {
 		return
 	}
-	c.applyNonConsumptionDamageEffects(isDOT)
+	if !hpConsumption {
+		c.applyNonConsumptionDamageEffects(isDOT)
+	}
 	if !c.damagePermitted(killer) {
 		return
 	}
@@ -729,8 +746,8 @@ func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT b
 // sitting down (an ordinary sit or a fake-death lie-down) unless it is in
 // shop mode, and — for non-DOT damage only — has a 1-in-10 chance to break
 // STUN. A sit-down or lie-down still under way is left to finish. HP spent
-// as a skill's own resource cost (isHPConsumption=true in the reference)
-// never routes through here.
+// as a skill's own resource cost, a toggle's upkeep tick among it
+// (ReduceHPByToggleUpkeep), never routes through here.
 func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	live := c.liveLocked()
 	list := live.EffectList()
