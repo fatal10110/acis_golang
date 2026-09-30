@@ -99,13 +99,15 @@ func fakeDeathDelays(t *testing.T, srv *gameservertest.Server, objID int32) (lie
 	return time.Duration(int32(3000/mult)) * time.Millisecond, time.Duration(int32(2500/mult)) * time.Millisecond
 }
 
-// startFakeDeath switches Fake Death on from the skill bar and returns when
-// the lie-down began.
+// startFakeDeath switches Fake Death on from the skill bar and returns the
+// time just before the request left: the lie-down begins no earlier, so a
+// "not before the lie-down ends" check measures from it.
 func startFakeDeath(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 	t.Helper()
+	sent := c.Now()
 	c.Send(encodeRequestMagicSkillUse(fakeDeathSkillID, false, false))
 	readMatching(t, c, time.Second, "fake-death start ChangeWaitType", isWaitType(serverpackets.WaitFakeDeathStart))
-	return c.Now()
+	return sent
 }
 
 // assertSittingRefusal expects CANT_MOVE_SITTING then ActionFailed, and no
@@ -130,9 +132,9 @@ func TestSkillBarCastDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 	srv, c, objID := bootPostureCaster(t)
 	mpBefore := srv.PlayerCurrentMP(t, objID)
 
+	sitAt := c.Now() // before the request, as for the stand-up below
 	c.Send(encodeRequestChangeWaitType(false))
 	readMatching(t, c, time.Second, "sit ChangeWaitType", isWaitType(serverpackets.WaitSitting))
-	sitAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued skill-bar cast")
 

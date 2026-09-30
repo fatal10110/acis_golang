@@ -52,6 +52,14 @@ func standUp(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 	return sent
 }
 
+// sitDown is standUp for the sit-down.
+func sitDown(t *testing.T, c *testsupport.ScriptedClient) time.Time {
+	t.Helper()
+	sent := c.Now()
+	changePosture(t, c, false)
+	return sent
+}
+
 // sitAndSettle seats the player and lets the sit-down transition end.
 func sitAndSettle(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
@@ -191,9 +199,10 @@ func TestQueuedItemSkillOutlastsStandUpBehindCast(t *testing.T) {
 	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
 	startInWorld(t, c)
 
+	// Timed from before the request, as standUp is.
+	castAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(longCastSkillID))
 	assertMagicSkillUseSelf(t, c.Read(), objID, longCastSkillID, 1, 4000, 0)
-	castAt := c.Now()
 	drainUntilQuiet(t, c)
 	changePosture(t, c, false)
 	changePosture(t, c, true)
@@ -418,8 +427,7 @@ func TestUseItemSkillDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
 	startInWorld(t, c)
 
-	changePosture(t, c, false)
-	sitAt := c.Now()
+	sitAt := sitDown(t, c)
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
 
