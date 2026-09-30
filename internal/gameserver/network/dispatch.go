@@ -123,7 +123,14 @@ type PlayerConfig struct {
 	// KarmaPlayerCanTeleport controls whether a karma-carrying player may
 	// use a TELEPORT/RECALL-type skill, direct or item-attached.
 	KarmaPlayerCanTeleport bool
-	AwardPKKillPVPPoint    bool
+	// KarmaPlayerCanShop, KarmaPlayerCanUseGK and KarmaPlayerCanUseWareHouse
+	// let a karma-carrying player use a shop, gatekeeper or warehouse NPC;
+	// when one is off, that NPC answers with its refusal page if it has
+	// one.
+	KarmaPlayerCanShop         bool
+	KarmaPlayerCanUseGK        bool
+	KarmaPlayerCanUseWareHouse bool
+	AwardPKKillPVPPoint        bool
 	// PerfectShieldBlockRate is the roll threshold (out of 100) below which
 	// a successful shield block upgrades to a perfect block.
 	PerfectShieldBlockRate int

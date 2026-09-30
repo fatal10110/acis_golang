@@ -52,6 +52,7 @@ type gameplayConfig struct {
 	InventorySlots           player.InventorySlots
 	StorageSlots             player.StorageSlots
 	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
+	KarmaServiceGates        karmaServiceGates
 	AllowDelevel             allowDelevel
 	RateKarmaExpLost         rateKarmaExpLost
 	CharacterSelectDelay     characterSelectDelay
@@ -111,6 +112,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.KarmaPlayerCanTeleport, err = loadKarmaPlayerCanTeleport(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.KarmaServiceGates, err = loadKarmaServiceGates(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.AllowDelevel, err = loadAllowDelevel(paths); err != nil {
@@ -324,6 +328,25 @@ func loadKarmaPlayerCanTeleport(paths gameServerPaths) (karmaPlayerCanTeleport, 
 		return false, err
 	}
 	return karmaPlayerCanTeleport(config.NewFields(props, "karma player can teleport").Bool("KarmaPlayerCanTeleport", true)), nil
+}
+
+// karmaServiceGates controls whether a karma-carrying player may use a
+// shop, gatekeeper or warehouse NPC, read from players.properties.
+type karmaServiceGates struct {
+	CanShop, CanUseGK, CanUseWareHouse bool
+}
+
+func loadKarmaServiceGates(paths gameServerPaths) (karmaServiceGates, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return karmaServiceGates{}, err
+	}
+	f := config.NewFields(props, "karma service gates")
+	return karmaServiceGates{
+		CanShop:         f.Bool("KarmaPlayerCanShop", false),
+		CanUseGK:        f.Bool("KarmaPlayerCanUseGK", false),
+		CanUseWareHouse: f.Bool("KarmaPlayerCanUseWareHouse", true),
+	}, f.Err()
 }
 
 // allowDelevel controls whether a player death may cost experience/karma at

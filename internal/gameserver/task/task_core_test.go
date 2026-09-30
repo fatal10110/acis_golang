@@ -1737,7 +1737,7 @@ func TestPvPFlagOptionsFromProperties(t *testing.T) {
 	props, err := config.ParseString(`
 PvPVsNormalTime = 40000
 PvPVsPvPTime = 20000
-KarmaPlayerCanShop = False
+KarmaPlayerCanTrade = False
 AwardPKKillPVPPoint = False
 `)
 	if err != nil {
@@ -1754,7 +1754,7 @@ AwardPKKillPVPPoint = False
 	if opts.AwardPKKillPVPPoint {
 		t.Fatal("AwardPKKillPVPPoint = true, want false")
 	}
-	wantUnsupported := []string{"KarmaPlayerCanShop"}
+	wantUnsupported := []string{"KarmaPlayerCanTrade"}
 	if !slices.Equal(opts.UnsupportedKeys, wantUnsupported) {
 		t.Fatalf("UnsupportedKeys = %v, want %v", opts.UnsupportedKeys, wantUnsupported)
 	}

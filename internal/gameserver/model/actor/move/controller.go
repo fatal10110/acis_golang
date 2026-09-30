@@ -20,6 +20,12 @@ type Located interface {
 	CollisionRadius() float64
 }
 
+// Pawn is a world object a MoveToPawn walk heads for.
+type Pawn interface {
+	ObjectID() int32
+	Position() (x, y, z int)
+}
+
 // Actor is the actor a Controller drives (self): its position/footprint,
 // plus its ability to broadcast its own movement to the world.
 type Actor interface {
@@ -490,7 +496,7 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // already running, offensive or friendly, so no follow recheck steers the
 // walk back toward an earlier target: nothing re-aims the walk if target
 // moves.
-func (c *Controller) MoveToPawn(target attackable.Combatant, offset int) bool {
+func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clearFollow()
