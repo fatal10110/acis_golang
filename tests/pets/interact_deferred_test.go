@@ -118,6 +118,25 @@ func TestOwnedPetInteractMidSwingRunsAtSwingEnd(t *testing.T) {
 	}
 }
 
+func TestSitReplacesOwnedPetInteractMidSwing(t *testing.T) {
+	t.Parallel()
+	h, pet := queuePetInteractMidSwing(t)
+	h.client.Send(encodeRequestChangeWaitType(false))
+	for _, frame := range readImmediate(h.client) {
+		if frame[0] == serverpackets.OpcodeChangeWaitType || isOwnerInteractFrame(frame, h.ownerID, pet) {
+			t.Fatalf("sit or pet interact ran during swing: %x", frame[0])
+		}
+	}
+	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit after swing")
+	h.srv.Advance(t, 2500*time.Millisecond)
+	frames = append(frames, readImmediate(h.client)...)
+	for _, frame := range frames {
+		if isOwnerInteractFrame(frame, h.ownerID, pet) {
+			t.Fatalf("replaced pet interact ran after sit: %x", frame[0])
+		}
+	}
+}
+
 // TestOwnedPetInteractMidCastRunsAtCastEnd is the same for a cast in
 // flight: PlayerAI.onEvtFinishedCasting runs the queued interact once the
 // cast launches, and only then is the owner shown facing its pet and given

@@ -93,9 +93,19 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 // mid-swing is waited out without being thought: no gate, no approach, until
 // the cast or swing ends.
 func (p *PlayerAttack) Start(target attackable.Combatant, shift bool) bool {
+	return p.start(target, shift, true)
+}
+
+// StartIntention runs an attack already accepted as the next intention.
+// The playable target gate belongs to the original request, before queuing.
+func (p *PlayerAttack) StartIntention(target attackable.Combatant, shift bool) bool {
+	return p.start(target, shift, false)
+}
+
+func (p *PlayerAttack) start(target attackable.Combatant, shift, request bool) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.gateRefusesLocked(target) {
+	if request && p.gateRefusesLocked(target) {
 		p.actor.RefuseAttackTarget()
 		return false
 	}

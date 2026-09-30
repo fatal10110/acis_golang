@@ -44,6 +44,21 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	if inPostureTransition(live) {
+		live.deferAction(func() { l.startLiveMove(live, target) })
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	live.takeDeferredAction()
+	l.startLiveMove(live, target)
+}
+
+func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Location) {
+	if live.DenyAIAction() || live.MovementDisabled() {
+		live.tryToIdle(false)
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// A client-initiated walk overrides any attack-driven chase movement —
 	// otherwise the server's own MaybeStartOffensiveFollow re-think would
 	// fight the player's own steering back toward the old target.
@@ -244,7 +259,6 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	waitType := serverpackets.WaitSitting
 	if stand {
 		waitType = serverpackets.WaitStanding
-		live.releaseChair()
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
@@ -258,8 +272,8 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 // denied (storing, stunned, observing, ...) or who is mounted drops its
 // intention and reads ActionFailed; fake death ends through its effect;
 // anyone else stands up as a stand request does. The stand runs on live's
-// own queue, right after the hit that reached it: it releases a chair and
-// drops queued intentions only that queue may touch.
+// own queue, right after the hit that reached it: it drops queued intentions
+// only that queue may touch. A chair is released when standing settles.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	if live == nil || !live.Seated() {
 		return

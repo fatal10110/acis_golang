@@ -113,6 +113,8 @@ type livePlayer struct {
 	// deferredUseItem is a weapon or shield toggle queued as the next
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
+	// deferredAction runs a player request held until a swing, cast or posture settles.
+	deferredAction func()
 	// deferredInteract is an interact with the player's own summon queued
 	// as the next intention; see showOwnedPetStatus.
 	deferredInteract *petInteractIntention
@@ -284,6 +286,7 @@ func (p *livePlayer) Stop() {
 	p.takeDeferredMagicSkill()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.takeDeferredPetInteract()
 	p.takePetInteract()
 	if p.combat != nil {
@@ -342,6 +345,7 @@ func (p *livePlayer) clearNextIntentionLocked() {
 	p.deferredItem = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.deferredInteract = nil
 }
 
@@ -488,6 +492,29 @@ func (p *livePlayer) hasDeferredUseItem() bool {
 	return p.deferredUseItem != nil
 }
 
+// deferAction replaces the next player intention. It is drained by the
+// player's queue when the swing, cast, or posture transition ends.
+func (p *livePlayer) deferAction(run func()) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
+	p.deferredAction = run
+}
+
+func (p *livePlayer) takeDeferredAction() func() {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	run := p.deferredAction
+	p.deferredAction = nil
+	return run
+}
+
+func (p *livePlayer) hasDeferredAction() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredAction != nil
+}
+
 // deferPetInteract stores the owner's interact with its own summon pet as
 // the next intention, replacing whatever was queued before.
 func (p *livePlayer) deferPetInteract(pet *summon.Actor, shift bool) {
@@ -576,6 +603,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.takeDeferredPetInteract()
 	p.takePetInteract()
 	if p.combat != nil {
@@ -599,6 +627,7 @@ func (p *livePlayer) clearParkedApproaches() {
 	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.takeDeferredPetInteract()
 	p.endFollow()
 }

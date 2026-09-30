@@ -55,28 +55,113 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if l.startPickupLiveGroundItem(ctx, live, target, shift) {
+	_, ground := target.(*grounditem.Item)
+	if ground {
+		if inPostureTransition(live) {
+			if live.DenyAIAction() {
+				live.SendFrame(serverpackets.FrameActionFailed())
+				return
+			}
+			live.deferAction(func() {
+				if l.resolveTarget(objectID) != target {
+					live.SendFrame(serverpackets.FrameActionFailed())
+					return
+				}
+				l.startPickupLiveGroundItem(ctx, live, target, shift)
+			})
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		live.takeDeferredAction()
+		l.startPickupLiveGroundItem(ctx, live, target, shift)
 		return
 	}
 	if cur := live.Target(); cur == nil || cur.ObjectID() != target.ObjectID() {
 		l.selectLiveTarget(live, target)
 		return
 	}
-	if selected && l.actOnSummon(live, target, ctrl, shift) {
+	if !selected {
 		return
 	}
-	if selected && l.actOnPlayer(live, target, ctrl, shift) {
+	if inPostureTransition(live) {
+		if live.DenyAIAction() || (ctrl && liveOutOfControl(live)) || target.ObjectID() == live.ObjectID() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		if pet, ok := target.(*summon.Actor); ok && !ctrl && pet.ShownAsOwnedBy(live.ObjectID()) {
+			live.deferPetInteract(pet, shift)
+		} else {
+			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
+			live.deferAction(func() {
+				if l.resolveTarget(objectID) != target {
+					live.SendFrame(serverpackets.FrameActionFailed())
+					return
+				}
+				run()
+			})
+		}
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if selected && l.interactLiveStaticObject(live, target) {
+	live.takeDeferredAction()
+	l.actOnSelectedTarget(live, target, ctrl, shift)
+}
+
+func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Tracked, ctrl, shift bool) {
+	if l.actOnSummon(live, target, ctrl, shift) {
 		return
 	}
-	if selected && l.sitLiveOnChair(live, target, true) {
+	if l.actOnPlayer(live, target, ctrl, shift) {
 		return
 	}
-	if selected {
-		l.attackLiveTarget(live, target, shift)
+	if l.interactLiveStaticObject(live, target) {
+		return
 	}
+	if l.sitLiveOnChair(live, target, true) {
+		return
+	}
+	l.attackLiveTarget(live, target, shift)
+}
+
+// queuedSelectedTargetAction captures the click's resolved intention before a
+// posture transition ends. A later selection must not change what it runs.
+func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) func() {
+	attack := func() { l.attackQueuedTarget(live, target, shift) }
+	switch v := target.(type) {
+	case *summon.Actor:
+		// The caller queues a click without ctrl on an owned summon as its
+		// interact intention, so only a ctrl-click reaches here.
+		if v.ShownAsOwnedBy(live.ObjectID()) {
+			return attack
+		}
+		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
+			return attack
+		}
+		return func() { l.startLiveFollow(live, v, shift) }
+	case *livePlayer:
+		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
+			return attack
+		}
+		if v.Operating() {
+			return func() {
+				l.log.Debug().Int32("target", v.ObjectID()).Msg("targeting: private store interact not modeled")
+				live.SendFrame(serverpackets.FrameActionFailed())
+			}
+		}
+		return func() { l.startLiveFollow(live, v, shift) }
+	case *staticobject.Object:
+		if v.Type() == staticobject.MapType || v.Type() == staticobject.ArenaSignType {
+			return func() {
+				if live.DenyAIAction() || live.Seated() {
+					live.tryToIdle(false)
+					live.SendFrame(serverpackets.FrameActionFailed())
+					return
+				}
+				l.interactLiveStaticObject(live, v)
+			}
+		}
+	}
+	return attack
 }
 
 func (l *GameClientLink) interactLiveStaticObject(live *livePlayer, target world.Tracked) bool {
@@ -303,8 +388,6 @@ type petInteractIntention struct {
 // or casting queues the interact for that to end, answered ActionFailed
 // too. Otherwise the interact replaces the current intention, an attack
 // waiting out a bow's reuse or chasing its target included, and runs now.
-// ponytail: a sit-down or stand-up in progress does not queue the interact
-// yet (#2674).
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
 	if live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -504,6 +587,24 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
 		return
 	}
+	target := live.Target()
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if itemAICastBusy(live) {
+		live.deferAction(func() { l.runChangeWaitType(live, stand, target) })
+		return
+	}
+	live.takeDeferredAction()
+	l.runChangeWaitType(live, stand, target)
+}
+
+func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target world.Tracked) {
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// The reference's thinkStand rejects only on real death (denyAiAction),
 	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
 	// removes the FAKE_DEATH effect, whose exit hook stands the player back
@@ -515,7 +616,7 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 		return
 	}
 	if !stand {
-		if target := live.Target(); target != nil && l.sitLiveOnChair(live, target, false) {
+		if target != nil && l.sitLiveOnChair(live, target, false) {
 			return
 		}
 	}
@@ -639,6 +740,14 @@ func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Track
 // target out of reach it goes idle. It reports whether the attempt was
 // accepted — false means the caller should report the action as failed.
 func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked, shift bool) bool {
+	return l.attackLiveTargetWithGate(live, target, shift, true)
+}
+
+func (l *GameClientLink) attackQueuedTarget(live *livePlayer, target world.Tracked, shift bool) bool {
+	return l.attackLiveTargetWithGate(live, target, shift, false)
+}
+
+func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world.Tracked, shift, request bool) bool {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -646,7 +755,7 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 	}
 	// Reference: AttackRequest.java:31 rejects via isOutOfControl()
 	// (Creature.java:652-655) before dispatching to onAction.
-	if liveOutOfControl(live) {
+	if request && liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
@@ -660,12 +769,19 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 	// target the playable attack gate refuses replaces nothing, so it is
 	// answered before the clear: a pickup or pet interact still in flight
 	// completes.
-	if live.combat.RefuseTarget(combatant) {
+	if request && live.combat.RefuseTarget(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	live.takeDeferredAction()
 	live.clearParkedApproaches()
-	if !live.combat.Start(combatant, shift) {
+	var accepted bool
+	if request {
+		accepted = live.combat.Start(combatant, shift)
+	} else {
+		accepted = live.combat.StartIntention(combatant, shift)
+	}
+	if !accepted {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}

@@ -121,6 +121,13 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.FakeDeathRevived, event.Revived:
 		l.broadcastLiveRevive(live)
 	case event.PostureSettled:
+		if live.Standing() {
+			live.releaseChair()
+		}
+		if l.finishDeferredAction(live) {
+			return
+		}
+		l.finishDeferredPickup(live)
 		// A cast queued behind the sit/stand transition runs now, unless a
 		// swing or cast still holds it for its own finish.
 		if !itemAICastBusy(live) {
@@ -298,6 +305,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Evaded:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))
 	case event.AttackFinished:
+		if l.finishDeferredAction(live) {
+			return
+		}
 		// A queued pickup, cast, follow or summon interact took the
 		// intention the swing had when it was queued; whether it started
 		// now, was refused, or is held for PostureSettled, the attack does
@@ -308,6 +318,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 		live.finishAttack()
 	case event.BowShotFinished:
+		if l.finishDeferredAction(live) {
+			return
+		}
 		// A shot's end runs whatever was queued behind it, while the bow
 		// still reloads: a pickup, cast, follow, summon interact or equip
 		// toggle starts now, and an attack is re-thought, which the running
@@ -460,6 +473,9 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
 // target ends.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
+	if l.finishDeferredAction(live) {
+		return
+	}
 	// A queued pickup, item cast or skill request replaced the cast that just
 	// ended as the intention, whether it starts now or not: the ended cast's
 	// nextActionAttack follow-up does not run.
@@ -491,6 +507,23 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		return
 	}
 	live.endCastIntention(def, target)
+}
+
+func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
+	if live == nil || live.detached() || !live.hasDeferredAction() {
+		return false
+	}
+	if itemAICastBusy(live) {
+		return true
+	}
+	if run := live.takeDeferredAction(); run != nil {
+		if live.combat != nil {
+			live.combat.Replace()
+		}
+		run()
+		return true
+	}
+	return false
 }
 
 // endCastIntention ends the CAST intention a cast of def on target held,
