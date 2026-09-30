@@ -10,15 +10,17 @@ import (
 )
 
 // knowingFollowSelf is a player-shaped follower whose known list the test
-// controls.
+// controls and which records every heading set on it.
 type knowingFollowSelf struct {
 	playerFollowSelf
-	forgot  bool
-	stopped int
+	forgot   bool
+	stopped  int
+	headings []int
 }
 
 func (s *knowingFollowSelf) Knows(attackable.Combatant) bool { return !s.forgot }
 func (s *knowingFollowSelf) BroadcastStop()                  { s.stopped++ }
+func (s *knowingFollowSelf) SetHeading(h int)                { s.headings = append(s.headings, h) }
 
 func newPlayerFriendlyFollowController(t *testing.T) (*Controller, *CreatureMove, *knowingFollowSelf) {
 	t.Helper()
@@ -292,15 +294,30 @@ func TestControllerPawnWalkReaimsAndStopsWithinOffset(t *testing.T) {
 }
 
 // The re-aim is 2D and follows a pawn moving sideways too; the stop keeps
-// strictly inside the offset.
+// strictly inside the offset. Each continuing step turns the walker toward
+// the step it took (PlayerMove.updatePosition's setHeadingTo(nextX, nextY)
+// when _pawn != null), so the heading follows the pawn rather than keeping
+// the walk's starting +X heading.
 func TestControllerPawnWalkFollowsSidewaysPawn(t *testing.T) {
-	controller, mover, _, _, _ := newPawnWalkController(t)
+	controller, mover, self, _, _ := newPawnWalkController(t)
 	pawn := &followTarget{x: 300}
 	if !controller.MoveToPawn(pawn, 40) {
 		t.Fatal("MoveToPawn() = false, want the walk accepted")
 	}
+	start := location.Location{}.HeadingTo(location.Location{X: 300})
 	controller.PositionUpdate()
 	pawn.x, pawn.y = 0, 300
+	self.headings = nil
+	before := mover.Position()
+	controller.PositionUpdate()
+	after := mover.Position()
+	want := before.HeadingTo(after)
+	if want == start {
+		t.Fatalf("test setup: the sideways step %+v -> %+v kept the start heading %d", before, after, start)
+	}
+	if len(self.headings) != 1 || self.headings[0] != want {
+		t.Fatalf("headings set on the sideways step = %v, want [%d] (toward %+v, not the start heading %d)", self.headings, want, after, start)
+	}
 	for range 100 {
 		if !mover.Moving() {
 			break
@@ -353,9 +370,14 @@ func TestControllerPlainWalkIgnoresKnownList(t *testing.T) {
 		t.Fatalf("MoveToLocation() = %v, %v; want accepted", ok, err)
 	}
 	self.forgot = true
+	self.headings = nil
 	controller.PositionUpdate()
 	if !mover.Moving() {
 		t.Fatal("a walk to a fixed point ended on a known-list check")
+	}
+	// Only a pawn walk turns the walker on each update.
+	if len(self.headings) != 0 {
+		t.Fatalf("headings set by a plain walk's position update = %v, want none", self.headings)
 	}
 }
 
