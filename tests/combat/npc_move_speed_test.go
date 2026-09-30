@@ -26,13 +26,14 @@ const (
 	speedTestRun  = 132.0
 )
 
-// coveredInOneSecond lets one second pass in position-update steps and
+// coveredInOneSecond lets one second pass in position-update ticks and
 // returns how far the server moved hostile.
 func coveredInOneSecond(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) float64 {
 	t.Helper()
 	from := hostile.Move().Position()
 	for range 10 {
 		srv.Advance(t, 100*time.Millisecond)
+		srv.TickPositions()
 	}
 	return from.Distance2D(hostile.Move().Position())
 }

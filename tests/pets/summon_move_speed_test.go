@@ -10,13 +10,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// petCoveredInOneSecond lets one second pass in position-update steps and
+// petCoveredInOneSecond lets one second pass in position-update ticks and
 // returns how far the server moved the pet.
 func petCoveredInOneSecond(t *testing.T, h *petWorld, petActor *summon.Actor) float64 {
 	t.Helper()
 	from := petActor.Move().Position()
 	for range 10 {
 		h.srv.Advance(t, 100*time.Millisecond)
+		h.srv.TickPositions()
 	}
 	return from.Distance2D(petActor.Move().Position())
 }
