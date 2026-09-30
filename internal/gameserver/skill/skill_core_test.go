@@ -356,6 +356,10 @@ func TestEquipItemStatsWithholdsWeaponPassiveBelowExpertise(t *testing.T) {
 	}
 }
 
+// Two equipped copies of a passive-granting ring apply its modifiers twice
+// but its passive once: the reference's addSkill ignores a skill already
+// known at that level, and the unequip listener keeps the skill while
+// another copy stays equipped (ItemPassiveSkillsListener.onUnequip).
 func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 	templates := itemStatsTestTemplates()
 	inv := itemcontainer.NewPlayerInventory(1, templates)
@@ -376,15 +380,25 @@ func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 		t.Fatalf("EquipItemStats(ring2) error: %v", err)
 	}
 	afterBoth := ch.MAtk()
-	if want := baseMAtk + 2*(5+8); afterBoth != want {
-		t.Fatalf("MAtk() with both rings equipped = %v, want %v", afterBoth, want)
+	if want := baseMAtk + 2*5 + 8; afterBoth != want {
+		t.Fatalf("MAtk() with both rings equipped = %v, want %v (two modifiers, one passive)", afterBoth, want)
 	}
 
 	inv.UnequipSlot(inv.ItemByObjectID(ring1.ObjectID).Snapshot().LocationData)
-	p.UnequipItemStats(ch, inv, ring1, tmpl)
+	if p.UnequipItemStats(ch, inv, ring1, tmpl) {
+		t.Fatal("UnequipItemStats(ring1) skillsChanged = true, want false while ring2 still grants the skill")
+	}
 
 	if got, want := ch.MAtk(), baseMAtk+5+8; got != want {
-		t.Fatalf("MAtk() after unequipping ring1 only = %v, want %v (ring2's own funcs must survive)", got, want)
+		t.Fatalf("MAtk() after unequipping ring1 only = %v, want %v (ring2's modifier and the passive must survive)", got, want)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(ring2.ObjectID).Snapshot().LocationData)
+	if !p.UnequipItemStats(ch, inv, ring2, tmpl) {
+		t.Fatal("UnequipItemStats(ring2) skillsChanged = false, want true for the last copy")
+	}
+	if got := ch.MAtk(); got != baseMAtk {
+		t.Fatalf("MAtk() after unequipping both rings = %v, want %v", got, baseMAtk)
 	}
 }
 

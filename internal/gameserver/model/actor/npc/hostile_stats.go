@@ -36,7 +36,9 @@ func (h *Hostile) StatFuncsAttached(fns []effect.Mod) {
 	h.broadcastModifiedStats(fns)
 }
 
-// RemoveStatsByOwner drops every stat func previously added for owner.
+// RemoveStatsByOwner drops every stat func previously added for owner. An
+// effect a stop-all is ending changes the movement speed only; its
+// observers are sent nothing.
 func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
@@ -51,6 +53,12 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 				modified = append(modified, stat.Stat(s))
 			}
 		}
+	}
+	if owner.Stripped() {
+		if len(modified) > 0 {
+			h.refreshMoveSpeed()
+		}
+		return
 	}
 	h.broadcastModifiedStatsFor(modified)
 }

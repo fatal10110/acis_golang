@@ -20,7 +20,8 @@ const petCorpseTime = 1200 * time.Second
 // die runs a's death sequence once drainHP has marked it dead; drainHP lets
 // exactly one caller through. The summon stops moving, attacking and
 // casting, drops its target, loses the effects that do not last through
-// death, and republishes its status. Observers then see it die
+// death (its owner's pet window is refreshed once after that strip, not per
+// stripped stat change), and republishes its status. Observers then see it die
 // (event.Died) and it goes idle; killer gets its karma for the kill. A
 // summon whose Phoenix Blessing survived the death offers its owner its
 // resurrection, and last the owner is told (event.DeathSettled).
@@ -35,8 +36,12 @@ func (a *Actor) die(killer attackable.Combatant) {
 		a.brain.AbortAll()
 	}
 	a.SetTarget(nil)
-	for range a.EffectList().StopOnDeath() {
+	blessingStops, stripped := a.EffectList().StopOnDeath()
+	for range blessingStops {
 		a.UpdateAbnormalEffect()
+	}
+	if stripped {
+		a.emit(event.OwnerInfoChanged{})
 	}
 	a.BroadcastStatus()
 	a.emit(event.Died{})

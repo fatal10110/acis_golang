@@ -239,27 +239,39 @@ func (l *List) StopAllToggles() {
 	}
 }
 
-// StopAll removes every active effect, running each exit hook.
+// StopAll removes every active effect, running each exit hook. The holder
+// does not announce the stat change of each removal (see ModOwner.Stripped);
+// a player or summon caller refreshes its view once the strip ends, an NPC
+// caller sends nothing.
 func (l *List) StopAll() {
 	if l == nil {
 		return
 	}
 	for _, e := range l.All() {
-		l.Remove(e)
+		l.strip(e)
 	}
 }
 
 // StopAllExceptThoseThatLastThroughDeath removes active effects whose owning
-// skill is not configured to persist through death.
+// skill is not configured to persist through death, leaving their stat
+// changes unannounced as StopAll does.
 func (l *List) StopAllExceptThoseThatLastThroughDeath() {
 	if l == nil {
 		return
 	}
 	for _, e := range l.All() {
 		if !e.Skill.StayAfterDeath {
-			l.Remove(e)
+			l.strip(e)
 		}
 	}
+}
+
+// strip ends e as part of a stop-all: e is marked before its removal, so a
+// stack member promoted in its place still reports its own activation and
+// only e's stat removal goes unannounced.
+func (l *List) strip(e *Effect) {
+	e.strippedAll.Store(true)
+	l.Remove(e)
 }
 
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon

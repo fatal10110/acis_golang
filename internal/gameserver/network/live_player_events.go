@@ -171,8 +171,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	case event.RunSpeedChanged:
-		l.broadcastRunSpeedChange(live)
+	case event.RunSpeedChanged, event.EffectsStripped:
+		l.broadcastFullStatus(live)
 	case event.StatsModified:
 		l.sendModifiedStats(live, e.Attrs)
 	case event.ChargesChanged, event.EtcStatusChanged:

@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -54,6 +55,12 @@ type Effect struct {
 	// Only losing its stack group's head runs onExit, because setInUse(false)
 	// calls it unconditionally (AbstractEffect.java:159-166, EffectList.java:762).
 	startRefused bool
+
+	// strippedAll marks an effect a stop-all is ending. Its holder removes
+	// its stat funcs without reporting the change (see ModOwner.Stripped):
+	// the stop-all's caller refreshes the holder's view once, when the
+	// strip ends. Read by the holder outside the list lock.
+	strippedAll atomic.Bool
 
 	// scheduleMu guards remaining and nextAction. The caster that adds or
 	// dispels this effect starts or stops its schedule from the caster's
