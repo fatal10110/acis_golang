@@ -45,6 +45,10 @@ func craftSkillsPersistence(t *testing.T) *skillstate.Persistence {
 			ID: 1322, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "COMMON_CRAFT", HitTime: 500, StaticHitTime: true,
 		},
+		{
+			ID: 1321, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "DWARVEN_CRAFT", HitTime: 500, StaticHitTime: true,
+		},
 	}), gamesql.NewCharacterSkillStore(db))
 }
 
@@ -461,7 +465,7 @@ func TestCraftSelfRefusals(t *testing.T) {
 		opts     []gameservertest.Option
 		material int32
 		seed     bool
-		prepare  func(t *testing.T, srv *gameservertest.Server, objID int32)
+		prepare  func(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32)
 		check    func(t *testing.T, frames [][]byte)
 	}{
 		{name: "missing material", material: 1, seed: true, check: func(t *testing.T, f [][]byte) {
@@ -471,7 +475,7 @@ func TestCraftSelfRefusals(t *testing.T) {
 				t.Fatalf("status = %d, want 0", got[4])
 			}
 		}},
-		{name: "not enough MP", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, objID int32) {
+		{name: "not enough MP", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, _ *testsupport.ScriptedClient, objID int32) {
 			srv.DrainPlayerMP(t, objID, srv.PlayerCurrentMP(t, objID)-29)
 		}, check: func(t *testing.T, f [][]byte) {
 			requireFrames(t, f, 2)
@@ -480,19 +484,35 @@ func TestCraftSelfRefusals(t *testing.T) {
 				t.Fatalf("craft window = %v, want MP 29 status 0", got)
 			}
 		}},
-		{name: "in combat", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, objID int32) {
+		{name: "in combat", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, _ *testsupport.ScriptedClient, objID int32) {
 			srv.SetPlayerInCombat(t, objID, true)
 		}, check: func(t *testing.T, f [][]byte) {
 			requireFrames(t, f, 1)
 			assertStaticSystemMessage(t, f[0], serverpackets.SystemMessageCantOperateStoreDuringCombat)
 		}},
-		{name: "dead", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, objID int32) {
+		{name: "dead", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, _ *testsupport.ScriptedClient, objID int32) {
 			srv.MarkPlayerDead(t, objID)
 		}, check: func(t *testing.T, f [][]byte) {
 			requireFrames(t, f, 2)
 			assertFrameOpcode(t, f[0], serverpackets.OpcodeActionFailed, "dead craft")
 			recipeMakeInfo(t, f[1])
 		}},
+		{name: "trade request received", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32) {
+			other, _ := enterTradePartner(t, srv, c)
+			other.Send(encodeTradeRequest(objID))
+			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSendTradeRequest, "SendTradeRequest")
+			drainUntilQuiet(t, c)
+		}, check: assertCraftRefusedSilently},
+		{name: "trade open", material: 2, seed: true, prepare: func(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32) {
+			other, otherID := enterTradePartner(t, srv, c)
+			openTrade(t, c, other, objID, otherID)
+			drainUntilQuiet(t, c)
+		}, check: assertCraftRefusedSilently},
+		{
+			name: "recipe above Create Item level", material: 2, seed: true,
+			opts:  []gameservertest.Option{gameservertest.WithRecipes(commonRecipeAtLevel(2))},
+			check: assertCraftRefusedSilently,
+		},
 		{name: "not in book", material: 2, check: func(t *testing.T, f [][]byte) {
 			requireFrames(t, f, 0)
 		}},
@@ -515,7 +535,7 @@ func TestCraftSelfRefusals(t *testing.T) {
 			material := srv.GiveItem(t, objID, commonMaterialID, tc.material)
 			startInWorld(t, c)
 			if tc.prepare != nil {
-				tc.prepare(t, srv, objID)
+				tc.prepare(t, srv, c, objID)
 			}
 			mp := srv.PlayerCurrentMP(t, objID)
 
@@ -530,6 +550,47 @@ func TestCraftSelfRefusals(t *testing.T) {
 			}
 		})
 	}
+}
+
+// assertCraftRefusedSilently expects the reference's quiet craft refusal:
+// ActionFailed, then the craft window with status 0.
+func assertCraftRefusedSilently(t *testing.T, f [][]byte) {
+	t.Helper()
+	requireFrames(t, f, 2)
+	assertFrameOpcode(t, f[0], serverpackets.OpcodeActionFailed, "refused craft")
+	if got := recipeMakeInfo(t, f[1]); got[0] != commonRecipeID || got[4] != 0 {
+		t.Fatalf("craft window = %v, want recipe %d status 0", got, commonRecipeID)
+	}
+}
+
+// enterTradePartner brings a second player into the world next to the
+// crafter and returns its client and object id.
+func enterTradePartner(t *testing.T, srv *gameservertest.Server, crafter *testsupport.ScriptedClient) (*testsupport.ScriptedClient, int32) {
+	t.Helper()
+	partner := srv.SeedCharacterFor(t, "player2", "Partner", 1, 0)
+	other := srv.DialClient(t, "player2", 1)
+	startInWorld(t, other)
+	drainUntilQuiet(t, other)
+	drainUntilQuiet(t, crafter)
+	return other, partner.ID
+}
+
+// commonRecipeAtLevel is the shipped recipe table with the common test
+// recipe raised to level.
+func commonRecipeAtLevel(level int) *recipe.Table {
+	src := gameservertest.RecipeTemplates()
+	var rows []recipe.Recipe
+	for _, id := range []int{dwarvenRecipeID, 2, commonRecipeID} {
+		r, ok := src.Find(id)
+		if !ok {
+			panic("recipe fixture missing")
+		}
+		if r.ID == commonRecipeID {
+			r.Level = level
+		}
+		rows = append(rows, r)
+	}
+	return recipe.NewTable(rows)
 }
 
 // TestCraftSelfManufactureReuse drops a craft sent inside the manufacture
@@ -660,5 +721,88 @@ func TestCommonCraftSkillOpensBook(t *testing.T) {
 	})
 	if typ, _, ids := recipeBookList(t, book); typ != 1 || !slices.Equal(ids, []int32{commonRecipeID}) {
 		t.Fatalf("craft skill page = type %d ids %v", typ, ids)
+	}
+}
+
+// TestCraftSkillBranches casts each craft skill to the end: Create Dwarven
+// Item opens the dwarven page, and either skill landing while the caster
+// runs a store answers CANNOT_CREATE_WHILE_TRADING with no book.
+func TestCraftSkillBranches(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name      string
+		skillID   int32
+		operating bool
+		wantType  int32
+		wantIDs   []int32
+	}{
+		{name: "dwarven craft opens dwarven page", skillID: 1321, wantType: 0, wantIDs: []int32{dwarvenRecipeID}},
+		{name: "common craft while operating", skillID: 1322, operating: true},
+		{name: "dwarven craft while operating", skillID: 1321, operating: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv, objID := bootCraft(t)
+			c := srv.Client
+			knowSkill(t, srv, objID, modelskill.ID(tc.skillID))
+			seedRecipes(t, srv, objID, commonRecipeID, dwarvenRecipeID)
+			startInWorld(t, c)
+			drainUntilQuiet(t, c)
+
+			c.Send(encodeRequestMagicSkillUse(tc.skillID))
+			started := collectUntilQuiet(t, c)
+			if !srv.PlayerCastingNow(t, objID) {
+				t.Fatalf("craft skill %d did not start casting", tc.skillID)
+			}
+			// The store opens mid-cast: the handler, not the cast request,
+			// owns this refusal.
+			if tc.operating {
+				srv.SetPlayerOperating(t, objID, true)
+			}
+			var book, refusal []byte
+			keep := func(f []byte) {
+				switch f[0] {
+				case serverpackets.OpcodeRecipeBookItemList:
+					book = f
+				case serverpackets.OpcodeSystemMessage:
+					if systemMessageID(t, f) == serverpackets.SystemMessageCannotCreateWhileTrading {
+						refusal = f
+					}
+				}
+			}
+			for _, f := range started {
+				keep(f)
+			}
+			srv.AdvanceUntil(t, "craft cast lands", func() bool {
+				for {
+					f := c.ReadWithTimeout(50 * time.Millisecond)
+					if f == nil {
+						return !srv.PlayerCastingNow(t, objID)
+					}
+					keep(f)
+				}
+			})
+			for _, f := range collectUntilQuiet(t, c) {
+				keep(f)
+			}
+			if tc.operating {
+				if book != nil {
+					t.Fatal("craft skill opened the recipe book while operating a store")
+				}
+				if refusal == nil {
+					t.Fatal("craft skill while operating sent no CANNOT_CREATE_WHILE_TRADING")
+				}
+				return
+			}
+			if refusal != nil {
+				t.Fatal("craft skill refused although the caster runs no store")
+			}
+			if book == nil {
+				t.Fatal("craft skill sent no RecipeBookItemList")
+			}
+			if typ, _, ids := recipeBookList(t, book); typ != tc.wantType || !slices.Equal(ids, tc.wantIDs) {
+				t.Fatalf("craft skill %d page = type %d ids %v, want type %d ids %v", tc.skillID, typ, ids, tc.wantType, tc.wantIDs)
+			}
+		})
 	}
 }

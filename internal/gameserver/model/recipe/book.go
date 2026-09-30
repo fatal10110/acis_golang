@@ -20,7 +20,9 @@ type Book struct {
 // hash table the book is specified against, which starts at 16 buckets,
 // doubles once it holds more than three quarters of its size, and also
 // doubles, while under 64 buckets, when a ninth recipe lands in one
-// bucket. The table never shrinks, not even on removal.
+// bucket. The table never shrinks, not even on removal. Once the table has
+// 64 buckets, a ninth recipe in one bucket turns that bucket into a tree,
+// whose order is not insertion order; that order is not modelled here.
 type bookPage struct {
 	// entries is in insertion order.
 	entries []Recipe
