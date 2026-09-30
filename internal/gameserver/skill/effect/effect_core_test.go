@@ -2822,9 +2822,9 @@ func (t *liveEffectTarget) OwnerObject() (world.Tracked, bool)                  
 func (t *liveEffectTarget) TryToFollow(world.Tracked)                              {}
 func (t *liveEffectTarget) RandomConfusionTarget(int) (world.Tracked, bool)        { return nil, false }
 
-// playerStubs supplies the player-only effect surface (except
-// BroadcastAbnormalEffect) as no-ops, so a fake that records abnormal-effect
-// broadcasts can stand in for a player target.
+// playerStubs supplies the player-only effect surface as no-ops, so a fake
+// that records abnormal-mask changes and appearance refreshes can stand in
+// for a player target.
 type playerStubs struct{}
 
 func (playerStubs) IncreaseCharges(int, int) bool        { return false }
@@ -3375,5 +3375,94 @@ func TestPeriodRemainingTracksCurrentTickPeriod(t *testing.T) {
 	unscheduled.startSchedule(start)
 	if got := unscheduled.periodRemaining(start.Add(time.Hour)); got != 0 {
 		t.Errorf("no-period effect: periodRemaining = %d, want 0", got)
+	}
+}
+
+// maskRecordingTarget is a liveEffectTarget that also records the abnormal
+// mask set and cleared on it, so the template-abnormal chain can be ordered
+// against a kind's own hook events.
+type maskRecordingTarget struct {
+	*liveEffectTarget
+}
+
+func (t maskRecordingTarget) StartAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("start:%#x", mask))
+}
+
+func (t maskRecordingTarget) StopAbnormalEffect(mask int) {
+	t.events = append(t.events, fmt.Sprintf("stop:%#x", mask))
+}
+
+// TestTemplateAbnormalChainsAfterKindHooks pins wireTemplateAbnormal's
+// ownership split: a kind whose hook defers to the default one runs its own
+// work first and then sets (start) or clears (exit) the template mask; a
+// kind that owns a hook outright never touches the mask there, while its
+// other, default hook still does.
+func TestTemplateAbnormalChainsAfterKindHooks(t *testing.T) {
+	const mask = 0x4000
+	set, clear := fmt.Sprintf("start:%#x", mask), fmt.Sprintf("stop:%#x", mask)
+	tests := []struct {
+		name      string
+		setup     func(*liveEffectTarget)
+		wantStart []string
+		wantExit  []string
+	}{
+		// Own start and exit work, then the default hook's mask.
+		{name: "Invincible", wantStart: []string{"invul:true", set, "abnormal"}, wantExit: []string{"invul:false", clear, "abnormal"}},
+		// No hooks of its own: the mask is all it does.
+		{name: "Buff", wantStart: []string{set, "abnormal"}, wantExit: []string{clear, "abnormal"}},
+		// Owns both hooks: the mask never appears.
+		{name: "Stun", wantStart: []string{"abort:false", "idle", "abnormal"}, wantExit: []string{"abnormal"}},
+		// Owns only its start hook: no set on start, the default exit still clears.
+		{name: "Heal", setup: func(t *liveEffectTarget) { t.canBeHealed, t.healEffectiveness = true, 100 }, wantStart: []string{"add-hp:10", "add-hp:10"}, wantExit: []string{clear, "abnormal"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inner := &liveEffectTarget{list: newTestList(nil)}
+			if tt.setup != nil {
+				tt.setup(inner)
+			}
+			e, err := New(Skill{}, modelskill.EffectTemplate{Name: tt.name, Value: 10, AbnormalEffect: mask})
+			if err != nil {
+				t.Fatalf("New(%q) error: %v", tt.name, err)
+			}
+			e.Effected = maskRecordingTarget{inner}
+
+			if !e.OnStart(e) {
+				t.Fatalf("%s OnStart() = false, want true", tt.name)
+			}
+			if !reflect.DeepEqual(inner.events, tt.wantStart) {
+				t.Fatalf("%s start events = %#v, want %#v", tt.name, inner.events, tt.wantStart)
+			}
+			inner.events = nil
+			e.OnExit(e)
+			if !reflect.DeepEqual(inner.events, tt.wantExit) {
+				t.Fatalf("%s exit events = %#v, want %#v", tt.name, inner.events, tt.wantExit)
+			}
+		})
+	}
+}
+
+// TestTemplateAbnormalSkippedWhenKindDeclinesStart proves a chained start
+// hook that refuses the effect leaves the template mask unset: the default
+// hook runs only after the kind's own work succeeded.
+func TestTemplateAbnormalSkippedWhenKindDeclinesStart(t *testing.T) {
+	inner := &liveEffectTarget{list: newTestList(nil)}
+	e := &Effect{
+		Type:     TypeInvincible,
+		Template: modelskill.EffectTemplate{AbnormalEffect: 0x4000},
+		Effected: maskRecordingTarget{inner},
+		OnStart: func(e *Effect) bool {
+			inner.events = append(inner.events, "declined")
+			return false
+		},
+	}
+	wireTemplateAbnormal(e)
+
+	if e.OnStart(e) {
+		t.Fatal("OnStart() = true, want false: the kind's own hook declined")
+	}
+	if want := []string{"declined"}; !reflect.DeepEqual(inner.events, want) {
+		t.Fatalf("events = %#v, want %#v: a declined start must not set the template mask", inner.events, want)
 	}
 }
