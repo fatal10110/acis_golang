@@ -116,9 +116,12 @@ func (a *Actor) Level() int {
 }
 
 // UpdateStatus reports that this summon's current status must be
-// republished to its owner's pet window and observers. A vitals setter uses
-// BroadcastStatus instead, which also reaches the players targeting it.
+// republished to its owner's pet window and observers. A pet first
+// refreshes its weight-penalty band; a band change republishes the status
+// once more before this one. A vitals setter uses BroadcastStatus instead,
+// which also reaches the players targeting it.
 func (a *Actor) UpdateStatus() {
+	a.refreshWeightPenalty()
 	a.emit(event.StatusChanged{})
 }
 

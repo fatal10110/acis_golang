@@ -133,6 +133,12 @@ type Actor struct {
 	// hand-off to the movement, so the last refresh to run always sets the
 	// speed that the latest stat funcs give.
 	speedMu sync.Mutex
+	// weightPenalty is a pet's weight-penalty band, read lock-free by the
+	// speed and regeneration formulas. weightPenaltyMu serializes a
+	// refresh's read of the carried weight with its store, so the last
+	// refresh to run always leaves the band the latest weight gives.
+	weightPenalty   atomic.Int32
+	weightPenaltyMu sync.Mutex
 	// queue is the queue this summon's work runs on: its owner's, set once
 	// before the summon is published, and a queue of its own once its corpse
 	// outlives its owner's session (AdoptCorpseQueue), revived or not.
