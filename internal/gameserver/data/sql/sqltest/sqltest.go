@@ -4,29 +4,12 @@
 package sqltest
 
 import (
-	"context"
 	"database/sql"
-	"sync"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/dbtest"
 	_ "github.com/go-sql-driver/mysql"
 )
-
-// sharedTables lists every table SharedDB empties between tests (no
-// cross-table FKs today, so order doesn't matter, but keep it in sync with
-// the CREATE TABLE calls below).
-var sharedTables = []string{
-	"characters", "items", "augmentations", "spawn_data",
-	"items_on_ground", "character_skills", "character_shortcuts",
-	"character_hennas", "pets", "character_skills_save", "seven_signs_status",
-}
-
-// sharedReseeds restores shipped seed rows that the cleanup removes, keyed by
-// table, so every test starts from the schema's default data.
-var sharedReseeds = map[string]string{
-	"seven_signs_status": sevenSignsStatusSeed,
-}
 
 // charactersSchema mirrors the shipped characters table definition verbatim.
 const charactersSchema = "CREATE TABLE IF NOT EXISTS characters (\n" +
@@ -240,101 +223,28 @@ const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
 // NewDB creates a fresh database on the shared MariaDB instance (see
 // internal/dbtest), creates the gameserver tables used by integration
 // tests, and returns a pool connected to it. The database is dropped and
-// the pool closed when the test completes.
+// the pool closed when the test completes. Prefer SharedDB; NewDB is for
+// store-level tests that want a database no other test has touched.
 func NewDB(t *testing.T) *sql.DB {
 	t.Helper()
-	return dbtest.NewDB(t, schemaStmts...)
+	return dbtest.NewDB(t, append(append([]string(nil), schemaStmts...), seedStmts...)...)
 }
+
+// SharedDB returns tb's database from a per-test-binary pool of databases
+// carrying the gameserver schema (see dbtest.Pool). The package's TestMain
+// must call dbtest.Main.
+func SharedDB(tb testing.TB) *sql.DB {
+	tb.Helper()
+	return pool.DB(tb)
+}
+
+var pool = dbtest.NewPool(dbtest.PoolConfig{Schema: schemaStmts, Seed: seedStmts})
 
 var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, petsSchema, characterSkillsSaveSchema,
-	sevenSignsStatusSchema, sevenSignsStatusSeed,
+	sevenSignsStatusSchema,
 }
 
-type pooledDB struct {
-	db   *sql.DB
-	name string
-}
-
-var (
-	sharedMu   sync.Mutex
-	sharedFree []*sql.DB
-	sharedAll  []pooledDB
-	sharedHeld = map[testing.TB]*sql.DB{}
-)
-
-// SharedDB returns a MariaDB pool for tb, backed by a database on the shared
-// instance. Databases are pooled per test binary: a test checks one out and
-// returns it, emptied, when it completes, so parallel tests each hold their
-// own database while sequential tests reuse one. Repeated calls from the
-// same test return the same database; a t.Run subtest is a different test
-// and gets a different database from its parent. The package's TestMain must call Main
-// so every pooled database is dropped once, after the package's tests.
-func SharedDB(tb testing.TB) *sql.DB {
-	tb.Helper()
-	sharedMu.Lock()
-	if db, ok := sharedHeld[tb]; ok {
-		sharedMu.Unlock()
-		return db
-	}
-	var db *sql.DB
-	if n := len(sharedFree); n > 0 {
-		db = sharedFree[n-1]
-		sharedFree = sharedFree[:n-1]
-	}
-	sharedMu.Unlock()
-
-	if db == nil {
-		name := dbtest.NewName()
-		opened, err := dbtest.Open(context.Background(), name, schemaStmts...)
-		if err != nil {
-			tb.Fatalf("shared mariadb db: %v", err)
-		}
-		db = opened
-		sharedMu.Lock()
-		sharedAll = append(sharedAll, pooledDB{db: db, name: name})
-		sharedMu.Unlock()
-	}
-	sharedMu.Lock()
-	sharedHeld[tb] = db
-	sharedMu.Unlock()
-
-	// DELETE rather than TRUNCATE: TRUNCATE is InnoDB DDL that drops and
-	// recreates the tablespace under the server-wide dictionary lock, so
-	// cleanups from every parallel test and concurrent `go test` run on the
-	// shared instance queue behind one another. None of these tables uses
-	// AUTO_INCREMENT, so DELETE leaves them in the same state.
-	tb.Cleanup(func() {
-		ctx := context.Background()
-		for _, table := range sharedTables {
-			if _, err := db.ExecContext(ctx, "DELETE FROM `"+table+"`"); err != nil {
-				tb.Fatalf("clear %s: %v", table, err)
-			}
-			if seed, ok := sharedReseeds[table]; ok {
-				if _, err := db.ExecContext(ctx, seed); err != nil {
-					tb.Fatalf("reseed %s: %v", table, err)
-				}
-			}
-		}
-		sharedMu.Lock()
-		delete(sharedHeld, tb)
-		sharedFree = append(sharedFree, db)
-		sharedMu.Unlock()
-	})
-	return db
-}
-
-// Main runs a package's tests and drops every SharedDB database afterward.
-// Every package using SharedDB must call it from a TestMain:
-//
-//	func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
-func Main(m *testing.M) int {
-	code := m.Run()
-	for _, p := range sharedAll {
-		p.db.Close()
-		dbtest.Drop(p.name)
-	}
-	return code
-}
+var seedStmts = []string{sevenSignsStatusSeed}

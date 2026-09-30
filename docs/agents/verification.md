@@ -88,8 +88,8 @@ tears down each container it starts.
 
 `sqltest.NewDB(t)` creates a fresh database and applies the schema for that single test. For a
 package with many persistence tests, repeating the schema dominates wall-clock time.
-`sqltest.SharedDB(tb)` instead checks a database out of a per-test-binary pool (Go compiles each
-package's tests into its own binary, so the pool is per package). The test holds it until its
+`sqltest.SharedDB(tb)` instead checks a database out of a per-test-binary `dbtest.Pool` (Go
+compiles each package's tests into its own binary, so the pool is per package). The test holds it until its
 `tb.Cleanup`, which empties the tables and returns it. Sequential tests therefore reuse one
 database, and each test running at the same time under `t.Parallel()` gets its own. Repeated
 calls with the same `tb` return the same database.
@@ -104,11 +104,13 @@ The pooled databases outlive individual tests, so a package using `SharedDB` mus
 `TestMain` that drops them once, after every test in the package has run:
 
 ```go
-func TestMain(m *testing.M) { os.Exit(sqltest.Main(m)) }
+func TestMain(m *testing.M) { os.Exit(dbtest.Main(m)) }
 ```
 
-Without it, the package's databases leak on the shared MariaDB instance and pile up across local
-runs. Add it to any new package that adopts `SharedDB`.
+Without it the pooled databases would leak on the shared MariaDB instance, so `SharedDB` fails the
+test when the package's `TestMain` does not call `dbtest.Main`. Add it to any new package that
+adopts `SharedDB`. Another schema gets its own pool the same way `sqltest` does:
+`dbtest.NewPool(dbtest.PoolConfig{Schema: ..., Seed: ...})`.
 
 Use `NewDB` instead of `SharedDB` for a test that mutates the schema itself (e.g. dropping a table to
 force a downstream failure), because the database goes back to the pool for the package's next test.

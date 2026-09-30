@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -14,7 +14,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(sqltest.Main(m))
+	os.Exit(dbtest.Main(m))
 }
 
 func encodeRequestGameStart(slot int32) []byte {
