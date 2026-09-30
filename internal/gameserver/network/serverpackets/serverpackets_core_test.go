@@ -2215,6 +2215,18 @@ func TestFrameRideMountWyvern(t *testing.T) {
 	}
 }
 
+// TestFrameRideMountTypes pins Ride's ride type switch (Ride.java:19-28):
+// the three striders ride as type 1, the wyvern as type 2, any other NPC
+// as 0.
+func TestFrameRideMountTypes(t *testing.T) {
+	for npcID, want := range map[int32]uint32{12526: 1, 12527: 1, 12528: 1, 12621: 2, 12077: 0} {
+		got := framePayload(t, FrameRide(7, npcID))
+		if v := binary.LittleEndian.Uint32(got[1+2*4:]); v != want {
+			t.Fatalf("Ride(%d) ride type = %d, want %d", npcID, v, want)
+		}
+	}
+}
+
 // TestFrameDismount pins Ride(objectId, ACTION_DISMOUNT, 0): no ride type
 // and the bare 1000000 class offset.
 func TestFrameDismount(t *testing.T) {

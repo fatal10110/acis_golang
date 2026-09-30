@@ -72,9 +72,9 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(c.PvPFlagState()))
 	w.WriteInt32(int32(c.Karma()))
 
-	runSpd := int32(t.RunSpeed)
-	walkSpd := int32(t.WalkSpeed)
-	swimSpd := int32(t.SwimSpeed)
+	runSpd := int32(c.BaseRunSpeed())
+	walkSpd := int32(c.BaseWalkSpeed())
+	swimSpd := int32(c.BaseSwimSpeed())
 	w.WriteInt32(runSpd)
 	w.WriteInt32(walkSpd)
 	w.WriteInt32(swimSpd)

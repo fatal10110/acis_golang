@@ -12,8 +12,9 @@ import (
 // mountFeedPeriod is the fixed rate a rider's mount eats at.
 const mountFeedPeriod = 10 * time.Second
 
-// MountFeed is a mount's feeding data at the level its rider mounted it.
-type MountFeed struct {
+// MountData is a mount's pet data at the level its rider mounted it: how it
+// is fed, and how fast it carries its rider.
+type MountData struct {
 	MaxMeal int
 	// MealInNormal is the mount's ride rate out of combat. MealInBattle is
 	// its unmounted battle rate: a rider in combat pays that one, not the
@@ -21,20 +22,35 @@ type MountFeed struct {
 	MealInNormal, MealInBattle int
 	Food1, Food2               int32
 	AutoFeedLimit              float64
+	// HungryLimit is the share of MaxMeal below which a fed mount is
+	// hungry and carries its rider at half its speeds.
+	HungryLimit float64
+	// RunSpeed, SwimSpeed and FlySpeed are the mount's base speeds on land,
+	// in water and in the air; AtkSpd is its rider's base P.Atk. speed on a
+	// strider.
+	RunSpeed, SwimSpeed, FlySpeed int
+	AtkSpd                        float64
 }
 
-// MountFeeds resolves a mount's feeding data for a rider of level.
-type MountFeeds interface {
-	MountFeed(npcID int32, level int) (MountFeed, bool)
+// MountDataSource resolves a mount's pet data for a rider of level.
+type MountDataSource interface {
+	MountData(npcID int32, level int) (MountData, bool)
 }
 
 // mountFeedState is the feed gauge of the mount a character rides. mu
 // guards it: the feed task runs on the rider's queue, while a killer's or a
 // reviver's queue stops and restarts it.
 type mountFeedState struct {
-	mu      sync.Mutex
-	data    MountFeed
+	mu   sync.Mutex
+	data MountData
+	// found is whether the ridden mount has pet data for its level at all;
+	// without it the rider keeps its own speeds.
+	found   bool
 	canFeed bool
+	// fed is set by the first feed start on this character and never
+	// cleared, and current survives a dismount: until a new mount's feed
+	// starts, its hunger is judged by the gauge the last mount left.
+	fed     bool
 	current int
 	ticker  *sim.Ticker
 	// gen tells a tick of a stopped task from one of the running task.
@@ -64,6 +80,11 @@ func (f *mountFeedState) gaugeLocked(inCombat bool) event.MountFeedGauge {
 	}
 }
 
+// hungryLocked reports whether the mount is fed below its hungry limit.
+func (f *mountFeedState) hungryLocked() bool {
+	return f.fed && float64(f.current) < float64(f.data.MaxMeal)*f.data.HungryLimit
+}
+
 func (f *mountFeedState) stopLocked() {
 	f.gen++
 	if f.ticker != nil {
@@ -72,20 +93,21 @@ func (f *mountFeedState) stopLocked() {
 	}
 }
 
-// loadMountFeed resolves the feeding data of the mount npcID for the
-// character's current level. A mount with no usable data is never fed.
+// loadMountFeed resolves the pet data of the mount npcID for the
+// character's current level. A mount with no usable feeding data is never
+// fed. The gauge is left as it was until the feed starts.
 func (c *Character) loadMountFeed(npcID int32) {
-	var data MountFeed
-	ok := false
-	if c.mountFeeds != nil {
-		data, ok = c.mountFeeds.MountFeed(npcID, c.Level())
+	var data MountData
+	found := false
+	if c.mountData != nil {
+		data, found = c.mountData.MountData(npcID, c.Level())
 	}
-	ok = ok && data.MaxMeal > 0 && data.MealInNormal > 0 && data.MealInBattle > 0
+	ok := found && data.MaxMeal > 0 && data.MealInNormal > 0 && data.MealInBattle > 0
 	f := &c.mountFeed
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.stopLocked()
-	f.data, f.canFeed, f.current = data, ok, 0
+	f.data, f.found, f.canFeed = data, found, ok
+	f.mu.Unlock()
 }
 
 // StartMountFeed fills the ridden mount's gauge and shows it, then, unless
@@ -104,12 +126,14 @@ func (c *Character) StartMountFeed() {
 		return
 	}
 	f.stopLocked()
+	f.fed = true
 	gauge := f.setCurrentLocked(f.data.MaxMeal, inCombat)
 	if q := c.Queue(); q != nil && !c.Dead() {
 		gen := f.gen
 		f.ticker = q.Every(mountFeedPeriod, func() { c.tickMountFeed(gen) })
 	}
 	f.mu.Unlock()
+	c.refreshMoveSpeed()
 	// Setting the gauge shows it, and starting the feed shows it again.
 	c.emit(gauge)
 	c.emit(gauge)
@@ -138,6 +162,7 @@ func (c *Character) AddMountFeed(amount int) {
 	}
 	gauge := f.setCurrentLocked(f.current+amount, inCombat)
 	f.mu.Unlock()
+	c.refreshMoveSpeed()
 	c.emit(gauge)
 }
 
@@ -162,6 +187,7 @@ func (c *Character) tickMountFeed(gen uint64) {
 		food1, food2 := f.data.Food1, f.data.Food2
 		hungry := float64(f.current) < float64(f.data.MaxMeal)*f.data.AutoFeedLimit
 		f.mu.Unlock()
+		c.refreshMoveSpeed()
 		c.emit(gauge)
 		c.autoFeedMount(food1, food2, hungry)
 		return
@@ -202,7 +228,7 @@ func (c *Character) Dismount() bool {
 		return false
 	}
 	wasFlying := c.flying
-	c.mountNPCID, c.mountObjectID, c.mountType = 0, 0, 0
+	c.mountNPCID, c.mountObjectID, c.mountType, c.mountLevel = 0, 0, 0, 0
 	c.flying = false
 	c.stateMu.Unlock()
 	if wasFlying {
@@ -212,8 +238,9 @@ func (c *Character) Dismount() bool {
 	f := &c.mountFeed
 	f.mu.Lock()
 	f.stopLocked()
-	f.data, f.canFeed = MountFeed{}, false
+	f.data, f.found, f.canFeed = MountData{}, false, false
 	f.mu.Unlock()
+	c.refreshMoveSpeed()
 	c.emit(event.Dismounted{})
 	return true
 }
