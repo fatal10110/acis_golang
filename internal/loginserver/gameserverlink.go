@@ -324,7 +324,7 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 	host := auth.HostName
 	if host != "*" {
 		if resolved, err := l.lookupHost(host); err == nil && len(resolved) > 0 {
-			host = resolved[0]
+			host = advertisedAddress(resolved)
 		} else {
 			l.log.Error().Str("host", host).Err(err).Msg("gameserver link: couldn't resolve hostname")
 			host = c.remoteIP.String()
@@ -352,6 +352,18 @@ func (l *GameServerLink) onGameServerAuth(ctx context.Context, c *gameServerConn
 		return false
 	}
 	return true
+}
+
+// advertisedAddress picks the address a registering server is advertised on
+// from a non-empty resolver result: the first IPv4 address, because the
+// server list carries four address bytes, else the first address.
+func advertisedAddress(resolved []string) string {
+	for _, addr := range resolved {
+		if ip4 := net.ParseIP(addr).To4(); ip4 != nil {
+			return ip4.String()
+		}
+	}
+	return resolved[0]
 }
 
 func (l *GameServerLink) persistRegistration(ctx context.Context, id int, hexID []byte, host string) {
