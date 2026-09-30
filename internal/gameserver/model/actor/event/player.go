@@ -258,8 +258,12 @@ const (
 	// or a single enchanted item's enchant level.
 	ObtainPickup
 	// ObtainCreated names an item created by template id, such as an
-	// auto-looted kill reward: a stack's count as an item number.
+	// auto-looted kill reward or an opened capsule's product: a stack's
+	// count as an item number.
 	ObtainCreated
+	// ObtainEarned names an item earned by template id, such as a swept
+	// spoil: a stack's count as an item number.
+	ObtainEarned
 )
 
 // AttackRequested reports an aggression effect provoking an attack on Target.

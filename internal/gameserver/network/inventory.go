@@ -581,9 +581,14 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 // itemObtainedFrame is the chat line naming items that reached a player's
 // inventory. Adena names only its amount. A picked-up item names a stack's
 // count as a plain number and a single enchanted item's enchant level; an
-// item created by id names a stack's count as an item number.
+// item created by id names a stack's count as an item number. An earned
+// item reads as earned rather than picked up.
 func itemObtainedFrame(e event.ItemObtained) wire.Frame {
 	switch {
+	case e.Notice == event.ObtainEarned && e.Count > 1:
+		return serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageEarnedS2S1S, e.ItemID, int32(e.Count))
+	case e.Notice == event.ObtainEarned:
+		return serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, e.ItemID)
 	case e.Notice == event.ObtainAdena:
 		return serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, int32(e.Count))
 	case e.Count > 1 && e.Notice == event.ObtainPickup:

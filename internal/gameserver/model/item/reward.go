@@ -28,8 +28,13 @@ func RollKillReward(categories []DropCategory, pool *SpoilPool, levelMultiplier 
 
 		switch cat.Kind {
 		case DropSpoil:
-			for id, qty := range rolled {
-				pool.Add(id, qty)
+			// The pool keeps the order items are added in, which Sweep
+			// reads; add them in the category's drop order.
+			for _, d := range cat.Drops {
+				if qty, ok := rolled[d.ItemID]; ok {
+					pool.Add(d.ItemID, qty)
+					delete(rolled, d.ItemID)
+				}
 			}
 		case DropHerb:
 			for id, qty := range rolled {

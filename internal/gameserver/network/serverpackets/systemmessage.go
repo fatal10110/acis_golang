@@ -26,6 +26,8 @@ const (
 	SystemMessageSkillReadyToUseAgain              = 2015
 	SystemMessageS1HasBeenActivated                = 2012
 	SystemMessageEarnedS2S1S                       = 53
+	SystemMessageEarnedItemS1                      = 54 // item-name parameter
+	SystemMessageNothingInsideThat                 = 1669
 	SystemMessageNothingHappened                   = 61
 	SystemMessageS1SuccessfullyEnchanted           = 62
 	SystemMessageS1S2SuccessfullyEnchanted         = 63

@@ -300,6 +300,76 @@ func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool 
 	return true
 }
 
+// ItemSlotsNeeded reports how many new inventory slots count units of
+// itemID would take in this character's inventory: none for a held
+// stackable, one for a new stack, one per unit of a non-stackable.
+func (c *Character) ItemSlotsNeeded(itemID int32, count int) int {
+	if c.inventory == nil {
+		return count
+	}
+	return c.inventory.SlotsNeededForItemID(itemID, count)
+}
+
+// ItemSlotsFit reports whether slots more stacks fit within this
+// character's inventory slot limit.
+func (c *Character) ItemSlotsFit(slots int) bool {
+	return c.inventory != nil && c.inventory.ValidateCapacity(slots)
+}
+
+// AddCreatedItem creates count units of itemID in this live character's
+// inventory, named in chat as picked up, the way an opened capsule hands
+// over its product. nextID allocates each new instance's object id. It
+// reports whether anything was added or, for a herb, applied.
+func (c *Character) AddCreatedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	return c.createItem(itemID, count, nextID, event.ObtainCreated)
+}
+
+// AddEarnedItem creates count units of itemID in this live character's
+// inventory, named in chat as earned, the way a sweep or a harvest pays
+// out. nextID allocates each new instance's object id. It reports whether
+// anything was added or, for a herb, applied.
+func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	return c.createItem(itemID, count, nextID, event.ObtainEarned)
+}
+
+// createItem creates count units of itemID by template id: a herb is
+// applied at once instead of carried, a stackable joins the held stack or
+// starts one, and a non-stackable arrives as one instance per unit. The
+// items are then named in chat as notice says. Slot and weight limits are
+// the caller's to check first.
+func (c *Character) createItem(itemID int32, count int, nextID func() (int32, error), notice event.ObtainNotice) bool {
+	if c.inventory == nil || count < 1 || nextID == nil {
+		return false
+	}
+	tmpl, ok := c.inventory.Templates().Get(itemID)
+	if !ok {
+		return false
+	}
+	if tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb {
+		return c.ConsumeHerb(itemID)
+	}
+	instances := 1
+	if !tmpl.Stackable {
+		instances = count
+	}
+	added := 0
+	for range instances {
+		id, err := nextID()
+		if err != nil || c.inventory.AddNew(itemID, count, id) == nil {
+			break
+		}
+		added++
+	}
+	if added == 0 {
+		return false
+	}
+	if !tmpl.Stackable {
+		count = added
+	}
+	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
+	return true
+}
+
 // ItemAdded runs the side effects of items already added to this
 // character's inventory, shared by every path that grants items: it names
 // them in chat, then, for arrows reaching a bow user whose left hand is

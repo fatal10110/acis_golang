@@ -1,6 +1,10 @@
 package item
 
-import "sync"
+import (
+	"cmp"
+	"slices"
+	"sync"
+)
 
 // SpoilPool holds one monster's spoil state across a single life: whether a
 // player has marked it for spoil, and — once marked — the pool of items its
@@ -13,7 +17,13 @@ import "sync"
 type SpoilPool struct {
 	mu        sync.Mutex
 	spoilerID int32
-	items     map[int32]int32
+	items     []SpoilItem // one entry per item id, in the order first added
+}
+
+// SpoilItem is one pooled item id and its amount.
+type SpoilItem struct {
+	ItemID int32
+	Count  int32
 }
 
 // IsSpoiled reports whether a player has successfully marked the monster
@@ -50,10 +60,13 @@ func (p *SpoilPool) Mark(spoilerID int32) bool {
 func (p *SpoilPool) Add(itemID, quantity int32) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.items == nil {
-		p.items = make(map[int32]int32, 1)
+	for i := range p.items {
+		if p.items[i].ItemID == itemID {
+			p.items[i].Count += quantity
+			return
+		}
 	}
-	p.items[itemID] += quantity
+	p.items = append(p.items, SpoilItem{ItemID: itemID, Count: quantity})
 }
 
 // Sweepable reports whether the pool holds anything left to harvest.
@@ -65,12 +78,29 @@ func (p *SpoilPool) Sweepable() bool {
 
 // Sweep drains and returns the pooled items, clearing the spoil state. A
 // second call returns nothing.
-func (p *SpoilPool) Sweep() map[int32]int32 {
+//
+// The items come in hash-bucket order, the order a sweep has always named
+// them in: by the bucket an item id falls in within a table of 16 buckets,
+// doubled while the pool fills more than three quarters of it, and in the
+// order they were added within one bucket.
+func (p *SpoilPool) Sweep() []SpoilItem {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	items := p.items
 	p.spoilerID = 0
 	p.items = nil
+	p.mu.Unlock()
+
+	buckets := uint32(16)
+	for uint32(len(items)) > buckets/4*3 {
+		buckets *= 2
+	}
+	bucket := func(id int32) uint32 {
+		h := uint32(id)
+		return (h ^ h>>16) & (buckets - 1)
+	}
+	slices.SortStableFunc(items, func(a, b SpoilItem) int {
+		return cmp.Compare(bucket(a.ItemID), bucket(b.ItemID))
+	})
 	return items
 }
 

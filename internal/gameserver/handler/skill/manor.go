@@ -80,23 +80,24 @@ type harvestCaster interface {
 	Level() int
 }
 
-// earner receives an item a harvest, sweep or extraction rewards directly
-// to its owner (as opposed to a party distribution, which an optional
-// interface layers on top).
+// earner is a player caster that takes the items a harvest or a sweep
+// pays out as earned.
 type earner interface {
-	AddEarnedItem(itemID int32, count int)
+	AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool
 }
 
-type harvestHandler struct{}
+// harvestHandler harvests crops. Without ids it cannot create the crop and
+// harvests nothing.
+type harvestHandler struct{ ids objectIDAllocator }
 
 func (harvestHandler) Types() []string { return []string{"HARVEST"} }
 
 // Use harvests the first target's sown crop into the caster's inventory,
 // when the target is seeded, unharvested, the caster is allowed to harvest
 // it, and the harvest roll succeeds.
-func (harvestHandler) Use(cast Cast) {
+func (h harvestHandler) Use(cast Cast) {
 	caster, ok := cast.Caster.(harvestCaster)
-	if !ok {
+	if !ok || h.ids == nil {
 		return
 	}
 	if len(cast.Targets) == 0 {
@@ -121,6 +122,6 @@ func (harvestHandler) Use(cast Cast) {
 
 	itemID, count := state.HarvestedCrop()
 	if e, ok := cast.Caster.(earner); ok {
-		e.AddEarnedItem(itemID, count)
+		e.AddEarnedItem(itemID, count, h.ids.NextID)
 	}
 }

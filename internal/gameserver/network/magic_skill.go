@@ -927,6 +927,14 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 			}
+		case skillhandler.SlotsFullMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+			}
+		case skillhandler.NothingInsideMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
+			}
 		case skillhandler.MagicResist:
 			target, online := l.livePlayerByID(m.TargetID)
 			if !online {
