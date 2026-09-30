@@ -116,6 +116,11 @@ type PlayerActor interface {
 	MarkRecentFakeDeath()
 	HPFull() bool
 
+	// ReduceHPByToggleUpkeep takes a toggle skill's own damage-over-time
+	// upkeep as spent HP: the tick lands like ReduceHPByDOT's but never
+	// wakes the player or stands it up.
+	ReduceHPByToggleUpkeep(damage float64, effector Actor)
+
 	SendRegenMax(count, period int32, hpRegen float64)
 	NotifyEffectRemovedDueLackHP(*Effect)
 	NotifyEffectRemovedDueLackMP(*Effect)

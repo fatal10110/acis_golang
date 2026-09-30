@@ -736,6 +736,11 @@ func (t *liveEffectTarget) ReduceHPByDOT(damage float64, effector Actor, isDOT b
 	t.events = append(t.events, fmt.Sprintf("dot:%g:%v", damage, effector))
 }
 
+func (t *liveEffectTarget) ReduceHPByToggleUpkeep(damage float64, effector Actor) {
+	t.hp -= damage
+	t.events = append(t.events, fmt.Sprintf("upkeep:%g:%v", damage, effector))
+}
+
 // ReduceMP mirrors the production actors' clamp-at-zero semantics (see
 // Character.ReduceMP/Hostile.ReduceMP): a target already at 0 MP applies
 // and returns 0 rather than going negative, so tests can exercise the
@@ -2837,6 +2842,8 @@ func (playerStubs) NotifyHPRestored(string, int, bool)   {}
 func (playerStubs) NotifyMPRestored(string, int, bool)   {}
 func (playerStubs) NotifySpoilAlready()                  {}
 func (playerStubs) NotifySpoilSuccess()                  {}
+
+func (playerStubs) ReduceHPByToggleUpkeep(float64, Actor) {}
 
 // abnormalPlayerTarget is a player-shaped growEffectTarget.
 type abnormalPlayerTarget struct {
