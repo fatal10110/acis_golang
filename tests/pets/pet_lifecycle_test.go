@@ -185,7 +185,7 @@ func TestPetPickupAttentionAnnouncedToObservers(t *testing.T) {
 					t.Fatalf("%s pet pickup produced no attention 1535 for the %s", tc.name, who)
 				}
 				assertPetPickupPlainParams(t, msg, "Owner", tc.templateID)
-				assertDeletedBeforeAttention(t, who, frames, groundID)
+				assertDeletedBeforeAttention(t, who, frames, groundID, serverpackets.SystemMessageAttentionS1PetPickedUpS2)
 			}
 		})
 	}
@@ -235,6 +235,7 @@ func TestPetPickupAttentionEnchantedWeapon(t *testing.T) {
 			t.Fatalf("enchanted weapon pet pickup produced no attention 1536 for the %s", who)
 		}
 		assertPetPickupEnchantParams(t, msg, "Owner", 7, 30)
+		assertDeletedBeforeAttention(t, who, frames, groundID, serverpackets.SystemMessageAttentionS1PetPickedUpS2S3)
 	}
 }
 
@@ -331,15 +332,15 @@ func systemMessageID(t *testing.T, frame []byte) int {
 }
 
 // assertDeletedBeforeAttention requires the looted item's DeleteObject to
-// reach who before the pet pickup attention line.
-func assertDeletedBeforeAttention(t *testing.T, who string, frames [][]byte, groundID int32) {
+// reach who before the pet pickup attention line messageID.
+func assertDeletedBeforeAttention(t *testing.T, who string, frames [][]byte, groundID int32, messageID int) {
 	t.Helper()
 	deleted := false
 	for _, f := range frames {
 		switch {
 		case f[0] == serverpackets.OpcodeDeleteObject && wire.NewReader(f[1:]).ReadInt32() == groundID:
 			deleted = true
-		case f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageAttentionS1PetPickedUpS2:
+		case f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == messageID:
 			if !deleted {
 				t.Fatalf("%s received the pet pickup attention before the item's DeleteObject", who)
 			}
