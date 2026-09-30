@@ -63,13 +63,12 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 	return nil
 }
 
-// Save persists a character's full stats — level, exp, expBeforeDeath, sp,
+// Save persists a character's progress — level, exp, expBeforeDeath, sp,
 // cur/max HP/CP/MP, karma/pvpkills/pkkills, death_penalty_level, and the
-// accumulated session playtime — the same column set Create writes at
-// character creation plus the remaining base-stat columns listed above, so a
-// later reload reflects everything gained since the last save instead of the
-// row's creation-time values. The row is also marked online: Save only runs
-// for characters currently in game.
+// accumulated session playtime — so a later reload reflects everything gained
+// since the last save instead of the row's creation-time values. Location and
+// appearance columns are not written here. The row is also marked online:
+// Save only runs for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
