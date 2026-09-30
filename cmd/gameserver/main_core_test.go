@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/config"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
@@ -1337,5 +1338,47 @@ func TestLoadStorageSlotsDefaults(t *testing.T) {
 	}
 	if got != player.DefaultStorageSlots {
 		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, player.DefaultStorageSlots)
+	}
+}
+
+func TestLoadEnchantConfigUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, []byte(`
+EnchantChanceMagicWeapon = 0.5
+EnchantChanceMagicWeapon15Plus = 0.25
+EnchantChanceNonMagicWeapon = 0.8
+EnchantChanceNonMagicWeapon15Plus = 0.45
+EnchantChanceArmor = 0.7
+EnchantMaxWeapon = 16
+EnchantMaxArmor = 12
+EnchantSafeMax = 4
+EnchantSafeMaxFull = 5
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadEnchantConfig(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadEnchantConfig() error = %v", err)
+	}
+	want := enchant.Config{
+		ChanceMagicWeapon: 0.5, ChanceMagicWeapon15Plus: 0.25,
+		ChanceWeapon: 0.8, ChanceWeapon15Plus: 0.45, ChanceArmor: 0.7,
+		MaxWeapon: 16, MaxArmor: 12, SafeMax: 4, SafeMaxFull: 5,
+	}
+	if got != want {
+		t.Fatalf("loadEnchantConfig() = %+v, want %+v", got, want)
+	}
+
+	empty := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err = loadEnchantConfig(gameServerPaths{PlayersConfigPath: empty})
+	if err != nil {
+		t.Fatalf("loadEnchantConfig(empty) error = %v", err)
+	}
+	if got != enchant.DefaultConfig() {
+		t.Fatalf("loadEnchantConfig(empty) = %+v, want the shipped defaults %+v", got, enchant.DefaultConfig())
 	}
 }

@@ -355,15 +355,16 @@ func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int)
 }
 
 // EquipItemStats attaches the stat functions inst's template contributes
-// while equipped and grants its attached skills, mirroring the equip
-// listeners in their order: the item's equip modifiers (and a weapon's +4
-// enchant passive, gated on the live enchant level) owned by the instance
-// first, then every item.Template.AttachedSkills entry (any activation)
-// added to c's known-skill set the way learning it would, a passive one
-// attaching its stat functions owned by the skill. Each attach reports its
-// own stat change. Call once per instance, right after it becomes equipped.
-// skillsChanged and timersChanged report whether the caller must resend
-// SkillList and SkillCoolTime respectively.
+// while equipped and grants its item skills, mirroring the equip listeners in
+// their order: the item's equip modifiers owned by the instance first, then —
+// unless inst is a weapon above the character's Expertise — a weapon's +4
+// enchant skill while inst is at +4 or higher, then every
+// item.Template.AttachedSkills entry (any activation), each added to c's
+// known-skill set the way learning it would, a passive one attaching its stat
+// functions owned by the skill. Each attach reports its own stat change. Call
+// once per instance, right after it becomes equipped. skillsChanged and
+// timersChanged report whether the caller must resend SkillList and
+// SkillCoolTime respectively.
 func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) (skillsChanged, timersChanged bool, err error) {
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
@@ -374,26 +375,96 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
 	// A weapon whose crystal grade the character's Expertise doesn't yet
-	// allow skips its whole item_skill loop in the reference (the grade
-	// penalty check returns before that loop runs), so neither its passive
-	// stat funcs nor any of its granted skills apply until Expertise catches
-	// up.
-	var enchantFns []effect.Mod
+	// allow skips its whole item-skill grant in the reference (the grade
+	// penalty check returns before the +4 skill and the item_skill loop
+	// run), so none of its granted skills apply until Expertise catches up.
 	var grants []itemSkillGrant
 	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
-		enchantFns, err = effect.ItemEnchantSkillFuncs(p.skills, owner)
+		if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel {
+			g, ok, err := p.enchant4SkillGrant(tmpl)
+			if err != nil {
+				return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
+			}
+			if ok {
+				grants = append(grants, g)
+			}
+		}
+		attached, err := p.itemSkillGrants(tmpl)
 		if err != nil {
 			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
 		}
-		grants, err = p.itemSkillGrants(tmpl)
-		if err != nil {
-			return false, false, fmt.Errorf("apply equip passives for character %d item %d: %w", c.ID, inst.ObjectID, err)
-		}
+		grants = append(grants, attached...)
 	}
 	c.AddStatFuncs(modFns)
-	c.AddStatFuncs(enchantFns)
 	skillsChanged, timersChanged = p.grantItemSkills(c, grants)
 	return skillsChanged, timersChanged, nil
+}
+
+// enchant4SkillGrant resolves tmpl's +4 enchant skill. ok is false for a
+// non-weapon, a weapon without one, or one naming no loaded skill.
+func (p *Persistence) enchant4SkillGrant(tmpl *item.Template) (g itemSkillGrant, ok bool, err error) {
+	if tmpl == nil || tmpl.Weapon == nil || tmpl.Weapon.Enchant4Skill == nil {
+		return itemSkillGrant{}, false, nil
+	}
+	ref := *tmpl.Weapon.Enchant4Skill
+	def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
+	if !ok {
+		return itemSkillGrant{}, false, nil
+	}
+	g = itemSkillGrant{def: def, noEquipDelay: true}
+	if def.Activation == modelskill.ActivationPassive {
+		fns, err := effect.PassiveFuncs(def)
+		if err != nil {
+			return itemSkillGrant{}, false, fmt.Errorf("item %d enchant skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
+		}
+		g.fns = fns
+	}
+	return g, true, nil
+}
+
+// GrantEnchant4Skill adds tmpl's +4 enchant skill to c's known-skill set, as
+// a scroll of enchant taking an equipped weapon to +4 does. It reports
+// whether tmpl has a loaded +4 skill, which is when the caller resends
+// SkillList. No Expertise check applies here: the enchant path grants it
+// whatever the weapon's grade.
+func (p *Persistence) GrantEnchant4Skill(c *player.Character, tmpl *item.Template) (bool, error) {
+	if p == nil || c == nil {
+		return false, nil
+	}
+	g, ok, err := p.enchant4SkillGrant(tmpl)
+	if err != nil || !ok {
+		return false, err
+	}
+	p.grantItemSkills(c, []itemSkillGrant{g})
+	return true, nil
+}
+
+// RevokeEnchant4Skill drops tmpl's +4 enchant skill from c's known-skill
+// set with the stat functions of the level c knows it at. It reports whether
+// tmpl has a loaded +4 skill, which is when the caller resends SkillList —
+// even when c did not know it.
+func (p *Persistence) RevokeEnchant4Skill(c *player.Character, tmpl *item.Template) bool {
+	if p == nil || c == nil {
+		return false
+	}
+	g, ok, err := p.enchant4SkillGrant(tmpl)
+	if err != nil || !ok {
+		return ok
+	}
+	removeItemSkill(c, int(g.def.ID))
+	return true
+}
+
+// removeItemSkill drops skillID from c's known-skill set with the stat
+// functions of the level c knows it at. It reports whether c knew it.
+func removeItemSkill(c *player.Character, skillID int) bool {
+	level := c.SkillLevel(skillID)
+	if level <= 0 {
+		return false
+	}
+	c.SetSkillLevel(skillID, 0)
+	c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(skillID), Level: level}))
+	return true
 }
 
 // itemSkillGrant is one loaded tmpl.AttachedSkills entry and, for a passive
@@ -401,6 +472,9 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 type itemSkillGrant struct {
 	def modelskill.Definition
 	fns []effect.Mod
+	// noEquipDelay skips the equip-delay reuse timer an ACTIVE item skill
+	// arms: the +4 enchant skill is added without one.
+	noEquipDelay bool
 }
 
 // itemSkillGrants resolves tmpl's attached skills before any is granted, so
@@ -445,7 +519,7 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 			}
 			c.AddStatFuncs(g.fns)
 		}
-		if def.Activation != modelskill.ActivationActive {
+		if def.Activation != modelskill.ActivationActive || g.noEquipDelay {
 			continue
 		}
 		key := cast.ReuseKey(def)
@@ -459,40 +533,44 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 
 // UnequipItemStats removes every stat function inst contributed via
 // EquipItemStats, mirroring the unequip listeners in their order: the
-// instance's own functions first, then — unless inv still has another
-// equipped item sharing tmpl's id — every tmpl.AttachedSkills entry leaves
-// c's known-skill set with the stat functions of the level c knows it at.
-// Each removal reports its own stat change, so a passive-granting item
-// sends one refresh for the item and one for the skill. tmpl must be the
-// same template instance EquipItemStats was called with, so the owner
-// identity used to attach the functions matches the one used to remove
-// them. skillsChanged reports whether the caller must resend SkillList; no
-// reuse timer armed by the equip-delay grant is cleared, matching the
-// reference.
+// instance's own functions first, then — for a weapon at +4 or higher — its
+// +4 enchant skill, then — unless inv still has another equipped item
+// sharing tmpl's id — every tmpl.AttachedSkills entry leaves c's known-skill
+// set with the stat functions of the level c knows it at. Each removal
+// reports its own stat change, so a passive-granting item sends one refresh
+// for the item and one per skill. tmpl must be the same template instance
+// EquipItemStats was called with, so the owner identity used to attach the
+// functions matches the one used to remove them. skillsChanged reports
+// whether the caller must resend SkillList: a loaded +4 skill asks for it at
+// +4 or higher even when the Expertise gate kept it from being granted, as
+// the reference's unequip listener does. No reuse timer armed by the
+// equip-delay grant is cleared, matching the reference.
 func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
 	}
 	c.RemoveStatsByOwner(effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmpl}))
-	if tmpl == nil || inv == nil {
+	if tmpl == nil {
 		return false
+	}
+	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
+		skillsChanged = true
+	}
+	if inv == nil {
+		return skillsChanged
 	}
 	for _, other := range inv.PaperdollItems() {
 		if other == inst {
 			continue
 		}
 		if other.TemplateID == tmpl.ID {
-			return false
+			return skillsChanged
 		}
 	}
 	for _, ref := range tmpl.AttachedSkills {
-		level := c.SkillLevel(int(ref.ID))
-		if level <= 0 {
-			continue
+		if removeItemSkill(c, int(ref.ID)) {
+			skillsChanged = true
 		}
-		c.SetSkillLevel(int(ref.ID), 0)
-		c.RemoveStatsByOwner(effect.ModOwnerSkill(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: level}))
-		skillsChanged = true
 	}
 	return skillsChanged
 }
