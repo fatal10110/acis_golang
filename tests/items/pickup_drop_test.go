@@ -120,6 +120,9 @@ func TestDropGroundItemRoundTrip(t *testing.T) {
 			t.Fatalf("%s DeleteObject object id = %d, want %d", who.name, got, groundID)
 		}
 	}
+	// Merged into the held adena, the pickup names only its amount, ahead
+	// of the tick's InventoryUpdate.
+	assertGrantMessage(t, c.Read(), serverpackets.SystemMessageEarnedS1Adena, numberParam(40))
 
 	srv.InventoryUpdates.Tick()
 	readInventoryUpdateFor(t, c, adena, 100)
@@ -278,6 +281,7 @@ func TestPickupWalksToDistantGroundItem(t *testing.T) {
 		t.Fatal("pickup after walking never collected the item")
 	}
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeDeleteObject, "DeleteObject")
+	assertGrantMessage(t, c.Read(), serverpackets.SystemMessageEarnedS1Adena, numberParam(40))
 
 	srv.InventoryUpdates.Tick()
 	readInventoryUpdateFor(t, c, adena, 100)

@@ -232,6 +232,31 @@ type SkillDamageDealt struct {
 // HerbConsumed reports a received herb whose carried skill must be applied.
 type HerbConsumed struct{ ItemID int32 }
 
+// ItemObtained reports items that reached the character's inventory with
+// a chat line naming them. Notice picks the line and how its parameters are
+// typed; EnchantLevel is read only by ObtainPickup.
+type ItemObtained struct {
+	ItemID       int32
+	Count        int
+	EnchantLevel int
+	Notice       ObtainNotice
+}
+
+// ObtainNotice picks the chat line an ItemObtained sends.
+type ObtainNotice uint8
+
+const (
+	// ObtainAdena names the adena amount earned.
+	ObtainAdena ObtainNotice = iota
+	// ObtainPickup names an existing item taken into the inventory, such
+	// as one picked up off the ground: a stack's count as a plain number,
+	// or a single enchanted item's enchant level.
+	ObtainPickup
+	// ObtainCreated names an item created by template id, such as an
+	// auto-looted kill reward: a stack's count as an item number.
+	ObtainCreated
+)
+
 // AttackRequested reports an aggression effect provoking an attack on Target.
 type AttackRequested struct{ Target world.Tracked }
 
@@ -330,6 +355,7 @@ func (DamageReceived) event()         {}
 func (ServitorDamageShared) event()   {}
 func (SkillDamageDealt) event()       {}
 func (HerbConsumed) event()           {}
+func (ItemObtained) event()           {}
 func (AttackRequested) event()        {}
 func (FleeRequested) event()          {}
 func (Retargeted) event()             {}

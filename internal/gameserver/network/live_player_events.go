@@ -33,7 +33,7 @@ func (p *livePlayer) BroadcastFrame(frame wire.Frame) bool {
 // attached. Every other event keeps reaching observers after detach.
 func sessionOnly(ev event.Event) bool {
 	switch ev.(type) {
-	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed,
+	case event.Attack, event.BowDrawn, event.Died, event.DeathSettled, event.HerbConsumed, event.ItemObtained,
 		event.RegenMax, event.EffectRemovedLackHP, event.EffectRemovedLackMP,
 		event.RelaxHPFull, event.Restored, event.EffectEnded, event.EffectFelt, event.SpoilResult,
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
@@ -258,6 +258,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.selectLiveTarget(live, e.Target)
 	case event.HerbConsumed:
 		l.consumeHerb(live, e.ItemID)
+	case event.ItemObtained:
+		live.SendFrame(itemObtainedFrame(e))
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:

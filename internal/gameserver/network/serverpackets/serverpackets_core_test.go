@@ -2784,6 +2784,26 @@ func TestFrameSystemMessageTwoNumbers(t *testing.T) {
 	}
 }
 
+// TestFrameSystemMessageItemNameNumber pins the pickup form of
+// YOU_PICKED_UP_S2_S1: the count goes out as a plain number parameter
+// (type 1), unlike the item-number (type 6) form an item created by id
+// uses.
+func TestFrameSystemMessageItemNameNumber(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageItemNameNumber(SystemMessageYouPickedUpS2S1, 1060, 5))
+	want := []byte{
+		OpcodeSystemMessage,
+		0x1d, 0x00, 0x00, 0x00, // 29
+		0x02, 0x00, 0x00, 0x00, // two params
+		0x03, 0x00, 0x00, 0x00, // item-name param
+		0x24, 0x04, 0x00, 0x00, // item 1060
+		0x01, 0x00, 0x00, 0x00, // number param
+		0x05, 0x00, 0x00, 0x00, // 5
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageItemNameNumber() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameSystemMessageSkillName(t *testing.T) {
 	got := framePayload(t, FrameSystemMessageSkillName(SystemMessageNightSkillEffectApplies, 294, 1))
 	want := []byte{

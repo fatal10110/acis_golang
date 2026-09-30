@@ -113,8 +113,10 @@ const (
 	SystemMessageWeightLimitExceeded               = 422
 	SystemMessageCrystallizeLevelTooLow            = 562
 	SystemMessageCannotTradeDiscardDropInShopMode  = 1065 // no parameter
-	SystemMessageYouPickedUpS2S1                   = 29   // item-name then item-number parameter
+	SystemMessageYouPickedUpS2S1                   = 29   // item-name then (item-)number parameter
 	SystemMessageYouPickedUpS1                     = 30   // item-name parameter
+	SystemMessageYouPickedUpAS1S2                  = 369  // number (enchant) then item-name parameter
+	SystemMessageEarnedS1Adena                     = 52   // number parameter
 	SystemMessageCubicSummoningFailed              = 568
 	SystemMessagePetCannotSentBackDuringBattle     = 579
 	SystemMessageDeadPetCannotBeReturned           = 589
@@ -354,6 +356,19 @@ func FrameSystemMessageStringNumberItemName(id int, text string, number int32, i
 	w.WriteInt32(number)
 	w.WriteInt32(SystemMessageParamItemName)
 	w.WriteInt32(itemID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSystemMessageItemNameNumber builds a SystemMessage packet with an
+// item-name parameter followed by a plain number parameter.
+func FrameSystemMessageItemNameNumber(id int, itemID int32, number int32) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(2)
+	w.WriteInt32(SystemMessageParamItemName)
+	w.WriteInt32(itemID)
+	w.WriteInt32(SystemMessageParamNumber)
+	w.WriteInt32(number)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 

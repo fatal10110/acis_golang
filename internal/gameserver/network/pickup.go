@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -101,6 +102,15 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		return true
 	}
 
+	// The chat line names the item as it lay on the ground: the add below
+	// may merge it into a held stack. Adena names only its amount, but only
+	// when merged into adena already held; the first adena is named like
+	// any other picked-up stack.
+	picked := ground.Instance.Snapshot()
+	obtained := event.ItemObtained{ItemID: picked.TemplateID, Count: picked.Count, EnchantLevel: picked.EnchantLevel, Notice: event.ObtainPickup}
+	if picked.TemplateID == item.AdenaID && inv.ItemByTemplateID(item.AdenaID) != nil {
+		obtained.Notice = event.ObtainAdena
+	}
 	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	switch failure {
 	case invops.PickupOK:
@@ -130,6 +140,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
+	live.ItemAdded(obtained)
 	l.lockPickupParalysis(live)
 
 	l.applyPersistActions(res.Persist)
