@@ -17,8 +17,10 @@ import (
 
 // folkInstanceKinds are the civilian service NPC types: shopkeepers,
 // trainers, gatekeepers, warehouse keepers, village masters and the like.
-// HolyThing, a civilian type too, is left out: the castle artifact belongs
-// to the siege runtime.
+// Two civilian types are left out and skipped at spawn: HolyThing, as the
+// castle artifact belongs to the siege runtime, and ChristmasTree, whose
+// click only releases the client (no selection, no talk) and which spawns
+// only from event makers or as a summoned Decoration.
 var folkInstanceKinds = map[InstanceKind]struct{}{
 	"Adventurer":            {},
 	"Auctioneer":            {},
@@ -28,7 +30,6 @@ var folkInstanceKinds = map[InstanceKind]struct{}{
 	"CastleGatekeeper":      {},
 	"CastleMagician":        {},
 	"CastleWarehouseKeeper": {},
-	"ChristmasTree":         {},
 	"ClanHallDoorman":       {},
 	"ClanHallManagerNpc":    {},
 	"ClassMaster":           {},
