@@ -123,9 +123,9 @@ func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *li
 // deferOrFailPickup parks target for a later drain if deferrable (live's
 // current blocker, as decided atomically alongside blocked by
 // livePickupBlockedDeferrable, is one finishDeferredPickup will promote it
-// past — attack or pickup lock), and either way answers the click with
-// ActionFailed so the client's pending action releases immediately instead
-// of waiting on a response that never comes.
+// past — attack, cast in flight or pickup lock), and either way answers the
+// click with ActionFailed so the client's pending action releases
+// immediately instead of waiting on a response that never comes.
 func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift, deferrable bool) {
 	if deferrable {
 		live.deferPickup(ctx, ground, shift)
@@ -175,9 +175,10 @@ func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 }
 
 // finishDeferredPickup runs the pickup queued as the next intention, if any,
-// and reports whether one was waiting. The pickup replaces the attack
-// intention whatever its outcome: the swing or shot it waited behind is not
-// followed by another. An item gone meanwhile only releases the click.
+// and reports whether one was waiting. The pickup replaces the attack or
+// cast intention whatever its outcome: the swing, shot or cast it waited
+// behind is not followed by another. An item gone meanwhile only releases
+// the click.
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	pickup := live.takeDeferredPickup()
 	if pickup == nil {

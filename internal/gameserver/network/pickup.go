@@ -136,10 +136,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// every later click — the same failure shape as an unanswered rejection.
 	live.SendFrame(serverpackets.FrameActionFailed())
 
+	// Every viewer, the picker included, sees GetItem, then the item's
+	// DeleteObject, then the attention line; the picker's own pickup line
+	// comes last.
 	l.broadcastGroundPickup(ground, live.ObjectID())
-	l.broadcastPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
+	l.broadcastPickupAttention(live, ground)
 	live.ItemAdded(obtained)
 	l.lockPickupParalysis(live)
 
@@ -181,15 +184,16 @@ func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 // (matching use/unequip) and leaves teleporting/immobile-until-attacked as
 // the same documented deferred gaps noted for those two handlers. The
 // transient pickup lock (pickupLocked, the PlayerAI.java:406-407 200ms
-// anti-mash gate), a non-standing pose, attacking, and casting still defer
-// rather than reject outright — those are the busy states the reference's AI
-// retries on its next think.
+// anti-mash gate), a swing and a cast in flight queue the pickup as the next
+// intention, run when the lock lifts, the swing ends (finishQueuedBehindAttack)
+// or the cast ends (finishLiveCast).
 func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
 	live.pickupMu.Lock()
 	defer live.pickupMu.Unlock()
 	attacking := live.attack != nil && live.attack.AttackingNow()
-	blocked = !liveItemInteractionAllowed(live) || live.pickupLocked || !live.Standing() || attacking || (live.cast != nil && live.cast.CastingNow())
-	deferrable = attacking || live.pickupLocked
+	casting := live.cast != nil && live.cast.CastingNow()
+	blocked = !liveItemInteractionAllowed(live) || live.pickupLocked || !live.Standing() || attacking || casting
+	deferrable = attacking || casting || live.pickupLocked
 	return
 }
 
@@ -225,8 +229,15 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 			st.TemplateID,
 		)
 	}
+	l.broadcastToSelfAndKnownInRadius(live, pickupAttentionRadius, frame)
+}
+
+// broadcastToSelfAndKnownInRadius sends one copy of frame to p first, then
+// to every known receiver within radius of p.
+func (l *GameClientLink) broadcastToSelfAndKnownInRadius(p *livePlayer, radius int, frame func() wire.Frame) {
 	broadcastFrame(frame, func(send func(frameReceiver)) {
-		l.world.ForEachKnownInRadius(live, pickupAttentionRadius, func(o world.Tracked) {
+		send(p)
+		l.world.ForEachKnownInRadius(p, radius, func(o world.Tracked) {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)
 			}

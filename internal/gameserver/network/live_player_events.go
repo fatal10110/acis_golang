@@ -454,9 +454,12 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
 // target ends.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
-	// A queued item cast or skill request replaced the cast that just ended
-	// as the intention, whether it starts now or not: the ended cast's
+	// A queued pickup, item cast or skill request replaced the cast that just
+	// ended as the intention, whether it starts now or not: the ended cast's
 	// nextActionAttack follow-up does not run.
+	if l.finishDeferredPickup(live) {
+		return
+	}
 	if l.finishDeferredItemAICast(live) {
 		return
 	}

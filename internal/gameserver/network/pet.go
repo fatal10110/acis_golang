@@ -210,9 +210,9 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	}
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
-	l.broadcastPetPickupAttention(live, ground)
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
+	l.broadcastPetPickupAttention(live, ground)
 
 	if result.Herb != nil {
 		l.consumePetHerb(live, pet, petInv, result.Herb)
@@ -220,14 +220,10 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	l.applyPersistActions(result.Persist)
 }
 
-// broadcastPetPickupAttention mirrors SummonAI.java:214-222: after a pet
-// loots armor or a weapon, nearby players hear an owner-named attention
-// SystemMessage within 1400 units of the owner. Enchanted gear uses 1536;
-// plain gear uses 1535. Other kinds stay silent.
-//
-// Recipients match the existing player pickup attention path
-// (ForEachKnownInRadius, owner excluded). Java's Player.broadcastPacketInRadius
-// also sendPackets the owner; that shared self-delivery gap stays out of scope.
+// broadcastPetPickupAttention announces a pet's loot of armor or a weapon:
+// the owner, then every player within 1400 units of the owner, reads an
+// owner-named attention SystemMessage. Enchanted gear uses 1536; plain gear
+// uses 1535. Other kinds stay silent.
 func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *grounditem.Item) {
 	if l.world == nil || owner == nil || ground == nil || ground.Template == nil {
 		return
@@ -254,13 +250,7 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 			st.TemplateID,
 		)
 	}
-	broadcastFrame(frame, func(send func(frameReceiver)) {
-		l.world.ForEachKnownInRadius(owner, pickupAttentionRadius, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
+	l.broadcastToSelfAndKnownInRadius(owner, pickupAttentionRadius, frame)
 }
 
 func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetUseItem) {
