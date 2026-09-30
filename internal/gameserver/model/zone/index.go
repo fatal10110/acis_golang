@@ -28,10 +28,16 @@ func NewIndex() *Index { return &Index{} }
 func (ix *Index) Add(k Kind) {
 	ix.all = append(ix.all, k)
 	form := k.Core().Form()
+	// Only the rows near the footprint can overlap it. Columns cannot be
+	// narrowed the same way: IntersectsRect's corner-in-ring probe wraps in
+	// 32-bit arithmetic, so a wide ring can claim a corner far outside it
+	// on the x axis, but never one outside the y range of its edges.
+	_, _, minY, maxY := form.Bounds()
+	ry1, ry2 := regionSpan(minY, maxY, world.MinY, world.RegionsY)
 	for rx := 0; rx < world.RegionsX; rx++ {
 		x1 := world.MinX + rx*regionEdge
 		x2 := x1 + regionEdge
-		for ry := 0; ry < world.RegionsY; ry++ {
+		for ry := ry1; ry <= ry2; ry++ {
 			y1 := world.MinY + ry*regionEdge
 			y2 := y1 + regionEdge
 			if form.IntersectsRect(x1, x2, y1, y2) {
@@ -39,6 +45,18 @@ func (ix *Index) Add(k Kind) {
 			}
 		}
 	}
+}
+
+// regionSpan returns the region indexes, clamped to 0..n-1, worth testing
+// for a footprint spanning lo..hi on an axis whose grid starts at origin:
+// the regions under the span plus one on each side. A region further out
+// is a whole region edge away from the footprint, so no boundary
+// convention lets it touch. first > last when the footprint lies off the
+// grid.
+func regionSpan(lo, hi, origin, n int) (first, last int) {
+	// Truncating division rounds a negative offset up, which only widens
+	// the span.
+	return max((lo-origin)/regionEdge-1, 0), min((hi-origin)/regionEdge+1, n-1)
 }
 
 // All returns every zone in load order.
