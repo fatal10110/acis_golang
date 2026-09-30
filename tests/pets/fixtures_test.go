@@ -209,14 +209,13 @@ func (h *petWorld) returnPet(t *testing.T) {
 func (h *petWorld) spawnWolf(t *testing.T) (*summon.Actor, [][]byte) {
 	t.Helper()
 	h.client.Send(encodeUseItem(h.collarID, false))
-	frame := mustRead(t, h.client, "SUMMON_A_PET system message")
-	assertStaticSystemMessage(t, frame, serverpackets.SystemMessageSummonAPet)
-	frame = mustRead(t, h.client, "collar MagicSkillUse")
+	frame := mustRead(t, h.client, "collar MagicSkillUse")
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMagicSkillUse, "collar MagicSkillUse")
 	r := wire.NewReader(frame[1:])
 	if caster, _, skill, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster != h.ownerID || skill != summonCreatureID || level != 1 {
 		t.Fatalf("collar cast = caster %d skill %d level %d, want %d/%d/1", caster, skill, level, h.ownerID, summonCreatureID)
 	}
+	assertStaticSystemMessage(t, mustRead(t, h.client, "SUMMON_A_PET system message"), serverpackets.SystemMessageSummonAPet)
 	var actor *summon.Actor
 	h.srv.AdvanceUntil(t, "pet in world state", func() bool {
 		obj, ok := h.srv.State.Summon(h.ownerID)

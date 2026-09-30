@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // Shipped equipment the formal wear scenarios put on over the dress: the
@@ -29,10 +30,8 @@ const (
 // keyed by template id.
 func bootFormalWear(t *testing.T) (*gameservertest.Server, map[int32]int32) {
 	t.Helper()
+	datapack.Require(t)
 	_, shipped := shippedData()
-	if shipped == nil {
-		t.Skip("aCis_datapack not checked out near the module root")
-	}
 	ids := []int32{formalWearID, leatherHelmetID, shortGlovesID, leatherPantsID, shortSwordID, leatherShieldID}
 	var templates []*item.Template
 	for _, tmpl := range gameservertest.ItemTemplates().All() {
