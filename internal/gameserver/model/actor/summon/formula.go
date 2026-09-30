@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -69,17 +70,31 @@ func (a *Actor) initVitals() {
 // effect-driven adds through AttachStatFuncs).
 func (a *Actor) AddStatFuncs(fns []effect.Mod) {
 	a.AttachStatFuncs(fns)
+	a.StatFuncsAttached(fns)
 }
 
-// AttachStatFuncs attaches fns to a's live stat calculators.
+// AttachStatFuncs attaches fns to a's live stat calculators without
+// reporting the change.
 func (a *Actor) AttachStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		a.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
 
-// StatFuncsAttached is a no-op: a summon's stat change reports nothing.
-func (a *Actor) StatFuncsAttached([]effect.Mod) {}
+// StatFuncsAttached reports the stat change of attached fns: the movement
+// takes the new move speed, and a RUN_SPEED change republishes the pet
+// window and the observers' NpcInfo. The effect list calls it after
+// releasing its lock, since those packets read the list back.
+func (a *Actor) StatFuncsAttached(fns []effect.Mod) {
+	if len(fns) == 0 {
+		return
+	}
+	runSpeed := false
+	for _, fn := range fns {
+		runSpeed = runSpeed || fn.Stat == stat.RunSpeed
+	}
+	a.statsModified(runSpeed)
+}
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
 func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
@@ -89,10 +104,28 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	a.statCalc.mu.RLock()
 	calcs := a.statCalc.calcs
 	a.statCalc.mu.RUnlock()
-	for _, calc := range calcs {
-		if calc != nil {
-			calc.RemoveOwner(owner)
+	removed, runSpeed := false, false
+	for s, calc := range calcs {
+		if calc != nil && calc.RemoveOwner(owner) > 0 {
+			removed = true
+			runSpeed = runSpeed || stat.Stat(s) == stat.RunSpeed
 		}
+	}
+	if removed {
+		a.statsModified(runSpeed)
+	}
+}
+
+// statsModified follows a stat func change: every position update reads
+// the live move speed, so the movement gets the new one. A RUN_SPEED change
+// also changes the movement speed multiplier the client scales the base
+// speeds by, so the owner's pet window and every observer's NpcInfo are
+// republished before the client falls out of step with the server's pace.
+func (a *Actor) statsModified(runSpeed bool) {
+	a.refreshMoveSpeed()
+	if runSpeed && a.ownerDiscovered.Load() {
+		a.emit(event.OwnerInfoChanged{})
+		a.emit(event.StatusChanged{})
 	}
 }
 
@@ -315,11 +348,22 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 	return float64(min(int(a.calcStat(stat.CriticalRate, baseCritRate)), 500))
 }
 
-// MoveSpeed returns this summon's current move speed, matching its run
-// speed: a summon always moves at its run speed, mirroring
-// PetStatus.getMoveSpeed()/SummonStatus's shared run-speed basis.
+// MoveSpeed returns this summon's current move speed from its template
+// run speed: a summon stays in run stance, and the RUN_SPEED stat
+// finalizes the speed, narrowed to float32 like the client-facing speed.
 func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
-	return a.calcStat(stat.RunSpeed, baseRunSpeed)
+	return float64(float32(a.calcStat(stat.RunSpeed, float64(int(baseRunSpeed)))))
+}
+
+// MovementSpeedMultiplier is the current move speed over the template run
+// speed, or 0 when that base is 0. The client scales the base run and walk
+// speeds it is sent by this value.
+func (a *Actor) MovementSpeedMultiplier(baseRunSpeed float64) float32 {
+	base := int(baseRunSpeed)
+	if base == 0 {
+		return 0
+	}
+	return float32(a.MoveSpeed(baseRunSpeed)) / float32(base)
 }
 
 // hungryHalved reports whether a pet's attack speed should be halved for

@@ -64,6 +64,11 @@ func (h *Hostile) broadcastModifiedStats(fns []effect.Mod) {
 }
 
 func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
+	// Every position update reads the live move speed; hand the movement
+	// simulation the new one after any stat func change.
+	if len(stats) > 0 {
+		h.refreshMoveSpeed()
+	}
 	if h.sink == nil {
 		return
 	}

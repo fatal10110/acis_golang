@@ -39,7 +39,7 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 		ObjectID: d.ObjectID(), TemplateID: t.TemplateID,
 		X: x, Y: y, Z: z, Heading: d.Heading(),
 		MAtkSpd: int(t.AtkSpd), PAtkSpd: int(t.AtkSpd),
-		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
+		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed), MoveMultiplier: 1,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
 		SummonAnimation: 2, Name: name, Title: d.title,

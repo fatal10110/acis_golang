@@ -36,7 +36,7 @@ func FrameNPCInfo(s NPCInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.WalkSpd))
 	w.WriteInt32(int32(s.RunSpd))
 	w.WriteInt32(int32(s.WalkSpd))
-	w.WriteFloat64(1)
+	w.WriteFloat64(s.MoveMultiplier)
 	w.WriteFloat64(1.1)
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
