@@ -28,8 +28,7 @@ func TestDestroyedStackDoesNotReturnOnRelog(t *testing.T) {
 	potions := srv.GiveItem(t, objID, 20, 5)
 	startInWorld(t, c)
 
-	c.Send(encodeRequestDestroyItem(potions, 5))
-	testsupport.SyncBarrier(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList)
+	destroyStack(t, c, potions, 5)
 
 	// Back to character selection with no flush of the pending delete, which
 	// is what a logout inside the one-minute tick window looks like.

@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
-	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // TestShutdownFlushMatchesFinalInventoryState drops part of an adena stack
@@ -60,8 +59,7 @@ func TestShutdownFlushPersistsDestruction(t *testing.T) {
 	potions := srv.GiveItem(t, objID, 20, 5)
 	startInWorld(t, c)
 
-	c.Send(encodeRequestDestroyItem(potions, 5))
-	testsupport.SyncBarrier(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList)
+	destroyStack(t, c, potions, 5)
 
 	srv.Shutdown(t)
 

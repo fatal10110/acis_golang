@@ -477,8 +477,15 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	})
 }
 
+// destroyLiveItem answers RequestDestroyItem. A player running a private
+// store or tied up in a direct trade is refused before anything else; a
+// destroy that goes through names what disappeared.
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
 	if live == nil {
+		return
+	}
+	if live.Operating() || (l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotTradeDiscardDropInShopMode))
 		return
 	}
 	inv := live.Inventory()
@@ -505,13 +512,32 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		return
 	}
 	l.unequipDestroyedItem(live, inv, objectID, count)
+	templateID := int32(0)
+	if inst := inv.ItemByObjectID(objectID); inst != nil {
+		templateID = inst.TemplateID
+	}
 	res, failure := l.inventory.DestroyItemResult(inv, objectID, count)
 	if failure != invops.DestroyOK {
 		return
 	}
+	sendDestroyedMessage(live, templateID, count)
 	l.applyEquipStatChanges(live, inv, res)
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
+	}
+}
+
+// sendDestroyedMessage names count units of templateID the player just
+// destroyed: a shadow item reads as its mana running out, several units
+// carry their count.
+func sendDestroyedMessage(live *livePlayer, templateID int32, count int) {
+	switch {
+	case shadowTemplate(live, templateID):
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageRemainingManaIsNow0, templateID))
+	case count > 1:
+		live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageS2S1Disappeared, templateID, int32(count)))
+	default:
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disappeared, templateID))
 	}
 }
 
