@@ -9,9 +9,13 @@ import (
 	"github.com/rs/zerolog"
 
 	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -44,6 +48,8 @@ func shippedItemTemplate(t *testing.T, id int32) *item.Template {
 
 // pkKillScene is a PvP-flagged killer wearing the shipped PK-free knife
 // next to an innocent level 1 victim, both in world with quiet clients.
+// The killer knows the lethal skill 42 and every skill the scene was booted
+// with.
 type pkKillScene struct {
 	srv             *gameservertest.Server
 	c, vc           *scriptedClient
@@ -56,7 +62,7 @@ type pkKillScene struct {
 	setRollSource   func(func(int) int)
 }
 
-func bootPKKillScene(t *testing.T) *pkKillScene {
+func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene {
 	t.Helper()
 	knife := shippedItemTemplate(t, apprenticeKnifeID)
 	if len(knife.UseConditions) != 1 || knife.UseConditions[0].MessageID != 1685 {
@@ -71,12 +77,15 @@ func bootPKKillScene(t *testing.T) *pkKillScene {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Killer", 5, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(combatPersistence(t, offensiveKillSkillDefs())),
+		gameservertest.WithSkills(combatPersistence(t, append(offensiveKillSkillDefs(), known...))),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithPvPFlags(flags),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
+	for _, def := range known {
+		seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
+	}
 	knifeObjID := srv.GiveItem(t, objID, apprenticeKnifeID, 1)
 	victim := srv.SeedCharacterFor(t, "victim", "Victim", 1, 0)
 	vc := srv.DialClient(t, "victim", 1)
@@ -117,9 +126,10 @@ func bootPKKillScene(t *testing.T) *pkKillScene {
 }
 
 // assertKnifeTakenOff checks the killer's frames after its karma change for
-// the knife's removal through the equip toggle: S1_DISARMED, the refresh,
-// then ActionFailed for the aborted attack. It returns the frames and the
-// ActionFailed's index.
+// the knife's removal through the equip toggle: S1_DISARMED right after the
+// karma change's UserInfo, so no frame of the killing blow slips in ahead of
+// it, then the refresh and ActionFailed for the aborted attack. It returns
+// the frames and the ActionFailed's index.
 func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	t.Helper()
 	frames := readQuiet(s.c)
@@ -140,6 +150,9 @@ func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	}
 	if disarmed < 0 {
 		t.Fatalf("no S1_DISARMED for the knife among %x", opcodesOf(frames))
+	}
+	if disarmed != 1 || frames[0][0] != serverpackets.OpcodeUserInfo {
+		t.Fatalf("frames after the karma change = %x, want the karma UserInfo then S1_DISARMED first", opcodesOf(frames))
 	}
 	refresh := indexOf(frames, disarmed, serverpackets.OpcodeUserInfo, -1)
 	aborted := indexOf(frames, disarmed, serverpackets.OpcodeActionFailed, -1)
@@ -178,11 +191,21 @@ func (s *pkKillScene) lastVictimRelation(t *testing.T) (relation, karma, pvpFlag
 // off through the equip toggle (S1_DISARMED, the refresh, and ActionFailed
 // for the aborted attack), then the PvP flag task stops and the flag
 // resets, which the victim sees as a RelationChanged without the flag.
+//
+// All of it happens inside the killing hit's damage (CreatureAttack.doHit
+// → reduceCurrentHp → onKillUpdatePvPKarma), ahead of the rest of the hit:
+// the wounded killer absorbs part of the damage, and the StatusUpdate that
+// reports it follows the flag reset.
 func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	t.Parallel()
 	s := bootPKKillScene(t)
 	// Every swing hits, so the scenario never waits on a lucky roll.
 	s.setRollSource(func(int) int { return 0 })
+	onPlayerQueue(t, s.srv, s.objID, func(pc *player.Character) {
+		pc.AddStatFuncs([]effect.Mod{{Stat: stat.AbsorbDamagePercent, Op: effect.OpAdd, Value: 50}})
+		pc.SetHP(1)
+	})
+	drainUntilQuiet(t, s.c)
 
 	selectPlayerTarget(t, s.c, s.victimID)
 	s.c.Send(encodeAttackRequest(s.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
@@ -190,8 +213,13 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	s.srv.Settle(t)
 
 	frames, aborted := s.assertKnifeTakenOff(t)
-	if indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1) < 0 {
+	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
+	if flagReset < 0 {
 		t.Fatalf("frames after the karma change = %x, want the flag reset's UserInfo after ActionFailed", opcodesOf(frames))
+	}
+	absorbed := indexOfSelfHPAbove(frames, s.objID, 1)
+	if absorbed < flagReset {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED and the flag reset's UserInfo before the absorbed HP's StatusUpdate", opcodesOf(frames))
 	}
 	if state := s.killer.PvPFlagState(); state != task.PvPFlagNone {
 		t.Fatalf("killer PvP flag = %v after the physical PK kill, want none", state)
@@ -242,6 +270,66 @@ func TestPKSkillKillEndsWithTheKillerFlagged(t *testing.T) {
 	if relation, karma, pvpFlag := s.lastVictimRelation(t); relation&serverpackets.RelationPvPFlag == 0 || pvpFlag == 0 || karma != 240 {
 		t.Fatalf("victim's last RelationChanged for the killer = relation %#x karma %d flag %d, want karma 240 and the flag", relation, karma, pvpFlag)
 	}
+}
+
+// TestPKProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage has the same
+// flagged killer's physical hit set off its passive ON_HIT chance skill,
+// which triggers the lethal skill 42 on the innocent victim; the victim's
+// raised max HP outlasts the hit itself, so the proc makes the kill. As for
+// a physical or a skill kill, the karma gain takes the knife off and resets
+// the flag inside the killing blow: both reach the killer before the proc's
+// YOU_DID_S1_DMG, which the triggered skill's handler sends after its
+// damage.
+func TestPKProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage(t *testing.T) {
+	t.Parallel()
+	s := bootPKKillScene(t, modelskill.Definition{
+		ID: 43, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
+		SkillType: "BUFF", ChanceType: "ON_HIT", ActivationChance: -1,
+		TriggeredID: 42, TriggeredLevel: 1,
+	})
+	// Every swing hits, so the scenario never waits on a lucky roll.
+	s.setRollSource(func(int) int { return 0 })
+	onPlayerQueue(t, s.srv, s.victimID, func(pc *player.Character) {
+		pc.AddStatFuncs([]effect.Mod{{Stat: stat.MaxHP, Op: effect.OpAdd, Value: 10_000}})
+		pc.SetHP(pc.MaxHPValue())
+	})
+	drainUntilQuiet(t, s.vc)
+	drainUntilQuiet(t, s.c)
+
+	selectPlayerTarget(t, s.c, s.victimID)
+	s.c.Send(encodeAttackRequest(s.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	assertKarmaChangeFrames(t, s.c, s.objID, 240)
+	s.srv.Settle(t)
+
+	frames, aborted := s.assertKnifeTakenOff(t)
+	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
+	damage := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageYouDidS1Dmg)
+	if flagReset < 0 || damage < flagReset {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED and the flag reset's UserInfo before the proc's YOU_DID_S1_DMG", opcodesOf(frames))
+	}
+	if karma := s.karma(); karma != 240 {
+		t.Fatalf("killer karma = %d after the proc PK kill, want 240", karma)
+	}
+}
+
+// indexOfSelfHPAbove finds the first StatusUpdate for objID that reports a
+// CUR_HP above hp, or -1.
+func indexOfSelfHPAbove(frames [][]byte, objID, hp int32) int {
+	for i, f := range frames {
+		if f[0] != serverpackets.OpcodeStatusUpdate {
+			continue
+		}
+		r := wireReader(f[1:])
+		if r.ReadInt32() != objID {
+			continue
+		}
+		for n := r.ReadInt32(); n > 0; n-- {
+			if attr, value := r.ReadInt32(), r.ReadInt32(); attr == int32(serverpackets.StatusCurrentHP) && value > hp {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // opcodesOf lists each frame's opcode, for failure messages.

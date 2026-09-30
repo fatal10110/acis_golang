@@ -70,6 +70,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
+	case event.HitDamageApplied:
+		// The hit's own task runs on live's queue: a PK kill it just made
+		// takes its items off and resets its flag before anything else the
+		// hit sends.
+		l.settlePvPChanges(live)
 	case event.HitLanded:
 		l.chance.AttackHit(live.Character, e)
 	case event.ShotsRechargeRequested:
