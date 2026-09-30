@@ -601,6 +601,9 @@ type recordingMove struct {
 	stopCount     int
 	home          location.Location
 	denyMove      bool
+	// outOfReach is what HoldOffensiveFollow reports; holdCalls counts it.
+	outOfReach bool
+	holdCalls  int
 }
 
 func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
@@ -608,6 +611,13 @@ func (m *recordingMove) MaybeStartOffensiveFollow(target attackable.Combatant, a
 	m.followTarget = target
 	m.followRange = attackRange
 	return m.followStarted, nil
+}
+
+func (m *recordingMove) HoldOffensiveFollow(target attackable.Combatant, attackRange int) bool {
+	m.holdCalls++
+	m.followTarget = target
+	m.followRange = attackRange
+	return m.outOfReach
 }
 
 func (m *recordingMove) MoveHome(home location.Location) error {
@@ -3363,11 +3373,11 @@ func TestPlayerAttackRefusedTargetKeepsCurrentTarget(t *testing.T) {
 	strike := &recordingAttack{canAttack: true}
 	brain := NewPlayerAttack(pk, &recordingMove{}, strike)
 
-	if !brain.Start(prev) {
+	if !brain.Start(prev, false) {
 		t.Fatal("Start(prev) = false, want accepted")
 	}
 	strike.attackingNow = false
-	if brain.Start(blessed) {
+	if brain.Start(blessed, false) {
 		t.Fatal("Start(blessed) = true, want refused")
 	}
 	if pk.refusals != 1 {
@@ -3410,7 +3420,7 @@ func TestPlayerAttackSkipsGateWhileDeniedOrBusy(t *testing.T) {
 			if brain.RefuseTarget(blessed) {
 				t.Fatal("RefuseTarget() = true, want the gate skipped")
 			}
-			brain.Start(blessed)
+			brain.Start(blessed, false)
 			if pk.refusals != 0 {
 				t.Fatalf("refusals = %d, want 0 while %s", pk.refusals, tc.name)
 			}
@@ -3677,7 +3687,7 @@ func TestPlayerAttackFinishedAttackKeepsOnlyKeepableTargets(t *testing.T) {
 			strike := &recordingAttack{canAttack: true}
 			move := &recordingMove{}
 			brain := NewPlayerAttack(pc, move, strike)
-			if !brain.Start(target) {
+			if !brain.Start(target, false) {
 				t.Fatal("Start() = false, want the first swing")
 			}
 			strike.attackingNow = false
@@ -3706,10 +3716,10 @@ func TestPlayerAttackFinishedAttackRunsTheQueuedAttack(t *testing.T) {
 	target := gatePlayerFake(2, 40, 0)
 	strike := &recordingAttack{canAttack: true}
 	brain := NewPlayerAttack(pc, &recordingMove{}, strike)
-	if !brain.Start(target) {
+	if !brain.Start(target, false) {
 		t.Fatal("Start() = false, want the first swing")
 	}
-	brain.Start(target)
+	brain.Start(target, false)
 	strike.attackingNow = false
 
 	brain.FinishedAttack()
@@ -3734,7 +3744,7 @@ func TestPlayerAttackFinishedAttackOnDeadTarget(t *testing.T) {
 			target := &deadGateFake{gateFake: gatePlayerFake(2, 40, tc.karma)}
 			strike := &recordingAttack{canAttack: true}
 			brain := NewPlayerAttack(pc, &recordingMove{}, strike)
-			if !brain.Start(target) {
+			if !brain.Start(target, false) {
 				t.Fatal("Start() = false, want the first swing")
 			}
 			strike.attackingNow = false
@@ -3900,5 +3910,74 @@ func TestAttackableThinkDuringWanderTakesNoStep(t *testing.T) {
 	}
 	if got := ai.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() after RunAI = %v, want %v", got, IntentionAttack)
+	}
+}
+
+// A shift-held attack never walks: on a target out of reach it goes idle,
+// answered ActionFailed, with no follow and no swing. Within reach it swings
+// as an unshifted attack does.
+func TestPlayerAttackShiftHeldNeverWalks(t *testing.T) {
+	pc := gatePlayerFake(1, 40, 0)
+	target := gatePlayerFake(2, 40, 500)
+	strike := &recordingAttack{canAttack: true}
+	move := &recordingMove{outOfReach: true, followStarted: true}
+	brain := NewPlayerAttack(pc, move, strike)
+
+	if brain.Start(target, true) {
+		t.Fatal("Start(shift) on a target out of reach = true, want ActionFailed")
+	}
+	if move.followCalls != 0 || move.holdCalls != 1 {
+		t.Fatalf("follow calls = %d, hold calls = %d, want 0 and 1", move.followCalls, move.holdCalls)
+	}
+	if strike.doAttackCalls != 0 {
+		t.Fatalf("swings = %d, want none", strike.doAttackCalls)
+	}
+	if brain.Target() != nil {
+		t.Fatal("shift-held attack out of reach kept its intention, want idle")
+	}
+	if move.stopCount == 0 {
+		t.Fatal("idle did not stop movement")
+	}
+
+	move.outOfReach = false
+	if !brain.Start(target, true) {
+		t.Fatal("Start(shift) within reach = false, want the swing")
+	}
+	if strike.doAttackCalls != 1 || move.followCalls != 0 {
+		t.Fatalf("swings = %d, follow calls = %d, want 1 and 0", strike.doAttackCalls, move.followCalls)
+	}
+
+	// The target steps out of reach before the swing ends: the re-think
+	// goes idle instead of chasing it.
+	strike.attackingNow = false
+	move.outOfReach = true
+	if !brain.FinishedAttack() {
+		t.Fatal("FinishedAttack() on a shift-held attack out of reach = false, want ActionFailed")
+	}
+	if move.followCalls != 0 || brain.Target() != nil {
+		t.Fatalf("follow calls = %d, intention kept = %v, want no follow and idle", move.followCalls, brain.Target() != nil)
+	}
+}
+
+// The attack a nextActionAttack cast hands on to holds the cast's shift.
+func TestPlayerAttackAfterShiftCastNeverWalks(t *testing.T) {
+	pc := gatePlayerFake(1, 40, 0)
+	target := gatePlayerFake(2, 40, 500)
+	strike := &recordingAttack{canAttack: true}
+	move := &recordingMove{outOfReach: true, followStarted: true}
+	brain := NewPlayerAttack(pc, move, strike)
+
+	if !brain.AttackAfterCast(target, true) {
+		t.Fatal("AttackAfterCast(shift) out of reach = no ActionFailed, want ActionFailed")
+	}
+	if move.followCalls != 0 || strike.doAttackCalls != 0 || brain.Target() != nil {
+		t.Fatalf("follow calls = %d, swings = %d, intention kept = %v, want none and idle", move.followCalls, strike.doAttackCalls, brain.Target() != nil)
+	}
+
+	if brain.AttackAfterCast(target, false) {
+		t.Fatal("AttackAfterCast(no shift) out of reach = ActionFailed, want the walk")
+	}
+	if move.followCalls != 1 {
+		t.Fatalf("follow calls = %d, want the walk toward the target", move.followCalls)
 	}
 }

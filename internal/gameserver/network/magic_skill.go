@@ -81,11 +81,11 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		}
 		live.endFollow()
 	}
+	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	if known && def.Activation == modelskill.ActivationToggle {
 		l.handleToggleSkillUse(live, req, selected)
 		return
 	}
-	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	controller := l.castController(live)
 	// The pre-attempt gate above ran before this GROUND approach walk, so a
 	// recast still on cooldown never starts walking toward the signet.
@@ -118,7 +118,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target))
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed)
 		}
 		// A player's cast that fails its cost or target conditions after the
 		// hit-time stop answers with its reason alone: no ActionFailed, no

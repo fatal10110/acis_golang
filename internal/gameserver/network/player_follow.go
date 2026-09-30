@@ -29,7 +29,7 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 	// boat-mismatch refusal never applies.
 	switch {
 	case other.AttackableWithoutForceBy(live.Character) || (ctrl && other.AttackableBy(live.Character)):
-		l.attackLiveTarget(live, other)
+		l.attackLiveTarget(live, other, shift)
 	case other.Operating():
 		// Private stores are not ported (#137): the store window a click
 		// opens has nothing to show yet, so the click is only released.

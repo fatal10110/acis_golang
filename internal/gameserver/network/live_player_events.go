@@ -256,7 +256,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 	case event.AttackRequested:
 		if e.Target != nil {
-			l.attackLiveTarget(live, e.Target)
+			// An attack an effect forces on the player holds no shift.
+			l.attackLiveTarget(live, e.Target, false)
 		}
 	case event.FleeRequested:
 		l.fleeLivePlayer(live, e)
@@ -477,13 +478,14 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 
 // endCastIntention ends the CAST intention a cast of def on target held,
 // with nothing queued behind it: a skill carrying nextActionAttack attacks
-// target when live may attack it without force; anything else, a toggle
-// included, goes idle.
+// target when live may attack it without force, held with the cast's shift
+// modifier; anything else, a toggle included, goes idle.
 func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant) {
 	if live.combat == nil {
 		return
 	}
-	if live.attackAfterCast(def, target) {
+	_, shift := live.Character.CastModifiers()
+	if live.attackAfterCast(def, target, shift) {
 		return
 	}
 	live.combat.Stop()
@@ -491,9 +493,10 @@ func (live *livePlayer) endCastIntention(def modelskill.Definition, target attac
 
 // attackAfterCast starts the attack a nextActionAttack skill hands on to its
 // final target, once its cast ends or is refused at its cost and condition
-// checks. It reports false, starting nothing, for any other skill, or a
+// checks, held with the cast's shift modifier: a shift-held follow-up never
+// walks. It reports false, starting nothing, for any other skill, or a
 // target live may not attack without force.
-func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant) bool {
+func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift bool) bool {
 	if live.combat == nil || !def.NextActionIsAttack || target == nil {
 		return false
 	}
@@ -501,7 +504,7 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 	if !ok || !rules.AttackableWithoutForceBy(live.Character) {
 		return false
 	}
-	if live.combat.AttackAfterCast(target) {
+	if live.combat.AttackAfterCast(target, shift) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	return true

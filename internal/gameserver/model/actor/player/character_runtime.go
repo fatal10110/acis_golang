@@ -125,10 +125,10 @@ func (c *Character) GroundTarget() (x, y, z int) {
 	return c.groundTarget.X, c.groundTarget.Y, c.groundTarget.Z
 }
 
-// SetCastModifiers records the Ctrl/Shift state of the client's most recent
-// skill-cast request, reused across casts until the next request overwrites
-// it — the domain cast-condition check and post-cast offensive-follow
-// decision read it from here once those rules exist.
+// SetCastModifiers records the Ctrl/Shift state the player's latest CAST
+// intention was started with: a skill request's own modifiers, or an item
+// use's force-use modifier and no shift. The attack a nextActionAttack cast
+// hands on to once it ends is held with that shift.
 func (c *Character) SetCastModifiers(ctrl, shift bool) {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()

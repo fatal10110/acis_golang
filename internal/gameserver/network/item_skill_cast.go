@@ -132,6 +132,8 @@ func inPostureTransition(live *livePlayer) bool {
 // refused the skill (the attached-skill loop continues). failed means the
 // carrier could not be consumed (the loop stops).
 func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, carrier *item.Instance, selected world.Tracked, def modelskill.Definition, ctrl bool) (run func(), rejected, failed bool) {
+	// An item's cast intention holds its force-use modifier and never shift.
+	live.Character.SetCastModifiers(ctrl, false)
 	controller := l.castController(live)
 	var carrierLost bool
 	var consumeCarrier func() error
@@ -177,7 +179,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target))
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), false)
 		}
 		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)
