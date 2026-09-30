@@ -191,6 +191,11 @@ func (g *gatedWriteConn) Write(p []byte) (int, error) {
 	return g.Conn.Write(p)
 }
 
+// SetWriteDeadline succeeds the way a TCP socket whose peer left still does.
+// Without this, net.Pipe rejects the deadline once its peer is closed, which
+// would also stop the writer. Stubbing it means only the parked Write can fail.
+func (g *gatedWriteConn) SetWriteDeadline(time.Time) error { return nil }
+
 func (g *gatedWriteConn) Close() error {
 	g.closes.Add(1)
 	return g.Conn.Close()
