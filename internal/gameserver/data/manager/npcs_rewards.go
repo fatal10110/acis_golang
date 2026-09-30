@@ -146,7 +146,7 @@ func actingCharacter(c attackable.Combatant) (*player.Character, bool) {
 	default:
 		return nil, false
 	}
-	holder, ok := c.(interface{ PlayerCharacter() *player.Character })
+	holder, ok := c.(player.CharacterHolder)
 	if !ok {
 		return nil, false
 	}

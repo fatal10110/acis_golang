@@ -913,7 +913,7 @@ func actingPlayerID(a target.Actor) int32 {
 // inPvPZone reports whether a stands inside a PvP zone; an actor without
 // zone membership (an NPC or door) never does.
 func inPvPZone(a target.Actor) bool {
-	member, ok := a.(interface{ InPvPZone() bool })
+	member, ok := a.(attackable.PvPZoneMember)
 	return ok && member.InPvPZone()
 }
 

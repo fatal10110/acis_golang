@@ -84,6 +84,9 @@ func (Creature) MaxHPValue() float64 { return 0 }
 func (Creature) MaxMPValue() float64 { return 0 }
 func (Creature) SetHP(float64)       {}
 
+// Kill reports that the neutral creature was not killed: it never dies.
+func (Creature) Kill(attackable.Combatant) bool { return false }
+
 // Formula surface: the neutral creature has no stats, no weapon and no
 // shots, so every formula term is the zero value and its rolls are 0.
 func (Creature) STR() int                                     { return 0 }

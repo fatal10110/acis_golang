@@ -8,15 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-// effectNotCancellable are effect classification tags a cancel-family skill
-// can never strip, regardless of roll.
-var effectNotCancellable = map[string]bool{
-	"CHARM_OF_COURAGE":    true,
-	"CHARM_OF_LUCK":       true,
-	"NOBLESSE_BLESSING":   true,
-	"PROTECTION_BLESSING": true,
-}
-
 type cancelHandler struct{}
 
 func (cancelHandler) Types() []string { return []string{"CANCEL", "MAGE_BANE", "WARRIOR_BANE"} }
@@ -57,7 +48,7 @@ func cancelOne(cast Cast, target effect.Actor, skillType string, minRate, maxRat
 		if e.Skill.Toggle || e.Skill.Debuff {
 			continue
 		}
-		if effectNotCancellable[strings.ToUpper(e.ClassTag())] {
+		if effect.NotCancellable(e.ClassTag()) {
 			continue
 		}
 

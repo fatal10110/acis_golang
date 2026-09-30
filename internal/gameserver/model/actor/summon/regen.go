@@ -7,15 +7,15 @@ import (
 )
 
 // HPRegenRate returns a's HP regeneration per tick: its npc template's base
-// through its live stat calculator.
+// through its live stat calculator, scaled by a pet's weight-penalty band.
 func (a *Actor) HPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen)
+	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
 }
 
 // MPRegenRate returns a's MP regeneration per tick: its npc template's base
-// through its live stat calculator.
+// through its live stat calculator, scaled by a pet's weight-penalty band.
 func (a *Actor) MPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen)
+	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
 }
 
 // TickRegen applies one HP/MP regeneration step: each resource short of its

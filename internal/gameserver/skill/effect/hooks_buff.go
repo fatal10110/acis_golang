@@ -125,7 +125,7 @@ func cancelStart(e *Effect) bool {
 	if list == nil {
 		return true
 	}
-	if effectNotCancellable[strings.ToUpper(e.ClassTag())] {
+	if NotCancellable(e.ClassTag()) {
 		return true
 	}
 
@@ -155,9 +155,14 @@ func cancelStart(e *Effect) bool {
 	return true
 }
 
-// effectNotCancellable are effect classification tags that appear to be
-// exempt from cancelStart's strip loop; see cancelStart's doc comment for
-// why the exemption never actually applies there.
+// NotCancellable reports whether classTag (matched case-insensitively) names
+// one of the protected effect classifications a cancel-family skill can
+// never strip, regardless of roll. cancelStart consults it too, but against
+// its own tag; see its doc comment for why the exemption never applies there.
+func NotCancellable(classTag string) bool {
+	return effectNotCancellable[strings.ToUpper(classTag)]
+}
+
 var effectNotCancellable = map[string]bool{
 	"CHARM_OF_COURAGE":    true,
 	"CHARM_OF_LUCK":       true,

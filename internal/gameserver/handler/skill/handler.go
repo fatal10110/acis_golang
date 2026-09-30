@@ -86,6 +86,9 @@ type Creature interface {
 	HealInput(modelskill.Definition) (formulas.HealInput, bool)
 	MaxMPValue() float64
 	SetHP(float64)
+	// Kill runs this creature's death sequence at once, whatever its HP,
+	// crediting killer, and reports whether this call killed it.
+	Kill(killer attackable.Combatant) bool
 }
 
 // Player is the player-only cast participant surface: the resources, cast

@@ -78,7 +78,7 @@ func (c *Cipher) OutboundState() (armed bool, key [KeySize]byte) {
 }
 
 // rollKey advances key's bytes 8..11, read as a little-endian uint32, by
-// size — the key roll every GameCrypt call applies after processing a
+// size — the key roll every encrypt and decrypt applies after processing a
 // packet.
 func rollKey(key *[KeySize]byte, size int) {
 	old := binary.LittleEndian.Uint32(key[8:12])
