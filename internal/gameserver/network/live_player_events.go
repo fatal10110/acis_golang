@@ -323,6 +323,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishLiveGroundPickup(live)
 		l.finishPetInteract(live)
 		l.finishDeferredMagicSkill(live)
+		l.finishDeferredItemAICast(live)
 		live.thinkAttack()
 	case event.MoveBlocked:
 		if !l.onPlayerArrivedBlocked(live) {
