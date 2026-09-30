@@ -174,17 +174,6 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	drainUntilQuiet(t, c)
 }
 
-// isLeadingLoginRefresh reports whether opcode is one of the refreshes that
-// may precede the EnterWorld burst.
-func isLeadingLoginRefresh(opcode byte) bool {
-	switch opcode {
-	case serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate,
-		serverpackets.OpcodeUserInfo, serverpackets.OpcodeEtcStatusUpdate:
-		return true
-	}
-	return false
-}
-
 func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	want := []byte{
@@ -207,19 +196,22 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	for i, opcode := range want {
 		frame := c.Read()
 		// A client that already knows another player receives that player's
-		// CharInfo ahead of its own burst, a client carrying weighted items
-		// receives the login weight refresh ahead of it, and one carrying
-		// enough to enter a weight penalty band also receives that band's
-		// UserInfo/EtcStatusUpdate refresh; skip such leading frames.
-		for i == 0 && isLeadingLoginRefresh(frame[0]) {
+		// CharInfo ahead of its own burst; skip those leading spawn frames.
+		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
 			frame = c.Read()
+		}
+		// A client carrying weighted items receives the login weight refresh,
+		// and a weight penalty band's UserInfo/EtcStatusUpdate refresh, between
+		// UserInfo and ItemList, never ahead of the burst.
+		if opcode == serverpackets.OpcodeItemList {
+			frame = gameservertest.ReadLoginWeightRefresh(t, c, frame)
 		}
 		if frame[0] != opcode {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		frames = append(frames, frame)
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
 		}
 	}
 	return frames

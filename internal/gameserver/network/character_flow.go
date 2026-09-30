@@ -307,7 +307,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// snapshot rather than missed.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
-	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
@@ -356,6 +355,14 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	// Restored rows leave the carried weight at 0, so this first recompute is
+	// what sends the login StatusUpdate(CUR_LOAD) and, when the load crosses
+	// into a penalty band, that band's refresh. Both go out after the burst's
+	// UserInfo and ahead of the ItemList, where the full inventory snapshot
+	// settles the weight on every send.
+	if inv := c.Inventory(); inv != nil {
+		inv.UpdateWeight()
+	}
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.shortcuts.All())))
 	if c.Dead() {
@@ -664,13 +671,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
-	if inv := c.Inventory(); inv != nil {
-		// Restored rows never queue update notifications, so totalWeight stays
-		// 0 unless recomputed here, matching the reference's ItemList
-		// constructor calling PcInventory.updateWeight() on every send
-		// (including the one EnterWorld makes right after this).
-		inv.UpdateWeight()
-	}
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {
 			tmpl, ok := inv.Templates().Get(inst.TemplateID)
