@@ -134,9 +134,9 @@ func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store 
 	}
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
-			if err := store.Save(ctx, items.Snapshots(skip)); err != nil {
-				log.Warn().Err(err).Msg("save ground items")
-			}
+			saveOnStop(ctx, shutdownSaveTimeout, log, "save ground items", func(ctx context.Context) error {
+				return store.Save(ctx, items.Snapshots(skip))
+			})
 			return nil
 		},
 	})
@@ -390,10 +390,11 @@ func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, worker *pers
 // drainItemInstances runs the shutdown item flush: a final save, a drain of
 // the persistence worker, then a second save for items that owner jobs which
 // gave up on a backed-up lane returned to pending. This is the last chance to
-// write these rows, and fx skips every later stop hook once its own ctx has
-// expired, so each step gets budget detached from ctx: earlier stop hooks
-// draining player containers can have consumed most of fx's stop timeout by
-// now. A failure is reported rather than swallowed.
+// write these rows, so each step gets its own budget detached from ctx rather
+// than whatever the earlier stop hooks left of it. The drain still has to
+// finish inside fx's stop deadline, after which the process exits;
+// gameServerStopTimeout counts all three steps. A failure is reported rather
+// than swallowed.
 func drainItemInstances(ctx context.Context, items *task.ItemInstances, worker *persist.Worker, log zerolog.Logger, budget time.Duration) error {
 	detached := context.WithoutCancel(ctx)
 	save := func() error {

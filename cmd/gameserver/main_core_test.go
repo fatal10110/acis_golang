@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -949,27 +950,83 @@ func TestLogUnsupportedSkillEffectsStaysQuietForAnUnresolvedTableName(t *testing
 	}
 }
 
-// TestItemInstanceSaveTimeoutFitsShutdownBudget pins a coupling that has no
-// compiler-visible link between the two constants: startItemInstances
-// (tasks.go) wraps both the periodic tick's ctx and the shutdown hook's ctx
-// with task.ItemInstanceSaveTimeout, and scheduler.Ticker.StopAndWait has
-// no ctx of its own, so the ticker's OnStop hook can block a shutdown for
-// up to that long waiting on an in-flight tick. That wait, plus the
-// shutdown hook's own ItemInstanceSaveTimeout-bounded final Save, plus
-// whatever every earlier stop hook takes, all have to fit inside
-// gameServerStopTimeout — fx aborts any stop hook it hasn't started yet the
-// moment that budget is gone (go.uber.org/fx's Stop loop checks ctx.Err()
-// before each hook), so a shutdown that runs out of budget mid-sequence
-// drops the remaining hooks, including the final item save, rather than
-// running them late. Raising ItemInstanceSaveTimeout without raising
-// gameServerStopTimeout (or vice versa) would silently reopen that gap.
-func TestItemInstanceSaveTimeoutFitsShutdownBudget(t *testing.T) {
-	if task.ItemInstanceSaveTimeout >= gameServerStopTimeout {
-		t.Fatalf("task.ItemInstanceSaveTimeout (%s) >= gameServerStopTimeout (%s): "+
-			"the ticker's OnStop can block that long with no ctx of its own, leaving no "+
-			"room for the other stop hooks (including the final item-instance save) "+
-			"before fx's Stop loop starts refusing to run them",
-			task.ItemInstanceSaveTimeout, gameServerStopTimeout)
+// TestGameServerStopTimeoutCoversEveryStopStep pins fx's stop budget to the
+// sum of every stop step's own worst case, in stop order. fx checks its one
+// stop deadline before each hook and skips the rest once it has expired, and
+// Run then exits the process with any running hook cut off, so a step that
+// can outlast its share (a slow database under the spawn-data save, say)
+// would drop the final item flush and ground-item save rather than delay
+// them. Raising any of these bounds without raising gameServerStopTimeout
+// would reopen that gap.
+func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
+	steps := []struct {
+		name  string
+		bound time.Duration
+	}{
+		{"game listener: every connection's exit waits for its player's saves, in parallel", network.LivePlayerPersistWait},
+		{"debug http listener stop", debugHTTPStopTimeout},
+		{"spawn_data save", shutdownSaveTimeout},
+		{"item ticker finishing an in-flight save", task.ItemInstanceSaveTimeout},
+		{"item drain: first save", task.ItemInstanceSaveTimeout},
+		{"item drain: persistence-worker drain", task.ItemInstanceSaveTimeout},
+		{"item drain: retry save", task.ItemInstanceSaveTimeout},
+		{"items_on_ground save", shutdownSaveTimeout},
+		{"hooks with no database I/O", gameServerStopSlack},
+	}
+	var sum time.Duration
+	for _, step := range steps {
+		if step.bound <= 0 {
+			t.Fatalf("%s has no bound (%s)", step.name, step.bound)
+		}
+		sum += step.bound
+	}
+	if gameServerStopTimeout < sum {
+		t.Fatalf("gameServerStopTimeout = %s, below the %s its stop steps can take: %+v", gameServerStopTimeout, sum, steps)
+	}
+}
+
+// TestSlowSpawnSaveLeavesItemDrainItsStopBudget stops an fx app whose hooks
+// sit in the game server's order: the spawn-data save first, then the final
+// item drain. The spawn save's database never answers and an owner's
+// persistence lane is held past the drain's first save. The stop budget is
+// the sum of the steps' own bounds, so fx still reaches the drain and the
+// pending item row is written. A spawn save on fx's own stop context would
+// spend the whole budget, and fx would then skip the drain.
+func TestSlowSpawnSaveLeavesItemDrainItsStopBudget(t *testing.T) {
+	const budget = 200 * time.Millisecond
+	worker := persist.New(zerolog.Nop())
+	flusher := &countingItemFlusher{}
+	items := task.NewItemInstances(flusher, item.NewTable(nil), worker, nil, zerolog.Nop())
+	inst := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 7, Count: 1, Location: item.LocationInventory}
+	items.Add(inst)
+	// Held through the spawn save and the drain's first save.
+	worker.Enqueue(inst.OwnerID, func() { time.Sleep(2*budget + budget/2) })
+
+	app := fx.New(fx.NopLogger, fx.Invoke(func(lc fx.Lifecycle) {
+		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+			return drainItemInstances(ctx, items, worker, zerolog.Nop(), budget)
+		}})
+		lc.Append(fx.Hook{OnStop: func(ctx context.Context) error {
+			saveOnStop(ctx, budget, zerolog.Nop(), "save spawn data", func(ctx context.Context) error {
+				<-ctx.Done()
+				return ctx.Err()
+			})
+			return nil
+		}})
+	}))
+	if err := app.Start(context.Background()); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	stopCtx, cancel := context.WithTimeout(context.Background(), budget+3*budget+budget)
+	defer cancel()
+	if err := app.Stop(stopCtx); err != nil {
+		t.Fatalf("stop error = %v, want every hook run inside the stop budget", err)
+	}
+	if got := flusher.count(); got != 1 {
+		t.Fatalf("item flushes = %d, want 1 from the drain", got)
+	}
+	if items.Contains(inst) {
+		t.Fatal("item still pending after shutdown")
 	}
 }
 

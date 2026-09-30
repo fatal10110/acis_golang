@@ -223,6 +223,8 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			ctx, cancel := context.WithTimeout(ctx, debugHTTPStopTimeout)
+			defer cancel()
 			return debughttp.Shutdown(ctx, srv)
 		},
 	})

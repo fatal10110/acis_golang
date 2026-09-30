@@ -31,9 +31,9 @@ const (
 	// give a chunk more room also raises how long the ticker's OnStop hook
 	// can block (scheduler.Ticker.StopAndWait has no ctx of its own — see
 	// Start) inside cmd/gameserver's gameServerStopTimeout budget for the
-	// whole shutdown sequence. cmd/gameserver/main_core_test.go pins
-	// ItemInstanceSaveTimeout staying comfortably under that budget;
-	// check it before changing either constant.
+	// whole shutdown sequence. That budget is summed from this constant
+	// (the ticker's wait plus the shutdown flush's three steps), and
+	// cmd/gameserver/main_core_test.go pins the sum.
 	ItemInstanceSaveTimeout = 10 * time.Second
 	// ItemInstanceSaveChunkSize bounds how many items one Save transaction
 	// covers. Save commits chunks independently, so a batch that grew past
