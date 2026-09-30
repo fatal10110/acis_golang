@@ -36,7 +36,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// The selection is dropped while live is still placed, so its
 	// neighborhood gets TargetUnselected before live's DeleteObject.
 	live.forgetTarget(live.Target())
-	l.cancelActiveTrade(live)
+	l.leaveActiveTrade(live)
 	// TaskEffects.Save runs on this queue too, so every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
 	live.markDetaching()

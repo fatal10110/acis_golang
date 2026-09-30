@@ -74,6 +74,9 @@ const (
 	DoneConfirmed
 	// DoneReady means both sides confirmed and the returned session is ready to commit.
 	DoneReady
+	// DonePartnerLeft means the partner left the world with the window
+	// still open; nothing was confirmed.
+	DonePartnerLeft
 )
 
 // DoneResult is returned after a player confirms a trade.

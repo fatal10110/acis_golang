@@ -31,6 +31,10 @@ type session struct {
 	offers    map[int32]*offer
 	confirmed map[int32]bool
 	locked    bool
+	// leftID is the participant who left the world with the window still
+	// open, or 0. The session stays reachable from the one who remains;
+	// a second departure drops it.
+	leftID int32
 }
 
 type offer struct {
@@ -76,6 +80,9 @@ type Session struct {
 	SecondID    int32
 	FirstOffer  Offer
 	SecondOffer Offer
+	// LeftID is the participant who left the world with the window still
+	// open, or 0.
+	LeftID int32
 }
 
 // NewBook returns an empty direct-trade book.
@@ -216,14 +223,15 @@ func (b *Book) Confirm(playerID int32) DoneResult {
 	if s.confirmed[playerID] {
 		return DoneResult{Status: DoneAlreadyConfirmed, PartnerID: partnerID}
 	}
+	if s.leftID == partnerID {
+		return DoneResult{Status: DonePartnerLeft, PartnerID: partnerID}
+	}
 	s.confirmed[playerID] = true
 	if !s.confirmed[partnerID] {
 		return DoneResult{Status: DoneConfirmed, PartnerID: partnerID}
 	}
 
-	s.locked = true
-	delete(b.active, s.firstID)
-	delete(b.active, s.secondID)
+	b.closeLocked(s)
 	return DoneResult{Status: DoneReady, PartnerID: partnerID, Session: s.snapshot()}
 }
 
@@ -236,10 +244,41 @@ func (b *Book) Cancel(playerID int32) CancelResult {
 	if s == nil || s.locked {
 		return CancelResult{Status: CancelMissing}
 	}
-	s.locked = true
-	delete(b.active, s.firstID)
-	delete(b.active, s.secondID)
+	b.closeLocked(s)
 	return CancelResult{Status: CancelDone, Session: s.snapshot()}
+}
+
+// Leave takes playerID, who is leaving the world, out of its open session
+// without closing it: the partner's window stays open and learns of the
+// departure only on its own next trade action. The departed side can no
+// longer reach the session, so a later login under the same id starts free
+// of it. When the partner has already left too, the session is dropped.
+func (b *Book) Leave(playerID int32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	s := b.active[playerID]
+	if s == nil || s.locked {
+		return
+	}
+	delete(b.active, playerID)
+	if s.leftID != 0 {
+		s.locked = true
+		return
+	}
+	s.leftID = playerID
+}
+
+// closeLocked locks s and drops the book entries that still point at it. A
+// participant who left may already hold a newer session under the same id,
+// which must survive.
+func (b *Book) closeLocked(s *session) {
+	s.locked = true
+	for _, id := range []int32{s.firstID, s.secondID} {
+		if b.active[id] == s {
+			delete(b.active, id)
+		}
+	}
 }
 
 // PartnerID returns the active direct-trade partner for playerID.
@@ -252,6 +291,13 @@ func (s Session) PartnerID(playerID int32) (int32, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// PartnerLeft reports whether playerID's partner left the world with the
+// window still open.
+func (s Session) PartnerLeft(playerID int32) bool {
+	partnerID, ok := s.PartnerID(playerID)
+	return ok && s.LeftID == partnerID
 }
 
 // Offer returns playerID's offer from the session.
@@ -402,6 +448,7 @@ func (s *session) snapshot() Session {
 		SecondID:    s.secondID,
 		FirstOffer:  s.offers[s.firstID].snapshot(),
 		SecondOffer: s.offers[s.secondID].snapshot(),
+		LeftID:      s.leftID,
 	}
 }
 
