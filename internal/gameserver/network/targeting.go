@@ -83,7 +83,20 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if !selected {
 		return
 	}
-	if inPostureTransition(live) {
+	// A static object's interact also waits out a swing or a cast; every
+	// other selected-target click waits here only for a sit-down or
+	// stand-up. A player that cannot act is refused the interact outright,
+	// before anything is queued or run, so the click leaves a fear flee or
+	// any other walk under way untouched.
+	busy := inPostureTransition(live)
+	if _, static := target.(*staticobject.Object); static {
+		if live.DenyAIAction() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		busy = itemAICastBusy(live)
+	}
+	if busy {
 		if live.DenyAIAction() || (ctrl && liveOutOfControl(live)) || target.ObjectID() == live.ObjectID() {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
@@ -119,10 +132,8 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 	if l.actOnFolk(live, target, ctrl, shift) {
 		return
 	}
-	if l.interactLiveStaticObject(live, target) {
-		return
-	}
-	if l.sitLiveOnChair(live, target, true) {
+	if obj, ok := target.(*staticobject.Object); ok {
+		l.thinkStaticInteract(live, obj)
 		return
 	}
 	l.attackLiveTarget(live, target, shift)
@@ -155,47 +166,37 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 		}
 		return func() { l.startLiveFollow(live, v, shift) }
 	case *staticobject.Object:
-		if v.Type() == staticobject.MapType || v.Type() == staticobject.ArenaSignType {
-			return func() {
-				if live.DenyAIAction() || live.Seated() {
-					live.tryToIdle(false)
-					live.SendFrame(serverpackets.FrameActionFailed())
-					return
-				}
-				l.interactLiveStaticObject(live, v)
-			}
-		}
+		return func() { l.thinkStaticInteract(live, v) }
 	}
 	return attack
 }
 
-func (l *GameClientLink) interactLiveStaticObject(live *livePlayer, target world.Tracked) bool {
-	obj, ok := target.(*staticobject.Object)
-	if !ok {
-		return false
+// thinkStaticInteract runs a second click on a selected static object as an
+// interact: the click is released with ActionFailed first, then a town map
+// shows its map and an arena sign its signboard. A throne answers nothing
+// more: a click never sits on or claims it, only the sit request does. A
+// player that cannot act, sits, flies, runs a private store or trades
+// interacts with nothing. Every interact ends idle, stopping a walk under
+// way.
+// ponytail: an object out of interact range is not walked to, and no
+// MoveToPawn faces it (#2962).
+func (l *GameClientLink) thinkStaticInteract(live *livePlayer, obj *staticobject.Object) {
+	live.SendFrame(serverpackets.FrameActionFailed())
+	if live.DenyAIAction() || live.Seated() || live.Flying() || !l.playerCanAttemptInteract(live) {
+		live.tryToIdle(false)
+		return
 	}
-
-	// Interacting replaces the follow intention and a held walk or equip
-	// toggle.
 	switch obj.Type() {
 	case staticobject.MapType:
-		live.endFollow()
-		live.dropHeldIntention()
-		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
 	case staticobject.ArenaSignType:
-		live.endFollow()
-		live.dropHeldIntention()
 		html, ok := l.html.Get("signboard.htm")
 		if !ok {
 			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
 		}
-		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameNpcHtmlMessage(obj.ObjectID(), html, 0))
-	default:
-		return false
 	}
-	return true
+	live.tryToIdle(false)
 }
 
 func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {
@@ -671,7 +672,7 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		return
 	}
 	if !stand {
-		if target != nil && l.sitLiveOnChair(live, target, false) {
+		if target != nil && l.sitLiveOnChair(live, target) {
 			return
 		}
 	}
@@ -680,15 +681,9 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	}
 }
 
-// sitLiveOnChair claims target as a throne and sits live on it. viaClick
-// distinguishes the two reference entry points that share this logic: a
-// second Action click routes through StaticObject.onAction ->
-// tryToInteract -> thinkInteract, whose first statement is an unconditional
-// clientActionFailed() (PlayerAI.java:415) — so a successful click-driven
-// sit still has to release the pending action here. The sit key and
-// action-bar button route through tryToSit (PlayableAI.java:430), which only
-// sends clientActionFailed on a denyAiAction rejection, never on success.
-func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, viaClick bool) bool {
+// sitLiveOnChair claims target as a throne and sits live on it, for a sit
+// request: a successful sit answers no ActionFailed.
+func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked) bool {
 	if live == nil {
 		return false
 	}
@@ -700,9 +695,6 @@ func (l *GameClientLink) sitLiveOnChair(live *livePlayer, target world.Tracked, 
 	if !l.changeLiveWaitType(live, false) {
 		live.releaseChair()
 		return false
-	}
-	if viaClick {
-		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChairSit(live.ObjectID(), chair.StaticObjectID())

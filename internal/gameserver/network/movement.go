@@ -44,7 +44,14 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if inPostureTransition(live) {
+	// A walk requested mid-swing, mid-cast or mid-transition waits for it as
+	// the next intention, answered ActionFailed; the end of the swing, cast
+	// or transition walks.
+	if itemAICastBusy(live) {
+		if live.DenyAIAction() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		live.deferAction(func() { l.startLiveMove(live, target) })
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -59,12 +66,10 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// A client-initiated walk overrides any attack-driven chase movement —
-	// otherwise the server's own MaybeStartOffensiveFollow re-think would
-	// fight the player's own steering back toward the old target.
-	if live.combat != nil {
-		live.combat.Stop()
-	}
+	// The walk replaces the attack and follow intentions, so no chase
+	// re-think steers back toward an old target. A walk already under way
+	// is re-steered by the new MoveToLocation, never stopped first.
+	live.replaceIntention()
 
 	// The server-authoritative position, never the packet's claimed origin,
 	// is what the walk simulates from (matching the reference's
@@ -76,12 +81,12 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 		l.log.Warn().Err(err).Msg("move: broadcast")
 	}
 	if !accepted {
-		// Rejected moves leave heading untouched.
+		// A rejected walk leaves the player standing, heading untouched.
+		live.move.Stop()
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// combat.Stop() above cancelled any move in flight, so parked approach
-	// slots must not survive this new accepted walk.
+	// Parked approach slots must not survive this new accepted walk.
 	live.clearParkedApproaches()
 	live.holdMoveTo(target)
 	// Face the destination from the same server-authoritative origin the
