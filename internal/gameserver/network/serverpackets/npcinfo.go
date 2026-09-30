@@ -37,7 +37,7 @@ func FrameNPCInfo(s NPCInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.RunSpd))
 	w.WriteInt32(int32(s.WalkSpd))
 	w.WriteFloat64(s.MoveMultiplier)
-	w.WriteFloat64(1.1)
+	w.WriteFloat64(s.AtkSpdMultiplier)
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
 	w.WriteInt32(int32(s.RightHand))
@@ -78,8 +78,8 @@ func FrameServerObjectInfo(s NPCInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.Y))
 	w.WriteInt32(int32(s.Z))
 	w.WriteInt32(int32(s.Heading))
-	w.WriteFloat64(1)
-	w.WriteFloat64(1.1)
+	w.WriteFloat64(1) // movement speed multiplier
+	w.WriteFloat64(1) // attack speed multiplier
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
 	w.WriteInt32(int32(s.CurrentHP))

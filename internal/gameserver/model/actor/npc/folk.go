@@ -84,15 +84,58 @@ const socialInterval = 12 * time.Second
 type Folk struct {
 	world.Presence
 	Instance *Instance
-
-	maxHP          int
-	pAtkSpd        int
-	mAtkSpd        int
-	moveMultiplier float64
-	inPeace        bool
+	fixedStats
+	inPeace bool
 
 	// lastSocial is the Unix millisecond time of the last talk animation.
 	lastSocial atomic.Int64
+}
+
+// fixedStats are the client-visible stats of an NPC that holds no effects,
+// settled once at spawn from its template and passive skills.
+type fixedStats struct {
+	maxHP, pAtkSpd, mAtkSpd          int
+	moveMultiplier, atkSpdMultiplier float64
+}
+
+// settleFixedStats finalizes inst's stats through the builtin stat funcs
+// and the template passives lookup resolves.
+func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, error) {
+	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	if err != nil {
+		return fixedStats{}, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
+	}
+	t := inst.Template
+	calc := func(s stat.Stat, base float64) float64 {
+		c := effect.NewCalculator(defaultBuiltin(s))
+		for _, m := range mods {
+			if m.Stat == s {
+				c.AddMod(m)
+			}
+		}
+		v := c.Calc(templateStatActor{t: t}, base)
+		if s.CantBeNegative() && v <= 0 {
+			return 1
+		}
+		return v
+	}
+	fs := fixedStats{
+		maxHP:   int(calc(stat.MaxHP, t.HPMax)),
+		pAtkSpd: int(calc(stat.PowerAttackSpeed, t.AtkSpd)),
+		mAtkSpd: int(calc(stat.MagicAttackSpeed, magicAttackSpeedBase)),
+	}
+	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
+	// The move speed over the base speed the stance picks, as a moving NPC
+	// computes it; 0 for an NPC whose base is 0.
+	base := int(t.RunSpeed)
+	if inst.WalkMode {
+		base = int(t.WalkSpeed)
+	}
+	if base != 0 {
+		speed := float32(calc(stat.RunSpeed, float64(base)))
+		fs.moveMultiplier = float64(speed / float32(base))
+	}
+	return fs, nil
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
@@ -109,42 +152,11 @@ func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, e
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
+	fs, err := settleFixedStats(inst, lookup)
 	if err != nil {
-		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
+		return nil, err
 	}
-	t := inst.Template
-	calc := func(s stat.Stat, base float64) float64 {
-		c := effect.NewCalculator(defaultBuiltin(s))
-		for _, m := range mods {
-			if m.Stat == s {
-				c.AddMod(m)
-			}
-		}
-		v := c.Calc(templateStatActor{t: t}, base)
-		if s.CantBeNegative() && v <= 0 {
-			return 1
-		}
-		return v
-	}
-	f := &Folk{
-		Instance: inst,
-		maxHP:    int(calc(stat.MaxHP, t.HPMax)),
-		pAtkSpd:  int(calc(stat.PowerAttackSpeed, t.AtkSpd)),
-		mAtkSpd:  int(calc(stat.MagicAttackSpeed, magicAttackSpeedBase)),
-		inPeace:  inPeace,
-	}
-	// The move speed over the base speed the stance picks, as a moving NPC
-	// computes it; 0 for an NPC whose base is 0.
-	base := int(t.RunSpeed)
-	if inst.WalkMode {
-		base = int(t.WalkSpeed)
-	}
-	if base != 0 {
-		speed := float32(calc(stat.RunSpeed, float64(base)))
-		f.moveMultiplier = float64(speed / float32(base))
-	}
-	return f, nil
+	return &Folk{Instance: inst, fixedStats: fs, inPeace: inPeace}, nil
 }
 
 // ObjectID returns this NPC's world object id.
@@ -213,7 +225,8 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		ObjectID: f.ObjectID(), TemplateID: t.TemplateID,
 		X: x, Y: y, Z: z, Heading: f.Heading(),
 		MAtkSpd: f.mAtkSpd, PAtkSpd: f.pAtkSpd,
-		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed), MoveMultiplier: f.moveMultiplier,
+		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
+		MoveMultiplier: f.moveMultiplier, AtkSpdMultiplier: f.atkSpdMultiplier,
 		CurrentHP: f.maxHP, MaxHP: f.maxHP,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
