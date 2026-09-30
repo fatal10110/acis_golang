@@ -42,9 +42,11 @@ func (p clickPair) startFollowing(t *testing.T) {
 	p.c.Send(encodeAction(p.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertFrameOpcode(t, mustRead(t, p.c, "follow ActionFailed"), serverpackets.OpcodeActionFailed, "follow ActionFailed")
 	p.tickUntil(t, "the follower reaching the target", func() bool {
-		ax, ay, az := p.srv.PlayerPosition(t, p.attackerID)
-		vx, vy, vz := p.srv.PlayerPosition(t, p.victimID)
-		return location.In3DRange(ax, ay, az, vx, vy, vz, playerFollowOffset+60)
+		// 2D: the follow walk now stops short of the target mid-leg, where
+		// the test geodata's echoed height hint has lifted Z every update.
+		ax, ay, _ := p.srv.PlayerPosition(t, p.attackerID)
+		vx, vy, _ := p.srv.PlayerPosition(t, p.victimID)
+		return location.In2DRadius(ax, ay, vx, vy, playerFollowOffset+60)
 	})
 	drainUntilQuiet(t, p.c)
 }
