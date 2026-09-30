@@ -560,6 +560,158 @@ func TestClientLinkUnknownAccountAutoCreateOffCountsFailedAttempts(t *testing.T)
 	}
 }
 
+// newFailedAttemptLink builds a ClientLink with only what the failed-attempt
+// bookkeeping touches, so the window can be driven with explicit times.
+func newFailedAttemptLink() (*ClientLink, *manager.IPBanList) {
+	bans := manager.NewIPBanList(zerolog.Nop())
+	return &ClientLink{
+		bans:               bans,
+		loginTryBeforeBan:  DefaultLoginTryBeforeBan,
+		loginBlockAfterBan: DefaultLoginBlockAfterBan,
+		log:                zerolog.Nop(),
+	}, bans
+}
+
+func failedAttemptCount(l *ClientLink) int {
+	l.failedMu.Lock()
+	defer l.failedMu.Unlock()
+	return len(l.failedAttempts)
+}
+
+func TestClientLinkFailedAttemptWindow(t *testing.T) {
+	l, _ := newFailedAttemptLink()
+	if got := l.failedAttemptWindow(); got != time.Hour {
+		t.Fatalf("default window = %v, want 1h", got)
+	}
+	l.loginBlockAfterBan = 3 * time.Hour
+	if got := l.failedAttemptWindow(); got != 3*time.Hour {
+		t.Fatalf("window with 3h block = %v, want 3h (never shorter than the ban)", got)
+	}
+	l.loginBlockAfterBan = 0
+	if got := l.failedAttemptWindow(); got != time.Hour {
+		t.Fatalf("window with zero block = %v, want 1h", got)
+	}
+}
+
+// TestClientLinkSubThresholdFailuresFromManyIPsAreSwept drives the
+// cycling-address shape: many addresses each stop one failure short of the
+// ban. Once they have been idle past the window a sweep drops them all,
+// while an address still inside the window keeps its count toward the ban.
+func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
+	l, bans := newFailedAttemptLink()
+	window := l.failedAttemptWindow()
+	t0 := time.Now()
+
+	const cycled = 2000
+	for i := range cycled {
+		ip := net.IPv4(10, byte(i>>16), byte(i>>8), byte(i))
+		for range DefaultLoginTryBeforeBan - 1 {
+			l.recordFailedAttempt(ip, t0)
+		}
+		if bans.IsBanned(ip) {
+			t.Fatalf("ip %s banned below the threshold", ip)
+		}
+	}
+	recent := net.ParseIP("192.0.2.1")
+	for range DefaultLoginTryBeforeBan - 1 {
+		l.recordFailedAttempt(recent, t0.Add(window/2))
+	}
+	if got := failedAttemptCount(l); got != cycled+1 {
+		t.Fatalf("tracked addresses = %d, want %d", got, cycled+1)
+	}
+
+	sweepAt := t0.Add(window + time.Second)
+	l.sweepFailedAttempts(sweepAt)
+	if got := failedAttemptCount(l); got != 1 {
+		t.Fatalf("tracked addresses after sweep = %d, want 1 (only the in-window address)", got)
+	}
+
+	l.recordFailedAttempt(recent, sweepAt)
+	if !bans.IsBanned(recent) {
+		t.Fatal("in-window address was not banned at the threshold after a sweep")
+	}
+	if got := failedAttemptCount(l); got != 0 {
+		t.Fatalf("tracked addresses after ban = %d, want 0", got)
+	}
+}
+
+func TestClientLinkFailedAttemptsWithinWindowStillBan(t *testing.T) {
+	l, bans := newFailedAttemptLink()
+	window := l.failedAttemptWindow()
+	ip := net.ParseIP("192.0.2.2")
+	t0 := time.Now()
+
+	// Consecutive failures exactly one window apart still accumulate.
+	for i := range DefaultLoginTryBeforeBan {
+		l.recordFailedAttempt(ip, t0.Add(time.Duration(i)*window))
+	}
+	if !bans.IsBanned(ip) {
+		t.Fatal("failures spaced exactly one window apart did not ban")
+	}
+}
+
+func TestClientLinkFailedAttemptsIdlePastWindowRestartCount(t *testing.T) {
+	l, bans := newFailedAttemptLink()
+	window := l.failedAttemptWindow()
+	ip := net.ParseIP("192.0.2.3")
+	t0 := time.Now()
+
+	for range DefaultLoginTryBeforeBan - 1 {
+		l.recordFailedAttempt(ip, t0)
+	}
+	// No sweep ran: the stale count is discarded when the next failure lands.
+	restart := t0.Add(window + time.Second)
+	l.recordFailedAttempt(ip, restart)
+	if bans.IsBanned(ip) {
+		t.Fatal("failure after an idle window counted toward the old attempts")
+	}
+	for range DefaultLoginTryBeforeBan - 1 {
+		l.recordFailedAttempt(ip, restart)
+	}
+	if !bans.IsBanned(ip) {
+		t.Fatal("restarted count did not ban at the threshold")
+	}
+}
+
+func TestClientLinkPurgeLoopSweepsFailedAttempts(t *testing.T) {
+	_, l, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false, func(l *ClientLink) {
+		l.loginTimeout = 20 * time.Millisecond
+		l.failedAttempts = map[string]failedAttempt{
+			"192.0.2.4": {count: 1, last: time.Now().Add(-2 * l.failedAttemptWindow())},
+		}
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for failedAttemptCount(l) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("purge loop did not sweep an expired failed-attempt count")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestClientLinkFailedAttemptsConcurrentAccess(t *testing.T) {
+	l, _ := newFailedAttemptLink()
+	var wg sync.WaitGroup
+	for g := range 8 {
+		wg.Go(func() {
+			for i := range 200 {
+				ip := net.IPv4(10, 1, byte(g), byte(i))
+				now := time.Now()
+				l.recordFailedAttempt(ip, now)
+				if i%3 == 0 {
+					l.clearFailedAttempts(ip)
+				}
+				l.sweepFailedAttempts(now.Add(2 * l.failedAttemptWindow()))
+			}
+		})
+	}
+	wg.Wait()
+	if got := failedAttemptCount(l); got != 0 {
+		t.Fatalf("tracked addresses = %d, want 0 after sweeping past the window", got)
+	}
+}
+
 func TestClientLinkLoginUnknownAccountAutoCreateOn(t *testing.T) {
 	accounts := newFakeAccountStore()
 	addr, l, _, sessions, _ := newTestClientLink(t, accounts, true)
