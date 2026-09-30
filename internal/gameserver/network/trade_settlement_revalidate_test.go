@@ -45,8 +45,8 @@ func TestSettleConfirmedTradeOutOfRangeCancels(t *testing.T) {
 
 // TestSettleConfirmedTradePartnerGoneCancelsConfirmer pins the settle-time
 // cancel when the partner left the world after Confirm took the ready
-// session out of the book (its own detach cancel then found nothing to
-// cancel): the confirmer still gets the reference's cancelActiveTrade pair,
+// session out of the book (its own detach then found no open session to
+// leave): the confirmer still gets the reference's cancelActiveTrade pair,
 // naming itself, instead of a trade window left open.
 func TestSettleConfirmedTradePartnerGoneCancelsConfirmer(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)

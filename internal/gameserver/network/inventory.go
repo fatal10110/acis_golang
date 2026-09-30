@@ -418,23 +418,29 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 	}
 }
 
+// dropLiveItem answers RequestDropItem. Whether the item can be discarded
+// at all is settled before the distance: a pet's collar while the pet is out,
+// a missing item or a bad count never reads as too far.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
-	if !liveItemOpsAllowed(live) || l.groundItems == nil || req.Count < 0 {
-		return
-	}
-	if req.Count == 0 {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
+	if !liveItemOpsAllowed(live) || l.groundItems == nil {
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
 		return
 	}
-	if req.ObjectID == live.Character.MountObjectID() {
+	count := int(req.Count)
+	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, live.ControlItemInUse(req.ObjectID)) {
+	case invops.DropOK:
+	case invops.DropCannotDiscard:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
+		return
+	default:
+		// The reference ignores these requests without an answer;
+		// ActionFailed releases the drag without a message.
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	count := int(req.Count)
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardDistanceTooFar))
 		return
@@ -507,8 +513,8 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	default:
 		return
 	}
-	if objectID == live.Character.MountObjectID() {
-		live.SendFrame(serverpackets.FrameActionFailed())
+	if live.ControlItemInUse(objectID) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetSummonedMayNotDestroyed))
 		return
 	}
 	l.unequipDestroyedItem(live, inv, objectID, count)

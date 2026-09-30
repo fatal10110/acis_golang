@@ -106,13 +106,26 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
-	if !ok || !l.tradePartnerLive(live, partner) {
+	switch {
+	case session.PartnerLeft(live.ObjectID()):
+		if !ok {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+			l.cancelTradeByID(live.ObjectID())
+			return
+		}
+		// The partner left the world with the window open and is back
+		// under the same id. The reference's presence check looks the id
+		// up, finds the new login and lets the add through; the offer only
+		// ever reaches the departed session, so the new login is told
+		// nothing.
+		partner = nil
+	case !ok || !l.tradePartnerLive(live, partner):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
 
-	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), req.ObjectID, int(req.Count))
+	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), live.Character, req.ObjectID, int(req.Count))
 	switch result.Status {
 	case tradebook.AddNoSession:
 		return
@@ -146,6 +159,9 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		l.log.Error().Err(err).Msg("build TradeItemUpdate")
 		return
 	}
+	if partner == nil {
+		return
+	}
 	if frame, err := serverpackets.FrameTradeOtherAdd(snapshot, result.AddedCount, partner.Inventory().Templates()); err == nil {
 		partner.SendFrame(frame)
 	} else {
@@ -176,11 +192,20 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
-	if !ok || !l.tradePartnerLive(live, partner) {
+	switch {
+	case session.PartnerLeft(live.ObjectID()):
+		// A partner who left with the window open is answered like any
+		// absent partner. Once the id is back online the reference goes on
+		// to confirm, whose re-check of the departed partner then fails:
+		// Confirm reports that below.
+		if !ok {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+			return
+		}
+	case !ok || !l.tradePartnerLive(live, partner):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
-	}
-	if !livePlayersInRange(live, partner, tradeInteractionDistance) {
+	case !livePlayersInRange(live, partner, tradeInteractionDistance):
 		// The reference validates the interaction radius on every confirm
 		// and answers an out-of-range confirm by cancelling the whole
 		// trade for both players, not with a per-player error message.
@@ -191,6 +216,11 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	result := l.tradeBook().Confirm(live.ObjectID())
 	switch result.Status {
 	case tradebook.DoneNoSession, tradebook.DoneAlreadyConfirmed:
+		return
+	case tradebook.DonePartnerLeft:
+		// The confirm's re-check found the partner gone: the whole trade
+		// is cancelled, naming the confirmer.
+		l.cancelTradeByID(live.ObjectID())
 		return
 	case tradebook.DoneConfirmed:
 		l.sendTradeConfirmed(live, partner)
@@ -226,8 +256,8 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 	if !session.Empty() {
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
-			func(first, second itemcontainer.Held) bool {
-				status = session.Check(first, second)
+			func(firstHeld, secondHeld itemcontainer.Held) bool {
+				status = session.Check(firstHeld, secondHeld, first.Character, second.Character)
 				return status == tradebook.SettlementOK
 			})
 		switch {
@@ -266,6 +296,18 @@ func (l *GameClientLink) cancelActiveTrade(live *livePlayer) {
 	l.cancelTradeByID(live.ObjectID())
 }
 
+// leaveActiveTrade takes a player leaving the world out of its open trade
+// without cancelling it. The reference cancels on exit only while a request
+// answer is still pending, and the answer clears that, so an open window
+// stays open on the partner's side with nothing sent; the partner finds out
+// on its own next trade action.
+func (l *GameClientLink) leaveActiveTrade(live *livePlayer) {
+	if live == nil || l.trades == nil {
+		return
+	}
+	l.trades.Leave(live.ObjectID())
+}
+
 func (l *GameClientLink) cancelTradeByID(playerID int32) {
 	result := l.tradeBook().Cancel(playerID)
 	if result.Status != tradebook.CancelDone {
@@ -277,13 +319,14 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 // sendTradeCanceled closes the trade window on both clients, partner first,
 // naming the canceller to each: the canceller reads its own name. A
 // participant no longer in the world gets nothing, so a canceller whose
-// partner is gone still hears its own cancel.
+// partner is gone still hears its own cancel. Neither does a partner who
+// left with the window open, even when a new login holds its id.
 func (l *GameClientLink) sendTradeCanceled(session tradebook.Session, cancellerID int32) {
 	canceller, ok := l.livePlayerByID(cancellerID)
 	if !ok {
 		return
 	}
-	if partnerID, ok := session.PartnerID(cancellerID); ok {
+	if partnerID, ok := session.PartnerID(cancellerID); ok && !session.PartnerLeft(cancellerID) {
 		if partner, ok := l.livePlayerByID(partnerID); ok {
 			sendTradeCancel(partner, canceller.Name)
 		}

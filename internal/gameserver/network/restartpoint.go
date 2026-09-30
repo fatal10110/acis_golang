@@ -135,6 +135,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		live.zoneActor.sendCurrentCompass()
 	}
 	l.updateLivePlayerPosition(live, target, heading)
+	// An accepted teleport ends any open trade for both sides, naming the
+	// one who moved.
+	l.cancelActiveTrade(live)
 }
 
 // inWater reports whether at lies inside a water zone, where a creature
