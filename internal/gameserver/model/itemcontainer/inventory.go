@@ -322,10 +322,9 @@ func (inv *Inventory) Restore(items []*item.Instance) {
 		}
 		inv.Container.items[inst.ObjectID] = inst
 
-		// totalWeight is left at 0 here, matching the reference's restore()
-		// (Inventory.java:108-154), which populates _items via addBasicItem()
-		// without ever touching _totalWeight: only an explicit updateWeight()
-		// call (as ItemList's constructor makes) computes and reports it.
+		// totalWeight is deliberately left at 0 here: restoring only fills
+		// the item set, and carried weight is computed and reported solely by
+		// an explicit UpdateWeight call (as every item-list send makes).
 		if st.Location != inv.equipLocation || st.LocationData < 0 || st.LocationData >= item.PaperdollSlots {
 			continue
 		}
@@ -1104,10 +1103,10 @@ func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, s
 }
 
 func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
-	// Coalesce a repeated update for the same instance and state (e.g.
-	// several count changes in a row) into the latest count, matching the
-	// Java reference's dedup rule, instead of letting the queue grow
-	// unbounded.
+	// Coalesce a repeated update for the same stackable instance and state
+	// (e.g. several count changes in a row) into the latest count instead of
+	// letting the queue grow unbounded; any other update is appended as its
+	// own entry.
 	tmpl, _ := inv.Templates().Get(templateID)
 	if tmpl != nil && tmpl.Stackable {
 		for i, u := range inv.updates {
