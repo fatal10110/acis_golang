@@ -205,8 +205,9 @@ type Controller struct {
 //     _actor.getAI().clientActionFailed() (PlayerCast.java:381-387) that
 //     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
 //   - ShotsRechargeRequested, first when a cast of a skill that spends
-//     soulshots or spiritshots finishes naturally, fusion channels aside:
-//     the caster charges them again from its auto-use shots;
+//     soulshots or spiritshots finishes naturally, fusion channels aside,
+//     and for a SIGNET_CASTTIME cast also at its launch: the caster charges
+//     them again from its auto-use shots;
 //   - AttackStanceRequested, just ahead of the CastFinished of an
 //     offensive cast that finished naturally after its launch resolved at
 //     least one target (SetLaunchTargets): the caster enters or refreshes
@@ -519,7 +520,10 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 	// instead of destroying zero units and reporting success/failure for an
 	// item it never touched — again preferred over reproducing that
 	// zero-count side effect.
-	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 {
+	//
+	// A fusion-timeline cast (FusionTimeline) only needs the item: CanCast
+	// checked the count, and nothing takes it.
+	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && !FusionTimeline(def) {
 		switch {
 		case c.actor.ConsumeItem(def.ItemConsumeID, def.ItemConsumeCount):
 			plan.ItemCharge = ItemChargePaid
@@ -844,13 +848,20 @@ func ReuseKey(def modelskill.Definition) int32 {
 	return int32(ref.ID)*256 + int32(ref.Level)
 }
 
+// FusionTimeline reports whether a player cast of def runs the fusion-cast
+// timeline instead of the ordinary launch, hit and cool phases: a FUSION
+// channel or a SIGNET_CASTTIME signet. Such a cast lands its effect when it
+// starts, keeps the template hit time, cool time and reuse unscaled, and
+// takes nothing for the skill's consume item, which it only has to hold.
+func FusionTimeline(def modelskill.Definition) bool {
+	return def.SkillType == "FUSION" || def.SkillType == "SIGNET_CASTTIME"
+}
+
 func (c *Controller) buildPlan(def modelskill.Definition) Plan {
-	// PlayerCast.doFusionCast (PlayerCast.java:75-76,52) reads
-	// skill.getHitTime()/getCoolTime()/getReuseDelay() raw, with no atkSpd,
-	// spiritshot, or reuse-rate scaling applied — channel length, gauge,
-	// interrupt window, and reuse are fixed for every caster regardless of
-	// attack speed.
-	fusion := def.SkillType == "FUSION"
+	// A fusion-timeline cast reads its hit time, cool time and reuse delay
+	// raw, with no attack-speed, spiritshot or reuse-rate scaling: its
+	// length, gauge, interrupt window and reuse are fixed for every caster.
+	fusion := FusionTimeline(def)
 
 	hitTime := def.HitTime
 	coolTime := def.CoolTime

@@ -253,7 +253,7 @@ func TestSignetMDamBreaksTheMonsterCastBeforeTheDamageReport(t *testing.T) {
 	w := bootBreakingMonster(t, def)
 
 	w.c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
-	readCastStartFrames(t, w.c, w.objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), w.objID)
+	readSignetCastStartFrames(t, w.c, w.objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), w.objID)
 	tickSignetMDamLive(t, w.srv)
 	if w.hostile.CurrentHP() >= w.maxHP {
 		t.Fatal("the signet never damaged the monster")

@@ -50,7 +50,7 @@ type AttackRethink struct{}
 // again from the ones it has set to auto-use: the first hit group of its
 // swing reaching the target (Physical), and a skill's cast finalizer
 // (Physical for a skill that spends soulshots, Magic for one that spends
-// spiritshots). A player charges its weapon from its own shots, a summon
+// spiritshots), which for a SIGNET_CASTTIME cast also runs at its launch. A player charges its weapon from its own shots, a summon
 // from its owner's beast shots. Attack controllers emit it for players and
 // summons only. Cast controllers emit it for every caster; an NPC's owner
 // drops it, since an NPC's shots recharge from its AI.
