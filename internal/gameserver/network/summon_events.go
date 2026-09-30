@@ -181,7 +181,7 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.AbnormalEffectChanged:
 		l.refreshSummonAbnormalEffect(actor)
 	case event.AttackTargetRefused:
-		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
+		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 		}
 	case event.ExpGained:
@@ -193,7 +193,7 @@ func (s *summonSink) Emit(ev event.Event) {
 			owner.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessagePetUsesS1, e.SkillID, e.Level))
 		}
 	case event.Damaged:
-		owner, ok := l.livePlayerByID(actor.OwnerID())
+		owner, ok := l.currentSummonOwner(actor)
 		if !ok {
 			return
 		}
@@ -203,7 +203,7 @@ func (s *summonSink) Emit(ev event.Event) {
 		}
 		owner.SendFrame(serverpackets.FrameSystemMessageStringNumber(messageID, e.AttackerName, e.Damage))
 	case event.HitDealt:
-		owner, ok := l.livePlayerByID(actor.OwnerID())
+		owner, ok := l.currentSummonOwner(actor)
 		if !ok {
 			return
 		}
@@ -263,19 +263,21 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.Unsummoning:
 		if actor.OwnerLeft() {
 			// A corpse its owner left behind has not acted since its row was
-			// saved (leaveCorpseBehind); its items are all that is left to
-			// settle. One revived since is a living pet leaving the world
-			// (a signet's unsummon): it stops what it was doing, and its row
-			// is saved again first, alive, with its owner's collar lifted
-			// to the level it regained.
+			// saved (leaveCorpseBehind); a pet's items are all that is left
+			// to settle. One revived since is a living summon leaving the
+			// world (a signet's unsummon, a servitor's decay): it stops what
+			// it was doing, and a pet's row is saved again first, alive,
+			// with its owner's collar lifted to the level it regained.
 			if !actor.Dead() {
 				if s.brain != nil {
 					s.runCleanup(s.brain.AbortAll)
 				}
-				s.runCleanup(func() {
-					l.savePet(actor, nil)
-					l.liftLeftPetCollar(actor)
-				})
+				if actor.IsPet() {
+					s.runCleanup(func() {
+						l.savePet(actor, nil)
+						l.liftLeftPetCollar(actor)
+					})
+				}
 			}
 			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
@@ -333,6 +335,12 @@ func (s *summonSink) leaveCorpseBehind() {
 	actor.AdoptCorpseQueue(q)
 	s.moveWorkTo(q)
 	s.onDespawn(q.Close)
+	if l.attackStance != nil {
+		// A corpse revived meanwhile is in a stance of its own
+		// (startSummonAttackStance), whose expiry the closed queue would
+		// never run.
+		s.onDespawn(func() { l.attackStance.Remove(actor) })
+	}
 }
 
 // relinkToOwner moves the rest of a relinked pet's work onto its owner's
@@ -480,7 +488,7 @@ func (l *GameClientLink) liftLeftPetCollar(actor *summon.Actor) {
 // currentSummonOwner returns the connected player actor answers to. That is
 // its owner's session, until the owner leaves the world with actor lying
 // dead. A pet's corpse then answers to whichever session its owner comes back
-// with, and a servitor's corpse to nobody.
+// with, and a servitor's corpse to nobody, revived or not.
 func (l *GameClientLink) currentSummonOwner(actor *summon.Actor) (*livePlayer, bool) {
 	if !actor.OwnerLeft() {
 		return liveSummonOwner(actor)
@@ -495,7 +503,7 @@ func (l *GameClientLink) currentSummonOwner(actor *summon.Actor) (*livePlayer, b
 // owner's summon auto-shots are turned off, then the owner reads the death
 // message for a servitor or a pet.
 func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
-	owner, ok := liveSummonOwner(actor)
+	owner, ok := l.currentSummonOwner(actor)
 	if !ok {
 		return
 	}

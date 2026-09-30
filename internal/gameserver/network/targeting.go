@@ -638,7 +638,33 @@ func (l *GameClientLink) startLiveAutoAttack(live *livePlayer) {
 // startSummonAttackStance enters or refreshes the attack stance of actor's
 // owner, which a summon's stance is. Entering it shows the stance on actor,
 // then on its owner.
+//
+// A summon revived after its owner left the world is in a stance of its
+// own: the departed session is gone, and its object id may already be the
+// owner's next session's. Entering it shows the stance on actor, and its
+// expiry ends it on actor (attackStanceEffects).
 func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
+	if actor.OwnerLeft() {
+		if l.attackStance == nil {
+			return
+		}
+		if !l.attackStance.InAttackStance(actor) {
+			l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
+		}
+		l.attackStance.Add(actor)
+		// A hit that passed its Knows check as the summon's decay
+		// despawned it can get here after the despawn cleanup's Remove
+		// (leaveCorpseBehind), and its entry would outlive the summon,
+		// its expiry refused by the closed corpse queue on every tick.
+		// The summon leaves the world before that Remove runs, so either
+		// the cleanup or this check drops the entry.
+		if l.world != nil {
+			if obj, ok := l.world.Object(actor.ObjectID()); !ok || obj != world.Tracked(actor) {
+				l.attackStance.Remove(actor)
+			}
+		}
+		return
+	}
 	owner, ok := liveSummonOwner(actor)
 	if !ok {
 		return
