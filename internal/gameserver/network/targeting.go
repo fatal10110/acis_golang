@@ -266,7 +266,8 @@ type petInteractIntention struct {
 // status window, after an approach walk when out of range. An owner that
 // cannot take AI actions is only answered ActionFailed. One still swinging
 // or casting queues the interact for that to end, answered ActionFailed
-// too. Otherwise the interact replaces the follow intention and runs now.
+// too. Otherwise the interact replaces the current intention, an attack
+// waiting out a bow's reuse or chasing its target included, and runs now.
 // ponytail: a sit-down or stand-up in progress does not queue the interact
 // yet (#2674).
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
@@ -279,8 +280,29 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor,
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	live.endFollow()
+	replaceWithPetInteract(live)
 	l.thinkOwnedPetInteract(live, pet, shift)
+}
+
+// replaceWithPetInteract makes the owner's interact with its summon the
+// current intention: the attack intention is dropped and every follow task,
+// an attack chase or a friendly follow, is cancelled. A walk under way is
+// left to the interact's think, which walks elsewhere or stops it.
+func replaceWithPetInteract(live *livePlayer) {
+	if live.combat != nil {
+		live.combat.Replace()
+	}
+	if live.move != nil {
+		live.move.CancelFollow()
+	}
+}
+
+// endPetInteractIdle ends the owner's interact with its summon idle: a walk
+// still under way stops, broadcast as StopMove.
+func endPetInteractIdle(live *livePlayer) {
+	if live.move != nil {
+		live.move.Stop()
+	}
 }
 
 // finishDeferredPetInteract runs the summon interact queued as the next
@@ -299,12 +321,10 @@ func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
 	if queued == nil {
 		return false
 	}
-	if live.combat != nil {
-		live.combat.Replace()
-	}
-	live.endFollow()
+	replaceWithPetInteract(live)
 	if l.resolveTarget(queued.pet.ObjectID()) != world.Tracked(queued.pet) || queued.pet.OwnerID() != live.ObjectID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		endPetInteractIdle(live)
 		return true
 	}
 	l.thinkOwnedPetInteract(live, queued.pet, queued.shift)
@@ -318,14 +338,20 @@ func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
 // sits, flies, runs a private store or trades gets nothing more. Out of
 // approach range, a movable owner walks toward the summon unless shift is
 // held. In range, the owner still inside interaction distance faces the
-// summon and gets its status window.
+// summon and gets its status window. Every outcome but the approach walk,
+// or an owner that cannot move holding the interact, ends it idle.
 func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Actor, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {
+		endPetInteractIdle(live)
 		return
 	}
 	if !summonInRange(live, pet, int(summonInteractApproachOffset+live.CollisionRadius()+pet.CollisionRadius())) {
-		if shift || live.move == nil || live.MovementDisabled() {
+		if shift {
+			endPetInteractIdle(live)
+			return
+		}
+		if live.move == nil || live.MovementDisabled() {
 			return
 		}
 		live.clearParkedApproaches()
@@ -338,6 +364,7 @@ func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Act
 		return
 	}
 	if !l.playerCanDoInteract(live, pet) {
+		endPetInteractIdle(live)
 		return
 	}
 	at := live.CurrentLocation()
@@ -346,6 +373,7 @@ func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Act
 		return serverpackets.FrameMoveToPawn(live.ObjectID(), pet.ObjectID(), summonInteractRange, at)
 	})
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	endPetInteractIdle(live)
 }
 
 func petLocation(pet *summon.Actor) location.Location {
