@@ -322,7 +322,8 @@ func appendThunk(pending *[]func(), thunk func()) {
 // beginActivate returns a thunk that runs e's on-start hook once the
 // caller's lock is released, then briefly re-acquires l.mu to apply the
 // result: e activates and gains its stat funcs on success, or onReject
-// runs (still under l.mu) on failure. With announce set, a successful
+// runs (still under l.mu) on failure. The owner reports the stat change
+// after l.mu is released again. With announce set, a successful
 // activation of an icon effect then tells the owner it feels e's effect —
 // the add path's stack-head promotion does this (unless l.silent, read here
 // under l.mu), the removal path's does not.
@@ -340,17 +341,24 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 			ok = e.OnStart(e)
 		}
 
+		attached := false
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
 			if !e.startRefused {
-				l.addStatFuncs(e)
+				l.attachStatFuncs(e)
+				attached = true
 			}
 		} else {
 			onReject(e)
 		}
 		l.mu.Unlock()
 
+		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
+		// owner's appearance for its observers, which reads this list's flags.
+		if attached && l.owner != nil {
+			l.owner.StatFuncsAttached(e.Funcs)
+		}
 		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
 		}

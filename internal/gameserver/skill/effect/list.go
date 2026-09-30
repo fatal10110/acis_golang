@@ -15,7 +15,16 @@ import (
 // expiry messages. Kinds without client icons or messages implement those as
 // no-ops.
 type StatOwner interface {
-	AddStatFuncs([]Mod)
+	// AttachStatFuncs attaches fns to the owner's stat calculators without
+	// reporting the change. The list calls it under its own lock, so it must
+	// not reach back into the list; StatFuncsAttached follows once the lock
+	// is released.
+	AttachStatFuncs([]Mod)
+	// StatFuncsAttached reports that fns were attached: the owner refreshes
+	// whatever view follows those stats (move speed, appearance, status).
+	// The list calls it without holding its lock, so the refresh may read
+	// the list back.
+	StatFuncsAttached([]Mod)
 	RemoveStatsByOwner(owner ModOwner)
 	// MaxBuffCount is the number of non-toggle, non-seven-signs buffs the
 	// owner can hold at once (base slot count plus any bonus the owner

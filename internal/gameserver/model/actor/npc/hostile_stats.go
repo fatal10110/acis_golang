@@ -11,16 +11,28 @@ import (
 // maxBuffCount is the shipped players.properties MaxBuffsAmount default.
 const maxBuffCount = 20
 
-// AddStatFuncs attaches fns to h's live stat calculators. Each Mod is
-// published independently under its own Calculator's lock — the batch is
-// not atomic against a concurrent CalcStat, which may observe fns partially
-// applied. Callers that need a batch to appear all-or-nothing to readers
-// must serialize at a higher level (see effect.List, which does this for
-// effect-driven adds).
+// AddStatFuncs attaches fns to h's live stat calculators and reports the
+// change. Each Mod is published independently under its own Calculator's
+// lock — the batch is not atomic against a concurrent CalcStat, which may
+// observe fns partially applied. Callers that need a batch to appear
+// all-or-nothing to readers must serialize at a higher level (see
+// effect.List, which does this for effect-driven adds through
+// AttachStatFuncs and StatFuncsAttached).
 func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
+	h.AttachStatFuncs(fns)
+	h.StatFuncsAttached(fns)
+}
+
+// AttachStatFuncs attaches fns to h's live stat calculators without
+// reporting the change.
+func (h *Hostile) AttachStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		h.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
+}
+
+// StatFuncsAttached reports the stat change of attached fns.
+func (h *Hostile) StatFuncsAttached(fns []effect.Mod) {
 	h.broadcastModifiedStats(fns)
 }
 

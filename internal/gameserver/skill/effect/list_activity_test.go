@@ -22,7 +22,8 @@ func newTestList(owner StatOwner, opts ...Option) *List {
 // side effects.
 type activityTestOwner struct{}
 
-func (activityTestOwner) AddStatFuncs([]Mod)          {}
+func (activityTestOwner) AttachStatFuncs([]Mod)       {}
+func (activityTestOwner) StatFuncsAttached([]Mod)     {}
 func (activityTestOwner) RemoveStatsByOwner(ModOwner) {}
 func (activityTestOwner) MaxBuffCount() int           { return 20 }
 
