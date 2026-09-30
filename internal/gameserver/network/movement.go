@@ -44,6 +44,16 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	if inPostureTransition(live) {
+		live.deferAction(func() { l.startLiveMove(live, target) })
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	live.takeDeferredAction()
+	l.startLiveMove(live, target)
+}
+
+func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Location) {
 	// A client-initiated walk overrides any attack-driven chase movement —
 	// otherwise the server's own MaybeStartOffensiveFollow re-think would
 	// fight the player's own steering back toward the old target.
@@ -203,7 +213,6 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	waitType := serverpackets.WaitSitting
 	if stand {
 		waitType = serverpackets.WaitStanding
-		live.releaseChair()
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})

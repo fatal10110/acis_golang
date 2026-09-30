@@ -282,13 +282,9 @@ func (c *Character) DenyAIAction() bool {
 }
 
 // MovementDisabled reports whether this player is in a state where they
-// cannot move. Sit-down is immediate (`!Standing()`), matching Java's
-// sittingNow window from t=0. Stand-up is not: Java keeps
-// isMovementDisabled true for 2.5s after standUp (`_isStandingNow`), so an
-// out-of-range attack is still rejected; Go's StandUp calls SetStanding(true)
-// synchronously, so the range gate is skipped for that window.
+// cannot move, including the stand-up transition.
 func (c *Character) MovementDisabled() bool {
-	if c.AlikeDead() || !c.Standing() {
+	if c.AlikeDead() || !c.Standing() || c.StandingNow() {
 		return true
 	}
 	live := c.liveLocked()

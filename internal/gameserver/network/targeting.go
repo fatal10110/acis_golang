@@ -55,6 +55,15 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	_, ground := target.(*grounditem.Item)
+	if inPostureTransition(live) && (ground || selected) {
+		live.deferAction(func() { l.handleTargetAction(ctx, live, objectID, selected, ctrl, shift) })
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if ground || selected {
+		live.takeDeferredAction()
+	}
 	if l.startPickupLiveGroundItem(ctx, live, target, shift) {
 		return
 	}
@@ -378,6 +387,15 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
 		return
 	}
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if itemAICastBusy(live) {
+		live.deferAction(func() { l.requestChangeWaitType(live, stand) })
+		return
+	}
+	live.takeDeferredAction()
 	// The reference's thinkStand rejects only on real death (denyAiAction),
 	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
 	// removes the FAKE_DEATH effect, whose exit hook stands the player back
@@ -537,6 +555,7 @@ func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
+	live.takeDeferredAction()
 	live.clearParkedApproaches()
 	if !live.combat.Start(combatant) {
 		live.SendFrame(serverpackets.FrameActionFailed())

@@ -107,6 +107,7 @@ type livePlayer struct {
 	// deferredUseItem is a weapon or shield toggle queued as the next
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
+	deferredAction  func()
 	pickupLocked    bool
 	pickupLockGen   uint64
 
@@ -271,6 +272,7 @@ func (p *livePlayer) Stop() {
 	p.takeDeferredMagicSkill()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -326,6 +328,7 @@ func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
 	p.deferredItem = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.pickup = &pickupIntention{ctx: ctx, target: target}
 }
 
@@ -344,6 +347,7 @@ func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shif
 	p.deferredItem = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.deferredPickup = &pickupIntention{ctx: ctx, target: target, shift: shift}
 }
 
@@ -364,6 +368,7 @@ func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, sel
 	p.deferredItem = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
 }
 
@@ -398,6 +403,7 @@ func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *i
 	p.deferredMagic = nil
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
 }
 
@@ -418,6 +424,7 @@ func (p *livePlayer) deferFollow(target attackable.Combatant, shift bool) {
 	p.deferredMagic = nil
 	p.deferredItem = nil
 	p.deferredUseItem = nil
+	p.deferredAction = nil
 	p.deferredFollow = &followIntention{target: target, shift: shift}
 }
 
@@ -446,6 +453,7 @@ func (p *livePlayer) deferUseItem(objectID int32) {
 	p.deferredMagic = nil
 	p.deferredItem = nil
 	p.deferredFollow = nil
+	p.deferredAction = nil
 	p.deferredUseItem = &useItemIntention{objectID: objectID}
 }
 
@@ -463,6 +471,33 @@ func (p *livePlayer) hasDeferredUseItem() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.deferredUseItem != nil
+}
+
+// deferAction replaces the next player intention. It is drained by the
+// player's queue when the swing, cast, or posture transition ends.
+func (p *livePlayer) deferAction(run func()) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.deferredPickup = nil
+	p.deferredMagic = nil
+	p.deferredItem = nil
+	p.deferredFollow = nil
+	p.deferredUseItem = nil
+	p.deferredAction = run
+}
+
+func (p *livePlayer) takeDeferredAction() func() {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	run := p.deferredAction
+	p.deferredAction = nil
+	return run
+}
+
+func (p *livePlayer) hasDeferredAction() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredAction != nil
 }
 
 func (p *livePlayer) setPetInteract(pet *summon.Actor) {
@@ -519,6 +554,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.takePetInteract()
 	if p.combat != nil {
 		p.combat.Stop()
@@ -537,6 +573,7 @@ func (p *livePlayer) clearParkedApproaches() {
 	p.takeDeferredMagicSkill()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
+	p.takeDeferredAction()
 	p.endFollow()
 }
 
