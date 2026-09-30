@@ -297,6 +297,7 @@ func (r *Region) Height(blockX, blockY, layer int) int16 {
 		ci, li := layer/layerSlot, layer%layerSlot
 		return DecodeCell(r.multilayerCodeAt(entry, ci, li)).Height
 	default:
+		// Null block: constant ground height 0, same contract as Null.Height.
 		return 0
 	}
 }

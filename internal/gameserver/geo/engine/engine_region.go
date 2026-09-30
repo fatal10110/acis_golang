@@ -85,6 +85,8 @@ func (b regionBlock) Below(cellX, cellY int, worldZ int32) int {
 
 func (b regionBlock) Height(layer int) int16 {
 	if b.region == nil {
+		// Unloaded region: constant ground height 0, same contract as
+		// block.Null.Height.
 		return 0
 	}
 	return b.region.Height(b.blockX, b.blockY, layer)
