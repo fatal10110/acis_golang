@@ -127,7 +127,7 @@ func TestPetAttackRechargesAutoBeastSoulshots(t *testing.T) {
 	petActor, _ := h.spawnWolf(t)
 	hostile := h.srv.SpawnHostileNPC(t)
 	// The wolf would kill the fixture monster outright; blocked hits still
-	// land, spending the charge each time.
+	// land, spending the charge on each swing that connects.
 	hostile.SetInvul(true)
 	shotID := h.seededItem(t, beastSoulshotID)
 
@@ -153,9 +153,14 @@ func TestPetAttackRechargesAutoBeastSoulshots(t *testing.T) {
 	drainFrames(t, h.client)
 	h.client.Send(encodeRequestActionUse(16, false))
 
-	// The second landed hit finds the stack gone and drops auto use.
-	h.srv.AdvanceUntil(t, "auto beast soulshots dropped with the spent stack", func() bool {
-		return !owner.AutoSoulShotEnabled(beastSoulshotID)
+	// The swing after the recharge finds the stack gone and drops auto use.
+	// A swing whose hits all miss (the invulnerable monster can still evade)
+	// keeps its charge but still asks for a recharge, so auto use can drop
+	// while the pet is charged; the next landed swing then spends that charge
+	// with nothing left to recharge from. Wait for both rather than assuming
+	// which swing connects.
+	h.srv.AdvanceUntil(t, "auto beast soulshots dropped and the last charge spent", func() bool {
+		return !owner.AutoSoulShotEnabled(beastSoulshotID) && !petActor.SoulshotCharged()
 	})
 	frames := drainFrames(t, h.client)
 
@@ -182,9 +187,6 @@ func TestPetAttackRechargesAutoBeastSoulshots(t *testing.T) {
 	}
 	if uses != 1 || casts != 1 {
 		t.Fatalf("recharges in combat: PET_USES_S1 = %d, charge MagicSkillUse = %d; want 1, 1", uses, casts)
-	}
-	if petActor.SoulshotCharged() {
-		t.Fatal("pet still charged: the second hit did not spend the first hit's recharge")
 	}
 	if got := h.ownerItemCount(t, 6645); got != 0 {
 		t.Fatalf("beast soulshot stack = %d, want 0 after the recharge", got)
