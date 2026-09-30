@@ -32,6 +32,11 @@ import (
 // without an alternative packet when no offer matches (#1638), and the
 // opcode registers no pending client action, so its silence is documented
 // reference parity rather than a silent drop.
+//
+// Logout at character select is absent for the same reason: with no character
+// in the world the reference sends nothing and keeps the connection open
+// (#2514), and the opcode registers no pending client action there.
+// tests/character asserts that silence and the open connection.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
