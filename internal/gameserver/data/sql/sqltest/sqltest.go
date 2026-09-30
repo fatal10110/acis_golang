@@ -267,7 +267,7 @@ var (
 
 // SharedDB returns a MariaDB pool for tb, backed by a database on the shared
 // instance. Databases are pooled per test binary: a test checks one out and
-// returns it, truncated, when it completes, so parallel tests each hold their
+// returns it, emptied, when it completes, so parallel tests each hold their
 // own database while sequential tests reuse one. Repeated calls from the
 // same test return the same database; a t.Run subtest is a different test
 // and gets a different database from its parent. The package's TestMain must call Main
