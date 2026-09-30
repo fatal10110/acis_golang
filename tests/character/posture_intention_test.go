@@ -152,6 +152,11 @@ func TestChairReleasedAfterStandUp(t *testing.T) {
 	if !chair.Busy() {
 		t.Fatal("chair freed before stand-up settled")
 	}
+	if !srv.DrivesClock() {
+		// The wall clock cannot hold the stand-up's last millisecond.
+		srv.AdvanceUntil(t, "chair release", func() bool { return !chair.Busy() })
+		return
+	}
 	srv.Advance(t, 2499*time.Millisecond)
 	if !chair.Busy() {
 		t.Fatal("chair freed during stand-up")

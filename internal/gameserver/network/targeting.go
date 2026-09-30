@@ -129,11 +129,10 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 	attack := func() { l.attackQueuedTarget(live, target, shift) }
 	switch v := target.(type) {
 	case *summon.Actor:
+		// The caller queues a click without ctrl on an owned summon as its
+		// interact intention, so only a ctrl-click reaches here.
 		if v.ShownAsOwnedBy(live.ObjectID()) {
-			if ctrl {
-				return attack
-			}
-			return func() { live.SendFrame(serverpackets.FrameActionFailed()) }
+			return attack
 		}
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
 			return attack
