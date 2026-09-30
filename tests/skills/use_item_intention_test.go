@@ -335,3 +335,92 @@ func TestThinkMidWalkWalksOnAfresh(t *testing.T) {
 		t.Fatalf("MoveToLocation at frame %d for a THINK after the walk arrived", at)
 	}
 }
+
+// dieAndRevive kills objID and raises it again in place, each on its queue.
+func dieAndRevive(t *testing.T, srv *gameservertest.Server, objID int32) {
+	t.Helper()
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		if !pc.Die(nil) {
+			t.Error("Die() = false for a living player")
+		}
+	})
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		if !pc.Revive() {
+			t.Error("Revive() = false for a dead player")
+		}
+	})
+	srv.Settle(t)
+}
+
+// TestWeaponUseItemAfterDeathMidWalkWalksNowhere: death goes idle
+// (CreatureAI.onEvtDead, CreatureAI.java:77-86, doIdleIntention), so a
+// walk cut short by death is no longer current after the revive: a sword
+// put on then re-runs IDLE, and neither it nor a THINK walks back toward
+// the pre-death destination.
+func TestWeaponUseItemAfterDeathMidWalkWalksNowhere(t *testing.T) {
+	t.Parallel()
+	srv, objID, sword := bootIntentionCaster(t, modelskill.TargetSelf)
+	c := srv.Client
+	x, y, z := srv.PlayerPosition(t, objID)
+
+	c.Send(encodeMoveBackwardToLocation(int32(x+2000), int32(y), int32(z)))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
+	dieAndRevive(t, srv, objID)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeSignetUseItem(sword))
+	srv.Settle(t)
+	log := readFrameLog(c)
+	if log.index(isSystemMessage(serverpackets.SystemMessageS1Equipped)) < 0 {
+		t.Fatal("no S1_EQUIPPED for the sword after the revive")
+	}
+	if at := log.index(isOpcode(serverpackets.OpcodeMoveToLocation)); at >= 0 {
+		_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, log[at])
+		t.Fatalf("MoveToLocation to %+v at frame %d: the toggle re-ran the walk death ended", dest, at)
+	}
+
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
+	srv.Settle(t)
+	if at := readFrameLog(c).index(isOpcode(serverpackets.OpcodeMoveToLocation)); at >= 0 {
+		t.Fatalf("MoveToLocation at frame %d: a THINK after the revive re-ran the walk death ended", at)
+	}
+}
+
+// TestWeaponUseItemAfterDeathMidPickupWalkWalksNowhere: a pickup walk cut
+// short by death is dropped with it, so a sword put on after the revive
+// neither walks to the ground item nor collects it.
+func TestWeaponUseItemAfterDeathMidPickupWalkWalksNowhere(t *testing.T) {
+	t.Parallel()
+	srv, objID, sword := bootIntentionCaster(t, modelskill.TargetSelf)
+	c := srv.Client
+	x, y, z := srv.PlayerPosition(t, objID)
+	srv.SeedGroundItem(t, objID, item.AdenaID, 40, x+2000, y, z)
+	snaps := srv.GroundItems.Snapshots(nil)
+	if len(snaps) != 1 {
+		t.Fatalf("tracked ground items = %d, want 1", len(snaps))
+	}
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeAction(snaps[0].ObjectID, int32(x), int32(y), int32(z), false))
+	for frame := c.Read(); frame[0] != serverpackets.OpcodeMoveToLocation; frame = c.Read() {
+	}
+	dieAndRevive(t, srv, objID)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeSignetUseItem(sword))
+	srv.Settle(t)
+	log := readFrameLog(c)
+	if log.index(isSystemMessage(serverpackets.SystemMessageS1Equipped)) < 0 {
+		t.Fatal("no S1_EQUIPPED for the sword after the revive")
+	}
+	if at := log.index(isOpcode(serverpackets.OpcodeMoveToLocation)); at >= 0 {
+		_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, log[at])
+		t.Fatalf("MoveToLocation to %+v at frame %d: the toggle re-ran the pickup death ended", dest, at)
+	}
+	if srv.DrivesClock() {
+		srv.Advance(t, 3*time.Second)
+	}
+	if n := len(srv.GroundItems.Snapshots(nil)); n != 1 {
+		t.Fatalf("tracked ground items after the toggle = %d, want the item still on the ground", n)
+	}
+}

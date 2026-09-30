@@ -115,7 +115,7 @@ const (
 // slot records. Every other intention taking over drops it: a new walk,
 // attack, cast, follow, pickup or interact (clearParkedApproaches, the
 // pickup and static-object interact paths), a sit or stand, going idle
-// (tryToIdle) and Stop. Guarded by pickupMu.
+// (tryToIdle), Stop and death. Guarded by pickupMu.
 type heldIntention struct {
 	kind heldKind
 	// dest is a walk's destination.
