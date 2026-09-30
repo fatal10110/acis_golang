@@ -10,7 +10,9 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -422,7 +424,7 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 }
 
 // walkToCastTarget runs the approach a player's CAST intention takes toward
-// its creature target before anything is paid: nothing while target sits
+// its creature or door target before anything is paid: nothing while target sits
 // within castRange plus both footprints (3D), or when the skill has no range
 // or targets the caster. Out of range, a shift-held cast is refused with
 // TARGET_TOO_FAR and the player goes idle, walking nowhere; otherwise the
@@ -431,17 +433,14 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 // is answered ActionFailed and nothing is parked. It reports whether the cast
 // must not start now. The caller has already dropped every approach an
 // earlier intention parked.
-//
-// A target that is not a creature (a door) is not approached: the cast goes
-// on from where the player stands.
 func (l *GameClientLink) walkToCastTarget(live *livePlayer, target skilltarget.Actor, castRange int, shift bool, park func()) bool {
-	pawn, ok := target.(attackable.Combatant)
+	pawn, radius, ok := castApproachPawn(target)
 	if !ok || castRange < 0 || pawn.ObjectID() == live.ObjectID() {
 		return false
 	}
 	lx, ly, lz := live.Position()
 	tx, ty, tz := pawn.Position()
-	if location.In3DRadius(lx, ly, lz, tx, ty, tz, int(float64(castRange)+live.CollisionRadius()+pawn.CollisionRadius())) {
+	if location.In3DRadius(lx, ly, lz, tx, ty, tz, int(float64(castRange)+live.CollisionRadius()+radius)) {
 		return false
 	}
 	if shift {
@@ -462,6 +461,19 @@ func (l *GameClientLink) walkToCastTarget(live *livePlayer, target skilltarget.A
 	}
 	live.Character.SetHeading(live.move.Position().HeadingTo(location.Location{X: tx, Y: ty, Z: tz}))
 	return true
+}
+
+// castApproachPawn returns the final target a cast approach walks to and
+// the body radius its range check adds: a creature's collision radius, or
+// the fixed radius every door has. Any other target is not approached.
+func castApproachPawn(target skilltarget.Actor) (move.Pawn, float64, bool) {
+	switch t := target.(type) {
+	case attackable.Combatant:
+		return t, t.CollisionRadius(), true
+	case *door.Object:
+		return t, door.CollisionRadius, true
+	}
+	return nil, 0, false
 }
 
 // refuseCastTooFar answers a shift-held cast out of range: TARGET_TOO_FAR,

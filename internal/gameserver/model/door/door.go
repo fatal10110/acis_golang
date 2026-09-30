@@ -87,6 +87,11 @@ type Template struct {
 	OpenTime, RandomTime, CloseTime   int
 }
 
+// CollisionRadius is the body radius every door has, whatever its footprint:
+// what a range check to a door target, such as a cast's approach to it, adds
+// for the door.
+const CollisionRadius = 16
+
 // GeoShape is the geodata footprint calculated for a door.
 type GeoShape interface {
 	GeoX() int
