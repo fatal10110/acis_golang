@@ -13,7 +13,7 @@ type teleportFile struct {
 }
 
 type teleportListElement struct {
-	NPCID *coord         `xml:"npcId,attr"`
+	NPCID *coord32       `xml:"npcId,attr"`
 	Locs  []attrsElement `xml:"loc"`
 }
 
@@ -25,7 +25,7 @@ type instantTeleportFile struct {
 }
 
 type instantTeleportListElement struct {
-	NPCID *coord            `xml:"npcId,attr"`
+	NPCID *coord32          `xml:"npcId,attr"`
 	Locs  []locationElement `xml:"loc"`
 }
 

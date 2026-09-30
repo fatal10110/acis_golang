@@ -375,7 +375,7 @@ type observerGroupFile struct {
 }
 
 type observerGroupElement struct {
-	ID      *coord         `xml:"id,attr"`
+	ID      *coord32       `xml:"id,attr"`
 	Entries []attrsElement `xml:"entry"`
 }
 

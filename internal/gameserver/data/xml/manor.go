@@ -13,7 +13,7 @@ type manorFile struct {
 }
 
 type manorElement struct {
-	ID    *coord         `xml:"id,attr"`
+	ID    *coord32       `xml:"id,attr"`
 	Name  string         `xml:"name,attr"`
 	Crops []attrsElement `xml:"crop"`
 }
@@ -52,9 +52,9 @@ type manorAreaFile struct {
 
 type manorAreaElement struct {
 	Name     string         `xml:"name,attr"`
-	CastleID *coord         `xml:"castleId,attr"`
-	MinZ     *coord         `xml:"minZ,attr"`
-	MaxZ     *coord         `xml:"maxZ,attr"`
+	CastleID *coord32       `xml:"castleId,attr"`
+	MinZ     *coord32       `xml:"minZ,attr"`
+	MaxZ     *coord32       `xml:"maxZ,attr"`
 	Nodes    []pointElement `xml:"node"`
 }
 
@@ -67,8 +67,14 @@ func LoadManorAreas(path string) (manor.AreaTable, error) {
 
 	areas := make(manor.AreaTable, 0, len(doc.Areas))
 	for _, el := range doc.Areas {
-		if el.CastleID == nil || el.MinZ == nil || el.MaxZ == nil {
-			return nil, fmt.Errorf("xml: %s: manor area %q: castleId, minZ and maxZ are required", path, el.Name)
+		if el.CastleID == nil {
+			return nil, fmt.Errorf("xml: %s: manor area %q: castleId is required", path, el.Name)
+		}
+		if el.MinZ == nil {
+			return nil, fmt.Errorf("xml: %s: manor area %q: minZ is required", path, el.Name)
+		}
+		if el.MaxZ == nil {
+			return nil, fmt.Errorf("xml: %s: manor area %q: maxZ is required", path, el.Name)
 		}
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, node := range el.Nodes {

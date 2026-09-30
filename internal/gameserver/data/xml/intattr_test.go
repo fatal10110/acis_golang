@@ -3,6 +3,7 @@ package xml
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -13,11 +14,11 @@ import (
 // TestIntAttrsRejectMalformedValues pins the accepted input set of every
 // non-coordinate integer attribute decoded into a tagged field, the same way
 // TestCoordinateAttrRejectsMalformedValues pins the coordinates: a bare
-// base-10 integer is read, while an empty, whitespace-padded, or non-numeric
-// value fails the load naming the attribute and the file. A required
-// attribute that is absent fails the same way; an optional one (a boat
-// ticket item) defaults to 0. The decoder's own int conversion would read
-// the empty and absent cases as 0 and trim the padding.
+// base-10 integer is read, while an empty, whitespace-padded, non-numeric,
+// or out-of-int32 value fails the load naming the attribute and the file. A
+// required attribute that is absent fails the same way; an optional one (a
+// boat ticket item) defaults to 0. The decoder's own int conversion would
+// read the empty and absent cases as 0 and trim the padding.
 func TestIntAttrsRejectMalformedValues(t *testing.T) {
 	t.Parallel()
 
@@ -193,6 +194,8 @@ func TestIntAttrsRejectMalformedValues(t *testing.T) {
 		{name: "empty value is rejected", value: "", wantErr: true},
 		{name: "padded value is rejected", value: " 12 ", wantErr: true},
 		{name: "non-numeric value is rejected", value: "abc", wantErr: true},
+		{name: "int32 overflow is rejected", value: "2147483648", wantErr: true},
+		{name: "int32 underflow is rejected", value: "-2147483649", wantErr: true},
 		{name: "absent", absent: true},
 	}
 
@@ -213,7 +216,12 @@ func TestIntAttrsRejectMalformedValues(t *testing.T) {
 					if err == nil {
 						t.Fatalf("load(%s) = %d, want a rejection", attr, got)
 					}
-					if msg := err.Error(); !strings.Contains(msg, f.attr) || !strings.Contains(msg, path) {
+					// The attribute must be named as the failing one, not
+					// merely appear somewhere (the temp path embeds the
+					// subtest name, and a sibling attribute may share a
+					// suffix, e.g. castleId and id).
+					named := regexp.MustCompile(`(^|[^A-Za-z0-9])` + f.attr + `( is required|: )`)
+					if msg := err.Error(); !named.MatchString(msg) || !strings.Contains(msg, path) {
 						t.Fatalf("load(%s) error %q does not name attribute %q and file %q", attr, msg, f.attr, path)
 					}
 					return

@@ -55,13 +55,10 @@ func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet
 	return out, nil
 }
 
-// coord is a strict int attribute: a world coordinate, or any other integer
-// attribute (an id, a z bound, a heading). It parses itself with
-// strconv.Atoi so the accepted input set matches the attribute bag it
-// replaces exactly: the decoder's own int conversion accepts an empty value
-// as 0 and trims surrounding space, both of which the bag rejected. Declare
-// a required attribute as *coord so absence stays distinguishable; a plain
-// coord is an optional attribute whose default is 0.
+// coord is a world-coordinate attribute. It parses itself with strconv.Atoi
+// so the accepted input set matches the attribute bag it replaces exactly:
+// the decoder's own int conversion accepts an empty value as 0 and trims
+// surrounding space, both of which the bag rejected.
 type coord int
 
 func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -73,10 +70,11 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// coord32 is like coord but for an attribute that must fit int32 (a skill,
-// item, or npc id read directly as int32 rather than widened at the call
-// site), rejecting the same malformed, empty, padded, and out-of-range input
-// commons.StatSet.GetInt32 did.
+// coord32 is like coord but for an attribute that must fit int32 (an id, a z
+// bound, a heading), rejecting the same malformed, empty, padded, and
+// out-of-range input commons.StatSet.GetInt32 did. Declare a required
+// attribute as *coord32 so absence stays distinguishable; a plain coord32 is
+// an optional attribute whose default is 0.
 type coord32 int32
 
 func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
