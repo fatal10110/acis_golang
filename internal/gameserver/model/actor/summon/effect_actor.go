@@ -194,17 +194,16 @@ func (a *Actor) NotifyEffectDisappeared(modelskill.ID, int) {}
 // NotifyEffectAborted does nothing: effect expiry messages go to players.
 func (a *Actor) NotifyEffectAborted(modelskill.ID, int) {}
 
-// StopCharmOfLuck runs when a Charm of Luck ends on the summon: the effect
-// has already left its list, so only its appearance is refreshed.
+// StopCharmOfLuck runs when a Charm of Luck ends on the summon: its
+// appearance is refreshed.
 func (a *Actor) StopCharmOfLuck(*effect.Effect) { a.UpdateAbnormalEffect() }
 
-// StopPhoenixBlessing runs when a Phoenix Blessing ends on the summon: the
-// effect has already left its list, so only its appearance is refreshed.
+// StopPhoenixBlessing runs when a Phoenix Blessing ends on the summon: its
+// appearance is refreshed.
 func (a *Actor) StopPhoenixBlessing(*effect.Effect) { a.UpdateAbnormalEffect() }
 
 // StopProtectionBlessing runs when a Blessing of Protection loses its stack
-// group's head on the summon (a recast replacing it): only its appearance is
-// refreshed.
+// group's head on the summon: its appearance is refreshed.
 func (a *Actor) StopProtectionBlessing(*effect.Effect) { a.UpdateAbnormalEffect() }
 
 // NotifyEffectFelt does nothing: stack-change messages go to players.
