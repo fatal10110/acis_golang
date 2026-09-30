@@ -453,6 +453,93 @@ func TestCanSee(t *testing.T) {
 	})
 }
 
+// TestNullGeodataCrossingLandsAtHeightZero guards the null-block height
+// contract (issue #516). Expected values are hand-traced from the reference,
+// not from the Go code: GeoEngine.canMove/canSee
+// (aCis_gameserver/java/net/sf/l2j/gameserver/geoengine/GeoEngine.java) step
+// into the next cell with block.getIndexBelow then block.getHeight, and
+// BlockNull (geoengine/geodata/BlockNull.java) answers getIndexBelow = 0 and
+// getHeight = 0 for any input, while getHeightNearest echoes (short) worldZ.
+// Unloaded regions hold that same BlockNull (GeoEngine.loadNullBlocks), and
+// a region file's null block entries do too, so both layouts are covered.
+//
+// Loaded ground sits at -3000 so the snap to 0 cannot be confused with the
+// walker keeping its own Z. canMove's final check compares the walked
+// height (0) against getHeight(tx, ty, tz) = (short) tz on the null target.
+// canSee's walk reads the null cell as ground at 0, above the sight line
+// from -3000 (losz = -3000 + MaxObstacleHeight 32), and fails.
+func TestNullGeodataCrossingLandsAtHeightZero(t *testing.T) {
+	const ground = -3000
+
+	layouts := []struct {
+		name string
+		// origin and target geodata X; loaded ground covers origin and
+		// origin+1, null geodata covers target-1 and target.
+		originX, targetX int
+		engine           func(t *testing.T, height int16) *Engine
+	}{
+		{
+			name:    "null block inside a loaded region",
+			originX: 6,
+			targetX: 9,
+			engine: func(t *testing.T, height int16) *Engine {
+				// Block (0,0) covers geoX 0..7; block (1,0) is null.
+				return newTestEngine(t, block.NewFlat(height))
+			},
+		},
+		{
+			name:    "unloaded neighbouring region",
+			originX: regionCellsX - 2,
+			targetX: regionCellsX + 1,
+			engine: func(t *testing.T, height int16) *Engine {
+				// Last X block of the first region is loaded; the next
+				// region is never set.
+				e := New()
+				region := block.NewRegion()
+				region.SetFlat((block.RegionBlocksX-1)*block.RegionBlocksY, height)
+				if err := e.SetRegion(TileXMin, TileYMin, region); err != nil {
+					t.Fatalf("SetRegion(): %v", err)
+				}
+				return e
+			},
+		},
+	}
+
+	for _, l := range layouts {
+		t.Run(l.name, func(t *testing.T) {
+			e := l.engine(t, ground)
+			ox, oy := worldX(l.originX), worldY(0)
+			tx, ty := worldX(l.targetX), worldY(0)
+
+			if e.HasGeo(tx, ty) {
+				t.Fatal("target HasGeo() = true, want null geodata")
+			}
+			if got := e.Height(tx, ty, ground); got != ground {
+				t.Fatalf("null Height(tz=%d) = %d, want the queried Z", ground, got)
+			}
+
+			if e.CanMove(ox, oy, ground, tx, ty, ground) {
+				t.Error("CanMove(loaded -3000 -> null at -3000) = true, want false: walk lands at 0, not the walker's Z")
+			}
+			if !e.CanMove(ox, oy, ground, tx, ty, 0) {
+				t.Error("CanMove(loaded -3000 -> null at 0) = false, want true: walk lands at 0")
+			}
+
+			if e.CanSee(ox, oy, ground, tx, ty, ground) {
+				t.Error("CanSee(loaded -3000 -> null at -3000) = true, want false: null ground reads as 0, above the sight line")
+			}
+
+			flat := l.engine(t, 0)
+			if !flat.CanSee(ox, oy, 0, tx, ty, 0) {
+				t.Error("CanSee(loaded 0 -> null at 0) = false, want true")
+			}
+			if !flat.CanMove(ox, oy, 0, tx, ty, 0) {
+				t.Error("CanMove(loaded 0 -> null at 0) = false, want true")
+			}
+		})
+	}
+}
+
 func TestSightHeight(t *testing.T) {
 	tests := []struct {
 		name                  string
