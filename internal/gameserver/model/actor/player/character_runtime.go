@@ -258,9 +258,10 @@ func (c *Character) Configure(rt Runtime) {
 // never observes a torn pointer.
 func (c *Character) Attach(live *creature.Live, sink event.Sink) {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	c.Live = live
 	c.sink = sink
+	c.stateMu.Unlock()
+	c.refreshMoveSpeed()
 }
 
 // stopper is an armed one-shot timer.
@@ -282,6 +283,13 @@ func (c *Character) SessionDetached() bool { return c.sessionDetached.Load() }
 // PlayerCharacter returns c. A wrapper embedding *Character inherits it, so
 // a combatant reached through a summon's owner resolves to its model.
 func (c *Character) PlayerCharacter() *Character { return c }
+
+// CharacterHolder resolves to its underlying *Character: the model itself or
+// a live wrapper embedding it. NPCs, summons, and doors are not holders, so
+// an assertion to it legitimately fails for them.
+type CharacterHolder interface {
+	PlayerCharacter() *Character
+}
 
 func (c *Character) emit(e event.Event) {
 	if c.sink != nil {

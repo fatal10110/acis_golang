@@ -132,7 +132,7 @@ func actingCharacter(c attackable.Combatant) *Character {
 	if c != nil && c.Kind() == actor.KindSummon {
 		c, _ = c.Owner()
 	}
-	holder, ok := c.(interface{ PlayerCharacter() *Character })
+	holder, ok := c.(CharacterHolder)
 	if !ok {
 		return nil
 	}

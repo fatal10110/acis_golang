@@ -59,6 +59,6 @@ func actingGatePlayer(c attackable.Combatant) (gatePlayer, bool) {
 // inPvPZone reports whether c stands inside a PvP zone; a combatant without
 // zone membership never does.
 func inPvPZone(c attackable.Combatant) bool {
-	member, ok := c.(interface{ InPvPZone() bool })
+	member, ok := c.(attackable.PvPZoneMember)
 	return ok && member.InPvPZone()
 }

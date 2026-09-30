@@ -79,7 +79,7 @@ func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 // inPvPZone reports whether c stands inside a PvP zone; an actor without
 // zone membership (an NPC or door) never does.
 func inPvPZone(c skilltarget.Actor) bool {
-	member, ok := c.(interface{ InPvPZone() bool })
+	member, ok := c.(attackable.PvPZoneMember)
 	return ok && member.InPvPZone()
 }
 

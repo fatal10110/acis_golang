@@ -191,10 +191,15 @@ func (n *Npcs) RestoredDeadCount() int {
 }
 
 // SkippedNonCombatCount returns the number of spawn entries skipped at boot
-// for resolving to a non-combat instance type (shops, trainers, and similar
-// service NPCs the dialog pipeline doesn't support yet).
+// for resolving to a non-combat instance type that is not a civilian NPC
+// either (castle artifacts, siege flags, towers and the like).
 func (n *Npcs) SkippedNonCombatCount() int {
 	return int(n.skippedNonCombatCount.Load())
+}
+
+// FolkCount returns the number of civilian NPCs spawned.
+func (n *Npcs) FolkCount() int {
+	return int(n.folkCount.Load())
 }
 
 // pickPosition selects one spawn position from positions. A single entry

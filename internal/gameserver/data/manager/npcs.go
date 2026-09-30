@@ -24,9 +24,8 @@ import (
 // slotInfo is the static definition of one spawn slot: the entry it was
 // declared under, and (when non-empty) the persisted state row backing it.
 // A slot with a non-empty dbName is the only kind restored across restarts
-// and forced to a single live instance, matching the reference server's
-// "a database-tracked spawn ignores its total and only ever has one
-// instance" rule.
+// and forced to a single live instance: a database-tracked spawn ignores
+// its declared total and only ever has one instance.
 type slotInfo struct {
 	key      string
 	maker    *spawn.Maker
@@ -57,14 +56,11 @@ type KillRewardConfig struct {
 // spawn position) are not instantiated here; minion fan-out has its own
 // master/minion linking concerns.
 //
-// Every instantiated NPC becomes a npc.Hostile: an entry whose template
-// resolves to a non-combat instance type (a shop, trainer, gatekeeper,
-// village master, and similar service NPCs — confirmed against the full
-// shipped spawn list, roughly a quarter of positioned entries) is counted
-// and skipped rather than given some other live representation. Those NPCs
-// need dialog/HTML/shop interaction, not combat, which is its own later
-// system (the dialog pipeline epic) — this type only builds the
-// combat-capable half of "every spawn entry becomes a live NPC".
+// A combat-capable entry becomes a npc.Hostile with an AI loop, decay and
+// respawn. A civilian service NPC (a shop, trainer, gatekeeper, village
+// master and the like) becomes a npc.Folk that stands at its spawn point
+// for players to talk to. Any other non-combat instance type (castle
+// artifacts, siege flags, towers) is counted and skipped.
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {
@@ -117,6 +113,7 @@ type Npcs struct {
 	deferredCount         atomic.Int64
 	restoredDeadCount     atomic.Int64
 	skippedNonCombatCount atomic.Int64
+	folkCount             atomic.Int64
 }
 
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
