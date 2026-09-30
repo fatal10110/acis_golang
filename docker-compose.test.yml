@@ -2,16 +2,32 @@ version: '3.8'
 
 # Single shared MariaDB instance for `go test`. Every integration test
 # package/function creates its own database on it (see internal/dbtest)
-# instead of each one starting its own testcontainer.
+# instead of each one starting its own testcontainer. Start and stop it with
+# `make test-db-up` / `make test-db-down`, or pass `-p acis-test` when
+# running compose directly, so every worktree manages the same container.
+#
+# Host networking skips docker-proxy on the 127.0.0.1:3307 hop, which is
+# measurably slower under parallel test runs (it needs Linux Docker, or
+# Docker Desktop with host networking enabled). The data lives on tmpfs, so
+# durability settings are relaxed, and max_connections leaves room for
+# several concurrent `go test` runs sharing the instance.
 services:
   test-db:
     image: mariadb:11
     container_name: acis-test-mariadb
+    network_mode: host
+    command:
+      - --port=3307
+      - --bind-address=127.0.0.1
+      - --skip-log-bin
+      - --innodb-flush-log-at-trx-commit=0
+      - --innodb-doublewrite=0
+      - --max-connections=1000
+      - --table-open-cache=4000
+      - --table-definition-cache=4000
     environment:
       MARIADB_ROOT_PASSWORD: test
       MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "no"
-    ports:
-      - "3307:3306"
     tmpfs:
       - /var/lib/mysql
     healthcheck:

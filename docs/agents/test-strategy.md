@@ -129,7 +129,7 @@ handles. Apply the Rule of Three before extracting any new shared builder.
 Two entry points, both untagged:
 
 - `sqltest.SharedDB(tb)` — a database checked out of a per-package pool on the shared MariaDB
-  service, held until the test ends, then truncated and returned. Each test running in parallel
+  service, held until the test ends, then emptied and returned. Each test running in parallel
   gets its own, and a `t.Run` subtest gets a different one from its parent, so seed and `Boot`
   on the same `t`. Pair it with `TestMain(m) { os.Exit(sqltest.Main(m)) }`. This is what
   behavior suites and `gameservertest.Boot` use. Suites may call `t.Parallel()`: gameplay

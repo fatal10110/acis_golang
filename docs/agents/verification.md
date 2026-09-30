@@ -90,7 +90,7 @@ tears down each container it starts.
 package with many persistence tests, repeating the schema dominates wall-clock time.
 `sqltest.SharedDB(tb)` instead checks a database out of a per-test-binary pool (Go compiles each
 package's tests into its own binary, so the pool is per package). The test holds it until its
-`tb.Cleanup`, which truncates the tables and returns it. Sequential tests therefore reuse one
+`tb.Cleanup`, which empties the tables and returns it. Sequential tests therefore reuse one
 database, and each test running at the same time under `t.Parallel()` gets its own. Repeated
 calls with the same `tb` return the same database.
 
