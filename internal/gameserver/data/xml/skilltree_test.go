@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadSkillTrees(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "skillstrees"))
 
 	trees, err := LoadSkillTrees(dir)
@@ -125,6 +126,7 @@ func TestLoadSkillTrees(t *testing.T) {
 }
 
 func TestLoadSkillTreesErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {

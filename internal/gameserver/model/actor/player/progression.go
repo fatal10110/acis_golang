@@ -324,6 +324,8 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	// send below (:648) — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
+	// A rider's speeds halve once its mount outlevels it by more than 9.
+	hooks.add(c.refreshMoveSpeed)
 	hooks.add(c.UpdateUserInfo)
 	return increased
 }

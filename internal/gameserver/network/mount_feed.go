@@ -9,26 +9,33 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// mountFeedTable resolves a mount's feeding data from its NPC template's
-// pet data row for the rider's level.
-type mountFeedTable struct{ npcs *npc.Table }
+// mountDataTable resolves a mount's pet data from its NPC template's pet
+// data row for the rider's level.
+type mountDataTable struct{ npcs *npc.Table }
 
-func (t mountFeedTable) MountFeed(npcID int32, level int) (player.MountFeed, bool) {
+func (t mountDataTable) MountData(npcID int32, level int) (player.MountData, bool) {
 	tpl, ok := t.npcs.Get(int(npcID))
 	if !ok || tpl.Pet == nil {
-		return player.MountFeed{}, false
+		return player.MountData{}, false
 	}
 	row, ok := tpl.Pet.Levels[level]
 	if !ok {
-		return player.MountFeed{}, false
+		return player.MountData{}, false
 	}
-	return player.MountFeed{
+	return player.MountData{
 		MaxMeal:       row.MaxMeal,
 		MealInNormal:  row.MountMealInNormal,
 		MealInBattle:  row.MealInBattle,
 		Food1:         int32(tpl.Pet.Food1),
 		Food2:         int32(tpl.Pet.Food2),
 		AutoFeedLimit: tpl.Pet.AutoFeedLimit,
+		HungryLimit:   tpl.Pet.HungryLimit,
+		RunSpeed:      row.MountBaseSpeed,
+		SwimSpeed:     row.MountWaterSpeed,
+		FlySpeed:      row.MountFlySpeed,
+		AtkSpd:        row.MountAtkSpd,
+		PAtk:          row.MountPAtk,
+		MAtk:          row.MountMAtk,
 	}, true
 }
 

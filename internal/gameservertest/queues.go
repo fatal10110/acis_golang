@@ -20,10 +20,6 @@ import (
 // production sim.Pool, one worker per GOMAXPROCS, on the wall clock.
 const SimExecutorEnv = "ACIS_SIM_EXECUTOR"
 
-// inlinePollInterval is how long the inline runner sleeps once it finds no
-// work, bounding the delay a posted task waits before it runs.
-const inlinePollInterval = time.Millisecond
-
 // queues is the harness executor. It records every queue it creates so
 // Settle can wait for the work already posted to them.
 type queues struct {
@@ -101,8 +97,8 @@ func startQueues(tb testing.TB, log zerolog.Logger, realPool bool) *queues {
 
 // startInline runs a sim.Inline loop on one runner goroutine, which is the
 // only caller of Run and Advance. Connection goroutines post each frame's
-// work and wait for it, so the runner keeps running posted tasks on its own;
-// its clock moves only through the returned advance.
+// work and wait for it, so the runner runs posted tasks on its own as soon as
+// Ready reports them; its clock moves only through the returned advance.
 func startInline(tb testing.TB) *queues {
 	inline := sim.NewInline(time.Now())
 	type step struct {
@@ -122,7 +118,7 @@ func startInline(tb testing.TB) *queues {
 			case <-stop:
 				inline.Run()
 				return
-			case <-time.After(inlinePollInterval):
+			case <-inline.Ready():
 			}
 		}
 	}()

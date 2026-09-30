@@ -1624,24 +1624,45 @@ type extractableFakeCaster struct {
 	neutralCreature
 	world.Presence
 	fakeActor
-	granted  map[int32]int
-	capacity bool
+	granted map[int32]int
+	slots   map[int32]int // slots an item id needs per unit; 1 when absent
+	free    int
+	checked int // slots the last capacity check asked for
 }
 
-func (c *extractableFakeCaster) AddItem(itemID int32, count int) {
+func (*extractableFakeCaster) Kind() actor.Kind { return actor.KindPlayer }
+
+func (c *extractableFakeCaster) ItemSlotsNeeded(itemID int32, count int) int {
+	if per, ok := c.slots[itemID]; ok {
+		return per * count
+	}
+	return count
+}
+
+func (c *extractableFakeCaster) ItemSlotsFit(slots int) bool {
+	c.checked = slots
+	return slots <= c.free
+}
+
+func (c *extractableFakeCaster) AddCreatedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	if _, err := nextID(); err != nil {
+		return false
+	}
 	if c.granted == nil {
 		c.granted = make(map[int32]int)
 	}
 	c.granted[itemID] += count
+	return true
 }
 
-func (c *extractableFakeCaster) HasCapacityFor(itemIDs []int32) bool { return c.capacity }
+func extractableRegistry() *Registry {
+	return NewRegistry(extractableHandler{ids: &fakeSignetIDs{}})
+}
 
 func TestExtractableGrantsTheOnlyGuaranteedProduct(t *testing.T) {
-	registry := NewDefaultRegistry()
-	caster := &extractableFakeCaster{capacity: true}
+	caster := &extractableFakeCaster{free: 10}
 
-	registry.Use(Cast{
+	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,100.0"},
 		Targets: []Actor{},
@@ -1650,34 +1671,75 @@ func TestExtractableGrantsTheOnlyGuaranteedProduct(t *testing.T) {
 	if caster.granted[57] != 10 {
 		t.Fatalf("granted = %v, want {57: 10}", caster.granted)
 	}
+	if len(result.Messages) != 0 {
+		t.Fatalf("messages = %v, want none for a granted product", result.Messages)
+	}
+}
+
+// TestExtractableChecksTheRowsSlotsTogether pins validateCapacityByItemIds:
+// the slots every item of the rolled row needs are summed per item and
+// quantity into one check.
+func TestExtractableChecksTheRowsSlotsTogether(t *testing.T) {
+	caster := &extractableFakeCaster{free: 10, slots: map[int32]int{57: 0}}
+
+	extractableRegistry().Use(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,30,3,100.0"},
+		Targets: []Actor{},
+	})
+
+	if caster.checked != 3 {
+		t.Fatalf("capacity check asked for %d slots, want 3 (0 for the held stack, 3 for three units)", caster.checked)
+	}
+	if caster.granted[57] != 10 || caster.granted[30] != 3 {
+		t.Fatalf("granted = %v, want {57: 10, 30: 3}", caster.granted)
+	}
 }
 
 func TestExtractableFullInventoryGrantsNothing(t *testing.T) {
-	registry := NewDefaultRegistry()
-	caster := &extractableFakeCaster{capacity: false}
+	caster := &extractableFakeCaster{free: 1}
 
-	registry.Use(Cast{
+	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
-		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,100.0"},
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,30,1,100.0"},
 		Targets: []Actor{},
 	})
 
 	if len(caster.granted) != 0 {
-		t.Fatalf("granted = %v, want none when inventory is full", caster.granted)
+		t.Fatalf("granted = %v, want none when the row needs more slots than are free", caster.granted)
+	}
+	if len(result.Messages) != 1 || result.Messages[0] != (SlotsFullMessage{}) {
+		t.Fatalf("messages = %v, want one SlotsFullMessage", result.Messages)
+	}
+}
+
+func TestExtractableRollMissingEveryRowReportsNothingInside(t *testing.T) {
+	caster := &extractableFakeCaster{free: 10}
+
+	result, _ := extractableRegistry().UseResult(Cast{
+		Caster:  caster,
+		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE", ExtractableItems: "57,10,0"},
+		Targets: []Actor{},
+	})
+
+	if len(caster.granted) != 0 {
+		t.Fatalf("granted = %v, want none", caster.granted)
+	}
+	if len(result.Messages) != 1 || result.Messages[0] != (NothingInsideMessage{}) {
+		t.Fatalf("messages = %v, want one NothingInsideMessage", result.Messages)
 	}
 }
 
 func TestExtractableNoDataIsNoop(t *testing.T) {
-	registry := NewDefaultRegistry()
-	caster := &extractableFakeCaster{capacity: true}
+	caster := &extractableFakeCaster{free: 10}
 
-	registry.Use(Cast{
+	result, _ := extractableRegistry().UseResult(Cast{
 		Caster:  caster,
 		Skill:   modelskill.Definition{SkillType: "EXTRACTABLE_FISH"},
 		Targets: []Actor{},
 	})
-	if len(caster.granted) != 0 {
-		t.Fatalf("granted = %v, want none without extractable data", caster.granted)
+	if len(caster.granted) != 0 || len(result.Messages) != 0 {
+		t.Fatalf("granted = %v, messages = %v; want nothing without extractable data", caster.granted, result.Messages)
 	}
 }
 
@@ -3644,11 +3706,19 @@ type manorFakeCaster struct {
 
 func (c *manorFakeCaster) ObjectID() int32 { return c.id }
 func (c *manorFakeCaster) Level() int      { return c.level }
-func (c *manorFakeCaster) AddEarnedItem(itemID int32, count int) {
+func (c *manorFakeCaster) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	if _, err := nextID(); err != nil {
+		return false
+	}
 	if c.items == nil {
 		c.items = make(map[int32]int)
 	}
 	c.items[itemID] += count
+	return true
+}
+
+func harvestRegistry() *Registry {
+	return NewRegistry(harvestHandler{ids: &fakeSignetIDs{}})
 }
 
 func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
@@ -3693,7 +3763,7 @@ func TestSowAlreadySeededIsNoop(t *testing.T) {
 }
 
 func TestHarvestRewardsAllowedHarvester(t *testing.T) {
-	registry := NewDefaultRegistry()
+	registry := harvestRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
 
@@ -3715,7 +3785,7 @@ func TestHarvestRewardsAllowedHarvester(t *testing.T) {
 }
 
 func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
-	registry := NewDefaultRegistry()
+	registry := harvestRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: sownState(3, 5001)}
 
@@ -3730,7 +3800,7 @@ func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
 }
 
 func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
-	registry := NewDefaultRegistry()
+	registry := harvestRegistry()
 	caster := &manorFakeCaster{id: 7, level: 40}
 	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
 	target.state.MarkHarvested()
@@ -3977,10 +4047,8 @@ type spoilFakeCaster struct {
 	fakeActor
 	id             int32
 	level          int
-	inParty        bool
 	items          map[int32]int
-	distItem       int32
-	distCnt        int32
+	earned         []int32
 	alreadyNotices int
 	notices        []string
 	resisted       []Resisted
@@ -3989,15 +4057,20 @@ type spoilFakeCaster struct {
 func (c *spoilFakeCaster) ObjectID() int32 { return c.id }
 func (*spoilFakeCaster) Kind() actor.Kind  { return actor.KindPlayer }
 func (c *spoilFakeCaster) Level() int      { return c.level }
-func (c *spoilFakeCaster) AddEarnedItem(itemID int32, count int) {
+func (c *spoilFakeCaster) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	if _, err := nextID(); err != nil {
+		return false
+	}
 	if c.items == nil {
 		c.items = make(map[int32]int)
 	}
 	c.items[itemID] += count
+	c.earned = append(c.earned, itemID)
+	return true
 }
-func (c *spoilFakeCaster) InParty() bool { return c.inParty }
-func (c *spoilFakeCaster) DistributeItem(itemID, count int32) {
-	c.distItem, c.distCnt = itemID, count
+
+func sweepRegistry() *Registry {
+	return NewRegistry(sweepHandler{ids: &fakeSignetIDs{}})
 }
 
 func (c *spoilFakeCaster) NotifySpoilAlready() {
@@ -4091,14 +4164,13 @@ func TestSpoilAlreadySpoiledIsSkipped(t *testing.T) {
 	}
 }
 
-func TestSweepDistributesPooledItemsAndClearsPool(t *testing.T) {
-	registry := NewDefaultRegistry()
+func TestSweepEarnsPooledItemsAndClearsPool(t *testing.T) {
 	caster := &spoilFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 	target.pool.Mark(1)
 	target.pool.Add(57, 10)
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
+	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 
 	if caster.items[57] != 10 {
 		t.Fatalf("caster earned items = %v, want {57: 10}", caster.items)
@@ -4108,31 +4180,47 @@ func TestSweepDistributesPooledItemsAndClearsPool(t *testing.T) {
 	}
 }
 
-func TestSweepDistributesThroughParty(t *testing.T) {
-	registry := NewDefaultRegistry()
-	caster := &spoilFakeCaster{id: 1, inParty: true}
+// TestSweepEarnsInPoolOrder: the swept items are earned in the order the
+// pool hands them over.
+func TestSweepEarnsInPoolOrder(t *testing.T) {
+	caster := &spoilFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 	target.pool.Mark(1)
-	target.pool.Add(57, 10)
-
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
-
-	if caster.distItem != 57 || caster.distCnt != 10 {
-		t.Fatalf("party distribution = (%d, %d), want (57, 10)", caster.distItem, caster.distCnt)
+	for _, id := range []int32{1869, 1876, 1864, 116, 1872} {
+		target.pool.Add(id, 1)
 	}
-	if len(caster.items) != 0 {
-		t.Fatalf("caster should not also receive a direct reward: %v", caster.items)
+
+	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
+
+	if want := []int32{1872, 1876, 116, 1864, 1869}; !slices.Equal(caster.earned, want) {
+		t.Fatalf("earned order = %v, want %v", caster.earned, want)
 	}
 }
 
 func TestSweepEmptyPoolIsNoop(t *testing.T) {
-	registry := NewDefaultRegistry()
 	caster := &spoilFakeCaster{id: 1}
 	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
+	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
 	if len(caster.items) != 0 {
 		t.Fatalf("nothing to sweep should reward nothing, got %v", caster.items)
+	}
+}
+
+// TestSweepByNonPlayerLeavesPool: only a player sweeps; any other caster
+// leaves the pool, spoiler marker included, for the spoiler.
+func TestSweepByNonPlayerLeavesPool(t *testing.T) {
+	caster := &manorFakeCaster{id: 1}
+	target := &spoilFakeTarget{pool: &item.SpoilPool{}}
+	target.pool.Mark(1)
+	target.pool.Add(57, 10)
+
+	sweepRegistry().Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "SWEEP"}, Targets: []Actor{target}})
+	if !target.pool.IsSpoiler(1) || !target.pool.Sweepable() {
+		t.Fatal("a non-player sweep drained the pool")
+	}
+	if len(caster.items) != 0 {
+		t.Fatalf("non-player caster earned %v, want nothing", caster.items)
 	}
 }
 

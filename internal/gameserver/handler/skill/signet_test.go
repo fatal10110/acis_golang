@@ -69,7 +69,8 @@ func (c *signetFakeCaster) ReduceMP(v float64) float64 {
 
 type noopStatOwner struct{}
 
-func (noopStatOwner) AddStatFuncs([]effect.Mod)          {}
+func (noopStatOwner) AttachStatFuncs([]effect.Mod)       {}
+func (noopStatOwner) StatFuncsAttached([]effect.Mod)     {}
 func (noopStatOwner) RemoveStatsByOwner(effect.ModOwner) {}
 func (noopStatOwner) MaxBuffCount() int                  { return 0 }
 

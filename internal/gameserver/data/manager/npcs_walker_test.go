@@ -281,6 +281,7 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		Alias:       "chasetest",
 		HPMax:       100,
 		RunSpeed:    7000, // fast enough that both route and leash moves below finish in ~1 position tick
+		WalkSpeed:   7000, // the leash return walks
 		CanMove:     true,
 		AIParams:    commons.NewStatSet(),
 		NoSleepMode: true,
@@ -396,6 +397,7 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 		HPMax:      100,
 		RunSpeed:   200,
 		WalkSpeed:  50,
+		DEX:        30,
 		AIParams:   commons.NewStatSet(),
 	}})
 	spawns := NewSpawns(table, nil)
@@ -436,8 +438,9 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MoveToLocation() error: %v", err)
 	}
-	if got, want := ev.Speed, 50.0; got != want {
-		t.Fatalf("MoveToLocation() Speed = %v, want WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
+	// WalkSpeed 50 through the RUN_SPEED stat's DEX 30 bonus of 1.1.
+	if got, want := ev.Speed, 55.0; got != want {
+		t.Fatalf("MoveToLocation() Speed = %v, want finalized WalkSpeed %v (RunSpeed leaked through for a WALKING_NPCS id)", got, want)
 	}
 }
 

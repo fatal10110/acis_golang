@@ -16,8 +16,7 @@ func TestSchemaMatchesDatapack(t *testing.T) {
 
 	// Drive the check from schemaStmts itself (sqltest.go), rather than a
 	// separate name-to-constant map, so a constant added there without a
-	// matching entry here can't go unchecked. sevenSignsStatusSeed is an
-	// INSERT, not a CREATE TABLE, and is skipped below.
+	// matching entry here can't go unchecked.
 	for _, stmt := range schemaStmts {
 		copySchema, ok := createTableStatement(stmt)
 		if !ok {

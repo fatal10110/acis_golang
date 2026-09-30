@@ -80,6 +80,11 @@ type UserInfoChanged struct{}
 // RUN_SPEED, so its own and its observers' views of it are stale.
 type RunSpeedChanged struct{}
 
+// EffectsStripped reports that a stop-all ended the character's effects
+// without reporting each one's stat change: its own and its observers'
+// full views of it are stale.
+type EffectsStripped struct{}
+
 // StatsModified reports a stat func change that left RUN_SPEED alone: the
 // character's own view is stale, and Attrs holds the new P.Atk. and cast
 // speeds, one per changed func on those stats, its observers must see.
@@ -258,8 +263,12 @@ const (
 	// or a single enchanted item's enchant level.
 	ObtainPickup
 	// ObtainCreated names an item created by template id, such as an
-	// auto-looted kill reward: a stack's count as an item number.
+	// auto-looted kill reward or an opened capsule's product: a stack's
+	// count as an item number.
 	ObtainCreated
+	// ObtainEarned names an item earned by template id, such as a swept
+	// spoil: a stack's count as an item number.
+	ObtainEarned
 )
 
 // AttackRequested reports an aggression effect provoking an attack on Target.
@@ -334,6 +343,7 @@ func (PositionCorrected) event()      {}
 func (WeightPenaltyChanged) event()   {}
 func (UserInfoChanged) event()        {}
 func (RunSpeedChanged) event()        {}
+func (EffectsStripped) event()        {}
 func (StatsModified) event()          {}
 func (GradePenaltyChanged) event()    {}
 func (DeathPenaltyChanged) event()    {}
@@ -415,10 +425,15 @@ type Revived struct{}
 // shows (charges, penalties, charm of courage).
 type EtcStatusChanged struct{}
 
-func (ReviveRequested) event()  {}
-func (ReviveRefused) event()    {}
-func (Revived) event()          {}
-func (EtcStatusChanged) event() {}
+// EtcStatusBroadcast reports a change to those flags that the character's
+// observers are told about as well.
+type EtcStatusBroadcast struct{}
+
+func (ReviveRequested) event()    {}
+func (ReviveRefused) event()      {}
+func (Revived) event()            {}
+func (EtcStatusChanged) event()   {}
+func (EtcStatusBroadcast) event() {}
 
 // MountFeedGauge reports the ridden mount's feed gauge, in the client's
 // gauge units.

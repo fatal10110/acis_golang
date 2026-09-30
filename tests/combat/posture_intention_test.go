@@ -61,6 +61,24 @@ func TestAttackQueuedDuringStandUpKeepsOriginalTarget(t *testing.T) {
 	}
 }
 
+func TestShiftAttackQueuedDuringStandUpDoesNotWalk(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+	targetHostile(t, c, hostile.ObjectID())
+	sitPlayer(t, c)
+	srv.Advance(t, 2500*time.Millisecond)
+	c.Send(encodeRequestChangeWaitType(true))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
+	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, true))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued shift attack")
+	srv.Advance(t, 2500*time.Millisecond)
+	assertHeldAttackIdle(t, srv, c, objID, playerOrigin, time.Second, true, "shift attack after stand-up")
+}
+
 func TestAttackRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))

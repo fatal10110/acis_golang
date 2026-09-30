@@ -181,3 +181,27 @@ func TestControllerMoveToPawnBroadcastsPawnMoveWithoutFollow(t *testing.T) {
 		t.Fatalf("follow mode = %v after MoveToPawn, want none", mover.FollowMode())
 	}
 }
+
+// A pawn move replaces a running offensive follow: the follow's recheck must
+// not steer the walk back toward the earlier target.
+func TestControllerMoveToPawnDropsRunningFollow(t *testing.T) {
+	controller, mover, _ := newPlayerFriendlyFollowController(t)
+	chased := &followTarget{x: 500}
+	if following, err := controller.MaybeStartOffensiveFollow(chased, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want active follow", following, err)
+	}
+
+	pawn := &followTarget{x: -500}
+	if !controller.MoveToPawn(pawn, 100) {
+		t.Fatal("MoveToPawn() = false, want the walk accepted")
+	}
+	if mover.Following() {
+		t.Fatalf("follow mode = %v after MoveToPawn, want the offensive follow dropped", mover.FollowMode())
+	}
+	if controller.tracksFollowLocked() {
+		t.Fatal("controller still rechecks a follow after MoveToPawn")
+	}
+	if got := mover.Destination(); got != (location.Location{X: -500}) {
+		t.Fatalf("destination = %+v, want the pawn's cell", got)
+	}
+}

@@ -23,6 +23,10 @@ const (
 	CastRejectHarvestNotMonster
 	CastRejectCorpseTooOld
 	CastRejectSweepNotMonster
+	// Player sweep ownership: a monster corpse nobody spoiled, and one
+	// another player spoiled.
+	CastRejectSweepNotSpoiled
+	CastRejectSweepNotAllowed
 	// CastRejectCannotUseOnYourself refuses a skill that must not target
 	// its caster.
 	CastRejectCannotUseOnYourself
@@ -96,7 +100,15 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 			return CastRejectNone
 		}
 		return undeadCastRejection(target)
-	case modelskill.TargetCorpseMob, modelskill.TargetAreaCorpseMob:
+	case modelskill.TargetCorpseMob:
+		if target == nil {
+			return CastRejectNone
+		}
+		if rejection := corpseMobCastRejection(target, skill); rejection != CastRejectNone {
+			return rejection
+		}
+		return sweepOwnershipRejection(caster, target, skill)
+	case modelskill.TargetAreaCorpseMob:
 		if target == nil {
 			return CastRejectNone
 		}
@@ -105,6 +117,29 @@ func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill 
 		return corpsePlayerCastRejection(target)
 	case modelskill.TargetCorpsePet:
 		return corpsePetCastRejection(target)
+	}
+	return CastRejectNone
+}
+
+// spoilOwned is a monster that knows which player spoiled it.
+type spoilOwned interface {
+	SpoiledBy(objectID int32) bool
+}
+
+// sweepOwnershipRejection lets a player sweep only a monster they spoiled
+// themselves. The area corpse sweep skips this gate. Until parties exist
+// (#146) the spoiler's party members are not let in either. A monster that
+// cannot name its spoiler refuses the sweep.
+func sweepOwnershipRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
+	if skill == nil || skill.SkillType != "SWEEP" || caster.Kind() != actor.KindPlayer || !target.MonsterKind() {
+		return CastRejectNone
+	}
+	if !target.Spoiled() {
+		return CastRejectSweepNotSpoiled
+	}
+	owned, ok := target.(spoilOwned)
+	if !ok || !owned.SpoiledBy(caster.ObjectID()) {
+		return CastRejectSweepNotAllowed
 	}
 	return CastRejectNone
 }

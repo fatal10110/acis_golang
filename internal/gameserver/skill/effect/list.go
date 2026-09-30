@@ -15,7 +15,16 @@ import (
 // expiry messages. Kinds without client icons or messages implement those as
 // no-ops.
 type StatOwner interface {
-	AddStatFuncs([]Mod)
+	// AttachStatFuncs attaches fns to the owner's stat calculators without
+	// reporting the change. The list calls it under its own lock, so it must
+	// not reach back into the list; StatFuncsAttached follows once the lock
+	// is released.
+	AttachStatFuncs([]Mod)
+	// StatFuncsAttached reports that fns were attached: the owner refreshes
+	// whatever view follows those stats (move speed, appearance, status).
+	// The list calls it without holding its lock, so the refresh may read
+	// the list back.
+	StatFuncsAttached([]Mod)
 	RemoveStatsByOwner(owner ModOwner)
 	// MaxBuffCount is the number of non-toggle, non-seven-signs buffs the
 	// owner can hold at once (base slot count plus any bonus the owner
@@ -118,7 +127,8 @@ func (l *List) emptyLocked() bool {
 }
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, silent, and callbacks
+// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, silent, exiting,
+// dropHeld, and callbacks
 // into owner. Other actors add and dispel effects synchronously from their own
 // queues while the owner's effect tick runs.
 type List struct {
@@ -133,6 +143,12 @@ type List struct {
 	debuffs []*Effect
 	stacks  map[string][]*Effect
 
+	// visibleFlags mirrors flagsLocked for readers that must not take mu:
+	// the info packets' abnormal-effect field is built on paths that can
+	// already run under mu (a stat change broadcast from an activation).
+	// Written under mu whenever buffs or debuffs change.
+	visibleFlags atomic.Uint32
+
 	// tracked records whether l is currently registered with the
 	// activity registry, so notifyActivityTransition can
 	// reconcile against l's own last-known state instead of a value a
@@ -140,10 +156,18 @@ type List struct {
 	tracked bool
 	// untracked records that Untrack ran; l never registers again.
 	untracked bool
-	// silent is set only for the duration of one AddRestored's l.mu hold.
+	// silent is set only for the duration of an AddRestored's l.mu holds.
 	// The owner-message helpers read it while queueing, so the messages
 	// that insertion would queue are left out.
 	silent bool
+
+	// exiting collects, during one add's l.mu hold, the held effects whose
+	// exit hook that insertion queued (a replaced, evicted or displaced
+	// buff). dropHeld maps each of them, until that Add's hooks have run, to
+	// whether its exit hook asked Drop for it: such a drop waits for the
+	// insertion to finish.
+	exiting  []*Effect
+	dropHeld map[*Effect]bool
 
 	// queue is the owner's queue: periodic effect actions run on it and
 	// effect periods are measured on its clock. Set before the owner is
@@ -221,9 +245,48 @@ func (l *List) flagsLocked() Flag {
 	return flags
 }
 
+// publishFlagsLocked refreshes visibleFlags after buffs or debuffs
+// changed. Caller must hold l.mu.
+func (l *List) publishFlagsLocked() { l.visibleFlags.Store(uint32(l.flagsLocked())) }
+
 // IsAffected reports whether any bit of flag is set in l.Flags().
 func (l *List) IsAffected(flag Flag) bool {
 	return l.Flags()&flag != 0
+}
+
+// crowdControlVisuals pairs crowd-control flags with the client
+// abnormal-visual bit (the datapack abnormal name in the comment) a creature
+// shows while any of them is set.
+var crowdControlVisuals = [...]struct {
+	flags Flag
+	mask  int
+}{
+	{FlagStunned, 0x000040},                   // stun
+	{FlagRooted, 0x000200},                    // root
+	{FlagSleep, 0x000080},                     // sleep
+	{FlagConfused | FlagFear, 0x000020},       // fear
+	{flagMuted | flagPhysicalMuted, 0x000100}, // mute
+	{FlagMeditating, 0x020000},                // floatroot
+}
+
+// CrowdControlAbnormalEffect returns the abnormal-visual bits derived from
+// the crowd-control state l currently imposes. Info packets OR them into the
+// actor's stored visual bitmask; they are never stored, so clearing a
+// stored bit cannot clear them, and they end with the effect that set them.
+// It reads visibleFlags, never mu, so it is safe on any path, including one
+// that runs while l's own lock is held.
+func (l *List) CrowdControlAbnormalEffect() int {
+	if l == nil {
+		return 0
+	}
+	flags := Flag(l.visibleFlags.Load())
+	mask := 0
+	for _, v := range crowdControlVisuals {
+		if flags&v.flags != 0 {
+			mask |= v.mask
+		}
+	}
+	return mask
 }
 
 // AIDenyFlags are the effect flags that keep an actor from taking AI actions.

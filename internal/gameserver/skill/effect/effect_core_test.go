@@ -203,9 +203,11 @@ type funcOwner struct {
 	funcs []Mod
 }
 
-func (o *funcOwner) AddStatFuncs(funcs []Mod) {
+func (o *funcOwner) AttachStatFuncs(funcs []Mod) {
 	o.funcs = append(o.funcs, funcs...)
 }
+
+func (o *funcOwner) StatFuncsAttached([]Mod) {}
 
 func (o *funcOwner) RemoveStatsByOwner(ModOwner) {}
 
@@ -291,7 +293,7 @@ func TestNewBuildsCoreEffectMetadata(t *testing.T) {
 		{"ManaHeal", TypeManaHeal, FlagNone, false, false},
 		{"TargetMe", TypeTargetMe, FlagNone, false, false},
 		{"Bluff", TypeBluff, FlagNone, false, false},
-		{"CharmOfCourage", TypeCharmOfCourage, flagCharmOfCourage, false, false},
+		{"CharmOfCourage", TypeCharmOfCourage, FlagCharmOfCourage, false, false},
 		{"CharmOfLuck", TypeCharmOfLuck, FlagCharmOfLuck, false, false},
 		{"PhoenixBless", TypePhoenixBless, FlagPhoenixBlessing, false, false},
 		{"BlockBuff", TypeBlockBuff, FlagNone, false, false},
@@ -886,6 +888,10 @@ func (t *liveEffectTarget) StopProtectionBlessing(*Effect) {
 	t.events = append(t.events, "stop-protection-bless")
 }
 
+func (t *liveEffectTarget) BroadcastEtcStatus() {
+	t.events = append(t.events, "etc-status")
+}
+
 func (t *liveEffectTarget) StopSkillEffectsByID(id modelskill.ID) {
 	t.events = append(t.events, fmt.Sprintf("stop-skill:%d", id))
 }
@@ -1126,32 +1132,44 @@ func TestItemOwnerEnchantLevelReadsLiveInstanceState(t *testing.T) {
 	}
 }
 
-func TestItemPassiveFuncsOnlyAppliesLoadedPassiveSkills(t *testing.T) {
+func TestItemEnchantSkillFuncsOnlyAppliesLoadedPassiveEnchantSkill(t *testing.T) {
 	skills := modelskill.NewTable([]modelskill.Definition{
 		{ID: 200, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
 			{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 12},
 		}},
 		{ID: 201, Level: 1, Activation: modelskill.ActivationToggle},
 	})
-	tmpl := &item.Template{
-		ID: 103,
-		AttachedSkills: []item.SkillRef{
-			{ID: 200, Level: 1}, // passive: contributes
-			{ID: 201, Level: 1}, // not passive: skipped
-			{ID: 999, Level: 1}, // unloaded: skipped
-		},
+	build := func(enchant4 *item.SkillRef) []Mod {
+		t.Helper()
+		tmpl := &item.Template{
+			ID:             103,
+			Weapon:         &item.WeaponDetail{Type: item.WeaponDual, Enchant4Skill: enchant4},
+			AttachedSkills: []item.SkillRef{{ID: 200, Level: 1}}, // granted as a skill, not built here
+		}
+		owner := ItemOwner{Inst: &item.Instance{ObjectID: 1, TemplateID: 103}, Tmpl: tmpl}
+		fns, err := ItemEnchantSkillFuncs(skills, owner)
+		if err != nil {
+			t.Fatalf("ItemEnchantSkillFuncs() error: %v", err)
+		}
+		for _, fn := range fns {
+			if fn.Owner != ModOwnerItem(owner) {
+				t.Fatalf("Owner = %v, want the weapon instance %v", fn.Owner, ModOwnerItem(owner))
+			}
+		}
+		return fns
 	}
-	owner := ItemOwner{Inst: &item.Instance{ObjectID: 1, TemplateID: 103}, Tmpl: tmpl}
 
-	fns, err := ItemPassiveFuncs(skills, owner)
-	if err != nil {
-		t.Fatalf("ItemPassiveFuncs() error: %v", err)
+	if fns := build(&item.SkillRef{ID: 200, Level: 1}); len(fns) != 1 {
+		t.Fatalf("passive +4 skill: len(fns) = %d, want 1", len(fns))
 	}
-	if len(fns) != 1 {
-		t.Fatalf("len(fns) = %d, want 1", len(fns))
+	if fns := build(&item.SkillRef{ID: 201, Level: 1}); len(fns) != 0 {
+		t.Fatalf("non-passive +4 skill: len(fns) = %d, want 0", len(fns))
 	}
-	if fns[0].Owner != ModOwnerItem(owner) {
-		t.Fatalf("Owner = %v, want %v", fns[0].Owner, ModOwnerItem(owner))
+	if fns := build(&item.SkillRef{ID: 999, Level: 1}); len(fns) != 0 {
+		t.Fatalf("unloaded +4 skill: len(fns) = %d, want 0", len(fns))
+	}
+	if fns := build(nil); len(fns) != 0 {
+		t.Fatalf("no +4 skill: len(fns) = %d, want 0", len(fns))
 	}
 }
 
@@ -1200,9 +1218,11 @@ type eventOwner struct {
 	maxBuff int
 }
 
-func (o eventOwner) AddStatFuncs([]Mod) {
+func (o eventOwner) AttachStatFuncs([]Mod) {
 	*o.events = append(*o.events, "owner:add")
 }
+
+func (o eventOwner) StatFuncsAttached([]Mod) {}
 
 func (o eventOwner) RemoveStatsByOwner(owner ModOwner) {
 	e := owner.effect
@@ -2835,6 +2855,7 @@ func (playerStubs) WakeAI()                              {}
 func (playerStubs) StopCharmOfLuck(*Effect)              {}
 func (playerStubs) StopPhoenixBlessing(*Effect)          {}
 func (playerStubs) StopProtectionBlessing(*Effect)       {}
+func (playerStubs) BroadcastEtcStatus()                  {}
 func (playerStubs) WeaponGradePenalty() bool             { return false }
 func (playerStubs) ReduceDeathPenaltyLevel() int         { return 0 }
 func (playerStubs) CastingNow() bool                     { return false }
@@ -3116,10 +3137,14 @@ func TestListStackDisplacementSilentCases(t *testing.T) {
 }
 
 // Recasting an identical stacked buff replaces the stack head: the old
-// buff's exit hook runs once, it is announced as displaced and the recast
-// as felt. With lesser effects cancelled the old buff is already gone when
-// its removal runs, so nothing more is sent; kept, it is removed and
-// announced a second time.
+// buff's exit hook runs when it is retired and again when it loses the stack
+// head, after its stat removal (#2763: AbstractEffect.scheduleEffect's
+// FINISHING pass leaves _inUse set, so EffectList.addEffectFromQueue's
+// setInUse(false) on the old head calls onExit a second time,
+// EffectList.java:624-629, 757-765). It is announced as displaced and the
+// recast as felt. With lesser effects cancelled the old buff is already gone
+// when its removal runs, so nothing more is sent; kept, it is removed and
+// announced a second time, with no third exit hook.
 func TestListIdenticalStackedRecastAnnouncesHeadChange(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -3147,6 +3172,7 @@ func TestListIdenticalStackedRecastAnnouncesHeadChange(t *testing.T) {
 				"old:stop",
 				"old:exit",
 				"owner:remove:old",
+				"old:exit",
 				"disappeared:1086:0",
 				"fresh:start",
 				"owner:add",
@@ -3188,8 +3214,11 @@ func TestListIdenticalHerbRecastAtCapacityDropsBoth(t *testing.T) {
 // An identical recast at full buff slots still counts the retired buff, so
 // the cap eviction runs too. It walks the held buffs in order: an older
 // other buff ahead of the recast one is evicted as well, while reaching the
-// already-retired buff first uses up the eviction without retiring it again
-// (no second stop or exit hook), and the other buff survives.
+// already-retired buff first uses up the eviction: it runs that buff's exit
+// hook a second time, because retirement leaves it in use, but not its
+// stop-task hook, and the other buff survives (#2763: a second exit() on an
+// effect still _inUse reruns onExit, and stopEffectTask is a no-op once the
+// task is gone, AbstractEffect.java:229-240, 310-320).
 func TestListIdenticalRecastAtCapacityEvictsInHeldOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
@@ -3220,6 +3249,7 @@ func TestListIdenticalRecastAtCapacityEvictsInHeldOrder(t *testing.T) {
 			order: []string{"b", "a"},
 			events: []string{
 				"b:stop",
+				"b:exit",
 				"b:exit",
 				"b2:start",
 				"owner:add",

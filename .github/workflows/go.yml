@@ -65,6 +65,18 @@ jobs:
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
           restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
 
+      # main saves only the build cache entries its own run used, so the cache
+      # does not carry every earlier build forward and grow without bound. Go
+      # refreshes an entry's mtime when it uses one older than an hour, so
+      # backdating them all first marks every entry this run reads. Two hours
+      # stays well inside Go's own 5-day trim.
+      - name: Mark Go cache entries unused
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p ~/.cache/go-build
+          find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
+          touch "$RUNNER_TEMP/go-cache-start"
+
       - name: Build
         if: matrix.shard.name == 'rest'
         run: go build ./...
@@ -98,6 +110,17 @@ jobs:
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
+
+      # Go skips writing an output it already holds byte for byte, so an
+      # action entry written this run can name an output file left backdated;
+      # keep the output of every kept entry before dropping the rest.
+      - name: Drop Go cache entries this run did not use
+        if: github.event_name == 'push'
+        run: |
+          cd ~/.cache/go-build
+          find . -type f -name '*-a' -newer "$RUNNER_TEMP/go-cache-start" \
+            -exec awk '{print substr($3, 1, 2) "/" $3 "-d"}' {} + | xargs -r touch -c
+          find . -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
 
       # Only main saves, so every branch can restore it.
       - name: Save Go cache

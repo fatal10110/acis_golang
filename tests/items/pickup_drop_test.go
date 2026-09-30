@@ -384,10 +384,13 @@ func TestPickupSlotsFullRejection(t *testing.T) {
 	}
 }
 
-// TestPickupAttentionAnnouncedToObservers pins the pickup announcement: when
-// a player picks up a weapon, every nearby other client receives the
-// attention system message naming the picker and the item; an etc-item
-// pickup announces nothing.
+// TestPickupAttentionAnnouncedToObservers pins the pickup announcement
+// (PlayerAI.java:384-392 through Player.broadcastPacketInRadius,
+// Player.java:2229-2234): a weapon pickup sends the attention line naming
+// the picker and the item to the picker first, then to every nearby client.
+// It follows ItemInstance.pickupMe (ItemInstance.java:798-820), so every
+// viewer reads GetItem, then the item's DeleteObject, then the attention
+// line; the picker's own pickup line comes after it.
 func TestPickupAttentionAnnouncedToObservers(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
@@ -401,31 +404,104 @@ func TestPickupAttentionAnnouncedToObservers(t *testing.T) {
 	drainUntilQuiet(t, observer)
 	drainUntilQuiet(t, c)
 
-	pick := func(objectID int32) [][]byte {
-		t.Helper()
-		c.Send(encodeRequestDropItem(objectID, 1, spawnX, spawnY, spawnZ))
-		frame := c.Read()
-		assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
-		r := wire.NewReader(frame[1:])
-		r.ReadInt32()
-		groundID := r.ReadInt32()
-		drainUntilQuiet(t, observer)
+	c.Send(encodeRequestDropItem(weapon, 1, spawnX, spawnY, spawnZ))
+	frame := c.Read()
+	assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "DropItem")
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32()
+	groundID := r.ReadInt32()
+	drainUntilQuiet(t, observer)
+	drainUntilQuiet(t, c)
 
-		c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup release")
-		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, "GetItem")
-		frames := collectUntilQuiet(t, observer)
-		srv.InventoryUpdates.Tick()
-		waitForInventoryUpdate(t, c, objectID)
-		return frames
+	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup release")
+	pickerFrames := collectUntilQuiet(t, c)
+	observerFrames := collectUntilQuiet(t, observer)
+
+	isGetItem := func(f []byte) bool { return f[0] == serverpackets.OpcodeGetItem }
+	isDelete := func(f []byte) bool {
+		return f[0] == serverpackets.OpcodeDeleteObject && wire.NewReader(f[1:]).ReadInt32() == groundID
 	}
+	isMessage := func(id int) func([]byte) bool {
+		return func(f []byte) bool { return f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == id }
+	}
+	isAttention := isMessage(serverpackets.SystemMessageAttentionS1PickedUpS2)
 
-	for _, f := range pick(weapon) {
-		if f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageAttentionS1PickedUpS2 {
-			return // announced to the observer as expected
+	assertFrameOrder(t, "picker", pickerFrames,
+		orderedFrame{"GetItem", isGetItem},
+		orderedFrame{"DeleteObject", isDelete},
+		orderedFrame{"attention", isAttention},
+		orderedFrame{"YOU_PICKED_UP_S1", isMessage(serverpackets.SystemMessageYouPickedUpS1)},
+	)
+	assertFrameOrder(t, "observer", observerFrames,
+		orderedFrame{"GetItem", isGetItem},
+		orderedFrame{"DeleteObject", isDelete},
+		orderedFrame{"attention", isAttention},
+	)
+	for _, frames := range [][][]byte{pickerFrames, observerFrames} {
+		for _, f := range frames {
+			if isAttention(f) {
+				assertAttentionParams(t, f, "Newbie", 30)
+			}
 		}
 	}
-	t.Fatal("weapon pickup produced no attention message for the observer")
+	srv.InventoryUpdates.Tick()
+	waitForInventoryUpdate(t, c, weapon)
+}
+
+// orderedFrame names one frame an ordering assertion looks for.
+type orderedFrame struct {
+	name  string
+	match func([]byte) bool
+}
+
+// assertFrameOrder requires exactly one frame matching each of want in
+// frames, in want's order.
+func assertFrameOrder(t *testing.T, who string, frames [][]byte, want ...orderedFrame) {
+	t.Helper()
+	last := -1
+	for _, w := range want {
+		at := -1
+		for i, f := range frames {
+			if !w.match(f) {
+				continue
+			}
+			if at >= 0 {
+				t.Fatalf("%s received %s twice", who, w.name)
+			}
+			at = i
+		}
+		if at < 0 {
+			t.Fatalf("%s never received %s", who, w.name)
+		}
+		if at < last {
+			t.Fatalf("%s received %s out of order (frame %d, after %d)", who, w.name, at, last)
+		}
+		last = at
+	}
+}
+
+// assertAttentionParams requires the attention line to name the picker as
+// text and the item as an item name.
+func assertAttentionParams(t *testing.T, frame []byte, picker string, templateID int32) {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // message id already matched
+	if params := r.ReadInt32(); params != 2 {
+		t.Fatalf("attention param count = %d, want 2", params)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("attention param 1 type = %d, want text", typ)
+	}
+	if got := r.ReadString(); got != picker {
+		t.Fatalf("attention picker = %q, want %q", got, picker)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamItemName {
+		t.Fatalf("attention param 2 type = %d, want item name", typ)
+	}
+	if got := r.ReadInt32(); got != templateID {
+		t.Fatalf("attention item = %d, want %d", got, templateID)
+	}
 }
 
 func TestPickupAttentionSkippedForEtcItems(t *testing.T) {

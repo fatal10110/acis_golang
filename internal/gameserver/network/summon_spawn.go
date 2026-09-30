@@ -612,7 +612,12 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	// summon itself is never resolvable as a livePlayer (issue #2353).
 	// Damage feedback already names the owner as its recipient and is
 	// forwarded unchanged.
+	//
+	// The hit runs on the owner's queue: a PK kill it just made takes the
+	// owner's items off and resets its flag before each message that
+	// follows the killing blow, and before the hit ends.
 	aiController.OnHitResult = func(result actorcast.EffectResult) {
+		l.settleSummonOwnerPvPChanges(actor)
 		l.sendSummonSkillResult(actor, result)
 	}
 	brain.SetCastController(aiController)
@@ -692,7 +697,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	if l.world == nil {
 		return
 	}
-	info, ok := summonInfoSnapshot(actor, nil, owner.npcs)
+	info, ok := summonInfoSnapshot(actor, nil, owner.npcs, l.summonInCombat(actor))
 	if !ok {
 		return
 	}

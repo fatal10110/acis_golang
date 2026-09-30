@@ -137,12 +137,13 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	mounts                   MountBodies
-	mountFeeds               MountFeeds
+	mountData                MountDataSource
 	mountFeed                mountFeedState
 	insidePvPZone            atomic.Bool
 	insidePeaceZone          atomic.Bool
 	insideSiegeZone          atomic.Bool
 	insideNoSummonFriendZone atomic.Bool
+	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
 	abnormalEffectMask       atomic.Int32
@@ -155,6 +156,13 @@ type Character struct {
 	floatRoll                func(float64) float64
 
 	dead atomic.Bool
+
+	// charmOfCourage mirrors whether the effect list holds a Charm of
+	// Courage, for status-window packets built while that list's lock may
+	// be held (stat callbacks run under it). charmMu serializes its
+	// refreshes; it is taken before, never under, the effect list's lock.
+	charmOfCourage atomic.Bool
+	charmMu        sync.Mutex
 
 	// cast is the network-owned live cast controller wired back onto this
 	// character so effect hooks (mute, silence, abort-cast, damage-break)
@@ -204,6 +212,7 @@ type Character struct {
 	mountType            int32
 	mountNPCID           int32
 	mountObjectID        int32
+	mountLevel           int
 	transformed          bool
 	spawnProtected       bool
 	damagePermissionSet  bool

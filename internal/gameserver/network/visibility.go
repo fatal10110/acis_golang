@@ -44,7 +44,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 			}
 			return
 		}
-		if snap, ok := summonInfoSnapshot(o, p, p.npcs); ok {
+		if snap, ok := summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	case groundItemObject:
@@ -116,7 +116,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 		if !ok || a.ShownAsOwnedBy(p.ObjectID()) {
 			return
 		}
-		if snap, ok := summonInfoSnapshot(a, p, p.npcs); ok {
+		if snap, ok := summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	})
@@ -181,11 +181,22 @@ func rendersObject(obj world.Tracked) bool {
 	}
 }
 
+// summonInCombat reports whether a is drawn in its combat pose: while its
+// owner holds an attack stance, or, for a summon revived after its owner left
+// the world, while it holds the stance of its own that
+// startSummonAttackStance keeps for it.
+func (l *GameClientLink) summonInCombat(a *summon.Actor) bool {
+	if !a.OwnerLeft() {
+		return a.InCombat()
+	}
+	return l != nil && l.attackStance != nil && l.attackStance.InAttackStance(a)
+}
+
 // summonInfoSnapshot resolves the NpcInfo fields viewer sees for a summon it
 // does not own. Attackable is per viewer: whether viewer may attack a without
 // forcing, which follows a's owner's karma and PvP flag. A nil viewer sees it
-// as not attackable.
-func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table) (serverpackets.NPCInfoSnapshot, bool) {
+// as not attackable. inCombat is summonInCombat's answer for a.
+func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
@@ -205,8 +216,9 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table) (s
 		X: x, Y: y, Z: z, Heading: a.Heading(),
 		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: int(a.PAtkSpd(tmpl.AtkSpd)),
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
+		MoveMultiplier:  float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
 		CollisionRadius: a.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
-		Running: true, AlikeDead: a.AlikeDead(),
+		Running: true, InCombat: inCombat, AlikeDead: a.AlikeDead(),
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(),
@@ -271,6 +283,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		PAtkSpd:           int(a.PAtkSpd(tmpl.AtkSpd)),
 		RunSpd:            int(tmpl.RunSpeed),
 		WalkSpd:           int(tmpl.WalkSpeed),
+		MoveMultiplier:    float64(a.MovementSpeedMultiplier(tmpl.RunSpeed)),
 		CollisionRadius:   tmpl.CollisionRadius,
 		CollisionHeight:   tmpl.CollisionHeight,
 		InCombat:          owner.InCombat(),

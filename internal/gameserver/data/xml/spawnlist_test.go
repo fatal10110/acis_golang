@@ -13,6 +13,7 @@ import (
 )
 
 func TestLoadSpawnlistFixture(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -131,6 +132,7 @@ func TestLoadSpawnlistFixture(t *testing.T) {
 // the multiplier, while a fixed/weighted "pos" entry's total is left as
 // declared (MultiSpawn.java:59-61, coords != null).
 func TestLoadSpawnlistAppliesSpawnMultiplier(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -172,6 +174,7 @@ func TestLoadSpawnlistAppliesSpawnMultiplier(t *testing.T) {
 }
 
 func TestLoadSpawnlistDefaultMultiplierLeavesTotalsUnscaled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -203,6 +206,7 @@ func TestLoadSpawnlistDefaultMultiplierLeavesTotalsUnscaled(t *testing.T) {
 }
 
 func TestLoadSpawnlistRetainsNPCAIParamPrefix(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0"?>
 <list>
@@ -224,6 +228,7 @@ func TestLoadSpawnlistRetainsNPCAIParamPrefix(t *testing.T) {
 }
 
 func TestLoadSpawnlistResolvesTerritoryReferenceIgnoringCase(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0"?>
 <list>
@@ -245,6 +250,7 @@ func TestLoadSpawnlistResolvesTerritoryReferenceIgnoringCase(t *testing.T) {
 }
 
 func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "21_24.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -280,6 +286,7 @@ func TestLoadSpawnlistAllowsIdenticalDuplicateTerritory(t *testing.T) {
 }
 
 func TestLoadSpawnlistRetainsConflictingDuplicateTerritory(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "21_24.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -341,6 +348,7 @@ func unbuildableTerritoryNodes() string {
 // loads with zero resolved territories (matching findTerritory returning
 // null), instead of failing itself.
 func TestLoadSpawnlistSkipsUnbuildableTerritory(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -392,6 +400,7 @@ func TestLoadSpawnlistSkipsUnbuildableTerritory(t *testing.T) {
 // never declared at all resolves to null rather than failing, so the maker
 // still loads with zero territories instead of aborting the whole spawnlist.
 func TestLoadSpawnlistMakerToleratesUnknownTerritory(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -429,6 +438,7 @@ func TestLoadSpawnlistMakerToleratesUnknownTerritory(t *testing.T) {
 // composite of the names that do exist. A maker referencing "a;missing;b"
 // must end up with zero territories, not [a, b].
 func TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "19_21.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <list>
@@ -462,6 +472,7 @@ func TestLoadSpawnlistMultiNameTerritoryGroupIsAllOrNothing(t *testing.T) {
 }
 
 func TestLoadSpawnlistErrors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		xml  string
@@ -494,6 +505,7 @@ func TestLoadSpawnlistErrors(t *testing.T) {
 }
 
 func TestLoadSpawnlistAgainstDatapack(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "spawnlist"))
 
 	table, err := LoadSpawnlist(dir, zerolog.Nop(), 1)

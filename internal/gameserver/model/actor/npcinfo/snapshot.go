@@ -2,6 +2,8 @@
 package npcinfo
 
 // Snapshot is everything an NPCInfo packet needs for one visible NPC.
+// MoveMultiplier is the current move speed over the base speed the stance
+// picks; the client scales RunSpd/WalkSpd by it.
 type Snapshot struct {
 	ObjectID                     int32
 	TemplateID                   int
@@ -10,6 +12,7 @@ type Snapshot struct {
 	Heading                      int
 	MAtkSpd, PAtkSpd             int
 	RunSpd, WalkSpd              int
+	MoveMultiplier               float64
 	CurrentHP, MaxHP             int
 	CollisionRadius              float64
 	CollisionHeight              float64

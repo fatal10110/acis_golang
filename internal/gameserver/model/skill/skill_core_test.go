@@ -359,6 +359,11 @@ func TestParseExtractableItems(t *testing.T) {
 			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}}, Chance: 20.5}},
 		},
 		{
+			"quantity past 32 bits is skipped",
+			"57,2147483648,20.5;57,2147483647,20.5",
+			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 2147483647}}, Chance: 20.5}},
+		},
+		{
 			"even field count is skipped",
 			"57,10;57,10,20.5",
 			[]ExtractableProduct{{Items: []ExtractableItem{{ItemID: 57, Quantity: 10}}, Chance: 20.5}},

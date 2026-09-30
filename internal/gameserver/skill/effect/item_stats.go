@@ -137,40 +137,29 @@ func itemOp(op item.FuncOp) (Op, error) {
 	}
 }
 
-// ItemPassiveFuncs builds the stat functions owner.Tmpl.AttachedSkills
-// contributes while equipped: only ids resolving to a loaded passive skill
-// definition contribute, mirroring persistence.SetKnownSkill's
-// learned-passive path. A missing or non-passive entry is silently
-// skipped — a template may name an active-use item skill in the same list.
-func ItemPassiveFuncs(skills *modelskill.Table, owner ItemOwner) ([]Mod, error) {
+// ItemEnchantSkillFuncs builds the stat functions a weapon's +4 enchant
+// passive contributes while equipped, owned by the weapon instance and gated
+// on its live enchant level. Only an id resolving to a loaded passive skill
+// definition contributes. The item's other attached skills are granted as
+// skills of their own, owned by the skill (see PassiveFuncs).
+func ItemEnchantSkillFuncs(skills *modelskill.Table, owner ItemOwner) ([]Mod, error) {
 	if owner.Tmpl == nil || skills == nil {
 		return nil, nil
 	}
-	var mods []Mod
-	modOwner := ModOwnerItem(owner)
-	add := func(ref item.SkillRef, cond Condition) error {
-		def, ok := skills.Get(modelskill.ID(ref.ID), int(ref.Level))
-		if !ok || def.Activation != modelskill.ActivationPassive {
-			return nil
-		}
-		fns, err := statFuncs(modOwner, def.Funcs, cond)
-		if err != nil {
-			return fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
-		}
-		mods = append(mods, fns...)
-		return nil
+	weapon := owner.Tmpl.Weapon
+	if weapon == nil || weapon.Enchant4Skill == nil {
+		return nil, nil
 	}
-	for _, ref := range owner.Tmpl.AttachedSkills {
-		if err := add(ref, nil); err != nil {
-			return nil, err
-		}
+	ref := *weapon.Enchant4Skill
+	def, ok := skills.Get(modelskill.ID(ref.ID), int(ref.Level))
+	if !ok || def.Activation != modelskill.ActivationPassive {
+		return nil, nil
 	}
-	if weapon := owner.Tmpl.Weapon; weapon != nil && weapon.Enchant4Skill != nil {
-		if err := add(*weapon.Enchant4Skill, enchantAtLeast{owner: owner, level: 4}); err != nil {
-			return nil, err
-		}
+	fns, err := statFuncs(ModOwnerItem(owner), def.Funcs, enchantAtLeast{owner: owner, level: 4})
+	if err != nil {
+		return nil, fmt.Errorf("item %d passive skill %d level %d: %w", owner.Tmpl.ID, ref.ID, ref.Level, err)
 	}
-	return mods, nil
+	return fns, nil
 }
 
 type enchantAtLeast struct {

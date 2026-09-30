@@ -86,6 +86,7 @@ var _ stat.Actor = fakeWearingActor{}
 // gap (the Signet family and ClanGate), so a new one here means a shipped
 // template has genuinely gone unhandled again.
 func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
@@ -167,6 +168,7 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 // active_skill_id_lvl, battle_force, spell_force, seed_*), target
 // (active_skill_id, hp_min_max, npcId, race_id) and using kind.
 func TestEveryShippedSkillConditionCompiles(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
@@ -192,6 +194,7 @@ func TestEveryShippedSkillConditionCompiles(t *testing.T) {
 // templates carry different stack types: it is the first template's, in
 // document order, for every effect the skill applies.
 func TestSkillStackTypeComesFromFirstShippedTemplate(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
@@ -221,6 +224,7 @@ func TestSkillStackTypeComesFromFirstShippedTemplate(t *testing.T) {
 }
 
 func TestLoadSkillDefinitions(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "skills"))
 
 	table, err := LoadSkillDefinitions(dir, zerolog.Nop())
@@ -618,6 +622,7 @@ func skillFixture(extra string) string {
 }
 
 func TestLoadSkillDefinitionsTrimsSetAttrs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), `<list><skill id="1" name="x" levels="1">
 		<table name="#mp">12</table>
@@ -640,6 +645,7 @@ func TestLoadSkillDefinitionsTrimsSetAttrs(t *testing.T) {
 // element's data problem is tolerated (see
 // TestLoadSkillDefinitionsSkipsMalformedSkills).
 func TestLoadSkillDefinitionsMalformedXMLFails(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fixture.xml")
 	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1" <set name="target" val="ONE"/></skill></list>`)
@@ -653,6 +659,7 @@ func TestLoadSkillDefinitionsMalformedXMLFails(t *testing.T) {
 // the whole load, matching DocumentSkill.java's per-level try/catch
 // ("Failed parsing skill.").
 func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {
@@ -788,6 +795,7 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 // TestLoadSkillDefinitionsSkipsMalformedSkills where the "" substitution
 // feeds a required numeric attribute and fails there instead.
 func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fixture.xml")
 	writeXMLFixture(t, path, `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><cond><player Charges="#missing"/></cond></skill></list>`)
@@ -819,6 +827,7 @@ func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T)
 // applies its per-level try/catch at, rather than dropping the whole
 // <skill> element the way an earlier version of this loader did.
 func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fixture.xml")
 	writeXMLFixture(t, path, `<list><skill id="5" name="x" levels="3">
@@ -857,6 +866,7 @@ func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
 // ignoring msgId/addName entirely even when present
 // (DocumentSkill.java:245-247, 289-291).
 func TestConditionMessagePrecedence(t *testing.T) {
+	t.Parallel()
 	t.Run("regular cond: msg present wins over msgId", func(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond msg="both attrs present" msgId="113" addName="1"><player Charges="1"/></cond>`)
@@ -909,6 +919,7 @@ func TestConditionMessagePrecedence(t *testing.T) {
 // matching DocumentBase.java's parseCondition (returns null, attach(null) is
 // a no-op) and parseTemplate (no fall-through branch for an unknown tag).
 func TestSkillGrammarDegradesGracefully(t *testing.T) {
+	t.Parallel()
 	t.Run("empty cond is skipped, not a load failure", func(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond/>`)

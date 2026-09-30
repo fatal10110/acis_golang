@@ -423,6 +423,66 @@ func TestSignetMDamTickRefreshesSummonStatus(t *testing.T) {
 	}
 }
 
+// TestSignetMDamLackMPTellsCasterAndDespawnsPoint drains a SignetMDam
+// caster's MP before the effect's first paying tick (#2856). Reference:
+// EffectSignetMDam.onActionTime (EffectSignetMDam.java:73-81) sends the
+// caster SKILL_REMOVED_DUE_LACK_MP when mpConsume exceeds its MP and ends
+// the effect, whose onExit deletes the effect point. The two free ticks
+// before it pay nothing and send no such message.
+func TestSignetMDamLackMPTellsCasterAndDespawnsPoint(t *testing.T) {
+	t.Parallel()
+	def := signetMDamSkill()
+	def.Power = 1
+	srv, c, objID := bootSignetCaster(t, def, 0)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
+	readSignetCastStartFrames(t, c, objID, int32(def.ID), 1, int32(def.HitTime), int32(def.ReuseDelay), objID)
+	var pointID int32
+	for _, obj := range srv.State.Objects() {
+		if point, ok := obj.(*npc.EffectPoint); ok {
+			pointID = point.ObjectID()
+		}
+	}
+	if pointID == 0 {
+		t.Fatal("no signet effect point in the world after the cast started")
+	}
+	srv.Advance(t, 500*time.Millisecond)
+	for range 2 {
+		srv.Advance(t, 1100*time.Millisecond)
+		srv.TickEffects()
+	}
+	if at := readFrameLog(c).index(isSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP)); at >= 0 {
+		t.Fatalf("SKILL_REMOVED_DUE_LACK_MP at frame %d during the signet's free ticks", at)
+	}
+	if !signetPointSpawned(srv) {
+		t.Fatal("signet effect point gone before its first paying tick")
+	}
+
+	srv.Advance(t, 1100*time.Millisecond)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.ReduceMP(pc.MPValue()) })
+	srv.TickEffects()
+
+	log := readFrameLog(c)
+	lack := log.index(isSystemMessage(serverpackets.SystemMessageSkillRemovedDueLackMP))
+	if lack < 0 {
+		t.Fatal("caster never read SKILL_REMOVED_DUE_LACK_MP when its signet tick could not pay its MP")
+	}
+	if deleted := log.index(objectFrame(serverpackets.OpcodeDeleteObject, pointID)); deleted >= 0 && deleted < lack {
+		t.Fatalf("effect point DeleteObject at frame %d before SKILL_REMOVED_DUE_LACK_MP at %d; want the message first", deleted, lack)
+	}
+	if signetPointSpawned(srv) {
+		t.Fatal("signet effect point still in the world after the tick short of MP")
+	}
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		for _, e := range pc.EffectList().All() {
+			if e.Skill.ID == def.ID {
+				t.Errorf("caster still carries the signet's %s effect after the tick short of MP", e.Type)
+			}
+		}
+	})
+}
+
 func encodeSignetAutoSoulShot(itemID, typ int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
 	w.WriteUint16(clientpackets.OpcodeRequestAutoSoulShot)

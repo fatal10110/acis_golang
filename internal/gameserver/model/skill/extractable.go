@@ -56,11 +56,13 @@ func parseExtractableGroup(group string) (ExtractableProduct, bool) {
 		if err != nil {
 			return ExtractableProduct{}, false
 		}
-		quantity, err := strconv.Atoi(fields[i+1])
+		// A quantity past the 32-bit range fails its group, as the
+		// reference's Integer.parseInt does.
+		quantity, err := strconv.ParseInt(fields[i+1], 10, 32)
 		if err != nil {
 			return ExtractableProduct{}, false
 		}
-		items = append(items, ExtractableItem{ItemID: int32(itemID), Quantity: quantity})
+		items = append(items, ExtractableItem{ItemID: int32(itemID), Quantity: int(quantity)})
 	}
 
 	chance, err := strconv.ParseFloat(fields[pairFields], 64)

@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
@@ -66,13 +67,27 @@ func (l *GameClientLink) settlePvPChanges(live *livePlayer) {
 	}
 }
 
+// settleSummonOwnerPvPChanges runs, from a task of actor's own, the PvP flag
+// changes pending for its owner. A summon's work is scheduled on its owner's
+// queue (wireSummonAI), so a kill the summon's hit, skill or own proc just
+// made settles inside that killing blow, as a player's own does. A corpse
+// its owner left behind, and one revived since, has its work on a queue of
+// its own (AdoptCorpseQueue) and leaves them to the owner's queue.
+func (l *GameClientLink) settleSummonOwnerPvPChanges(actor *summon.Actor) {
+	owner, ok := liveSummonOwner(actor)
+	if !ok || actor.OwnerLeft() || actor.Queue() != owner.Queue() {
+		return
+	}
+	l.settlePvPChanges(owner)
+}
+
 // applyPKKarmaSideEffects schedules what a PK karma gain costs the killer:
 // every equipped item whose conditions it no longer meets comes off, then
 // its PvP flag task stops and the flag resets. The kill can run on another
-// actor's queue, so this queues the work; a task of live's own runs it
-// inside the killing blow: right after its physical hit's damage
-// (HitDamageApplied), and before each message of its cast's hit, its own
-// procs and its cubics' skills.
+// actor's queue, so this queues the work; a task of live's queue runs it
+// inside the killing blow: right after its own or its summon's physical
+// hit's damage (HitDamageApplied), and before each message of its own or
+// its summon's cast hit, their own procs and its cubics' skills.
 func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
 	l.queuePvPChange(live, pvpChange{reset: true})
 }
@@ -88,10 +103,10 @@ func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 // live's own action applies at once unless a change is still pending, in
 // which case it queues behind it: an offensive skill that kills an innocent
 // player flags its caster again after the kill's reset, and the caster ends
-// flagged. A request from live's summon comes from the summon's queue and
-// always queues, so the flag and a PK kill's reset keep the order the
-// summon produced them in: a lethal hit flags first and ends unflagged, a
-// lethal skill flags after and ends flagged.
+// flagged. A request from live's summon always queues, so the flag and a
+// PK kill's reset keep the order the summon produced them in: a lethal hit
+// flags first and ends unflagged, a lethal skill flags after and ends
+// flagged.
 func (l *GameClientLink) applyPvPFlag(live *livePlayer, e event.PvPFlagged) {
 	if l.pvpFlags == nil {
 		return

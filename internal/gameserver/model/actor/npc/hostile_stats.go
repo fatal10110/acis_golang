@@ -11,20 +11,34 @@ import (
 // maxBuffCount is the shipped players.properties MaxBuffsAmount default.
 const maxBuffCount = 20
 
-// AddStatFuncs attaches fns to h's live stat calculators. Each Mod is
-// published independently under its own Calculator's lock — the batch is
-// not atomic against a concurrent CalcStat, which may observe fns partially
-// applied. Callers that need a batch to appear all-or-nothing to readers
-// must serialize at a higher level (see effect.List, which does this for
-// effect-driven adds).
+// AddStatFuncs attaches fns to h's live stat calculators and reports the
+// change. Each Mod is published independently under its own Calculator's
+// lock — the batch is not atomic against a concurrent CalcStat, which may
+// observe fns partially applied. Callers that need a batch to appear
+// all-or-nothing to readers must serialize at a higher level (see
+// effect.List, which does this for effect-driven adds through
+// AttachStatFuncs and StatFuncsAttached).
 func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
+	h.AttachStatFuncs(fns)
+	h.StatFuncsAttached(fns)
+}
+
+// AttachStatFuncs attaches fns to h's live stat calculators without
+// reporting the change.
+func (h *Hostile) AttachStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		h.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
+}
+
+// StatFuncsAttached reports the stat change of attached fns.
+func (h *Hostile) StatFuncsAttached(fns []effect.Mod) {
 	h.broadcastModifiedStats(fns)
 }
 
-// RemoveStatsByOwner drops every stat func previously added for owner.
+// RemoveStatsByOwner drops every stat func previously added for owner. An
+// effect a stop-all is ending changes the movement speed only; its
+// observers are sent nothing.
 func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner == (effect.ModOwner{}) {
 		return
@@ -40,6 +54,12 @@ func (h *Hostile) RemoveStatsByOwner(owner effect.ModOwner) {
 			}
 		}
 	}
+	if owner.Stripped() {
+		if len(modified) > 0 {
+			h.refreshMoveSpeed()
+		}
+		return
+	}
 	h.broadcastModifiedStatsFor(modified)
 }
 
@@ -52,6 +72,11 @@ func (h *Hostile) broadcastModifiedStats(fns []effect.Mod) {
 }
 
 func (h *Hostile) broadcastModifiedStatsFor(stats []stat.Stat) {
+	// Every position update reads the live move speed; hand the movement
+	// simulation the new one after any stat func change.
+	if len(stats) > 0 {
+		h.refreshMoveSpeed()
+	}
 	if h.sink == nil {
 		return
 	}

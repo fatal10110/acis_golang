@@ -295,8 +295,12 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 	return caster != nil && caster.AttackType() == item.WeaponBow
 }
 
-// MAtk returns the current magic attack value.
+// MAtk returns the current magic attack value. A rider casts from its
+// mount's M.Atk. instead of its class and weapon.
 func (c *Character) MAtk() float64 {
+	if m, ok := c.ridden(); ok {
+		return c.calcStat(stat.MagicAttack, m.mAtk)
+	}
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MAtk > 0 {
@@ -694,13 +698,24 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 // too. The wake-up side effects run next, and only then does another
 // attacker's damage permission gate the CP and HP change: c's own damage is
 // never gated by c's own permission.
+//
+// A tick that works out to no damage (a DamOverTime template value of 0)
+// still runs the wake-up side effects. It then writes nothing unless it is
+// another playable's tick through CP, which rewrites CP unchanged and
+// reports the status, as reduceSkillHP does for a zero skill hit.
 func (c *Character) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	killer, _ := attacker.(attackable.Combatant)
-	if amount <= 0 || c.Dead() || c.invulnerableTo(killer, isDOT) {
+	if amount < 0 {
+		amount = 0
+	}
+	if c.Dead() || c.invulnerableTo(killer, isDOT) {
 		return
 	}
 	c.applyNonConsumptionDamageEffects(isDOT)
 	if !c.damagePermitted(killer) {
+		return
+	}
+	if amount == 0 && (!c.hitByOther(killer) || !killer.Kind().Playable()) {
 		return
 	}
 	if c.landHit(amount, killer, false, isDOT) {

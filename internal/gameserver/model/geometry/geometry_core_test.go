@@ -382,3 +382,22 @@ func TestTrianglePointAtMatchesReferenceFold(t *testing.T) {
 		})
 	}
 }
+
+func TestTerritoryBoundsUnionsItsShapes(t *testing.T) {
+	c, err := NewCircle(100, -50, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := NewPolygon([]Point{{X: -10, Y: 5}, {X: 40, Y: 90}, {X: 0, Y: 200}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := NewTerritory(0, 10, c, p, NewRectangle(60, 20, 0, -400))
+	if err != nil {
+		t.Fatal(err)
+	}
+	minX, maxX, minY, maxY := tr.Bounds()
+	if minX != -10 || maxX != 130 || minY != -400 || maxY != 200 {
+		t.Fatalf("Bounds = x %d..%d y %d..%d, want x -10..130 y -400..200", minX, maxX, minY, maxY)
+	}
+}

@@ -457,11 +457,12 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 }
 
 // SignetDeps carries the world-spawning collaborators the signet cast
-// shape needs beyond skill definitions.
+// shape needs beyond skill definitions. IDs also gives the item-creating
+// handlers (sweep, harvest, capsule extraction) their object ids.
 type SignetDeps struct {
 	Effects   effect.Env
 	Templates signetTemplates
-	IDs       signetIDAllocator
+	IDs       objectIDAllocator
 	World     *world.State
 	// NewSink builds the event sink a spawned signet effect point reports
 	// through; nil disables signet spawning.
@@ -475,9 +476,15 @@ type SignetDeps struct {
 // NewDefaultRegistryWithSignet returns the default handlers under the
 // server's MagicFailures switch, with the healSps table a spiritshot-boosted
 // heal reads, plus the signet cast shape wired with signet's own
-// world-spawning collaborators.
+// world-spawning collaborators, and the item-creating handlers wired with
+// its object ids.
 func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable, signet SignetDeps) *Registry {
 	r := newDefaultRegistry(defs, magicFailures, healSps)
+	if signet.IDs != nil {
+		r.Register(extractableHandler{ids: signet.IDs})
+		r.Register(harvestHandler{ids: signet.IDs})
+		r.Register(sweepHandler{ids: signet.IDs})
+	}
 	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }

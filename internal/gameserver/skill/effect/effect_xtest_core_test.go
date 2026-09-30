@@ -18,7 +18,8 @@ import (
 // effect's own state and the live list it lands in.
 type noopStatOwner struct{}
 
-func (noopStatOwner) AddStatFuncs([]effect.Mod)          {}
+func (noopStatOwner) AttachStatFuncs([]effect.Mod)       {}
+func (noopStatOwner) StatFuncsAttached([]effect.Mod)     {}
 func (noopStatOwner) RemoveStatsByOwner(effect.ModOwner) {}
 func (noopStatOwner) MaxBuffCount() int                  { return 20 }
 

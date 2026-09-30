@@ -4,14 +4,33 @@ import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/s
 
 const wyvernNPCID int32 = 12621
 
-// Mount records the active mount and the feeding data of the mount at the
-// character's level. StartMountFeed starts feeding it. A wyvern flies and
-// gives its rider Wyvern Breath for as long as it is ridden; the skill is
-// not stored.
+// Mount types: a strider is ridden, a wyvern flown.
+const (
+	MountTypeStrider int32 = 1
+	MountTypeWyvern  int32 = 2
+)
+
+// MountTypeOf is the mount type of the mount NPC npcID, or 0 for an NPC
+// that is neither a strider nor a wyvern.
+func MountTypeOf(npcID int32) int32 {
+	switch npcID {
+	case 12526, 12527, 12528: // Wind, Star and Twilight Strider
+		return MountTypeStrider
+	case wyvernNPCID:
+		return MountTypeWyvern
+	}
+	return 0
+}
+
+// Mount records the active mount, at the character's level, and the pet
+// data of the mount at that level. StartMountFeed starts feeding it. A
+// wyvern flies and gives its rider Wyvern Breath for as long as it is
+// ridden; the skill is not stored.
 func (c *Character) Mount(npcID, controlItemID int32) bool {
 	if npcID <= 0 || controlItemID <= 0 {
 		return false
 	}
+	level := c.Level()
 	c.stateMu.Lock()
 	c.initStateLocked()
 	if c.mountNPCID == npcID && c.mountObjectID == controlItemID {
@@ -20,18 +39,16 @@ func (c *Character) Mount(npcID, controlItemID int32) bool {
 	}
 	c.mountNPCID = npcID
 	c.mountObjectID = controlItemID
-	c.mountType = 0
-	c.flying = false
-	if npcID == wyvernNPCID {
-		c.mountType = 2
-		c.flying = true
-	}
+	c.mountLevel = level
+	c.mountType = MountTypeOf(npcID)
+	c.flying = c.mountType == MountTypeWyvern
 	flying := c.flying
 	c.stateMu.Unlock()
 	if flying {
 		c.SetSkillLevel(int(modelskill.WyvernBreathSkillID), 1)
 	}
 	c.loadMountFeed(npcID)
+	c.refreshMoveSpeed()
 	return true
 }
 

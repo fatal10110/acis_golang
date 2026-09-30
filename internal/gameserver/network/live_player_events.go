@@ -6,6 +6,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -177,12 +178,18 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	case event.RunSpeedChanged:
-		l.broadcastRunSpeedChange(live)
+	case event.RunSpeedChanged, event.EffectsStripped:
+		l.broadcastFullStatus(live)
 	case event.StatsModified:
 		l.sendModifiedStats(live, e.Attrs)
 	case event.ChargesChanged, event.EtcStatusChanged:
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{Charges: int32(live.Charges()), WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
+	case event.EtcStatusBroadcast:
+		// The saved effects EnterWorld replays have no observers yet, and
+		// the EnterWorld EtcStatusUpdate that follows carries their flags.
+		if !live.replayingEffects.Load() {
+			l.broadcastLiveFrame(live, func() wire.Frame { return serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)) })
+		}
 	case event.ChargeMessage:
 		if e.Maxed {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageForceMaxLevelReached))
@@ -191,7 +198,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageForceIncreasedToS1, int32(e.Charges)))
 	case event.GradePenaltyChanged:
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 		l.refreshLiveItemStats(live)
 	case event.WeightPenaltyChanged:
 		l.sendLiveWeightPenalty(live)
@@ -263,7 +270,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 	case event.AttackRequested:
 		if e.Target != nil {
-			l.attackLiveTarget(live, e.Target)
+			// An attack an effect forces on the player holds no shift.
+			l.attackLiveTarget(live, e.Target, false)
 		}
 	case event.FleeRequested:
 		l.fleeLivePlayer(live, e)
@@ -328,6 +336,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishLiveGroundPickup(live)
 		l.finishPetInteract(live)
 		l.finishDeferredMagicSkill(live)
+		l.finishDeferredItemAICast(live)
 		live.thinkAttack()
 	case event.MoveBlocked:
 		if !l.onPlayerArrivedBlocked(live) {
@@ -406,7 +415,7 @@ func (l *GameClientLink) refreshLiveItemStats(live *livePlayer) {
 func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	live.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(live.DeathPenaltyLevel())}))
+	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 	if l.world == nil {
 		return
 	}
@@ -429,7 +438,8 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 			l.log.Error().Err(err).Int32("object_id", live.ID).Msg("update death-penalty passive stats")
 		}
 	}
-	etc := serverpackets.EtcStatus{WeightPenalty: int32(live.WeightPenalty()), GradePenalty: live.WeaponGradePenalty() || live.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(e.New)}
+	etc := etcStatus(live.Character)
+	etc.DeathPenaltyLevel = int32(e.New)
 	if e.Raised {
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDeathPenaltyLevelS1Added, int32(e.New)))
@@ -461,9 +471,12 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if l.finishDeferredAction(live) {
 		return
 	}
-	// A queued item cast or skill request replaced the cast that just ended
-	// as the intention, whether it starts now or not: the ended cast's
+	// A queued pickup, item cast or skill request replaced the cast that just
+	// ended as the intention, whether it starts now or not: the ended cast's
 	// nextActionAttack follow-up does not run.
+	if l.finishDeferredPickup(live) {
+		return
+	}
 	if l.finishDeferredItemAICast(live) {
 		return
 	}
@@ -510,13 +523,14 @@ func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
 
 // endCastIntention ends the CAST intention a cast of def on target held,
 // with nothing queued behind it: a skill carrying nextActionAttack attacks
-// target when live may attack it without force; anything else, a toggle
-// included, goes idle.
+// target when live may attack it without force, held with the cast's shift
+// modifier; anything else, a toggle included, goes idle.
 func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant) {
 	if live.combat == nil {
 		return
 	}
-	if live.attackAfterCast(def, target) {
+	_, shift := live.Character.CastModifiers()
+	if live.attackAfterCast(def, target, shift) {
 		return
 	}
 	live.combat.Stop()
@@ -524,9 +538,10 @@ func (live *livePlayer) endCastIntention(def modelskill.Definition, target attac
 
 // attackAfterCast starts the attack a nextActionAttack skill hands on to its
 // final target, once its cast ends or is refused at its cost and condition
-// checks. It reports false, starting nothing, for any other skill, or a
+// checks, held with the cast's shift modifier: a shift-held follow-up never
+// walks. It reports false, starting nothing, for any other skill, or a
 // target live may not attack without force.
-func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant) bool {
+func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift bool) bool {
 	if live.combat == nil || !def.NextActionIsAttack || target == nil {
 		return false
 	}
@@ -534,7 +549,7 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 	if !ok || !rules.AttackableWithoutForceBy(live.Character) {
 		return false
 	}
-	if live.combat.AttackAfterCast(target) {
+	if live.combat.AttackAfterCast(target, shift) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	return true
@@ -575,5 +590,17 @@ func reviveRefusalMessage(reason event.ReviveRefusal) int {
 		return serverpackets.SystemMessageMasterCannotRes
 	default:
 		return serverpackets.SystemMessageResHasAlreadyBeenProposed
+	}
+}
+
+// etcStatus is c's status-window flags as EtcStatusUpdate reports them.
+func etcStatus(c *player.Character) serverpackets.EtcStatus {
+	return serverpackets.EtcStatus{
+		Charges:           int32(c.Charges()),
+		WeightPenalty:     int32(c.WeightPenalty()),
+		DangerArea:        c.InDangerArea(),
+		GradePenalty:      c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0,
+		CharmOfCourage:    c.CharmOfCourage(),
+		DeathPenaltyLevel: int32(c.DeathPenaltyLevel()),
 	}
 }

@@ -130,8 +130,21 @@ func inPostureTransition(live *livePlayer) bool {
 // is claimed and before any start-of-cast cost; without one the cast is an
 // ordinary skill cast and announces USE_S1. rejected means the start gates
 // refused the skill (the attached-skill loop continues). failed means the
-// carrier could not be consumed (the loop stops).
+// carrier could not be consumed (the loop stops). A skill that walks to its
+// target first returns neither and no run.
 func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.Inventory, carrier *item.Instance, selected world.Tracked, def modelskill.Definition, ctrl bool) (run func(), rejected, failed bool) {
+	// An item's cast intention holds its force-use modifier and never shift.
+	live.Character.SetCastModifiers(ctrl, false)
+	// This CAST intention replaces whatever walk or queued action an earlier
+	// intention parked. Out of cast range it walks to its creature target
+	// first, carrier unspent, and the arrival begins it again.
+	live.clearParkedApproaches()
+	if def.Target != modelskill.TargetGround {
+		target := l.skillFinalTarget(live, selected, def)
+		if l.walkToCastTarget(live, target, def.CastRange, false, func() { live.deferItemAICast(inv, carrier, def, selected, ctrl) }) {
+			return nil, false, false
+		}
+	}
 	controller := l.castController(live)
 	var carrierLost bool
 	var consumeCarrier func() error
@@ -177,7 +190,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target))
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), false)
 		}
 		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)

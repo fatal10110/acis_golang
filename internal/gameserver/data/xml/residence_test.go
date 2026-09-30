@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadCastles(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "castles.xml"))
 
 	table, err := LoadCastles(path)
@@ -48,6 +49,7 @@ func TestLoadCastles(t *testing.T) {
 // later child overwrote an earlier one. The XML-tag decode must reproduce
 // that last-wins order, not read the first child.
 func TestLoadCastlesControlTowerLastPositionAndStatsWin(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "castles.xml")
 	writeXMLFixture(t, path, `<list><castle id="1" alias="gludio" parentId="0" name="Gludio" circletId="1">
@@ -84,6 +86,7 @@ func TestLoadCastlesControlTowerLastPositionAndStatsWin(t *testing.T) {
 }
 
 func TestLoadClanHalls(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "clanHalls.xml"))
 
 	table, err := LoadClanHalls(path)
@@ -118,6 +121,7 @@ func TestLoadClanHalls(t *testing.T) {
 }
 
 func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	castlePath := filepath.Join(dir, "castles.xml")
 	writeXMLFixture(t, castlePath, `<list>
@@ -205,6 +209,7 @@ func TestResidenceLoadersMatchJavaEdgeCases(t *testing.T) {
 }
 
 func TestLoadClanHallDeco(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "clanHallDeco.xml"))
 
 	table, err := LoadClanHallDeco(path)
@@ -227,6 +232,7 @@ func TestLoadClanHallDeco(t *testing.T) {
 }
 
 func TestResidenceLoadersErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {

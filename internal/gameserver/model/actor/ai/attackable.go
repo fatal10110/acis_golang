@@ -686,7 +686,9 @@ const (
 // Think advances the current intention once, for a bow's reuse ending and
 // a control effect ending; an arrival does not think. It never selects a
 // queued desire, even from idle, follow or wander, and does not run
-// empty-queue idle abort: RunAI and TickThink do both. A non-nil return
+// empty-queue idle abort: RunAI and TickThink do both. A walk an arrival
+// finished is still current, so Think steps it again; a wander it finished
+// takes no step. A non-nil return
 // reports that an intention step ran but a broadcast within it failed; the
 // intention itself still advanced.
 func (a *Attackable) Think() error {
@@ -749,7 +751,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	if mode == thinkEvent && a.idleOnEmptyQueue() {
 		return nil
 	}
-	a.dropCurrentIfUnqueued()
+	a.dropCurrentIfUnqueued(mode)
 	canPromote := a.canPromote(updateTick, instantRun)
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
@@ -801,10 +803,10 @@ func (a *Attackable) think(mode thinkMode) error {
 // no desire selection, so a queued desire waits for the next RunAI or
 // TickThink. It neither takes nor updates the attack latch, leaves
 // lastDesire to desire selection, and does not re-select on a lost target.
-// Idle and wander take no step: idle here may be what an arrival left of a
-// finished walk or wander, which the continue pass must not restart, and a
+// A walk steps even when an arrival already finished it: one that stopped
+// short of its destination sets off again. Idle and wander take no step: a
 // truly idle actor already went through thinkIdle, so it stands walking
-// with nothing left to abort. The continue pass has no wander step.
+// with nothing left to abort, and the continue pass has no wander step.
 func (a *Attackable) continueCurrent() error {
 	switch a.current.kind {
 	case IntentionAttack:
@@ -846,15 +848,29 @@ func (a *Attackable) promoteAndStep() error {
 			a.lastDesire = IntentionFollow
 			return a.thinkFollow()
 		case IntentionWander:
+			if !a.currentQueued() {
+				return nil
+			}
 			a.thinkWander()
 			a.lastDesire = IntentionWander
 		case IntentionMoveTo:
+			if !a.currentQueued() {
+				return nil
+			}
 			a.thinkMoveTo()
 			a.lastDesire = IntentionMoveTo
 		}
 		return nil
 	}
 	return nil
+}
+
+// currentQueued reports whether the current wander or walk still has its
+// desire queued. Desire selection steps a walk or wander only through its
+// queued desire, so one an arrival finished waits, still current, for the
+// idle or the next promotion instead of setting off again.
+func (a *Attackable) currentQueued() bool {
+	return a.desires.Has(&Desire{Kind: a.current.kind, Location: a.current.loc})
 }
 
 // idleOnEmptyQueue runs the event-driven empty-queue idle: once the first
@@ -912,6 +928,10 @@ func (a *Attackable) promoteNext() bool {
 		a.latched = intention{}
 	}
 	if a.current.kind == IntentionWander {
+		a.wanderReady = time.Time{}
+	} else if next.kind == IntentionWander && !a.wanderReady.IsZero() && !a.now().Before(a.wanderReady) {
+		// A wander timer that ran out while the actor was not wandering
+		// found nothing to roll for and ended.
 		a.wanderReady = time.Time{}
 	}
 	if !a.current.same(next) {
@@ -1046,7 +1066,11 @@ func (a *Attackable) pruneDesires() {
 	})
 }
 
-func (a *Attackable) dropCurrentIfUnqueued() {
+// dropCurrentIfUnqueued idles an attack, cast or walk whose desire is no
+// longer queued, unless an action is in flight. The continue pass keeps a
+// desire-less walk: it steps the current walk as it stands, so one an
+// arrival left short of its destination sets off again.
+func (a *Attackable) dropCurrentIfUnqueued(mode thinkMode) {
 	if a.actor.DenyAIAction() || a.attack.AttackingNow() {
 		return
 	}
@@ -1060,6 +1084,9 @@ func (a *Attackable) dropCurrentIfUnqueued() {
 			a.setCurrent(intention{kind: IntentionIdle})
 		}
 	case IntentionMoveTo:
+		if mode == thinkContinue {
+			return
+		}
 		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
 		if !a.desires.Has(probe) {
 			a.setCurrent(intention{kind: IntentionIdle})
@@ -1159,17 +1186,17 @@ func (a *Attackable) thinkMoveTo() {
 	}
 	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
 		a.clearCurrentDesire()
-		a.setCurrent(intention{kind: IntentionIdle})
 		return
 	}
 	_ = a.move.MoveHome(a.current.loc)
 }
 
-// Arrived clears MOVE_TO, FLEE, and WANDER when movement finishes and
-// idles immediately. dropCurrentIfUnqueued skips its MOVE_TO arm while an
-// attack or cast is in flight, so leaving those kinds current would
-// restart the same walk on the next think pass. Arrival itself never
-// thinks: the next step waits for RunAI or TickThink.
+// Arrived drops the queued MOVE_TO, FLEE, or WANDER desire when movement
+// finishes and leaves the intention current: the next RunAI or TickThink
+// idles it on an empty queue or promotes the next desire, and desire
+// selection never steps it again without its desire (currentQueued). A
+// Think before then (a control effect ending) steps a walk once more and
+// leaves a wander alone. Arrival itself never thinks.
 // Escort FOLLOW returns without restoring spawn heading or arming the
 // out-of-territory stale-hate sweep; combat chase stays ATTACK and still
 // runs both.
@@ -1184,8 +1211,9 @@ func (a *Attackable) Arrived() {
 	a.syncOOTSweepLocked()
 }
 
-// ArrivedBlocked clears MOVE_TO, FLEE, and WANDER when an in-flight walk
-// is stopped by a blocked geodata path and idles, same as Arrived.
+// ArrivedBlocked drops the queued MOVE_TO, FLEE, or WANDER desire when an
+// in-flight walk is stopped by a blocked geodata path, leaving the
+// intention current, same as Arrived.
 func (a *Attackable) ArrivedBlocked() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -1197,7 +1225,6 @@ func (a *Attackable) clearArrivalDesire() {
 	case IntentionMoveTo, IntentionFlee, IntentionWander:
 		// IntentionFlee is dormant until promoteNext can make it current.
 		a.clearCurrentDesire()
-		a.setCurrent(intention{kind: IntentionIdle})
 	}
 }
 
@@ -1212,6 +1239,7 @@ func (a *Attackable) thinkWander() {
 		return
 	}
 	if a.lastDesire != IntentionWander {
+		a.wanderReady = time.Time{}
 		a.doWanderMove()
 		return
 	}

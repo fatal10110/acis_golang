@@ -2,6 +2,7 @@ package effect
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -54,6 +55,12 @@ type Effect struct {
 	// Only losing its stack group's head runs onExit, because setInUse(false)
 	// calls it unconditionally (AbstractEffect.java:159-166, EffectList.java:762).
 	startRefused bool
+
+	// strippedAll marks an effect a stop-all is ending. Its holder removes
+	// its stat funcs without reporting the change (see ModOwner.Stripped):
+	// the stop-all's caller refreshes the holder's view once, when the
+	// strip ends. Read by the holder outside the list lock.
+	strippedAll atomic.Bool
 
 	// scheduleMu guards remaining and nextAction. The caster that adds or
 	// dispels this effect starts or stops its schedule from the caster's
@@ -259,14 +266,28 @@ func (e *Effect) beginExit() func() {
 }
 
 // finishExit is beginExit for an effect that is ending for good (expiry,
-// dispel, replacement, eviction). A startRefused effect runs no exit hook
-// there and stays marked in use, so a stack-head displacement in the same
-// insertion still runs it through beginExit.
+// dispel, removal). A startRefused effect runs no exit hook there and stays
+// marked in use. A buff an insertion replaces or evicts ends through
+// retireExit instead.
 func (e *Effect) finishExit() func() {
 	if e.startRefused {
 		return nil
 	}
 	return e.beginExit()
+}
+
+// retireExit returns the exit hook one ending pass over a buff an insertion
+// replaces or evicts runs, or nil when e is inactive, start-refused or has
+// no hook. Unlike finishExit it leaves e marked in use, because the
+// insertion still holds e and every later pass over it runs the hook again
+// while e stays active: a cap eviction reaching a buff the identical check
+// already retired, then the stack-head change (beginExit), which clears the
+// flag. add clears it for good before e's list removal, which runs no hook.
+func (e *Effect) retireExit() func() {
+	if !e.inUse || e.startRefused || e.OnExit == nil {
+		return nil
+	}
+	return func() { e.OnExit(e) }
 }
 
 // stopTaskThunk returns a thunk that fires e's on-stop-task hook, or nil

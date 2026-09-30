@@ -117,6 +117,10 @@ type Hostile struct {
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
+	// speedMu serializes refreshMoveSpeed's read of the stance and stats
+	// with its hand-off to the movement, so the last refresh to run always
+	// sets the speed that the latest stance and stat funcs give.
+	speedMu sync.Mutex
 	// inCombat reports an attack stance, which the stance tracker ends.
 	inCombat atomic.Bool
 
@@ -292,6 +296,9 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	h.AddStatFuncs(mods)
+	// The live movement starts at the template speed; move at the stat-
+	// finalized one from the first step.
+	h.refreshMoveSpeed()
 	// Seed from calculated Max HP/MP after template passives attach:
 	// MaxHpMul/MaxMpMul scale by CON/MEN bonus, and int-truncated maxima
 	// match the persisted spawn current-hp/mp contract.
@@ -420,9 +427,11 @@ func (h *Hostile) StopAbnormalEffect(mask int) {
 	}
 }
 
-// AbnormalEffect returns this NPC's client-visible abnormal-effect bitmask.
+// AbnormalEffect returns this NPC's client-visible abnormal-effect bitmask:
+// the stored visual bits plus the ones its live crowd-control state
+// implies.
 func (h *Hostile) AbnormalEffect() int {
-	return int(h.abnormalEffect.Load())
+	return int(h.abnormalEffect.Load()) | h.EffectList().CrowdControlAbnormalEffect()
 }
 
 // NPCInfoSnapshot captures this NPC's current client-visible state.
@@ -440,7 +449,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
 		X: x, Y: y, Z: z, Heading: h.Heading(),
 		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: h.AttackSpeed(),
-		RunSpd: h.RunSpeed(), WalkSpd: int(tmpl.WalkSpeed),
+		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed), MoveMultiplier: float64(h.MovementSpeedMultiplier()),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
@@ -1156,10 +1165,11 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 }
 
 func (h *Hostile) scheduleWanderRecheck() {
-	if h.moveSpeed() <= 0 {
+	speed := float32(h.MoveSpeed())
+	if speed <= 0 {
 		return
 	}
-	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
+	delay := time.Duration(int32(float32(1500+h.roll(1001))*(100/speed))) * time.Millisecond
 	recheck := func() {
 		if h.brain.CurrentIntention() != ai.IntentionWander || h.MovementDisabled() {
 			return

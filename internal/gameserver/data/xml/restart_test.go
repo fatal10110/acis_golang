@@ -9,6 +9,7 @@ import (
 )
 
 func TestLoadRestartPoints(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "restartPointAreas.xml"))
 
 	table, err := LoadRestartPoints(path)
@@ -54,6 +55,7 @@ func TestLoadRestartPoints(t *testing.T) {
 }
 
 func TestLoadRestartPointsErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "restartPointAreas.xml")
 	writeXMLFixture(t, path, `<list><area minZ="0" maxZ="1"><node x="1" y="2"/><restart race="ALIEN" zone="x"/></area></list>`)
 
@@ -63,6 +65,7 @@ func TestLoadRestartPointsErrors(t *testing.T) {
 }
 
 func TestLoadRestartPointsAreaTooFewVertices(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "restartPointAreas.xml")
 	writeXMLFixture(t, path, `<list><area minZ="0" maxZ="1"><node x="1" y="2"/><node x="3" y="4"/></area></list>`)
 

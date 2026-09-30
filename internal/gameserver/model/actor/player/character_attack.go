@@ -143,9 +143,11 @@ func (c *Character) StopAbnormalEffect(mask int) {
 }
 
 // AbnormalEffect returns this character's client-visible abnormal-effect
-// bitmask.
+// bitmask: the stored visual bits plus the ones its live crowd-control
+// state implies (stun, root, sleep, fear, mute, floating root), which
+// StopAbnormalEffect never clears.
 func (c *Character) AbnormalEffect() int {
-	return int(c.abnormalEffectMask.Load())
+	return int(c.abnormalEffectMask.Load()) | c.EffectList().CrowdControlAbnormalEffect()
 }
 
 // BroadcastAbnormalEffect reports that StartAbnormalEffect/StopAbnormalEffect
@@ -320,14 +322,35 @@ func (c *Character) AttackType() item.WeaponType {
 	return c.activeWeapon().attackType()
 }
 
-// AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value.
+// AttackSpeed resolves the equipped weapon's pAtkSpd stat-set value. A
+// wyvern rider attacks at a flat 300, 150 while the wyvern is hungry; a
+// strider rider from the strider's P.Atk. speed, halved while it is hungry.
 func (c *Character) AttackSpeed() int {
+	if m, ok := c.ridden(); ok {
+		switch m.mountType {
+		case MountTypeWyvern:
+			if m.hungry {
+				return 150
+			}
+			return 300
+		case MountTypeStrider:
+			base := m.atkSpd
+			if m.hungry {
+				base /= 2
+			}
+			return int(c.calcStat(stat.PowerAttackSpeed, base))
+		}
+	}
 	return int(c.calcStat(stat.PowerAttackSpeed, c.activeWeapon().stat("pAtkSpd", defaultPlayerAttackSpeed)))
 }
 
 // MagicAttackSpeed returns the casting speed used by magic-skill timing.
+// A rider's hungry mount halves its base.
 func (c *Character) MagicAttackSpeed() int {
 	base := float64(defaultPlayerMagicAttackSpeed)
+	if m, ok := c.ridden(); ok && m.hungry {
+		base /= 2
+	}
 	if agp := c.ArmorGradePenalty(); agp > 0 {
 		base *= math.Pow(0.84, float64(agp))
 	}
@@ -359,33 +382,117 @@ func (c *Character) MagicCriticalRate() float64 {
 // the class data sets none, so the creature default applies.
 const basePlayerAttackSpeed = 300
 
+// mountedStats is what the ridden mount lends its rider: its base run
+// speed (its fly speed on a wyvern) and swim speed, each halved when the
+// mount outlevels its rider by more than 9 and halved again while it is
+// hungry; its unhalved strider P.Atk. speed; and its base P.Atk. and
+// M.Atk., reduced once the mount outlevels its rider by more than 4.
+type mountedStats struct {
+	mountType  int32
+	run, swim  int
+	atkSpd     float64
+	pAtk, mAtk float64
+	hungry     bool
+}
+
+// ridden returns the stats the ridden mount lends its rider, or false when
+// the character rides no strider or wyvern, or its mount has no pet data
+// for the level it was mounted at.
+func (c *Character) ridden() (mountedStats, bool) {
+	c.stateMu.RLock()
+	mountType, mountLevel := c.mountType, c.mountLevel
+	c.stateMu.RUnlock()
+	if mountType == 0 {
+		return mountedStats{}, false
+	}
+	f := &c.mountFeed
+	f.mu.Lock()
+	data, found, hungry := f.data, f.found, f.hungryLocked()
+	f.mu.Unlock()
+	if !found {
+		return mountedStats{}, false
+	}
+	m := mountedStats{
+		mountType: mountType, run: data.RunSpeed, swim: data.SwimSpeed, atkSpd: data.AtkSpd,
+		pAtk: data.PAtk, mAtk: data.MAtk, hungry: hungry,
+	}
+	if mountType == MountTypeWyvern {
+		m.run = data.FlySpeed
+	}
+	gap := mountLevel - c.Level()
+	if gap > 9 {
+		m.run /= 2
+		m.swim /= 2
+	}
+	if gap > 4 {
+		// 0.5 at 5 levels, down 0.05 a level to 0.25 from 10 levels on.
+		mul := 0.5 - float64(min(gap, 10)-5)*0.05
+		m.pAtk *= mul
+		m.mAtk *= mul
+	}
+	if hungry {
+		m.run /= 2
+		m.swim /= 2
+	}
+	return m, true
+}
+
+// BaseRunSpeed is the run speed the client scales by the movement
+// multiplier: the class template's, or a rider's mount's.
+func (c *Character) BaseRunSpeed() int {
+	if m, ok := c.ridden(); ok {
+		return m.run
+	}
+	if tmpl := c.template(); tmpl != nil {
+		return int(tmpl.RunSpeed)
+	}
+	return 0
+}
+
+// BaseWalkSpeed is the class template's walk speed; a mount does not
+// change it.
+func (c *Character) BaseWalkSpeed() int {
+	if tmpl := c.template(); tmpl != nil {
+		return int(tmpl.WalkSpeed)
+	}
+	return 0
+}
+
+// BaseSwimSpeed is the class template's swim speed, or a rider's mount's.
+func (c *Character) BaseSwimSpeed() int {
+	if m, ok := c.ridden(); ok {
+		return m.swim
+	}
+	if tmpl := c.template(); tmpl != nil {
+		return tmpl.SwimSpeed
+	}
+	return 0
+}
+
 // RunSpeed returns the current run speed.
 func (c *Character) RunSpeed() float64 {
-	tmpl := c.template()
-	if tmpl == nil {
+	if c.template() == nil {
 		return 0
 	}
-	return c.moveSpeedFrom(int(tmpl.RunSpeed))
+	return c.moveSpeedFrom(c.BaseRunSpeed())
 }
 
 // WalkSpeed returns the current walk speed.
 func (c *Character) WalkSpeed() float64 {
-	tmpl := c.template()
-	if tmpl == nil {
+	if c.template() == nil {
 		return 0
 	}
-	return c.moveSpeedFrom(int(tmpl.WalkSpeed))
+	return c.moveSpeedFrom(c.BaseWalkSpeed())
 }
 
 // SwimSpeed returns the current move speed while in water. One swim speed
 // applies regardless of the run/walk toggle, through the same swamp,
 // weight, armor-grade and RUN_SPEED pipeline as the land speeds.
 func (c *Character) SwimSpeed() float64 {
-	tmpl := c.template()
-	if tmpl == nil {
+	if c.template() == nil {
 		return 0
 	}
-	return c.moveSpeedFrom(tmpl.SwimSpeed)
+	return c.moveSpeedFrom(c.BaseSwimSpeed())
 }
 
 // MoveSpeed returns the speed this character currently moves at: the swim
@@ -425,18 +532,17 @@ func (c *Character) refreshMoveSpeed() {
 	c.Move().SetSpeed(c.MoveSpeed())
 }
 
-// MovementSpeedMultiplier is the current move speed over the template's
-// run or walk speed, whichever the run mode picks, or 0 when that base is
-// 0. In water the numerator is the swim speed while the base stays the land
-// one. The client scales the base speeds it is sent by this value.
+// MovementSpeedMultiplier is the current move speed over the base run or
+// walk speed, whichever the run mode picks, or 0 when that base is 0. In
+// water the numerator is the swim speed while the base stays the land one.
+// The client scales the base speeds it is sent by this value.
 func (c *Character) MovementSpeedMultiplier() float32 {
-	tmpl := c.template()
-	if tmpl == nil {
+	if c.template() == nil {
 		return 1
 	}
-	base := int(tmpl.WalkSpeed)
+	base := c.BaseWalkSpeed()
 	if c.Running() {
-		base = int(tmpl.RunSpeed)
+		base = c.BaseRunSpeed()
 	}
 	if base == 0 {
 		return 0
@@ -654,8 +760,12 @@ func (c *Character) ClearRecentFakeDeath() {
 func (c *Character) ClientActionFailed() {}
 
 // PAtk returns the physical attack value used by the current minimal combat
-// pipeline.
+// pipeline. A rider attacks from its mount's P.Atk. instead of its class
+// and weapon.
 func (c *Character) PAtk() float64 {
+	if m, ok := c.ridden(); ok {
+		return c.calcStat(stat.PowerAttack, m.pAtk)
+	}
 	return c.pAtk(c.activeWeapon())
 }
 

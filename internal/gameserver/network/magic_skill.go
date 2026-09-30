@@ -81,11 +81,22 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		}
 		live.endFollow()
 	}
+	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
+	if known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle) {
+		// A walk or queued action parked for an earlier intention is
+		// replaced by this CAST intention, whether it casts now or walks.
+		live.clearParkedApproaches()
+		if def.Target != modelskill.TargetGround {
+			target := l.magicSkillFinalTarget(live, def, selected)
+			if l.walkToCastTarget(live, target, def.CastRange, req.ShiftPressed, func() { live.deferMagicSkill(req, selected) }) {
+				return
+			}
+		}
+	}
 	if known && def.Activation == modelskill.ActivationToggle {
 		l.handleToggleSkillUse(live, req, selected)
 		return
 	}
-	live.Character.SetCastModifiers(req.CtrlPressed, req.ShiftPressed)
 	controller := l.castController(live)
 	// The pre-attempt gate above ran before this GROUND approach walk, so a
 	// recast still on cooldown never starts walking toward the signet.
@@ -118,7 +129,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target))
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed)
 		}
 		// A player's cast that fails its cost or target conditions after the
 		// hit-time stop answers with its reason alone: no ActionFailed, no
@@ -395,7 +406,7 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 		return false
 	}
 	if req.ShiftPressed {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+		refuseCastTooFar(live)
 		return true
 	}
 	if live.move == nil {
@@ -414,6 +425,59 @@ func (l *GameClientLink) walkToGroundCast(live *livePlayer, req clientpackets.Re
 	live.takeDeferredMagicSkill()
 	sendMagicActionFailed(live)
 	return true
+}
+
+// walkToCastTarget runs the approach a player's CAST intention takes toward
+// its creature target before anything is paid: nothing while target sits
+// within castRange plus both footprints (3D), or when the skill has no range
+// or targets the caster. Out of range, a shift-held cast is refused with
+// TARGET_TOO_FAR and the player goes idle, walking nowhere; otherwise the
+// player walks to target with MoveToPawn at castRange, park storing the cast
+// as the intention the walk's arrival thinks again. A player that cannot walk
+// is answered ActionFailed and nothing is parked. It reports whether the cast
+// must not start now. The caller has already dropped every approach an
+// earlier intention parked.
+//
+// A target that is not a creature (a door) is not approached: the cast goes
+// on from where the player stands.
+func (l *GameClientLink) walkToCastTarget(live *livePlayer, target skilltarget.Actor, castRange int, shift bool, park func()) bool {
+	pawn, ok := target.(attackable.Combatant)
+	if !ok || castRange < 0 || pawn.ObjectID() == live.ObjectID() {
+		return false
+	}
+	lx, ly, lz := live.Position()
+	tx, ty, tz := pawn.Position()
+	if location.In3DRadius(lx, ly, lz, tx, ty, tz, int(float64(castRange)+live.CollisionRadius()+pawn.CollisionRadius())) {
+		return false
+	}
+	if shift {
+		refuseCastTooFar(live)
+		return true
+	}
+	// The reference leaves an immobile caster's CAST intention current with
+	// no packet; the request still owes its client an answer.
+	if live.move == nil || live.MovementDisabled() {
+		sendMagicActionFailed(live)
+		return true
+	}
+	park()
+	if !live.move.MoveToPawn(pawn, castRange) {
+		live.clearParkedApproaches()
+		sendMagicActionFailed(live)
+		return true
+	}
+	live.Character.SetHeading(live.move.Position().HeadingTo(location.Location{X: tx, Y: ty, Z: tz}))
+	return true
+}
+
+// refuseCastTooFar answers a shift-held cast out of range: TARGET_TOO_FAR,
+// and the player goes idle, stopping any walk under way.
+func refuseCastTooFar(live *livePlayer) {
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetTooFar))
+	live.tryToIdle(false)
+	if live.move != nil {
+		live.move.Stop()
+	}
 }
 
 func (l *GameClientLink) resolveMagicSkillTarget(caster actorcast.Target, selected world.Tracked, def modelskill.Definition, ctrl bool) (actorcast.Target, skilltarget.CastRejection) {
@@ -453,8 +517,10 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
 	case skilltarget.CastRejectCorpseTooOld:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
-	case skilltarget.CastRejectSweepNotMonster:
+	case skilltarget.CastRejectSweepNotMonster, skilltarget.CastRejectSweepNotSpoiled:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	case skilltarget.CastRejectSweepNotAllowed:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweepNotAllowed))
 	case skilltarget.CastRejectCannotUseOnYourself:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseOnYourself))
 	case skilltarget.CastRejectOlympiadUnavailable:
@@ -926,6 +992,14 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 		case skillhandler.InvalidTargetMessage:
 			if live != nil {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+			}
+		case skillhandler.SlotsFullMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+			}
+		case skillhandler.NothingInsideMessage:
+			if live != nil {
+				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
 			}
 		case skillhandler.MagicResist:
 			target, online := l.livePlayerByID(m.TargetID)

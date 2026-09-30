@@ -15,6 +15,7 @@ import (
 // have valid shapes and node counts), so the expected counts equal the
 // per-file element counts, independently derived from the XML.
 func TestLoadZonesDatapack(t *testing.T) {
+	t.Parallel()
 	index, err := LoadZones(datapackPath(t, filepath.Join("data", "xml", "zones")))
 	if err != nil {
 		t.Fatalf("LoadZones: %v", err)
@@ -130,6 +131,7 @@ func assertZoneDatapackFields(t *testing.T, index *zone.Index) {
 }
 
 func TestLoadZonesRejectsMalformedData(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		file    string
 		content string
@@ -175,6 +177,7 @@ func TestLoadZonesRejectsMalformedData(t *testing.T) {
 }
 
 func TestLoadZonesDynamicIDsJumpPerFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "ArenaZone.xml"),
 		`<list>
@@ -204,6 +207,7 @@ func TestLoadZonesDynamicIDsJumpPerFile(t *testing.T) {
 }
 
 func TestLoadZonesMissingDir(t *testing.T) {
+	t.Parallel()
 	if _, err := LoadZones(filepath.Join(os.TempDir(), "no-such-zone-dir")); err == nil {
 		t.Error("LoadZones on a missing directory succeeded, want error")
 	}

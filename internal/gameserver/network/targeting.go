@@ -120,13 +120,13 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 	if l.sitLiveOnChair(live, target, true) {
 		return
 	}
-	l.attackLiveTarget(live, target)
+	l.attackLiveTarget(live, target, shift)
 }
 
 // queuedSelectedTargetAction captures the click's resolved intention before a
 // posture transition ends. A later selection must not change what it runs.
 func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) func() {
-	attack := func() { l.attackQueuedTarget(live, target) }
+	attack := func() { l.attackQueuedTarget(live, target, shift) }
 	switch v := target.(type) {
 	case *summon.Actor:
 		if v.ShownAsOwnedBy(live.ObjectID()) {
@@ -209,9 +209,9 @@ func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *li
 // deferOrFailPickup parks target for a later drain if deferrable (live's
 // current blocker, as decided atomically alongside blocked by
 // livePickupBlockedDeferrable, is one finishDeferredPickup will promote it
-// past — attack or pickup lock), and either way answers the click with
-// ActionFailed so the client's pending action releases immediately instead
-// of waiting on a response that never comes.
+// past — attack, cast in flight or pickup lock), and either way answers the
+// click with ActionFailed so the client's pending action releases
+// immediately instead of waiting on a response that never comes.
 func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift, deferrable bool) {
 	if deferrable {
 		live.deferPickup(ctx, ground, shift)
@@ -261,9 +261,10 @@ func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 }
 
 // finishDeferredPickup runs the pickup queued as the next intention, if any,
-// and reports whether one was waiting. The pickup replaces the attack
-// intention whatever its outcome: the swing or shot it waited behind is not
-// followed by another. An item gone meanwhile only releases the click.
+// and reports whether one was waiting. The pickup replaces the attack or
+// cast intention whatever its outcome: the swing, shot or cast it waited
+// behind is not followed by another. An item gone meanwhile only releases
+// the click.
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	pickup := live.takeDeferredPickup()
 	if pickup == nil {
@@ -326,14 +327,14 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 	}
 	if s.ShownAsOwnedBy(live.ObjectID()) {
 		if ctrl {
-			l.attackLiveTarget(live, s)
+			l.attackLiveTarget(live, s, shift)
 		} else {
 			l.showOwnedPetStatus(live, s, shift)
 		}
 		return true
 	}
 	if s.AttackableWithoutForceBy(live.Character) || (ctrl && s.AttackableBy(live.Character)) {
-		l.attackLiveTarget(live, s)
+		l.attackLiveTarget(live, s, shift)
 		return true
 	}
 	l.followLiveTarget(live, s, ctrl, shift)
@@ -351,7 +352,8 @@ type petInteractIntention struct {
 // status window, after an approach walk when out of range. An owner that
 // cannot take AI actions is only answered ActionFailed. One still swinging
 // or casting queues the interact for that to end, answered ActionFailed
-// too. Otherwise the interact replaces the follow intention and runs now.
+// too. Otherwise the interact replaces the current intention, an attack
+// waiting out a bow's reuse or chasing its target included, and runs now.
 func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
 	if live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -362,8 +364,32 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor,
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	live.endFollow()
+	replaceWithPetInteract(live)
 	l.thinkOwnedPetInteract(live, pet, shift)
+}
+
+// replaceWithPetInteract makes the owner's interact with its summon the
+// current intention: the attack intention is dropped, every parked approach
+// or queued intention (a pickup, a cast, a follow, a use-item, another pet
+// interact) goes with it, and every follow task, an attack chase or a
+// friendly follow, is cancelled. A walk under way is left to the interact's
+// think, which walks elsewhere or stops it.
+func replaceWithPetInteract(live *livePlayer) {
+	if live.combat != nil {
+		live.combat.Replace()
+	}
+	live.clearParkedApproaches()
+	if live.move != nil {
+		live.move.CancelFollow()
+	}
+}
+
+// endPetInteractIdle ends the owner's interact with its summon idle: a walk
+// still under way stops, broadcast as StopMove.
+func endPetInteractIdle(live *livePlayer) {
+	if live.move != nil {
+		live.move.Stop()
+	}
 }
 
 // finishDeferredPetInteract runs the summon interact queued as the next
@@ -382,12 +408,10 @@ func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
 	if queued == nil {
 		return false
 	}
-	if live.combat != nil {
-		live.combat.Replace()
-	}
-	live.endFollow()
+	replaceWithPetInteract(live)
 	if l.resolveTarget(queued.pet.ObjectID()) != world.Tracked(queued.pet) || queued.pet.OwnerID() != live.ObjectID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		endPetInteractIdle(live)
 		return true
 	}
 	l.thinkOwnedPetInteract(live, queued.pet, queued.shift)
@@ -401,17 +425,22 @@ func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
 // sits, flies, runs a private store or trades gets nothing more. Out of
 // approach range, a movable owner walks toward the summon unless shift is
 // held. In range, the owner still inside interaction distance faces the
-// summon and gets its status window.
+// summon and gets its status window. Every outcome but the approach walk,
+// or an owner that cannot move holding the interact, ends it idle.
 func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Actor, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {
+		endPetInteractIdle(live)
 		return
 	}
 	if !summonInRange(live, pet, int(summonInteractApproachOffset+live.CollisionRadius()+pet.CollisionRadius())) {
-		if shift || live.move == nil || live.MovementDisabled() {
+		if shift {
+			endPetInteractIdle(live)
 			return
 		}
-		live.clearParkedApproaches()
+		if live.move == nil || live.MovementDisabled() {
+			return
+		}
 		live.setPetInteract(pet)
 		if !live.move.MoveToPawn(pet, summonInteractApproachOffset) {
 			live.takePetInteract()
@@ -421,6 +450,7 @@ func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Act
 		return
 	}
 	if !l.playerCanDoInteract(live, pet) {
+		endPetInteractIdle(live)
 		return
 	}
 	at := live.CurrentLocation()
@@ -429,6 +459,7 @@ func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Act
 		return serverpackets.FrameMoveToPawn(live.ObjectID(), pet.ObjectID(), summonInteractRange, at)
 	})
 	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+	endPetInteractIdle(live)
 }
 
 func petLocation(pet *summon.Actor) location.Location {
@@ -483,7 +514,8 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 		return true
 	}
-	if live.takeDeferredMagicSkill() != nil {
+	magic, itemCast := live.takeDeferredMagicSkill(), live.takeDeferredItemAICast()
+	if magic != nil || itemCast != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
 	}
 	return false
@@ -669,17 +701,18 @@ func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Track
 // attackLiveTarget starts (or continues) live's attack intention against
 // target: closing distance first when target is out of weapon range, then
 // swinging once in range, repeating on subsequent calls until target dies,
-// is lost, or the attack is cancelled. It reports whether the attempt was
+// is lost, or the attack is cancelled. A shift-held attack never walks: on a
+// target out of reach it goes idle. It reports whether the attempt was
 // accepted — false means the caller should report the action as failed.
-func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked) bool {
-	return l.attackLiveTargetWithGate(live, target, true)
+func (l *GameClientLink) attackLiveTarget(live *livePlayer, target world.Tracked, shift bool) bool {
+	return l.attackLiveTargetWithGate(live, target, shift, true)
 }
 
-func (l *GameClientLink) attackQueuedTarget(live *livePlayer, target world.Tracked) bool {
-	return l.attackLiveTargetWithGate(live, target, false)
+func (l *GameClientLink) attackQueuedTarget(live *livePlayer, target world.Tracked, shift bool) bool {
+	return l.attackLiveTargetWithGate(live, target, shift, false)
 }
 
-func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world.Tracked, request bool) bool {
+func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world.Tracked, shift, request bool) bool {
 	combatant, ok := target.(attackable.Combatant)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -709,9 +742,9 @@ func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world
 	live.clearParkedApproaches()
 	var accepted bool
 	if request {
-		accepted = live.combat.Start(combatant)
+		accepted = live.combat.Start(combatant, shift)
 	} else {
-		accepted = live.combat.StartIntention(combatant)
+		accepted = live.combat.StartIntention(combatant, shift)
 	}
 	if !accepted {
 		live.SendFrame(serverpackets.FrameActionFailed())

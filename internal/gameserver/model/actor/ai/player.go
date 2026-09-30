@@ -22,6 +22,14 @@ type PlayerAttackActor interface {
 	RefuseAttackTarget()
 }
 
+// PlayerMoveController is the movement a player's attack intention drives.
+type PlayerMoveController interface {
+	MoveController
+	// HoldOffensiveFollow reports whether target is out of attackRange plus
+	// both footprints, without walking toward it.
+	HoldOffensiveFollow(target attackable.Combatant, attackRange int) bool
+}
+
 // PlayerAttack drives one player's physical-attack intention: closing
 // distance on a target and re-attacking it until it dies, is lost, or the
 // player cancels.
@@ -36,12 +44,15 @@ type PlayerAttackActor interface {
 // access would still be individually synchronized.
 type PlayerAttack struct {
 	actor  PlayerAttackActor
-	move   MoveController
+	move   PlayerMoveController
 	attack AttackController
 	log    zerolog.Logger
 
 	mu     sync.Mutex
 	target attackable.Combatant
+	// shift is the intention's shift modifier: an attack held with shift
+	// never walks, and goes idle once target is out of reach.
+	shift bool
 	// deferred marks target as the next intention behind the cast in flight:
 	// it was requested mid-cast, is not thought until the cast ends, and
 	// ResumeAfterCast runs it then.
@@ -53,7 +64,7 @@ type PlayerAttack struct {
 }
 
 // NewPlayerAttack builds an idle player attack intention loop.
-func NewPlayerAttack(actor PlayerAttackActor, move MoveController, attack AttackController) *PlayerAttack {
+func NewPlayerAttack(actor PlayerAttackActor, move PlayerMoveController, attack AttackController) *PlayerAttack {
 	return &PlayerAttack{actor: actor, move: move, attack: attack}
 }
 
@@ -66,12 +77,14 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 	p.log = log
 }
 
-// Start sets target as the attack intention and evaluates it once. It
-// reports false when the caller should report the action as failed
-// (the actor is disabled, sitting, the target is lost, the actor is still
-// mid-swing or mid-cast, or the attack was otherwise rejected) and true when
-// the attack was accepted — either a swing just started, or the actor has
-// begun closing distance and will attack once it arrives.
+// Start sets target as the attack intention, held with shift or not, and
+// evaluates it once. It reports false when the caller should report the action
+// as failed (the actor is disabled, sitting, the target is lost, the actor is
+// still mid-swing or mid-cast, or the attack was otherwise rejected) and true
+// when the attack was accepted — either a swing just started, or the actor has
+// begun closing distance and will attack once it arrives. A shift-held attack
+// on a target out of reach goes idle instead of closing distance, and reports
+// false.
 //
 // A target the playable attack gate refuses is reported to the player and
 // leaves the current intention untouched. The gate runs only when the
@@ -79,24 +92,24 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 // the deny and busy checks take ahead of it. A request made mid-cast or
 // mid-swing is waited out without being thought: no gate, no approach, until
 // the cast or swing ends.
-func (p *PlayerAttack) Start(target attackable.Combatant) bool {
-	return p.start(target, true)
+func (p *PlayerAttack) Start(target attackable.Combatant, shift bool) bool {
+	return p.start(target, shift, true)
 }
 
 // StartIntention runs an attack already accepted as the next intention.
 // The playable target gate belongs to the original request, before queuing.
-func (p *PlayerAttack) StartIntention(target attackable.Combatant) bool {
-	return p.start(target, false)
+func (p *PlayerAttack) StartIntention(target attackable.Combatant, shift bool) bool {
+	return p.start(target, shift, false)
 }
 
-func (p *PlayerAttack) start(target attackable.Combatant, request bool) bool {
+func (p *PlayerAttack) start(target attackable.Combatant, shift, request bool) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if request && p.gateRefusesLocked(target) {
 		p.actor.RefuseAttackTarget()
 		return false
 	}
-	p.target = target
+	p.target, p.shift = target, shift
 	p.deferred, p.queued = false, false
 	if p.actor.CastingNow() {
 		p.deferred = true
@@ -162,15 +175,15 @@ func (p *PlayerAttack) ReplaceWithCast() {
 }
 
 // AttackAfterCast makes target the attack intention once a nextActionAttack
-// skill cast on it ends, or is refused at its cost and condition checks, and
-// thinks it once, reporting whether that is answered with ActionFailed. The
-// caller has already checked that target may be attacked without force. Like
-// any intention the AI sets itself, it skips the playable attack gate a
-// player's own attack request runs.
-func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant) (actionFailed bool) {
+// skill cast on it ends, or is refused at its cost and condition checks, held
+// with the cast's own shift modifier, and thinks it once, reporting whether
+// that is answered with ActionFailed. The caller has already checked that
+// target may be attacked without force. Like any intention the AI sets itself,
+// it skips the playable attack gate a player's own attack request runs.
+func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift bool) (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.target = target
+	p.target, p.shift = target, shift
 	p.deferred, p.queued = false, false
 	_, actionFailed, err := p.thinkLocked()
 	if err != nil {
@@ -244,7 +257,7 @@ func (p *PlayerAttack) FinishedAttack() (actionFailed bool) {
 func (p *PlayerAttack) Replace() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.target = nil
+	p.target, p.shift = nil, false
 	p.deferred, p.queued = false, false
 }
 
@@ -275,7 +288,8 @@ func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 // fake-dead actor still closes distance first and only fails the attack
 // once in range, through CanAttack. Only once in range and stopped does a
 // swing, bow reuse or cast in flight hold the attack: it stays current,
-// becomes the next intention too, and is answered with ActionFailed.
+// becomes the next intention too, and is answered with ActionFailed. A
+// shift-held attack out of reach goes idle with ActionFailed, not walking.
 func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
 	if p.target == nil {
 		return false, false, nil
@@ -287,9 +301,17 @@ func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
 		return false, true, nil
 	}
 
-	following, err := p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange())
-	if following {
-		return true, false, err
+	if p.shift {
+		// A shift-held attack never walks: out of reach, it goes idle.
+		if p.move.HoldOffensiveFollow(p.target, p.actor.PhysicalAttackRange()) {
+			p.stopLocked()
+			return false, true, nil
+		}
+	} else {
+		following, err := p.move.MaybeStartOffensiveFollow(p.target, p.actor.PhysicalAttackRange())
+		if following {
+			return true, false, err
+		}
 	}
 
 	p.move.Stop()
@@ -309,7 +331,7 @@ func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
 }
 
 func (p *PlayerAttack) stopLocked() {
-	p.target = nil
+	p.target, p.shift = nil, false
 	p.deferred, p.queued = false, false
 	p.move.Stop()
 }

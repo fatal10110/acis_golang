@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/dbtest"
 )
 
 func TestMain(m *testing.M) {
-	os.Exit(sqltest.Main(m))
+	os.Exit(dbtest.Main(m))
 }

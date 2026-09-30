@@ -3,7 +3,8 @@
 // instead of each test package or test function starting its own
 // testcontainer. Callers get their own uniquely named database on that
 // instance so tests stay isolated from each other without needing a
-// container per package.
+// container per package: a fresh one per test (NewDB), or one checked out
+// of a Pool that reuses databases across a package's tests.
 package dbtest
 
 import (

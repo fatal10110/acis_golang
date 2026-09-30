@@ -71,6 +71,7 @@ func (l *List) evictForCap(e *Effect, pending *[]func(), retiring *[]*Effect) {
 }
 
 func (l *List) insertBuff(e *Effect) {
+	defer l.publishFlagsLocked()
 	if e.Skill.Toggle {
 		l.buffs = append(l.buffs, e)
 		return
@@ -117,6 +118,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			} else {
 				removeEffect(&l.buffs, victim)
 			}
+			l.publishFlagsLocked()
 		}
 	} else {
 		queue = append(queue, e)
@@ -131,6 +133,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 	// A stack-head change on the add path tells the owner which effect
 	// left and which took over.
 	if deactivate != nil {
+		l.holdExit(deactivate)
 		*pending = append(*pending, func() { l.removeStats(deactivate) })
 		appendThunk(pending, deactivate.beginExit())
 		l.notifyDisplaced(deactivate, pending)
@@ -243,6 +246,7 @@ func (l *List) contained(e *Effect) *Effect {
 }
 
 func (l *List) removeFromVisible(e *Effect) bool {
+	defer l.publishFlagsLocked()
 	if e.Skill.Debuff {
 		return removeEffect(&l.debuffs, e)
 	}
@@ -258,9 +262,12 @@ func removeEffect(effects *[]*Effect, e *Effect) bool {
 	return true
 }
 
-func (l *List) addStatFuncs(e *Effect) {
+// attachStatFuncs attaches e's stat funcs to the owner. The caller holds
+// l.mu, which keeps the attach and a concurrent removal of e in order; the
+// caller reports the change with statFuncsAttached after releasing it.
+func (l *List) attachStatFuncs(e *Effect) {
 	if l.owner != nil {
-		l.owner.AddStatFuncs(e.Funcs)
+		l.owner.AttachStatFuncs(e.Funcs)
 	}
 }
 

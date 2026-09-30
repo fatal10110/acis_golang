@@ -149,15 +149,22 @@ func (c *Character) revive() bool {
 //
 // Stripping a Phoenix or Noblesse Blessing's companions (the other blessing
 // and a Charm of Luck) refreshes the player's appearance for observers once
-// per blessing stopped, on top of each removed effect's own refresh.
+// per blessing stopped, on top of each removed effect's own refresh. Without
+// a blessing, every effect that does not last through death is stripped
+// without a stat refresh per effect, and the player and its observers get
+// its full view once the strip ends.
 func (c *Character) Die(killer attackable.Combatant) bool {
 	if !c.MarkDead() {
 		return false
 	}
 	c.BroadcastStatus()
 	c.StopCast()
-	for range c.EffectList().StopOnDeath() {
+	blessingStops, stripped := c.EffectList().StopOnDeath()
+	for range blessingStops {
 		c.BroadcastAbnormalEffect()
+	}
+	if stripped {
+		c.emit(event.EffectsStripped{})
 	}
 	c.BroadcastStatus()
 	c.BroadcastDie()

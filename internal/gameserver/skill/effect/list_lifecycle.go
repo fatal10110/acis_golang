@@ -58,11 +58,81 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.silent = !announce
 	l.add(e, &pending)
 	l.silent = false
+	exiting := l.exiting
+	l.exiting = nil
 	l.mu.Unlock()
 
 	runHooks(pending)
+	exits := l.dropDeferred(exiting, announce)
 	l.notifyAbnormalUpdate()
+	runHooks(exits)
 	l.notifyActivityTransition()
+}
+
+// Drop removes e, which its own exit hook is ending, when l still holds it —
+// as a displaced stack member does with cancel-lesser off. An effect that
+// already left the list is ignored. When an Add in progress ran that exit
+// hook, the removal waits until the Add's own hooks have run, so the owner
+// sees e's removal after the newcomer took its place, and one icon refresh
+// covers both.
+func (l *List) Drop(e *Effect) {
+	if l == nil || e == nil {
+		return
+	}
+	l.mu.Lock()
+	if _, ok := l.dropHeld[e]; ok {
+		l.dropHeld[e] = true
+		l.mu.Unlock()
+		return
+	}
+	held := l.holdsLocked(e)
+	l.mu.Unlock()
+	if held {
+		l.Remove(e)
+	}
+}
+
+// holdExit records that the add in progress queued held effect e's exit
+// hook, so a Drop from that hook waits for the add to finish.
+func (l *List) holdExit(e *Effect) {
+	if l.dropHeld == nil {
+		l.dropHeld = make(map[*Effect]bool)
+	}
+	l.dropHeld[e] = false
+	l.exiting = append(l.exiting, e)
+}
+
+// dropDeferred releases the effects an add held for its exit hooks and
+// removes those whose hook asked for a Drop. It runs their list bookkeeping
+// and returns their exit hooks, to run after the icon refresh. A restored
+// add's drops send no system messages, as the add itself sends none.
+func (l *List) dropDeferred(exiting []*Effect, announce bool) []func() {
+	if len(exiting) == 0 {
+		return nil
+	}
+	var pending, exits []func()
+	l.mu.Lock()
+	l.silent = !announce
+	for _, e := range exiting {
+		requested, ok := l.dropHeld[e]
+		if !ok {
+			continue
+		}
+		delete(l.dropHeld, e)
+		if requested {
+			l.remove(e, &pending, &exits)
+		}
+	}
+	l.silent = false
+	l.mu.Unlock()
+	runHooks(pending)
+	return exits
+}
+
+// holdsLocked reports whether e is still in l's visible lists or a stack
+// queue. Caller must hold l.mu.
+func (l *List) holdsLocked(e *Effect) bool {
+	return l.contained(e) != nil || slices.Contains(l.stacks[e.stackType()], e)
 }
 
 // Remove drops e from the list and activates the next member of its stack
@@ -169,27 +239,39 @@ func (l *List) StopAllToggles() {
 	}
 }
 
-// StopAll removes every active effect, running each exit hook.
+// StopAll removes every active effect, running each exit hook. The holder
+// does not announce the stat change of each removal (see ModOwner.Stripped);
+// a player or summon caller refreshes its view once the strip ends, an NPC
+// caller sends nothing.
 func (l *List) StopAll() {
 	if l == nil {
 		return
 	}
 	for _, e := range l.All() {
-		l.Remove(e)
+		l.strip(e)
 	}
 }
 
 // StopAllExceptThoseThatLastThroughDeath removes active effects whose owning
-// skill is not configured to persist through death.
+// skill is not configured to persist through death, leaving their stat
+// changes unannounced as StopAll does.
 func (l *List) StopAllExceptThoseThatLastThroughDeath() {
 	if l == nil {
 		return
 	}
 	for _, e := range l.All() {
 		if !e.Skill.StayAfterDeath {
-			l.Remove(e)
+			l.strip(e)
 		}
 	}
+}
+
+// strip ends e as part of a stop-all: e is marked before its removal, so a
+// stack member promoted in its place still reports its own activation and
+// only e's stat removal goes unannounced.
+func (l *List) strip(e *Effect) {
+	e.strippedAll.Store(true)
+	l.Remove(e)
 }
 
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
@@ -252,7 +334,8 @@ func appendThunk(pending *[]func(), thunk func()) {
 // beginActivate returns a thunk that runs e's on-start hook once the
 // caller's lock is released, then briefly re-acquires l.mu to apply the
 // result: e activates and gains its stat funcs on success, or onReject
-// runs (still under l.mu) on failure. With announce set, a successful
+// runs (still under l.mu) on failure. The owner reports the stat change
+// after l.mu is released again. With announce set, a successful
 // activation of an icon effect then tells the owner it feels e's effect —
 // the add path's stack-head promotion does this (unless l.silent, read here
 // under l.mu), the removal path's does not.
@@ -270,17 +353,24 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 			ok = e.OnStart(e)
 		}
 
+		attached := false
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
 			if !e.startRefused {
-				l.addStatFuncs(e)
+				l.attachStatFuncs(e)
+				attached = true
 			}
 		} else {
 			onReject(e)
 		}
 		l.mu.Unlock()
 
+		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
+		// owner's appearance for its observers, which reads this list's flags.
+		if attached && l.owner != nil {
+			l.owner.StatFuncsAttached(e.Funcs)
+		}
 		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)
 		}
@@ -299,11 +389,14 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 //
 // A buff e replaces (identical) or evicts (buff-slot cap) is retired in two
 // steps. Its stop-task and exit hooks are queued at once, but it stays held
-// — counted, stacked and positioned — for the rest of e's insertion, and its
-// list removal (stat removal, next-member promotion, expiry message) is
-// queued only after e's own activation. The owner therefore sees the old
-// exit hook, the newcomer's start, then the old removal and its message,
-// then the icon refresh.
+// — counted, stacked, positioned and in use — for the rest of e's
+// insertion, and its list removal (stat removal, next-member promotion,
+// expiry message) is queued only after e's own activation. The owner
+// therefore sees the old exit hook, the newcomer's start, then the old
+// removal and its message, then the icon refresh. Because the old buff stays
+// in use, every ending pass the insertion makes over it runs its exit hook
+// again: once when retired, again if the cap eviction reaches it, and again
+// when it loses its stack group's head to e.
 func (l *List) add(e *Effect, pending *[]func()) {
 	e.startSchedule(l.now())
 
@@ -315,6 +408,10 @@ func (l *List) add(e *Effect, pending *[]func()) {
 	var retiring []*Effect
 	l.insert(e, pending, &retiring)
 	for _, old := range retiring {
+		// Retirement left old in use (see retireExit). It has run every exit
+		// hook this insertion owes it, so its removal must not run another.
+		old.inUse = false
+		l.holdExit(old)
 		l.remove(old, pending, pending)
 	}
 }
@@ -330,6 +427,7 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 			}
 		}
 		l.debuffs = append(l.debuffs, e)
+		l.publishFlagsLocked()
 	} else {
 		for _, existing := range slices.Clone(l.buffs) {
 			if existing.identical(e) {
@@ -362,12 +460,12 @@ func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
 // retire queues e's stop-task hook and, if e is active, its exit hook, and
 // records e for removal once the insertion that retired it completes. A
 // second retirement of the same effect (a cap eviction reaching a buff the
-// identical check already retired) queues nothing more.
+// identical check already retired) queues the exit hook again, but no second
+// stop-task hook: e's schedule is already stopped.
 func retire(e *Effect, pending *[]func(), retiring *[]*Effect) {
-	if slices.Contains(*retiring, e) {
-		return
+	if !slices.Contains(*retiring, e) {
+		appendThunk(pending, e.stopTaskThunk())
+		*retiring = append(*retiring, e)
 	}
-	appendThunk(pending, e.stopTaskThunk())
-	appendThunk(pending, e.finishExit())
-	*retiring = append(*retiring, e)
+	appendThunk(pending, e.retireExit())
 }

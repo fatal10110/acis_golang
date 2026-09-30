@@ -229,6 +229,19 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen)
 }
 
+// HoldOffensiveFollow is MaybeStartOffensiveFollow for an intention that
+// may not walk (a shift-held attack): it reports whether target sits out of
+// attackRange plus both actors' footprints, and never starts a follow or a
+// movement toward it. A target within reach drops any follow task, as
+// MaybeStartOffensiveFollow does.
+func (c *Controller) HoldOffensiveFollow(target attackable.Combatant, attackRange int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Blocked, the follow returns before any follow, movement or error.
+	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, true, nil)
+	return outOfRange
+}
+
 // MaybeStartFriendlyFollow arms a friendly follow task and starts moving
 // toward target when it sits farther than offset plus both actors'
 // footprints. Friendly follow broadcasts a plain movement request; follow
@@ -465,9 +478,14 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // MoveToPawn starts a target-relative walk toward target's current position
 // and broadcasts it as an approach that stops offset short of target, the
 // same movement request a player's attack approach sends. It reports whether
-// the walk was accepted. It arms no follow task: nothing re-aims the walk if
-// target moves.
+// the walk was accepted. It arms no follow task and drops any follow task
+// already running, offensive or friendly, so no follow recheck steers the
+// walk back toward an earlier target: nothing re-aims the walk if target
+// moves.
 func (c *Controller) MoveToPawn(target attackable.Combatant, offset int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearFollow()
 	tx, ty, tz := target.Position()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(location.Location{X: tx, Y: ty, Z: tz})
 	if err != nil {

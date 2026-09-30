@@ -593,15 +593,16 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	}
 }
 
-// clearParkedApproaches drops pickup, pet-interact, and deferred-magic
-// approach slots, the follow intention, current or queued, and a queued
-// pickup, equip toggle or summon interact, so a later walk or chase cannot
-// inherit them.
+// clearParkedApproaches drops pickup, pet-interact, and deferred-magic and
+// item-cast approach slots, the follow intention, current or queued, and a
+// queued pickup, equip toggle or summon interact, so a later walk or chase
+// cannot inherit them.
 func (p *livePlayer) clearParkedApproaches() {
 	p.takePickup()
 	p.takePetInteract()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
+	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()

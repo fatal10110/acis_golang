@@ -27,6 +27,7 @@ import (
 var (
 	_ zone.Swimmer           = (*liveZoneActor)(nil)
 	_ zone.Wader             = (*liveZoneActor)(nil)
+	_ zone.Endangered        = (*liveZoneActor)(nil)
 	_ task.WaterEffects      = (*TaskEffects)(nil)
 	_ task.ShadowItemEffects = (*TaskEffects)(nil)
 	_ task.AutosaveEffects   = (*TaskEffects)(nil)
@@ -174,6 +175,7 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 	a.live.SetInWater(a.flags.Has(zone.FlagWater))
+	a.live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
 	if !a.flags.Has(zone.FlagSwamp) {
 		a.live.SetSwampMoveBonus(0)
 	}
@@ -418,6 +420,15 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	l.water.Remove(live)
+}
+
+// DangerStateChanged is the player's reaction to entering a damage or
+// effect zone, or leaving the last one: its own status window shows the
+// danger flag.
+func (a *liveZoneActor) DangerStateChanged() {
+	live := a.live
+	live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
+	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 }
 
 // SwampStateChanged is the player's reaction to crossing a swamp boundary:

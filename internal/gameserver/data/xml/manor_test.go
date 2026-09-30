@@ -6,6 +6,7 @@ import (
 )
 
 func TestLoadManors(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "manors.xml"))
 
 	table, err := LoadManors(path)
@@ -37,6 +38,7 @@ func TestLoadManors(t *testing.T) {
 }
 
 func TestLoadManorAreas(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "manorAreas.xml"))
 
 	areas, err := LoadManorAreas(path)
@@ -57,6 +59,7 @@ func TestLoadManorAreas(t *testing.T) {
 }
 
 func TestLoadManorsDuplicateSeedIDKeepsLast(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "manors.xml")
 	writeXMLFixture(t, path, `<list>
 		<manor id="1" name="a"><crop id="1" seedId="10" matureId="11" level="1" reward1="1" reward2="1" seedsLimit="1" cropsLimit="1"/></manor>
@@ -80,6 +83,7 @@ func TestLoadManorsDuplicateSeedIDKeepsLast(t *testing.T) {
 }
 
 func TestLoadManorAreasErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "manorAreas.xml")
 	writeXMLFixture(t, path, `<list>
 		<area name="good" castleId="1" minZ="1" maxZ="2">
@@ -96,6 +100,7 @@ func TestLoadManorAreasErrors(t *testing.T) {
 }
 
 func TestLoadManorsErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "manors.xml")
 	writeXMLFixture(t, path, `<list><manor id="1" name="x"><crop id="1" seedId="2"/></manor></list>`)
 

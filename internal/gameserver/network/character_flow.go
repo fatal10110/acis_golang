@@ -333,7 +333,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.skills.ReplayEffects(c)
 		live.replayingEffects.Store(false)
 	}
-	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(serverpackets.EtcStatus{WeightPenalty: int32(c.WeightPenalty()), GradePenalty: c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0, DeathPenaltyLevel: int32(c.DeathPenaltyLevel())}))
+	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
 		// character is restored and before it enters the world.
@@ -631,7 +631,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	if l.npcs != nil {
 		rt.Mounts = l.npcs
-		rt.MountFeeds = mountFeedTable{npcs: l.npcs}
+		rt.MountData = mountDataTable{npcs: l.npcs}
 	}
 	c.Configure(rt)
 	c.RefreshWeightPenalty()

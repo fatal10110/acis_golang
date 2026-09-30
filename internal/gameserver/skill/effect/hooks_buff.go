@@ -50,35 +50,56 @@ func bluffStart(e *Effect) bool {
 	return true
 }
 
+// charmOfCourageStart and charmOfCourageExit hold only for players, whose
+// status window shows the charm: its start and its end each republish the
+// player's status flags to the player and its observers.
 func charmOfCourageStart(e *Effect) bool {
-	return isPlayer(e.Effected)
+	target, ok := asPlayer(e.Effected)
+	if !ok {
+		return false
+	}
+	target.BroadcastEtcStatus()
+	return true
 }
 
-// charmOfLuckExit and phoenixBlessExit hand a playable's ending blessing to
-// the player or summon it was on, which refreshes its appearance.
+func charmOfCourageExit(e *Effect) {
+	if target, ok := asPlayer(e.Effected); ok {
+		target.BroadcastEtcStatus()
+	}
+}
+
+// charmOfLuckExit, phoenixBlessExit and protectionBlessExit end a playable's
+// blessing: the blessing leaves the list if it is still held (a stack member
+// displaced while cancel-lesser is off), and the player or summon it was on
+// refreshes its appearance.
 func charmOfLuckExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopCharmOfLuck(e)
 	} else if target, ok := asSummon(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopCharmOfLuck(e)
 	}
 }
 
 func phoenixBlessExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopPhoenixBlessing(e)
 	} else if target, ok := asSummon(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopPhoenixBlessing(e)
 	}
 }
 
-// protectionBlessExit hands a Blessing of Protection that lost its stack
-// group's head to the player or summon it was on. It never runs when the
-// blessing simply ends: see Effect.startRefused.
+// protectionBlessExit runs only when a Blessing of Protection loses its
+// stack group's head, never when it simply ends: see Effect.startRefused.
 func protectionBlessExit(e *Effect) {
 	if target, ok := asPlayer(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopProtectionBlessing(e)
 	} else if target, ok := asSummon(e.Effected); ok {
+		target.EffectList().Drop(e)
 		target.StopProtectionBlessing(e)
 	}
 }

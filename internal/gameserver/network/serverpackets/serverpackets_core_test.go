@@ -1790,6 +1790,17 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	}
 }
 
+// TestFrameNPCInfoWritesMovementSpeedMultiplier pins the movement
+// multiplier the client scales the base run/walk speeds by.
+func TestFrameNPCInfoWritesMovementSpeedMultiplier(t *testing.T) {
+	want := float64(float32(66) / 60)
+	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{RunSpd: 120, WalkSpd: 60, MoveMultiplier: want}))
+	const multiplierOffset = 1 + 18*4
+	if got := math.Float64frombits(binary.LittleEndian.Uint64(payload[multiplierOffset:])); got != want {
+		t.Fatalf("movement speed multiplier = %v, want %v", got, want)
+	}
+}
+
 func TestFrameNPCInfoWritesAttackSpeedMultiplier(t *testing.T) {
 	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{}))
 	const multiplierOffset = 1 + 18*4
@@ -1986,7 +1997,7 @@ func TestFramePetInfo(t *testing.T) {
 		SummonType: 2, ObjectID: 20, TemplateID: 12077,
 		X: 100, Y: 200, Z: -50, Heading: 123,
 		MAtkSpd: 333, PAtkSpd: 300,
-		RunSpd: 120, WalkSpd: 60,
+		RunSpd: 120, WalkSpd: 60, MoveMultiplier: float64(float32(132) / 120),
 		CollisionRadius: 8, CollisionHeight: 20,
 		InCombat: true, AlikeDead: false,
 		Name: "Wolf", Title: "",
@@ -2023,7 +2034,7 @@ func TestFramePetInfo(t *testing.T) {
 		want = appendPetInfoInt32(want, int32(s.RunSpd))
 		want = appendPetInfoInt32(want, int32(s.WalkSpd))
 	}
-	want = appendPetInfoFloat64(want, 1)
+	want = appendPetInfoFloat64(want, s.MoveMultiplier)
 	want = appendPetInfoFloat64(want, 1)
 	want = appendPetInfoFloat64(want, s.CollisionRadius)
 	want = appendPetInfoFloat64(want, s.CollisionHeight)
@@ -2212,6 +2223,18 @@ func TestFrameRideMountWyvern(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 1012621)
 	if got := framePayload(t, FrameRide(7, 12621)); string(got) != string(want) {
 		t.Fatalf("Ride = %x, want %x", got, want)
+	}
+}
+
+// TestFrameRideMountTypes pins Ride's ride type switch (Ride.java:19-28):
+// the three striders ride as type 1, the wyvern as type 2, any other NPC
+// as 0.
+func TestFrameRideMountTypes(t *testing.T) {
+	for npcID, want := range map[int32]uint32{12526: 1, 12527: 1, 12528: 1, 12621: 2, 12077: 0} {
+		got := framePayload(t, FrameRide(7, npcID))
+		if v := binary.LittleEndian.Uint32(got[1+2*4:]); v != want {
+			t.Fatalf("Ride(%d) ride type = %d, want %d", npcID, v, want)
+		}
 	}
 }
 

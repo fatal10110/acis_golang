@@ -92,6 +92,12 @@ func ModOwnerSkill(ref modelskill.Ref) ModOwner { return ModOwner{skill: ref} }
 // ModOwnerItem identifies a Mod attached by an equipped item instance.
 func ModOwnerItem(owner ItemOwner) ModOwner { return ModOwner{item: owner} }
 
+// Stripped reports whether o is an effect a stop-all is ending
+// (List.StopAll, List.StopAllExceptThoseThatLastThroughDeath). A holder
+// drops such an owner's Mods without announcing the stat change; whoever
+// ran the stop-all sends the one closing refresh.
+func (o ModOwner) Stripped() bool { return o.effect != nil && o.effect.strippedAll.Load() }
+
 // Mod is one data-driven stat modifier: a single (stat, op, value,
 // condition, owner) tuple with no behavior of its own beyond the pure
 // arithmetic Op names. It replaces the former Func interface hierarchy —
