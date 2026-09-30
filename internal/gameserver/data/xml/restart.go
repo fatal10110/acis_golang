@@ -15,8 +15,8 @@ type restartFile struct {
 }
 
 type restartAreaElement struct {
-	MinZ     int                         `xml:"minZ,attr"`
-	MaxZ     int                         `xml:"maxZ,attr"`
+	MinZ     *coord                      `xml:"minZ,attr"`
+	MaxZ     *coord                      `xml:"maxZ,attr"`
 	Nodes    []pointElement              `xml:"node"`
 	Restarts []restartRestrictionElement `xml:"restart"`
 }
@@ -63,6 +63,9 @@ func LoadRestartPoints(path string) (*restart.Table, error) {
 }
 
 func buildRestartArea(el restartAreaElement) (restart.Area, error) {
+	if el.MinZ == nil || el.MaxZ == nil {
+		return restart.Area{}, fmt.Errorf("restart area: minZ and maxZ are required")
+	}
 	nodes := make([]location.Point, 0, len(el.Nodes))
 	for _, node := range el.Nodes {
 		point, err := node.point()
@@ -79,7 +82,7 @@ func buildRestartArea(el restartAreaElement) (restart.Area, error) {
 		}
 		restrictions[race] = r.Zone
 	}
-	return restart.NewArea(nodes, el.MinZ, el.MaxZ, restrictions)
+	return restart.NewArea(nodes, int(*el.MinZ), int(*el.MaxZ), restrictions)
 }
 
 func buildRestartPoint(el restartPointElement) (restart.Point, error) {

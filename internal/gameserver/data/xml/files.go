@@ -55,10 +55,13 @@ func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet
 	return out, nil
 }
 
-// coord is a world-coordinate attribute. It parses itself with strconv.Atoi
-// so the accepted input set matches the attribute bag it replaces exactly:
-// the decoder's own int conversion accepts an empty value as 0 and trims
-// surrounding space, both of which the bag rejected.
+// coord is a strict int attribute: a world coordinate, or any other integer
+// attribute (an id, a z bound, a heading). It parses itself with
+// strconv.Atoi so the accepted input set matches the attribute bag it
+// replaces exactly: the decoder's own int conversion accepts an empty value
+// as 0 and trims surrounding space, both of which the bag rejected. Declare
+// a required attribute as *coord so absence stays distinguishable; a plain
+// coord is an optional attribute whose default is 0.
 type coord int
 
 func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {

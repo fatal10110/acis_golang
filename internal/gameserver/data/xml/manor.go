@@ -13,7 +13,7 @@ type manorFile struct {
 }
 
 type manorElement struct {
-	ID    int            `xml:"id,attr"`
+	ID    *coord         `xml:"id,attr"`
 	Name  string         `xml:"name,attr"`
 	Crops []attrsElement `xml:"crop"`
 }
@@ -27,17 +27,21 @@ func LoadManors(path string) (*manor.Table, error) {
 
 	manors := make([]manor.Manor, 0, len(doc.Manors))
 	for _, el := range doc.Manors {
+		if el.ID == nil {
+			return nil, fmt.Errorf("xml: %s: manor %q: id is required", path, el.Name)
+		}
+		id := int(*el.ID)
 		seeds := make([]manor.Seed, 0, len(el.Crops))
 		for _, crop := range el.Crops {
 			set := commons.StatSetFromXMLAttrs(crop.Attrs)
-			set.Set("castleId", el.ID)
+			set.Set("castleId", id)
 			seed, err := manor.NewSeed(set)
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: manor %d: %w", path, el.ID, err)
+				return nil, fmt.Errorf("xml: %s: manor %d: %w", path, id, err)
 			}
 			seeds = append(seeds, seed)
 		}
-		manors = append(manors, manor.Manor{ID: el.ID, Name: el.Name, Seeds: seeds})
+		manors = append(manors, manor.Manor{ID: id, Name: el.Name, Seeds: seeds})
 	}
 	return manor.NewTable(manors), nil
 }
@@ -48,9 +52,9 @@ type manorAreaFile struct {
 
 type manorAreaElement struct {
 	Name     string         `xml:"name,attr"`
-	CastleID int            `xml:"castleId,attr"`
-	MinZ     int            `xml:"minZ,attr"`
-	MaxZ     int            `xml:"maxZ,attr"`
+	CastleID *coord         `xml:"castleId,attr"`
+	MinZ     *coord         `xml:"minZ,attr"`
+	MaxZ     *coord         `xml:"maxZ,attr"`
 	Nodes    []pointElement `xml:"node"`
 }
 
@@ -63,6 +67,9 @@ func LoadManorAreas(path string) (manor.AreaTable, error) {
 
 	areas := make(manor.AreaTable, 0, len(doc.Areas))
 	for _, el := range doc.Areas {
+		if el.CastleID == nil || el.MinZ == nil || el.MaxZ == nil {
+			return nil, fmt.Errorf("xml: %s: manor area %q: castleId, minZ and maxZ are required", path, el.Name)
+		}
 		nodes := make([]location.Point, 0, len(el.Nodes))
 		for _, node := range el.Nodes {
 			point, err := node.point()
@@ -73,9 +80,9 @@ func LoadManorAreas(path string) (manor.AreaTable, error) {
 		}
 		areas = append(areas, manor.Area{
 			Name:     el.Name,
-			CastleID: el.CastleID,
-			MinZ:     el.MinZ,
-			MaxZ:     el.MaxZ,
+			CastleID: int(*el.CastleID),
+			MinZ:     int(*el.MinZ),
+			MaxZ:     int(*el.MaxZ),
 			Nodes:    nodes,
 		})
 	}

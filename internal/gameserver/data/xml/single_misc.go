@@ -375,7 +375,7 @@ type observerGroupFile struct {
 }
 
 type observerGroupElement struct {
-	ID      int            `xml:"id,attr"`
+	ID      *coord         `xml:"id,attr"`
 	Entries []attrsElement `xml:"entry"`
 }
 
@@ -387,15 +387,19 @@ func LoadObserverGroups(path string) (*observer.Table, error) {
 
 	groups := make(map[int][]observer.Location, len(doc.Groups))
 	for _, groupEl := range doc.Groups {
-		entries := groups[groupEl.ID]
+		if groupEl.ID == nil {
+			return nil, fmt.Errorf("xml: %s: group: id is required", path)
+		}
+		id := int(*groupEl.ID)
+		entries := groups[id]
 		for _, el := range groupEl.Entries {
 			entry, err := observer.NewLocation(commons.StatSetFromXMLAttrs(el.Attrs))
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: group %d: %w", path, groupEl.ID, err)
+				return nil, fmt.Errorf("xml: %s: group %d: %w", path, id, err)
 			}
 			entries = append(entries, entry)
 		}
-		groups[groupEl.ID] = entries
+		groups[id] = entries
 	}
 
 	spawns := make([]observer.Spawn, 0, len(doc.Spawns))
