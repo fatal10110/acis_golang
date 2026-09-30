@@ -790,9 +790,9 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// Think continues the hostile AI's current intention after arrival or a
-// bow's reuse ending. It never idles on an empty desire queue: RunAI and
-// TickThink do.
+// Think continues the hostile AI's current intention after a bow's reuse
+// ending or a control effect ending. It never idles on an empty desire
+// queue: RunAI and TickThink do.
 func (h *Hostile) Think() error {
 	if !h.canRunAI() {
 		return nil

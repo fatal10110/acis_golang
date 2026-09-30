@@ -236,11 +236,12 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 }
 
 // hostileControl reacts to a live hostile NPC's controller events: it
-// re-evaluates the AI loop as soon as a chase leg completes, a swing or its
-// hit animation finishes, or a cast ends, rather than waiting for the next
-// fixed AI tick — otherwise a hostile NPC only closes distance on, or
-// re-attacks, its target once per task.AITick — and closes an aborted AI
-// cast with its cancel animation.
+// re-evaluates the AI loop as soon as a swing or its hit animation
+// finishes, or a cast ends, rather than waiting for the next fixed AI tick,
+// and closes an aborted AI cast with its cancel animation. An arrival,
+// blocked or not, only settles the arrival state: the next intention step,
+// such as the swing at the end of a chase leg, waits for the next RunAI or
+// task.AITick.
 // newLiveHostile fills it before the NPC is published.
 type hostileControl struct {
 	hostile   *npc.Hostile
@@ -263,8 +264,7 @@ func (c *hostileControl) Emit(ev event.Event) {
 	case event.Arrived:
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
-		// actually read before re-thinking, or the AI loop re-runs against a
-		// stale position forever.
+		// actually read, or the next AI pass runs against a stale position.
 		c.hostile.SyncPosition(c.move.Position())
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome arrive the
@@ -275,11 +275,9 @@ func (c *hostileControl) Emit(ev event.Event) {
 			}
 		}
 		c.hostile.AI().Arrived()
-		c.think()
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
-		c.think()
 	case event.AttackFinished:
 		// A swing finishing re-runs desire selection; a bow's reuse ending
 		// only continues the current intention.

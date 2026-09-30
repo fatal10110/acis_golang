@@ -149,6 +149,9 @@ func TestBoxChestNeverSwingsBack(t *testing.T) {
 
 			tmpl := gameservertest.MovingHostileTemplate("Chest")
 			tmpl.ID, tmpl.TemplateID = tt.id, tt.id
+			// In reach: an arrival never thinks, so a chase leg would
+			// leave the mimic's swing to an AI cycle this test never runs.
+			tmpl.BaseAttackRange = 40
 			home := location.Location{X: hostileX - 20, Y: hostileY, Z: hostileZ}
 			chest := srv.SpawnMovingHostileNPCTemplate(t, tmpl, home, home)
 			drainUntilQuiet(t, c)

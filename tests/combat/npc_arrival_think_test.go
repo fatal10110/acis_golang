@@ -95,3 +95,76 @@ func TestArrivalLeavesQueuedAttackForNextRunAI(t *testing.T) {
 		t.Fatalf("FollowMode() after RunAI = %v, want the chase started", got)
 	}
 }
+
+// TestChaseArrivalSwingsOnNextAICycle pins that an NPC arrival never
+// thinks: a monster whose chase leg arrives in attack range sends no Attack
+// on the arrival and keeps its ATTACK intention; the next periodic AI cycle
+// swings.
+func TestChaseArrivalSwingsOnNextAICycle(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c := srv.Client
+	startInWorld(t, c)
+	objID := srv.SoleObjectID(t)
+	victim := livePlayer(t, srv, objID).(attackable.Combatant)
+
+	x, y, z := srv.PlayerPosition(t, objID)
+	at := location.Location{X: x + 400, Y: y, Z: z}
+	hostile := srv.SpawnMovingHostileNPCTemplate(t, gameservertest.MovingHostileTemplate("Monster"), at, at)
+	drainUntilQuiet(t, c)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("spawn-cycle TickThink() error: %v", err)
+	}
+	walkInPlace(t, srv, hostile)
+	drainUntilQuiet(t, c)
+
+	hostile.AddDamageHate(victim, 0, 100)
+	hostile.AddAttackDesire(victim, 5)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the attack desire = %v, want %v", got, ai.IntentionAttack)
+	}
+	if got := hostile.Move().FollowMode(); got != move.FollowOffensive {
+		t.Fatalf("FollowMode() after the attack desire = %v, want the chase started", got)
+	}
+	if !hostile.Move().Moving() {
+		t.Fatal("Moving() = false after the attack desire, want a chase leg toward the player")
+	}
+
+	swung := func() bool {
+		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+			if frame[0] == serverpackets.OpcodeAttack && len(frame) >= 5 && wireReader(frame[1:]).ReadInt32() == hostile.ObjectID() {
+				return true
+			}
+		}
+		return false
+	}
+	for i := 0; hostile.Move().Moving(); i++ {
+		if i >= int(10*time.Second/move.PositionUpdateInterval) {
+			t.Fatal("chase never arrived")
+		}
+		srv.TickPositions()
+		if swung() {
+			t.Fatal("monster sent Attack during the chase, want none before the next AI cycle")
+		}
+	}
+	if swung() {
+		t.Fatal("chase arrival sent Attack, want the swing left for the next AI cycle")
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the chase arrival = %v, want %v", got, ai.IntentionAttack)
+	}
+
+	hostile.Tick()
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if !swung() {
+		t.Fatal("next AI cycle sent no Attack, want the swing")
+	}
+}

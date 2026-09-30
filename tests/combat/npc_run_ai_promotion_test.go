@@ -50,6 +50,8 @@ func TestHeavierAttackDesireSwitchesRunningAttackTarget(t *testing.T) {
 	tmpl := gameservertest.MovingHostileTemplate("Monster")
 	tmpl.AtkSpd = latchAtkSpd
 	tmpl.PAtk = 0.25
+	// In reach, so the promoting pass swings at once.
+	tmpl.BaseAttackRange = 40
 	at := location.Location{X: x + 20, Y: y, Z: z}
 	hostile := srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
 	drainUntilQuiet(t, c)
