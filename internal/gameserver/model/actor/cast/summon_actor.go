@@ -82,10 +82,14 @@ func (a SummonActor) ItemCount(itemID int) int {
 // its owner's stack and has no consume step of its own.
 func (SummonActor) ConsumeItem(int, int) bool { return true }
 
-// SummonActor casters hold no cubics, ground signet, skill lock or charges.
+// AllSkillsDisabled reports the crowd control that keeps the summon from
+// using any skill.
+func (a SummonActor) AllSkillsDisabled() bool { return a.Summon != nil && a.Summon.AllSkillsDisabled() }
+
+// SummonActor casters hold no cubics, ground signet, raw skill lock or
+// charges.
 func (SummonActor) CubicListFull() bool           { return false }
 func (SummonActor) ExitSignetGround()             {}
-func (SummonActor) AllSkillsDisabled() bool       { return false }
 func (SummonActor) EnableAllSkills()              {}
 func (SummonActor) GroundTargetUnset() bool       { return false }
 func (SummonActor) IncreaseCharges(int, int) bool { return false }

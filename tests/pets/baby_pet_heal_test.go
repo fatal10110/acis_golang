@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -402,4 +403,68 @@ func TestBabyPetHealWaitsOutItsReuse(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Reference: Creature.isSkillDisabled (Creature.java:1584-1605) answers
+// false while _disabledSkills is empty and otherwise true for every skill
+// once isAllSkillsDisabled (:620-623: stunned, immobile until attacked,
+// asleep, paralyzed or afraid) holds; BabyPet.castSkill (:104, :115) skips a
+// heal and its PET_USES_S1 when isSkillDisabled holds.
+
+// babyHealKey is the reuse key of the baby pet's heal skillID.
+func babyHealKey(skillID modelskill.ID) int32 {
+	return actorcast.ReuseKey(modelskill.Definition{ID: skillID, Level: babyHealLevel})
+}
+
+// TestStunnedBabyPetWithHealOnReuseStaysSilent: once Heal Trick is on reuse,
+// a stunned baby pet counts every heal disabled, so its owner below 15% reads
+// no Greater Heal Trick announcement on the ticks the stun covers. When the
+// stun ends, the next tick casts Greater Heal Trick again.
+func TestStunnedBabyPetWithHealOnReuseStaysSilent(t *testing.T) {
+	t.Parallel()
+	s := bootBabyPet(t, 0)
+	s.woundOwner(t, 0.1)
+	s.awaitFirstHeal(t, babyWeakHeal)
+
+	// The stun aborts Heal Trick mid-cast; its reuse stays.
+	stun := landPetEffect(t, s.baby, s.baby, "Stun")
+	if !s.baby.SkillDisabled(babyHealKey(babyStrongHeal)) {
+		t.Fatal("stunned baby pet with Heal Trick on reuse reports Greater Heal Trick ready")
+	}
+	s.assertNoHealFor(t, s.started.Add(6500*time.Millisecond).Sub(s.baby.Now()), "stunned with Heal Trick on reuse")
+
+	removePetEffect(t, s.baby, stun)
+	if s.baby.SkillDisabled(babyHealKey(babyStrongHeal)) {
+		t.Fatal("Greater Heal Trick still disabled once the stun ended")
+	}
+	heals, casts := s.healsUntil(t, s.started.Add(7500*time.Millisecond))
+	if len(heals) != 1 || heals[0].skill != babyStrongHeal || casts != 1 {
+		t.Fatalf("heals %+v, %d pet casts once the stun ended; want one Greater Heal Trick", heals, casts)
+	}
+}
+
+// TestStunnedBabyPetWithNothingOnReuseStillAnnounces: with no skill on
+// reuse the crowd-control lock does not disable any skill, so a stunned baby
+// pet still tells its owner it uses Heal Trick, though its AI refuses the
+// cast itself.
+func TestStunnedBabyPetWithNothingOnReuseStillAnnounces(t *testing.T) {
+	t.Parallel()
+	s := bootBabyPet(t, 0)
+	landPetEffect(t, s.baby, s.baby, "Stun")
+	if !s.baby.AllSkillsDisabled() {
+		t.Fatal("stunned baby pet does not report all skills disabled")
+	}
+	if s.baby.SkillDisabled(babyHealKey(babyWeakHeal)) {
+		t.Fatal("stunned baby pet with nothing on reuse reports Heal Trick disabled")
+	}
+	s.woundOwner(t, 0.5)
+	frames, _ := s.framesUntil(t, s.started.Add(3500*time.Millisecond))
+	uses := petUsesAt(frames)
+	if uses < 0 {
+		t.Fatalf("no PET_USES_S1 on the first tick (frames %x), want Heal Trick announced", frameOpcodes(frames))
+	}
+	assertSystemMessageSkill(t, frames[uses], serverpackets.SystemMessagePetUsesS1, babyWeakHeal, babyHealLevel)
+	if cast := frameIndex(frames, serverpackets.OpcodeMagicSkillUse, s.baby.ObjectID()); cast >= 0 {
+		t.Fatalf("stunned baby pet cast its heal (frames %x)", frameOpcodes(frames))
+	}
 }
