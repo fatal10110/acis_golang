@@ -206,11 +206,12 @@ func TestOwnedPetInteractArrivalReapproachesMovedPet(t *testing.T) {
 	placePet(t, pet, location.Location{X: px + 700, Y: py, Z: pz})
 	mover := h.srv.PlayerMove(t, h.ownerID)
 	// The arrival re-thinks on the same settle that ends the walk, so the
-	// owner is never seen idle between the two walks: wait for it to pass
-	// the first walk's destination, the pet's old cell.
+	// owner is never seen idle between the two walks: wait for it to reach
+	// the first walk's stop, 100 short of the pet's old cell. No position
+	// update runs here to re-aim the walk at the moved pet.
 	h.srv.AdvanceUntil(t, "first approach arrival", func() bool {
 		x, _, _ := h.srv.PlayerPosition(t, h.ownerID)
-		return x >= px+300
+		return x >= px+200
 	})
 
 	frames = drainFrames(t, h.client)
