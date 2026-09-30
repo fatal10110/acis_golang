@@ -40,6 +40,26 @@ func changePosture(t *testing.T, c *testsupport.ScriptedClient, stand bool) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "ChangeWaitType")
 }
 
+// standUp requests the stand-up and returns the client time just before
+// the request left. The server starts sitStandDelay no earlier than that,
+// so a "not before the stand-up ends" check measures from it: timing from
+// the ChangeWaitType reply lags the server's start by the reply's delivery
+// and, on the wall clock under load, lets an on-time action look early.
+func standUp(t *testing.T, c *testsupport.ScriptedClient) time.Time {
+	t.Helper()
+	sent := c.Now()
+	changePosture(t, c, true)
+	return sent
+}
+
+// sitDown is standUp for the sit-down.
+func sitDown(t *testing.T, c *testsupport.ScriptedClient) time.Time {
+	t.Helper()
+	sent := c.Now()
+	changePosture(t, c, false)
+	return sent
+}
+
 // sitAndSettle seats the player and lets the sit-down transition end.
 func sitAndSettle(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
@@ -80,13 +100,12 @@ func TestUseItemSkillWaitsOutStandUp(t *testing.T) {
 	startInWorld(t, c)
 	sitAndSettle(t, srv)
 
-	changePosture(t, c, true)
-	standAt := c.Now()
+	standSent := standUp(t, c)
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
 
 	frame := c.Read()
-	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+	if elapsed := c.Now().Sub(standSent); elapsed < sitStandDelay {
 		t.Fatalf("queued item cast ran %v after stand-up, want no earlier than %v", elapsed, sitStandDelay)
 	}
 	assertMagicSkillUseSelf(t, frame, objID, 2013, 1, 0, 5000)
@@ -114,13 +133,12 @@ func TestUseItemSkillStandUpNotEndedByStaleSitTimer(t *testing.T) {
 
 	changePosture(t, c, false)
 	srv.Advance(t, time.Second)
-	changePosture(t, c, true)
-	standAt := c.Now()
+	standSent := standUp(t, c)
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
 
 	frame := c.Read()
-	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+	if elapsed := c.Now().Sub(standSent); elapsed < sitStandDelay {
 		t.Fatalf("queued item cast ran %v after stand-up, want no earlier than %v", elapsed, sitStandDelay)
 	}
 	assertMagicSkillUseSelf(t, frame, objID, 2013, 1, 0, 5000)
@@ -163,9 +181,10 @@ func TestSitRequestWaitsForCast(t *testing.T) {
 		t.Fatalf("seed known skill: %v", err)
 	}
 	startInWorld(t, c)
+	// Timed from before the request, as standUp is.
+	castAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(longCastSkillID))
 	assertMagicSkillUseSelf(t, c.Read(), objID, longCastSkillID, 1, 4000, 0)
-	castAt := c.Now()
 	c.Send(encodeRequestChangeWaitType(false))
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestItemList).Bytes())
@@ -225,8 +244,7 @@ func TestUseItemSkillDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 	scroll := srv.GiveItem(t, objID, escapeScrollID, 3)
 	startInWorld(t, c)
 
-	changePosture(t, c, false)
-	sitAt := c.Now()
+	sitAt := sitDown(t, c)
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
 

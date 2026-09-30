@@ -77,14 +77,19 @@ func TestHeavierAttackDesireSwitchesRunningAttackTarget(t *testing.T) {
 		t.Fatalf("queued desires = %d, want both attack desires", got)
 	}
 
-	srv.Advance(t, attackTime-10*time.Millisecond)
-	if got := hostile.AI().TopDesireTarget(); got == nil || got.ObjectID() != first.ObjectID() {
-		t.Fatalf("TopDesireTarget() inside the first swing = %v, want the first player", got)
-	}
+	// The 10 ms windows around the swing's end hold only on the driven
+	// clock: on the wall clock the swing began before its Attack frame
+	// arrived, by however long delivery took.
+	if srv.DrivesClock() {
+		srv.Advance(t, attackTime-10*time.Millisecond)
+		if got := hostile.AI().TopDesireTarget(); got == nil || got.ObjectID() != first.ObjectID() {
+			t.Fatalf("TopDesireTarget() inside the first swing = %v, want the first player", got)
+		}
 
-	srv.Advance(t, 20*time.Millisecond)
-	if got := hostile.AI().TopDesireTarget(); got == nil || got.ObjectID() != rival.ObjectID() {
-		t.Fatalf("TopDesireTarget() after the swing finished = %v, want the rival", got)
+		srv.Advance(t, 20*time.Millisecond)
+		if got := hostile.AI().TopDesireTarget(); got == nil || got.ObjectID() != rival.ObjectID() {
+			t.Fatalf("TopDesireTarget() after the swing finished = %v, want the rival", got)
+		}
 	}
 	frames = readUntil(t, c, serverpackets.OpcodeAttack, "Attack on the rival")
 	if got := attackTargetID(frames[len(frames)-1]); got != rival.ObjectID() {
