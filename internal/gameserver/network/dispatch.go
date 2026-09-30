@@ -130,7 +130,10 @@ type PlayerConfig struct {
 	KarmaPlayerCanShop         bool
 	KarmaPlayerCanUseGK        bool
 	KarmaPlayerCanUseWareHouse bool
-	AwardPKKillPVPPoint        bool
+	// KarmaPlayerCanTrade controls whether a trade may be requested while
+	// either side carries karma.
+	KarmaPlayerCanTrade bool
+	AwardPKKillPVPPoint bool
 	// PerfectShieldBlockRate is the roll threshold (out of 100) below which
 	// a successful shield block upgrades to a perfect block.
 	PerfectShieldBlockRate int

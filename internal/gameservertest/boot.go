@@ -29,6 +29,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -78,6 +79,8 @@ type options struct {
 	karmaPlayerCanTeleport bool
 	karmaServiceGates      [3]bool
 	htmlPages              map[string]string
+	karmaPlayerCanTrade    bool
+	admin                  *admin.Data
 	restarts               *restart.Table
 	zones                  *zone.Index
 	water                  bool
@@ -192,6 +195,17 @@ func WithHTMLPages(pages map[string]string) Option {
 		}
 	}
 }
+
+// WithKarmaTrade sets the players.properties KarmaPlayerCanTrade gate
+// (default true).
+func WithKarmaTrade(allowed bool) Option {
+	return func(o *options) { o.karmaPlayerCanTrade = allowed }
+}
+
+// WithAdmin supplies the access-level table characters resolve their
+// persisted access level against at login (default: none, so every
+// character plays under the attribute defaults).
+func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = data } }
 
 // WithRestartPoints supplies the restart-point table wired into the link
 // (default: none, so restart requests answer ActionFailed).
@@ -1148,6 +1162,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		account:                "player1",
 		karmaPlayerCanTeleport: true,
 		karmaServiceGates:      [3]bool{false, false, true},
+		karmaPlayerCanTrade:    true,
 		characterSelectDelay:   3 * time.Second,
 		serverBypassDelay:      100 * time.Millisecond,
 		maxBuffsAmount:         20,
@@ -1370,13 +1385,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
+		PlayerConfig:     network.PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
+		Admin:            o.admin,
 		Log:              o.log,
 	}
 	var water *task.Water
