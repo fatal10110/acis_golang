@@ -88,14 +88,18 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
-		live.deferAction(func() {
-			if l.resolveTarget(objectID) != target {
-				live.SendFrame(serverpackets.FrameActionFailed())
-				return
-			}
-			run()
-		})
+		if pet, ok := target.(*summon.Actor); ok && !ctrl && pet.ShownAsOwnedBy(live.ObjectID()) {
+			live.deferPetInteract(pet, shift)
+		} else {
+			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
+			live.deferAction(func() {
+				if l.resolveTarget(objectID) != target {
+					live.SendFrame(serverpackets.FrameActionFailed())
+					return
+				}
+				run()
+			})
+		}
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -129,7 +133,7 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 			if ctrl {
 				return attack
 			}
-			return func() { l.showOwnedPetStatus(live, v, shift) }
+			return func() { live.SendFrame(serverpackets.FrameActionFailed()) }
 		}
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
 			return attack
@@ -155,13 +159,6 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 					return
 				}
 				l.interactLiveStaticObject(live, v)
-			}
-		}
-	}
-	if _, ok := target.(staticobject.Chair); ok {
-		return func() {
-			if !l.sitLiveOnChair(live, target, true) {
-				live.SendFrame(serverpackets.FrameActionFailed())
 			}
 		}
 	}

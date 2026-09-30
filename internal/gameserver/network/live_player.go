@@ -113,7 +113,8 @@ type livePlayer struct {
 	// deferredUseItem is a weapon or shield toggle queued as the next
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
-	deferredAction  func()
+	// deferredAction runs a player request held until a swing, cast or posture settles.
+	deferredAction func()
 	// deferredInteract is an interact with the player's own summon queued
 	// as the next intention; see showOwnedPetStatus.
 	deferredInteract *petInteractIntention

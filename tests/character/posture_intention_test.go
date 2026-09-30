@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -203,7 +204,7 @@ func TestDamageDuringSitDownDoesNotStandPlayer(t *testing.T) {
 	}
 }
 
-func TestChairInteractWaitsForStandUp(t *testing.T) {
+func TestChairInteractAfterStandUpDoesNotSit(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -222,11 +223,54 @@ func TestChairInteractWaitsForStandUp(t *testing.T) {
 		t.Fatal("chair claimed during stand-up")
 	}
 	srv.Advance(t, 2500*time.Millisecond)
-	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "chair sit after stand-up")
-	if !chair.Busy() {
-		t.Fatal("chair not claimed after queued interact")
+	failed := false
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		switch frame[0] {
+		case serverpackets.OpcodeActionFailed:
+			failed = true
+		case serverpackets.OpcodeChangeWaitType, serverpackets.OpcodeChairSit:
+			t.Fatalf("queued chair interact seated the player: %x", frame[0])
+		}
 	}
-	mustReadOpcode(t, c, serverpackets.OpcodeChairSit, "chair sit")
+	if !failed || chair.Busy() {
+		t.Fatalf("queued chair interact: ActionFailed=%t, chair busy=%t", failed, chair.Busy())
+	}
+}
+
+func TestTownMapInteractWaitsForStandUp(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	enterWorld(t, c)
+	drainQuiet(t, c)
+	mapObject, err := staticobject.NewObject(srv.NewObjectID(), &staticobject.Template{
+		ID: 24180018, Location: spawnOrigin, Type: staticobject.MapType, Texture: "testmap",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.State.Spawn(mapObject, spawnOrigin.X, spawnOrigin.Y, spawnOrigin.Z, 0)
+	mustReadOpcode(t, c, serverpackets.OpcodeStaticObjectInfo, "town map StaticObjectInfo")
+	drainQuiet(t, c)
+	c.Send(encodeRequestChangeWaitType(false))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
+	srv.Advance(t, 2500*time.Millisecond)
+	c.Send(encodeAction(mapObject.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select town map")
+	c.Send(encodeRequestChangeWaitType(true))
+	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand")
+	c.Send(encodeAction(mapObject.ObjectID(), 10, 20, 30, false))
+	mustReadOpcode(t, c, serverpackets.OpcodeActionFailed, "queued town map interact")
+	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
+	}, serverpackets.OpcodeItemList) {
+		if frame[0] == serverpackets.OpcodeShowTownMap {
+			t.Fatal("town map opened during stand-up")
+		}
+	}
+	srv.Advance(t, 2500*time.Millisecond)
+	mustReadOpcode(t, c, serverpackets.OpcodeShowTownMap, "town map after stand-up")
 }
 
 func TestChairInteractDuringSitDownIsRejectedAtSettlement(t *testing.T) {

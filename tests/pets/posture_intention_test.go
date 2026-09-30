@@ -62,3 +62,23 @@ func TestQueuedSitDropsAttackBeforeLaterPetInteract(t *testing.T) {
 		t.Fatalf("old attack resumed after pet interaction: %x", frameOpcodes(frames))
 	}
 }
+
+func TestOwnedPetInteractWaitsForStandUp(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
+	placePet(t, pet, location.Location{X: px + 50, Y: py, Z: pz})
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeRequestChangeWaitType(false))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit")
+	h.srv.Advance(t, 2500*time.Millisecond)
+	drainUntilQuiet(t, h.client)
+	h.client.Send(encodeRequestChangeWaitType(true))
+	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "stand")
+	clickPetQueued(t, h, pet, "during stand-up")
+	h.srv.Advance(t, 2500*time.Millisecond)
+	readUntilOpcode(t, h.client, serverpackets.OpcodePetStatusShow, "pet status after stand-up")
+}

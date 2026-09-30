@@ -269,8 +269,8 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 // denied (storing, stunned, observing, ...) or who is mounted drops its
 // intention and reads ActionFailed; fake death ends through its effect;
 // anyone else stands up as a stand request does. The stand runs on live's
-// own queue, right after the hit that reached it: it releases a chair and
-// drops queued intentions only that queue may touch.
+// own queue, right after the hit that reached it: it drops queued intentions
+// only that queue may touch. A chair is released when standing settles.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	if live == nil || !live.Seated() {
 		return
