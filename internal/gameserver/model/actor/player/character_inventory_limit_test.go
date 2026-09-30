@@ -72,3 +72,25 @@ func TestAttachedInventoryCapacityFollowsInventoryLimit(t *testing.T) {
 		t.Fatal("ValidateCapacity(1) after inventoryLimit +1 = false, want true")
 	}
 }
+
+// TestMaxItemInPacketIsLargerInventoryBase pins the item-list decoder cap to
+// the larger configured base inventory size, whichever race it belongs to,
+// with the shipped 80/100 (so 100) when nothing is configured.
+func TestMaxItemInPacketIsLargerInventoryBase(t *testing.T) {
+	tests := []struct {
+		name  string
+		slots InventorySlots
+		want  int
+	}{
+		{"unconfigured", InventorySlots{}, 100},
+		{"dwarf larger", InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}, 117},
+		{"non-dwarf larger", InventorySlots{NoDwarf: 130, Dwarf: 100, Configured: true}, 130},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.slots.MaxItemInPacket(); got != tc.want {
+				t.Fatalf("MaxItemInPacket() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
