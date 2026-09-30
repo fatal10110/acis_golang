@@ -1555,15 +1555,48 @@ func TestApplyDeathExpKarmaLossNoKillerIsNoOp(t *testing.T) {
 // TestApplyDeathExpKarmaLossDelevelDisabledIsNoOp matches the caller-side
 // `Config.ALLOW_DELEVEL && ...` gate (Player.java:2650): with the config
 // off, no death ever applies the penalty regardless of killer or karma.
+// The previous death's exp snapshot is still cleared, since
+// `setExpBeforeDeath(0)` (Player.java:2618) runs before that gate, and a held
+// Charm of Courage is not used up, since a closed gate never reaches
+// applyDeathPenalty's charm check.
 func TestApplyDeathExpKarmaLossDelevelDisabledIsNoOp(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.allowDelevel = false
+	c.ExpBeforeDeath = 1800
+	c.SetInPvPZone(true)
+	c.SetInSiegeZone(true)
+	giveCharmOfCourage(t, c)
 	killer := &Character{ID: 2}
 
 	c.applyDeathExpKarmaLoss(killer)
 
 	if c.Exp != 1500 || c.KarmaPoints != 100 {
 		t.Fatalf("delevel-disabled death changed state: Exp=%d KarmaPoints=%d, want unchanged (1500, 100)", c.Exp, c.KarmaPoints)
+	}
+	assertGateClosedDeathSideEffects(t, c)
+}
+
+// giveCharmOfCourage lands a Charm of Courage on c itself, so its start and
+// exit hooks refresh c's status window.
+func giveCharmOfCourage(t *testing.T, c *Character) {
+	t.Helper()
+	attachTestLive(t, c)
+	landSelfEffect(t, c, "CharmOfCourage", 60)
+	if !c.CharmOfCourage() {
+		t.Fatal("CharmOfCourage() = false after the charm landed")
+	}
+}
+
+// assertGateClosedDeathSideEffects checks what a killed death does while the
+// delevel gate is closed: the stale exp snapshot is cleared and the Charm of
+// Courage stays.
+func assertGateClosedDeathSideEffects(t *testing.T, c *Character) {
+	t.Helper()
+	if c.ExpBeforeDeath != 0 {
+		t.Fatalf("ExpBeforeDeath after gate-closed killed death = %d, want 0 (cleared before the gate)", c.ExpBeforeDeath)
+	}
+	if !c.EffectList().IsAffected(effect.FlagCharmOfCourage) || !c.CharmOfCourage() {
+		t.Fatalf("Charm of Courage stopped by a gate-closed death, want it kept")
 	}
 }
 
@@ -1575,12 +1608,75 @@ func TestApplyDeathExpKarmaLossLuckySkillBelowTenIsNoOp(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	c.CharLevel = 9
 	c.SetSkillLevel(int(modelskill.LuckySkillID), 1)
+	c.ExpBeforeDeath = 1800
+	c.SetInPvPZone(true)
+	c.SetInSiegeZone(true)
+	giveCharmOfCourage(t, c)
 	killer := &Character{ID: 2}
 
 	c.applyDeathExpKarmaLoss(killer)
 
 	if c.Exp != 1500 || c.KarmaPoints != 100 {
 		t.Fatalf("Lucky-skill sub-10 death changed state: Exp=%d KarmaPoints=%d, want unchanged (1500, 100)", c.Exp, c.KarmaPoints)
+	}
+	assertGateClosedDeathSideEffects(t, c)
+}
+
+// TestApplyDeathExpKarmaLossSiegeCharmSparesNonPlayableKill matches
+// applyDeathPenalty's siege branch (Player.java:2881-2889): the charm exempts
+// the death whoever the killer, here a monster, and is used up.
+func TestApplyDeathExpKarmaLossSiegeCharmSparesNonPlayableKill(t *testing.T) {
+	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
+	c.ExpBeforeDeath = 1800
+	c.SetInPvPZone(true)
+	c.SetInSiegeZone(true)
+	giveCharmOfCourage(t, c)
+	rec := recordEvents(c)
+
+	c.applyDeathExpKarmaLoss(deathPenaltyKiller{})
+
+	if c.Exp != 1500 || c.KarmaPoints != 100 {
+		t.Fatalf("siege charm death to a monster changed state: Exp=%d KarmaPoints=%d, want unchanged (1500, 100)", c.Exp, c.KarmaPoints)
+	}
+	if c.ExpBeforeDeath != 0 {
+		t.Fatalf("ExpBeforeDeath after exempt death = %d, want 0", c.ExpBeforeDeath)
+	}
+	if c.EffectList().IsAffected(effect.FlagCharmOfCourage) {
+		t.Fatalf("Charm of Courage still held after the siege death it spared, want it stopped")
+	}
+	if c.CharmOfCourage() || event.Count[event.EtcStatusBroadcast](rec) != 1 {
+		t.Fatalf("charm end: CharmOfCourage()=%v EtcStatusBroadcast=%d, want false and 1 status refresh",
+			c.CharmOfCourage(), event.Count[event.EtcStatusBroadcast](rec))
+	}
+}
+
+// TestDeathLossExemption pins applyDeathPenalty's PvP-zone branches
+// (Player.java:2881-2894): outside a PvP zone nothing is exempt; in a siege
+// zone only the charm exempts, whoever the killer, and is used up; in any
+// other PvP zone a playable killer exempts without touching the charm.
+func TestDeathLossExemption(t *testing.T) {
+	tests := []struct {
+		name                          string
+		inPvP, inSiege, charm, byPlay bool
+		wantExempt, wantUseCharm      bool
+	}{
+		{name: "open world, charm, playable", charm: true, byPlay: true},
+		{name: "siege, charm, monster", inPvP: true, inSiege: true, charm: true, wantExempt: true, wantUseCharm: true},
+		{name: "siege, charm, playable", inPvP: true, inSiege: true, charm: true, byPlay: true, wantExempt: true, wantUseCharm: true},
+		{name: "siege, no charm, playable", inPvP: true, inSiege: true, byPlay: true},
+		{name: "siege, no charm, monster", inPvP: true, inSiege: true},
+		{name: "arena, playable", inPvP: true, byPlay: true, wantExempt: true},
+		{name: "arena, charm, playable", inPvP: true, charm: true, byPlay: true, wantExempt: true},
+		{name: "arena, monster", inPvP: true, charm: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exempt, useCharm := deathLossExemption(tt.inPvP, tt.inSiege, tt.charm, tt.byPlay)
+			if exempt != tt.wantExempt || useCharm != tt.wantUseCharm {
+				t.Fatalf("deathLossExemption(pvp=%v, siege=%v, charm=%v, playable=%v) = (%v, %v), want (%v, %v)",
+					tt.inPvP, tt.inSiege, tt.charm, tt.byPlay, exempt, useCharm, tt.wantExempt, tt.wantUseCharm)
+			}
+		})
 	}
 }
 
