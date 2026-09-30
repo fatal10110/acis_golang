@@ -12,6 +12,7 @@ import (
 )
 
 func TestLoadDoors(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "doors.xml"))
 
 	table, err := LoadDoors(path, zerolog.Nop())
@@ -53,6 +54,7 @@ func TestLoadDoors(t *testing.T) {
 }
 
 func TestLoadDoorsErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "doors.xml")
 	writeXMLFixture(t, path, `<list><door id="1" type="DOOR" level="1" name="broken"><position x="1" y="2" z="3"/><coordinates><loc x="1" y="2"/></coordinates><stats hp="1" pDef="1" mDef="1" height="1"/></door></list>`)
 
@@ -62,6 +64,7 @@ func TestLoadDoorsErrors(t *testing.T) {
 }
 
 func TestLoadDoorsSkipsOutOfWorldCoordinates(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "doors.xml")
 	writeXMLFixture(t, path, `<list>
 		<door id="1" type="DOOR" level="1" name="valid"><position x="1" y="2" z="3"/><coordinates><loc x="1" y="2"/><loc x="1" y="3"/><loc x="2" y="3"/></coordinates><stats hp="1" pDef="1" mDef="1" height="1"/></door>

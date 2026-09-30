@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadBoatRoutes(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "boatRoutes.xml"))
 
 	itineraries, err := LoadBoatRoutes(path)
@@ -45,6 +46,7 @@ func TestLoadBoatRoutes(t *testing.T) {
 }
 
 func TestLoadWalkerRoutes(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "walkerRoutes.xml"))
 
 	routes, err := LoadWalkerRoutes(path)
@@ -76,6 +78,7 @@ func TestLoadWalkerRoutes(t *testing.T) {
 }
 
 func TestLoadWalkerRoutesDuplicateKeysKeepLast(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "walkerRoutes.xml")
 	writeXMLFixture(t, path, `<list>
 		<route name="a">
@@ -110,6 +113,7 @@ func TestLoadWalkerRoutesDuplicateKeysKeepLast(t *testing.T) {
 }
 
 func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "walkerRoutes.xml")
 	writeXMLFixture(t, path, `<list>
 		<route name="a">
@@ -132,6 +136,7 @@ func TestLoadWalkerRoutesDuplicateNPCWithinRouteKeepsLast(t *testing.T) {
 }
 
 func TestLoadBoatRoutesErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "boatRoutes.xml")
 	writeXMLFixture(t, path, `<list><itinerary dock1="NOPE" heading="1"><route><node x="1" y="2" z="3"/></route></itinerary></list>`)
 

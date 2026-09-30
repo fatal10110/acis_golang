@@ -16,6 +16,7 @@ import (
 // file through the production element type and through a raw attribute
 // capture of the same path, then requires the coordinates to agree.
 func TestCoordinateElementsDecodeEveryShippedNode(t *testing.T) {
+	t.Parallel()
 	type rawNode struct {
 		Attrs []xml.Attr `xml:",any,attr"`
 	}
@@ -323,6 +324,7 @@ func itoa(v int) string {
 // without coord's UnmarshalXMLAttr an empty coordinate would silently place
 // the point at the world origin.
 func TestCoordinateAttrRejectsMalformedValues(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		doc     string

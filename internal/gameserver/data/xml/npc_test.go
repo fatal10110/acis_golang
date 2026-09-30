@@ -1,8 +1,10 @@
 package xml
 
 import (
+	"cmp"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -51,6 +53,7 @@ func loadNPCFixture(t *testing.T, body string, skills *skill.Table) *npc.Table {
 }
 
 func TestLoadNPCTemplates(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "npcs"))
 	skills, err := LoadSkillDefinitions(datapackPath(t, filepath.Join("data", "xml", "skills")), zerolog.Nop())
 	if err != nil {
@@ -58,14 +61,21 @@ func TestLoadNPCTemplates(t *testing.T) {
 	}
 
 	// The full 16-file datapack takes a few seconds to parse; load it once
-	// per item-table variant and share the result across subtests instead
-	// of reloading it for every assertion.
-	withGremlinItems, err := LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), skills, zerolog.Nop())
-	if err != nil {
-		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
-	}
-	withNoItems, err := LoadNPCTemplates(dir, itemTableWithIDs(nil), skills, zerolog.Nop())
-	if err != nil {
+	// per item-table variant, both at once, and share the result across
+	// subtests instead of reloading it for every assertion.
+	var (
+		withGremlinItems, withNoItems *npc.Table
+		gremlinErr, noItemsErr        error
+		loads                         sync.WaitGroup
+	)
+	loads.Go(func() {
+		withGremlinItems, gremlinErr = LoadNPCTemplates(dir, itemTableWithIDs(gremlinDropItemIDs), skills, zerolog.Nop())
+	})
+	loads.Go(func() {
+		withNoItems, noItemsErr = LoadNPCTemplates(dir, itemTableWithIDs(nil), skills, zerolog.Nop())
+	})
+	loads.Wait()
+	if err := cmp.Or(gremlinErr, noItemsErr); err != nil {
 		t.Fatalf("LoadNPCTemplates(%q) error: %v", dir, err)
 	}
 
@@ -334,6 +344,7 @@ func TestLoadNPCTemplates(t *testing.T) {
 }
 
 func TestLoadNPCTemplatesErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {
@@ -420,6 +431,7 @@ func TestLoadNPCTemplatesErrors(t *testing.T) {
 }
 
 func TestLoadNPCTemplateSkills(t *testing.T) {
+	t.Parallel()
 	known := skill.Ref{ID: 4067, Level: 5}
 	passive := skill.Ref{ID: 4121, Level: 1}
 	table := skillTableWith(known, passive)

@@ -10,6 +10,7 @@ import (
 )
 
 func TestLoadSoulCrystalData(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "soulCrystals.xml"))
 
 	table, err := LoadSoulCrystalData(path)
@@ -34,6 +35,7 @@ func TestLoadSoulCrystalData(t *testing.T) {
 }
 
 func TestLoadSpellbooks(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "spellbooks.xml"))
 
 	table, err := LoadSpellbooks(path)
@@ -50,6 +52,7 @@ func TestLoadSpellbooks(t *testing.T) {
 }
 
 func TestLoadSummonItems(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "summonItems.xml"))
 
 	table, err := LoadSummonItems(path)
@@ -67,6 +70,7 @@ func TestLoadSummonItems(t *testing.T) {
 }
 
 func TestLoadHealSps(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "healSps.xml"))
 
 	table, err := LoadHealSps(path)
@@ -104,6 +108,7 @@ func TestLoadHealSps(t *testing.T) {
 }
 
 func TestLoadNewbieBuffs(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "newbieBuffs.xml"))
 
 	table, err := LoadNewbieBuffs(path)
@@ -123,6 +128,7 @@ func TestLoadNewbieBuffs(t *testing.T) {
 }
 
 func TestLoadAdminData(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml"))
 
 	data, err := LoadAdminData(dir)
@@ -147,6 +153,7 @@ func TestLoadAdminData(t *testing.T) {
 }
 
 func TestLoadAnnouncements(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "announcements.xml"))
 
 	list, err := LoadAnnouncements(path)
@@ -171,6 +178,7 @@ func TestLoadAnnouncements(t *testing.T) {
 }
 
 func TestLoadObserverGroups(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "observerGroups.xml"))
 
 	table, err := LoadObserverGroups(path)
@@ -206,6 +214,7 @@ func TestLoadObserverGroups(t *testing.T) {
 }
 
 func TestLoadStaticObjects(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "staticObjects.xml"))
 
 	table, err := LoadStaticObjects(path)
@@ -243,6 +252,7 @@ func TestLoadStaticObjects(t *testing.T) {
 }
 
 func TestLoadCursedWeapons(t *testing.T) {
+	t.Parallel()
 	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
 	skills, err := LoadSkillDefinitions(skillsPath, zerolog.Nop())
 	if err != nil {
@@ -268,6 +278,7 @@ func TestLoadCursedWeapons(t *testing.T) {
 }
 
 func TestLoadBufferSkills(t *testing.T) {
+	t.Parallel()
 	skillsPath := datapackPath(t, filepath.Join("data", "xml", "skills"))
 	skills, err := LoadSkillDefinitions(skillsPath, zerolog.Nop())
 	if err != nil {
@@ -296,6 +307,7 @@ func TestLoadBufferSkills(t *testing.T) {
 }
 
 func TestLoaderParityForMissingSkillIDsAndDuplicates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	skills := &skill.Table{}
 
@@ -339,6 +351,7 @@ func TestLoaderParityForMissingSkillIDsAndDuplicates(t *testing.T) {
 }
 
 func TestSingleMiscLoadersErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {

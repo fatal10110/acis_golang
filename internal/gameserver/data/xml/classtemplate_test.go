@@ -35,6 +35,7 @@ func playerTemplateFixture(id int, fields string) string {
 // elements per <class> block and follows the profession parent chain
 // (ids 1, 2, 88) — not re-derived from this package's own code.
 func TestLoadPlayerTemplates(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "classes"))
 
 	table, err := LoadPlayerTemplates(dir)
@@ -193,6 +194,7 @@ func TestLoadPlayerTemplates(t *testing.T) {
 }
 
 func TestLoadPlayerTemplatesMissingDir(t *testing.T) {
+	t.Parallel()
 	_, err := LoadPlayerTemplates(filepath.Join(t.TempDir(), "does-not-exist"))
 	if err == nil {
 		t.Fatal("expected an error for a directory with no *.xml files, got nil")
@@ -201,6 +203,7 @@ func TestLoadPlayerTemplatesMissingDir(t *testing.T) {
 
 // TestLoadPlayerTemplatesDefaults exercises defaults absent from shipped data.
 func TestLoadPlayerTemplatesDefaults(t *testing.T) {
+	t.Parallel()
 	const fields = `
 		<set pAtk="1" pDef="1" mAtk="1" mDef="1"/>
 		<set radius="1" radiusFemale="1"/>
@@ -237,6 +240,7 @@ func TestLoadPlayerTemplatesDefaults(t *testing.T) {
 }
 
 func TestLoadPlayerTemplatesLoadsNestedAndSurvivesBadFiles(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name  string
 		setup func(t *testing.T, dir string)
@@ -281,6 +285,7 @@ func TestLoadPlayerTemplatesLoadsNestedAndSurvivesBadFiles(t *testing.T) {
 }
 
 func TestLoadPlayerTemplatesAcceptsReservedClassIDs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeXMLFixture(t, filepath.Join(dir, "template.xml"), playerTemplateFixture(58, completePlayerTemplateFields))
 
@@ -294,6 +299,7 @@ func TestLoadPlayerTemplatesAcceptsReservedClassIDs(t *testing.T) {
 }
 
 func TestLoadPlayerTemplatesErrors(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		doc  string

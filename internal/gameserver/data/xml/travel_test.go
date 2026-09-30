@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadTeleports(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "teleports.xml"))
 
 	table, err := LoadTeleports(path)
@@ -40,6 +41,7 @@ func TestLoadTeleports(t *testing.T) {
 }
 
 func TestLoadInstantTeleports(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "instantTeleports.xml"))
 
 	table, err := LoadInstantTeleports(path)
@@ -64,6 +66,7 @@ func TestLoadInstantTeleports(t *testing.T) {
 }
 
 func TestLoadTeleportsErrors(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "teleports.xml")
 	writeXMLFixture(t, path, `<list><telPosList npcId="1"><loc desc="bad" priceId="57" priceCount="1" x="1" y="2"/></telPosList></list>`)
 
@@ -73,6 +76,7 @@ func TestLoadTeleportsErrors(t *testing.T) {
 }
 
 func TestLoadTeleportsDuplicateNPCKeepsLast(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "teleports.xml")
 	writeXMLFixture(t, path, `<list>
 		<telPosList npcId="1"><loc desc="first" priceId="57" priceCount="1" x="1" y="2" z="3"/></telPosList>
@@ -96,6 +100,7 @@ func TestLoadTeleportsDuplicateNPCKeepsLast(t *testing.T) {
 }
 
 func TestLoadInstantTeleportsDuplicateNPCKeepsLast(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "instantTeleports.xml")
 	writeXMLFixture(t, path, `<list>
 		<telPosList npcId="1"><loc x="1" y="2" z="3"/></telPosList>

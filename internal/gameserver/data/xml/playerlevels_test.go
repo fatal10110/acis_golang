@@ -9,6 +9,7 @@ import (
 )
 
 func TestLoadPlayerLevels(t *testing.T) {
+	t.Parallel()
 	path := datapackPath(t, filepath.Join("data", "xml", "playerLevels.xml"))
 
 	table, err := LoadPlayerLevels(path)
@@ -97,6 +98,7 @@ func TestLoadPlayerLevels(t *testing.T) {
 }
 
 func TestLoadPlayerLevelsErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {

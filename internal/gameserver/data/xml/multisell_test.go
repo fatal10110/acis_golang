@@ -24,6 +24,7 @@ func writeMultiSellFile(t *testing.T, dir, name, body string) {
 }
 
 func TestLoadMultiSellLists(t *testing.T) {
+	t.Parallel()
 	itemDir := t.TempDir()
 	writeItemFile(t, itemDir, "items.xml", `
 	<item id="57" type="EtcItem" name="Adena">
@@ -109,6 +110,7 @@ func TestLoadMultiSellLists(t *testing.T) {
 }
 
 func TestLoadMultiSellListsFilenameKeying(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeMultiSellFile(t, dir, "foo.xml.xml", `
 	<item>
@@ -133,6 +135,7 @@ func TestLoadMultiSellListsFilenameKeying(t *testing.T) {
 }
 
 func TestLoadMultiSellListsErrors(t *testing.T) {
+	t.Parallel()
 	itemDir := t.TempDir()
 	writeItemFile(t, itemDir, "items.xml", `
 	<item id="57" type="EtcItem" name="Adena">
@@ -197,6 +200,7 @@ func TestLoadMultiSellListsErrors(t *testing.T) {
 }
 
 func TestLoadMultiSellListsDatapackSmoke(t *testing.T) {
+	t.Parallel()
 	itemsDir := datapackPath(t, filepath.Join("data", "xml", "items"))
 	items, err := LoadItemTemplates(itemsDir, zerolog.Nop())
 	if err != nil {
