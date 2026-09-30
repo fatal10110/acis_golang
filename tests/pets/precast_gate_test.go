@@ -143,8 +143,8 @@ func decorationCount(h *petWorld) int {
 // the collar's cast until the pet lands, so PlayableAI.tryToCast queues the
 // request as the next intention and answers ActionFailed
 // (PlayableAI.java:313-318). Once the pet is out the request runs, and
-// L2SkillSummon.checkCondition refuses it with SUMMON_ONLY_ONE before any
-// cost (L2SkillSummon.java:86-90, reached from PlayableCast.canCast:70):
+// PlayerCast.canCast refuses it with SUMMON_ONLY_ONE before any cost
+// (PlayerCast.java:273-277):
 // neither its consume item nor its MP is taken, and no cast starts.
 func TestServitorCastDuringRestoreWaitsForThePet(t *testing.T) {
 	t.Parallel()
@@ -188,21 +188,27 @@ func TestServitorCastDuringRestoreWaitsForThePet(t *testing.T) {
 	}
 }
 
-// TestServitorCastWithSummonOutAnswersSummonOnlyOneBeforeCost casts a
-// servitor SUMMON skill with a pet already out. L2SkillSummon.checkCondition
-// answers SUMMON_ONLY_ONE (L2SkillSummon.java:86-90) from PlayableCast.canCast
-// (PlayableCast.java:70), ahead of the consume-item check
-// (PlayableCast.java:81-97), so it answers the same with no consume item at
-// all. A canCast refusal in PlayerAI.thinkCast sends no ActionFailed
-// (PlayerAI.java:288-294). Nothing is paid and no cast starts.
-func TestServitorCastWithSummonOutAnswersSummonOnlyOneBeforeCost(t *testing.T) {
+// TestServitorCastWithSummonOutRefusedBeforeCost casts a
+// servitor SUMMON skill with a pet already out. PlayerCast.canCast answers
+// SUMMON_ONLY_ONE (PlayerCast.java:273-277) only after
+// PlayableCast.canCast's consume-item check (PlayableCast.java:88-96), so
+// with no consume item S1_CANNOT_BE_USED names the skill instead. A canCast
+// refusal in PlayerAI.thinkCast sends no ActionFailed (PlayerAI.java:288-294).
+// Nothing is paid and no cast starts.
+func TestServitorCastWithSummonOutRefusedBeforeCost(t *testing.T) {
 	t.Parallel()
-	for _, items := range []int{5, 0} {
-		t.Run(fmt.Sprintf("%d consume items", items), func(t *testing.T) {
+	for _, tt := range []struct {
+		items     int
+		messageID int
+	}{
+		{items: 5, messageID: serverpackets.SystemMessageSummonOnlyOne},
+		{items: 0, messageID: serverpackets.SystemMessageS1CannotBeUsed},
+	} {
+		t.Run(fmt.Sprintf("%d consume items", tt.items), func(t *testing.T) {
 			t.Parallel()
 			var seeds []seedItem
-			if items > 0 {
-				seeds = append(seeds, seedItem{TemplateID: catConsumeItemID, Count: int32(items)})
+			if tt.items > 0 {
+				seeds = append(seeds, seedItem{TemplateID: catConsumeItemID, Count: int32(tt.items)})
 			}
 			h := bootSummoner(t, seeds...)
 			h.spawnWolf(t)
@@ -212,13 +218,13 @@ func TestServitorCastWithSummonOutAnswersSummonOnlyOneBeforeCost(t *testing.T) {
 			h.client.Send(encodeRequestMagicSkillUse(summonCatSkillID))
 			frames := drainFrames(t, h.client)
 			if len(frames) != 1 {
-				t.Fatalf("servitor cast with a pet out = opcodes %x, want SUMMON_ONLY_ONE alone", frameOpcodes(frames))
+				t.Fatalf("servitor cast with a pet out = opcodes %x, want one system message", frameOpcodes(frames))
 			}
-			assertStaticSystemMessage(t, frames[0], serverpackets.SystemMessageSummonOnlyOne)
+			assertSystemMessageID(t, frames[0], tt.messageID)
 			if h.srv.PlayerCastingNow(t, h.ownerID) {
 				t.Fatal("servitor cast with a pet out left a cast running")
 			}
-			assertCatCostsUntouched(t, h, mpBefore, items)
+			assertCatCostsUntouched(t, h, mpBefore, tt.items)
 			obj, _ := h.srv.State.Summon(h.ownerID)
 			if s, ok := obj.(interface{ NPCID() int }); !ok || s.NPCID() != wolfNPCID {
 				t.Fatalf("active summon = %v, want the wolf", obj)
@@ -228,10 +234,10 @@ func TestServitorCastWithSummonOutAnswersSummonOnlyOneBeforeCost(t *testing.T) {
 }
 
 // TestServitorCastWhileMountedRefusedBeforeCost casts a servitor SUMMON
-// skill while riding a wyvern. checkCondition does not look at the mount;
-// PlayerCast.canCast refuses a rider with SUMMON_ONLY_ONE
-// (PlayerCast.java:271-277), after PlayableCast.canCast's consume-item check
-// (PlayableCast.java:88-97): with the item it answers SUMMON_ONLY_ONE, and
+// skill while riding a wyvern. PlayerCast.canCast refuses a rider with
+// SUMMON_ONLY_ONE (PlayerCast.java:273-277), after PlayableCast.canCast's
+// consume-item check (PlayableCast.java:88-96): with the item it answers
+// SUMMON_ONLY_ONE, and
 // without it S1_CANNOT_BE_USED names the skill instead. Either way nothing
 // is paid, no cast starts and no servitor spawns.
 func TestServitorCastWhileMountedRefusedBeforeCost(t *testing.T) {
@@ -279,8 +285,8 @@ func TestServitorCastWhileMountedRefusedBeforeCost(t *testing.T) {
 // while the owner's swing is in flight. PlayableAI.tryToCast queues the
 // request behind the swing with ActionFailed (PlayableAI.java:313-318), and
 // the swing clears isAttackingNow before its FINISHED_ATTACK runs the queued
-// cast (CreatureAttack.java:213-221), so checkCondition's
-// YOU_CANNOT_SUMMON_IN_COMBAT (L2SkillSummon.java:92-96) never answers it:
+// cast (CreatureAttack.java:213-221), so PlayerCast.canCast's
+// YOU_CANNOT_SUMMON_IN_COMBAT (PlayerCast.java:279-283) never answers it:
 // the servitor is summoned once the swing is over, and the attack stance
 // that outlives the swing does not refuse it.
 func TestServitorCastMidSwingRunsAfterTheSwing(t *testing.T) {

@@ -362,9 +362,9 @@ func (c *Controller) groundTargetGate(def modelskill.Definition) error {
 }
 
 // CanCast validates the reusable pre-cast checks for target, reuse, current
-// MP/HP, mute state, the weapon or shield the skill needs, a player's
-// servitor summon slot, the skill's <cond> clauses and the Olympiad skill ban
-// (for a caster that evaluates them), and required skill items.
+// MP/HP, mute state, the weapon or shield the skill needs, the skill's
+// <cond> clauses and the Olympiad skill ban (for a caster that evaluates
+// them), required skill items, and a player's servitor summon slot.
 func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
@@ -394,18 +394,6 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if !WeaponAllowed(def, c.actor.HeldItemTypeMask()) {
 		return ErrWeaponNotAllowed
 	}
-	servitor, summons := c.actor.(servitorGate)
-	summons = summons && ServitorSummon(def)
-	if summons {
-		if servitor.HasSummon() {
-			return ErrSummonOnlyOne
-		}
-		if servitor.AttackingNow() {
-			return ErrSummonInCombat
-		}
-		// Aboard a boat the summon is refused here next, with
-		// NOT_CALL_PET_FROM_THIS_LOCATION, once boats exist (#229).
-	}
 	if gate, ok := c.actor.(conditionGate); ok {
 		if clause, ok := gate.SkillConditions(target, def); !ok {
 			return &ConditionError{Clause: clause}
@@ -422,10 +410,16 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
 		return ErrNotEnoughItems
 	}
-	// A rider is refused only after the item check, unlike a summon already
-	// out.
-	if summons && servitor.Mounted() {
-		return ErrSummonOnlyOne
+	// The servitor slot is the last check, after the item cost.
+	if servitor, ok := c.actor.(servitorGate); ok && ServitorSummon(def) {
+		if servitor.HasSummon() || servitor.Mounted() {
+			return ErrSummonOnlyOne
+		}
+		if servitor.AttackingNow() {
+			return ErrSummonInCombat
+		}
+		// Aboard a boat the summon is refused here next, with
+		// NOT_CALL_PET_FROM_THIS_LOCATION, once boats exist (#229).
 	}
 	return nil
 }

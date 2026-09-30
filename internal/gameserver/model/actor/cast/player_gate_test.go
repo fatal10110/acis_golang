@@ -199,8 +199,8 @@ type swingState bool
 func (s swingState) AttackingNow() bool { return bool(s) }
 
 // TestServitorSummonMidSwingAnswersCannotSummonInCombat pins the in-combat
-// half of the servitor gate, L2SkillSummon.checkCondition's
-// YOU_CANNOT_SUMMON_IN_COMBAT (L2SkillSummon.java:92-96). A request made
+// half of the servitor gate, PlayerCast.canCast's
+// YOU_CANNOT_SUMMON_IN_COMBAT (PlayerCast.java:279-283). A request made
 // mid-swing waits for the swing's end, which clears the swing first, so no
 // request packet reaches it; only a swing in flight at the cost check does.
 // A cubic summon is never refused by it.
