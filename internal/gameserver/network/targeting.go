@@ -970,13 +970,18 @@ func (l *GameClientLink) broadcastTargetUnselected(live *livePlayer) {
 // players see a player's health only through the one-off update sent when
 // they select it.
 func sendLiveStatus(live *livePlayer) {
+	live.SendFrame(liveStatusFrame(live))
+}
+
+// liveStatusFrame is the StatusUpdate sendLiveStatus sends.
+func liveStatusFrame(live *livePlayer) wire.Frame {
 	resources := live.ResourceValues()
-	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+	return serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
 		{Type: serverpackets.StatusCurrentHP, Value: int(resources.CurrentHP)},
 		{Type: serverpackets.StatusCurrentMP, Value: int(resources.CurrentMP)},
 		{Type: serverpackets.StatusCurrentCP, Value: int(resources.CurrentCP)},
 		{Type: serverpackets.StatusMaxCP, Value: int(resources.MaxCP)},
-	}))
+	})
 }
 
 // updateLiveAbnormalEffect sends live's own session its current active

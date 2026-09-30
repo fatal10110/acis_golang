@@ -145,7 +145,7 @@ type livePlayer struct {
 	// pvpChanges holds the PvP flag changes waiting to run on this
 	// player's queue, in arrival order: a PK kill's side effects and its
 	// summon's flag requests, both of which can arrive from another
-	// actor's queue.
+	// actor's queue, and the frames held until they have run.
 	pvpChanges pendingPvPChanges
 
 	// teleportMu serializes a teleport from its start through the position
@@ -217,6 +217,9 @@ func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
 	if p.visibilitySend == nil || (p.Character != nil && p.SessionDetached()) {
 		frame.Release()
 		return false
+	}
+	if p.pvpChanges.hold(frame, true) {
+		return true
 	}
 	return p.visibilitySend(frame)
 }

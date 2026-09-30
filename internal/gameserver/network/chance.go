@@ -1,6 +1,7 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -23,29 +24,41 @@ import (
 // message and before the result: a PK kill the proc just made takes the
 // player's items off and resets its flag before anything else the proc
 // sends. A proc of the creature that was hit runs on its attacker's queue,
-// not its own, and leaves them to the player's queue.
+// not its own, and leaves them to the player's queue; every frame it sends
+// that player waits behind them instead (sendBehindPvPChanges), so the
+// player still reads the kill's side effects first.
 func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, ownHit bool, apply func(handlerskill.MessageSink) actorcast.EffectResult) {
-	var live *livePlayer
-	var deliver func(actorcast.EffectResult)
+	var live, actsFor *livePlayer
+	var summonCaster *summon.Actor
 	switch c := caster.(type) {
 	case *livePlayer:
-		live = c
-		deliver = l.chanceResultTo(c)
+		live, actsFor = c, c
 	case *player.Character:
 		live, _ = l.livePlayerByID(c.ObjectID())
-		deliver = l.chanceResultTo(live)
+		actsFor = live
 	case *summon.Actor:
-		deliver = func(result actorcast.EffectResult) { l.sendSummonSkillResult(c, result) }
-	default:
-		deliver = l.chanceResultTo(nil)
+		summonCaster = c
+		actsFor, _ = liveSummonOwner(c)
 	}
 	settle := func() {}
-	if ownHit {
-		if live != nil {
-			settle = func() { l.settlePvPChanges(live) }
-		} else if s, ok := caster.(*summon.Actor); ok {
-			settle = func() { l.settleSummonOwnerPvPChanges(s) }
+	send := frameSender(sendFrameTo)
+	switch {
+	case ownHit && live != nil:
+		settle = func() { l.settlePvPChanges(live) }
+	case ownHit && summonCaster != nil:
+		settle = func() { l.settleSummonOwnerPvPChanges(summonCaster) }
+	case !ownHit && actsFor != nil:
+		send = func(recipient *livePlayer, frame wire.Frame) {
+			if recipient == actsFor {
+				l.sendBehindPvPChanges(recipient, frame)
+				return
+			}
+			recipient.SendFrame(frame)
 		}
+	}
+	deliver := l.chanceResultTo(live, send)
+	if summonCaster != nil {
+		deliver = func(result actorcast.EffectResult) { l.sendSummonSkillResultVia(send, summonCaster, result) }
 	}
 	result := apply(func(message any) {
 		settle()
@@ -56,23 +69,24 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, ownHit 
 }
 
 // chanceResultTo delivers a chance-triggered skill's result for the player
-// caster live: the proc's own refusal and activation notices, then the
-// skill-handler messages. With a nil live (an NPC caster, or a player
-// offline) only the messages addressed to the players they name go out.
-func (l *GameClientLink) chanceResultTo(live *livePlayer) func(actorcast.EffectResult) {
+// caster live through send: the proc's own refusal and activation notices,
+// then the skill-handler messages. With a nil live (an NPC caster, or a
+// player offline) only the messages addressed to the players they name go
+// out.
+func (l *GameClientLink) chanceResultTo(live *livePlayer, send frameSender) func(actorcast.EffectResult) {
 	return func(result actorcast.EffectResult) {
 		if live != nil {
 			for _, message := range result.Messages {
 				switch m := message.(type) {
 				case actorcast.ChanceConditionFailed:
-					sendSkillConditionFailure(live, m.Clause, m.Skill.ID)
+					sendSkillConditionFailureVia(send, live, m.Clause, m.Skill.ID)
 				case actorcast.ChanceWeaponNotAllowed:
-					live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(m.Skill.ID), int32(m.Skill.Level)))
+					send(live, serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(m.Skill.ID), int32(m.Skill.Level)))
 				case actorcast.WeaponSkillActivated:
-					live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasBeenActivated, int32(m.Skill.ID), int32(m.Skill.Level)))
+					send(live, serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1HasBeenActivated, int32(m.Skill.ID), int32(m.Skill.Level)))
 				}
 			}
 		}
-		l.sendSkillHandlerResult(live, result)
+		l.sendSkillHandlerResultVia(send, live, result)
 	}
 }

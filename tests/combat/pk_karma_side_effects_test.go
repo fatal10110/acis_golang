@@ -68,6 +68,14 @@ func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene 
 // bootPKKillSceneWith is bootPKKillScene with extra boot options.
 func bootPKKillSceneWith(t *testing.T, extra []gameservertest.Option, known ...modelskill.Definition) *pkKillScene {
 	t.Helper()
+	return bootPKKillSceneKarma(t, 0, extra, known...)
+}
+
+// bootPKKillSceneKarma is bootPKKillSceneWith with the killer entering the
+// world holding karma: the karma a summon kill gives, which leaves its PK
+// count at 0 and the PK-free knife wearable.
+func bootPKKillSceneKarma(t *testing.T, karma int, extra []gameservertest.Option, known ...modelskill.Definition) *pkKillScene {
+	t.Helper()
 	knife := shippedItemTemplate(t, apprenticeKnifeID)
 	if len(knife.UseConditions) != 1 || knife.UseConditions[0].MessageID != 1685 {
 		t.Fatalf("shipped knife conditions = %+v, want the one pkCount clause with message 1685", knife.UseConditions)
@@ -86,6 +94,11 @@ func bootPKKillSceneWith(t *testing.T, extra []gameservertest.Option, known ...m
 		gameservertest.WithPvPFlags(flags),
 	}, extra...)...)
 	c, objID := srv.Client, srv.SoleObjectID(t)
+	if karma != 0 {
+		if _, err := srv.DB.Exec("UPDATE characters SET karma = ? WHERE obj_Id = ?", karma, objID); err != nil {
+			t.Fatalf("seed killer karma: %v", err)
+		}
+	}
 	seedKnownSkill(t, srv, objID, 42, 1)
 	for _, def := range known {
 		seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
@@ -344,4 +357,82 @@ func opcodesOf(frames [][]byte) []byte {
 		out[i] = f[0]
 	}
 	return out
+}
+
+// TestPKOnAttackedProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage has
+// the killer hold karma from a summon kill (PK count 0, so the PK-free
+// knife stays on) and an ON_ATTACKED chance skill triggering the lethal
+// skill 42, while still PvP-flagged by an earlier action of its own. The
+// karma-free, unflagged victim hits it: the hit does not flag the victim
+// (the killer has karma), and the killer's proc kills the victim inside the
+// victim's own hit (CreatureAttack.onHitTimer →
+// target.getChanceSkills().onSelfHit). The kill makes the killer a PKer:
+// the knife comes off and the flag resets inside the killing blow, so both
+// reach the killer before the proc's YOU_DID_S1_DMG, although the hit and
+// its proc run on the victim's queue and the killer's side effects run on
+// its own.
+func TestPKOnAttackedProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage(t *testing.T) {
+	t.Parallel()
+	const summonKillKarma = 60
+	s := bootPKKillSceneKarma(t, summonKillKarma, nil, modelskill.Definition{
+		ID: 44, Level: 1, Activation: modelskill.ActivationPassive, Target: modelskill.TargetSelf,
+		SkillType: "BUFF", ChanceType: "ON_ATTACKED", ActivationChance: -1,
+		TriggeredID: 42, TriggeredLevel: 1,
+	})
+	if s.karma() != summonKillKarma || s.killer.PvPFlagState() == task.PvPFlagNone {
+		t.Fatal("killer must start with the summon kill's karma and flagged")
+	}
+	// The killer's proc skill always hits, and its raised max HP outlasts
+	// the victim's swing, which always lands without a critical: hit and
+	// critical rolls alternate within a swing.
+	s.setRollSource(func(int) int { return 0 })
+	onPlayerQueue(t, s.srv, s.objID, func(pc *player.Character) {
+		pc.AddStatFuncs([]effect.Mod{{Stat: stat.MaxHP, Op: effect.OpAdd, Value: 10_000}})
+		pc.SetHP(pc.MaxHPValue())
+	})
+	onPlayerQueue(t, s.srv, s.victimID, func(pc *player.Character) {
+		calls := 0
+		pc.SetRollSource(func(int) int {
+			calls++
+			if calls%2 == 1 {
+				return 0
+			}
+			return 999
+		})
+	})
+	drainUntilQuiet(t, s.vc)
+	drainUntilQuiet(t, s.c)
+
+	selectPlayerTarget(t, s.vc, s.objID)
+	s.vc.Send(encodeAttackRequest(s.objID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	// The first PK kill adds 240 to the summon kill's karma.
+	assertKarmaChangeFrames(t, s.c, s.objID, summonKillKarma+240)
+	s.srv.Settle(t)
+
+	frames := readQuiet(s.c)
+	disarmed := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageS1Disarmed)
+	if disarmed < 0 {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED", opcodesOf(frames))
+	}
+	if string(opcodesOf(frames[:disarmed])) != string(s.karmaTail) {
+		t.Fatalf("frames after the karma change = %x, want %x then S1_DISARMED first", opcodesOf(frames), s.karmaTail)
+	}
+	refresh := indexOf(frames, disarmed, serverpackets.OpcodeUserInfo, -1)
+	flagReset := indexOf(frames, refresh+1, serverpackets.OpcodeUserInfo, -1)
+	damage := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageYouDidS1Dmg)
+	if refresh < 0 || flagReset < 0 || damage < flagReset {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED and the flag reset's UserInfo before the proc's YOU_DID_S1_DMG", opcodesOf(frames))
+	}
+	if s.inv.ItemByObjectID(s.knifeObjID).Equipped() {
+		t.Fatal("knife still equipped after the PK kill")
+	}
+	if karma := s.karma(); karma != summonKillKarma+240 {
+		t.Fatalf("killer karma = %d after the proc PK kill, want %d", karma, summonKillKarma+240)
+	}
+	if state := s.killer.PvPFlagState(); state != task.PvPFlagNone {
+		t.Fatalf("killer PvP flag = %v after the proc PK kill, want none", state)
+	}
+	if n := s.flags.Len(); n != 0 {
+		t.Fatalf("PvP flag task tracks %d players after the proc PK kill, want none", n)
+	}
 }
