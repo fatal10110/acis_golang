@@ -199,11 +199,10 @@ func (h *Hostile) whileAliveMP(write func()) {
 // ReduceHP applies skill HP damage and runs the once-only death path. The
 // hit first rolls whether it breaks h's cast, whatever the damage
 // permission. Hate, the shot-recharge roll, and the party/minion attacked
-// call always run for a live hit with positive amount, mirroring
-// Npc.reduceCurrentHp (Npc.java:390-464), which runs unconditionally one
-// layer above the invul/damage-permission guard (CreatureStatus.java:209-226):
-// an invulnerable NPC, or one hit by an attacker without damage permission,
-// still aggroes and calls its party, but takes no damage.
+// call always run for a live hit, a zero-damage one included, one layer
+// above the invul/damage-permission guard: an invulnerable NPC, or one hit
+// by an attacker without damage permission, still aggroes and calls its
+// party, but takes no damage. See reduceHP.
 func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	if h.AlikeDead() {
 		return
@@ -220,19 +219,26 @@ func (h *Hostile) ReduceHPWithoutCastBreak(amount float64, attacker attackable.C
 }
 
 // reduceHP is ReduceHP without the cast-break roll, for HP loss that is not
-// a damage hit of its own.
+// a damage hit of its own. A hit that works out to no damage (a
+// damage-denied or non-player CHARGEDAM, a countered hit whose countered
+// share is zero, a lethal strike on an NPC at 1 HP) still registers the hit
+// and, for a permitted attacker on a vulnerable NPC, still wakes it and
+// rolls the stun break; only the HP write and its status report need a
+// positive amount.
 func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
 	if h.AlikeDead() {
 		return
 	}
+	amount = max(amount, 0)
 	h.testOverhit(attacker, amount)
-	if amount > 0 {
-		h.registerHit(attacker, amount, false)
-	}
-	if amount <= 0 || h.Invul() || !creature.CanDealDamage(attacker) {
+	h.registerHit(attacker, amount, false)
+	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
 	h.applyNonConsumptionDamageEffects(false)
+	if amount == 0 {
+		return
+	}
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {
@@ -267,20 +273,23 @@ func (h *Hostile) ConsumeHP(amount float64) {
 // at zero hate weight, matching Npc.reduceCurrentHp's unconditional
 // addDamageHate(attacker, damage, 0) — every HP reduction feeds the
 // AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
-// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp).
+// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp). A
+// zero-damage tick registers the hit the same way and writes no HP.
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	if h.AlikeDead() {
 		return
 	}
+	amount = max(amount, 0)
 	killer, _ := attacker.(attackable.Combatant)
 	h.testOverhit(killer, amount)
-	if amount > 0 {
-		h.registerHit(killer, amount, true)
-	}
-	if amount <= 0 || h.Invul() || !creature.CanDealDamage(killer) {
+	h.registerHit(killer, amount, true)
+	if h.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
 	h.applyNonConsumptionDamageEffects(isDOT)
+	if amount == 0 {
+		return
+	}
 	newlyDead := h.health.DamageValue(amount)
 	h.BroadcastStatus()
 	if !newlyDead {

@@ -14,7 +14,7 @@ func damageOverTimeAction(e *Effect) bool {
 			player.NotifyEffectRemovedDueLackHP(e)
 		}
 	}
-	if result.Damage > 0 {
+	if result.Hit {
 		// A skill's own damage-over-time tick is always isDOT=true in the
 		// reference (Creature.reduceCurrentHpByDOT hardcodes it), unlike
 		// drowning's periodic damage, which reduceCurrentHp (isDOT=false)
@@ -105,7 +105,10 @@ type DamageOverTimeInput struct {
 
 // DamageOverTimeResult reports the effect of one periodic HP damage tick.
 type DamageOverTimeResult struct {
-	Damage           float64
+	Damage float64
+	// Hit reports that the tick reaches the target's HP reduction, a
+	// zero-damage tick included: an NPC still registers the hit for it.
+	Hit              bool
 	Continue         bool
 	RemovedForLackHP bool
 }
@@ -129,7 +132,7 @@ func DamageOverTimeTick(in DamageOverTimeInput) DamageOverTimeResult {
 			damage = in.HP - 1
 		}
 	}
-	return DamageOverTimeResult{Damage: damage, Continue: true}
+	return DamageOverTimeResult{Damage: damage, Hit: true, Continue: true}
 }
 
 // ManaDamageOverTimeInput is the state a periodic MP upkeep tick needs.
