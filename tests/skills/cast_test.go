@@ -332,6 +332,7 @@ func TestCastSkillMasteryCooldownBypass(t *testing.T) {
 				t.Fatalf("world player %d = %T, want mastery-capable player", objID, obj)
 			}
 			ch.AddStatFuncs([]effect.Mod{{Stat: stat.SkillMastery, Op: effect.OpSet, Value: tt.power}})
+			drainUntilQuiet(t, c) // the stat func change's own UserInfo
 			ch.SetFloatRollSource(func(n float64) float64 {
 				if n != 100 {
 					t.Fatalf("mastery roll bound = %g, want 100", n)

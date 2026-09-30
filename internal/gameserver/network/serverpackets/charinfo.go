@@ -67,7 +67,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 
 	w.WriteInt32(int32(c.PvPFlagState()))
 	w.WriteInt32(int32(c.Karma()))
-	w.WriteInt32(0) // M.Atk speed: not modeled
+	w.WriteInt32(int32(c.MagicAttackSpeed()))
 	w.WriteInt32(int32(c.AttackSpeed()))
 	w.WriteInt32(int32(c.PvPFlagState()))
 	w.WriteInt32(int32(c.Karma()))

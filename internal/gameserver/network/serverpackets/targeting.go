@@ -27,6 +27,8 @@ const (
 	StatusSP          StatusType = 13
 	StatusCurrentLoad StatusType = 14
 	StatusMaxLoad     StatusType = 15
+	StatusAttackSpeed StatusType = 18
+	StatusCastSpeed   StatusType = 24
 	StatusKarma       StatusType = 27
 	StatusCurrentCP   StatusType = 33
 	StatusMaxCP       StatusType = 34

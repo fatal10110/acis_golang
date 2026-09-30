@@ -18,6 +18,12 @@ func clampInt32(value int) int32 {
 	return int32(value)
 }
 
+// statInt32 narrows a live stat value to its wire int the way the client
+// status fields expect: truncated toward zero, saturating at the int32 range.
+func statInt32(value float64) int32 {
+	return clampInt32(int(value))
+}
+
 // OpcodeUserInfo is the wire opcode for UserInfo, the full self-status
 // packet sent on world entry and after any change to a character's own
 // visible state.
@@ -52,12 +58,11 @@ const teamBlue = 1
 
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
-// field list: systems this server hasn't built yet (clans,
-// hero/noble status, fishing, recommendations, and the
-// formula-derived combat stats — attack/cast speed, evasion, accuracy,
-// critical rate) always report their at-rest default, matching a freshly
-// entered character that has none of them. Base P.Atk/P.Def/M.Atk/M.Def come
-// straight from the profession template with no gear or skill bonus applied.
+// field list: systems this server hasn't built yet (clans, hero/noble
+// status, fishing, recommendations) always report their at-rest default,
+// matching a freshly entered character that has none of them. The
+// attributes and combat stats are Character's live values, so gear, buffs,
+// level and passives all reach the status window.
 type UserInfoSnapshot struct {
 	Character *player.Character
 	Template  *player.Template
@@ -127,12 +132,12 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(c.ClassID))
 	w.WriteInt32(int32(progression.CharLevel))
 	w.WriteInt64(progression.Exp)
-	w.WriteInt32(int32(t.STR))
-	w.WriteInt32(int32(t.DEX))
-	w.WriteInt32(int32(t.CON))
-	w.WriteInt32(int32(t.INT))
-	w.WriteInt32(int32(t.WIT))
-	w.WriteInt32(int32(t.MEN))
+	w.WriteInt32(int32(c.STR()))
+	w.WriteInt32(int32(c.DEX()))
+	w.WriteInt32(int32(c.CON()))
+	w.WriteInt32(int32(c.INT()))
+	w.WriteInt32(int32(c.WIT()))
+	w.WriteInt32(int32(c.MEN()))
 	w.WriteInt32(int32(resources.MaxHP))
 	w.WriteInt32(int32(resources.CurrentHP))
 	w.WriteInt32(int32(resources.MaxMP))
@@ -164,16 +169,17 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 		w.WriteUint16(0)
 	}
 
-	w.WriteInt32(int32(t.PAtk))
-	w.WriteInt32(0) // P.Atk speed: combat-formula stats are not modeled
-	w.WriteInt32(int32(t.PDef))
-	w.WriteInt32(0) // evasion: combat-formula stats are not modeled
-	w.WriteInt32(0) // accuracy: combat-formula stats are not modeled
-	w.WriteInt32(0) // critical rate: combat-formula stats are not modeled
-	w.WriteInt32(int32(t.MAtk))
-	w.WriteInt32(0) // M.Atk speed: combat-formula stats are not modeled
-	w.WriteInt32(0) // P.Atk speed (repeated field): combat-formula stats are not modeled
-	w.WriteInt32(int32(t.MDef))
+	attackSpeed := int32(c.AttackSpeed())
+	w.WriteInt32(statInt32(c.PAtk()))
+	w.WriteInt32(attackSpeed)
+	w.WriteInt32(statInt32(c.PDef()))
+	w.WriteInt32(int32(c.Evasion()))
+	w.WriteInt32(int32(c.Accuracy()))
+	w.WriteInt32(int32(c.CriticalRate()))
+	w.WriteInt32(statInt32(c.MAtk()))
+	w.WriteInt32(int32(c.MagicAttackSpeed()))
+	w.WriteInt32(attackSpeed)
+	w.WriteInt32(statInt32(c.MDef()))
 	w.WriteInt32(int32(c.PvPFlagState()))
 	w.WriteInt32(int32(progression.Karma))
 

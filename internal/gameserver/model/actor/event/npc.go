@@ -6,7 +6,7 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 // ServerObject selects the static-object view an immobile NPC uses.
 type NPCInfoChanged struct{ ServerObject bool }
 
-// StatusKind names one value an NPC status update carries.
+// StatusKind names one value a status update carries.
 type StatusKind uint8
 
 const (

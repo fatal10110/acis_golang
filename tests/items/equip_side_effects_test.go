@@ -86,8 +86,11 @@ func userInfoMaxHP(t *testing.T, frame []byte) int32 {
 }
 
 // equipSideEffects is what one equip-changing request sent: whether its
-// SkillList (ahead of the first UserInfo) lists the rigged sword's skill,
-// and the MaxHP that UserInfo carries.
+// SkillList (ahead of the closing UserInfo refresh) lists the rigged sword's
+// skill, and the MaxHP that refresh carries. The item's stat func change
+// sends its own UserInfo first, from the stat listener that runs ahead of
+// the item-skill listener (Inventory.java:64, PcInventory.java:42-45,
+// Creature.broadcastModifiedStats).
 type equipSideEffects struct {
 	skillList  bool
 	swordSkill bool
@@ -98,27 +101,26 @@ type equipSideEffects struct {
 func readEquipSideEffects(t *testing.T, frames [][]byte) equipSideEffects {
 	t.Helper()
 	var got equipSideEffects
-	userInfo := false
-	for _, f := range frames {
+	skillList, lastUserInfo := -1, -1
+	for i, f := range frames {
 		got.frameOrder = append(got.frameOrder, f[0])
 		switch f[0] {
 		case serverpackets.OpcodeSkillList:
-			if userInfo {
-				t.Fatal("SkillList after UserInfo, want it ahead of the refresh")
-			}
+			skillList = i
 			got.skillList = true
 			for _, e := range readSkillList(t, f) {
 				got.swordSkill = got.swordSkill || e.id == riggedSwordSkillID
 			}
 		case serverpackets.OpcodeUserInfo:
-			if !userInfo {
-				got.userInfoHP = userInfoMaxHP(t, f)
-			}
-			userInfo = true
+			lastUserInfo = i
+			got.userInfoHP = userInfoMaxHP(t, f)
 		}
 	}
-	if !userInfo {
+	if lastUserInfo < 0 {
 		t.Fatalf("no UserInfo among opcodes %x", got.frameOrder)
+	}
+	if skillList > lastUserInfo {
+		t.Fatalf("SkillList after the closing UserInfo among opcodes %x, want it ahead of the refresh", got.frameOrder)
 	}
 	return got
 }
