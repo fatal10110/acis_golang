@@ -107,6 +107,102 @@ func TestBookConfirmReturnsCommitSnapshot(t *testing.T) {
 	}
 }
 
+func openBookSession(t *testing.T, book *Book, requesterID, targetID int32) {
+	t.Helper()
+	if res := book.Request(requesterID, targetID); res.Status != RequestStarted {
+		t.Fatalf("Request(%d, %d) status = %v, want started", requesterID, targetID, res.Status)
+	}
+	if res := book.Answer(targetID, true); res.Status != AnswerAccepted {
+		t.Fatalf("Answer(%d) status = %v, want accepted", targetID, res.Status)
+	}
+}
+
+func TestBookConfirmAfterOwnConfirmIgnoresPartnerLeave(t *testing.T) {
+	book := NewBook(time.Now)
+	openBookSession(t, book, 1, 2)
+	if res := book.Confirm(1); res.Status != DoneConfirmed {
+		t.Fatalf("first Confirm status = %v, want confirmed", res.Status)
+	}
+	book.Leave(2)
+
+	// A repeat confirm is silent before any partner check runs.
+	if res := book.Confirm(1); res.Status != DoneAlreadyConfirmed || res.PartnerID != 2 {
+		t.Fatalf("repeat Confirm = %+v, want already confirmed with partner 2", res)
+	}
+	if !book.HasActive(1) {
+		t.Fatal("remaining trader lost its session on a repeat confirm")
+	}
+}
+
+func TestBookConfirmAfterPartnerLeaveReportsPartnerLeft(t *testing.T) {
+	book := NewBook(time.Now)
+	openBookSession(t, book, 1, 2)
+	book.Leave(2)
+
+	sess, ok := book.Session(1)
+	if !ok || !sess.PartnerLeft(1) || sess.LeftID != 2 {
+		t.Fatalf("Session(1) = %+v, %v; want open session with partner 2 gone", sess, ok)
+	}
+	if book.HasActive(2) || book.ProcessingTransaction(2) {
+		t.Fatal("departed trader still reaches the session")
+	}
+
+	if res := book.Confirm(1); res.Status != DonePartnerLeft || res.PartnerID != 2 {
+		t.Fatalf("Confirm = %+v, want partner left with partner 2", res)
+	}
+	// Confirm must not record a confirmation that could pair with the
+	// departed side; the session stays for the caller to cancel.
+	if res := book.Confirm(1); res.Status != DonePartnerLeft {
+		t.Fatalf("second Confirm status = %v, want partner left", res.Status)
+	}
+	if res := book.Cancel(1); res.Status != CancelDone {
+		t.Fatalf("Cancel status = %v, want done", res.Status)
+	}
+	if book.HasActive(1) || book.ProcessingTransaction(1) {
+		t.Fatal("remaining trader still busy after cancel")
+	}
+}
+
+func TestBookBothLeaveDropsSession(t *testing.T) {
+	book := NewBook(time.Now)
+	openBookSession(t, book, 1, 2)
+	book.Leave(1)
+	book.Leave(2)
+
+	for _, id := range []int32{1, 2} {
+		if book.HasActive(id) || book.ProcessingTransaction(id) {
+			t.Fatalf("player %d still tied to a trade after both left", id)
+		}
+		if res := book.Confirm(id); res.Status != DoneNoSession {
+			t.Fatalf("Confirm(%d) status = %v, want no session", id, res.Status)
+		}
+		if res := book.Cancel(id); res.Status != CancelMissing {
+			t.Fatalf("Cancel(%d) status = %v, want missing", id, res.Status)
+		}
+	}
+	if res := book.Request(1, 2); res.Status != RequestStarted {
+		t.Fatalf("new Request status = %v, want started", res.Status)
+	}
+}
+
+func TestBookCloseKeepsNewerSessionOfDepartedTrader(t *testing.T) {
+	book := NewBook(time.Now)
+	openBookSession(t, book, 1, 2)
+	book.Leave(2)
+	openBookSession(t, book, 2, 3)
+
+	if res := book.Cancel(1); res.Status != CancelDone || res.Session.SecondID != 2 {
+		t.Fatalf("Cancel(1) = %+v, want the old session with 2 closed", res)
+	}
+	sess, ok := book.Session(2)
+	if !ok || sess.FirstID != 2 || sess.SecondID != 3 {
+		t.Fatalf("Session(2) = %+v, %v; want the newer session with 3", sess, ok)
+	}
+	if !book.HasActive(3) {
+		t.Fatal("newer session partner lost its session")
+	}
+}
+
 func newTradeInventory(ownerID int32) *itemcontainer.Inventory {
 	return itemcontainer.NewPlayerInventory(ownerID, tradeTemplates())
 }
