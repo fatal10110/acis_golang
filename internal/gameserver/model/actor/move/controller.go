@@ -478,9 +478,14 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 // MoveToPawn starts a target-relative walk toward target's current position
 // and broadcasts it as an approach that stops offset short of target, the
 // same movement request a player's attack approach sends. It reports whether
-// the walk was accepted. It arms no follow task: nothing re-aims the walk if
-// target moves.
+// the walk was accepted. It arms no follow task and drops any follow task
+// already running, offensive or friendly, so no follow recheck steers the
+// walk back toward an earlier target: nothing re-aims the walk if target
+// moves.
 func (c *Controller) MoveToPawn(target attackable.Combatant, offset int) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clearFollow()
 	tx, ty, tz := target.Position()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(location.Location{X: tx, Y: ty, Z: tz})
 	if err != nil {
