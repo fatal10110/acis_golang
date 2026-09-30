@@ -349,8 +349,12 @@ func (c *Character) AttackSpeed() int {
 }
 
 // MagicAttackSpeed returns the casting speed used by magic-skill timing.
+// A rider's hungry mount halves its base.
 func (c *Character) MagicAttackSpeed() int {
 	base := float64(defaultPlayerMagicAttackSpeed)
+	if m, ok := c.ridden(); ok && m.hungry {
+		base /= 2
+	}
 	if agp := c.ArmorGradePenalty(); agp > 0 {
 		base *= math.Pow(0.84, float64(agp))
 	}
@@ -382,41 +386,53 @@ func (c *Character) MagicCriticalRate() float64 {
 // the class data sets none, so the creature default applies.
 const basePlayerAttackSpeed = 300
 
-// mountedSpeeds is what the ridden mount lends its rider: its base run
+// mountedStats is what the ridden mount lends its rider: its base run
 // speed (its fly speed on a wyvern) and swim speed, each halved when the
 // mount outlevels its rider by more than 9 and halved again while it is
-// hungry, and its unhalved strider P.Atk. speed.
-type mountedSpeeds struct {
-	mountType int32
-	run, swim int
-	atkSpd    float64
-	hungry    bool
+// hungry; its unhalved strider P.Atk. speed; and its base P.Atk. and
+// M.Atk., reduced once the mount outlevels its rider by more than 4.
+type mountedStats struct {
+	mountType  int32
+	run, swim  int
+	atkSpd     float64
+	pAtk, mAtk float64
+	hungry     bool
 }
 
-// ridden returns the speeds the ridden mount lends its rider, or false when
+// ridden returns the stats the ridden mount lends its rider, or false when
 // the character rides no strider or wyvern, or its mount has no pet data
 // for the level it was mounted at.
-func (c *Character) ridden() (mountedSpeeds, bool) {
+func (c *Character) ridden() (mountedStats, bool) {
 	c.stateMu.RLock()
 	mountType, mountLevel := c.mountType, c.mountLevel
 	c.stateMu.RUnlock()
 	if mountType == 0 {
-		return mountedSpeeds{}, false
+		return mountedStats{}, false
 	}
 	f := &c.mountFeed
 	f.mu.Lock()
 	data, found, hungry := f.data, f.found, f.hungryLocked()
 	f.mu.Unlock()
 	if !found {
-		return mountedSpeeds{}, false
+		return mountedStats{}, false
 	}
-	m := mountedSpeeds{mountType: mountType, run: data.RunSpeed, swim: data.SwimSpeed, atkSpd: data.AtkSpd, hungry: hungry}
+	m := mountedStats{
+		mountType: mountType, run: data.RunSpeed, swim: data.SwimSpeed, atkSpd: data.AtkSpd,
+		pAtk: data.PAtk, mAtk: data.MAtk, hungry: hungry,
+	}
 	if mountType == MountTypeWyvern {
 		m.run = data.FlySpeed
 	}
-	if mountLevel-c.Level() > 9 {
+	gap := mountLevel - c.Level()
+	if gap > 9 {
 		m.run /= 2
 		m.swim /= 2
+	}
+	if gap > 4 {
+		// 0.5 at 5 levels, down 0.05 a level to 0.25 from 10 levels on.
+		mul := 0.5 - float64(min(gap, 10)-5)*0.05
+		m.pAtk *= mul
+		m.mAtk *= mul
 	}
 	if hungry {
 		m.run /= 2
@@ -748,8 +764,12 @@ func (c *Character) ClearRecentFakeDeath() {
 func (c *Character) ClientActionFailed() {}
 
 // PAtk returns the physical attack value used by the current minimal combat
-// pipeline.
+// pipeline. A rider attacks from its mount's P.Atk. instead of its class
+// and weapon.
 func (c *Character) PAtk() float64 {
+	if m, ok := c.ridden(); ok {
+		return c.calcStat(stat.PowerAttack, m.pAtk)
+	}
 	return c.pAtk(c.activeWeapon())
 }
 
