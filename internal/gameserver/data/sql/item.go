@@ -60,6 +60,13 @@ func (s *ItemStore) SaveState(ctx context.Context, st item.InstanceState) error 
 	return nil
 }
 
+// WriteBatch lands every row of batch in one transaction, the way
+// ItemFlushStore.Flush does: an operation that changed several rows — both
+// sides of a trade — is written whole or, on any error, not at all.
+func (s *ItemStore) WriteBatch(ctx context.Context, batch item.FlushBatch) error {
+	return NewItemFlushStore(s.db).Flush(ctx, batch)
+}
+
 // ListByOwner returns every item ownerID owns, ordered by loc_data. A login
 // restore depends on that order: when two rows of one stackable template
 // merge, the row read first survives, so an inventory row (loc_data 0) keeps
