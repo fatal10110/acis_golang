@@ -147,9 +147,11 @@ func withoutOpcode(frames [][]byte, opcode byte) [][]byte {
 	return slices.DeleteFunc(slices.Clone(frames), func(f []byte) bool { return f[0] == opcode })
 }
 
-// requirePetStatusUpdate checks the closing StatusUpdate every herb pickup
-// broadcasts for the pet, handled or not (SummonAI.thinkPickUp's
-// broadcastStatusUpdate after destroying the herb).
+// requirePetStatusUpdate checks the closing status frame every herb pickup
+// sends for the pet, handled or not. It pins the current Go frame, a plain
+// StatusUpdate, and not the reference one: after destroying the herb the
+// reference sends PetStatusUpdate to the owner and SummonInfo to other
+// players. Tracked by #3007.
 func requirePetStatusUpdate(t *testing.T, frame []byte, wolf *summon.Actor) {
 	t.Helper()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeStatusUpdate, "pet StatusUpdate")
@@ -255,8 +257,9 @@ func TestPetPickupHerbUnderReuseReportsReuse(t *testing.T) {
 
 // TestPetPickupUnhandledHerbIsAcknowledged loots a herb with no attached
 // skill. The reference's ItemSkills logs the missing skill and does nothing
-// else; the pet has still taken and destroyed the herb. The owner's command
-// is released with ActionFailed ahead of the status broadcast.
+// else; the pet has still taken and destroyed the herb. The ActionFailed
+// ahead of the status frame is a known Go-only divergence that the reference
+// does not send; this test pins current behavior until #3007 removes it.
 func TestPetPickupUnhandledHerbIsAcknowledged(t *testing.T) {
 	t.Parallel()
 	h, wolf := bootHerbWolf(t)
@@ -266,6 +269,7 @@ func TestPetPickupUnhandledHerbIsAcknowledged(t *testing.T) {
 	if len(rest) != 2 {
 		t.Fatalf("unhandled herb frames = %x, want ActionFailed then StatusUpdate", frameOpcodes(rest))
 	}
+	// Go-only ActionFailed, pinned as a known divergence (#3007).
 	assertFrameOpcode(t, rest[0], serverpackets.OpcodeActionFailed, "ActionFailed")
 	requirePetStatusUpdate(t, rest[1], wolf)
 	h.requireHerbGone(t, wolf, groundID, emptyHerbID)
