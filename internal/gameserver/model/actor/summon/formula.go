@@ -66,12 +66,20 @@ func (a *Actor) initVitals() {
 // not atomic against a concurrent CalcStat, which may observe fns partially
 // applied. Callers that need a batch to appear all-or-nothing to readers
 // must serialize at a higher level (see effect.List, which does this for
-// effect-driven adds).
+// effect-driven adds through AttachStatFuncs).
 func (a *Actor) AddStatFuncs(fns []effect.Mod) {
+	a.AttachStatFuncs(fns)
+}
+
+// AttachStatFuncs attaches fns to a's live stat calculators.
+func (a *Actor) AttachStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		a.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
 }
+
+// StatFuncsAttached is a no-op: a summon's stat change reports nothing.
+func (a *Actor) StatFuncsAttached([]effect.Mod) {}
 
 // RemoveStatsByOwner drops every stat func previously added for owner.
 func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {

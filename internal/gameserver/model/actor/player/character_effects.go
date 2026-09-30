@@ -38,16 +38,30 @@ func (c *Character) MaxBuffCount() int {
 	return base + c.SkillLevel(int(modelskill.DivineInspirationSkillID))
 }
 
-// AddStatFuncs attaches fns to c's live stat calculators. Each Mod is
-// published independently under its own Calculator's lock — the batch is
-// not atomic against a concurrent CalcStat, which may observe fns partially
-// applied. Callers that need a batch to appear all-or-nothing to readers
-// must serialize at a higher level (see effect.List, which does this for
-// effect-driven adds).
+// AddStatFuncs attaches fns to c's live stat calculators and reports the
+// change. Each Mod is published independently under its own Calculator's
+// lock — the batch is not atomic against a concurrent CalcStat, which may
+// observe fns partially applied. Callers that need a batch to appear
+// all-or-nothing to readers must serialize at a higher level (see
+// effect.List, which does this for effect-driven adds through
+// AttachStatFuncs and StatFuncsAttached).
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
+	c.AttachStatFuncs(fns)
+	c.StatFuncsAttached(fns)
+}
+
+// AttachStatFuncs attaches fns to c's live stat calculators without
+// reporting the change.
+func (c *Character) AttachStatFuncs(fns []effect.Mod) {
+	for _, fn := range fns {
+		c.statCalcOrCreate(fn.Stat).AddMod(fn)
+	}
+}
+
+// StatFuncsAttached reports the stat change of attached fns.
+func (c *Character) StatFuncsAttached(fns []effect.Mod) {
 	stats := make([]stat.Stat, len(fns))
 	for i, fn := range fns {
-		c.statCalcOrCreate(fn.Stat).AddMod(fn)
 		stats[i] = fn.Stat
 	}
 	c.statsModified(stats)

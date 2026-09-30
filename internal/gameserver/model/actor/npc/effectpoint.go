@@ -63,9 +63,11 @@ func (ep *EffectPoint) CollisionRadius() float64 { return ep.Instance.Template.C
 // server's shared effect scheduler exactly like any other actor.
 func (ep *EffectPoint) EffectList() *effect.List { return ep.effects }
 
-// AddStatFuncs, RemoveStatsByOwner, and MaxBuffCount satisfy
-// effect.StatOwner; an EffectPoint carries no stats and no buff slots.
-func (ep *EffectPoint) AddStatFuncs([]effect.Mod)          {}
+// AttachStatFuncs, StatFuncsAttached, RemoveStatsByOwner, and MaxBuffCount
+// satisfy effect.StatOwner; an EffectPoint carries no stats and no buff
+// slots.
+func (ep *EffectPoint) AttachStatFuncs([]effect.Mod)       {}
+func (ep *EffectPoint) StatFuncsAttached([]effect.Mod)     {}
 func (ep *EffectPoint) RemoveStatsByOwner(effect.ModOwner) {}
 func (ep *EffectPoint) MaxBuffCount() int                  { return 0 }
 

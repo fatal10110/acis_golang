@@ -14,7 +14,8 @@ import (
 // matching the effect package's own noopStatOwner test double.
 type benchNoopStatOwner struct{}
 
-func (benchNoopStatOwner) AddStatFuncs([]effect.Mod)          {}
+func (benchNoopStatOwner) AttachStatFuncs([]effect.Mod)       {}
+func (benchNoopStatOwner) StatFuncsAttached([]effect.Mod)     {}
 func (benchNoopStatOwner) RemoveStatsByOwner(effect.ModOwner) {}
 func (benchNoopStatOwner) MaxBuffCount() int                  { return 20 }
 

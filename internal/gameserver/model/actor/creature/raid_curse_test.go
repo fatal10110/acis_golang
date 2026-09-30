@@ -316,7 +316,8 @@ func (p *cursePlayable) Invul() bool                        { return false }
 func (p *cursePlayable) Level() int                         { return p.level }
 func (p *cursePlayable) Position() (int, int, int)          { return 0, 0, 0 }
 func (p *cursePlayable) EffectList() *effect.List           { return p.list }
-func (p *cursePlayable) AddStatFuncs([]effect.Mod)          {}
+func (p *cursePlayable) AttachStatFuncs([]effect.Mod)       {}
+func (p *cursePlayable) StatFuncsAttached([]effect.Mod)     {}
 func (p *cursePlayable) RemoveStatsByOwner(effect.ModOwner) {}
 func (p *cursePlayable) MaxBuffCount() int                  { return 20 }
 

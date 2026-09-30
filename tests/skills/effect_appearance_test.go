@@ -302,9 +302,10 @@ func TestPlayerTemplateAbnormalVisual(t *testing.T) {
 				t.Fatalf("shipped %d effect = %s abnormal %#x, want %s %#x", tc.id, tmpl.Name, tmpl.AbnormalEffect, tc.kind, tc.want)
 			}
 			tmpl.Count, tmpl.Time, tmpl.Value = tc.count, 1, 1
-			// Dance of Shadows' runSpd func would hit #2854 (a run-speed
-			// change on a watched player deadlocks its queue); the visual
-			// does not depend on it.
+			// Dance of Shadows' runSpd func adds a second UserInfo/CharInfo
+			// (the RUN_SPEED refresh, pinned by
+			// TestRunSpeedBuffOnWatchedPlayerCompletes); the visual does not
+			// depend on it.
 			tmpl.Funcs = nil
 			p := bootAppearancePair(t)
 

@@ -203,9 +203,11 @@ type funcOwner struct {
 	funcs []Mod
 }
 
-func (o *funcOwner) AddStatFuncs(funcs []Mod) {
+func (o *funcOwner) AttachStatFuncs(funcs []Mod) {
 	o.funcs = append(o.funcs, funcs...)
 }
+
+func (o *funcOwner) StatFuncsAttached([]Mod) {}
 
 func (o *funcOwner) RemoveStatsByOwner(ModOwner) {}
 
@@ -1204,9 +1206,11 @@ type eventOwner struct {
 	maxBuff int
 }
 
-func (o eventOwner) AddStatFuncs([]Mod) {
+func (o eventOwner) AttachStatFuncs([]Mod) {
 	*o.events = append(*o.events, "owner:add")
 }
+
+func (o eventOwner) StatFuncsAttached([]Mod) {}
 
 func (o eventOwner) RemoveStatsByOwner(owner ModOwner) {
 	e := owner.effect
