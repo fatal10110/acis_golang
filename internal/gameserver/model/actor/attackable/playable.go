@@ -6,6 +6,14 @@ package attackable
 type Playable interface {
 	Combatant
 	ProtectionBlessing() bool
+	PvPZoneMember
+}
+
+// PvPZoneMember is an actor that tracks whether it stands inside a PvP zone:
+// a player or a summon. NPCs, doors, and other non-playables track no zone
+// membership, so an assertion to it legitimately fails for them and they
+// never count as standing inside a PvP zone.
+type PvPZoneMember interface {
 	InPvPZone() bool
 }
 
