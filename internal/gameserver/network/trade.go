@@ -217,8 +217,9 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		return
 	}
 	partner, ok := l.livePlayerByID(partnerID)
+	partnerLeft := session.PartnerLeft(live.ObjectID())
 	switch {
-	case session.PartnerLeft(live.ObjectID()):
+	case partnerLeft:
 		// A partner who left with the window open is answered like any
 		// absent partner. Once the id is back online the reference goes on
 		// to confirm, whose re-check of the departed partner then fails:
@@ -230,10 +231,14 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	case !ok || !l.tradePartnerLive(live, partner):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
-	case !live.access.AllowTransaction:
+	}
+	// The access check follows the presence check on both paths, the
+	// departed-partner one included, and keeps the trade open.
+	if !live.access.AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
-	case !livePlayersInRange(live, partner, tradeInteractionDistance):
+	}
+	if !partnerLeft && !livePlayersInRange(live, partner, tradeInteractionDistance) {
 		// The reference validates the interaction radius on every confirm
 		// and answers an out-of-range confirm by cancelling the whole
 		// trade for both players, not with a per-player error message.

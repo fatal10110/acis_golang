@@ -80,3 +80,28 @@ func TestTradeDoneWithoutTransactionRightKeepsTradeOpen(t *testing.T) {
 		t.Fatal("trade settled although the gated side never confirmed")
 	}
 }
+
+// TestTradeDoneWithoutTransactionRightAfterPartnerLeftKeepsTradeOpen pins
+// the TradeDone access gate on the departed-partner path: the partner left
+// the world with the window open and its id resolves again, so the presence
+// check passes and the access check answers next, before any confirm. The
+// restricted confirmer is told it is not authorized and the trade stays open
+// instead of being cancelled by the confirm's re-check.
+func TestTradeDoneWithoutTransactionRightAfterPartnerLeftKeepsTradeOpen(t *testing.T) {
+	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
+	openDirectTrade(t, link, first, second, firstCap, secondCap)
+
+	link.leaveActiveTrade(second)
+	testsupport.ResetCapture(firstCap, secondCap)
+	first.access.AllowTransaction = false
+	link.handleTradeDone(context.Background(), first, clientpackets.TradeDone{Response: 1})
+
+	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeSystemMessage)
+	assertSystemMessageIDFrame(t, firstCap.Frames()[0], serverpackets.SystemMessageNotAuthorizedToDoThat)
+	if n := len(secondCap.Frames()); n != 0 {
+		t.Fatalf("partner received %d frames, want none", n)
+	}
+	if !link.trades.HasActive(first.ObjectID()) {
+		t.Fatal("access gate on TradeDone closed the trade on the departed-partner path")
+	}
+}

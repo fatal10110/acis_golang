@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	xmldata "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -103,13 +102,6 @@ func setCharacterColumn(t *testing.T, h *traders, objID int32, column string, va
 	}
 }
 
-func assertGateSilent(t *testing.T, c *testsupport.ScriptedClient, who string) {
-	t.Helper()
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s received opcode %#x, want silence", who, frame[0])
-	}
-}
-
 // TestTradeRequestRefusedWithoutTransactionRight pins the requester-side
 // access gate: a character whose access level forbids transactions is
 // answered YOU_ARE_NOT_AUTHORIZED_TO_DO_THAT and the target hears nothing.
@@ -122,7 +114,7 @@ func TestTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 
 	h.first.Send(encodeTradeRequest(h.secondID))
 	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageNotAuthorizedToDoThat)
-	assertGateSilent(t, h.second, "target of a refused request")
+	assertSilent(t, h.second, "target of a refused request")
 
 	h.second.Send(encodeTradeRequest(h.firstID))
 	assertFrameOpcode(t, h.first.Read(), serverpackets.OpcodeSendTradeRequest, "SendTradeRequest")
@@ -144,8 +136,8 @@ func TestAnswerTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 
 	h.second.Send(encodeAnswerTradeRequest(1))
 	assertStaticSystemMessage(t, h.second.Read(), serverpackets.SystemMessageNotAuthorizedToDoThat)
-	assertGateSilent(t, h.second, "refused answerer")
-	assertGateSilent(t, h.first, "requester of a refused answer")
+	assertSilent(t, h.second, "refused answerer")
+	assertSilent(t, h.first, "requester of a refused answer")
 
 	h.first.Send(encodeTradeRequest(h.secondID))
 	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageAlreadyTrading)
@@ -177,7 +169,7 @@ func TestTradeRequestRefusedWithKarma(t *testing.T) {
 
 			h.first.Send(encodeTradeRequest(h.secondID))
 			assertSystemMessageText(t, h.first.Read(), serverpackets.SystemMessageS1, chaoticTradeRefusal)
-			assertGateSilent(t, h.second, "target of a karma-refused request")
+			assertSilent(t, h.second, "target of a karma-refused request")
 		})
 	}
 }
