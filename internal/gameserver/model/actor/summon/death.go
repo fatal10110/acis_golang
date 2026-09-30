@@ -17,8 +17,27 @@ var _ task.SummonDecayActor = (*Actor)(nil)
 // decays and the pet is lost.
 const petCorpseTime = 1200 * time.Second
 
-// die runs a's death sequence once drainHP has marked it dead; drainHP lets
-// exactly one caller through. The summon stops moving, attacking and
+// Kill runs a's death sequence at once, whatever its HP, crediting killer,
+// and reports whether this call killed it; a dead summon ignores it. No hit
+// lands on the way: invulnerability, damage permission, the hit side
+// effects and the owner's damage notice play no part. As with a lethal hit,
+// HP drops to zero and the status is republished before the death sequence.
+func (a *Actor) Kill(killer attackable.Combatant) bool {
+	a.vitals.mu.Lock()
+	if a.dead {
+		a.vitals.mu.Unlock()
+		return false
+	}
+	a.vitals.hp = 0
+	a.dead = true
+	a.vitals.mu.Unlock()
+	a.BroadcastStatus()
+	a.die(killer)
+	return true
+}
+
+// die runs a's death sequence once drainHP or Kill has marked it dead; the
+// two share vitals.mu, so exactly one caller gets through. The summon stops moving, attacking and
 // casting, drops its target, loses the effects that do not last through
 // death (its owner's pet window is refreshed once after that strip, not per
 // stripped stat change), and republishes its status. Observers then see it die
