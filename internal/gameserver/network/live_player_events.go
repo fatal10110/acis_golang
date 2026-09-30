@@ -49,6 +49,12 @@ func sessionOnly(ev event.Event) bool {
 // Emit maps one of p's character events to its packets and follow-up
 // actions. Each arm keeps the send order its packets reach clients in.
 func (p *livePlayer) Emit(ev event.Event) {
+	if _, died := ev.(event.Died); died {
+		// Death goes idle whether or not a client watches: no walk, pickup,
+		// interact, follow, toggle or queued request outlives it to be
+		// re-run after a revive.
+		p.clearParkedApproaches()
+	}
 	if p.SessionDetached() && sessionOnly(ev) {
 		return
 	}
@@ -338,6 +344,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.finishDeferredMagicSkill(live)
 		l.finishDeferredItemAICast(live)
 		live.thinkAttack()
+		l.arriveHeldIntention(live)
 	case event.MoveBlocked:
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
@@ -347,9 +354,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.IdleRequested:
 		live.tryToIdle(e.AIDenied)
 	case event.ThinkRequested:
-		// Only the attack intention re-evaluates on a think; nothing else a
-		// player holds acts on one.
-		live.thinkAttack()
+		l.thinkCurrentIntention(live)
 	case event.CastAborted:
 		l.broadcastCastAborted(live, e.Interrupted)
 	case event.CastStopAck:

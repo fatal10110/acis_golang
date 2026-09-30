@@ -171,14 +171,17 @@ func (l *GameClientLink) interactLiveStaticObject(live *livePlayer, target world
 		return false
 	}
 
-	// Interacting replaces the follow intention.
+	// Interacting replaces the follow intention and a held walk or equip
+	// toggle.
 	switch obj.Type() {
 	case staticobject.MapType:
 		live.endFollow()
+		live.dropHeldIntention()
 		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
 	case staticobject.ArenaSignType:
 		live.endFollow()
+		live.dropHeldIntention()
 		html, ok := l.html.Get("signboard.htm")
 		if !ok {
 			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
@@ -226,6 +229,8 @@ func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer
 // reference's maybeMoveToLocation(..., isShiftPressed) (CreatureMove.java:
 // 438-443, the walk is skipped when isShiftPressed).
 func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift bool) bool {
+	// The pickup is the current intention now, in range or not.
+	live.dropHeldIntention()
 	if groundPickupInRange(live, ground) {
 		return l.pickupLiveGroundItem(ctx, live, ground)
 	}
@@ -258,6 +263,36 @@ func (l *GameClientLink) finishLiveGroundPickup(live *livePlayer) {
 		return
 	}
 	l.pickupLiveGroundItem(pickup.ctx, live, target)
+}
+
+// thinkLivePickup thinks the pickup a walk toward a ground item holds
+// again: the client is released, then the player walks to the item afresh,
+// or collects it once in range. A player that cannot act or is not standing,
+// or an item gone meanwhile, ends the pickup idle, stopping the walk.
+func (l *GameClientLink) thinkLivePickup(live *livePlayer) {
+	pickup := live.takePickup()
+	if pickup == nil {
+		return
+	}
+	if live.DenyAIAction() || !live.Standing() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.tryToIdle(false)
+		return
+	}
+	var ground *grounditem.Item
+	if pickup.target != nil {
+		if target := l.resolveTarget(pickup.target.ObjectID()); target == pickup.target {
+			ground, _ = target.(*grounditem.Item)
+		}
+	}
+	if ground == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		if live.move != nil {
+			live.move.Stop()
+		}
+		return
+	}
+	l.walkOrForwardPickup(pickup.ctx, live, ground, false)
 }
 
 // finishDeferredPickup runs the pickup queued as the next intention, if any,
@@ -473,12 +508,12 @@ func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
 	return location.In3DRadius(lx, ly, lz, px, py, pz, radius)
 }
 
-// finishPetInteract fires once an approach walk started by
-// thinkOwnedPetInteract arrives (the Arrived event from its move.Controller)
-// and thinks the interact again: the owner or pet may have moved meanwhile,
-// so every gate runs again, and a summon that walked out of approach range
-// is approached anew. A summon that left the world or changed owner ends the
-// interact.
+// finishPetInteract thinks the interact an approach walk started by
+// thinkOwnedPetInteract holds again, once the walk arrives (the Arrived
+// event from its move.Controller) or an equip toggle mid-walk replaced it:
+// the owner or pet may have moved meanwhile, so every gate runs again, and a
+// summon out of approach range is approached anew. A summon that left the
+// world or changed owner ends the interact idle, stopping a walk under way.
 func (l *GameClientLink) finishPetInteract(live *livePlayer) {
 	pet := live.takePetInteract()
 	if pet == nil {
@@ -486,6 +521,7 @@ func (l *GameClientLink) finishPetInteract(live *livePlayer) {
 	}
 	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) || pet.OwnerID() != live.ObjectID() {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		endPetInteractIdle(live)
 		return
 	}
 	l.thinkOwnedPetInteract(live, pet, false)
