@@ -56,11 +56,7 @@ jobs:
           # never refreshed. Cache per shard and commit instead.
           cache: false
 
-      # main builds cold, so the cache it saves holds only its own build.
-      # Restoring the previous one there would carry every earlier object
-      # forward and grow the cache without bound.
       - name: Restore Go cache
-        if: github.event_name != 'push'
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -68,6 +64,18 @@ jobs:
             ~/go/pkg/mod
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
           restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
+
+      # main saves only the build cache entries its own run used, so the cache
+      # does not carry every earlier build forward and grow without bound. Go
+      # refreshes an entry's mtime when it uses one older than an hour, so
+      # backdating them all first marks every entry this run reads. Two hours
+      # stays well inside Go's own 5-day trim.
+      - name: Mark Go cache entries unused
+        if: github.event_name == 'push'
+        run: |
+          mkdir -p ~/.cache/go-build
+          find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
+          touch "$RUNNER_TEMP/go-cache-start"
 
       - name: Build
         if: matrix.shard.name == 'rest'
@@ -102,6 +110,10 @@ jobs:
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
+
+      - name: Drop Go cache entries this run did not use
+        if: github.event_name == 'push'
+        run: find ~/.cache/go-build -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
 
       # Only main saves, so every branch can restore it.
       - name: Save Go cache
