@@ -162,6 +162,10 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	inst.Maker = n.slot[key].maker
 	n.mu.Unlock()
 
+	if npc.FolkKind(inst) {
+		n.spawnFolk(inst, loc, heading)
+		return nil
+	}
 	if !npc.Attackable(inst) {
 		n.skippedNonCombatCount.Add(1)
 		return nil
@@ -221,6 +225,20 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	n.slot[key] = slot
 	n.mu.Unlock()
 	return hostile
+}
+
+// spawnFolk places a civilian NPC built from inst in the world at (loc,
+// heading). It stands there for the server's lifetime: nothing kills it,
+// so it takes no AI tick, decay or respawn.
+func (n *Npcs) spawnFolk(inst *npc.Instance, loc location.Location, heading int) {
+	inPeace := n.zones != nil && n.zones.NPCInPeaceZone(loc.X, loc.Y, loc.Z)
+	f, err := npc.NewFolk(inst, inPeace, n.castDefs)
+	if err != nil {
+		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
+		return
+	}
+	n.state.Spawn(f, loc.X, loc.Y, loc.Z, heading)
+	n.folkCount.Add(1)
 }
 
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {

@@ -217,7 +217,7 @@ func TestLoadPvPFlagOptionsUsesPlayersProperties(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`
 PvPVsNormalTime = 1234
 PvPVsPvPTime = 5678
-KarmaPlayerCanShop = False
+KarmaPlayerCanTrade = False
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -229,8 +229,8 @@ KarmaPlayerCanShop = False
 	if opts.Normal != 1234*time.Millisecond || opts.Flagged != 5678*time.Millisecond {
 		t.Fatalf("durations = normal %s flagged %s, want 1234ms/5678ms", opts.Normal, opts.Flagged)
 	}
-	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "KarmaPlayerCanShop" {
-		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanShop]", opts.UnsupportedKeys)
+	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "KarmaPlayerCanTrade" {
+		t.Fatalf("UnsupportedKeys = %v, want [KarmaPlayerCanTrade]", opts.UnsupportedKeys)
 	}
 }
 
@@ -246,6 +246,33 @@ func TestLoadAutoLearnSkillsUsesPlayersProperties(t *testing.T) {
 	}
 	if !got {
 		t.Fatal("loadAutoLearnSkills() = false, want true")
+	}
+}
+
+func TestLoadKarmaServiceGatesUsesPlayersProperties(t *testing.T) {
+	dir := t.TempDir()
+	set := filepath.Join(dir, "set.properties")
+	if err := os.WriteFile(set, []byte("KarmaPlayerCanShop = True\nKarmaPlayerCanUseGK = True\nKarmaPlayerCanUseWareHouse = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unset := filepath.Join(dir, "unset.properties")
+	if err := os.WriteFile(unset, []byte("AutoLearnSkills = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadKarmaServiceGates(gameServerPaths{PlayersConfigPath: set})
+	if err != nil {
+		t.Fatalf("loadKarmaServiceGates() error = %v", err)
+	}
+	if want := (karmaServiceGates{CanShop: true, CanUseGK: true, CanUseWareHouse: false}); got != want {
+		t.Fatalf("loadKarmaServiceGates() = %+v, want %+v", got, want)
+	}
+	got, err = loadKarmaServiceGates(gameServerPaths{PlayersConfigPath: unset})
+	if err != nil {
+		t.Fatalf("loadKarmaServiceGates() defaults error = %v", err)
+	}
+	if want := (karmaServiceGates{CanShop: false, CanUseGK: false, CanUseWareHouse: true}); got != want {
+		t.Fatalf("loadKarmaServiceGates() defaults = %+v, want %+v", got, want)
 	}
 }
 

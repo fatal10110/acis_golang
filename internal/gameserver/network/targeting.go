@@ -89,7 +89,9 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 			return
 		}
 		if pet, ok := target.(*summon.Actor); ok && !ctrl && pet.ShownAsOwnedBy(live.ObjectID()) {
-			live.deferPetInteract(pet, shift)
+			live.deferInteract(pet, shift)
+		} else if f, ok := target.(*npc.Folk); ok && !ctrl {
+			live.deferInteract(f, shift)
 		} else {
 			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
 			live.deferAction(func() {
@@ -112,6 +114,9 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 		return
 	}
 	if l.actOnPlayer(live, target, ctrl, shift) {
+		return
+	}
+	if l.actOnFolk(live, target, ctrl, shift) {
 		return
 	}
 	if l.interactLiveStaticObject(live, target) {
@@ -339,14 +344,14 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 }
 
 const (
-	// summonInteractApproachOffset is how far short of an owned summon the
-	// owner's interact approach stops. A click from within this offset plus
-	// both bodies' collision radii skips the walk.
-	summonInteractApproachOffset = 100
-	// summonInteractRange is the interaction distance: the gate every
-	// interact re-checks before the status window opens, and the distance
-	// the owner is shown facing the summon from.
-	summonInteractRange = 150
+	// interactApproachOffset is how far short of an interact target the
+	// approach walk stops. A click from within this offset plus both bodies'
+	// collision radii skips the walk.
+	interactApproachOffset = 100
+	// interactionDistance is the interaction distance: the gate every
+	// interact re-checks before the target is acted on, and the distance
+	// the player is shown facing the target from.
+	interactionDistance = 150
 )
 
 // actOnSummon answers a click on an already-selected summon and reports
@@ -363,7 +368,7 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 		if ctrl {
 			l.attackLiveTarget(live, s, shift)
 		} else {
-			l.showOwnedPetStatus(live, s, shift)
+			l.tryToInteract(live, s, shift)
 		}
 		return true
 	}
@@ -375,40 +380,66 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 	return true
 }
 
-// petInteractIntention is an owner's interact with its own summon queued
-// behind a swing or a cast.
-type petInteractIntention struct {
-	pet   *summon.Actor
-	shift bool
+// actOnFolk answers a click on an already-selected civilian NPC and
+// reports whether target was one. A forced click attacks it, since another
+// creature may always attack it by force; any other click talks to it.
+func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
+	f, ok := target.(*npc.Folk)
+	if !ok || live == nil {
+		return false
+	}
+	if ctrl {
+		// A civilian NPC is not a combatant yet, so the attack answers
+		// ActionFailed (#2664).
+		l.attackLiveTarget(live, f, shift)
+		return true
+	}
+	l.tryToInteract(live, f, shift)
+	return true
 }
 
-// showOwnedPetStatus is the owner's interact with its own summon: the
-// status window, after an approach walk when out of range. An owner that
-// cannot take AI actions is only answered ActionFailed. One still swinging
-// or casting queues the interact for that to end, answered ActionFailed
-// too. Otherwise the interact replaces the current intention, an attack
-// waiting out a bow's reuse or chasing its target included, and runs now.
-func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor, shift bool) {
+// interactTarget is what a player's interact intention walks to and acts
+// on: the player's own summon, whose status window opens, or a civilian
+// NPC, whose chat window opens.
+type interactTarget interface {
+	world.Tracked
+	Position() (x, y, z int)
+	CollisionRadius() float64
+}
+
+// interactIntention is an interact queued behind a swing or a cast.
+type interactIntention struct {
+	target interactTarget
+	shift  bool
+}
+
+// tryToInteract is the player's interact with target, after an approach
+// walk when out of range. A player that cannot take AI actions is only
+// answered ActionFailed. One still swinging or casting queues the interact
+// for that to end, answered ActionFailed too. Otherwise the interact
+// replaces the current intention, an attack waiting out a bow's reuse or
+// chasing its target included, and runs now.
+func (l *GameClientLink) tryToInteract(live *livePlayer, target interactTarget, shift bool) {
 	if live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	if (live.attack != nil && live.attack.AttackingNow()) || live.CastingNow() {
-		live.deferPetInteract(pet, shift)
+		live.deferInteract(target, shift)
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	replaceWithPetInteract(live)
-	l.thinkOwnedPetInteract(live, pet, shift)
+	replaceWithInteract(live)
+	l.thinkInteract(live, target, shift)
 }
 
-// replaceWithPetInteract makes the owner's interact with its summon the
-// current intention: the attack intention is dropped, every parked approach
-// or queued intention (a pickup, a cast, a follow, a use-item, another pet
-// interact) goes with it, and every follow task, an attack chase or a
-// friendly follow, is cancelled. A walk under way is left to the interact's
-// think, which walks elsewhere or stops it.
-func replaceWithPetInteract(live *livePlayer) {
+// replaceWithInteract makes the interact the current intention: the attack
+// intention is dropped, every parked approach or queued intention (a
+// pickup, a cast, a follow, a use-item, another interact) goes with it, and
+// every follow task, an attack chase or a friendly follow, is cancelled. A
+// walk under way is left to the interact's think, which walks elsewhere or
+// stops it.
+func replaceWithInteract(live *livePlayer) {
 	if live.combat != nil {
 		live.combat.Replace()
 	}
@@ -418,112 +449,136 @@ func replaceWithPetInteract(live *livePlayer) {
 	}
 }
 
-// endPetInteractIdle ends the owner's interact with its summon idle: a walk
-// still under way stops, broadcast as StopMove.
-func endPetInteractIdle(live *livePlayer) {
+// endInteractIdle ends the interact idle: a walk still under way stops,
+// broadcast as StopMove.
+func endInteractIdle(live *livePlayer) {
 	if live.move != nil {
 		live.move.Stop()
 	}
 }
 
-// finishDeferredPetInteract runs the summon interact queued as the next
-// intention, if any, and reports whether one was waiting. It replaces the
-// attack intention; a summon that left the world or changed owner meanwhile
-// ends it with ActionFailed. During a sit-down or stand-up the interact
-// stays queued for PostureSettled.
-func (l *GameClientLink) finishDeferredPetInteract(live *livePlayer) bool {
+// interactTargetLost reports whether target can no longer be interacted
+// with: it left the world, or, for a summon, is no longer live's own.
+func (l *GameClientLink) interactTargetLost(live *livePlayer, target interactTarget) bool {
+	if l.resolveTarget(target.ObjectID()) != world.Tracked(target) {
+		return true
+	}
+	if pet, ok := target.(*summon.Actor); ok {
+		return pet.OwnerID() != live.ObjectID()
+	}
+	return false
+}
+
+// finishDeferredInteract runs the interact queued as the next intention, if
+// any, and reports whether one was waiting. It replaces the attack
+// intention; a target lost meanwhile ends it with ActionFailed. During a
+// sit-down or stand-up the interact stays queued for PostureSettled.
+func (l *GameClientLink) finishDeferredInteract(live *livePlayer) bool {
 	if live == nil || live.detached() {
 		return false
 	}
 	if inPostureTransition(live) {
-		return live.hasDeferredPetInteract()
+		return live.hasDeferredInteract()
 	}
-	queued := live.takeDeferredPetInteract()
+	queued := live.takeDeferredInteract()
 	if queued == nil {
 		return false
 	}
-	replaceWithPetInteract(live)
-	if l.resolveTarget(queued.pet.ObjectID()) != world.Tracked(queued.pet) || queued.pet.OwnerID() != live.ObjectID() {
+	replaceWithInteract(live)
+	if l.interactTargetLost(live, queued.target) {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		endPetInteractIdle(live)
+		endInteractIdle(live)
 		return true
 	}
-	l.thinkOwnedPetInteract(live, queued.pet, queued.shift)
+	l.thinkInteract(live, queued.target, queued.shift)
 	return true
 }
 
-// thinkOwnedPetInteract runs one think of the owner's interact with its own
-// summon, on the click and again when an approach walk arrives. It always
-// releases the pending client action first; PetStatusShow alone leaves that
-// action outstanding and locks further input. An owner that cannot act,
-// sits, flies, runs a private store or trades gets nothing more. Out of
-// approach range, a movable owner walks toward the summon unless shift is
-// held. In range, the owner still inside interaction distance faces the
-// summon and gets its status window. Every outcome but the approach walk,
-// or an owner that cannot move holding the interact, ends it idle.
-func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Actor, shift bool) {
+// thinkInteract runs one think of the interact with target, on the click
+// and again when an approach walk arrives. It always releases the pending
+// client action first; PetStatusShow alone leaves that action outstanding
+// and locks further input. A player that cannot act, sits, flies, runs a
+// private store or trades gets nothing more. Out of approach range, a
+// movable player walks toward the target unless shift is held. In range,
+// the player still inside interaction distance faces the target and acts
+// on it. Every outcome but the approach walk, or a player that cannot move
+// holding the interact, ends it idle.
+func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {
-		endPetInteractIdle(live)
+		endInteractIdle(live)
 		return
 	}
-	if !summonInRange(live, pet, int(summonInteractApproachOffset+live.CollisionRadius()+pet.CollisionRadius())) {
+	if !interactInRange(live, target, int(interactApproachOffset+live.CollisionRadius()+target.CollisionRadius())) {
 		if shift {
-			endPetInteractIdle(live)
+			endInteractIdle(live)
 			return
 		}
 		if live.move == nil || live.MovementDisabled() {
 			return
 		}
-		live.setPetInteract(pet)
-		if !live.move.MoveToPawn(pet, summonInteractApproachOffset) {
-			live.takePetInteract()
+		live.setInteract(target)
+		if !live.move.MoveToPawn(target, interactApproachOffset) {
+			live.takeInteract()
 			return
 		}
-		live.Character.SetHeading(live.move.Position().HeadingTo(petLocation(pet)))
+		live.Character.SetHeading(live.move.Position().HeadingTo(targetLocation(target)))
 		return
 	}
-	if !l.playerCanDoInteract(live, pet) {
-		endPetInteractIdle(live)
+	if !l.playerCanDoInteract(live, target) {
+		endInteractIdle(live)
 		return
 	}
+	// A moving NPC target is answered StopMove instead; no interact target
+	// moves yet.
 	at := live.CurrentLocation()
-	live.Character.SetHeading(at.HeadingTo(petLocation(pet)))
+	live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMoveToPawn(live.ObjectID(), pet.ObjectID(), summonInteractRange, at)
+		return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID(), interactionDistance, at)
 	})
-	live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
-	endPetInteractIdle(live)
+	l.onInteract(live, target)
+	endInteractIdle(live)
 }
 
-func petLocation(pet *summon.Actor) location.Location {
-	x, y, z := pet.Position()
+// onInteract acts on an interact target in reach: the player's own summon
+// shows its status window, a civilian NPC talks.
+func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
+	switch t := target.(type) {
+	case *summon.Actor:
+		live.SendFrame(serverpackets.FramePetStatusShow(t.SummonType()))
+	case *npc.Folk:
+		l.talkToFolk(live, t)
+	}
+}
+
+func targetLocation(target interactTarget) location.Location {
+	x, y, z := target.Position()
 	return location.Location{X: x, Y: y, Z: z}
 }
 
-func summonInRange(live *livePlayer, pet *summon.Actor, radius int) bool {
+func interactInRange(live *livePlayer, target interactTarget, radius int) bool {
 	lx, ly, lz := live.Position()
-	px, py, pz := pet.Position()
-	return location.In3DRadius(lx, ly, lz, px, py, pz, radius)
+	tx, ty, tz := target.Position()
+	return location.In3DRadius(lx, ly, lz, tx, ty, tz, radius)
 }
 
-// finishPetInteract thinks the interact an approach walk started by
-// thinkOwnedPetInteract holds again, once the walk arrives (the Arrived
-// event from its move.Controller) or an equip toggle mid-walk replaced it:
-// the owner or pet may have moved meanwhile, so every gate runs again, and a
-// summon out of approach range is approached anew. A summon that left the
-// world or changed owner ends the interact idle, stopping a walk under way.
-func (l *GameClientLink) finishPetInteract(live *livePlayer) {
-	pet := live.takePetInteract()
-	if pet == nil {
+// finishInteract thinks the interact an approach walk started by
+// thinkInteract holds again, once the walk arrives (the Arrived event from
+// its move.Controller) or an equip toggle mid-walk replaced it: the player
+// or target may have moved meanwhile, so every gate runs again, and a
+// target out of approach range is approached anew. A target lost meanwhile
+// ends the interact idle, stopping a walk under way.
+func (l *GameClientLink) finishInteract(live *livePlayer) {
+	target := live.takeInteract()
+	if target == nil {
 		return
 	}
-	if l.resolveTarget(pet.ObjectID()) != world.Tracked(pet) || pet.OwnerID() != live.ObjectID() {
+	if l.interactTargetLost(live, target) {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		endPetInteractIdle(live)
+		endInteractIdle(live)
 		return
 	}
-	l.thinkOwnedPetInteract(live, pet, false)
+	l.thinkInteract(live, target, false)
 }
 
 // onPlayerArrivedBlocked is the player blocked-arrival arm: INTERACT in
@@ -538,15 +593,15 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		pos := live.move.Position()
 		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
 	}
-	if pet := live.takePetInteract(); pet != nil {
+	if target := live.takeInteract(); target != nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		if !l.playerCanDoInteract(live, pet) {
+		if !l.playerCanDoInteract(live, target) {
 			return false
 		}
 		live.BroadcastStop()
-		// onInteract has no world-presence check: PetStatusShow uses the
-		// snapshot summon even if it has already left the world.
-		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
+		// onInteract has no world-presence check: a summon's PetStatusShow
+		// uses the snapshot summon even if it has already left the world.
+		l.onInteract(live, target)
 		return true
 	}
 	magic, itemCast := live.takeDeferredMagicSkill(), live.takeDeferredItemAICast()
@@ -567,12 +622,12 @@ func (l *GameClientLink) playerCanAttemptInteract(live *livePlayer) bool {
 
 // playerCanDoInteract is the interact attempt gate plus the 150 3D
 // interaction distance. Blocked INTERACT uses this as the single
-// StopMove+PetStatusShow gate.
-func (l *GameClientLink) playerCanDoInteract(live *livePlayer, pet *summon.Actor) bool {
-	if live == nil || pet == nil || !l.playerCanAttemptInteract(live) {
+// StopMove+onInteract gate.
+func (l *GameClientLink) playerCanDoInteract(live *livePlayer, target interactTarget) bool {
+	if live == nil || target == nil || !l.playerCanAttemptInteract(live) {
 		return false
 	}
-	return summonInRange(live, pet, summonInteractRange)
+	return interactInRange(live, target, interactionDistance)
 }
 
 // requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
@@ -690,6 +745,9 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 		live.SendFrame(serverpackets.FrameStatusUpdate(target.ObjectID(), attrs))
 	}
 	l.broadcastTargetSelected(live, target)
+	if f, ok := target.(*npc.Folk); ok {
+		live.currentFolk.Store(f)
+	}
 	return true
 }
 
@@ -730,6 +788,7 @@ func (l *GameClientLink) announceTargetCleared(live *livePlayer, old world.Track
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if old != nil {
 		l.broadcastTargetUnselected(live)
+		live.currentFolk.Store(nil)
 	}
 }
 
@@ -973,6 +1032,8 @@ func targetLevel(target world.Tracked) int {
 		if t.Instance != nil && t.Instance.Template != nil {
 			return t.Instance.Template.Level
 		}
+	case *npc.Folk:
+		return t.Level()
 	case *summon.Actor:
 		return t.Level()
 	}

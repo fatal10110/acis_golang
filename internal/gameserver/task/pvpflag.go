@@ -52,10 +52,7 @@ func DefaultPvPFlagOptions() PvPFlagOptions {
 
 var unsupportedPvPFlagKeys = []string{
 	"CanGMDropEquipment",
-	"KarmaPlayerCanShop",
 	"KarmaPlayerCanTrade",
-	"KarmaPlayerCanUseGK",
-	"KarmaPlayerCanUseWareHouse",
 	"ListOfNonDroppableItemsForPK",
 	"ListOfPetItems",
 	"MinimumPKRequiredToDrop",
