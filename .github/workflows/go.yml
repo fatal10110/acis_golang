@@ -111,9 +111,16 @@ jobs:
         if: matrix.shard.name == 'rest'
         run: go test -race -tags simdebug ./internal/gameserver/sim/...
 
+      # Go skips writing an output it already holds byte for byte, so an
+      # action entry written this run can name an output file left backdated;
+      # keep the output of every kept entry before dropping the rest.
       - name: Drop Go cache entries this run did not use
         if: github.event_name == 'push'
-        run: find ~/.cache/go-build -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
+        run: |
+          cd ~/.cache/go-build
+          find . -type f -name '*-a' -newer "$RUNNER_TEMP/go-cache-start" \
+            -exec awk '{print substr($3, 1, 2) "/" $3 "-d"}' {} + | xargs -r touch -c
+          find . -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
 
       # Only main saves, so every branch can restore it.
       - name: Save Go cache
