@@ -89,9 +89,6 @@ func TestWeaponUseItemDropsGroundCastApproach(t *testing.T) {
 			if at := log.index(isSystemMessage(serverpackets.SystemMessageS1Equipped)); at < 0 {
 				t.Fatal("no S1_EQUIPPED for the mid-walk sword")
 			}
-			if at := log.index(isSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped)); at >= 0 {
-				t.Fatalf("DIST_TOO_FAR_CASTING_STOPPED at frame %d with no cast intention left", at)
-			}
 			if srv.PlayerCastingNow(t, objID) {
 				t.Fatal("casting after the arrival")
 			}
@@ -102,5 +99,53 @@ func TestWeaponUseItemDropsGroundCastApproach(t *testing.T) {
 				t.Fatalf("right hand after the arrival = %v, want the sword", worn)
 			}
 		})
+	}
+}
+
+// TestWeaponUseItemDropsBlockedGroundCastApproach toggles a sword on while
+// walking toward a signet point, then closes the path before arrival
+// (#2815).
+//
+// Reference: the toggle leaves USE_ITEM current (see
+// TestWeaponUseItemDropsGroundCastApproach), so PlayerAI.onEvtArrivedBlocked
+// (PlayerAI.java:68-97) skips the CAST arm (90-94) and its
+// DIST_TOO_FAR_CASTING_STOPPED; the base CreatureAI.onEvtArrivedBlocked
+// (CreatureAI.java:72-75) still broadcasts the same-cell MoveToLocation.
+func TestWeaponUseItemDropsBlockedGroundCastApproach(t *testing.T) {
+	t.Parallel()
+	geo := &gameservertest.GateGeo{}
+	srv := bootBlockedGroundCastOffline(t, geo)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	sword := srv.GiveItem(t, objID, approachSwordID, 1)
+	startInWorld(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(200, 20, 30, 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "cast approach")
+
+	c.Send(encodeSignetUseItem(sword))
+	srv.Settle(t)
+	drainUntilQuiet(t, c)
+	if worn := srv.PlayerInventory(t, objID).ItemAt(itemcontainer.RHand); worn == nil || worn.ObjectID != sword {
+		t.Fatalf("right hand after the mid-walk UseItem = %v, want the sword", worn)
+	}
+
+	advanced := srv.TickPlayerBlocked(t, objID, geo)
+	log := readFrameLog(c)
+	if at := log.index(isSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped)); at >= 0 {
+		t.Fatalf("DIST_TOO_FAR_CASTING_STOPPED at frame %d after the toggle replaced the cast approach", at)
+	}
+	if at := log.index(func(frame []byte) bool { return frame[0] == serverpackets.OpcodeMagicSkillUse }); at >= 0 {
+		t.Fatalf("MagicSkillUse at frame %d after the blocked walk", at)
+	}
+	at := log.index(func(frame []byte) bool { return frame[0] == serverpackets.OpcodeMoveToLocation })
+	if at < 0 {
+		t.Fatal("no same-cell MoveToLocation correction for the blocked walk")
+	}
+	objectID, dest, origin := gameservertest.ReadMoveToLocationCoords(t, log[at])
+	if objectID != objID || dest != advanced || origin != advanced {
+		t.Fatalf("MoveToLocation object/dest/origin = %d/%+v/%+v, want %d/%+v/%+v", objectID, dest, origin, objID, advanced, advanced)
+	}
+	if worn := srv.PlayerInventory(t, objID).ItemAt(itemcontainer.RHand); worn == nil || worn.ObjectID != sword {
+		t.Fatalf("right hand after the blocked walk = %v, want the sword", worn)
 	}
 }
