@@ -108,6 +108,28 @@ func TestMidSwingCastableRequestWaitsForTheSwing(t *testing.T) {
 	srv.AdvanceUntil(t, "queued cast start", func() bool { return srv.PlayerCastingNow(t, objID) })
 }
 
+// TestThinkMidSwingLeavesQueuedCastWaiting pins the THINK's guard (#2925):
+// a request queued behind the swing in flight is the next intention, not a
+// cast approach, so a THINK starts nothing and answers nothing; the swing's
+// end still starts it.
+func TestThinkMidSwingLeavesQueuedCastWaiting(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootMidSwing(t)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+
+	c.Send(encodeRequestMagicSkillUse(midSwingSkillID, false, false))
+	assertFrameOpcode(t, mustRead(t, c, "queued ActionFailed"), serverpackets.OpcodeActionFailed, "queued ActionFailed")
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
+	srv.Settle(t)
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("THINK started the cast queued behind the swing")
+	}
+	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+		t.Fatalf("frame %#x for the THINK mid-swing, want none", frame[0])
+	}
+	srv.AdvanceUntil(t, "queued cast start", func() bool { return srv.PlayerCastingNow(t, objID) })
+}
+
 func toggleOn(pc *player.Character) bool {
 	_, on := pc.EffectList().ActiveBySkillID(midSwingToggleID)
 	return on

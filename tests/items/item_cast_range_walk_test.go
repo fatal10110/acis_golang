@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -87,6 +88,42 @@ func TestUseItemSkillOutOfRangeWalksThenCasts(t *testing.T) {
 		t.Fatalf("MagicSkillUse = caster %d target %d skill %d, want %d/%d/2236", caster, target, skillID, objID, hostileID)
 	}
 	drainUntilQuiet(t, c)
+	assertItemCount(t, srv, objID, key, 2)
+}
+
+// TestThinkMidItemCastApproachWalksOnAfresh pins a THINK on an item cast's
+// approach (#2925) running PlayerAI.thinkCast (PlayerAI.java:219-) as the
+// arrival does: a fresh MoveToPawn to the monster at the cast range, no
+// ActionFailed, the key still unspent; the arrival casts it and spends one
+// key.
+func TestThinkMidItemCastApproachWalksOnAfresh(t *testing.T) {
+	t.Parallel()
+	srv, c, objID, key, hostileID, _ := itemCastApproach(t, nil)
+	srv.Advance(t, 500*time.Millisecond)
+	drainUntilQuiet(t, c)
+
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
+	srv.Settle(t)
+	walk := c.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToPawn, "fresh item cast approach MoveToPawn")
+	r := wire.NewReader(walk[1:])
+	if obj, target, distance := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); obj != objID || target != hostileID || distance != 400 {
+		t.Fatalf("fresh MoveToPawn = object %d target %d distance %d, want %d/%d/400", obj, target, distance, objID, hostileID)
+	}
+	assertItemCount(t, srv, objID, key, 3)
+
+	casts := 0
+	for _, frame := range readFramesFor(t, srv, c, 20*time.Second) {
+		switch frame[0] {
+		case serverpackets.OpcodeActionFailed:
+			t.Fatal("ActionFailed after the THINK on the item cast approach")
+		case serverpackets.OpcodeMagicSkillUse:
+			casts++
+		}
+	}
+	if casts != 1 {
+		t.Fatalf("MagicSkillUse frames = %d, want 1: the arrival casts the key once", casts)
+	}
 	assertItemCount(t, srv, objID, key, 2)
 }
 
