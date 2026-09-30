@@ -173,6 +173,104 @@ func TestConnAbortsStalledReaderAtHighWater(t *testing.T) {
 	}
 }
 
+// gatedWriteConn parks every Write until proceed is closed, announcing each
+// one on entered, and counts Close calls reaching the socket.
+type gatedWriteConn struct {
+	net.Conn
+	entered chan struct{}
+	proceed chan struct{}
+	closes  atomic.Int64
+}
+
+func (g *gatedWriteConn) Write(p []byte) (int, error) {
+	select {
+	case g.entered <- struct{}{}:
+	default:
+	}
+	<-g.proceed
+	return g.Conn.Write(p)
+}
+
+// SetWriteDeadline succeeds the way a TCP socket whose peer left still does.
+// Without this, net.Pipe rejects the deadline once its peer is closed, which
+// would also stop the writer. Stubbing it means only the parked Write can fail.
+func (g *gatedWriteConn) SetWriteDeadline(time.Time) error { return nil }
+
+func (g *gatedWriteConn) Close() error {
+	g.closes.Add(1)
+	return g.Conn.Close()
+}
+
+// When a write fails because the peer went away, the writer tears the
+// connection down on its own — no Close needed: the frame being written and
+// every frame queued behind it are released exactly once, the socket is
+// closed once, later sends fail without blocking,
+// and Close then returns promptly instead of waiting on a dead writer.
+func TestConnWriteErrorClosesConnAndReleasesBacklog(t *testing.T) {
+	server, client := net.Pipe()
+	gated := &gatedWriteConn{Conn: server, entered: make(chan struct{}, 1), proceed: make(chan struct{})}
+	c := newConn(gated, zerolog.Nop())
+
+	var released [4]atomic.Int64
+	if !sendWithin(t, c, countedFrame(t, 16, 0, &released[0])) {
+		t.Fatal("first frame rejected by a healthy connection")
+	}
+	select {
+	case <-gated.entered:
+	case <-time.After(time.Second):
+		t.Fatal("writer never started writing the first frame")
+	}
+	// The writer is parked inside the first write, so these stay queued.
+	for seq := uint32(1); seq <= 2; seq++ {
+		if !sendWithin(t, c, countedFrame(t, 16, seq, &released[seq])) {
+			t.Fatalf("frame %d rejected while the first write was still in flight", seq)
+		}
+	}
+
+	// The peer disconnects, so the parked write fails with io.ErrClosedPipe.
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	close(gated.proceed)
+
+	select {
+	case <-c.stopped:
+	case <-time.After(time.Second):
+		t.Fatal("writer did not stop after its write failed")
+	}
+	for seq := range 3 {
+		if got := released[seq].Load(); got != 1 {
+			t.Fatalf("frame %d released %d times after the write error, want 1", seq, got)
+		}
+	}
+	if got := gated.closes.Load(); got != 1 {
+		t.Fatalf("socket closed %d times by the failed writer, want 1", got)
+	}
+
+	if sendWithin(t, c, countedFrame(t, 16, 3, &released[3])) {
+		t.Fatal("SendFrame after the write error accepted, want false")
+	}
+	if got := released[3].Load(); got != 1 {
+		t.Fatalf("rejected frame released %d times, want 1", got)
+	}
+
+	for i := range 2 {
+		closed := make(chan error, 1)
+		go func() { closed <- c.Close() }()
+		select {
+		case err := <-closed:
+			if err != nil {
+				t.Fatalf("Close %d: %v", i, err)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("Close %d blocked after the writer exited on a write error", i)
+		}
+	}
+	if got := gated.closes.Load(); got != 1 {
+		t.Fatalf("socket closed %d times after Close, want 1", got)
+	}
+}
+
 // Tiny frames are charged the buffer and queue slot they pin, not just their
 // wire bytes, so a stalled reader flooded with 3-byte replies is cut off at
 // the same memory bound as one fed large frames. Each frame here is a grown

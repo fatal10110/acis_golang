@@ -615,6 +615,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,
 			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
 			InventorySlots:         l.playerConfig.InventorySlots,
+			StorageSlots:           l.playerConfig.StorageSlots,
 			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
 			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,
 			DeathPenaltyChance:     l.playerConfig.DeathPenaltyChance,

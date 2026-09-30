@@ -101,6 +101,7 @@ func provideGameClientLink(
 		AutoLearnSkills:          bool(gameplay.AutoLearnSkills),
 		WeightLimitMultiplier:    float64(gameplay.WeightLimitMultiplier),
 		InventorySlots:           gameplay.InventorySlots,
+		StorageSlots:             gameplay.StorageSlots,
 		KarmaPlayerCanTeleport:   bool(gameplay.KarmaPlayerCanTeleport),
 		AwardPKKillPVPPoint:      pvpOptions.AwardPKKillPVPPoint,
 		AllowWater:               cfg.AllowWater,

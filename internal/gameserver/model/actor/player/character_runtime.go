@@ -200,6 +200,7 @@ type Rules struct {
 	RespawnRestoreHP       float64
 	WeightLimitMultiplier  float64
 	InventorySlots         InventorySlots
+	StorageSlots           StorageSlots
 	PerfectShieldBlockRate int
 	MaxBuffsAmount         int
 	DeathPenaltyChance     int
@@ -241,6 +242,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.respawnRestoreHP = rt.Rules.RespawnRestoreHP
 	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
 	c.inventorySlots = rt.Rules.InventorySlots
+	c.storageSlots = rt.Rules.StorageSlots
 	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
 	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount
 	c.deathPenaltyChance = rt.Rules.DeathPenaltyChance

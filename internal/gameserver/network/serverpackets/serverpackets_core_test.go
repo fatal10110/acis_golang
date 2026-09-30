@@ -788,15 +788,56 @@ func TestFrameExStorageMaxCount(t *testing.T) {
 	got := framePayload(t, FrameExStorageMaxCount(&player.Character{Race: player.RaceDwarf}))
 	want := []byte{OpcodeExtended}
 	want = appendH(want, OpcodeExStorageMaxCount)
-	want = appendD(want, 100) // MaximumSlotsForDwarf default
-	want = appendD(want, warehouseSlotsDwarf)
-	want = appendD(want, freightSlots)
-	want = appendD(want, privateStoreSlotsDwarf)
-	want = appendD(want, privateStoreSlotsDwarf)
-	want = appendD(want, dwarfRecipeLimit)
-	want = appendD(want, commonRecipeLimit)
+	want = appendD(want, 100) // MaximumSlotsForDwarf
+	want = appendD(want, 120) // MaximumWarehouseSlotsForDwarf
+	want = appendD(want, 20)  // MaximumFreightSlots
+	want = appendD(want, 5)   // MaxPvtStoreSlotsDwarf (sell)
+	want = appendD(want, 5)   // MaxPvtStoreSlotsDwarf (buy)
+	want = appendD(want, 50)  // DwarfRecipeLimit
+	want = appendD(want, 50)  // CommonRecipeLimit
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameExStorageMaxCount() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameExStorageMaxCountFollowsConfigAndLimitStats pins every field to
+// its configured base for the character's race plus its own limit stat,
+// truncated, in the reference field order.
+func TestFrameExStorageMaxCountFollowsConfigAndLimitStats(t *testing.T) {
+	slots := player.StorageSlots{
+		WarehouseNoDwarf: 11, WarehouseDwarf: 12, Freight: 13,
+		PrivateStoreNoDwarf: 14, PrivateStoreDwarf: 15,
+		DwarfRecipe: 16, CommonRecipe: 17, Configured: true,
+	}
+	mods := []effect.Mod{
+		{Stat: stat.WhLim, Op: effect.OpAdd, Value: 1.9},
+		{Stat: stat.FreightLim, Op: effect.OpAdd, Value: 2},
+		{Stat: stat.PSellLim, Op: effect.OpAdd, Value: 3},
+		{Stat: stat.PBuyLim, Op: effect.OpAdd, Value: 4},
+		{Stat: stat.RecDLim, Op: effect.OpAdd, Value: 5},
+		{Stat: stat.RecCLim, Op: effect.OpAdd, Value: 6},
+	}
+	for _, tc := range []struct {
+		race player.Race
+		want []int32
+	}{
+		{player.RaceHuman, []int32{90, 12, 15, 17, 18, 21, 23}},
+		{player.RaceDwarf, []int32{117, 13, 15, 18, 19, 21, 23}},
+	} {
+		c := &player.Character{Race: tc.race, Name: "S"}
+		c.Configure(player.Runtime{Rules: player.Rules{
+			InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true},
+			StorageSlots:   slots,
+		}})
+		c.AddStatFuncs(mods)
+		got := framePayload(t, FrameExStorageMaxCount(c))
+		want := appendH([]byte{OpcodeExtended}, OpcodeExStorageMaxCount)
+		for _, v := range tc.want {
+			want = appendD(want, v)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("race %v: FrameExStorageMaxCount() = %x, want %x", tc.race, got, want)
+		}
 	}
 }
 
