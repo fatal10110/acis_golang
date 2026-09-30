@@ -21,6 +21,9 @@ type Inline struct {
 	tasks  []inlineTask
 	timers vtimerHeap
 	seq    uint64
+	// ready holds one token once work may be runnable: a task was posted,
+	// or a timer was armed already due.
+	ready chan struct{}
 }
 
 type inlineTask struct {
@@ -30,7 +33,21 @@ type inlineTask struct {
 
 // NewInline returns an idle loop whose clock reads start.
 func NewInline(start time.Time) *Inline {
-	return &Inline{at: start}
+	return &Inline{at: start, ready: make(chan struct{}, 1)}
+}
+
+// Ready receives once work may be runnable since the last receive: a task
+// was posted, or a timer was armed already due. A runner that finds nothing
+// to do can wait on it instead of polling. Several posts may share one
+// receive, and a receive may find the work already run.
+func (in *Inline) Ready() <-chan struct{} { return in.ready }
+
+// signal leaves a token on ready unless one is already there.
+func (in *Inline) signal() {
+	select {
+	case in.ready <- struct{}{}:
+	default:
+	}
 }
 
 // NewQueue returns an open queue run by in. id names it in logs.
@@ -97,6 +114,7 @@ func (in *Inline) enqueue(q *Queue, fn func()) bool {
 	in.mu.Lock()
 	in.tasks = append(in.tasks, inlineTask{q: q, fn: fn})
 	in.mu.Unlock()
+	in.signal()
 	return true
 }
 
@@ -136,6 +154,9 @@ func (v *vtimer) Reset(d time.Duration) bool {
 	in.seq++
 	v.at, v.seq = in.at.Add(d), in.seq
 	heap.Push(&in.timers, v)
+	if d <= 0 {
+		in.signal()
+	}
 	return armed
 }
 

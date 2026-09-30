@@ -158,3 +158,44 @@ func assertFires[T comparable](t *testing.T, got, want []T) {
 		}
 	}
 }
+
+func TestInlineReadySignalsPostsAndDueTimers(t *testing.T) {
+	in := NewInline(epoch)
+	q := in.NewQueue("q")
+	ready := func() bool {
+		select {
+		case <-in.Ready():
+			return true
+		default:
+			return false
+		}
+	}
+	if ready() {
+		t.Fatal("Ready signalled on an idle loop")
+	}
+
+	q.Post(func() {})
+	q.Post(func() {})
+	if !ready() {
+		t.Fatal("Ready did not signal a posted task")
+	}
+	if ready() {
+		t.Fatal("two posts left two signals, want them coalesced")
+	}
+	in.Run()
+
+	q.After(time.Second, func() {})
+	if ready() {
+		t.Fatal("Ready signalled a timer that is not due")
+	}
+	q.After(0, func() {})
+	if !ready() {
+		t.Fatal("Ready did not signal a timer armed already due")
+	}
+
+	q.Close()
+	q.Post(func() {})
+	if ready() {
+		t.Fatal("Ready signalled a post a closed queue refused")
+	}
+}
