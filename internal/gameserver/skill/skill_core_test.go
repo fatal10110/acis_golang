@@ -402,6 +402,65 @@ func TestUnequipItemStatsOnlyRemovesTheUnequippedInstance(t *testing.T) {
 	}
 }
 
+// TestEquipItemStatsReplacesKnownPassiveAtAnotherLevel pins the item grant
+// of a passive the character already knows at another level: the known
+// level's stat functions leave before the granted level's attach, so the two
+// never stack, and unequipping removes the skill outright.
+func TestEquipItemStatsReplacesKnownPassiveAtAnotherLevel(t *testing.T) {
+	const necklaceTemplateID int32 = 43
+	const passiveID = 310
+	tmpl := &item.Template{
+		ID:             necklaceTemplateID,
+		Kind:           item.KindArmor,
+		Slot:           item.SlotNeck,
+		Armor:          &item.ArmorDetail{Type: item.ArmorLight},
+		AttachedSkills: []item.SkillRef{{ID: passiveID, Level: 2}},
+	}
+	templates := item.NewTable([]*item.Template{tmpl})
+	skills := modelskill.NewTable([]modelskill.Definition{
+		{ID: passiveID, Level: 1, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncAdd, Stat: "mAtk", Value: 8},
+		}},
+		{ID: passiveID, Level: 2, Activation: modelskill.ActivationPassive, Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncAdd, Stat: "mAtk", Value: 13},
+		}},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	p := NewPersistence(nil, skills)
+	ch := &player.Character{ID: 1}
+	baseMAtk := ch.MAtk()
+
+	if err := p.SetKnownSkill(ch, passiveID, 1); err != nil {
+		t.Fatalf("SetKnownSkill() error: %v", err)
+	}
+	if got, want := ch.MAtk(), baseMAtk+8; got != want {
+		t.Fatalf("MAtk() with the level-1 passive learned = %v, want %v", got, want)
+	}
+
+	inst := inv.AddNew(necklaceTemplateID, 1, 100)
+	inv.EquipItem(inst, tmpl)
+	if _, _, err := p.EquipItemStats(ch, inst, tmpl); err != nil {
+		t.Fatalf("EquipItemStats() error: %v", err)
+	}
+	if got := ch.SkillLevel(passiveID); got != 2 {
+		t.Fatalf("SkillLevel(%d) after equip = %d, want 2 (the item's level replaces the known one)", passiveID, got)
+	}
+	if got, want := ch.MAtk(), baseMAtk+13; got != want {
+		t.Fatalf("MAtk() after equip = %v, want %v (level 2 only; level 1 must not stack with it)", got, want)
+	}
+
+	inv.UnequipSlot(inv.ItemByObjectID(inst.ObjectID).Snapshot().LocationData)
+	if !p.UnequipItemStats(ch, inv, inst, tmpl) {
+		t.Fatal("UnequipItemStats() skillsChanged = false, want true")
+	}
+	if got := ch.SkillLevel(passiveID); got != 0 {
+		t.Fatalf("SkillLevel(%d) after unequip = %d, want 0 (the grant removes the skill outright)", passiveID, got)
+	}
+	if got := ch.MAtk(); got != baseMAtk {
+		t.Fatalf("MAtk() after unequip = %v, want base %v", got, baseMAtk)
+	}
+}
+
 func TestEquipItemStatsEnchantFuncReadsLiveEnchantLevel(t *testing.T) {
 	templates := itemStatsTestTemplates()
 	inv := itemcontainer.NewPlayerInventory(1, templates)
