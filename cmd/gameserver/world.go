@@ -77,6 +77,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 	log.Info().
 		Int("live_npcs", npcs.LiveCount()).
+		Int("folk_npcs", npcs.FolkCount()).
 		Int("deferred_territory_spawns", npcs.DeferredCount()).
 		Int("restored_dead_spawns", npcs.RestoredDeadCount()).
 		Int("skipped_non_combat_spawns", npcs.SkippedNonCombatCount()).

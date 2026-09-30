@@ -355,12 +355,11 @@ func (c *Container) insertLocked(inst *item.Instance) {
 // does. count is clamped to at least 1. It returns nil when templateID
 // isn't a loaded template.
 //
-// The Java reference can split a non-stackable count > 1 across several
-// freshly created instances when MULTIPLE_ITEM_DROP is enabled; this
-// always creates exactly one instance instead (a stackable template gets
-// count units on it, a non-stackable one gets a single unit regardless of
-// count) — a deliberate simplification, since that config path only
-// matters for bulk GM item creation.
+// It always creates exactly one instance: a stackable template gets count
+// units on it, a non-stackable one gets a single unit regardless of count.
+// Splitting a non-stackable count > 1 across several freshly created
+// instances under the MultipleItemDrop setting is deliberately not done
+// here, since that path only matters for bulk GM item creation.
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
 	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {

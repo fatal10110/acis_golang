@@ -27,8 +27,8 @@ func isPlayable(a Actor) bool { return a.Kind().Playable() }
 // are held to: an NPC in a peace zone still casts its auras.
 func playableInPeaceZone(caster Actor) bool { return isPlayable(caster) && caster.InPeaceZone() }
 
-// isAttackable reports an attackable NPC.
-func isAttackable(a Actor) bool { return a.Kind() == actor.KindNPC }
+// isAttackable reports an attackable NPC: any NPC but a civilian one.
+func isAttackable(a Actor) bool { return a.Kind() == actor.KindNPC && !a.Folk() }
 
 func areaCanAffect(caster, creature Actor) bool {
 	if isPlayable(caster) && (isAttackable(creature) || isPlayable(creature)) {

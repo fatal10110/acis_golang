@@ -55,9 +55,8 @@ func (d *petInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Inventory
 }
 
 // UpdateInventoryWeight republishes the pet's status (owner PetStatusUpdate,
-// NpcInfo to other watchers) and then the owner's PetInfo window, which
-// carries the new carried weight.
-// TODO(#2524): refresh the pet's weight-penalty band first.
+// NpcInfo to other watchers), after its weight-penalty band refresh, and
+// then the owner's PetInfo window, which carries the new carried weight.
 func (d *petInventoryDelivery) UpdateInventoryWeight(inv *itemcontainer.Inventory) {
 	if pet, _, ok := d.pet(inv); ok {
 		pet.UpdateStatus()

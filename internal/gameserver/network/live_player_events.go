@@ -134,7 +134,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.finishDeferredMagicSkill(live)
 			l.finishDeferredItemAICast(live)
 			l.finishDeferredFollow(live)
-			l.finishDeferredPetInteract(live)
+			l.finishDeferredInteract(live)
 			l.finishDeferredUseItem(live, resumePosture)
 		}
 	case event.ReviveRequested:
@@ -211,7 +211,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 		l.refreshLiveItemStats(live)
 	case event.WeightPenaltyChanged:
-		l.sendLiveWeightPenalty(live)
+		// The login decides the band inside the replay window, where the
+		// burst's own frames carry it.
+		if !live.replayingEffects.Load() {
+			l.sendLiveWeightPenalty(live)
+		}
 	case event.DeathPenaltyChanged:
 		l.applyLiveDeathPenalty(live, e)
 	case event.LevelChanged:
@@ -344,7 +348,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		pos := live.move.Position()
 		l.updateLivePlayerPosition(live, pos, live.CurrentHeading())
 		l.finishLiveGroundPickup(live)
-		l.finishPetInteract(live)
+		l.finishInteract(live)
 		l.finishDeferredMagicSkill(live)
 		l.finishDeferredItemAICast(live)
 		live.thinkAttack()
@@ -470,7 +474,7 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 		l.finishDeferredMagicSkill(live) ||
 		l.finishDeferredItemAICast(live) ||
 		l.finishDeferredFollow(live) ||
-		l.finishDeferredPetInteract(live) ||
+		l.finishDeferredInteract(live) ||
 		l.finishDeferredUseItem(live, resumeAttack)
 }
 
@@ -495,7 +499,7 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if l.finishDeferredFollow(live) {
 		return
 	}
-	if l.finishDeferredPetInteract(live) {
+	if l.finishDeferredInteract(live) {
 		return
 	}
 	if l.finishDeferredUseItem(live, resumeNothing) {

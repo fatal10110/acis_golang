@@ -46,9 +46,9 @@ func (f *Finder) HasPath(origin, target location.Location) bool {
 	return ok
 }
 
-// maxTargetHeightGap mirrors GeoEngine.findPath's reference pre-gate: reject
-// outright when the target's own nearest geodata height lies more than this
-// far from the requested target Z (GeoEngine.java:1771-1773).
+// maxTargetHeightGap is the search pre-gate: reject outright when the
+// target's own nearest geodata height lies more than this far from the
+// requested target Z.
 const maxTargetHeightGap = 500
 
 func (f *Finder) find(dst []location.Location, origin, target location.Location, buildResult bool) ([]location.Location, int, bool) {
@@ -56,8 +56,8 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	if f == nil || f.engine == nil || engine.OutOfWorld(origin.X, origin.Y) || engine.OutOfWorld(target.X, target.Y) {
 		return dst, 0, false
 	}
-	// GeoEngine.findPath rejects outright when either endpoint has no loaded
-	// geodata (GeoEngine.java:1760, 1768), before resolving any height.
+	// Reject outright when either endpoint has no loaded geodata, before
+	// resolving any height.
 	if !f.engine.HasGeo(origin.X, origin.Y) || !f.engine.HasGeo(target.X, target.Y) {
 		return dst, 0, false
 	}
@@ -97,14 +97,13 @@ func (f *Finder) find(dst []location.Location, origin, target location.Location,
 	return path, cost, ok
 }
 
-// collapseWaypoints mirrors GeoEngine.findPath's post-search smoothing
-// (GeoEngine.java:1775-1846): a single forward pass over the returned
-// waypoints that drops waypoint B whenever a straight move from the current
-// anchor (starting at origin) reaches the following waypoint C directly,
-// with no distance cap on the CanMove check. The anchor only advances to B
-// when B is kept; on a successful skip it stays put so a chain of mutually
-// visible points can collapse across more than one removal. The final
-// waypoint (the target) is never subject to removal.
+// collapseWaypoints is the post-search smoothing: a single forward pass
+// over the returned waypoints that drops waypoint B whenever a straight move
+// from the current anchor (starting at origin) reaches the following
+// waypoint C directly, with no distance cap on the CanMove check. The
+// anchor only advances to B when B is kept; on a successful skip it stays
+// put so a chain of mutually visible points can collapse across more than
+// one removal. The final waypoint (the target) is never subject to removal.
 func (f *Finder) collapseWaypoints(originX, originY, originZ int, path []location.Location) []location.Location {
 	ax, ay, az := originX, originY, originZ
 	j := 0
@@ -327,10 +326,9 @@ func (s *searchScratch) newNode(gx, gy, z int) *node {
 	return &s.nodes[len(s.nodes)-1]
 }
 
-// cardinalSteps mirrors the reference PathFinder's four addDirectionalNode
-// calls: N, S, W, E, in that order. Corner (diagonal) gating below indexes
-// into this array by direction, matching addCornerNode's directionFlagX/Y
-// parameters.
+// cardinalSteps are the four straight neighbor expansions: N, S, W, E, in
+// that order. Corner (diagonal) gating below indexes into this array by
+// direction to pick the X and Y flags each diagonal must pass.
 var cardinalSteps = [4]struct {
 	dx, dy int
 	flag   block.NSWE
@@ -350,7 +348,7 @@ const (
 	dirE
 )
 
-// cornerSteps mirrors the reference PathFinder's four addCornerNode calls:
+// cornerSteps are the four diagonal neighbor expansions, in order:
 // NW, NE, SW, SE. xDir/yDir name which cardinalSteps entries supply the
 // mutual-mask gate for this diagonal.
 var cornerSteps = [4]struct {
@@ -400,16 +398,15 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 			continue
 		}
 
-		// Mirrors the reference's extra getNodeNswe(x+dx, y, z) corner
-		// check: a fresh resolve of the X-direction neighbor (same cell and
-		// z as nsweX above, kept as its own call for structural fidelity
-		// with addCornerNode rather than reusing nsweX's value). Provably
-		// value-identical to nsweX given static geodata — this line is only
-		// reachable once nsweX itself came from a successful candidateNSWE
-		// call at this exact cell/z — so it's a candidate for collapsing to
-		// nsweX if profiling ever calls for it; the only behavioral
-		// difference would surface under a door toggling this block mid-
-		// search, which isn't a case the reference itself accounts for.
+		// Extra corner check: a fresh resolve of the X-direction neighbor
+		// (same cell and z as nsweX above, kept as its own call rather than
+		// reusing nsweX's value). Provably value-identical to nsweX given
+		// static geodata — this line is only reachable once nsweX itself
+		// came from a successful candidateNSWE call at this exact cell/z —
+		// so it's a candidate for collapsing to nsweX if profiling ever calls
+		// for it; the only behavioral difference would surface under a door
+		// toggling this block mid-search, which the search does not account
+		// for.
 		xGX, xGY := current.gx+corner.dx, current.gy
 		_, recheckNSWE, ok := f.candidateNSWE(xGX, xGY, z)
 		if !ok || !recheckNSWE.Allows(flagY) {
@@ -458,7 +455,7 @@ func (f *Finder) expandBackward(current, goal *node, seq *int64, scratch *search
 }
 
 // candidateNSWE resolves a candidate cell's own decoded height and NSWE
-// mask, mirroring the reference's getIndexBelow/getHeight/getNswe sequence.
+// mask from the nearest geodata layer at or below z.
 func (f *Finder) candidateNSWE(gx, gy, z int) (height int, nswe block.NSWE, ok bool) {
 	worldX, worldY := engine.WorldX(gx), engine.WorldY(gy)
 	if engine.OutOfWorld(worldX, worldY) {

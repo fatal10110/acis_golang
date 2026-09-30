@@ -183,3 +183,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.UpdateEffectIcons()
 	return true
 }
+
+// Kill runs c's death sequence at once, whatever its HP, crediting killer;
+// see Die.
+func (c *Character) Kill(killer attackable.Combatant) bool { return c.Die(killer) }

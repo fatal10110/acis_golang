@@ -239,12 +239,13 @@ Remaining EnterWorld burst packet gaps:
 - `PledgeSkillList` ([#717](https://github.com/fatal10110/acis_golang/issues/717))
 - `ExMailArrived` ([#718](https://github.com/fatal10110/acis_golang/issues/718))
 - `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
-- `NpcHtmlMessage` ([#720](https://github.com/fatal10110/acis_golang/issues/720))
+- `NpcHtmlMessage` clan notice / server news ([#2951](https://github.com/fatal10110/acis_golang/issues/2951))
 
 `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
-`PledgeSkillList`, `ExMailArrived`, `PlaySound`, `NpcHtmlMessage`, `BuyList`, and `SellList`
-currently have Go frame builders only. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
+`PledgeSkillList`, `ExMailArrived`, `PlaySound`, `BuyList`, and `SellList`
+currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
+(`talkToFolk`, #720), link and help pages, and the arena signboard. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
 frame builders only. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
 `ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
@@ -253,7 +254,6 @@ wired until production owner flows can emit them truthfully.
 
 Missing M3 data/UI server packets:
 
-- `NpcHtmlMessage`
 - `MultiSellList`
 - `BuyList`
 - `SellList`

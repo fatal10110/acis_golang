@@ -27,6 +27,8 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *npc.Decoration:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+	case *npc.Folk:
+		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {
 			o.MarkDiscoveredByOwner()
@@ -174,7 +176,7 @@ type staticObject interface {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, *npc.Decoration, *summon.Actor, groundItemObject, doorObject, staticObject:
+	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject:
 		return true
 	default:
 		return false

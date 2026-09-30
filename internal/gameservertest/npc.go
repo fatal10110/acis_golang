@@ -506,3 +506,39 @@ func (s *Server) installPeaceZone(hostile *npc.Hostile) {
 		return s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
 	})
 }
+
+// FolkTemplate is a fixture civilian NPC template of the given instance
+// kind and template id.
+func FolkTemplate(kind string, npcID int) *npc.Template {
+	return &npc.Template{
+		ID:              npcID,
+		TemplateID:      npcID,
+		Type:            kind,
+		Name:            "Folk",
+		Level:           70,
+		HPMax:           2444,
+		AtkSpd:          253,
+		RunSpeed:        120,
+		WalkSpeed:       50,
+		CON:             43,
+		CollisionRadius: 8,
+		CollisionHeight: 24,
+	}
+}
+
+// SpawnFolkNPCAt places a civilian NPC built from tmpl at at through the
+// production Folk constructor, the way the spawner places one.
+func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location) *npc.Folk {
+	t.Helper()
+	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	inPeace := s.zones != nil && s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
+	f, err := npc.NewFolk(inst, inPeace)
+	if err != nil {
+		t.Fatalf("new folk npc: %v", err)
+	}
+	s.State.Spawn(f, at.X, at.Y, at.Z, 0)
+	return f
+}
