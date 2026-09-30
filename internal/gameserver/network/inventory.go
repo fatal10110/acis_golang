@@ -504,6 +504,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	l.unequipDestroyedItem(live, inv, objectID, count)
 	res, failure := l.inventory.DestroyItemResult(inv, objectID, count)
 	if failure != invops.DestroyOK {
 		return
@@ -512,6 +513,27 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
+}
+
+// unequipDestroyedItem takes a worn item off before a destroy consumes all
+// of it, the way UseItem takes it off: the removal message ahead of the
+// paperdoll change, the weapon's shot charges, the grade penalty refresh,
+// UserInfo/CharInfo and a moved storage limit. A destroy that leaves part
+// of a worn stack behind keeps it worn.
+func (l *GameClientLink) unequipDestroyedItem(live *livePlayer, inv *itemcontainer.Inventory, objectID int32, count int) {
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return
+	}
+	st := inst.Snapshot()
+	if !st.Equipped() || st.Count > count {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(st.TemplateID)
+	if !ok {
+		return
+	}
+	l.toggleEquipItem(live, inv, inst, tmpl, false)
 }
 
 // crystallizeLiveItem answers RequestCrystallizeItem. A player running a
