@@ -113,7 +113,7 @@ func TestTrimControlBytes(t *testing.T) {
 
 // encryptBlock RSA-encrypts a full-size block with no padding scheme,
 // mirroring how the client encrypts the credential block: c = m^e mod n.
-func encryptBlock(t *testing.T, pub *rsa.PublicKey, plaintext []byte) []byte {
+func encryptBlock(t testing.TB, pub *rsa.PublicKey, plaintext []byte) []byte {
 	t.Helper()
 	m := new(big.Int).SetBytes(plaintext)
 	c := new(big.Int).Exp(m, big.NewInt(int64(pub.E)), pub.N)
