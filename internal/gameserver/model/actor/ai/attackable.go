@@ -38,6 +38,9 @@ const ootSweepPeriod = 10 * time.Second
 type AttackableActor interface {
 	attackable.Combatant
 	DenyAIAction() bool
+	// OutOfControl reports whether the actor cannot choose a new intention:
+	// DenyAIAction or confused. Desire selection waits while it holds.
+	OutOfControl() bool
 	PhysicalAttackRange() int
 	ReturnHome() bool
 	InTerritory() bool
@@ -675,12 +678,15 @@ const (
 	// ending or a control effect ending; it never selects a desire and
 	// never idles on an empty queue.
 	thinkContinue thinkMode = iota
-	// thinkEvent re-runs desire selection on an event: a swing finishing,
-	// the hit animation ending, a bow shot, a completed cast or a first
-	// attack desire.
+	// thinkEvent re-runs desire selection on an event: the hit animation
+	// ending, a bow shot, a completed cast or a first attack desire.
 	thinkEvent
 	// thinkTick is the periodic AI cycle.
 	thinkTick
+	// thinkAttackFinished is a swing finishing: desire selection as on an
+	// event, then, for an out-of-control actor that selects nothing, the
+	// continue pass the finished attack's think falls back to.
+	thinkAttackFinished
 )
 
 // Think advances the current intention once, for a bow's reuse ending and
@@ -696,9 +702,10 @@ func (a *Attackable) Think() error {
 }
 
 // RunAI re-runs desire selection on an event. After the first periodic
-// cycle, a controllable actor that is not casting, has an empty desire
-// queue and is not idle aborts everything and goes idle; otherwise it
-// makes the heaviest queued desire current and steps it.
+// cycle, an actor that is not casting, has an empty desire queue and is
+// not idle aborts everything and goes idle; otherwise it makes the
+// heaviest queued desire current and steps it. An out-of-control actor
+// does neither.
 func (a *Attackable) RunAI() error {
 	return a.think(thinkEvent)
 }
@@ -706,9 +713,19 @@ func (a *Attackable) RunAI() error {
 // TickThink is the periodic AI cycle. Empty-queue idle abort runs after
 // the first cycle and does not promote a follow or wander queued in that
 // same cycle. Promotion itself also waits for that first cycle unless an
-// ATTACK desire is already queued, and is skipped while a cast is in flight.
+// ATTACK desire is already queued, and is skipped while a cast is in flight
+// or the actor is out of control.
 func (a *Attackable) TickThink() error {
 	return a.think(thinkTick)
+}
+
+// AttackFinished is a swing finishing: RunAI's desire selection, followed
+// by the finished attack's think. An in-control actor's selection already
+// stepped the current intention, so only an out-of-control one, which
+// selects nothing, takes that think as a continue pass: a confused actor
+// keeps swinging at its current target while a stunned one does nothing.
+func (a *Attackable) AttackFinished() error {
+	return a.think(thinkAttackFinished)
 }
 
 // ClearCurrentDesire drops the queued desire matching the current intention,
@@ -746,12 +763,16 @@ func (a *Attackable) think(mode thinkMode) error {
 		a.ticked = false
 	}
 	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
+	outOfControl := a.actor.OutOfControl()
 	a.refreshCombatMemory()
-	a.pruneDesires()
-	if mode == thinkEvent && a.idleOnEmptyQueue() {
+	a.pruneDesires(outOfControl)
+	onEvent := mode == thinkEvent || mode == thinkAttackFinished
+	if onEvent && !outOfControl && a.idleOnEmptyQueue() {
 		return nil
 	}
-	a.dropCurrentIfUnqueued(mode)
+	if !outOfControl {
+		a.dropCurrentIfUnqueued(mode)
+	}
 	canPromote := a.canPromote(updateTick, instantRun)
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
@@ -780,6 +801,21 @@ func (a *Attackable) think(mode thinkMode) error {
 			return nil
 		}
 	}
+	// An out-of-control actor selects nothing: the current intention, the
+	// attack latch and lastDesire stay as they are, and a queued wander
+	// takes no step. Only the periodic cycle's empty-queue idle runs, at
+	// once even with a latch set; the latch waits for the first pass after
+	// control returns. A finished swing still continues the current
+	// intention, as its think does not go through desire selection.
+	if outOfControl && mode != thinkContinue {
+		if idleAfterLatch {
+			a.idleAndRequeue()
+		}
+		if mode == thinkAttackFinished && canPromote {
+			return a.continueCurrent()
+		}
+		return nil
+	}
 	if !canPromote {
 		return nil
 	}
@@ -789,14 +825,20 @@ func (a *Attackable) think(mode thinkMode) error {
 	err := a.promoteAndStep()
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
-			a.thinkIdle()
-			a.queueIdleFollow()
-			if _, ok := a.desires.Peek(); !ok {
-				a.queueIdleWander()
-			}
+			a.idleAndRequeue()
 		}
 	}
 	return err
+}
+
+// idleAndRequeue is the empty-queue idle: abort everything, go idle, and
+// queue the idle follow, else the idle wander.
+func (a *Attackable) idleAndRequeue() {
+	a.thinkIdle()
+	a.queueIdleFollow()
+	if _, ok := a.desires.Peek(); !ok {
+		a.queueIdleWander()
+	}
 }
 
 // continueCurrent is Think's pass: one step of the current intention with
@@ -874,21 +916,18 @@ func (a *Attackable) currentQueued() bool {
 }
 
 // idleOnEmptyQueue runs the event-driven empty-queue idle: once the first
-// periodic cycle has run, a controllable actor that is not casting, has no
-// queued desire and is not already idle aborts everything and goes idle.
-// It reports whether it did; the idle then takes no further step this pass.
+// periodic cycle has run, an actor that is not casting, has no queued
+// desire and is not already idle aborts everything and goes idle. The
+// caller skips it while the actor is out of control. It reports whether it
+// did; the idle then takes no further step this pass.
 func (a *Attackable) idleOnEmptyQueue() bool {
-	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.actor.DenyAIAction() || a.castingNow() {
+	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.castingNow() {
 		return false
 	}
 	if _, ok := a.desires.Peek(); ok {
 		return false
 	}
-	a.thinkIdle()
-	a.queueIdleFollow()
-	if _, ok := a.desires.Peek(); !ok {
-		a.queueIdleWander()
-	}
+	a.idleAndRequeue()
 	return true
 }
 
@@ -1041,7 +1080,9 @@ func (a *Attackable) syncOOTSweepLocked() {
 	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
 }
 
-func (a *Attackable) pruneDesires() {
+// pruneDesires drops invalid cast desires, then, unless the actor is out of
+// control, attack desires whose target is beyond attackDesireRange.
+func (a *Attackable) pruneDesires(outOfControl bool) {
 	a.desires.RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionCast {
 			return false
@@ -1052,7 +1093,7 @@ func (a *Attackable) pruneDesires() {
 		cast := a.CastController()
 		return cast != nil && !cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
 	})
-	if a.actor.DenyAIAction() {
+	if outOfControl {
 		return
 	}
 	ox, oy, oz := a.actor.Position()
@@ -1067,11 +1108,12 @@ func (a *Attackable) pruneDesires() {
 }
 
 // dropCurrentIfUnqueued idles an attack, cast or walk whose desire is no
-// longer queued, unless an action is in flight. The continue pass keeps a
-// desire-less walk: it steps the current walk as it stands, so one an
-// arrival left short of its destination sets off again.
+// longer queued, unless an action is in flight. The caller skips it while
+// the actor is out of control. The continue pass keeps a desire-less walk:
+// it steps the current walk as it stands, so one an arrival left short of
+// its destination sets off again.
 func (a *Attackable) dropCurrentIfUnqueued(mode thinkMode) {
-	if a.actor.DenyAIAction() || a.attack.AttackingNow() {
+	if a.attack.AttackingNow() {
 		return
 	}
 	if a.castingNow() {
@@ -1270,9 +1312,11 @@ func (a *Attackable) doWanderMove() {
 	if a.actor.ReturnHome() {
 		return
 	}
+	// Out of territory with no walk home: drop only the wander desire. The
+	// wander stays current until desire selection replaces it or idles the
+	// actor on the now-empty queue.
 	if !a.actor.InTerritory() {
 		a.clearCurrentDesire()
-		a.setCurrent(intention{kind: IntentionIdle})
 		return
 	}
 	a.actor.MoveFromSpawnUsingRandomOffset(int(a.actor.RealMoveSpeed()) * 3)

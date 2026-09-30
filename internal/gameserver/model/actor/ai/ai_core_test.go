@@ -518,6 +518,7 @@ type fakeActor struct {
 	siegeGuard      bool
 	alikeDead       bool
 	denyAction      bool
+	confused        bool
 	attackRange     int
 	known           map[int32]bool
 	inTerritory     bool
@@ -549,6 +550,7 @@ func (a *fakeActor) AlikeDead() bool     { return a.alikeDead }
 func (a *fakeActor) DenyAIAction() bool {
 	return a.denyAction
 }
+func (a *fakeActor) OutOfControl() bool { return a.denyAction || a.confused }
 
 func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	known, ok := a.known[target.ObjectID()]
@@ -882,22 +884,91 @@ func TestAttackableRunAIKeepsAttackDesireAt1500(t *testing.T) {
 	}
 }
 
+// TestAttackableRunAIKeepsFarAttackWhenOutOfControl pins NpcAI.runAI's
+// out-of-control gate: a stunned or confused actor neither prunes a far
+// ATTACK desire nor selects it, so the current intention stays idle and no
+// attack starts.
 func TestAttackableRunAIKeepsFarAttackWhenOutOfControl(t *testing.T) {
-	owner := actor(1)
-	owner.denyAction = true
-	far := actor(2)
-	far.x = 2000
-	owner.known = map[int32]bool{far.ObjectID(): true}
-	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{canAttack: true})
-	addAttackHate(ai, far, 0, 20)
+	for _, tc := range []struct {
+		name string
+		set  func(*fakeActor)
+	}{
+		{"denied AI action", func(a *fakeActor) { a.denyAction = true }},
+		{"confused", func(a *fakeActor) { a.confused = true }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			owner := actor(1)
+			tc.set(owner)
+			far := actor(2)
+			far.x = 2000
+			owner.known = map[int32]bool{far.ObjectID(): true}
+			strike := &recordingAttack{canAttack: true}
+			ai := NewAttackable(owner, &recordingMove{}, strike)
+			addAttackHate(ai, far, 0, 20)
 
-	ai.RunAI()
+			ai.RunAI()
 
-	if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: far}) {
-		t.Fatal("far ATTACK desire pruned while out of control")
+			if !ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: far}) {
+				t.Fatal("far ATTACK desire pruned while out of control")
+			}
+			if got := ai.CurrentIntention(); got != IntentionIdle {
+				t.Fatalf("CurrentIntention() = %v, want %v (no selection while out of control)", got, IntentionIdle)
+			}
+			if strike.target != nil {
+				t.Fatalf("attacked %v while out of control, want none", strike.target)
+			}
+		})
 	}
-	if got := ai.CurrentIntention(); got != IntentionAttack {
-		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
+}
+
+// TestAttackableAttackFinishedContinuesAttackWhenOutOfControl pins a
+// finished swing's think past the out-of-control gate: RunAI steps nothing,
+// but AttackFinished continues the current attack for a confused actor and
+// does nothing for one that is denied AI action.
+func TestAttackableAttackFinishedContinuesAttackWhenOutOfControl(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		set   func(*fakeActor)
+		swing bool
+	}{
+		{"denied AI action", func(a *fakeActor) { a.denyAction = true }, false},
+		{"confused", func(a *fakeActor) { a.confused = true }, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			owner := actor(1)
+			target := actor(2)
+			owner.known = map[int32]bool{target.ObjectID(): true}
+			strike := &recordingAttack{canAttack: true}
+			ai := NewAttackable(owner, &recordingMove{}, strike)
+			addAttackHate(ai, target, 0, 20)
+			if err := ai.RunAI(); err != nil {
+				t.Fatalf("RunAI() error = %v, want nil", err)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("setup DoAttack calls = %d, want 1", strike.doAttackCalls)
+			}
+			tc.set(owner)
+
+			if err := ai.RunAI(); err != nil {
+				t.Fatalf("out-of-control RunAI() error = %v, want nil", err)
+			}
+			if strike.doAttackCalls != 1 {
+				t.Fatalf("DoAttack calls after out-of-control RunAI = %d, want 1 (no selection)", strike.doAttackCalls)
+			}
+			if err := ai.AttackFinished(); err != nil {
+				t.Fatalf("AttackFinished() error = %v, want nil", err)
+			}
+			want := 1
+			if tc.swing {
+				want = 2
+			}
+			if strike.doAttackCalls != want {
+				t.Fatalf("DoAttack calls after AttackFinished = %d, want %d", strike.doAttackCalls, want)
+			}
+			if got := ai.CurrentIntention(); got != IntentionAttack {
+				t.Fatalf("CurrentIntention() = %v, want %v kept", got, IntentionAttack)
+			}
+		})
 	}
 }
 
@@ -1790,8 +1861,8 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 		t.Fatalf("Think() error: %v", err)
 	}
 
-	if got := ai.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() = %v, want idle outside territory without return home", got)
+	if got := ai.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander kept current outside territory without return home", got)
 	}
 	if ai.Desires().Has(&Desire{Kind: IntentionWander}) {
 		t.Fatal("wander desire still queued after out-of-territory thinkWander, want it dropped")
