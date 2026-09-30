@@ -59,10 +59,13 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 }
 
 // registerHit records hate, the shot-recharge roll, and the party/minion
-// attacked call for a live hit, whatever its amount — the block
-// TakeDamage, ReduceHP, and ReduceHPByDOT all run unconditionally one layer
-// above the invul/damage-permission guard, matching Npc.reduceCurrentHp
-// (Npc.java:390-464). isDOT selects ReduceHPByDOT's zero-weight hate call
+// attacked call for a live hit, one layer above the invul/damage-permission
+// guard, matching Npc.reduceCurrentHp (Npc.java:390-464). ReduceHP and
+// ReduceHPByDOT run it whatever the amount, a zero-damage hit included
+// (Npc.reduceCurrentHp has no damage check). TakeDamage only ever sees
+// positive damage, since the auto-attack path drops zero hits before
+// reaching it (CreatureAttack.java:235), so its dmg > 0 gate never skips a
+// real hit. isDOT selects ReduceHPByDOT's zero-weight hate call
 // (Npc.java:395's unconditional addDamageHate(attacker, damage, 0)) plus its
 // own attackedHateWeight-derived attack Desire, instead of
 // AddCombatDamageHate's combined write for TakeDamage/ReduceHP. A no-op when
