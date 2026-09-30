@@ -949,7 +949,8 @@ func (h *Hostile) MarkDead() bool {
 }
 
 // Die runs this NPC's death sequence: the once-only dead-state
-// transition, then its reward hook. rewards may be nil — the drop and
+// transition, the strip of every effect that does not last through death,
+// then its reward hook. rewards may be nil — the drop and
 // experience/SP systems land separately and plug in here once ready. It
 // reports whether the death was newly applied by this call.
 //
@@ -963,6 +964,9 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	}
 	h.BroadcastStatus()
 	h.AbortAll(true)
+	// A death strip ends each effect's stat change silently; the status
+	// broadcast below is the only refresh observers get.
+	h.EffectList().StopAllExceptThoseThatLastThroughDeath()
 	if rewards != nil {
 		rewards.CalculateRewards(killer)
 	}
@@ -980,9 +984,10 @@ func (h *Hostile) Decayed() bool {
 	return h.decayed
 }
 
-// Decay removes this NPC's corpse from the world and runs the respawn
-// hook, if any. It is idempotent: a repeat call is a no-op, matching the
-// once-only guarantee the corpse decay task relies on.
+// Decay removes this NPC's corpse from the world, stops every effect it
+// still holds and runs the respawn hook, if any. It is idempotent: a repeat
+// call is a no-op, matching the once-only guarantee the corpse decay task
+// relies on.
 //
 // worldState may be nil in tests that do not track live world placement.
 // respawn is called after the world removal when non-nil; a live spawn
@@ -1003,10 +1008,12 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	if worldState != nil {
 		worldState.Despawn(h)
 	}
-	// Stop the periodic effect sweep from reaching this corpse's list: it
-	// left the world above, but a buff/debuff that persists through death
-	// (StopAllExceptThoseThatLastThroughDeath is player-only) would
-	// otherwise keep the list registered with task.Effects forever.
+	// End whatever outlived the death strip (effects that last through
+	// death, or anything on a living NPC removed at once) with their exit
+	// hooks, after the world removal so nobody sees them go. Untrack then
+	// keeps a straggler tick or skill task already on this queue from
+	// registering the list with task.Effects again.
+	h.EffectList().StopAll()
 	h.EffectList().Untrack()
 	if respawn != nil {
 		respawn()

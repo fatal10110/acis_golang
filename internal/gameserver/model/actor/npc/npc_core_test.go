@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -304,12 +305,22 @@ func TestHostileAttackDisabledMatchesReferenceTerms(t *testing.T) {
 	})
 }
 
+// newSurvivingHostile returns a monster at full HP that a 10-point hit
+// leaves alive: a dying NPC loses its effects, which would hide what a hit
+// alone does to them.
+func newSurvivingHostile(t *testing.T) *Hostile {
+	t.Helper()
+	h := newCombatHostile(t, 101, &Template{ID: 9001, Type: "Monster", HPMax: 500})
+	h.SetHP(h.MaxHPValue())
+	return h
+}
+
 // TestHostileReduceHPByDOTLeavesEffectsAloneOnRealDOTTick mirrors the
 // !isDOT gate on CreatureStatus.reduceHp's whole SLEEP/IMMOBILE/STUN block:
 // NpcStatus has no PlayerStatus-style override, so a real DOT tick
 // (isDOT=true) skips the block entirely.
 func TestHostileReduceHPByDOTLeavesEffectsAloneOnRealDOTTick(t *testing.T) {
-	hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+	hostile := newSurvivingHostile(t)
 	addHostileEffect(t, hostile, "Sleep")
 	addHostileEffect(t, hostile, "ImmobileUntilAttacked")
 	addHostileEffect(t, hostile, "Stun")
@@ -374,7 +385,7 @@ func TestHostileReduceHPBreaksStunOnOneInTenRollForNonDOTDamage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			hostile := newTestHostile(t, &hostileMove{}, &hostileAttack{})
+			hostile := newSurvivingHostile(t)
 			addHostileEffect(t, hostile, "Stun")
 			hostile.SetRollSource(func(int) int { return tt.roll })
 
@@ -620,6 +631,74 @@ func TestHostileInactiveRegionStopsAllEffects(t *testing.T) {
 
 	if got := hostile.EffectList().All(); len(got) != 0 {
 		t.Fatalf("effects after region deactivation = %d, want 0", len(got))
+	}
+}
+
+// activityRecorder is an effect activity registry that records whether each
+// list is registered.
+type activityRecorder struct {
+	mu     sync.Mutex
+	active map[*effect.List]bool
+}
+
+func (r *activityRecorder) SetActive(l *effect.List, active bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.active[l] = active
+}
+
+func (r *activityRecorder) registered(l *effect.List) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.active[l]
+}
+
+// TestHostileDeathAndDecayStopEffects follows Creature.doDie and
+// Npc.deleteMe: death ends every effect that does not last through death,
+// running its exit hook; decay ends the rest and leaves the list registered
+// with no effect task.
+func TestHostileDeathAndDecayStopEffects(t *testing.T) {
+	rec := &activityRecorder{active: map[*effect.List]bool{}}
+	hostile, err := NewHostile(&Instance{ObjectID: 1, Template: &Template{ID: 1, Type: "Monster"}, Kind: "Monster"},
+		newHostileLive(t, effect.WithEnv(effect.Env{Activity: rec})), &hostileMove{}, &hostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock := driveHostile(hostile)
+	exits := map[skill.ID]int{}
+	add := func(meta effect.Skill, name string) *effect.Effect {
+		e := &effect.Effect{Skill: meta, Template: skill.EffectTemplate{Name: name}, Effected: hostile, Effector: hostile}
+		e.OnExit = func(e *effect.Effect) { exits[e.Skill.ID]++ }
+		hostile.EffectList().Add(e)
+		return e
+	}
+	add(effect.Skill{ID: 1}, "Buff")
+	add(effect.Skill{ID: 2, Debuff: true}, "DamOverTime")
+	lasting := add(effect.Skill{ID: 3, StayAfterDeath: true}, "Buff")
+	list := hostile.EffectList()
+
+	if !hostile.Die(nil, nil) {
+		t.Fatal("Die() = false for a living NPC")
+	}
+	if held := list.All(); len(held) != 1 || held[0] != lasting {
+		t.Fatalf("effects after death = %v, want only the one lasting through death", held)
+	}
+	if exits[1] != 1 || exits[2] != 1 || exits[3] != 0 {
+		t.Fatalf("exit hooks after death = %v, want the buff and DoT once each", exits)
+	}
+
+	if !hostile.Decay(nil, nil) {
+		t.Fatal("Decay() = false for a fresh corpse")
+	}
+	clock.Run()
+	if held := list.All(); len(held) != 0 {
+		t.Fatalf("effects after decay = %d, want 0", len(held))
+	}
+	if exits[3] != 1 {
+		t.Fatalf("lasting effect exit hooks after decay = %d, want 1", exits[3])
+	}
+	if rec.registered(list) {
+		t.Fatal("decayed NPC's effect list is still registered with the effect task")
 	}
 }
 
