@@ -35,9 +35,9 @@ type ChanceProcs struct {
 	// place among the frames the skill's own state changes send at once; a
 	// message the sink took is left out of the returned result. ownHit
 	// reports that caster is the attacker or the skill caster whose hit set
-	// the proc off, not the creature that was hit nor the effector of a
-	// trigger effect: a player's hits and casts run on its own queue, so a
-	// player proc with ownHit set runs there too. Nil runs apply without a
+	// the proc off, not the creature that was hit nor a trigger effect's
+	// effector other than the effect's owner: a player's hits and casts run
+	// on its own queue, so a player proc with ownHit set runs there too. Nil runs apply without a
 	// sink and drops the result.
 	Deliver func(caster handlerskill.Creature, ownHit bool, apply func(sink handlerskill.MessageSink) EffectResult)
 }

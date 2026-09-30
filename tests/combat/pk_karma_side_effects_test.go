@@ -13,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -126,28 +125,11 @@ func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene 
 	}
 }
 
-// onPlayer runs fn on the queue of the online player objID.
-func (s *pkKillScene) onPlayer(t *testing.T, objID int32, fn func(*player.Character)) {
-	t.Helper()
-	obj, ok := s.srv.State.Player(objID)
-	if !ok {
-		t.Fatalf("player %d missing from world state", objID)
-	}
-	pc, ok := network.OnlineCharacter(obj)
-	if !ok {
-		t.Fatalf("player %T is not an online character", obj)
-	}
-	done := make(chan struct{})
-	if !pc.Queue().Post(func() { defer close(done); fn(pc) }) {
-		t.Fatalf("player %d queue closed", objID)
-	}
-	<-done
-}
-
 // assertKnifeTakenOff checks the killer's frames after its karma change for
-// the knife's removal through the equip toggle: S1_DISARMED, the refresh,
-// then ActionFailed for the aborted attack. It returns the frames and the
-// ActionFailed's index.
+// the knife's removal through the equip toggle: S1_DISARMED right after the
+// karma change's UserInfo, so no frame of the killing blow slips in ahead of
+// it, then the refresh and ActionFailed for the aborted attack. It returns
+// the frames and the ActionFailed's index.
 func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	t.Helper()
 	frames := readQuiet(s.c)
@@ -168,6 +150,9 @@ func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	}
 	if disarmed < 0 {
 		t.Fatalf("no S1_DISARMED for the knife among %x", opcodesOf(frames))
+	}
+	if disarmed != 1 || frames[0][0] != serverpackets.OpcodeUserInfo {
+		t.Fatalf("frames after the karma change = %x, want the karma UserInfo then S1_DISARMED first", opcodesOf(frames))
 	}
 	refresh := indexOf(frames, disarmed, serverpackets.OpcodeUserInfo, -1)
 	aborted := indexOf(frames, disarmed, serverpackets.OpcodeActionFailed, -1)
@@ -216,7 +201,7 @@ func TestPKKillUnequipsPKFreeWeaponAndEndsTheFlag(t *testing.T) {
 	s := bootPKKillScene(t)
 	// Every swing hits, so the scenario never waits on a lucky roll.
 	s.setRollSource(func(int) int { return 0 })
-	s.onPlayer(t, s.objID, func(pc *player.Character) {
+	onPlayerQueue(t, s.srv, s.objID, func(pc *player.Character) {
 		pc.AddStatFuncs([]effect.Mod{{Stat: stat.AbsorbDamagePercent, Op: effect.OpAdd, Value: 50}})
 		pc.SetHP(1)
 	})
@@ -304,7 +289,7 @@ func TestPKProcKillTakesTheKnifeOffBeforeTheProcsDamageMessage(t *testing.T) {
 	})
 	// Every swing hits, so the scenario never waits on a lucky roll.
 	s.setRollSource(func(int) int { return 0 })
-	s.onPlayer(t, s.victimID, func(pc *player.Character) {
+	onPlayerQueue(t, s.srv, s.victimID, func(pc *player.Character) {
 		pc.AddStatFuncs([]effect.Mod{{Stat: stat.MaxHP, Op: effect.OpAdd, Value: 10_000}})
 		pc.SetHP(pc.MaxHPValue())
 	})
