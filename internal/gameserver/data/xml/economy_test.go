@@ -10,6 +10,7 @@ import (
 )
 
 func TestLoadEconomyData(t *testing.T) {
+	t.Parallel()
 	xmlDir := datapackPath(t, filepath.Join("data", "xml"))
 
 	t.Run("recipes", func(t *testing.T) {
@@ -168,6 +169,7 @@ func TestLoadEconomyData(t *testing.T) {
 }
 
 func TestBuildAugmentationStatGroupTableRouting(t *testing.T) {
+	t.Parallel()
 	order := coord(0)
 	group, err := buildAugmentationStatGroup(augmentationSetElement{
 		Order: &order,
@@ -192,6 +194,7 @@ func TestBuildAugmentationStatGroupTableRouting(t *testing.T) {
 }
 
 func TestLoadEconomyDataErrors(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cases := []struct {

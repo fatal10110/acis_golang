@@ -10,6 +10,7 @@ import (
 
 // ---- from main_test.go ----
 func TestRun_List(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-list"}, &stdout, &stderr)
 	if code != exitOK {
@@ -23,6 +24,7 @@ func TestRun_List(t *testing.T) {
 }
 
 func TestRun_MissingCategory(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-datapack", t.TempDir()}, &stdout, &stderr)
 	if code != exitError {
@@ -31,6 +33,7 @@ func TestRun_MissingCategory(t *testing.T) {
 }
 
 func TestRun_UnknownCategory(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-category", "nope", "-datapack", t.TempDir()}, &stdout, &stderr)
 	if code != exitError {
@@ -39,6 +42,7 @@ func TestRun_UnknownCategory(t *testing.T) {
 }
 
 func TestRun_BothSourcesGiven(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-category", "item", "-datapack", t.TempDir(), "-dump", t.TempDir()}, &stdout, &stderr)
 	if code != exitError {
@@ -58,6 +62,7 @@ func writeDumpFile(t *testing.T, content string) string {
 }
 
 func TestRun_DumpModePassesThroughDumpFile(t *testing.T) {
+	t.Parallel()
 	dumpPath := writeDumpFile(t, "1\tname=a\n2\tname=b\n")
 
 	var stdout, stderr bytes.Buffer
@@ -71,6 +76,7 @@ func TestRun_DumpModePassesThroughDumpFile(t *testing.T) {
 }
 
 func TestRun_CompareMatch(t *testing.T) {
+	t.Parallel()
 	dumpPath := writeDumpFile(t, "1\tname=a\n")
 	expectedPath := writeDumpFile(t, "1\tname=a\n")
 
@@ -85,6 +91,7 @@ func TestRun_CompareMatch(t *testing.T) {
 }
 
 func TestRun_CompareMismatch(t *testing.T) {
+	t.Parallel()
 	dumpPath := writeDumpFile(t, "1\tname=a\n2\tname=z\n")
 	expectedPath := writeDumpFile(t, "1\tname=a\n3\tname=c\n")
 
@@ -103,6 +110,7 @@ func TestRun_CompareMismatch(t *testing.T) {
 }
 
 func TestRun_LoadFromMissingDatapackDirIsAnError(t *testing.T) {
+	t.Parallel()
 	var stdout, stderr bytes.Buffer
 	code := run([]string{"-category", "item", "-datapack", filepath.Join(t.TempDir(), "does-not-exist")}, &stdout, &stderr)
 	if code != exitError {
@@ -111,6 +119,7 @@ func TestRun_LoadFromMissingDatapackDirIsAnError(t *testing.T) {
 }
 
 func TestFindDatapackDir_FindsSiblingCheckout(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	module := filepath.Join(root, "acis_public", "acis_golang")
 	if err := os.MkdirAll(module, 0o755); err != nil {

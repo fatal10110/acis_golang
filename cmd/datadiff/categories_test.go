@@ -39,10 +39,12 @@ func datapackRoot(t *testing.T) string {
 // works against the actual shipped data, for every category wired in
 // today.
 func TestLoadRecords_RealDatapack(t *testing.T) {
+	t.Parallel()
 	root := datapackRoot(t)
 
 	for _, name := range sortedCategoryNames() {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			records, err := categories[name].load(root)
 			if err != nil {
 				t.Fatalf("load(%q) error: %v", root, err)
@@ -69,6 +71,7 @@ func TestLoadRecords_RealDatapack(t *testing.T) {
 }
 
 func TestLoadItemRecordsIncludesModeledFields(t *testing.T) {
+	t.Parallel()
 	records, err := loadItemRecords(datapackRoot(t))
 	if err != nil {
 		t.Fatalf("loadItemRecords error: %v", err)
@@ -94,6 +97,7 @@ func TestLoadItemRecordsIncludesModeledFields(t *testing.T) {
 }
 
 func TestLoadHTMLRecordsIncludesContentIdentity(t *testing.T) {
+	t.Parallel()
 	root := datapackRoot(t)
 
 	records, err := loadHTMLRecords(root)
@@ -135,6 +139,7 @@ func recordByID(t *testing.T, records []datadiff.Record, id string) datadiff.Rec
 // takes when writing a dump for another implementation to compare
 // against, or reloading a previously captured one.
 func TestDumpRoundTrip_RealDatapack(t *testing.T) {
+	t.Parallel()
 	root := datapackRoot(t)
 
 	records, err := loadPlayerLevelRecords(root)

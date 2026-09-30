@@ -22,6 +22,7 @@ func writeItemFile(t *testing.T, dir, name, body string) {
 }
 
 func TestLoadItemTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	writeItemFile(t, dir, "0000-0099.xml", `
@@ -389,12 +390,14 @@ func TestLoadItemTemplates(t *testing.T) {
 }
 
 func TestLoadItemTemplatesMissingDirectory(t *testing.T) {
+	t.Parallel()
 	if _, err := LoadItemTemplates(filepath.Join(t.TempDir(), "does-not-exist"), zerolog.Nop()); err == nil {
 		t.Fatal("LoadItemTemplates with missing directory: expected error")
 	}
 }
 
 func TestLoadItemTemplatesMalformedXML(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "broken.xml"), []byte("<list><item id=\"1\">"), 0o600); err != nil {
 		t.Fatal(err)
@@ -409,6 +412,7 @@ func TestLoadItemTemplatesMalformedXML(t *testing.T) {
 // element with a data problem is logged and skipped rather than aborting
 // the whole load, matching DocumentItem.java's per-item try/catch.
 func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		content string
@@ -487,6 +491,7 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 // L2Skill has an attach(EffectTemplate) overload, so on an Item the parsed
 // EffectTemplate is discarded (java/.../DocumentBase.java:201-307).
 func TestLoadItemTemplatesEffectValidatedNotAttached(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeItemFile(t, dir, "fixture.xml", `<item id="1" type="Weapon" name="x">
 		<set name="bodypart" val="rhand"/>
@@ -519,6 +524,7 @@ func TestLoadItemTemplatesEffectValidatedNotAttached(t *testing.T) {
 // not a computed formula, so no external oracle run was needed to produce
 // them.
 func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
@@ -676,6 +682,7 @@ func TestLoadItemTemplatesAgainstDatapack(t *testing.T) {
 // if any id appeared in more than one file, the table (deduplicated by id)
 // would hold fewer entries than the raw count of <item> elements parsed.
 func TestLoadItemTemplatesNoDuplicateIDsInDatapack(t *testing.T) {
+	t.Parallel()
 	dir := datapackPath(t, filepath.Join("data", "xml", "items"))
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
@@ -706,6 +713,7 @@ func TestLoadItemTemplatesNoDuplicateIDsInDatapack(t *testing.T) {
 }
 
 func TestLoadItemTemplatesDecodesConditionMessageIDLiterals(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writeItemFile(t, dir, "fixture.xml", `
 		<item id="1" type="EtcItem" name="decimal"><cond msgId="100"><player /></cond></item>
