@@ -52,7 +52,7 @@ Rules:
 - Use `SyncBarrier` when a triggering request has no synchronous reply and you need ordering
   before driving a task tick.
 - Suites need the shared MariaDB service (`make test-db-up`); each suite package calls
-  `sqltest.Main(m)` from `TestMain` to release its uniquely named database.
+  `dbtest.Main(m)` from `TestMain` to release its uniquely named database.
 - Never wait on the wall clock (`time.Sleep`, polling loops). Every `gameservertest.Boot` runs
   actor queues on `sim.Inline` with a clock that moves only when the test lets time pass: `srv.Advance(t, d)` for a known
   delay, `srv.AdvanceUntil(t, what, cond)` for "until this happens", and client reads, which
@@ -131,7 +131,7 @@ Two entry points, both untagged:
 - `sqltest.SharedDB(tb)` — a database checked out of a per-package pool on the shared MariaDB
   service, held until the test ends, then emptied and returned. Each test running in parallel
   gets its own, and a `t.Run` subtest gets a different one from its parent, so seed and `Boot`
-  on the same `t`. Pair it with `TestMain(m) { os.Exit(sqltest.Main(m)) }`. This is what
+  on the same `t`. Pair it with `TestMain(m) { os.Exit(dbtest.Main(m)) }`. This is what
   behavior suites and `gameservertest.Boot` use. Suites may call `t.Parallel()`: gameplay
   settings are per server (`Boot` options), never package globals.
 - `sqltest.NewDB(t)` — a dedicated database per call on the shared MariaDB service; reserved for

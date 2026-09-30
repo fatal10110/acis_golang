@@ -1,4 +1,4 @@
-package combat
+package sql
 
 import (
 	"os"

@@ -122,7 +122,7 @@ The only `*_test.go` files allowed outside `tests/` are pure-unit tests in these
 - concurrency primitives (`internal/gameserver/sim`, `internal/commons/scheduler`), including
   `sim`'s `simdebug`-tagged tests.
 
-Harness usage (each suite package calls `sqltest.Main(m)` from `TestMain`; assertions target three
+Harness usage (each suite package calls `dbtest.Main(m)` from `TestMain`; assertions target three
 surfaces — client-visible packets, world state, persisted DB rows):
 
 ```go
