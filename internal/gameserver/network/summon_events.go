@@ -151,6 +151,11 @@ func (s *summonSink) Emit(ev event.Event) {
 		l.broadcastSummon(actor, func() wire.Frame {
 			return frames.SkillLaunched(actor.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 		})
+	case event.HitDamageApplied:
+		// The hit runs on the owner's queue: a PK kill it just made takes
+		// the owner's items off and resets its flag before anything else
+		// the hit sends.
+		l.settleSummonOwnerPvPChanges(actor)
 	case event.HitLanded:
 		l.chance.AttackHit(actor, e)
 	case event.ShotsRechargeRequested:

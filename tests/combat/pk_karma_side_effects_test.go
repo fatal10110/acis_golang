@@ -60,9 +60,19 @@ type pkKillScene struct {
 	killer          interface{ PvPFlagState() task.PvPFlagState }
 	karma           func() int
 	setRollSource   func(func(int) int)
+	// karmaTail is the opcodes of the frames the killer reads between the
+	// karma change's StatusUpdate and S1_DISARMED: the karma UserInfo, and
+	// the owner's own RelationChanged for its summon when it has one.
+	karmaTail []byte
 }
 
 func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene {
+	t.Helper()
+	return bootPKKillSceneWith(t, nil, known...)
+}
+
+// bootPKKillSceneWith is bootPKKillScene with extra boot options.
+func bootPKKillSceneWith(t *testing.T, extra []gameservertest.Option, known ...modelskill.Definition) *pkKillScene {
 	t.Helper()
 	knife := shippedItemTemplate(t, apprenticeKnifeID)
 	if len(knife.UseConditions) != 1 || knife.UseConditions[0].MessageID != 1685 {
@@ -74,13 +84,13 @@ func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene 
 	light.Weight = 0
 	templates := append(gameservertest.ItemTemplates().All(), &light)
 	flags := task.NewPvPFlags(task.DefaultPvPFlagOptions(), nil)
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Killer", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(combatPersistence(t, append(offensiveKillSkillDefs(), known...))),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithPvPFlags(flags),
-	)
+	}, extra...)...)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 42, 1)
 	for _, def := range known {
@@ -117,8 +127,9 @@ func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene 
 	return &pkKillScene{
 		srv: srv, c: c, vc: vc, objID: objID, victimID: victim.ID,
 		knifeObjID: knifeObjID, inv: inv, flags: flags,
-		killer: obj.(interface{ PvPFlagState() task.PvPFlagState }),
-		karma:  obj.(interface{ Karma() int }).Karma,
+		karmaTail: []byte{serverpackets.OpcodeUserInfo},
+		killer:    obj.(interface{ PvPFlagState() task.PvPFlagState }),
+		karma:     obj.(interface{ Karma() int }).Karma,
 		setRollSource: func(roll func(int) int) {
 			runOnKiller(func() { obj.(interface{ SetRollSource(func(int) int) }).SetRollSource(roll) })
 		},
@@ -127,9 +138,9 @@ func bootPKKillScene(t *testing.T, known ...modelskill.Definition) *pkKillScene 
 
 // assertKnifeTakenOff checks the killer's frames after its karma change for
 // the knife's removal through the equip toggle: S1_DISARMED right after the
-// karma change's UserInfo, so no frame of the killing blow slips in ahead of
-// it, then the refresh and ActionFailed for the aborted attack. It returns
-// the frames and the ActionFailed's index.
+// rest of the karma change (karmaTail), so no frame of the killing blow
+// slips in ahead of it, then the refresh and ActionFailed for the aborted
+// attack. It returns the frames and the ActionFailed's index.
 func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	t.Helper()
 	frames := readQuiet(s.c)
@@ -151,8 +162,8 @@ func (s *pkKillScene) assertKnifeTakenOff(t *testing.T) ([][]byte, int) {
 	if disarmed < 0 {
 		t.Fatalf("no S1_DISARMED for the knife among %x", opcodesOf(frames))
 	}
-	if disarmed != 1 || frames[0][0] != serverpackets.OpcodeUserInfo {
-		t.Fatalf("frames after the karma change = %x, want the karma UserInfo then S1_DISARMED first", opcodesOf(frames))
+	if disarmed != len(s.karmaTail) || string(opcodesOf(frames[:disarmed])) != string(s.karmaTail) {
+		t.Fatalf("frames after the karma change = %x, want %x then S1_DISARMED first", opcodesOf(frames), s.karmaTail)
 	}
 	refresh := indexOf(frames, disarmed, serverpackets.OpcodeUserInfo, -1)
 	aborted := indexOf(frames, disarmed, serverpackets.OpcodeActionFailed, -1)
