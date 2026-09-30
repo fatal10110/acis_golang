@@ -161,6 +161,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(expSpGainMessage(e.Exp, e.SP))
 	case event.ExpSPLost:
 		sendExpSpLossFrames(live, e)
+	case event.SPChanged:
+		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusSP, Value: e.SP},
+		}))
 	case event.KarmaChanged:
 		sendKarmaChangeFrames(live, e.Karma)
 	case event.RelationChanged:

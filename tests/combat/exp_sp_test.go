@@ -83,6 +83,85 @@ func readExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {
 	t.Fatal("exp/SP gain message not found within 50 frames")
 }
 
+// assertRewardTail reads frames until the exp/SP gain message and checks
+// the reward's own packets reached the client in the reference order: the
+// UserInfo PlayerStatus.addExp sends for any non-negative experience add
+// (PlayerStatus.java:478-485), then the StatusUpdate(SP) PlayerStatus.setSp
+// sends with the new total (PlayerStatus.java:881-891), then the message
+// (PlayerStatus.java:501-520), back to back. A zero add still goes down the
+// same path.
+func assertRewardTail(t *testing.T, c *scriptedClient, selfID int32, wantSPTotal int, wantMessage int, wantParams ...int32) {
+	t.Helper()
+	userInfo, spStatus := -1, -1
+	for i := 0; i < 100; i++ {
+		frame := c.ReadWithTimeout(readQuietWindow)
+		if frame == nil {
+			t.Fatalf("reward message %d never arrived", wantMessage)
+		}
+		r := wireReader(frame[1:])
+		switch frame[0] {
+		case serverpackets.OpcodeUserInfo:
+			userInfo = i
+		case serverpackets.OpcodeStatusUpdate:
+			if r.ReadInt32() != selfID || r.ReadInt32() != 1 || r.ReadInt32() != int32(serverpackets.StatusSP) {
+				continue
+			}
+			if got := r.ReadInt32(); got != int32(wantSPTotal) {
+				t.Fatalf("StatusUpdate(SP) = %d, want %d", got, wantSPTotal)
+			}
+			spStatus = i
+		case serverpackets.OpcodeSystemMessage:
+			if r.ReadInt32() != int32(wantMessage) {
+				continue
+			}
+			if params := r.ReadInt32(); params != int32(len(wantParams)) {
+				t.Fatalf("reward message params = %d, want %d", params, len(wantParams))
+			}
+			for j, want := range wantParams {
+				if typ, got := r.ReadInt32(), r.ReadInt32(); typ != serverpackets.SystemMessageParamNumber || got != want {
+					t.Fatalf("reward message param %d = type %d value %d, want number %d", j, typ, got, want)
+				}
+			}
+			// The three go out back to back from one add, so the reward's
+			// UserInfo is the frame right before its StatusUpdate(SP).
+			if userInfo != i-2 || spStatus != i-1 {
+				t.Fatalf("reward tail: UserInfo at %d, StatusUpdate(SP) at %d, message at %d; want UserInfo, StatusUpdate(SP), message back to back",
+					userInfo, spStatus, i)
+			}
+			return
+		}
+	}
+	t.Fatal("reward message not found within 100 frames")
+}
+
+// TestKillNPCZeroRewardStillReports pins the zero-value kill reward — what a
+// full level-difference penalty leaves — against the reference: nothing
+// changes, yet the client still gets UserInfo, StatusUpdate(SP) and
+// YOU_EARNED_S1_EXP_AND_S2_SP with 0 and 0, because every step of the add
+// treats zero as a successful add.
+func TestKillNPCZeroRewardStillReports(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 70),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(combatPersistence(t, killSkillDefs())),
+		gameservertest.WithLevels(levelTableFor(t)),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 42, 1)
+	startInWorld(t, c)
+	hostile := spawnRewardedNPC(t, srv, 0, 0)
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	drainUntilQuiet(t, c)
+
+	castKillSkill(t, srv, c, objID, hostile.ObjectID(), false)
+	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
+
+	assertRewardTail(t, c, objID, 70, serverpackets.SystemMessageYouEarnedS1ExpAndS2SP, 0, 0)
+}
+
 // TestKillNPCPaysExpAndSp walks the reward chain end to end: killing the
 // monster reports the exact awarded amounts on the wire and persists them.
 func TestKillNPCPaysExpAndSp(t *testing.T) {
@@ -108,7 +187,7 @@ func TestKillNPCPaysExpAndSp(t *testing.T) {
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	wantExp, wantSp := int64(4096), 32
-	readExpSpGain(t, c, wantExp, wantSp)
+	assertRewardTail(t, c, objID, wantSp, serverpackets.SystemMessageYouEarnedS1ExpAndS2SP, int32(wantExp), int32(wantSp))
 
 	// Logout persists the character; the reward must survive the round-trip.
 	logoutPersisted(t, srv, c)
