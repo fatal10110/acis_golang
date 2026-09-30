@@ -15,8 +15,11 @@ const OpcodePlayerInGame = 0x02
 func DecodePlayerInGame(payload []byte) ([]string, error) {
 	r := newReader(payload)
 	count := int(r.ReadUint16())
-	accounts := make([]string, 0, count)
-	for i := 0; i < count; i++ {
+	// Every account is at least its 2-byte terminator, so the bytes present
+	// bound both the capacity and the loop: the count alone would let a
+	// short packet reserve, then append, up to 65535 accounts.
+	accounts := make([]string, 0, min(count, r.Remaining()/2))
+	for i := 0; i < count && r.Err() == nil; i++ {
 		accounts = append(accounts, r.ReadString())
 	}
 	if r.Err() != nil {

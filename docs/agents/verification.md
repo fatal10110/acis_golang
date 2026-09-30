@@ -148,6 +148,20 @@ report it as unavailable, never as passed.
 If an external integration service is unavailable, run all independent gates and report the exact
 blocked test; do not convert the missing service into a passing result.
 
+### Inbound-packet fuzzing
+
+Changes to the frame reader, `wire.Reader`, login or link decryption, or any client or link packet
+decoder also run the fuzz target that covers them for at least 60s (no database needed):
+
+```bash
+make -C acis_golang fuzz FUZZ=FuzzGameClientPackets   # one target
+make -C acis_golang fuzz FUZZTIME=60s                  # all seven, 60s each
+```
+
+Each target fails on a panic or on a decode whose heap allocation exceeds 64 KiB plus 4x its input
+(`internal/testsupport/decodefuzz`). A new decoder joins its listener's table in the package's
+`*_fuzz_test.go` with a well-formed seed; the `*FuzzSeedsDecode` test proves the seed decodes.
+
 ## Documentation and agent configuration
 
 When only Markdown, TOML, JSON, YAML, or agent configuration changes, the full game-server suite is
