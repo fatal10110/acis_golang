@@ -20,12 +20,6 @@ type Located interface {
 	CollisionRadius() float64
 }
 
-// Pawn is a world object a MoveToPawn walk heads for.
-type Pawn interface {
-	ObjectID() int32
-	Position() (x, y, z int)
-}
-
 // Actor is the actor a Controller drives (self): its position/footprint,
 // plus its ability to broadcast its own movement to the world.
 type Actor interface {
