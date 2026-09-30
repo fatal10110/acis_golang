@@ -37,15 +37,6 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			return
 		}
 	}
-	// A pets-row read still in flight stands in for a cast the caster is
-	// still in, whether or not its hold already ended. A servitor cast started
-	// there would pay its item and MP, only to lose the slot to the inbound
-	// pet at hit, so it is refused, not queued, with an ActionFailed and no
-	// reason: queued, it would run once the pet has landed and pay for a
-	// cast refused at hit, until the servitor gate refuses it before any
-	// cost (#2513). The pre-attempt gate above still answers first, with its
-	// own reason, as it would for any caster.
-	restoringServitor := known && def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live)
 	// A request that passed the pre-attempt gate while a swing or another
 	// cast is in flight, toggle or not, becomes the next CAST intention and
 	// is answered with ActionFailed; the swing's or cast's end runs it.
@@ -54,15 +45,16 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// attack queued behind the same cast, and the attack the swing in
 	// flight is for. itemAICastBusy is the wait predicate every cast request
 	// shares, the sit-down and stand-up transitions included.
-	if castable && !restoringServitor && itemAICastBusy(live) {
+	//
+	// A pets-row read still in flight stands in for a cast the caster is
+	// still in, whether or not its hold already ended, so a servitor request
+	// made across it waits for the pet to land the same way, and the summon
+	// slot gate then refuses it before any cost.
+	if castable && (itemAICastBusy(live) || l.restoringServitor(live, def)) {
 		live.deferMagicSkill(req, selected)
 		if live.combat != nil {
 			live.combat.ReplaceWithCast()
 		}
-		sendMagicActionFailed(live)
-		return
-	}
-	if restoringServitor {
 		sendMagicActionFailed(live)
 		return
 	}
@@ -364,6 +356,8 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrWeaponNotAllowed) ||
 		errors.Is(err, actorcast.ErrCantSeeTarget) ||
 		errors.Is(err, actorcast.ErrOlympiadSkill) ||
+		errors.Is(err, actorcast.ErrSummonOnlyOne) ||
+		errors.Is(err, actorcast.ErrSummonInCombat) ||
 		errors.As(err, new(*actorcast.ConditionError))
 }
 
@@ -571,11 +565,37 @@ func (l *GameClientLink) resumeMagicSkill(live *livePlayer, queued deferredMagic
 		sendMagicCastFailureReason(live, def, err)
 		return
 	}
-	if def.SkillType == "SUMMON" && !def.IsCubic && l.restoringSummon(live) {
-		sendMagicActionFailed(live)
+	// A servitor request keeps waiting on a pets-row read that outlived the
+	// swing or cast it was queued behind; the read's end runs it.
+	if l.restoringServitor(live, def) {
+		live.deferMagicSkill(req, queued.selected)
 		return
 	}
 	l.castMagicSkill(live, req, def, true, queued.selected)
+}
+
+// restoringServitor reports whether def summons a servitor while live's
+// pets-row read is still in flight.
+func (l *GameClientLink) restoringServitor(live *livePlayer, def modelskill.Definition) bool {
+	return actorcast.ServitorSummon(def) && l.restoringSummon(live)
+}
+
+// resumeServitorAfterRestore runs a queued servitor request once live's
+// pets-row read has ended, unless a swing or cast still holds it for its own
+// end. Only a servitor request waits on the read, so any other queued
+// request is left for whatever it waits on.
+func (l *GameClientLink) resumeServitorAfterRestore(live *livePlayer) {
+	if live == nil || itemAICastBusy(live) {
+		return
+	}
+	skillID, ok := live.deferredMagicSkillID()
+	if !ok {
+		return
+	}
+	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: live.SkillLevel(int(skillID))})
+	if known && actorcast.ServitorSummon(def) {
+		l.finishDeferredMagicSkill(live)
+	}
 }
 
 // magicTargetLost reports whether a queued skill's target has left the world
@@ -809,6 +829,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 	case errors.Is(err, actorcast.ErrCubicListFull):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCubicSummoningFailed))
+	case errors.Is(err, actorcast.ErrSummonOnlyOne):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
+	case errors.Is(err, actorcast.ErrSummonInCombat):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
 	case errors.Is(err, actorcast.ErrFormalWear):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseSkillsWithFormalWear))
 	case errors.Is(err, actorcast.ErrFishingSkillsOnly):
