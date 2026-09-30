@@ -8,11 +8,6 @@ import (
 
 const itemRequestSize = 2 * 4
 
-// maxItemInPacket mirrors Config.MAX_ITEM_IN_PACKET, the larger of the
-// (file-configurable, but not yet plumbed here) MaximumSlotsForNoDwarf/
-// MaximumSlotsForDwarf player.properties defaults (80/100).
-const maxItemInPacket = 100
-
 // ItemRequest identifies one item object and the requested unit count.
 type ItemRequest struct {
 	ObjectID int32
@@ -44,9 +39,10 @@ type RequestPackageSend struct {
 }
 
 // DecodeSendWarehouseDepositList parses a raw SendWarehouseDepositList
-// payload (opcode byte included).
-func DecodeSendWarehouseDepositList(payload []byte) (SendWarehouseDepositList, error) {
-	items, err := decodeExactItemRequestBatch(payload, "SendWarehouseDepositList")
+// payload (opcode byte included) of at most maxItems rows
+// (player.InventorySlots.MaxItemInPacket).
+func DecodeSendWarehouseDepositList(payload []byte, maxItems int) (SendWarehouseDepositList, error) {
+	items, err := decodeExactItemRequestBatch(payload, "SendWarehouseDepositList", maxItems)
 	if err != nil {
 		return SendWarehouseDepositList{}, err
 	}
@@ -54,9 +50,10 @@ func DecodeSendWarehouseDepositList(payload []byte) (SendWarehouseDepositList, e
 }
 
 // DecodeSendWarehouseWithdrawList parses a raw SendWarehouseWithdrawList
-// payload (opcode byte included).
-func DecodeSendWarehouseWithdrawList(payload []byte) (SendWarehouseWithdrawList, error) {
-	items, err := decodeExactItemRequestBatch(payload, "SendWarehouseWithdrawList")
+// payload (opcode byte included) of at most maxItems rows
+// (player.InventorySlots.MaxItemInPacket).
+func DecodeSendWarehouseWithdrawList(payload []byte, maxItems int) (SendWarehouseWithdrawList, error) {
+	items, err := decodeExactItemRequestBatch(payload, "SendWarehouseWithdrawList", maxItems)
 	if err != nil {
 		return SendWarehouseWithdrawList{}, err
 	}
@@ -78,8 +75,9 @@ func DecodeRequestPackageSendableItemList(payload []byte) (RequestPackageSendabl
 }
 
 // DecodeRequestPackageSend parses a raw RequestPackageSend payload (opcode
-// byte included).
-func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
+// byte included) of at most maxItems rows
+// (player.InventorySlots.MaxItemInPacket).
+func DecodeRequestPackageSend(payload []byte, maxItems int) (RequestPackageSend, error) {
 	r := newReader(payload)
 	if r.Remaining() < 8 {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need 8 bytes, got %d: %w", r.Remaining(), wire.ErrShortPacket)
@@ -94,8 +92,8 @@ func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 	if count < 0 {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: negative item count %d", count)
 	}
-	if count > maxItemInPacket {
-		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: item count %d exceeds max %d", count, maxItemInPacket)
+	if int(count) > maxItems {
+		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: item count %d exceeds max %d", count, maxItems)
 	}
 	if r.Remaining() < int(count)*itemRequestSize {
 		return RequestPackageSend{}, fmt.Errorf("clientpackets: RequestPackageSend: need %d item bytes, got %d: %w", int(count)*itemRequestSize, r.Remaining(), wire.ErrShortPacket)
@@ -110,7 +108,7 @@ func DecodeRequestPackageSend(payload []byte) (RequestPackageSend, error) {
 	return req, nil
 }
 
-func decodeExactItemRequestBatch(payload []byte, name string) ([]ItemRequest, error) {
+func decodeExactItemRequestBatch(payload []byte, name string, maxItems int) ([]ItemRequest, error) {
 	r := newReader(payload)
 	if r.Remaining() < 4 {
 		return nil, fmt.Errorf("clientpackets: %s: need 4 bytes, got %d: %w", name, r.Remaining(), wire.ErrShortPacket)
@@ -118,6 +116,9 @@ func decodeExactItemRequestBatch(payload []byte, name string) ([]ItemRequest, er
 	count := r.ReadInt32()
 	if count <= 0 {
 		return nil, fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
+	}
+	if int(count) > maxItems {
+		return nil, fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxItems)
 	}
 	// A row-count/remaining-length mismatch mirrors the reference's silent
 	// readImpl() return (SendWarehouseDepositList/WithdrawList: "count *

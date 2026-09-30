@@ -895,7 +895,7 @@ func TestDecodeRequestBuyItem(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 	}
 
-	got, err := DecodeRequestBuyItem(payload)
+	got, err := DecodeRequestBuyItem(payload, defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeRequestBuyItem: %v", err)
 	}
@@ -921,7 +921,7 @@ func TestDecodeRequestSellItem(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 	}
 
-	got, err := DecodeRequestSellItem(payload)
+	got, err := DecodeRequestSellItem(payload, defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeRequestSellItem: %v", err)
 	}
@@ -953,10 +953,10 @@ func TestDecodeShopTradeShort(t *testing.T) {
 	if _, err := DecodeRequestShortCutDel([]byte{OpcodeRequestShortCutDel, 1}); err == nil {
 		t.Fatal("DecodeRequestShortCutDel: want error on short payload")
 	}
-	if _, err := DecodeRequestBuyItem([]byte{OpcodeRequestBuyItem, 1}); err == nil {
+	if _, err := DecodeRequestBuyItem([]byte{OpcodeRequestBuyItem, 1}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestBuyItem: want error on short payload")
 	}
-	if _, err := DecodeRequestSellItem([]byte{OpcodeRequestSellItem, 1}); err == nil {
+	if _, err := DecodeRequestSellItem([]byte{OpcodeRequestSellItem, 1}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestSellItem: want error on short payload")
 	}
 }
@@ -966,7 +966,7 @@ func TestDecodeShopTradeRejectsMalformedLists(t *testing.T) {
 		OpcodeRequestBuyItem,
 		0x01, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
-	}); err == nil {
+	}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestBuyItem: want error on zero item count")
 	}
 	if _, err := DecodeRequestSellItem([]byte{
@@ -974,7 +974,7 @@ func TestDecodeShopTradeRejectsMalformedLists(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 		0x01, 0x00, 0x00, 0x00,
 		0x01, 0x00, 0x00, 0x00,
-	}); err == nil {
+	}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestSellItem: want error on mismatched row length")
 	}
 	if _, err := DecodeRequestBuyItem([]byte{
@@ -983,7 +983,7 @@ func TestDecodeShopTradeRejectsMalformedLists(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
 		0x01, 0x00, 0x00, 0x00,
-	}); err == nil {
+	}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestBuyItem: want error on zero item id")
 	}
 	if _, err := DecodeRequestSellItem([]byte{
@@ -993,30 +993,73 @@ func TestDecodeShopTradeRejectsMalformedLists(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 		0x02, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
-	}); err == nil {
+	}, defaultMaxItemInPacket); err == nil {
 		t.Fatal("DecodeRequestSellItem: want error on zero count")
 	}
 }
 
-// TestDecodeShopTradeRejectsOversizedCount proves RequestBuyItem/
-// RequestSellItem reject a row count above Config.MAX_ITEM_IN_PACKET
-// (RequestBuyItem.java:32, RequestSellItem.java:26), mirroring the cap
-// warehouse.go already enforces for sibling packets.
-func TestDecodeShopTradeRejectsOversizedCount(t *testing.T) {
-	const oversized = maxShopItemInPacket + 1
+// defaultMaxItemInPacket is the item-list cap for the shipped inventory
+// sizes: max(MaximumSlotsForNoDwarf 80, MaximumSlotsForDwarf 100).
+const defaultMaxItemInPacket = 100
 
-	buyPayload := []byte{OpcodeRequestBuyItem, 0x01, 0x00, 0x00, 0x00}
-	buyPayload = binary.LittleEndian.AppendUint32(buyPayload, uint32(oversized))
-	buyPayload = append(buyPayload, make([]byte, oversized*shopBuyRowSize)...)
-	if _, err := DecodeRequestBuyItem(buyPayload); err == nil {
-		t.Fatal("DecodeRequestBuyItem: want error on count exceeding MAX_ITEM_IN_PACKET")
+// TestItemListDecodersFollowConfiguredCap pins every item-list decoder to
+// the configured cap it is handed (max of the configured inventory sizes,
+// not a constant): exactly maxItems well-formed rows decode, one more row is
+// rejected as a plain validation error, never as a short packet.
+func TestItemListDecodersFollowConfiguredCap(t *testing.T) {
+	const maxItems = 117
+	rows := func(n, fields int) []byte {
+		var b []byte
+		for range n * fields {
+			b = binary.LittleEndian.AppendUint32(b, 1)
+		}
+		return b
 	}
-
-	sellPayload := []byte{OpcodeRequestSellItem, 0x01, 0x00, 0x00, 0x00}
-	sellPayload = binary.LittleEndian.AppendUint32(sellPayload, uint32(oversized))
-	sellPayload = append(sellPayload, make([]byte, oversized*shopSellRowSize)...)
-	if _, err := DecodeRequestSellItem(sellPayload); err == nil {
-		t.Fatal("DecodeRequestSellItem: want error on count exceeding MAX_ITEM_IN_PACKET")
+	withCount := func(head []byte, n, fields int) []byte {
+		b := binary.LittleEndian.AppendUint32(append([]byte(nil), head...), uint32(n))
+		return append(b, rows(n, fields)...)
+	}
+	decoders := []struct {
+		name   string
+		fields int
+		head   []byte
+		decode func([]byte, int) (int, error)
+	}{
+		{"RequestBuyItem", 2, []byte{OpcodeRequestBuyItem, 1, 0, 0, 0}, func(p []byte, m int) (int, error) {
+			r, err := DecodeRequestBuyItem(p, m)
+			return len(r.Items), err
+		}},
+		{"RequestSellItem", 3, []byte{OpcodeRequestSellItem, 1, 0, 0, 0}, func(p []byte, m int) (int, error) {
+			r, err := DecodeRequestSellItem(p, m)
+			return len(r.Items), err
+		}},
+		{"SendWarehouseDepositList", 2, []byte{OpcodeSendWarehouseDeposit}, func(p []byte, m int) (int, error) {
+			r, err := DecodeSendWarehouseDepositList(p, m)
+			return len(r.Items), err
+		}},
+		{"SendWarehouseWithdrawList", 2, []byte{OpcodeSendWarehouseWithdraw}, func(p []byte, m int) (int, error) {
+			r, err := DecodeSendWarehouseWithdrawList(p, m)
+			return len(r.Items), err
+		}},
+		{"RequestPackageSend", 2, []byte{OpcodeRequestPackageSend, 1, 0, 0, 0}, func(p []byte, m int) (int, error) {
+			r, err := DecodeRequestPackageSend(p, m)
+			return len(r.Items), err
+		}},
+	}
+	for _, d := range decoders {
+		t.Run(d.name, func(t *testing.T) {
+			n, err := d.decode(withCount(d.head, maxItems, d.fields), maxItems)
+			if err != nil || n != maxItems {
+				t.Fatalf("%d rows at cap %d = %d rows, %v; want all accepted", maxItems, maxItems, n, err)
+			}
+			_, err = d.decode(withCount(d.head, maxItems+1, d.fields), maxItems)
+			if err == nil {
+				t.Fatalf("%d rows at cap %d accepted, want rejected", maxItems+1, maxItems)
+			}
+			if errors.Is(err, wire.ErrShortPacket) {
+				t.Fatalf("over-cap error = %v, want a non-short-packet validation error", err)
+			}
+		})
 	}
 }
 
@@ -1311,11 +1354,11 @@ func TestDecodeWarehouseItemBatchPackets(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 	}
 
-	deposit, err := DecodeSendWarehouseDepositList(payload)
+	deposit, err := DecodeSendWarehouseDepositList(payload, defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeSendWarehouseDepositList: %v", err)
 	}
-	withdraw, err := DecodeSendWarehouseWithdrawList(append([]byte{OpcodeSendWarehouseWithdraw}, payload[1:]...))
+	withdraw, err := DecodeSendWarehouseWithdrawList(append([]byte{OpcodeSendWarehouseWithdraw}, payload[1:]...), defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeSendWarehouseWithdrawList: %v", err)
 	}
@@ -1341,7 +1384,7 @@ func TestDecodeWarehouseItemBatchRejectsMalformedPayload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := DecodeSendWarehouseDepositList(tt.payload); err == nil {
+			if _, err := DecodeSendWarehouseDepositList(tt.payload, defaultMaxItemInPacket); err == nil {
 				t.Fatal("DecodeSendWarehouseDepositList: want error")
 			}
 		})
@@ -1371,7 +1414,7 @@ func TestDecodeRequestPackageSend(t *testing.T) {
 		0x01, 0x00, 0x00, 0x00,
 	}
 
-	got, err := DecodeRequestPackageSend(payload)
+	got, err := DecodeRequestPackageSend(payload, defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeRequestPackageSend: %v", err)
 	}
@@ -1384,7 +1427,7 @@ func TestDecodeRequestPackageSend(t *testing.T) {
 func TestDecodeRequestPackageSendAllowsEmptyList(t *testing.T) {
 	payload := []byte{OpcodeRequestPackageSend, 0x78, 0x56, 0x34, 0x12, 0, 0, 0, 0}
 
-	got, err := DecodeRequestPackageSend(payload)
+	got, err := DecodeRequestPackageSend(payload, defaultMaxItemInPacket)
 	if err != nil {
 		t.Fatalf("DecodeRequestPackageSend: %v", err)
 	}
@@ -1394,7 +1437,7 @@ func TestDecodeRequestPackageSendAllowsEmptyList(t *testing.T) {
 }
 
 // TestDecodeRequestPackageSendCountAboveMaxIsNotShortPacket proves a
-// count exceeding maxItemInPacket (mirroring Config.MAX_ITEM_IN_PACKET,
+// count exceeding the item-list cap (mirroring Config.MAX_ITEM_IN_PACKET,
 // whose readImpl() guard returns silently before any row read, so it can
 // never throw BufferUnderflowException) is a plain validation error, not
 // classified as a buffer-underflow-equivalent wire.ErrShortPacket -- even
@@ -1404,10 +1447,10 @@ func TestDecodeRequestPackageSendCountAboveMaxIsNotShortPacket(t *testing.T) {
 	payload := []byte{
 		OpcodeRequestPackageSend,
 		0x78, 0x56, 0x34, 0x12,
-		0x65, 0x00, 0x00, 0x00, // count = 101, exceeds maxItemInPacket (100)
+		0x65, 0x00, 0x00, 0x00, // count = 101, exceeds the default cap (100)
 	}
 
-	_, err := DecodeRequestPackageSend(payload)
+	_, err := DecodeRequestPackageSend(payload, defaultMaxItemInPacket)
 	if err == nil {
 		t.Fatal("DecodeRequestPackageSend: want error for count above max")
 	}
@@ -1427,7 +1470,7 @@ func TestDecodeRequestPackageSendRejectsMalformedPayload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, err := DecodeRequestPackageSend(tt.payload); err == nil {
+			if _, err := DecodeRequestPackageSend(tt.payload, defaultMaxItemInPacket); err == nil {
 				t.Fatal("DecodeRequestPackageSend: want error")
 			}
 		})

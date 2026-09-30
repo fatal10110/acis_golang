@@ -74,7 +74,11 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	c.ExpBeforeDeath = c.Exp
 
 	c.updateKarmaLoss(table, lostExp, &hooks)
-	c.removeExpAndSp(table, c.runtimeTemplate, lostExp, 0, &hooks)
+	// The loss is a negative experience add, not a removal: one that would
+	// take experience below zero is dropped rather than floored, no loss
+	// message goes out, and UserInfo is sent either way.
+	c.addExp(table, c.runtimeTemplate, -lostExp, &hooks)
+	hooks.add(c.UpdateUserInfo)
 }
 
 // RestoreExp restores restorePercent (0-100) of the experience lost in this
@@ -93,9 +97,12 @@ func (c *Character) RestoreExp(restorePercent float64) {
 	}
 	restored := int64(math.Round(float64(c.ExpBeforeDeath-c.Exp) * restorePercent / 100))
 	c.ExpBeforeDeath = 0
+	// A bare experience add: UserInfo, but no reward message.
+	var hooks progressionHooks
+	c.addExp(table, c.runtimeTemplate, restored, &hooks)
 	c.progressionMu.Unlock()
-
-	c.addExpAndSp(table, c.runtimeTemplate, restored, -1)
+	hooks.run()
+	c.UpdateUserInfo()
 }
 
 // UpdateKarmaLoss reduces this character's karma for exp experience earned

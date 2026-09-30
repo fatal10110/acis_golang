@@ -150,6 +150,7 @@ type Character struct {
 	weightPenalty            int
 	weightLimitMultiplier    float64
 	inventorySlots           InventorySlots
+	storageSlots             StorageSlots
 	maxBuffsAmount           int
 	awardPKKillPVPPoint      bool
 	roll                     func(int) int

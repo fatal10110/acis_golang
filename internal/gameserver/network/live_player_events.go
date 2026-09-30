@@ -161,6 +161,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(expSpGainMessage(e.Exp, e.SP))
 	case event.ExpSPLost:
 		sendExpSpLossFrames(live, e)
+	case event.SPChanged:
+		live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
+			{Type: serverpackets.StatusSP, Value: e.SP},
+		}))
 	case event.KarmaChanged:
 		sendKarmaChangeFrames(live, e.Karma)
 	case event.RelationChanged:
@@ -207,7 +211,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
 		l.refreshLiveItemStats(live)
 	case event.WeightPenaltyChanged:
-		l.sendLiveWeightPenalty(live)
+		// The login decides the band inside the replay window, where the
+		// burst's own frames carry it.
+		if !live.replayingEffects.Load() {
+			l.sendLiveWeightPenalty(live)
+		}
 	case event.DeathPenaltyChanged:
 		l.applyLiveDeathPenalty(live, e)
 	case event.LevelChanged:

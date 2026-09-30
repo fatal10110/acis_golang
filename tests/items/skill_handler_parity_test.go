@@ -30,8 +30,8 @@ const (
 
 // TestUseSPScrollGrantsSPAndConsumes drives the SP scroll end to end: the
 // item-carried GIVE_SP cast grants its power as SP with the self-only
-// UserInfo refresh and ACQUIRED_S1_SP message, consumes one scroll, and the
-// SP survives logout into the character row.
+// UserInfo, StatusUpdate(SP) and ACQUIRED_S1_SP message, consumes one scroll,
+// and the SP survives logout into the character row.
 func TestUseSPScrollGrantsSPAndConsumes(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -75,35 +75,46 @@ func TestUseSPScrollGrantsSPAndConsumes(t *testing.T) {
 	}
 }
 
-// readSPGain reads until the ACQUIRED_S1_SP message, requiring the UserInfo
-// that refreshes the SP to arrive before it.
+// readSPGain reads until the ACQUIRED_S1_SP message, requiring the packets
+// GIVE_SP's addExpAndSp(0, sp) sends ahead of it, back to back: UserInfo for
+// the zero experience add (PlayerStatus.java:478-485), then
+// StatusUpdate(SP) with the new total (PlayerStatus.java:881-891), then the
+// message (PlayerStatus.java:501-520). The character starts with no SP, so
+// the total is sp.
 func readSPGain(t *testing.T, c *testsupport.ScriptedClient, sp int32) {
 	t.Helper()
-	sawUserInfo := false
+	var seen []string
 	for range 50 {
 		frame := c.ReadWithTimeout(2 * time.Second)
 		if frame == nil {
 			t.Fatalf("ACQUIRED_S1_SP for %d never arrived", sp)
 		}
+		r := wire.NewReader(frame[1:])
+		kind := "other"
 		switch frame[0] {
 		case serverpackets.OpcodeUserInfo:
-			sawUserInfo = true
-			continue
+			kind = "userinfo"
+		case serverpackets.OpcodeStatusUpdate:
+			r.ReadInt32() // object id
+			if count, typ := r.ReadInt32(), r.ReadInt32(); count == 1 && typ == int32(serverpackets.StatusSP) {
+				if got := r.ReadInt32(); got != sp {
+					t.Fatalf("StatusUpdate(SP) = %d, want %d", got, sp)
+				}
+				kind = "sp"
+			}
 		case serverpackets.OpcodeSystemMessage:
-		default:
-			continue
+			if id := r.ReadInt32(); id != serverpackets.SystemMessageAcquiredS1SP {
+				t.Fatalf("SystemMessage id = %d, want ACQUIRED_S1_SP (%d)", id, serverpackets.SystemMessageAcquiredS1SP)
+			}
+			if len(seen) < 2 || seen[len(seen)-2] != "userinfo" || seen[len(seen)-1] != "sp" {
+				t.Fatalf("frames before ACQUIRED_S1_SP = %v, want ... userinfo sp", seen)
+			}
+			if params, typ, got := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); params != 1 || typ != serverpackets.SystemMessageParamNumber || got != sp {
+				t.Fatalf("ACQUIRED_S1_SP params = %d type %d value %d, want 1 number %d", params, typ, got, sp)
+			}
+			return
 		}
-		r := wire.NewReader(frame[1:])
-		if id := r.ReadInt32(); id != serverpackets.SystemMessageAcquiredS1SP {
-			t.Fatalf("SystemMessage id = %d, want ACQUIRED_S1_SP (%d)", id, serverpackets.SystemMessageAcquiredS1SP)
-		}
-		if !sawUserInfo {
-			t.Fatal("ACQUIRED_S1_SP arrived before the UserInfo carrying the new SP")
-		}
-		if params, typ, got := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); params != 1 || typ != serverpackets.SystemMessageParamNumber || got != sp {
-			t.Fatalf("ACQUIRED_S1_SP params = %d type %d value %d, want 1 number %d", params, typ, got, sp)
-		}
-		return
+		seen = append(seen, kind)
 	}
 	t.Fatal("ACQUIRED_S1_SP not found within 50 frames")
 }

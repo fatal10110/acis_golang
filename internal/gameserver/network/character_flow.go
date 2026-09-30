@@ -307,7 +307,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// snapshot rather than missed.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
-	c.RefreshWeightPenalty()
 	skillList := skillListEntries(c, l.skills)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
@@ -328,11 +327,17 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate
 	// frame (if any effect was restored) right where the reference sends it,
 	// ahead of EtcStatusUpdate.
+	live.replayingEffects.Store(true)
 	if l.skills != nil {
-		live.replayingEffects.Store(true)
 		l.skills.ReplayEffects(c)
-		live.replayingEffects.Store(false)
 	}
+	// Decide the restored load's penalty band only now that the replayed
+	// effects and the equipped items have set the weight limit, and inside
+	// the silent replay window: the EtcStatusUpdate below and every later
+	// login frame carry the band, and sendLoginWeight reports the change
+	// between UserInfo and ItemList.
+	c.RefreshWeightPenalty()
+	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
@@ -356,6 +361,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.shortcuts.All())))
 	if c.Dead() {
@@ -364,6 +370,26 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
+}
+
+// sendLoginWeight reports the restored load between the login burst's
+// UserInfo and its ItemList: StatusUpdate(CUR_LOAD) for any carried weight,
+// then the penalty band's refresh (UserInfo, EtcStatusUpdate, CharInfo to
+// every player that already sees live) when that load sits in a band.
+// Both were decided silently earlier in the login, so every earlier login
+// frame already carries them and this is the client's first report of the
+// change.
+func (l *GameClientLink) sendLoginWeight(live *livePlayer) {
+	weight := live.CurrentWeight()
+	if weight == 0 {
+		return
+	}
+	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{{
+		Type: serverpackets.StatusCurrentLoad, Value: weight,
+	}}))
+	if live.WeightPenalty() != 0 {
+		l.sendLiveWeightPenalty(live)
+	}
 }
 
 // sevenSignsPeriodMessage maps a Seven Signs period onto the system message
@@ -615,6 +641,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,
 			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
 			InventorySlots:         l.playerConfig.InventorySlots,
+			StorageSlots:           l.playerConfig.StorageSlots,
 			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
 			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,
 			DeathPenaltyChance:     l.playerConfig.DeathPenaltyChance,
@@ -634,7 +661,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		rt.MountData = mountDataTable{npcs: l.npcs}
 	}
 	c.Configure(rt)
-	c.RefreshWeightPenalty()
+	// Restored rows leave the carried weight at 0. Compute it here, while the
+	// inventory has no live delivery target, so it stays silent: every login
+	// frame carries the real load, and finishEnterWorld reports it between
+	// UserInfo and ItemList. The penalty band waits for the restored stats
+	// that move the weight limit (finishEnterWorld, after the effect replay).
+	if inv := c.Inventory(); inv != nil {
+		inv.UpdateWeight()
+	}
 	c.RefreshExpertisePenalty()
 
 	x, y, z := c.Position()
@@ -664,13 +698,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
-	if inv := c.Inventory(); inv != nil {
-		// Restored rows never queue update notifications, so totalWeight stays
-		// 0 unless recomputed here, matching the reference's ItemList
-		// constructor calling PcInventory.updateWeight() on every send
-		// (including the one EnterWorld makes right after this).
-		inv.UpdateWeight()
-	}
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {
 			tmpl, ok := inv.Templates().Get(inst.TemplateID)

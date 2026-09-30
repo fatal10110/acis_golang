@@ -3,7 +3,6 @@ package combat
 import (
 	"context"
 	"testing"
-	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -75,40 +74,28 @@ func killPrimaryClient(t *testing.T, srv *gameservertest.Server, killer *scripte
 	srv.Settle(t)
 }
 
-// readExpLossMessage scans the victim's frames until the experience-loss
-// announcement arrives and asserts its amount.
-func readExpLossMessage(t *testing.T, c *scriptedClient, wantLost int64) {
+// assertSilentExpLoss reads the victim's frames until they go quiet and
+// checks the experience loss told the client the way the reference does: a
+// death's loss is a negative experience add (Player.applyDeathPenalty,
+// Player.java:2925), so it sends UserInfo (PlayerStatus.addExp,
+// PlayerStatus.java:478-485) and no EXP_DECREASED_BY_S1 — only
+// PlayerStatus.removeExpAndSp (PlayerStatus.java:583-603) sends that, and a
+// death never calls it.
+func assertSilentExpLoss(t *testing.T, c *scriptedClient) {
 	t.Helper()
-	for i := 0; i < 50; i++ {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			t.Fatalf("experience-loss message for %d never arrived", wantLost)
-		}
-		if frame[0] != serverpackets.OpcodeSystemMessage {
-			continue
-		}
-		r := wireReader(frame[1:])
-		if id := r.ReadInt32(); id != int32(serverpackets.SystemMessageExpDecreasedByS1) {
-			continue
-		}
-		if params := r.ReadInt32(); params != 1 {
-			t.Fatalf("exp-loss message params = %d, want 1", params)
-		}
-		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamNumber {
-			t.Fatalf("exp-loss message param type = %d, want number", typ)
-		}
-		if got := r.ReadInt32(); got != int32(wantLost) {
-			t.Fatalf("exp-loss message amount = %d, want %d", got, wantLost)
-		}
-		return
+	frames := readQuiet(c)
+	if lost := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageExpDecreasedByS1); lost >= 0 {
+		t.Fatalf("death sent EXP_DECREASED_BY_S1 at frame %d; the reference sends none", lost)
 	}
-	t.Fatal("experience-loss message not found within 50 frames")
+	if indexOf(frames, 0, serverpackets.OpcodeUserInfo, -1) < 0 {
+		t.Fatal("death's experience loss sent no UserInfo")
+	}
 }
 
 // TestDeathCostsConfiguredExperience walks the exp half of the death
 // penalty: a karma-free victim dies to a forced cast and loses exactly
-// round(span * ExpLossAtDeath / 100) — 200 of its 1500 — announced on the
-// wire and persisted at logout.
+// round(span * ExpLossAtDeath / 100) — 200 of its 1500 — told to the client
+// through UserInfo alone and persisted at logout.
 func TestDeathCostsConfiguredExperience(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -131,8 +118,7 @@ func TestDeathCostsConfiguredExperience(t *testing.T) {
 
 	killPrimaryClient(t, srv, killer, killerChar.ID, victimID)
 
-	readExpLossMessage(t, c, 200)
-	drainUntilQuiet(t, c)
+	assertSilentExpLoss(t, c)
 
 	// Logout persists the character; the reduced total must survive.
 	logoutPersisted(t, srv, c)
@@ -167,11 +153,10 @@ func TestKarmaDeathLosesKarma(t *testing.T) {
 
 	killPrimaryClient(t, srv, killer, killerChar.ID, victimID)
 
-	// The dying client learns both costs: its new karma total first (the
-	// karma update precedes the exp removal), then the exp loss.
+	// The dying client learns its new karma total (the karma update precedes
+	// the exp loss); the loss itself only refreshes UserInfo.
 	assertKarmaChangeFrames(t, c, victimID, 227)
-	readExpLossMessage(t, c, 400)
-	drainUntilQuiet(t, c)
+	assertSilentExpLoss(t, c)
 
 	logoutPersisted(t, srv, c)
 	if ch, err := srv.Chars.Get(context.Background(), victimID); err != nil || ch.Exp != 1100 || ch.KarmaPoints != 227 {

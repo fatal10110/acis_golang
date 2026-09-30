@@ -29,6 +29,41 @@ type olympiadGate interface {
 	ActingPlayerInOlympiad() bool
 }
 
+// servitorGate is the optional Actor capability CanCast asks before a
+// servitor summon pays anything: whether the player already has a summon
+// out, rides a mount, or is mid-swing. Only a player caster answers it.
+type servitorGate interface {
+	HasSummon() bool
+	Mounted() bool
+	AttackingNow() bool
+}
+
+// ServitorSummon reports whether def summons a servitor rather than a cubic.
+func ServitorSummon(def modelskill.Definition) bool {
+	return def.SkillType == "SUMMON" && !def.IsCubic
+}
+
+// HasSummon reports whether the player has a summon in the world. A pet
+// still resolving its pets row is not in it yet.
+func (a PlayerActor) HasSummon() bool {
+	if a.Character == nil {
+		return false
+	}
+	_, ok := a.Character.Summon()
+	return ok
+}
+
+// Mounted reports whether the player rides a mount.
+func (a PlayerActor) Mounted() bool {
+	return a.Character != nil && a.Character.Mounted()
+}
+
+// AttackingNow reports whether the player's swing is still in flight. The
+// attack stance that outlives a swing does not count.
+func (a PlayerActor) AttackingNow() bool {
+	return a.Attack != nil && a.Attack.AttackingNow()
+}
+
 // olympiadRestricted reports whether def is barred from Olympiad matches.
 func olympiadRestricted(def modelskill.Definition) bool {
 	return def.HeroSkill || def.SkillType == "RESURRECT"

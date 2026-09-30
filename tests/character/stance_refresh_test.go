@@ -92,7 +92,7 @@ func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
 	self.Read() // SSQInfo
 	self.Read() // CharSelected
 	self.Send(encodeEnterWorld())
-	// The overload StatusUpdate precedes the usual world-entry burst.
+	// The overload StatusUpdate and band refresh ride inside the world-entry burst.
 	drainQuiet(t, self)
 	srv.SeedCharacterFor(t, "observer", "Observer", 1, 0)
 	observer := srv.DialClient(t, "observer", 1)

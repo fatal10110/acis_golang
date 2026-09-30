@@ -192,3 +192,38 @@ func TestSummonActorAsksItsOwnerAboutOlympiad(t *testing.T) {
 		})
 	}
 }
+
+// swingState is a player's swing, in flight or not.
+type swingState bool
+
+func (s swingState) AttackingNow() bool { return bool(s) }
+
+// TestServitorSummonMidSwingAnswersCannotSummonInCombat pins the in-combat
+// half of the servitor gate, PlayerCast.canCast's
+// YOU_CANNOT_SUMMON_IN_COMBAT (PlayerCast.java:279-283). A request made
+// mid-swing waits for the swing's end, which clears the swing first, so no
+// request packet reaches it; only a swing in flight at the cost check does.
+// A cubic summon is never refused by it.
+func TestServitorSummonMidSwingAnswersCannotSummonInCombat(t *testing.T) {
+	_, ch := newGatePlayer(t)
+	servitor := modelskill.Definition{ID: 1111, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: "SUMMON", NpcID: 12600}
+	cubic := servitor
+	cubic.ID, cubic.IsCubic = 10, true
+	for _, tt := range []struct {
+		name     string
+		def      modelskill.Definition
+		swinging swingState
+		want     error
+	}{
+		{name: "servitor mid-swing", def: servitor, swinging: true, want: ErrSummonInCombat},
+		{name: "servitor between swings", def: servitor},
+		{name: "cubic mid-swing", def: cubic, swinging: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := NewController(PlayerActor{Character: ch, Attack: tt.swinging}, nil)
+			if err := ctrl.CanCast(ch, tt.def); !errors.Is(err, tt.want) {
+				t.Fatalf("CanCast = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
