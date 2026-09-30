@@ -191,8 +191,9 @@ func TestGuardDoesNotIdleWander(t *testing.T) {
 }
 
 // TestIdleHostileWanderArrivedClearsDesire pins NpcAI.onEvtArrived's
-// WANDER arm: finishing a wander step drops that desire and idles, then
-// the next TickThink re-queues idle wander without promoting it; the
+// WANDER arm: finishing a wander step drops that desire and keeps WANDER
+// current, then the next TickThink idles on the empty queue and re-queues
+// idle wander without promoting it; the
 // cycle after that promotes wander. lastDesire is still wander, so
 // thinkWander arms the timer instead of MoveFromSpawnUsingRandomOffset.
 func TestIdleHostileWanderArrivedClearsDesire(t *testing.T) {
@@ -242,8 +243,8 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	}
 
 	arrive(hostile)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() after arrival = %v, want wander kept", got)
 	}
 	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire still queued after arrival")

@@ -80,14 +80,16 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	// Production MoveToLocation snaps destination Z through geo.Height, so
 	// arrival is not an exact Home identity. Drive the onEvtArrived path.
 	hostile.SetXYZ(home.X, home.Y, home.Z-4)
+	// The arrival drops the MOVE_TO desire and keeps the walk current; the
+	// next AI cycle idles it.
 	hostile.AI().Arrived()
-	if err := hostile.Think(); err != nil {
-		t.Fatalf("Think() after arrival error: %v", err)
-	}
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after arrival = %v, want idle", got)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after arrival = %v, want move_to kept", got)
 	}
 	tickThinkIdle(t, hostile)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after the idle cycle = %v, want idle", got)
+	}
 	// Periodic idle abort matches thinkIdle: leftover movement StopMove
 	// and walk stance. SiegeGuard return-home had switched to run, so
 	// observers then see ChangeMoveType(walk) and nothing else.
