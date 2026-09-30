@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -270,5 +271,59 @@ func TestThroneClickMidCastInteractsAtCastEnd(t *testing.T) {
 	assertThroneInteract(t, srv.Client, throne, serverpackets.OpcodeMagicSkillLaunched, 2*queueHitTime*time.Millisecond)
 	if !pc.Standing() {
 		t.Fatal("a throne click left the player not standing")
+	}
+}
+
+// TestFearedThroneClickKeepsFleeing pins PlayableAI.tryToInteract's deny
+// gate (PlayableAI.java:373-379): a feared player's second click on a
+// selected throne is answered ActionFailed alone. Nothing is queued or run,
+// so no StopMove cuts the fear flee short and the player keeps running.
+func TestFearedThroneClickKeepsFleeing(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	home := location.Location{X: hostileX, Y: hostileY, Z: hostileZ}
+	hostile := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
+	throne := spawnThrone(t, srv)
+	drainUntilQuiet(t, c)
+
+	x, y, z := int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z)
+	c.Send(encodeAction(throne.ObjectID(), x, y, z, false))
+	readUntil(t, c, serverpackets.OpcodeMyTargetSelected, "throne selected")
+	drainUntilQuiet(t, c)
+
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	player, ok := obj.(interface {
+		effectHolder
+		IsMoving() bool
+	})
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is not an effect holder", objID, obj)
+	}
+	landFear(t, hostile, player, curseFearSkillID, 10)
+	readMoveOf(t, c, objID, "landing flee")
+	if !player.IsMoving() {
+		t.Fatal("IsMoving() = false after the landing flee, want a live run")
+	}
+
+	c.Send(encodeAction(throne.ObjectID(), x, y, z, false))
+	var opcodes []byte
+	for _, frame := range readImmediateFrames(c) {
+		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) || frame[0] == serverpackets.OpcodeActionFailed {
+			opcodes = append(opcodes, frame[0])
+		}
+	}
+	if len(opcodes) != 1 || opcodes[0] != serverpackets.OpcodeActionFailed {
+		t.Fatalf("feared throne click answered opcodes %x, want ActionFailed alone", opcodes)
+	}
+	if !player.IsMoving() {
+		t.Fatal("the feared throne click stopped the fear flee")
+	}
+	if throne.Busy() {
+		t.Fatal("a feared throne click claimed the throne")
 	}
 }

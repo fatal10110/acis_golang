@@ -85,9 +85,15 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	}
 	// A static object's interact also waits out a swing or a cast; every
 	// other selected-target click waits here only for a sit-down or
-	// stand-up.
+	// stand-up. A player that cannot act is refused the interact outright,
+	// before anything is queued or run, so the click leaves a fear flee or
+	// any other walk under way untouched.
 	busy := inPostureTransition(live)
 	if _, static := target.(*staticobject.Object); static {
+		if live.DenyAIAction() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		busy = itemAICastBusy(live)
 	}
 	if busy {
