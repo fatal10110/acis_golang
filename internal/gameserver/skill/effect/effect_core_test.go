@@ -433,13 +433,11 @@ func TestBigHeadEffectCarriesVisibleAbnormalHooks(t *testing.T) {
 	}
 }
 
-// TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh proves
-// BigHead's start/exit hooks flip the 0x002000 mask and drive both the icon
-// refresh (UpdateAbnormalEffect, Java's EffectList.updateEffectIcons()) and
-// the client-visible mask broadcast (BroadcastAbnormalEffect, Java's
-// Creature.startAbnormalEffect() -> updateAbnormalEffect()) — the gap this
-// issue closes for player targets.
-func TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh(t *testing.T) {
+// TestBigHeadEffectTogglesMaskAndRefreshesAppearanceOnce proves BigHead's
+// start/exit hooks flip the 0x002000 mask and re-announce the target's
+// appearance exactly once each (Creature.startAbnormalEffect() ->
+// updateAbnormalEffect()), with no separate broadcast on top.
+func TestBigHeadEffectTogglesMaskAndRefreshesAppearanceOnce(t *testing.T) {
 	target := &abnormalPlayerTarget{}
 	e, err := New(Skill{}, modelskill.EffectTemplate{Name: "BigHead"})
 	if err != nil {
@@ -452,7 +450,7 @@ func TestBigHeadEffectTogglesMaskAndBroadcastsDistinctFromIconRefresh(t *testing
 	}
 	e.OnExit(e)
 
-	want := []string{"start:0x2000", "abnormal", "broadcast", "stop:0x2000", "abnormal", "broadcast"}
+	want := []string{"start:0x2000", "abnormal", "stop:0x2000", "abnormal"}
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events = %#v, want %#v", target.events, want)
 	}
@@ -487,13 +485,13 @@ func TestClanGateEffectStartsAndStopsMagicCircle(t *testing.T) {
 	if !e.OnStart(e) {
 		t.Fatal("ClanGate OnStart() = false, want true")
 	}
-	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal", "broadcast"}
+	want := []string{fmt.Sprintf("start:%#x", magicCircleAbnormalMask), "abnormal"}
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("start events = %#v, want %#v", target.events, want)
 	}
 
 	e.OnExit(e)
-	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal", "broadcast")
+	want = append(want, fmt.Sprintf("stop:%#x", magicCircleAbnormalMask), "abnormal")
 	if !reflect.DeepEqual(target.events, want) {
 		t.Fatalf("events after exit = %#v, want %#v", target.events, want)
 	}
@@ -776,10 +774,6 @@ func (t *liveEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
 }
 
-func (t *liveEffectTarget) BroadcastAbnormalEffect() {
-	t.events = append(t.events, "broadcast")
-}
-
 func (t *liveEffectTarget) Think() error {
 	t.events = append(t.events, "think")
 	return nil
@@ -989,10 +983,6 @@ func (t *growEffectTarget) StopAbnormalEffect(mask int) {
 
 func (t *growEffectTarget) UpdateAbnormalEffect() {
 	t.events = append(t.events, "abnormal")
-}
-
-func (t *growEffectTarget) BroadcastAbnormalEffect() {
-	t.events = append(t.events, "broadcast")
 }
 
 // ---- from hooks_chance_trigger_test.go ----

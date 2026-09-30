@@ -326,7 +326,6 @@ func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause,
 		Time:             int(a.int32LiteralDefault("time", 1)),
 		Self:             a.int32LiteralDefault("self", 0) == 1,
 		Icon:             a.int32LiteralDefault("noicon", 0) != 1,
-		Abnormal:         a.strDefault("abnormal", "NULL"),
 		StackType:        a.strDefault("stackType", "none"),
 		StackOrder:       a.float64Default("stackOrder", 0),
 		EffectPower:      a.float64Default("effectPower", -1),
@@ -337,6 +336,13 @@ func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause,
 		ChanceType:       a.strDefault("chanceType", ""),
 		ActivationChance: int(a.int32LiteralDefault("activationChance", -1)),
 		AttachCondition:  attachCond,
+	}
+	if a.has("abnormal") {
+		mask, err := skill.ParseAbnormalEffect(a.str("abnormal"))
+		if err != nil {
+			a.fail(fmt.Errorf("attribute %q: %w", "abnormal", err))
+		}
+		eff.AbnormalEffect = mask
 	}
 	if err := a.Err(); err != nil {
 		return skill.EffectTemplate{}, err

@@ -116,12 +116,12 @@ func (c *Character) UpdateUserInfo() {
 	c.emit(event.UserInfoChanged{})
 }
 
-// UpdateAbnormalEffect reports that this character's active-effect icon list
-// changed, called from effect hooks and the effect list's icon refresh: it fires on every effect start and stop, matching
-// Creature.addEffect()/removeEffect() unconditionally queueing an
-// EffectList icon update on each attempt.
+// UpdateAbnormalEffect reports that this character's appearance (its
+// abnormal-effect bitmask and crowd-control state) changed, so its UserInfo
+// and its observers' CharInfo must be resent. Effect start/exit hooks call
+// it; the effect list's icon refresh is UpdateEffectIcons.
 func (c *Character) UpdateAbnormalEffect() {
-	c.emit(event.EffectIconsChanged{})
+	c.emit(event.AbnormalEffectChanged{})
 }
 
 // StartAbnormalEffect adds mask to this character's client-visible

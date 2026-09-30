@@ -100,5 +100,7 @@ func (c *Character) stopPhoenixBlessing() {
 	c.BroadcastAbnormalEffect()
 }
 
-// UpdateEffectIcons refreshes the player's effect icons.
-func (c *Character) UpdateEffectIcons() { c.UpdateAbnormalEffect() }
+// UpdateEffectIcons reports that the player's active-effect icon list must
+// be resent. The effect list calls it on every add or remove attempt,
+// whether or not the attempt changed anything.
+func (c *Character) UpdateEffectIcons() { c.emit(event.EffectIconsChanged{}) }

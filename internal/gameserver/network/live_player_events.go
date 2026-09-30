@@ -134,7 +134,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.EffectIconsChanged:
 		l.updateLiveAbnormalEffect(live)
 	case event.AbnormalEffectChanged:
-		l.broadcastCharacterInfo(live)
+		if !live.replayingEffects.Load() {
+			l.broadcastCharacterInfo(live)
+		}
 	case event.ExpSPGained:
 		live.SendFrame(expSpGainMessage(e.Exp, e.SP))
 	case event.ExpSPLost:

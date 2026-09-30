@@ -71,8 +71,14 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
-	shortcuts          *shortcut.List
-	isGM               bool
+	// replayingEffects is set while EnterWorld replays the saved effects,
+	// before the player is in the world. Their start hooks change its
+	// appearance, but it has no observers yet and the EnterWorld UserInfo
+	// that follows carries the result, so the appearance refresh stays
+	// silent. Written on the owner's queue; atomic for the Emit readers.
+	replayingEffects atomic.Bool
+	shortcuts        *shortcut.List
+	isGM             bool
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.

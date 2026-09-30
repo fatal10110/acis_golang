@@ -101,6 +101,8 @@ type FuncTemplate struct {
 
 // EffectTemplate is one parsed <effect> block. Runtime effect behavior is
 // built later; this type preserves the full XML template shape.
+// AbnormalEffect is the client abnormal-visual bitmask the abnormal
+// attribute names (0 for none), resolved at load.
 type EffectTemplate struct {
 	Name             string
 	Value            float64
@@ -108,7 +110,7 @@ type EffectTemplate struct {
 	Time             int
 	Self             bool
 	Icon             bool
-	Abnormal         string
+	AbnormalEffect   int
 	StackType        string
 	StackOrder       float64
 	EffectPower      float64
