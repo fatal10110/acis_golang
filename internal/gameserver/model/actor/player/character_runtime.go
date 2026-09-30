@@ -283,6 +283,13 @@ func (c *Character) SessionDetached() bool { return c.sessionDetached.Load() }
 // a combatant reached through a summon's owner resolves to its model.
 func (c *Character) PlayerCharacter() *Character { return c }
 
+// CharacterHolder resolves to its underlying *Character: the model itself or
+// a live wrapper embedding it. NPCs, summons, and doors are not holders, so
+// an assertion to it legitimately fails for them.
+type CharacterHolder interface {
+	PlayerCharacter() *Character
+}
+
 func (c *Character) emit(e event.Event) {
 	if c.sink != nil {
 		c.sink.Emit(e)
