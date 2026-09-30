@@ -10,10 +10,25 @@ import (
 
 var _ skilltarget.Actor = (*Object)(nil)
 
+// CanSeeTarget reports line of sight from this door to t, as when an area
+// skill centered on the door picks its splash victims: the geodata query runs
+// from the door's position raised by its eye height, a t that is itself a
+// geodata object (another closed door) is left out of the query, and this
+// door's own geodata stays in it, so a closed door standing in its own
+// footprint sees nothing. A door with no query attached sees everything.
+func (o *Object) CanSeeTarget(t skilltarget.Actor) bool {
+	if o.sight == nil {
+		return true
+	}
+	ox, oy, oz := o.Position()
+	tx, ty, tz := t.Position()
+	ignore, _ := t.(GeoShape)
+	return o.sight.CanSeeActorIgnoring(ox, oy, oz, o.CollisionHeight(), tx, ty, tz, t.CollisionHeight(), ignore)
+}
+
 // A door only answers attackability and unlocking; it never casts, moves,
 // dies into a corpse or belongs to any social group, so every method below is
 // the neutral answer.
-func (o *Object) CanSeeTarget(skilltarget.Actor) bool            { return true }
 func (o *Object) CanSeePoint(int, int, int) bool                 { return true }
 func (o *Object) EffectRangeInPeaceZone(int, int, int, int) bool { return false }
 func (o *Object) InPeaceZone() bool                              { return false }
