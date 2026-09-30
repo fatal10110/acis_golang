@@ -642,8 +642,9 @@ func (c *Controller) PositionUpdate() bool {
 
 // knowsPawn reports whether the actor still knows pawn: a combatant through
 // the actor's own known list, any other world object (a door) by the world
-// grid's. A pawn off the grid, or an actor with no known list, counts as
-// known.
+// grid's. A pawn that is not a world object, or an actor with no known list,
+// counts as known; a world-object pawn that left the grid (a despawned door)
+// does not, so the walk ends as an arrival.
 func (c *Controller) knowsPawn(pawn Pawn) bool {
 	if target, ok := pawn.(attackable.Combatant); ok {
 		actor, ok := c.self.(targetKnower)
