@@ -292,6 +292,9 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	h.AddStatFuncs(mods)
+	// The live movement starts at the template speed; move at the stat-
+	// finalized one from the first step.
+	h.refreshMoveSpeed()
 	// Seed from calculated Max HP/MP after template passives attach:
 	// MaxHpMul/MaxMpMul scale by CON/MEN bonus, and int-truncated maxima
 	// match the persisted spawn current-hp/mp contract.
@@ -1158,10 +1161,11 @@ func (h *Hostile) returnHomeOutsideDriftRange() bool {
 }
 
 func (h *Hostile) scheduleWanderRecheck() {
-	if h.moveSpeed() <= 0 {
+	speed := float32(h.MoveSpeed())
+	if speed <= 0 {
 		return
 	}
-	delay := time.Duration(float64(1500+h.roll(1001))*100/float64(h.moveSpeed())) * time.Millisecond
+	delay := time.Duration(int32(float32(1500+h.roll(1001))*(100/speed))) * time.Millisecond
 	recheck := func() {
 		if h.brain.CurrentIntention() != ai.IntentionWander || h.MovementDisabled() {
 			return

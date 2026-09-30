@@ -1431,6 +1431,7 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.Template.WalkSpeed = 100
+	hostile.Instance.Template.DEX = 30 // run-speed DEX bonus 1.1: walks at 110
 	hostile.Instance.Template.CollisionRadius = 30
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
@@ -1444,7 +1445,7 @@ func TestReturnHomeRechecksWanderBehindActor(t *testing.T) {
 		t.Fatalf("MoveHome destination = %#v, want spawn home", movement.home)
 	}
 
-	clock.Advance(1500 * time.Millisecond) // (1500+roll)*100/WalkSpeed ms
+	clock.Advance(1500 * time.Millisecond) // (int)((1500+roll) * (100/moveSpeed)) = 1363 ms
 	select {
 	case got := <-movement.moved:
 		if want := (location.Location{X: 50, Y: 500, Z: 0}); got != want {
@@ -1515,6 +1516,7 @@ func TestReturnHomeWanderRecheckSkippedWhileRooted(t *testing.T) {
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.Template.WalkSpeed = 100
+	hostile.Instance.Template.DEX = 30 // run-speed DEX bonus 1.1: walks at 110
 	hostile.Instance.Template.CollisionRadius = 30
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
@@ -1593,6 +1595,7 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 	hostile.Instance.HasHome = true
 	hostile.Instance.Home = location.Location{X: 100, Y: 0, Z: 0}
 	hostile.Instance.Template.WalkSpeed = 200
+	hostile.Instance.Template.DEX = 30 // run-speed DEX bonus 1.1: walks at 220
 	hostile.roll = func(int) int { return 0 }
 	world.New().Spawn(hostile, 100, 500, 0, 0)
 	clock := driveHostile(hostile)
@@ -1601,8 +1604,9 @@ func TestReturnHomeScalesWanderRecheckDelayForFastNPC(t *testing.T) {
 		t.Fatalf("RunAI() error: %v", err)
 	}
 
-	// (1500+roll)*100/WalkSpeed = 750 ms at WalkSpeed 200.
-	clock.Advance(749 * time.Millisecond)
+	// The delay reads the stat-finalized walk speed in float32:
+	// (int)((1500+roll) * (100f/220f)) = 681 ms.
+	clock.Advance(680 * time.Millisecond)
 	select {
 	case <-movement.moved:
 		t.Fatal("wander recheck fired before the scaled delay")

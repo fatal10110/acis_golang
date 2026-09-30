@@ -125,6 +125,10 @@ type Actor struct {
 	// zero-value until InitMovement wires real geodata/speed, so Move().Moving()
 	// stays false (not an error) for a summon with no movement controller.
 	movement move.CreatureMove
+	// baseRunSpeed is the template run speed InitMovement recorded, read
+	// only once movementReady (stored after it) reports true.
+	baseRunSpeed  float64
+	movementReady atomic.Bool
 	// queue is the queue this summon's work runs on: its owner's, set once
 	// before the summon is published, and a queue of its own once its corpse
 	// outlives its owner's session (AdoptCorpseQueue), revived or not.

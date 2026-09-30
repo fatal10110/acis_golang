@@ -30,7 +30,7 @@ func (h *Hostile) ShouldIdleWander() bool {
 // RealMoveSpeed is the stance-aware move speed used as the wander offset
 // basis (walk after thinkWander switches stance).
 func (h *Hostile) RealMoveSpeed() float64 {
-	return float64(h.moveSpeed())
+	return h.MoveSpeed()
 }
 
 // MoveFromSpawnUsingRandomOffset walks toward a geo-validated wander point.

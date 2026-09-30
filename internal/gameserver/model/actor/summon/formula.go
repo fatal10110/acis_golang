@@ -76,6 +76,9 @@ func (a *Actor) AttachStatFuncs(fns []effect.Mod) {
 	for _, fn := range fns {
 		a.statCalcOrCreate(fn.Stat).AddMod(fn)
 	}
+	if len(fns) > 0 {
+		a.refreshMoveSpeed()
+	}
 }
 
 // StatFuncsAttached is a no-op: a summon's stat change reports nothing.
@@ -89,10 +92,14 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	a.statCalc.mu.RLock()
 	calcs := a.statCalc.calcs
 	a.statCalc.mu.RUnlock()
+	removed := false
 	for _, calc := range calcs {
-		if calc != nil {
-			calc.RemoveOwner(owner)
+		if calc != nil && calc.RemoveOwner(owner) > 0 {
+			removed = true
 		}
+	}
+	if removed {
+		a.refreshMoveSpeed()
 	}
 }
 
@@ -315,11 +322,11 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 	return float64(min(int(a.calcStat(stat.CriticalRate, baseCritRate)), 500))
 }
 
-// MoveSpeed returns this summon's current move speed, matching its run
-// speed: a summon always moves at its run speed, mirroring
-// PetStatus.getMoveSpeed()/SummonStatus's shared run-speed basis.
+// MoveSpeed returns this summon's current move speed from its template
+// run speed: a summon stays in run stance, and the RUN_SPEED stat
+// finalizes the speed, narrowed to float32 like the client-facing speed.
 func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
-	return a.calcStat(stat.RunSpeed, baseRunSpeed)
+	return float64(float32(a.calcStat(stat.RunSpeed, float64(int(baseRunSpeed)))))
 }
 
 // hungryHalved reports whether a pet's attack speed should be halved for
