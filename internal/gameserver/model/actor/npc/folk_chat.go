@@ -100,27 +100,52 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int) (string, Chat
 	if _, ok := unportedFolkChats[kind]; ok {
 		return "", ChatUnported
 	}
-	id := strconv.Itoa(f.NpcID())
-	chat, ok := folkChats[kind]
-	if ok && chat.pk != nil && karma > 0 && !chat.pk(rules) {
-		if page, ok := pages.Get("data/html/" + chat.dir + "/" + id + "-pk.htm"); ok {
-			return page, ChatShown
-		}
+	chat := folkChats[kind]
+	if page, refused := f.pkRefusal(pages, chat, rules, karma); refused {
+		return page, ChatShown
 	}
-	path := "data/html/default/" + id + ".htm"
+	return f.chatPage(pages, chat, 0), ChatShown
+}
+
+// pkRefusal is the karma gate of chat's type: the refusal page
+// <dir>/<npcId>-pk.htm, when the gate refuses a talker carrying karma and
+// that page exists. The page is sent as is.
+func (f *Folk) pkRefusal(pages Pages, chat folkChat, rules ChatRules, karma int) (string, bool) {
+	if chat.pk == nil || karma <= 0 || chat.pk(rules) {
+		return "", false
+	}
+	return pages.Get("data/html/" + chat.dir + "/" + strconv.Itoa(f.NpcID()) + "-pk.htm")
+}
+
+// chatPage resolves chat page val of this NPC: <npcId>.htm for 0, else
+// <npcId>-<val>.htm, in its type's folder. A type without a folder reads
+// data/html/default and falls back to npcdefault.htm when the page is not
+// there.
+func (f *Folk) chatPage(pages Pages, chat folkChat, val int) string {
+	name := strconv.Itoa(f.NpcID())
+	if val != 0 {
+		name += "-" + strconv.Itoa(val)
+	}
+	path := "data/html/default/" + name + ".htm"
 	switch {
 	case chat.fixed != "":
 		path = chat.fixed
 	case chat.dir != "":
-		path = "data/html/" + chat.dir + "/" + id + ".htm"
+		path = "data/html/" + chat.dir + "/" + name + ".htm"
 	default:
 		if _, ok := pages.Get(path); !ok {
 			path = "data/html/npcdefault.htm"
 		}
 	}
+	return f.page(pages, path)
+}
+
+// page reads path with %objectId% naming this NPC; a missing page reads as
+// a "My html is missing" notice naming it.
+func (f *Folk) page(pages Pages, path string) string {
 	page, ok := pages.Get(path)
 	if !ok {
 		page = "<html><body>My html is missing:<br>" + path + "</body></html>"
 	}
-	return strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID()))), ChatShown
+	return strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
 }

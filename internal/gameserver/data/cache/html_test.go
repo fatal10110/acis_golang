@@ -77,18 +77,6 @@ func TestHTMLPathsAreSorted(t *testing.T) {
 	}
 }
 
-func TestBypassCommands(t *testing.T) {
-	html := `<a action="bypass -h npc_%objectId%_Chat 1">Talk</a>` +
-		`<a action="bypass player_help tutorial.htm#7064">Help</a>` +
-		`<a action="bypass -h npc_$ask">Ask</a>`
-
-	got := BypassCommands(html)
-	want := []string{"npc_%objectId%_Chat 1", "player_help tutorial.htm#7064", "npc_"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("BypassCommands() = %#v, want %#v", got, want)
-	}
-}
-
 func TestLoadHTMLAgainstDatapack(t *testing.T) {
 	dir := datapack.Path(t, "data", "html")
 

@@ -133,6 +133,9 @@ type livePlayer struct {
 	// playerCanDoInteract(p, currentFolk) holds.
 	currentFolk atomic.Pointer[npc.Folk]
 
+	// bypasses are the links of the last validated HTML page p was sent.
+	bypasses bypassWhitelist
+
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.
 	fusionTargetID atomic.Int32

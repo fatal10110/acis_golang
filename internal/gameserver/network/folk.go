@@ -26,7 +26,7 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
 		return
 	}
-	live.SendFrame(serverpackets.FrameNpcHtmlMessage(f.ObjectID(), html, 0))
+	sendValidatedHTML(live, f.ObjectID(), html, 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 }
 

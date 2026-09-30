@@ -104,35 +104,3 @@ func htmlKey(name string) string {
 	key = strings.TrimPrefix(key, "./")
 	return strings.TrimPrefix(key, "data/html/")
 }
-
-// BypassCommands returns bypass command strings embedded in HTML action links.
-// It only extracts commands; validation and routing belong to the dialog layer.
-func BypassCommands(html string) []string {
-	var commands []string
-	for i := 0; i < len(html); {
-		start := strings.Index(html[i:], `"bypass `)
-		if start < 0 {
-			break
-		}
-		start += i
-		quoteEnd := strings.IndexByte(html[start+1:], '"')
-		if quoteEnd < 0 {
-			break
-		}
-		quoteEnd += start + 1
-
-		commandStart := start + len(`"bypass `)
-		commandEnd := quoteEnd
-		if strings.HasPrefix(html[commandStart:quoteEnd], "-h ") {
-			commandStart += len("-h ")
-		}
-		if dollar := strings.IndexByte(html[commandStart:quoteEnd], '$'); dollar >= 0 {
-			commandEnd = commandStart + dollar
-		}
-		if command := strings.TrimSpace(html[commandStart:commandEnd]); command != "" {
-			commands = append(commands, command)
-		}
-		i = quoteEnd + 1
-	}
-	return commands
-}
