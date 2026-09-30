@@ -50,6 +50,7 @@ type gameplayConfig struct {
 	AutoLearnSkills          autoLearnSkills
 	WeightLimitMultiplier    weightLimitMultiplier
 	InventorySlots           player.InventorySlots
+	StorageSlots             player.StorageSlots
 	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
 	AllowDelevel             allowDelevel
 	RateKarmaExpLost         rateKarmaExpLost
@@ -104,6 +105,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.InventorySlots, err = loadInventorySlots(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.StorageSlots, err = loadStorageSlots(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.KarmaPlayerCanTeleport, err = loadKarmaPlayerCanTeleport(paths); err != nil {
@@ -272,6 +276,31 @@ func loadInventorySlots(paths gameServerPaths) (player.InventorySlots, error) {
 	}
 	if err := fields.Err(); err != nil {
 		return player.InventorySlots{}, err
+	}
+	return slots, nil
+}
+
+// loadStorageSlots reads the base warehouse, freight, private store and
+// recipe book sizes.
+func loadStorageSlots(paths gameServerPaths) (player.StorageSlots, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return player.StorageSlots{}, err
+	}
+	fields := config.NewFields(props, "storage slots")
+	def := player.DefaultStorageSlots
+	slots := player.StorageSlots{
+		WarehouseNoDwarf:    fields.Int("MaximumWarehouseSlotsForNoDwarf", def.WarehouseNoDwarf),
+		WarehouseDwarf:      fields.Int("MaximumWarehouseSlotsForDwarf", def.WarehouseDwarf),
+		Freight:             fields.Int("MaximumFreightSlots", def.Freight),
+		PrivateStoreNoDwarf: fields.Int("MaxPvtStoreSlotsOther", def.PrivateStoreNoDwarf),
+		PrivateStoreDwarf:   fields.Int("MaxPvtStoreSlotsDwarf", def.PrivateStoreDwarf),
+		DwarfRecipe:         fields.Int("DwarfRecipeLimit", def.DwarfRecipe),
+		CommonRecipe:        fields.Int("CommonRecipeLimit", def.CommonRecipe),
+		Configured:          true,
+	}
+	if err := fields.Err(); err != nil {
+		return player.StorageSlots{}, err
 	}
 	return slots, nil
 }

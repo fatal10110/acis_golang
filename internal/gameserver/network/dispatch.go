@@ -101,6 +101,9 @@ type PlayerConfig struct {
 	WeightLimitMultiplier float64
 	// InventorySlots is the base player inventory slot count by race.
 	InventorySlots player.InventorySlots
+	// StorageSlots is the base warehouse, freight, private store and recipe
+	// book size.
+	StorageSlots player.StorageSlots
 	// AllowWater controls whether entering a water zone starts the
 	// drowning breath-gauge countdown at all.
 	AllowWater          bool
