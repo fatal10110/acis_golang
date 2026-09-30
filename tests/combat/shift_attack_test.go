@@ -108,3 +108,43 @@ func TestNextActionAttackCastOnDistantTargetWalks(t *testing.T) {
 	f.readUntilOwnMagicSkillUse(t, "follow-up skill MagicSkillUse")
 	readUntil(t, f.c, serverpackets.OpcodeMoveToPawn, "follow-up walk MoveToPawn")
 }
+
+// TestShiftNextActionAttackSkillRefusedForMPOnDistantTargetEndsWithoutWalking
+// pins the shift carried by the cost-check refusal's hand-off: a shift-held
+// nextActionAttack skill the player cannot pay MP for, cast on a monster
+// inside cast range but out of weapon range, is answered NOT_ENOUGH_MP and
+// its attack never walks — no MoveToPawn, no Attack, and the player stays
+// put.
+func TestShiftNextActionAttackSkillRefusedForMPOnDistantTargetEndsWithoutWalking(t *testing.T) {
+	t.Parallel()
+	f := bootFollowUpCaster(t)
+	far := f.srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 250, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, f.c)
+	f.selectAmidFrames(t, far.ObjectID())
+	drainUntilQuiet(t, f.c)
+
+	f.c.Send(encodeRequestMagicSkillUse(followUpCostlySkillID, false, true))
+	refusal := readUntil(t, f.c, serverpackets.OpcodeSystemMessage, "shift NOT_ENOUGH_MP")[0]
+	if got := wireReader(refusal[1:]).ReadInt32(); got != int32(serverpackets.SystemMessageNotEnoughMP) {
+		t.Fatalf("refusal system message = %d, want NOT_ENOUGH_MP (%d)", got, serverpackets.SystemMessageNotEnoughMP)
+	}
+	assertHeldAttackIdle(t, f.srv, f.c, f.objID, f.origin, time.Second, false, "after the shift refused follow-up skill")
+	if f.pc.CastingNow() {
+		t.Fatal("refused skill started casting")
+	}
+}
+
+// TestNextActionAttackSkillRefusedForMPOnDistantTargetWalks is the unshifted
+// half: the same refusal without shift walks to the monster.
+func TestNextActionAttackSkillRefusedForMPOnDistantTargetWalks(t *testing.T) {
+	t.Parallel()
+	f := bootFollowUpCaster(t)
+	far := f.srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 250, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, f.c)
+	f.selectAmidFrames(t, far.ObjectID())
+	drainUntilQuiet(t, f.c)
+
+	f.c.Send(encodeRequestMagicSkillUse(followUpCostlySkillID, false, false))
+	readUntil(t, f.c, serverpackets.OpcodeSystemMessage, "NOT_ENOUGH_MP")
+	readUntil(t, f.c, serverpackets.OpcodeMoveToPawn, "refused follow-up walk MoveToPawn")
+}

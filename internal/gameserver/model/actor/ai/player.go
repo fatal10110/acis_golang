@@ -78,13 +78,13 @@ func (p *PlayerAttack) SetLogger(log zerolog.Logger) {
 }
 
 // Start sets target as the attack intention, held with shift or not, and
-// evaluates it once. It reports false when the caller should report the action as failed
-// (the actor is disabled, sitting, the target is lost, the actor is still
-// mid-swing or mid-cast, or the attack was otherwise rejected) and true when
-// the attack was accepted — either a swing just started, or the actor has
-// begun closing distance and will attack once it arrives. A shift-held
-// attack on a target out of reach goes idle instead of closing distance, and
-// reports false.
+// evaluates it once. It reports false when the caller should report the action
+// as failed (the actor is disabled, sitting, the target is lost, the actor is
+// still mid-swing or mid-cast, or the attack was otherwise rejected) and true
+// when the attack was accepted — either a swing just started, or the actor has
+// begun closing distance and will attack once it arrives. A shift-held attack
+// on a target out of reach goes idle instead of closing distance, and reports
+// false.
 //
 // A target the playable attack gate refuses is reported to the player and
 // leaves the current intention untouched. The gate runs only when the
@@ -165,11 +165,11 @@ func (p *PlayerAttack) ReplaceWithCast() {
 }
 
 // AttackAfterCast makes target the attack intention once a nextActionAttack
-// skill cast on it ends, or is refused at its cost and condition checks,
-// held with the cast's own shift modifier, and thinks it once, reporting whether that is answered with ActionFailed. The
-// caller has already checked that target may be attacked without force. Like
-// any intention the AI sets itself, it skips the playable attack gate a
-// player's own attack request runs.
+// skill cast on it ends, or is refused at its cost and condition checks, held
+// with the cast's own shift modifier, and thinks it once, reporting whether
+// that is answered with ActionFailed. The caller has already checked that
+// target may be attacked without force. Like any intention the AI sets itself,
+// it skips the playable attack gate a player's own attack request runs.
 func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift bool) (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
