@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"testing"
+	"unicode/utf16"
 )
 
 // ---- from frame_length_test.go ----
@@ -343,11 +344,118 @@ func TestReaderNegativeByteCountSetsErrInsteadOfPanicking(t *testing.T) {
 func TestReaderReadStringWithoutTerminatorIsShort(t *testing.T) {
 	r := NewReader([]byte{'a', 0}) // one code unit, no null terminator
 
-	if got := r.ReadString(); got != "a" {
-		t.Fatalf("ReadString() = %q, want %q", got, "a")
+	if got := r.ReadString(); got != "" {
+		t.Fatalf("ReadString() = %q, want empty", got)
 	}
 	if r.Err() != ErrShortPacket {
 		t.Fatalf("Err() = %v, want %v", r.Err(), ErrShortPacket)
+	}
+}
+
+// utf16LE encodes units as little-endian bytes, optionally followed by the
+// 0x0000 terminator.
+func utf16LE(units []uint16, terminated bool) []byte {
+	out := make([]byte, 0, 2*len(units)+2)
+	for _, u := range units {
+		out = append(out, byte(u), byte(u>>8))
+	}
+	if terminated {
+		out = append(out, 0, 0)
+	}
+	return out
+}
+
+func repeatedUnits(n int) []uint16 {
+	units := make([]uint16, n)
+	for i := range units {
+		units[i] = 'A'
+	}
+	return units
+}
+
+func TestReaderReadStringRejectsLongUnterminatedFieldWithoutAllocating(t *testing.T) {
+	payload := utf16LE(repeatedUnits(8000), false)
+
+	r := NewReader(payload)
+	if got := r.ReadString(); got != "" {
+		t.Fatalf("ReadString() length = %d, want empty", len(got))
+	}
+	if r.Err() != ErrShortPacket {
+		t.Fatalf("Err() = %v, want %v", r.Err(), ErrShortPacket)
+	}
+
+	allocs := testing.AllocsPerRun(100, func() {
+		NewReader(payload).ReadString()
+	})
+	// One allocation is the Reader itself; the rejected field adds none.
+	if allocs > 1 {
+		t.Fatalf("rejecting an unterminated field allocated %.0f times, want at most 1", allocs)
+	}
+}
+
+func TestReaderReadStringCapsCodeUnitsBeforeTerminator(t *testing.T) {
+	longest := utf16LE(repeatedUnits(MaxStringUnits), true)
+	r := NewReader(longest)
+	if got := r.ReadString(); len(got) != MaxStringUnits {
+		t.Fatalf("ReadString() length = %d, want %d", len(got), MaxStringUnits)
+	}
+	if r.Err() != nil || r.Remaining() != 0 {
+		t.Fatalf("Err() = %v, Remaining() = %d, want nil, 0", r.Err(), r.Remaining())
+	}
+
+	tooLong := utf16LE(repeatedUnits(MaxStringUnits+1), true)
+	r = NewReader(tooLong)
+	if got := r.ReadString(); got != "" {
+		t.Fatalf("ReadString() length = %d, want empty", len(got))
+	}
+	if r.Err() != ErrStringTooLong {
+		t.Fatalf("Err() = %v, want %v", r.Err(), ErrStringTooLong)
+	}
+	if got := r.ReadUint16(); got != 0 {
+		t.Fatalf("ReadUint16() after rejected string = %d, want 0", got)
+	}
+}
+
+func TestMaxStringUnitsCoversLargestFramePayload(t *testing.T) {
+	// A frame payload holds at most MaxFrameLength-FrameHeaderSize bytes, so
+	// no framed string field can reach the cap.
+	if got, want := 2*MaxStringUnits, MaxFrameLength-FrameHeaderSize; got > want || got+2 <= want {
+		t.Fatalf("2*MaxStringUnits = %d, want the largest even count <= %d", got, want)
+	}
+}
+
+func TestReaderReadStringDecodesLikeUTF16Decode(t *testing.T) {
+	cases := [][]uint16{
+		{},
+		{'a', 'b', 'c'},
+		{0x0439, 0x4E2D, 0xFFFF},         // 2- and 3-byte UTF-8 runes
+		{0xD83D, 0xDE00},                 // valid surrogate pair
+		{0xD83D},                         // lone high surrogate at end
+		{0xDE00, 'x'},                    // lone low surrogate
+		{0xD83D, 'x', 0xD83D, 0xDE00},    // high surrogate followed by non-low
+		{0xD83D, 0xD83D, 0xDE00, 0xDE00}, // high, pair, low
+	}
+	for _, units := range cases {
+		want := string(utf16.Decode(units))
+		r := NewReader(append(utf16LE(units, true), 0x7F))
+		if got := r.ReadString(); got != want {
+			t.Fatalf("ReadString(%04X) = %q, want %q", units, got, want)
+		}
+		if got := r.ReadUint8(); got != 0x7F || r.Err() != nil {
+			t.Fatalf("byte after string = %#x, Err() = %v; want 0x7F, nil", got, r.Err())
+		}
+	}
+}
+
+func TestReaderReadStringDecodesInOneAllocation(t *testing.T) {
+	payload := utf16LE([]uint16{'N', 'a', 'm', 'e', 0x0439, 0xD83D, 0xDE00}, true)
+	r := NewReader(payload)
+	allocs := testing.AllocsPerRun(100, func() {
+		r.pos, r.err = 0, nil
+		_ = r.ReadString()
+	})
+	if allocs != 1 {
+		t.Fatalf("ReadString allocated %.0f times, want 1", allocs)
 	}
 }
 
