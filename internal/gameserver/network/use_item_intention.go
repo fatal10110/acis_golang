@@ -36,10 +36,14 @@ const (
 // flight resolves with the weapon it started with; the reference answers
 // nothing for that, and UseItem registers no pending client action.
 // Anyone else toggles the item now and carries on with the intention it
-// had: nothing it was doing is stopped.
-// ponytail: the intention carried on is not re-issued, and a cast approach
-// is kept rather than dropped (#2815); the upgrade is a player intention
-// slot that can re-run what was current.
+// had, except a walk into ground-cast range: the toggle takes the CAST
+// intention's place, so the walk goes on but arriving casts nothing and a
+// blocked walk reports no stopped cast. Nothing is stopped.
+// ponytail: the intention carried on is not re-issued, so a walk, follow,
+// pickup, interact or attack approach under way sends no fresh movement
+// packet, and a toggle that replaced a cast approach is not run a second
+// time when the walk arrives (#2877); the upgrade is a player
+// current-intention slot that can re-run what was current.
 func (l *GameClientLink) tryToUseItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
 	if live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -49,6 +53,10 @@ func (l *GameClientLink) tryToUseItem(live *livePlayer, inv *itemcontainer.Inven
 		live.deferUseItem(inst.ObjectID)
 		return
 	}
+	// The toggle is the current intention now and empties the next-intention
+	// slot, which also holds the skill request a walk into ground-cast range
+	// casts on arrival.
+	live.clearNextIntention()
 	l.toggleEquipItem(live, inv, inst, tmpl, false)
 }
 
