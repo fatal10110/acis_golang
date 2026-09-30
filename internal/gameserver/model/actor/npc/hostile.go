@@ -1029,6 +1029,13 @@ func (h *Hostile) DenyAIAction() bool {
 	return h.AlikeDead() || h.Stunned() || h.ImmobileUntilAttacked() || h.Sleeping() || h.Paralyzed() || h.Teleporting() || h.Afraid()
 }
 
+// OutOfControl reports whether this NPC's AI cannot choose a new intention:
+// DenyAIAction, or confused. Confusion counts once its start has run, so
+// the attack desire a confusion start queues is still selected at once.
+func (h *Hostile) OutOfControl() bool {
+	return h.DenyAIAction() || h.EffectList().StartedAffected(effect.FlagConfused)
+}
+
 // Knows reports whether target is currently visible to this NPC.
 // attackable stays a leaf, so a Combatant is not statically a world object;
 // one that is not on the grid is never known.

@@ -349,11 +349,13 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	}
 }
 
-// TestMakerIdleWanderOutOfTerritoryStaysIdle pins AttackableAI.thinkWander
-// when the maker NPC is outside the polygon but still at spawn: returnHome
-// is a no-op (inside 2D drift) and random walk is skipped, so intention
-// drops to idle and the wander desire leaves the queue.
-func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
+// TestMakerIdleWanderOutOfTerritoryKeepsWanderCurrent pins
+// AttackableAI.thinkWander when the maker NPC is outside the polygon but
+// still at spawn: returnHome is a no-op (inside 2D drift) and random walk is
+// skipped, so only the wander desire leaves the queue and WANDER stays the
+// current intention. The next event runAI finds the queue empty and idles
+// it: walk stance, and the idle wander queued again.
+func TestMakerIdleWanderOutOfTerritoryKeepsWanderCurrent(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -374,14 +376,35 @@ func TestMakerIdleWanderOutOfTerritoryStaysIdle(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() = %v, want idle", got)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
+		t.Fatalf("CurrentIntention() = %v, want wander kept current", got)
 	}
 	if hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire still queued after out-of-territory Think, want it dropped")
 	}
+	if got := hostile.AI().Desires().Len(); got != 0 {
+		t.Fatalf("queued desires = %d, want 0 after the out-of-territory wander step", got)
+	}
 	if hostile.IsMoving() {
-		t.Fatal("IsMoving() = true for out-of-territory maker NPC at home, want idle")
+		t.Fatal("IsMoving() = true for out-of-territory maker NPC at home, want no wander step")
+	}
+
+	// Running, so the idle's walk stance shows on the wire.
+	hostile.ForceRunStance()
+	drainUntilQuiet(t, c)
+	if err := hostile.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after the event runAI = %v, want idle", got)
+	}
+	walk := readUntil(t, c, serverpackets.OpcodeChangeMoveType, "idle walk stance")
+	assertChangeMoveType(t, walk[len(walk)-1], hostile.ObjectID(), false)
+	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
+		t.Fatal("wander desire not queued again after the event runAI idled")
+	}
+	if hostile.IsMoving() {
+		t.Fatal("IsMoving() = true after the event runAI idled, want it standing")
 	}
 }
 
