@@ -72,6 +72,22 @@ func encodeRequestDestroyItem(objectID, count int32) []byte {
 	return w.Bytes()
 }
 
+// destroyStack destroys count (> 1) units of objectID and waits for the
+// server to process it: the only frame ahead of the ItemList barrier reply
+// is the S2_S1_DISAPPEARED line the destroy answers with.
+func destroyStack(t *testing.T, c *testsupport.ScriptedClient, objectID, count int32) {
+	t.Helper()
+	c.Send(encodeRequestDestroyItem(objectID, count))
+	frames := testsupport.SyncBarrierFrames(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList)
+	if len(frames) != 1 {
+		t.Fatalf("destroy sent %d frame(s) before the barrier reply, want the one disappeared message: %x", len(frames), frames)
+	}
+	assertFrameOpcode(t, frames[0], serverpackets.OpcodeSystemMessage, "destroy SystemMessage")
+	if id := wire.NewReader(frames[0][1:]).ReadInt32(); id != serverpackets.SystemMessageS2S1Disappeared {
+		t.Fatalf("destroy message id = %d, want S2_S1_DISAPPEARED (%d)", id, serverpackets.SystemMessageS2S1Disappeared)
+	}
+}
+
 func encodeAction(objectID int32, x, y, z int32, shift bool) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
 	w.WriteInt32(objectID)

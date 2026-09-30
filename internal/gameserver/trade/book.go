@@ -151,6 +151,16 @@ func (b *Book) HasActive(playerID int32) bool {
 	return ok
 }
 
+// ProcessingTransaction reports whether playerID is tied up in a direct
+// trade: an open session, or an unexpired request it sent or received.
+func (b *Book) ProcessingTransaction(playerID int32) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.purgeExpiredLocked(b.now())
+	return b.processingTransactionLocked(playerID)
+}
+
 // AddItem adds an item to a player's active direct-trade offer.
 func (b *Book) AddItem(playerID int32, inv *itemcontainer.Inventory, objectID int32, count int) AddResult {
 	b.mu.Lock()
