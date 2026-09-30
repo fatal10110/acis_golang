@@ -33,6 +33,9 @@ const (
 	// LoginTimeout is how long an authenticated client may hold its
 	// session without joining a game server before the purge loop drops it.
 	LoginTimeout = 60 * time.Second
+	// minFailedAttemptWindow is the shortest idle time after which an IP's
+	// failed-attempt count is forgotten; see failedAttemptWindow.
+	minFailedAttemptWindow = time.Hour
 )
 
 // accountStore is the account persistence ClientLink needs. *sql.AccountStore
@@ -61,9 +64,10 @@ type ClientLink struct {
 	loginBlockAfterBan time.Duration
 	log                zerolog.Logger
 
-	// failedMu guards failedAttempts.
+	// failedMu guards failedAttempts, which handler goroutines update and
+	// the purge loop sweeps.
 	failedMu       sync.Mutex
-	failedAttempts map[string]int
+	failedAttempts map[string]failedAttempt
 
 	// loginTimeout is how long an authed connection may outstay its
 	// welcome before the purge loop closes it; zero disables purging.
@@ -119,7 +123,7 @@ func NewClientLink(
 		loginTryBeforeBan:  loginTryBeforeBan,
 		loginBlockAfterBan: loginBlockAfterBan,
 		log:                log,
-		failedAttempts:     make(map[string]int),
+		failedAttempts:     make(map[string]failedAttempt),
 		loginTimeout:       LoginTimeout,
 		purgeable:          make(map[*clientConn]struct{}),
 		holders:            make(map[string]*clientConn),
@@ -144,19 +148,26 @@ func (l *ClientLink) Serve(ctx context.Context, ln net.Listener) error {
 
 // purgeLoop sweeps the authenticated connections every half login timeout,
 // dropping those whose connection outlived it, as the reference's purge
-// task does.
+// task does. The same tick drops expired failed-attempt counts; with
+// purging disabled (zero loginTimeout) it still ticks at half LoginTimeout
+// for that sweep alone.
 func (l *ClientLink) purgeLoop(ctx context.Context) {
-	if l.loginTimeout <= 0 {
-		return
+	interval := l.loginTimeout / 2
+	if interval <= 0 {
+		interval = LoginTimeout / 2
 	}
-	ticker := time.NewTicker(l.loginTimeout / 2)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			l.purgeStale(time.Now())
+			now := time.Now()
+			if l.loginTimeout > 0 {
+				l.purgeStale(now)
+			}
+			l.sweepFailedAttempts(now)
 		}
 	}
 }
@@ -465,7 +476,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	switch {
 	case errors.Is(err, loginsql.ErrAccountNotFound):
 		if !l.autoCreateAccounts {
-			l.recordFailedAttempt(c.remoteIP)
+			l.recordFailedAttempt(c.remoteIP, time.Now())
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
@@ -490,7 +501,7 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 
 	default:
 		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {
-			l.recordFailedAttempt(c.remoteIP)
+			l.recordFailedAttempt(c.remoteIP, time.Now())
 			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
 			return model.Account{}, false
 		}
@@ -504,16 +515,57 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	}
 }
 
-func (l *ClientLink) recordFailedAttempt(ip net.IP) {
+// failedAttempt is one IP's running count of failed credential attempts
+// and the time of the most recent one.
+type failedAttempt struct {
+	count int
+	last  time.Time
+}
+
+// failedAttemptWindow is how long an IP's failed-attempt count survives
+// without a further failure; ok is false when counts never expire. Counts
+// are kept per IP until the ban threshold or a successful login clears
+// them; the window only exists so an address that fails a few times and
+// never returns does not hold memory forever.
+//
+// Deliberate trade-off: with temporary bans, an address whose consecutive
+// failures are always more than one window apart never reaches the ban. The
+// window is at least loginBlockAfterBan, so pacing below the threshold that
+// slowly yields fewer attempts per unit of time than tripping the ban and
+// waiting it out, and at least an hour, so any client retrying faster than
+// that sees the same threshold, LoginFail replies, and ban timing as with an
+// unexpiring count.
+//
+// A non-positive loginBlockAfterBan makes the ban permanent, so no pacing
+// may ever earn more than loginTryBeforeBan attempts: counts never expire
+// and the memory bound does not apply. The ban list already keeps one
+// permanent entry per banned address in that configuration.
+func (l *ClientLink) failedAttemptWindow() (window time.Duration, ok bool) {
+	if l.loginBlockAfterBan <= 0 {
+		return 0, false
+	}
+	return max(l.loginBlockAfterBan, minFailedAttemptWindow), true
+}
+
+// recordFailedAttempt counts a failed credential attempt from ip at now and
+// bans ip once loginTryBeforeBan consecutive failures accumulate within the
+// failed-attempt window.
+func (l *ClientLink) recordFailedAttempt(ip net.IP, now time.Time) {
 	key := ip.String()
+	window, expires := l.failedAttemptWindow()
 
 	l.failedMu.Lock()
 	if l.failedAttempts == nil {
-		l.failedAttempts = make(map[string]int)
+		l.failedAttempts = make(map[string]failedAttempt)
 	}
-	attempts := l.failedAttempts[key] + 1
-	if attempts < l.loginTryBeforeBan {
-		l.failedAttempts[key] = attempts
+	entry := l.failedAttempts[key]
+	if expires && now.Sub(entry.last) > window {
+		entry.count = 0
+	}
+	entry.count++
+	entry.last = now
+	if entry.count < l.loginTryBeforeBan {
+		l.failedAttempts[key] = entry
 		l.failedMu.Unlock()
 		return
 	}
@@ -530,6 +582,25 @@ func (l *ClientLink) clearFailedAttempts(ip net.IP) {
 	l.failedMu.Lock()
 	delete(l.failedAttempts, key)
 	l.failedMu.Unlock()
+}
+
+// sweepFailedAttempts drops every failed-attempt count idle for longer than
+// the failed-attempt window at now: the same test recordFailedAttempt
+// applies on the next failure, so a swept count is one that failure would
+// have discarded anyway.
+func (l *ClientLink) sweepFailedAttempts(now time.Time) {
+	window, expires := l.failedAttemptWindow()
+	if !expires {
+		return
+	}
+
+	l.failedMu.Lock()
+	defer l.failedMu.Unlock()
+	for key, entry := range l.failedAttempts {
+		if now.Sub(entry.last) > window {
+			delete(l.failedAttempts, key)
+		}
+	}
 }
 
 // onRequestServerList validates the session keys and replies ServerList.
