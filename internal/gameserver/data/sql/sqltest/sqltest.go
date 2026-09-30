@@ -13,16 +13,16 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// sharedTables lists every table SharedDB truncates between tests, in an
-// order safe for TRUNCATE (no cross-table FKs today, so order doesn't
-// matter, but keep it in sync with the CREATE TABLE calls below).
+// sharedTables lists every table SharedDB empties between tests (no
+// cross-table FKs today, so order doesn't matter, but keep it in sync with
+// the CREATE TABLE calls below).
 var sharedTables = []string{
 	"characters", "items", "augmentations", "spawn_data",
 	"items_on_ground", "character_skills", "character_shortcuts",
 	"character_hennas", "pets", "character_skills_save", "seven_signs_status",
 }
 
-// sharedReseeds restores shipped seed rows that TRUNCATE removes, keyed by
+// sharedReseeds restores shipped seed rows that the cleanup removes, keyed by
 // table, so every test starts from the schema's default data.
 var sharedReseeds = map[string]string{
 	"seven_signs_status": sevenSignsStatusSeed,
@@ -301,11 +301,16 @@ func SharedDB(tb testing.TB) *sql.DB {
 	sharedHeld[tb] = db
 	sharedMu.Unlock()
 
+	// DELETE rather than TRUNCATE: TRUNCATE is InnoDB DDL that drops and
+	// recreates the tablespace under the server-wide dictionary lock, so
+	// cleanups from every parallel test and concurrent `go test` run on the
+	// shared instance queue behind one another. None of these tables uses
+	// AUTO_INCREMENT, so DELETE leaves them in the same state.
 	tb.Cleanup(func() {
 		ctx := context.Background()
 		for _, table := range sharedTables {
-			if _, err := db.ExecContext(ctx, "TRUNCATE TABLE `"+table+"`"); err != nil {
-				tb.Fatalf("truncate %s: %v", table, err)
+			if _, err := db.ExecContext(ctx, "DELETE FROM `"+table+"`"); err != nil {
+				tb.Fatalf("clear %s: %v", table, err)
 			}
 			if seed, ok := sharedReseeds[table]; ok {
 				if _, err := db.ExecContext(ctx, seed); err != nil {
