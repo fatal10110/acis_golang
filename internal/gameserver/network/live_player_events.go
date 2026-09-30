@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -563,7 +562,7 @@ func etcStatus(c *player.Character) serverpackets.EtcStatus {
 		Charges:           int32(c.Charges()),
 		WeightPenalty:     int32(c.WeightPenalty()),
 		GradePenalty:      c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0,
-		CharmOfCourage:    c.EffectList().IsAffected(effect.FlagCharmOfCourage),
+		CharmOfCourage:    c.CharmOfCourage(),
 		DeathPenaltyLevel: int32(c.DeathPenaltyLevel()),
 	}
 }

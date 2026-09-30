@@ -156,6 +156,13 @@ type Character struct {
 
 	dead atomic.Bool
 
+	// charmOfCourage mirrors whether the effect list holds a Charm of
+	// Courage, for status-window packets built while that list's lock may
+	// be held (stat callbacks run under it). charmMu serializes its
+	// refreshes; it is taken before, never under, the effect list's lock.
+	charmOfCourage atomic.Bool
+	charmMu        sync.Mutex
+
 	// cast is the network-owned live cast controller wired back onto this
 	// character so effect hooks (mute, silence, abort-cast, damage-break)
 	// can reach it without this domain package importing the cast package

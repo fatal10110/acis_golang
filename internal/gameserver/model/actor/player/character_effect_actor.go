@@ -91,9 +91,20 @@ func (c *Character) StopPhoenixBlessing(*effect.Effect) { c.BroadcastAbnormalEff
 // group's head: the player's appearance is refreshed for observers.
 func (c *Character) StopProtectionBlessing(*effect.Effect) { c.BroadcastAbnormalEffect() }
 
-// BroadcastEtcStatus sends c's status-window flags to c and every player
-// that sees it.
-func (c *Character) BroadcastEtcStatus() { c.emit(event.EtcStatusBroadcast{}) }
+// BroadcastEtcStatus refreshes whether c holds a Charm of Courage from its
+// effect list, then sends c's status-window flags to c and every player that
+// sees it. The Charm of Courage hooks call it outside the effect list's lock.
+func (c *Character) BroadcastEtcStatus() {
+	c.charmMu.Lock()
+	c.charmOfCourage.Store(c.EffectList().IsAffected(effect.FlagCharmOfCourage))
+	c.charmMu.Unlock()
+	c.emit(event.EtcStatusBroadcast{})
+}
+
+// CharmOfCourage reports whether c held a Charm of Courage when its last
+// one started or ended. It never takes the effect list's lock, so status
+// packets built from inside a stat callback can read it.
+func (c *Character) CharmOfCourage() bool { return c.charmOfCourage.Load() }
 
 // stopPhoenixBlessing uses up every Phoenix Blessing c holds, then refreshes
 // its appearance once more.
