@@ -341,6 +341,13 @@ func (p *livePlayer) clearNextIntentionLocked() {
 	p.deferredInteract = nil
 }
 
+// clearNextIntention drops whatever is queued as the next intention.
+func (p *livePlayer) clearNextIntention() {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
+}
+
 func (p *livePlayer) setPickup(ctx context.Context, target world.Tracked) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
