@@ -23,6 +23,11 @@ func (h *Hostile) Spoiled() bool {
 	return h.spoil.IsSpoiled()
 }
 
+// SpoiledBy reports whether the player objectID marked this NPC for spoil.
+func (h *Hostile) SpoiledBy(objectID int32) bool {
+	return h.spoil.IsSpoiler(objectID)
+}
+
 // SeedState returns this NPC life's manor seed state.
 func (h *Hostile) SeedState() *SeedState {
 	return &h.seed

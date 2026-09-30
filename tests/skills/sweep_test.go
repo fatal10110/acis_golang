@@ -44,13 +44,13 @@ func spoiledMonsterTemplate() *npc.Template {
 	}
 }
 
-// TestSweepEarnsSpoilIntoInventory spoils a monster for the player, kills
-// it and sweeps the corpse. The player reads the earned lines after the
-// launch, holds the swept items, and the corpse's spoil is gone.
-func TestSweepEarnsSpoilIntoInventory(t *testing.T) {
-	t.Parallel()
+// sweepScene boots a Sweeper-casting player with no free slot, targets a
+// fresh monster, marks it spoiled by the id spoilerFor returns unless that
+// is zero, kills it with the player and gives the corpse a live deadline.
+func sweepScene(t *testing.T, spoilerFor func(srv *gameservertest.Server, sweeperID int32) int32) (*gameservertest.Server, int32, *npc.Hostile) {
+	t.Helper()
 	srv := gameservertest.Boot(t,
-		gameservertest.WithCharacter("Spoiler", 5, 0),
+		gameservertest.WithCharacter("Sweeper", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{sweeperSkill()})),
 		// No free slot: sweeping checks none.
@@ -66,7 +66,7 @@ func TestSweepEarnsSpoilIntoInventory(t *testing.T) {
 	targetHostile(t, c, mob.ObjectID())
 	drainUntilQuiet(t, c)
 
-	if !mob.SpoilPool().Mark(objID) {
+	if spoilerID := spoilerFor(srv, objID); spoilerID != 0 && !mob.SpoilPool().Mark(spoilerID) {
 		t.Fatal("fresh monster already spoiled")
 	}
 	obj, ok := srv.State.Player(objID)
@@ -83,6 +83,16 @@ func TestSweepEarnsSpoilIntoInventory(t *testing.T) {
 	// No corpse time schedules no decay; give the corpse a fresh deadline.
 	mob.SetCorpseDeadline(time.Now().Add(time.Minute))
 	drainUntilQuiet(t, c)
+	return srv, objID, mob
+}
+
+// TestSweepEarnsSpoilIntoInventory spoils a monster for the player, kills
+// it and sweeps the corpse. The player reads the earned lines after the
+// launch, holds the swept items, and the corpse's spoil is gone.
+func TestSweepEarnsSpoilIntoInventory(t *testing.T) {
+	t.Parallel()
+	srv, objID, mob := sweepScene(t, func(_ *gameservertest.Server, sweeperID int32) int32 { return sweeperID })
+	c := srv.Client
 	if !mob.SpoilPool().Sweepable() {
 		t.Fatal("the kill left nothing to sweep")
 	}
@@ -118,5 +128,56 @@ func TestSweepEarnsSpoilIntoInventory(t *testing.T) {
 	}
 	if mob.SpoilPool().Sweepable() || mob.SpoilPool().IsSpoiled() {
 		t.Fatal("the swept corpse kept its spoil")
+	}
+}
+
+// Reference: PlayerCast.canCast, case SWEEP (PlayerCast.java:336-351). A
+// player's CORPSE_MOB sweep of a Monster nobody spoiled is refused with
+// SWEEPER_FAILED_TARGET_NOT_SPOILED (343). One another player spoiled is
+// refused with SWEEP_NOT_ALLOWED (683): isLooterOrInLooterParty holds only
+// for the spoiler itself while nobody is in a party. Either refusal starts no
+// cast, so the corpse keeps its spoil and the caster gets nothing.
+
+// TestSweepOfAnotherPlayersSpoilIsRefused has the player sweep a corpse a
+// second character spoiled. The cast is refused with SWEEP_NOT_ALLOWED, the
+// spoil stays on the corpse under its spoiler, and the sweeper holds none of
+// it.
+func TestSweepOfAnotherPlayersSpoilIsRefused(t *testing.T) {
+	t.Parallel()
+	var spoilerID int32
+	srv, objID, mob := sweepScene(t, func(srv *gameservertest.Server, _ int32) int32 {
+		spoilerID = srv.SeedCharacterFor(t, "player2", "Spoiler", 5, 0).ID
+		return spoilerID
+	})
+	c := srv.Client
+	if !mob.SpoilPool().Sweepable() {
+		t.Fatal("the kill left nothing to sweep")
+	}
+
+	c.Send(encodeRequestMagicSkillUse(sweeperSkillID, false, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageSweepNotAllowed)
+	assertNoActionFailedUntilQuiet(t, c, "sweep of another player's spoil")
+
+	if !mob.SpoilPool().IsSpoiler(spoilerID) || !mob.SpoilPool().Sweepable() {
+		t.Fatal("the refused sweep took the spoiler's pool")
+	}
+	inv := srv.PlayerInventory(t, objID)
+	if got := inv.ItemCount(20, -1, true) + inv.ItemCount(30, -1, true); got != 0 {
+		t.Fatalf("sweeper holds %d spoil items, want none", got)
+	}
+}
+
+// TestSweepOfUnspoiledCorpseIsRefused sweeps a corpse nobody spoiled: the
+// cast is refused with SWEEPER_FAILED_TARGET_NOT_SPOILED.
+func TestSweepOfUnspoiledCorpseIsRefused(t *testing.T) {
+	t.Parallel()
+	srv, _, mob := sweepScene(t, func(*gameservertest.Server, int32) int32 { return 0 })
+	c := srv.Client
+
+	c.Send(encodeRequestMagicSkillUse(sweeperSkillID, false, false))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageSweeperFailedTargetNotSpoiled)
+	assertNoActionFailedUntilQuiet(t, c, "sweep of an unspoiled corpse")
+	if mob.SpoilPool().IsSpoiled() || mob.SpoilPool().Sweepable() {
+		t.Fatal("an unspoiled corpse gained spoil")
 	}
 }

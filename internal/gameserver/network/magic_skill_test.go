@@ -206,6 +206,8 @@ func TestTargetCastRejectionsSendMessageBeforeActionFailed(t *testing.T) {
 		{"corpse mob harvest non-monster", skilltarget.CastRejectHarvestNotMonster, modelskill.Definition{}, serverpackets.SystemMessageHarvestFailedSeedNotSown},
 		{"corpse mob too old", skilltarget.CastRejectCorpseTooOld, modelskill.Definition{}, serverpackets.SystemMessageCorpseTooOldSkillNotUsed},
 		{"corpse mob sweep non-monster", skilltarget.CastRejectSweepNotMonster, modelskill.Definition{}, serverpackets.SystemMessageSweeperFailedTargetNotSpoiled},
+		{"corpse mob sweep unspoiled", skilltarget.CastRejectSweepNotSpoiled, modelskill.Definition{}, serverpackets.SystemMessageSweeperFailedTargetNotSpoiled},
+		{"corpse mob sweep someone else's spoil", skilltarget.CastRejectSweepNotAllowed, modelskill.Definition{}, serverpackets.SystemMessageSweepNotAllowed},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			testsupport.ResetCapture(frames)

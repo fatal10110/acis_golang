@@ -453,8 +453,10 @@ func sendTargetCastRejection(live *livePlayer, rejection skilltarget.CastRejecti
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHarvestFailedSeedNotSown))
 	case skilltarget.CastRejectCorpseTooOld:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCorpseTooOldSkillNotUsed))
-	case skilltarget.CastRejectSweepNotMonster:
+	case skilltarget.CastRejectSweepNotMonster, skilltarget.CastRejectSweepNotSpoiled:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweeperFailedTargetNotSpoiled))
+	case skilltarget.CastRejectSweepNotAllowed:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSweepNotAllowed))
 	case skilltarget.CastRejectCannotUseOnYourself:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseOnYourself))
 	case skilltarget.CastRejectOlympiadUnavailable:

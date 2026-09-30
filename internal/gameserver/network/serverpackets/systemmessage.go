@@ -90,6 +90,7 @@ const (
 	SystemMessageLethalStrikeSuccessful            = 1668
 	SystemMessageInvalidTarget                     = 109
 	SystemMessageSweeperFailedTargetNotSpoiled     = 343
+	SystemMessageSweepNotAllowed                   = 683
 	SystemMessageHarvestFailedSeedNotSown          = 893
 	SystemMessageCorpseTooOldSkillNotUsed          = 1247
 	SystemMessageCannotDiscardDistanceTooFar       = 151
