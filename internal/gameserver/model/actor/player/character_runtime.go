@@ -258,9 +258,10 @@ func (c *Character) Configure(rt Runtime) {
 // never observes a torn pointer.
 func (c *Character) Attach(live *creature.Live, sink event.Sink) {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	c.Live = live
 	c.sink = sink
+	c.stateMu.Unlock()
+	c.refreshMoveSpeed()
 }
 
 // stopper is an armed one-shot timer.

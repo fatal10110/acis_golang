@@ -128,7 +128,9 @@ func TestBlockedInteractAfterPetReturnStillStopMoveAndPetStatus(t *testing.T) {
 	geo := &gameservertest.GateGeo{}
 	h := bootOwnerWithCollarAndGeo(t, geo)
 	pet, _ := h.spawnWolf(t)
-	placePet(t, pet, location.Location{X: 130, Y: 20, Z: 30})
+	// Far enough that the approach, which stops 100 short of the pet, is
+	// still under way for the ticks below.
+	placePet(t, pet, location.Location{X: 160, Y: 20, Z: 30})
 	drainUntilQuiet(t, h.client)
 
 	startOwnedPetApproach(t, h, pet)
