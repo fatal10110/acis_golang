@@ -16,6 +16,9 @@ type Form interface {
 	// IntersectsRect reports whether the volume's 2D footprint overlaps the
 	// axis-aligned rectangle spanning x1..x2 by y1..y2.
 	IntersectsRect(x1, x2, y1, y2 int) bool
+	// Bounds is the smallest axis-aligned box, bounds inclusive, holding
+	// the 2D footprint.
+	Bounds() (minX, maxX, minY, maxY int)
 	// LowZ is the volume's lower z bound.
 	LowZ() int
 	// HighZ is the volume's upper z bound.

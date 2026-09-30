@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // ---- from form_test.go ----
@@ -338,5 +339,50 @@ func TestSummonCombatZonesMatchesZoneEntry(t *testing.T) {
 	var nilIndex *Index
 	if pvp, siege := nilIndex.SummonCombatZones(500, 500, 0); pvp || siege {
 		t.Error("nil index: SummonCombatZones reported a combat zone")
+	}
+}
+
+// TestIndexAttachesEveryRegionIntersectsRectReports checks that Add, which
+// skips the rows away from a footprint, attaches a zone to exactly the
+// regions a scan of the whole grid would. The wide ring's corner probe
+// wraps in 32-bit arithmetic and claims regions far outside it on the x
+// axis; they must stay attached.
+func TestIndexAttachesEveryRegionIntersectsRectReports(t *testing.T) {
+	mustForm := func(f Form, err error) Form {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	wide := mustForm(NewPolygon([]location.Point{{X: -76016, Y: 98}, {X: 50773, Y: 81087}, {X: -76016, Y: 81087}}, -4848, -3760))
+	forms := map[string]Form{
+		"wide ring":         wide,
+		"inverted-z ring":   mustForm(NewPolygon([]location.Point{{X: 1000, Y: 1000}, {X: 9000, Y: 1500}, {X: 5000, Y: 7000}}, 100, -100)),
+		"cuboid on a seam":  mustForm(NewCuboid(-2048, 2048, -4096, 0, -100, 100)),
+		"cylinder":          mustForm(NewCylinder(81000, -120000, -100, 100, 3000)),
+		"off the grid edge": mustForm(NewCuboid(world.MinX-5000, world.MinX+10, world.MaxY-10, world.MaxY+5000, 0, 1)),
+	}
+	for name, form := range forms {
+		ix := NewIndex()
+		ix.Add(NewFishing(1, form))
+		minX, maxX, _, _ := form.Bounds()
+		farColumns := 0
+		for rx := range world.RegionsX {
+			x1 := world.MinX + rx*regionEdge
+			for ry := range world.RegionsY {
+				y1 := world.MinY + ry*regionEdge
+				want := form.IntersectsRect(x1, x1+regionEdge, y1, y1+regionEdge)
+				if got := len(ix.byRegion[rx][ry]) == 1; got != want {
+					t.Fatalf("%s: region %d,%d attached = %v, IntersectsRect = %v", name, rx, ry, got, want)
+				}
+				if want && (x1+regionEdge < minX || x1 > maxX) {
+					farColumns++
+				}
+			}
+		}
+		if name == "wide ring" && farColumns == 0 {
+			t.Fatal("wide ring: no region outside its x extent reported, want the wrapped corner probe to claim some")
+		}
 	}
 }

@@ -67,5 +67,10 @@ func (c Circle) IntersectsRect(ax1, ax2, ay1, ay2 int) bool {
 	return false
 }
 
+// Bounds is the disc's bounding box.
+func (c Circle) Bounds() (minX, maxX, minY, maxY int) {
+	return c.x - c.rad, c.x + c.rad, c.y - c.rad, c.y + c.rad
+}
+
 // Intersects reports whether c overlaps other, dispatching on other's kind.
 func (c Circle) Intersects(other Shape) bool { return intersects(c, other) }

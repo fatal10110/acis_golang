@@ -23,6 +23,9 @@ type Shape interface {
 	// IntersectsRect reports whether the shape's footprint overlaps the
 	// axis-aligned rectangle spanning x1..x2 by y1..y2.
 	IntersectsRect(x1, x2, y1, y2 int) bool
+	// Bounds is the smallest axis-aligned box, bounds inclusive, holding
+	// the footprint.
+	Bounds() (minX, maxX, minY, maxY int)
 	// Intersects reports whether the shape overlaps other.
 	Intersects(other Shape) bool
 }

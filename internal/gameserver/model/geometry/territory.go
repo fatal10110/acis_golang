@@ -90,6 +90,18 @@ func (t *Territory) IntersectsRect(x1, x2, y1, y2 int) bool {
 	return false
 }
 
+// Bounds is the bounding box of the territory's 2D footprint, the union of
+// its shapes' boxes.
+func (t *Territory) Bounds() (minX, maxX, minY, maxY int) {
+	minX, maxX, minY, maxY = t.Shapes[0].Bounds()
+	for _, s := range t.Shapes[1:] {
+		x1, x2, y1, y2 := s.Bounds()
+		minX, maxX = min(minX, x1), max(maxX, x2)
+		minY, maxY = min(minY, y1), max(maxY, y2)
+	}
+	return minX, maxX, minY, maxY
+}
+
 // LowZ is the territory's lower z bound.
 func (t *Territory) LowZ() int { return t.MinZ }
 

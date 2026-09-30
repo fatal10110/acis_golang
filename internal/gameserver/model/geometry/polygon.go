@@ -38,6 +38,16 @@ func (v vertexList) IntersectsRect(x1, x2, y1, y2 int) bool {
 	return vertexRingIntersectsRect(v.xs, v.ys, x1, x2, y1, y2)
 }
 
+// Bounds is the vertex ring's bounding box.
+func (v vertexList) Bounds() (minX, maxX, minY, maxY int) {
+	minX, maxX, minY, maxY = int(v.xs[0]), int(v.xs[0]), int(v.ys[0]), int(v.ys[0])
+	for i := range v.xs {
+		minX, maxX = min(minX, int(v.xs[i])), max(maxX, int(v.xs[i]))
+		minY, maxY = min(minY, int(v.ys[i])), max(maxY, int(v.ys[i]))
+	}
+	return minX, maxX, minY, maxY
+}
+
 // Intersects reports whether v overlaps other, dispatching on other's kind.
 func (v vertexList) Intersects(other Shape) bool { return intersects(v, other) }
 
