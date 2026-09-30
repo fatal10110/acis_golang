@@ -850,16 +850,22 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 // configures: its system message, naming the skill at level 1 when the
 // clause asks for the name, or else its literal text, or nothing.
 func sendSkillConditionFailure(live *livePlayer, clause modelskill.ConditionClause, skillID modelskill.ID) {
+	sendSkillConditionFailureVia(sendFrameTo, live, clause, skillID)
+}
+
+// sendSkillConditionFailureVia is sendSkillConditionFailure sending its
+// frame through send.
+func sendSkillConditionFailureVia(send frameSender, live *livePlayer, clause modelskill.ConditionClause, skillID modelskill.ID) {
 	if live == nil {
 		return
 	}
 	switch {
 	case clause.MessageID != 0 && clause.AddName:
-		live.SendFrame(serverpackets.FrameSystemMessageSkillName(int(clause.MessageID), int32(skillID), 1))
+		send(live, serverpackets.FrameSystemMessageSkillName(int(clause.MessageID), int32(skillID), 1))
 	case clause.MessageID != 0:
-		live.SendFrame(serverpackets.FrameSystemMessage(int(clause.MessageID)))
+		send(live, serverpackets.FrameSystemMessage(int(clause.MessageID)))
 	case clause.Message != "":
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, clause.Message))
+		send(live, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, clause.Message))
 	}
 }
 
@@ -930,6 +936,14 @@ func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
 	return actorcast.EffectHandlers{Targets: l.targets, Skills: l.skillHandlers, Chance: l.chance}
 }
 
+// frameSender sends frame to recipient's client.
+type frameSender func(recipient *livePlayer, frame wire.Frame)
+
+// sendFrameTo sends frame to recipient at once.
+func sendFrameTo(recipient *livePlayer, frame wire.Frame) {
+	recipient.SendFrame(frame)
+}
+
 // sendSkillHandlerResult delivers both caster-addressed messages (sent to
 // live, when connected) and target-addressed messages (resolved by ID
 // through l.livePlayerByID, independent of whether live is connected or
@@ -937,11 +951,17 @@ func (l *GameClientLink) castEffects() actorcast.EffectHandlers {
 // live its own status, so a caller that follows with a changed-vitals
 // StatusUpdate can measure from there instead of repeating it.
 func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorcast.EffectResult) (statusSent bool) {
+	return l.sendSkillHandlerResultVia(sendFrameTo, live, result)
+}
+
+// sendSkillHandlerResultVia is sendSkillHandlerResult sending each frame
+// through send.
+func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *livePlayer, result actorcast.EffectResult) (statusSent bool) {
 	for _, message := range result.Messages {
 		switch m := message.(type) {
 		case skillhandler.CasterVitalsChanged:
 			if live != nil {
-				sendLiveStatus(live)
+				send(live, liveStatusFrame(live))
 				statusSent = true
 			}
 		case skillhandler.Counterattack:
@@ -956,10 +976,10 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 				defenderName = defender.Name
 			}
 			if defenderOnline {
-				defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
+				send(defender, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
 			}
 			if attackerOnline {
-				attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, defenderName))
+				send(attacker, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1PerformingCounterattack, defenderName))
 			}
 		case skillhandler.Dodge:
 			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)
@@ -973,57 +993,57 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 				defenderName = defender.Name
 			}
 			if attackerOnline {
-				attacker.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
+				send(attacker, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))
 			}
 			if defenderOnline {
-				defender.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
+				send(defender, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, attackerName))
 			}
 		case skillhandler.Lethal:
 			if target, online := l.livePlayerByID(m.TargetID); online {
-				target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrike))
+				send(target, serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrike))
 			}
 			if attacker, online := l.livePlayerByID(m.AttackerID); online {
-				attacker.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
+				send(attacker, serverpackets.FrameSystemMessage(serverpackets.SystemMessageLethalStrikeSuccessful))
 			}
 		case skillhandler.Damage:
 			if recipient, online := l.livePlayerByID(m.RecipientID); online {
-				sendDamageMessage(recipient, m)
+				sendDamageMessageVia(send, recipient, m)
 			}
 		case skillhandler.DamageReceived:
 			if target, online := l.livePlayerByID(m.TargetID); online {
-				target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS1GaveYouS2Dmg, m.AttackerName, m.Amount))
+				send(target, serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS1GaveYouS2Dmg, m.AttackerName, m.Amount))
 			}
 		case skillhandler.Resisted:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))
+				send(live, serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, m.TargetName, int32(m.SkillID), int32(m.SkillLevel)))
 			}
 		case skillhandler.AttackFailedMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackFailed))
 			}
 		case skillhandler.DrainHalfSucceededMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDrainHalfSuccessful))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageDrainHalfSuccessful))
 			}
 		case skillhandler.DoorUnlockUnableMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageUnableToUnlockDoor))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageUnableToUnlockDoor))
 			}
 		case skillhandler.DoorUnlockFailedMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToUnlockDoor))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToUnlockDoor))
 			}
 		case skillhandler.InvalidTargetMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 			}
 		case skillhandler.SlotsFullMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 			}
 		case skillhandler.NothingInsideMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
 			}
 		case skillhandler.MagicResist:
 			target, online := l.livePlayerByID(m.TargetID)
@@ -1034,20 +1054,20 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 			if m.Drain {
 				id = serverpackets.SystemMessageResistedS1Drain
 			}
-			target.SendFrame(serverpackets.FrameSystemMessageString(id, m.AttackerName))
+			send(target, serverpackets.FrameSystemMessageString(id, m.AttackerName))
 		case skillhandler.ManaDamageMissedMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageMissedTarget))
 			}
 		case skillhandler.ManaDrain:
 			target, online := l.livePlayerByID(m.TargetID)
 			if !online {
 				continue
 			}
-			target.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, m.CasterName, m.MP))
+			send(target, serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageS2MPHasBeenDrainedByS1, m.CasterName, m.MP))
 		case skillhandler.OpponentMPReducedMessage:
 			if live != nil {
-				live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, m.MP))
+				send(live, serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1, m.MP))
 			}
 		}
 	}
@@ -1058,34 +1078,40 @@ func (l *GameClientLink) sendSkillHandlerResult(live *livePlayer, result actorca
 // player sees each critical kind it rolled, a summon's owner sees one summon
 // critical, then either the blocked notice or the damage dealt.
 func sendDamageMessage(recipient *livePlayer, m skillhandler.Damage) {
+	sendDamageMessageVia(sendFrameTo, recipient, m)
+}
+
+// sendDamageMessageVia is sendDamageMessage sending each frame through
+// send.
+func sendDamageMessageVia(send frameSender, recipient *livePlayer, m skillhandler.Damage) {
 	crit := m.PhysicalCrit || m.MagicCrit
 	dealt := serverpackets.SystemMessageYouDidS1Dmg
 	switch m.Source {
 	case skillhandler.DamageByPlayer:
 		if m.PhysicalCrit {
-			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHit))
+			send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHit))
 		}
 		if m.MagicCrit {
-			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitMagic))
+			send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitMagic))
 		}
 	case skillhandler.DamageByPet:
 		dealt = serverpackets.SystemMessagePetHitForS1Damage
 		if crit {
-			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitByPet))
+			send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitByPet))
 		}
 	case skillhandler.DamageByServitor:
 		dealt = serverpackets.SystemMessageSummonGaveDamageS1
 		if crit {
-			recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitBySummonedMob))
+			send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCriticalHitBySummonedMob))
 		}
 	}
 	switch {
 	case m.Petrified:
-		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOpponentPetrified))
+		send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageOpponentPetrified))
 	case m.Blocked:
-		recipient.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackWasBlocked))
+		send(recipient, serverpackets.FrameSystemMessage(serverpackets.SystemMessageAttackWasBlocked))
 	default:
-		recipient.SendFrame(serverpackets.FrameSystemMessageNumber(dealt, m.Amount))
+		send(recipient, serverpackets.FrameSystemMessageNumber(dealt, m.Amount))
 	}
 }
 

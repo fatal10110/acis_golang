@@ -655,6 +655,12 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 // sendSummonSkillResult delivers the result of a skill summon cast to its
 // owner, the only client a summon's messages reach.
 func (l *GameClientLink) sendSummonSkillResult(actor *summon.Actor, result actorcast.EffectResult) {
+	l.sendSummonSkillResultVia(sendFrameTo, actor, result)
+}
+
+// sendSummonSkillResultVia is sendSummonSkillResult sending each frame
+// through send.
+func (l *GameClientLink) sendSummonSkillResultVia(send frameSender, actor *summon.Actor, result actorcast.EffectResult) {
 	owner, ok := l.livePlayerByID(actor.OwnerID())
 	if !ok {
 		return
@@ -678,7 +684,7 @@ func (l *GameClientLink) sendSummonSkillResult(actor *summon.Actor, result actor
 			messages = append(messages, message)
 		}
 	}
-	l.sendSkillHandlerResult(owner, actorcast.EffectResult{Messages: messages})
+	l.sendSkillHandlerResultVia(send, owner, actorcast.EffectResult{Messages: messages})
 }
 
 // The production movement geo answers the sight queries a summon takes from

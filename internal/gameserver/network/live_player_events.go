@@ -15,13 +15,37 @@ import (
 )
 
 // SendFrame sends frame to this player's client. Once the session has
-// detached it releases frame and reports false.
+// detached it releases frame and reports false. While frames wait for the
+// player's PvP flag changes, frame waits behind them (sendBehindPvPChanges).
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
 	if p.session == nil || p.SessionDetached() {
 		frame.Release()
 		return false
 	}
+	if p.pvpChanges.hold(frame, false) {
+		return true
+	}
 	return p.session(frame)
+}
+
+// sendFrameNow sends frame through the client path visibility names,
+// without waiting behind held frames.
+func (p *livePlayer) sendFrameNow(frame wire.Frame, visibility bool) bool {
+	send := p.session
+	if visibility {
+		send = p.visibilitySend
+	}
+	if send == nil || (p.Character != nil && p.SessionDetached()) {
+		frame.Release()
+		return false
+	}
+	return send(frame)
+}
+
+// sendHeldFrame sends a frame that waited behind the player's PvP flag
+// changes.
+func (p *livePlayer) sendHeldFrame(f heldFrame) {
+	p.sendFrameNow(f.frame, f.visibility)
 }
 
 // BroadcastFrame delivers one copy of another actor's broadcast to this
