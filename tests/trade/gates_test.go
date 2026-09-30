@@ -103,7 +103,7 @@ func setCharacterColumn(t *testing.T, h *traders, objID int32, column string, va
 	}
 }
 
-func assertSilent(t *testing.T, c *testsupport.ScriptedClient, who string) {
+func assertGateSilent(t *testing.T, c *testsupport.ScriptedClient, who string) {
 	t.Helper()
 	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
 		t.Fatalf("%s received opcode %#x, want silence", who, frame[0])
@@ -122,7 +122,7 @@ func TestTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 
 	h.first.Send(encodeTradeRequest(h.secondID))
 	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageNotAuthorizedToDoThat)
-	assertSilent(t, h.second, "target of a refused request")
+	assertGateSilent(t, h.second, "target of a refused request")
 
 	h.second.Send(encodeTradeRequest(h.firstID))
 	assertFrameOpcode(t, h.first.Read(), serverpackets.OpcodeSendTradeRequest, "SendTradeRequest")
@@ -144,8 +144,8 @@ func TestAnswerTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 
 	h.second.Send(encodeAnswerTradeRequest(1))
 	assertStaticSystemMessage(t, h.second.Read(), serverpackets.SystemMessageNotAuthorizedToDoThat)
-	assertSilent(t, h.second, "refused answerer")
-	assertSilent(t, h.first, "requester of a refused answer")
+	assertGateSilent(t, h.second, "refused answerer")
+	assertGateSilent(t, h.first, "requester of a refused answer")
 
 	h.first.Send(encodeTradeRequest(h.secondID))
 	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageAlreadyTrading)
@@ -177,7 +177,7 @@ func TestTradeRequestRefusedWithKarma(t *testing.T) {
 
 			h.first.Send(encodeTradeRequest(h.secondID))
 			assertSystemMessageText(t, h.first.Read(), serverpackets.SystemMessageS1, chaoticTradeRefusal)
-			assertSilent(t, h.second, "target of a karma-refused request")
+			assertGateSilent(t, h.second, "target of a karma-refused request")
 		})
 	}
 }
