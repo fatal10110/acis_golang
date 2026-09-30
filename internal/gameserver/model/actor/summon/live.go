@@ -552,6 +552,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
+	a.settleWeightPenalty()
 	return a, nil
 }
 

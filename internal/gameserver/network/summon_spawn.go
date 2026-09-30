@@ -415,6 +415,11 @@ func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, 
 		log:     l.log,
 	}, l.itemPersister(controlItemID))
 	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
+	// Restored rows never queue an update, so the carried weight stays 0
+	// unless recomputed here; the pet built around inv takes its
+	// weight-penalty band from it. No pet holds inv yet, so the weight
+	// delivery sends nothing.
+	inv.UpdateWeight()
 	return inv
 }
 

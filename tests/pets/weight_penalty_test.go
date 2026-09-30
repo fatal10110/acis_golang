@@ -31,7 +31,10 @@ const ballastID = int32(9510)
 //	weightLimit = (int)(34500 * CON_BONUS[43]=1.58 * 1.0) = 54510
 //	weight 27250 NONE    move 132 multiplier 1.1f  regen HP 3.1284 MP 1.08702
 //	weight 27260 LEVEL_1 move 132 multiplier 1.1f  regen HP 1.5642 MP 0.54351
+//	weight 36300 LEVEL_1 move 132 multiplier 1.1f  regen HP 1.5642 MP 0.54351
+//	weight 36310 LEVEL_2 move  66 multiplier 0.55f regen HP 1.5642 MP 0.54351
 //	weight 43610 LEVEL_3 move  66 multiplier 0.55f regen HP 1.5642 MP 0.54351
+//	weight 46360 LEVEL_3 move  66 multiplier 0.55f regen HP 1.5642 MP 0.54351
 //	weight 54510 LEVEL_4 move   0 multiplier 0     regen HP 0.31284 MP 0.108702
 const petWeightLimit = 54510
 
@@ -44,8 +47,8 @@ type petLoad struct {
 	mpRegen    float64
 }
 
-// TestPetWeightPenaltyBands loads a wolf through give-to-pet past 50%, 80%
-// and exactly 100% of its weight limit, then unloads it below 50%. Each
+// TestPetWeightPenaltyBands loads a wolf through give-to-pet past 50%,
+// 66.6%, 80% and exactly 100% of its weight limit, then unloads it below 50%. Each
 // band crossing republishes the pet's status once more than a weight change
 // that keeps the band (Pet.refreshWeightPenalty broadcasting from
 // Pet.updateAndBroadcastStatus), and the PetInfo that follows carries the
@@ -74,7 +77,9 @@ func TestPetWeightPenaltyBands(t *testing.T) {
 	}{
 		{"just under half", 1, false, petLoad{0, 27250, 132, float64(float32(1.1)), 3.1284, 1.08702}},
 		{"past half", 1, true, petLoad{1, 27260, 132, float64(float32(1.1)), 1.5642, 0.54351}},
-		{"past 80%", 1635, true, petLoad{3, 43610, 66, float64(float32(0.55)), 1.5642, 0.54351}},
+		{"just under 66.6%", 904, false, petLoad{1, 36300, 132, float64(float32(1.1)), 1.5642, 0.54351}},
+		{"past 66.6%", 1, true, petLoad{2, 36310, 66, float64(float32(0.55)), 1.5642, 0.54351}},
+		{"past 80%", 730, true, petLoad{3, 43610, 66, float64(float32(0.55)), 1.5642, 0.54351}},
 		{"at the limit", 1090, true, petLoad{4, 54510, 0, 0, 0.31284, 0.108702}},
 	}
 	for _, step := range steps {
@@ -137,6 +142,54 @@ func TestGiveToPetPastWeightLimitRefused(t *testing.T) {
 	}
 }
 
+// TestRestoredPetLoadSetsBand calls out a wolf whose saved items already
+// weigh 46360 of its 54510 limit (85%, LEVEL_3), alive and as a corpse. The
+// restored load is weighed before the pet appears, so its first PetInfo
+// already carries the load and the band's halved speed, and its movement
+// and regeneration follow the band without any inventory change.
+func TestRestoredPetLoadSetsBand(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		curHP float64
+	}{{"alive", 100}, {"corpse", 0}} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			saved := pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: tc.curHP, CurMP: 10, Fed: wolfMaxMeal}
+			h := bootBallastWolfCarrying(t, saved, 4636)
+			wolf, burst := h.spawnWolf(t)
+			if wolf.Dead() != (tc.curHP == 0) {
+				t.Fatalf("restored wolf dead = %v, want %v", wolf.Dead(), tc.curHP == 0)
+			}
+			info, ok := firstOpcode(burst, serverpackets.OpcodePetInfo)
+			if !ok {
+				t.Fatalf("spawn burst has no PetInfo: opcodes %x", frameOpcodes(burst))
+			}
+			want := petInfoLoad{multiplier: float64(float32(0.55)), weight: 46360, limit: petWeightLimit, moveSpeed: 66}
+			if got := readPetInfoLoad(t, info); got != want {
+				t.Fatalf("spawn PetInfo load = %+v, want %+v", got, want)
+			}
+			if band := wolf.WeightPenalty(); band != 3 {
+				t.Fatalf("restored band = %d, want 3", band)
+			}
+			if speed := wolf.Move().Speed(); speed != 66 {
+				t.Fatalf("restored movement speed = %v, want 66", speed)
+			}
+			if hp, mp := wolf.HPRegenRate(), wolf.MPRegenRate(); math.Abs(hp-1.5642) > 1e-9 || math.Abs(mp-0.54351) > 1e-9 {
+				t.Fatalf("restored regen HP/MP = %v/%v, want 1.5642/0.54351", hp, mp)
+			}
+			if tc.curHP == 0 {
+				return
+			}
+			drainUntilQuiet(t, h.client)
+			regenTick(t, h)
+			if got, want := wolf.HP(), 100+1.5642; math.Abs(got-want) > 1e-9 {
+				t.Fatalf("HP after a regen tick = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
 // TestOverloadedPetRegenTick runs a regeneration tick on a wolf in the
 // half-weight band: it regains half its unloaded rate, and the tick's
 // status republish keeps the band without a second broadcast.
@@ -166,6 +219,13 @@ func TestOverloadedPetRegenTick(t *testing.T) {
 // weight-penalty band of its own.
 func bootBallastWolf(t *testing.T) *petWorld {
 	t.Helper()
+	return bootBallastWolfCarrying(t, pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}, 2724)
+}
+
+// bootBallastWolfCarrying is bootBallastWolf with the wolf saved as saved,
+// carrying carried ballast.
+func bootBallastWolfCarrying(t *testing.T, saved pet.State, carried int) *petWorld {
+	t.Helper()
 	catalog := append(gameservertest.ItemTemplates().All(), &item.Template{
 		ID: ballastID, Name: "Ballast", Kind: item.KindEtcItem, Duration: -1,
 		Stackable: true, Dropable: true, Tradable: true, Destroyable: true,
@@ -176,12 +236,11 @@ func bootBallastWolf(t *testing.T) *petWorld {
 		gameservertest.WithItemTemplates(item.NewTable(catalog)),
 		gameservertest.WithWeightLimitMultiplier(4),
 	}, seedItem{TemplateID: ballastID, Count: 2728})
-	saved := pet.State{Level: wolfLevel, Exp: wolfLevelExp, CurHP: 100, CurMP: 10, Fed: wolfMaxMeal}
 	if err := h.srv.Pets.Save(context.Background(), h.collarID, saved); err != nil {
 		t.Fatalf("seed pets row: %v", err)
 	}
-	carried := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: ballastID, OwnerID: h.collarID, Count: 2724, Location: item.LocationPet}
-	if err := h.srv.Items.Create(context.Background(), h.collarID, carried); err != nil {
+	stack := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: ballastID, OwnerID: h.collarID, Count: carried, Location: item.LocationPet}
+	if err := h.srv.Items.Create(context.Background(), h.collarID, stack); err != nil {
 		t.Fatalf("seed pet ballast: %v", err)
 	}
 	return h

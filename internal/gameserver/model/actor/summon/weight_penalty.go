@@ -29,11 +29,28 @@ func (a *Actor) WeightPenalty() int {
 // republishes the pet's status once. A pet with no weight limit keeps its
 // band, and a servitor carries nothing.
 func (a *Actor) refreshWeightPenalty() {
+	if a.storeWeightPenalty() {
+		a.refreshMoveSpeed()
+		a.BroadcastStatus()
+	}
+}
+
+// settleWeightPenalty gives a pet just built around a restored inventory
+// the band its load puts it in. Nothing has seen the pet yet, so nothing
+// is republished: its first PetInfo carries the band's speed.
+func (a *Actor) settleWeightPenalty() {
+	a.storeWeightPenalty()
+}
+
+// storeWeightPenalty stores the band the pet's current load gives and
+// reports whether it changed.
+func (a *Actor) storeWeightPenalty() bool {
 	inv := a.PetInventory()
 	if inv == nil || inv.WeightLimit <= 0 {
-		return
+		return false
 	}
 	a.weightPenaltyMu.Lock()
+	defer a.weightPenaltyMu.Unlock()
 	ratio := (float64(inv.TotalWeight()) - a.calcStat(stat.WeightPenalty, 0)) / float64(inv.WeightLimit)
 	band := int32(weightPenaltyLevel4)
 	switch {
@@ -46,10 +63,5 @@ func (a *Actor) refreshWeightPenalty() {
 	case ratio < 1:
 		band = weightPenaltyLevel3
 	}
-	changed := a.weightPenalty.Swap(band) != band
-	a.weightPenaltyMu.Unlock()
-	if changed {
-		a.refreshMoveSpeed()
-		a.BroadcastStatus()
-	}
+	return a.weightPenalty.Swap(band) != band
 }
