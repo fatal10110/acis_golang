@@ -285,13 +285,16 @@ func (l *GameClientLink) showOwnedPetStatus(live *livePlayer, pet *summon.Actor,
 }
 
 // replaceWithPetInteract makes the owner's interact with its summon the
-// current intention: the attack intention is dropped and every follow task,
-// an attack chase or a friendly follow, is cancelled. A walk under way is
-// left to the interact's think, which walks elsewhere or stops it.
+// current intention: the attack intention is dropped, every parked approach
+// or queued intention (a pickup, a cast, a follow, a use-item, another pet
+// interact) goes with it, and every follow task, an attack chase or a
+// friendly follow, is cancelled. A walk under way is left to the interact's
+// think, which walks elsewhere or stops it.
 func replaceWithPetInteract(live *livePlayer) {
 	if live.combat != nil {
 		live.combat.Replace()
 	}
+	live.clearParkedApproaches()
 	if live.move != nil {
 		live.move.CancelFollow()
 	}
@@ -354,7 +357,6 @@ func (l *GameClientLink) thinkOwnedPetInteract(live *livePlayer, pet *summon.Act
 		if live.move == nil || live.MovementDisabled() {
 			return
 		}
-		live.clearParkedApproaches()
 		live.setPetInteract(pet)
 		if !live.move.MoveToPawn(pet, summonInteractApproachOffset) {
 			live.takePetInteract()
