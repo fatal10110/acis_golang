@@ -94,6 +94,14 @@ func encodeRequestMagicSkillUse(skillID int32, ctrl, shift bool) []byte {
 	return w.Bytes()
 }
 
+func encodeRequestActionUse(actionID int32, ctrl bool) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestActionUse)
+	w.WriteInt32(actionID)
+	w.WriteInt32(wire.BoolInt32(ctrl))
+	w.WriteUint8(0)
+	return w.Bytes()
+}
+
 func encodeRequestRestartPoint(requestType int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestRestartPoint)
 	w.WriteInt32(requestType)

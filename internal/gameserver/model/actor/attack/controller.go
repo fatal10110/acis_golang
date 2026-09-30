@@ -528,7 +528,7 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 	}
 	reflected := c.reflectedDamage(hit)
 	hit.Target.TakeDamage(hit.Damage, c.actor)
-	if c.player != nil {
+	if c.playable != nil {
 		c.emit(event.HitDamageApplied{})
 	}
 	if reflected > 0 {
