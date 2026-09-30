@@ -30,11 +30,11 @@ func TestQueuedSitDropsAttackBeforeLaterPetInteract(t *testing.T) {
 		}
 	}
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit after swing")
-	h.srv.Advance(t, 2500*time.Millisecond)
+	h.srv.SettlePosture(t, h.ownerID)
 	drainUntilQuiet(t, h.client)
 	h.client.Send(encodeRequestChangeWaitType(true))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "stand")
-	h.srv.Advance(t, 2500*time.Millisecond)
+	h.srv.SettlePosture(t, h.ownerID)
 	drainUntilQuiet(t, h.client)
 
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
@@ -74,7 +74,7 @@ func TestOwnedPetInteractWaitsForStandUp(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 	h.client.Send(encodeRequestChangeWaitType(false))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit")
-	h.srv.Advance(t, 2500*time.Millisecond)
+	h.srv.SettlePosture(t, h.ownerID)
 	drainUntilQuiet(t, h.client)
 	h.client.Send(encodeRequestChangeWaitType(true))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "stand")

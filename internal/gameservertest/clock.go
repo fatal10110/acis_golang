@@ -36,6 +36,20 @@ func (s *Server) Advance(tb testing.TB, d time.Duration) {
 // inline executor) rather than the wall clock doing it (the real pool).
 func (s *Server) DrivesClock() bool { return s.queues.advance != nil }
 
+// postureDelay is how long a sit-down or stand-up transition lasts.
+const postureDelay = 2500 * time.Millisecond
+
+// SettlePosture lets the sit-down or stand-up the player objID just started
+// run out: it advances the transition's length, then waits until the
+// transition has ended. On the wall clock the transition's timer can fire a
+// few milliseconds after that length, timed from the ChangeWaitType reply.
+func (s *Server) SettlePosture(tb testing.TB, objID int32) {
+	tb.Helper()
+	s.Advance(tb, postureDelay)
+	c := s.onlineCharacter(tb, objID)
+	s.AdvanceUntil(tb, "posture transition end", func() bool { return !c.SittingNow() && !c.StandingNow() })
+}
+
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
 // advanceLimit how far it goes before giving up.
 const (

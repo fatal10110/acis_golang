@@ -20,7 +20,7 @@ func TestAttackRequestWaitsForStandUp(t *testing.T) {
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
 	sitPlayer(t, c)
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
 	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, false))
@@ -46,7 +46,7 @@ func TestAttackQueuedDuringStandUpKeepsOriginalTarget(t *testing.T) {
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, first.ObjectID())
 	sitPlayer(t, c)
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
 	c.Send(encodeAttackRequest(first.ObjectID(), 10, 20, 30, false))
@@ -70,7 +70,7 @@ func TestShiftAttackQueuedDuringStandUpDoesNotWalk(t *testing.T) {
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
 	sitPlayer(t, c)
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
 	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, true))
@@ -90,7 +90,7 @@ func TestAttackRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	sitPlayer(t, c)
 	c.Send(encodeAttackRequest(hostile.ObjectID(), 10, 20, 30, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued attack")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
@@ -115,7 +115,7 @@ func TestFollowRequestWaitsForStandUp(t *testing.T) {
 	p.walkVictimAway(t, 300)
 	selectPlayerTarget(t, p.c, p.victimID)
 	sitPlayer(t, p.c)
-	p.srv.Advance(t, 2500*time.Millisecond)
+	p.srv.SettlePosture(t, p.attackerID)
 	p.c.Send(encodeRequestChangeWaitType(true))
 	assertFrameOpcode(t, p.c.Read(), serverpackets.OpcodeChangeWaitType, "stand")
 	p.c.Send(encodeAction(p.victimID, 10, 20, 30, false))
@@ -123,7 +123,7 @@ func TestFollowRequestWaitsForStandUp(t *testing.T) {
 	if x, _, _ := p.srv.PlayerPosition(t, p.attackerID); x != playerOrigin.X {
 		t.Fatalf("follower moved during stand-up to x=%d", x)
 	}
-	p.srv.Advance(t, 2500*time.Millisecond)
+	p.srv.SettlePosture(t, p.attackerID)
 	frames := readQuiet(p.c)
 	if followMoveIndex(frames, p.attackerID, p.victimID) < 0 {
 		t.Fatalf("frames after stand-up = %v, want queued follow MoveToPawn", opcodes(frames))

@@ -41,7 +41,7 @@ func TestMoveRequestWaitsForStandUp(t *testing.T) {
 	drainQuiet(t, c)
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand")
 
@@ -68,7 +68,7 @@ func TestMoveRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: 80, Y: 70, Z: 30}, spawnOrigin, 1))
 	mustReadOpcode(t, c, serverpackets.OpcodeActionFailed, "queued move")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
@@ -92,7 +92,7 @@ func TestSitRequestWaitsForStandUp(t *testing.T) {
 	drainQuiet(t, c)
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand")
 	c.Send(encodeRequestChangeWaitType(false))
@@ -116,7 +116,7 @@ func TestQueuedSitKeepsChairSelectedAtRequest(t *testing.T) {
 	second := spawnChair(t, srv, c, nil)
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeAction(first.ObjectID(), 10, 20, 30, false))
 	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select first chair")
 	c.Send(encodeRequestChangeWaitType(true))
@@ -146,7 +146,7 @@ func TestChairReleasedAfterStandUp(t *testing.T) {
 	drainQuiet(t, c)
 	chair := spawnChair(t, srv, c, nil)
 	sitOnChair(t, c, nil, chair)
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeRequestChangeWaitType(true))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "stand from chair")
 	if !chair.Busy() {
@@ -199,7 +199,7 @@ func TestDamageDuringSitDownDoesNotStandPlayer(t *testing.T) {
 			t.Fatal("hit broadcast a stand during sit-down")
 		}
 	}
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	if !posture.Seated() {
 		t.Fatal("player did not finish sitting down")
 	}
@@ -217,7 +217,7 @@ func TestChairInteractAfterStandUpDoesNotSit(t *testing.T) {
 	chair := spawnChair(t, srv, c, nil)
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeAction(chair.ObjectID(), 10, 20, 30, false))
 	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select chair")
 	c.Send(encodeRequestChangeWaitType(true))
@@ -227,7 +227,7 @@ func TestChairInteractAfterStandUpDoesNotSit(t *testing.T) {
 	if chair.Busy() {
 		t.Fatal("chair claimed during stand-up")
 	}
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
@@ -260,7 +260,7 @@ func TestTownMapInteractWaitsForStandUp(t *testing.T) {
 	drainQuiet(t, c)
 	c.Send(encodeRequestChangeWaitType(false))
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "sit")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	c.Send(encodeAction(mapObject.ObjectID(), 10, 20, 30, false))
 	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select town map")
 	c.Send(encodeRequestChangeWaitType(true))
@@ -290,7 +290,7 @@ func TestChairInteractDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	mustReadOpcode(t, c, serverpackets.OpcodeMyTargetSelected, "select chair")
 	c.Send(encodeAction(chair.ObjectID(), 10, 20, 30, false))
 	mustReadOpcode(t, c, serverpackets.OpcodeActionFailed, "queued chair interact")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))

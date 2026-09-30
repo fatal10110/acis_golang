@@ -53,7 +53,7 @@ func TestPickupDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 	changePosture(t, c, false)
 	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued pickup")
-	srv.Advance(t, 2500*time.Millisecond)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	failed := false
 	for _, frame := range testsupport.SyncBarrierFrames(t, c, func() { c.Send(encodeRequestItemList()) }, serverpackets.OpcodeItemList) {
 		if frame[0] == serverpackets.OpcodeGetItem {
