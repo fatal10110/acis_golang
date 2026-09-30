@@ -163,10 +163,9 @@ func (l *GameClientLink) arriveHeldIntention(live *livePlayer) {
 }
 
 // thinkCurrentIntention thinks live's current intention again, as a THINK
-// does: a toggle left current toggles its item again, and an attack, pickup,
-// summon interact, follow or walk to a point is thought as an equip toggle
-// re-runs it.
-// ponytail: a cast approach is not thought again yet (#2925).
+// does: a toggle left current toggles its item again, a cast approach is
+// thought as its arrival thinks it, and an attack, pickup, summon interact,
+// follow or walk to a point is thought as an equip toggle re-runs it.
 func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
 	if live.combat != nil && live.combat.Target() != nil {
 		live.thinkAttack()
@@ -176,8 +175,45 @@ func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
 		l.toggleHeldItem(live, held.itemID)
 		return
 	}
+	if live.hasDeferredMagicSkill() || live.hasDeferredItemAICast() {
+		l.thinkParkedCast(live)
+		return
+	}
 	if rerun, _ := l.replacedIntention(live); rerun != nil {
 		rerun()
+	}
+}
+
+// thinkParkedCast thinks a cast request held in the next-intention slot
+// again. While a swing, a cast or a sit-down or stand-up is in flight the
+// request is queued behind it, not current, and waits for that action's end
+// to run it. Otherwise it is a cast approach, the current CAST intention: a
+// player that cannot act or has every skill disabled goes idle, stopping any
+// walk under way, and is answered ActionFailed; anyone else thinks it as the
+// approach's arrival does, walking toward the target or signet afresh from
+// where it stands while out of range and casting once in range.
+func (l *GameClientLink) thinkParkedCast(live *livePlayer) {
+	if itemAICastBusy(live) {
+		// A THINK on the action in flight does not keep a cast queued
+		// behind it in the reference AI: thinking an attack mid-swing
+		// requeues the attack over the cast, thinking a cast mid-cast goes
+		// idle and clears the queue, and both answer ActionFailed. Keeping
+		// the cast queued and silent here cannot be told apart in play: a
+		// player's only THINK is the ImmobileUntilAttacked exit, whose
+		// start aborted every swing and cast and whose hold denies new
+		// ones, so no swing or cast is in flight when it runs.
+		return
+	}
+	if live.DenyAIAction() || live.Character.AllSkillsDisabled() {
+		live.tryToIdle(false)
+		if live.move != nil {
+			live.move.Stop()
+		}
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if !l.finishDeferredMagicSkill(live) {
+		l.finishDeferredItemAICast(live)
 	}
 }
 

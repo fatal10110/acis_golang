@@ -13,7 +13,7 @@ type teleportFile struct {
 }
 
 type teleportListElement struct {
-	NPCID int            `xml:"npcId,attr"`
+	NPCID *coord32       `xml:"npcId,attr"`
 	Locs  []attrsElement `xml:"loc"`
 }
 
@@ -25,7 +25,7 @@ type instantTeleportFile struct {
 }
 
 type instantTeleportListElement struct {
-	NPCID int               `xml:"npcId,attr"`
+	NPCID *coord32          `xml:"npcId,attr"`
 	Locs  []locationElement `xml:"loc"`
 }
 
@@ -38,15 +38,19 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 
 	table := make(travel.TeleportTable, len(doc.Lists))
 	for _, list := range doc.Lists {
+		if list.NPCID == nil {
+			return nil, fmt.Errorf("xml: %s: telPosList: npcId is required", path)
+		}
+		npcID := int(*list.NPCID)
 		teleports := make([]travel.Teleport, 0, len(list.Locs))
 		for _, loc := range list.Locs {
 			t, err := travel.NewTeleport(commons.StatSetFromXMLAttrs(loc.Attrs))
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, list.NPCID, err)
+				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, npcID, err)
 			}
 			teleports = append(teleports, t)
 		}
-		table[list.NPCID] = teleports
+		table[npcID] = teleports
 	}
 	return table, nil
 }
@@ -60,15 +64,19 @@ func LoadInstantTeleports(path string) (travel.InstantTable, error) {
 
 	table := make(travel.InstantTable, len(doc.Lists))
 	for _, list := range doc.Lists {
+		if list.NPCID == nil {
+			return nil, fmt.Errorf("xml: %s: telPosList: npcId is required", path)
+		}
+		npcID := int(*list.NPCID)
 		teleports := make([]location.Location, 0, len(list.Locs))
 		for _, loc := range list.Locs {
 			t, err := loc.loc()
 			if err != nil {
-				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, list.NPCID, err)
+				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, npcID, err)
 			}
 			teleports = append(teleports, t)
 		}
-		table[list.NPCID] = teleports
+		table[npcID] = teleports
 	}
 	return table, nil
 }

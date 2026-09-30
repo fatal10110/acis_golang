@@ -652,6 +652,18 @@ func (p *livePlayer) clearParkedApproaches() {
 	p.endFollow()
 }
 
+// replaceIntention drops p's attack and follow intentions, offensive or
+// friendly, for a new intention taking their place, leaving a walk under
+// way running.
+func (p *livePlayer) replaceIntention() {
+	if p.combat != nil {
+		p.combat.Replace()
+	}
+	if p.move != nil {
+		p.move.CancelFollow()
+	}
+}
+
 // endFollow drops p's follow intention, leaving a walk under way running.
 func (p *livePlayer) endFollow() {
 	if p.move != nil {

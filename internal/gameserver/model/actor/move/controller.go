@@ -20,12 +20,6 @@ type Located interface {
 	CollisionRadius() float64
 }
 
-// Pawn is a world object a MoveToPawn walk heads for.
-type Pawn interface {
-	ObjectID() int32
-	Position() (x, y, z int)
-}
-
 // Actor is the actor a Controller drives (self): its position/footprint,
 // plus its ability to broadcast its own movement to the world.
 type Actor interface {
@@ -232,7 +226,7 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	if isNPC && !disabled && !holds {
 		unseen = func() bool { return !npcActor.CanSee(target) }
 	}
-	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen)
+	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen, false)
 }
 
 // HoldOffensiveFollow is MaybeStartOffensiveFollow for an intention that
@@ -244,7 +238,7 @@ func (c *Controller) HoldOffensiveFollow(target attackable.Combatant, attackRang
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Blocked, the follow returns before any follow, movement or error.
-	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, true, nil)
+	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, true, nil, false)
 	return outOfRange
 }
 
@@ -269,7 +263,7 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 		c.startPawnFriendlyFollow(target, offset)
 		return true, nil
 	}
-	return c.maybeStartFollow(target, offset, FollowFriendly, false, nil)
+	return c.maybeStartFollow(target, offset, FollowFriendly, false, nil, false)
 }
 
 // CancelFriendlyFollow drops a player's friendly follow task, leaving a walk
@@ -327,7 +321,7 @@ func (c *Controller) pawnFriendlyFollowTick() {
 	if (location.Location{X: sx, Y: sy, Z: sz}).In2DRadius(dest, c.friendlyOffset) {
 		return
 	}
-	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
+	ev, outcome, err := c.move.MoveToPawnWithPathOutcome(target, c.friendlyOffset)
 	if err != nil {
 		return
 	}
@@ -373,8 +367,9 @@ func (c *Controller) followingLocked(target attackable.Combatant, mode FollowMod
 // cannot move and has no follow toward target running: an out-of-range
 // target then reports true without starting a follow or a move. unseen,
 // when set, reports that an offensive target already in reach is out of
-// sight, so the actor still closes in to the target's footprint.
-func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool, unseen func() bool) (bool, error) {
+// sight, so the actor still closes in to the target's footprint. reissue
+// re-sends the walk even when one toward the target's position is under way.
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool, unseen func() bool, reissue bool) (bool, error) {
 	if offset < 0 {
 		return false, nil
 	}
@@ -427,8 +422,18 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	default:
 		return false, nil
 	}
-	if !c.move.Moving() || c.move.Destination() != dest {
-		ev, outcome, err := c.move.MoveToLocationWithPathOutcome(dest)
+	if reissue || !c.move.Moving() || c.move.Destination() != dest {
+		pawnMove := mode == FollowOffensive && c.selfFollowsByPawn()
+		var (
+			ev      event.Move
+			outcome pathFindResult
+			err     error
+		)
+		if pawnMove {
+			ev, outcome, err = c.move.MoveToPawnWithPathOutcome(target, offset)
+		} else {
+			ev, outcome, err = c.move.MoveToLocationWithPathOutcome(dest)
+		}
 		if err != nil {
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
@@ -437,11 +442,9 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			return false, nil
 		}
 		c.applyPathFindOutcome(outcome)
-		if mode == FollowOffensive {
-			if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
-				ev.FollowTarget = target.ObjectID()
-				ev.FollowOffset = offset
-			}
+		if pawnMove {
+			ev.FollowTarget = target.ObjectID()
+			ev.FollowOffset = offset
 		}
 		c.self.BroadcastMove(ev)
 		c.addPositionUpdate()
@@ -489,19 +492,20 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 	return true, nil
 }
 
-// MoveToPawn starts a target-relative walk toward target's current position
-// and broadcasts it as an approach that stops offset short of target, the
-// same movement request a player's attack approach sends. It reports whether
-// the walk was accepted. It arms no follow task and drops any follow task
-// already running, offensive or friendly, so no follow recheck steers the
-// walk back toward an earlier target: nothing re-aims the walk if target
-// moves.
+// MoveToPawn starts a pawn walk toward target and broadcasts it as an
+// approach that stops offset short of target, the same movement request a
+// player's attack approach sends. The walk itself tracks target: it re-aims
+// at target's current position on every position update of its last leg,
+// ends once within offset of it, and ends where it stands once the actor no
+// longer knows target. It reports whether the walk was accepted. It arms no
+// follow task and drops any follow task already running, offensive or
+// friendly, so no follow recheck steers the walk back toward an earlier
+// target.
 func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clearFollow()
-	tx, ty, tz := target.Position()
-	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(location.Location{X: tx, Y: ty, Z: tz})
+	ev, outcome, err := c.move.MoveToPawnWithPathOutcome(target, offset)
 	if err != nil {
 		return false
 	}
@@ -604,7 +608,17 @@ func (c *Controller) Queue() *sim.Queue {
 // move as a result, c.move is moving again by the time UpdatePosition
 // returns, so the fresh state here — not the stale result of this tick —
 // decides whether to unregister.
+//
+// A pawn walk whose pawn the actor no longer knows ends first, where the
+// actor stands, as an arrival; while it goes on, each update turns the actor
+// toward the step it took.
 func (c *Controller) PositionUpdate() bool {
+	pawn, gen := c.move.walkingPawn()
+	if pawn != nil && !c.knowsPawn(pawn) {
+		c.move.abandonPawnWalk(gen)
+		pawn = nil
+	}
+	before := c.move.Position()
 	ev, moving := c.move.UpdatePosition(PositionUpdateInterval)
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -616,8 +630,22 @@ func (c *Controller) PositionUpdate() bool {
 		}
 		return c.move.Moving() || c.tracksFollowLocked()
 	}
+	if pawn != nil && ev.Origin != before {
+		c.self.SetHeading(before.HeadingTo(ev.Origin))
+	}
 	c.self.SyncPosition(ev.Origin)
 	return true
+}
+
+// knowsPawn reports whether the actor still knows pawn. A pawn that is not a
+// combatant, or an actor with no known list, counts as known.
+func (c *Controller) knowsPawn(pawn Pawn) bool {
+	actor, ok := c.self.(targetKnower)
+	if !ok {
+		return true
+	}
+	target, ok := pawn.(attackable.Combatant)
+	return !ok || actor.Knows(target)
 }
 
 func (c *Controller) recheckOffensiveFollow() {
@@ -633,7 +661,10 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	c.offensiveFollowElapsed = 0
-	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil)
+	// A player's recheck re-sends its pawn walk whenever the target is out
+	// of reach: the walk already tracks the target, so its destination
+	// alone no longer tells whether the target moved.
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil, c.selfFollowsByPawn())
 }
 
 // startOffensiveFollow arms the offensive follow task toward target at

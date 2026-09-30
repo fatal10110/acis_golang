@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -130,5 +131,52 @@ func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
 	}
 	if dest != advanced || origin != advanced {
 		t.Fatalf("MoveToLocation dest/origin = %+v/%+v, want advanced cell %+v", dest, origin, advanced)
+	}
+}
+
+// TestRunStartsAtWalkSpeed pins PlayerMove.updatePosition's start phase
+// (PlayerMove.java:228,246 over PlayerStatus.getRealMoveSpeed,
+// PlayerStatus.java:958-982): a running player's first five position
+// updates of a move advance at its walk speed, the following ones at its run
+// speed.
+func TestRunStartsAtWalkSpeed(t *testing.T) {
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+	objID := srv.SoleObjectID(t)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	character, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %T is not an online character", obj)
+	}
+	if !character.Running() || character.WalkSpeed() >= character.RunSpeed() {
+		t.Fatalf("fixture running %v at walk %v / run %v, want a running player walking slower", character.Running(), character.WalkSpeed(), character.RunSpeed())
+	}
+
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
+	c.Send(encodeMoveBackwardToLocation(location.Location{X: 3_000, Y: 20, Z: 30}, spawn, 1))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	mover := srv.PlayerMove(t, objID)
+	accurate := float64(spawn.X)
+	for update := 1; update <= 8; update++ {
+		srv.TickPositions()
+		speed := character.RunSpeed()
+		if update <= 5 {
+			speed = character.WalkSpeed()
+		}
+		accurate += speed / 10
+		if got, want := mover.Position().X, int(accurate); got != want {
+			t.Fatalf("X after update %d = %d, want %d (walk %v, run %v)", update, got, want, character.WalkSpeed(), character.RunSpeed())
+		}
 	}
 }

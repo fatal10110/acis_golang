@@ -70,10 +70,11 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// coord32 is like coord but for an attribute that must fit int32 (a skill,
-// item, or npc id read directly as int32 rather than widened at the call
-// site), rejecting the same malformed, empty, padded, and out-of-range input
-// commons.StatSet.GetInt32 did.
+// coord32 is like coord but for an attribute that must fit int32 (an id, a z
+// bound, a heading), rejecting the same malformed, empty, padded, and
+// out-of-range input commons.StatSet.GetInt32 did. Declare a required
+// attribute as *coord32 so absence stays distinguishable; a plain coord32 is
+// an optional attribute whose default is 0.
 type coord32 int32
 
 func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
