@@ -234,3 +234,46 @@ func TestItemStore_SetEnchantOwned(t *testing.T) {
 		t.Fatalf("ListByOwner() after SetEnchantOwned = %+v, want one row at enchant 10", got)
 	}
 }
+
+// TestItemStore_DeleteOwned: a row that changed hands survives a delete
+// scoped to its former owner and goes only with its current one, so a late
+// delete issued for the old owner cannot take another player's item.
+func TestItemStore_DeleteOwned(t *testing.T) {
+	ctx := context.Background()
+	store := NewItemStore(sqltest.SharedDB(t))
+
+	const formerID, holderID = 0x10000093, 0x10000094
+	inst := item.Instance{ObjectID: 0x10000393, TemplateID: 2375, Count: 1, Location: item.LocationInventory, ManaLeft: -1}
+	if err := store.Create(ctx, formerID, inst); err != nil {
+		t.Fatalf("Create() unexpected error: %v", err)
+	}
+	inst.OwnerID = holderID
+	if err := store.Update(ctx, &inst); err != nil {
+		t.Fatalf("Update(new owner) unexpected error: %v", err)
+	}
+
+	if ok, err := store.DeleteOwned(ctx, formerID, inst.ObjectID); err != nil || ok {
+		t.Fatalf("DeleteOwned(former owner) = %v, %v; want false, nil", ok, err)
+	}
+	got, err := store.ListByOwner(ctx, holderID)
+	if err != nil {
+		t.Fatalf("ListByOwner() unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].ObjectID != inst.ObjectID {
+		t.Fatalf("ListByOwner(holder) after former-owner delete = %+v, want the row to survive", got)
+	}
+
+	if ok, err := store.DeleteOwned(ctx, holderID, inst.ObjectID); err != nil || !ok {
+		t.Fatalf("DeleteOwned(holder) = %v, %v; want true, nil", ok, err)
+	}
+	if ok, err := store.DeleteOwned(ctx, holderID, inst.ObjectID); err != nil || ok {
+		t.Fatalf("DeleteOwned(holder) again = %v, %v; want false, nil", ok, err)
+	}
+	got, err = store.ListByOwner(ctx, holderID)
+	if err != nil {
+		t.Fatalf("ListByOwner() after delete unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("ListByOwner(holder) after delete = %+v, want empty", got)
+	}
+}
