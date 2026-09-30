@@ -356,3 +356,59 @@ func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
 		t.Fatal("a refused exchange moved items")
 	}
 }
+
+func TestDropItemFailureClassifiesInReferenceOrder(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
+		{ID: 20, Kind: item.KindEtcItem, Dropable: true, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
+		{ID: 21, Kind: item.KindEtcItem, Dropable: false, Tradable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{}},
+		{ID: 22, Kind: item.KindEtcItem, Stackable: true, Dropable: true, Destroyable: true, Duration: -1, EtcItem: &item.EtcItemDetail{Type: item.EtcItemQuest}},
+	})
+	inv := itemcontainer.NewPlayerInventory(1, templates)
+	adena := inv.AddNew(item.AdenaID, 10, 500)
+	single := inv.AddNew(20, 1, 501)
+	undroppable := inv.AddNew(21, 1, 502)
+	quest := inv.AddNew(22, 3, 503)
+	// An unstackable instance holding several units only arises from a bad
+	// row; it is the one way to reach the unstackable-count branch, since
+	// asking for 2 of a single unit fails the stack check first.
+	corrupt, _ := inv.Add(&item.Instance{ObjectID: 504, TemplateID: 20, Count: 2})
+	svc := NewService(nil)
+
+	tests := []struct {
+		name     string
+		inv      *itemcontainer.Inventory
+		objectID int32
+		count    int
+		bound    bool
+		want     DropFailure
+	}{
+		{"nil inventory", nil, adena.ObjectID, 1, false, DropNoop},
+		{"not held", inv, 999, 1, false, DropCannotDiscard},
+		{"bound to a pet that is out", inv, single.ObjectID, 1, true, DropCannotDiscard},
+		{"zero count", inv, adena.ObjectID, 0, false, DropCannotDiscard},
+		{"undroppable", inv, undroppable.ObjectID, 1, false, DropCannotDiscard},
+		{"quest item above the stack stays silent", inv, quest.ObjectID, 4, false, DropNoop},
+		{"quest item", inv, quest.ObjectID, 1, false, DropNoop},
+		{"above the stack", inv, adena.ObjectID, 11, false, DropCannotDiscard},
+		{"negative count", inv, adena.ObjectID, -1, false, DropNoop},
+		{"negative count of an item not held", inv, 999, -1, false, DropCannotDiscard},
+		{"negative count of an undroppable item", inv, undroppable.ObjectID, -1, false, DropCannotDiscard},
+		{"negative count of a bound item", inv, single.ObjectID, -1, true, DropCannotDiscard},
+		{"two of a single unstackable is above the stack", inv, single.ObjectID, 2, false, DropCannotDiscard},
+		{"several units of an unstackable item", inv, corrupt.ObjectID, 2, false, DropNoop},
+		{"whole stack", inv, adena.ObjectID, 10, false, DropOK},
+		{"part of a stack", inv, adena.ObjectID, 4, false, DropOK},
+		{"single unstackable", inv, single.ObjectID, 1, false, DropOK},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := svc.DropItemFailure(tt.inv, tt.objectID, tt.count, tt.bound); got != tt.want {
+				t.Fatalf("DropItemFailure = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	if got := inv.ItemByObjectID(adena.ObjectID).Snapshot().Count; got != 10 {
+		t.Fatalf("classification mutated the stack: count = %d, want 10", got)
+	}
+}

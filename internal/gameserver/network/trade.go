@@ -125,7 +125,7 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	}
 
-	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), req.ObjectID, int(req.Count))
+	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), live.Character, req.ObjectID, int(req.Count))
 	switch result.Status {
 	case tradebook.AddNoSession:
 		return
@@ -256,8 +256,8 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 	if !session.Empty() {
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
-			func(first, second itemcontainer.Held) bool {
-				status = session.Check(first, second)
+			func(firstHeld, secondHeld itemcontainer.Held) bool {
+				status = session.Check(firstHeld, secondHeld, first.Character, second.Character)
 				return status == tradebook.SettlementOK
 			})
 		switch {

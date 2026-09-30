@@ -704,3 +704,34 @@ func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Fatal("client kept receiving frames after 100 drains")
 	return nil
 }
+
+// TestDropValidityAnswersBeforeDistance drops out of reach an item the
+// player does not hold and more adena than it carries. Whether the item can
+// be discarded is settled before where it would land (RequestDropItem.java:
+// validateItemManipulation and the count checks at :39-55 precede the
+// distance check at :88-92), so both answer CANNOT_DISCARD_THIS_ITEM, never
+// CANNOT_DISCARD_DISTANCE_TOO_FAR, and nothing leaves the inventory.
+func TestDropValidityAnswersBeforeDistance(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	c := srv.Client
+	objID := srv.SoleObjectID(t)
+	adena := srv.GiveItem(t, objID, item.AdenaID, 100)
+	startInWorld(t, c)
+
+	for _, req := range []struct {
+		objectID, count int32
+	}{
+		{adena + 1000, 1}, // not held
+		{adena, 101},      // above the stack
+	} {
+		c.Send(encodeRequestDropItem(req.objectID, req.count, spawnX+1000, spawnY, spawnZ))
+		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotDiscardThisItem)
+		if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
+			t.Fatalf("drop of object %d x%d sent opcode %#x after its refusal, want nothing", req.objectID, req.count, frame[0])
+		}
+	}
+	if inst := mustFindItem(t, srv, objID, adena); inst.Count != 100 {
+		t.Fatalf("adena count after refused drops = %d, want 100", inst.Count)
+	}
+}
