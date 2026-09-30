@@ -823,6 +823,63 @@ func TestTeleportWithinRegionRejoinsEveryObserver(t *testing.T) {
 	}
 }
 
+// teleportPlayer is an observing player double that records its own
+// callbacks into the same log as the teleportObservers around it.
+type teleportPlayer struct {
+	teleportObserver
+	RelocateScratch
+}
+
+func (*teleportPlayer) Kind() actor.Kind      { return actor.KindPlayer }
+func (*teleportPlayer) CharacterName() string { return "" }
+
+// A player walking one region east forgets the column it leaves before
+// discovering the column it enters, and for every affected object the other
+// party hears about the crossing before the player does. The column both
+// neighborhoods share stays silent, and a non-observer only produces the
+// player's own callback.
+func TestMoveRegionCrossingNotifiesOtherPartyFirstForgetsFirst(t *testing.T) {
+	s := New()
+	log := &teleportLog{}
+	cell := func(col, row int) (int, int) {
+		return MinX + col*regionSize + regionSize/2, MinY + row*regionSize + regionSize/2
+	}
+	for _, o := range []struct {
+		obj      Tracked
+		col, row int
+	}{
+		{&teleportObserver{id: 1, log: log}, 49, 50}, // left column: forgotten
+		{&regionTestObject{id: 2}, 49, 51},           // left column, not an observer
+		{&teleportObserver{id: 3, log: log}, 51, 50}, // shared column: silent
+		{&teleportObserver{id: 4, log: log}, 52, 49}, // entered column: discovered
+		{&regionTestObject{id: 5}, 52, 51},           // entered column, not an observer
+	} {
+		x, y := cell(o.col, o.row)
+		s.Spawn(o.obj, x, y, 0, 0)
+	}
+	p := &teleportPlayer{teleportObserver: teleportObserver{id: 99, log: log}}
+	x, y := cell(50, 50)
+	s.Spawn(p, x, y, 0, 0)
+	log.take()
+
+	nx, ny := cell(51, 50)
+	if err := s.Move(p, nx, ny, 0); err != nil {
+		t.Fatalf("Move() error: %v", err)
+	}
+	want := []string{
+		"1 forget 99", "99 forget 1",
+		"99 forget 2",
+		"4 discover 99", "99 discover 4",
+		"99 discover 5",
+	}
+	if got := log.take(); !slices.Equal(got, want) {
+		t.Fatalf("callbacks = %q, want %q", got, want)
+	}
+	if next, _ := s.RegionAt(nx, ny); p.presence().region.Load() != next {
+		t.Fatal("player is not in its destination region")
+	}
+}
+
 // An object off the grid only has its position updated.
 func TestTeleportOffGridOnlyUpdatesPosition(t *testing.T) {
 	s := New()
