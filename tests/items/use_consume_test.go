@@ -263,10 +263,13 @@ func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	key := srv.GiveItem(t, objID, gameservertest.UnlockableKeyID, 1)
 	startInWorld(t, c)
-	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
+	// The key's skill has no cast range: the monster stands within both
+	// footprints, so the cast refuses it at once instead of walking first.
+	x, y, z := srv.PlayerPosition(t, objID)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: x + 5, Y: y, Z: z})
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeAction(hostile.ObjectID(), 40, 20, 30, false))
+	c.Send(encodeAction(hostile.ObjectID(), int32(x+5), int32(y), int32(z), false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeValidateLocation, "select ValidateLocation")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMyTargetSelected, "select MyTargetSelected")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "select StatusUpdate")

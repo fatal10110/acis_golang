@@ -430,7 +430,8 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		live.SendFrame(serverpackets.FramePetStatusShow(pet.SummonType()))
 		return true
 	}
-	if live.takeDeferredMagicSkill() != nil {
+	magic, itemCast := live.takeDeferredMagicSkill(), live.takeDeferredItemAICast()
+	if magic != nil || itemCast != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
 	}
 	return false
