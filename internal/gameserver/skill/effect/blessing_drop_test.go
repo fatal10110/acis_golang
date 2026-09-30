@@ -131,4 +131,26 @@ func TestBlessingDropIgnoresEndedEffect(t *testing.T) {
 	requireEvents(t, events, []string{"owner:remove:CharmOfLuck", "disappeared:1325:1", "icons", "stop:CharmOfLuck"})
 }
 
+// TestRestoredDisplacedBlessingDropsSilently restores two blessings of one
+// stack type with lesser effects kept. The reference restores effects
+// before the player has a client, so the displaced blessing leaves the list
+// without any system message, as the restored add itself sends none.
+func TestRestoredDisplacedBlessingDropsSilently(t *testing.T) {
+	t.Parallel()
+	var events []string
+	list := newTestList(iconEventOwner{eventOwner{events: &events}}, WithEnv(Env{KeepLesser: true}))
+	target := &droppingSummon{list: list, events: &events}
+	weak := newBlessing(t, target, "CharmOfLuck", 1325, "reduce_drop_penalty", 6)
+	strong := newBlessing(t, target, "CharmOfLuck", 2168, "reduce_drop_penalty", 8)
+
+	list.AddRestored(weak)
+	events = nil
+	list.AddRestored(strong)
+
+	requireEvents(t, events, []string{"owner:remove:CharmOfLuck", "stop:CharmOfLuck", "owner:add", "icons"})
+	if held := list.All(); len(held) != 1 || held[0] != strong {
+		t.Fatalf("held effects = %v, want only the newcomer", held)
+	}
+}
+
 func itoa(id modelskill.ID) string { return strconv.Itoa(int(id)) }

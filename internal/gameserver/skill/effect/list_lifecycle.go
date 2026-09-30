@@ -63,7 +63,7 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.mu.Unlock()
 
 	runHooks(pending)
-	exits := l.dropDeferred(exiting)
+	exits := l.dropDeferred(exiting, announce)
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
 	l.notifyActivityTransition()
@@ -104,13 +104,15 @@ func (l *List) holdExit(e *Effect) {
 
 // dropDeferred releases the effects an add held for its exit hooks and
 // removes those whose hook asked for a Drop. It runs their list bookkeeping
-// and returns their exit hooks, to run after the icon refresh.
-func (l *List) dropDeferred(exiting []*Effect) []func() {
+// and returns their exit hooks, to run after the icon refresh. A restored
+// add's drops send no system messages, as the add itself sends none.
+func (l *List) dropDeferred(exiting []*Effect, announce bool) []func() {
 	if len(exiting) == 0 {
 		return nil
 	}
 	var pending, exits []func()
 	l.mu.Lock()
+	l.silent = !announce
 	for _, e := range exiting {
 		requested, ok := l.dropHeld[e]
 		if !ok {
@@ -121,6 +123,7 @@ func (l *List) dropDeferred(exiting []*Effect) []func() {
 			l.remove(e, &pending, &exits)
 		}
 	}
+	l.silent = false
 	l.mu.Unlock()
 	runHooks(pending)
 	return exits

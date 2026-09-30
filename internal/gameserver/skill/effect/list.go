@@ -141,7 +141,7 @@ type List struct {
 	tracked bool
 	// untracked records that Untrack ran; l never registers again.
 	untracked bool
-	// silent is set only for the duration of one AddRestored's l.mu hold.
+	// silent is set only for the duration of an AddRestored's l.mu holds.
 	// The owner-message helpers read it while queueing, so the messages
 	// that insertion would queue are left out.
 	silent bool
