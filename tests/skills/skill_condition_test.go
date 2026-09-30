@@ -1,9 +1,7 @@
 package skills
 
 import (
-	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"testing"
 
@@ -14,14 +12,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 var shippedSkillTable = sync.OnceValue(func() *modelskill.Table {
-	_, thisFile, _, _ := runtime.Caller(0)
-	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml", "skills")
-	if _, err := os.Stat(dir); err != nil {
-		return nil
-	}
+	// Callers run datapack.Require first, so the checkout is present here.
+	root, _ := datapack.Find()
+	dir := filepath.Join(root, "data", "xml", "skills")
 	table, err := xmldata.LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		panic(err)
@@ -33,10 +30,8 @@ var shippedSkillTable = sync.OnceValue(func() *modelskill.Table {
 // datapack is not checked out next to the module.
 func shippedSkill(t *testing.T, id modelskill.ID, level int) modelskill.Definition {
 	t.Helper()
+	datapack.Require(t)
 	table := shippedSkillTable()
-	if table == nil {
-		t.Skip("aCis_datapack not checked out near the module root")
-	}
 	def, ok := table.Get(id, level)
 	if !ok {
 		t.Fatalf("shipped skill %d level %d missing", id, level)

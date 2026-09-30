@@ -5,33 +5,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
 
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 
 	"github.com/fatal10110/acis_golang/internal/datadiff"
 )
 
-// datapackRoot resolves the aCis_datapack checkout that sits next to the
-// module root (the same files a loader reads at boot), and skips the
-// calling test when it isn't present. Resolution is relative to this
-// source file so it works regardless of the directory `go test` is
-// invoked from.
+// datapackRoot resolves the shared aCis_datapack checkout (the same files a
+// loader reads at boot), and skips the calling test when it isn't present.
 func datapackRoot(t *testing.T) string {
 	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed to resolve test file path")
-	}
-	// this file lives at <workspace>/<checkout>/cmd/datadiff
-	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack")
-	if _, err := os.Stat(root); err != nil {
-		t.Skipf("aCis_datapack not checked out next to the module root, skipping: %v", err)
-	}
-	return root
+	return datapack.Require(t)
 }
 
 // TestLoadRecords_RealDatapack proves the end-to-end mechanism — invoking

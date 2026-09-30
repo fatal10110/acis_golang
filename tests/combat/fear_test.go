@@ -1,9 +1,6 @@
 package combat
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"testing"
 	"time"
@@ -18,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // curseFearSkillID is Curse Fear, whose Fear effect (count 10, time 2) runs
@@ -456,15 +454,7 @@ func TestImmobileUntilAttackedExitStopsItsSkillEffects(t *testing.T) {
 // calling test when the datapack is not checked out next to the module.
 func shippedSkills(t *testing.T) *modelskill.Table {
 	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed to resolve the test file path")
-	}
-	checkout := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	dir := filepath.Join(checkout, "..", "aCis_datapack", "data", "xml", "skills")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("aCis_datapack not checked out near the module root, skipping oracle comparison")
-	}
+	dir := datapack.Path(t, "data", "xml", "skills")
 	table, err := xmldata.LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions: %v", err)

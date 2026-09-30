@@ -1,9 +1,6 @@
 package skills
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"testing"
 
@@ -21,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // The fixtures below mirror shipped chance skills: Mirage (445) arms an
@@ -584,14 +582,7 @@ func TestChanceSkillConditionGatesProc(t *testing.T) {
 // the module.
 func shippedSkillDefinitions(t *testing.T) []modelskill.Definition {
 	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed to resolve the test file path")
-	}
-	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml", "skills")
-	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("aCis_datapack not checked out near the module root, skipping oracle comparison")
-	}
+	dir := datapack.Path(t, "data", "xml", "skills")
 	table, err := xmldata.LoadSkillDefinitions(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions: %v", err)

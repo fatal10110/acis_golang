@@ -3,9 +3,7 @@ package items
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -20,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // Shipped items whose attached skills carry a <cond>: 5250 (Greater
@@ -39,11 +38,9 @@ const (
 )
 
 var shippedData = sync.OnceValues(func() (*modelskill.Table, *item.Table) {
-	_, thisFile, _, _ := runtime.Caller(0)
-	root := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", "aCis_datapack", "data", "xml")
-	if _, err := os.Stat(root); err != nil {
-		return nil, nil
-	}
+	// Callers run datapack.Require first, so the checkout is present here.
+	dir, _ := datapack.Find()
+	root := filepath.Join(dir, "data", "xml")
 	skills, err := xmldata.LoadSkillDefinitions(filepath.Join(root, "skills"), zerolog.Nop())
 	if err != nil {
 		panic(err)
@@ -60,10 +57,8 @@ var shippedData = sync.OnceValues(func() (*modelskill.Table, *item.Table) {
 // known seeds learned skills before the character enters the world.
 func bootShippedConditionItems(t *testing.T, known map[int]int) *gameservertest.Server {
 	t.Helper()
+	datapack.Require(t)
 	skills, shippedItems := shippedData()
-	if skills == nil {
-		t.Skip("aCis_datapack not checked out near the module root")
-	}
 	templates := gameservertest.ItemTemplates().All()
 	for _, id := range []int32{soulshotPackageID, fishermanPotionID} {
 		tmpl, ok := shippedItems.Get(id)
