@@ -22,15 +22,18 @@ func (s InventorySlots) withDefaults() InventorySlots {
 	return s
 }
 
+// MaxItemInPacket is the most item rows one client item-list request may
+// carry: the larger configured base inventory size, before any stat.
+func (s InventorySlots) MaxItemInPacket() int {
+	s = s.withDefaults()
+	return max(s.NoDwarf, s.Dwarf)
+}
+
 // InventoryLimit returns how many item slots c's inventory may hold: the
 // configured base for c's race plus the inventoryLimit stat, truncated.
 func (c *Character) InventoryLimit() int {
 	c.stateMu.RLock()
 	slots := c.inventorySlots.withDefaults()
 	c.stateMu.RUnlock()
-	base := slots.NoDwarf
-	if c.Race == RaceDwarf {
-		base = slots.Dwarf
-	}
-	return base + int(c.CalcStat(stat.InvLim, 0))
+	return c.byRace(slots.NoDwarf, slots.Dwarf) + c.limitStat(stat.InvLim)
 }

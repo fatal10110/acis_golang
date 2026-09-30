@@ -1248,3 +1248,41 @@ func TestLoadInventorySlotsDefaults(t *testing.T) {
 		t.Fatalf("loadInventorySlots() = %+v, want {NoDwarf:80 Dwarf:100}", got)
 	}
 }
+
+func TestLoadStorageSlotsUsesPlayersProperties(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	props := "MaximumWarehouseSlotsForNoDwarf = 11\nMaximumWarehouseSlotsForDwarf = 12\n" +
+		"MaximumFreightSlots = 13\nMaxPvtStoreSlotsOther = 14\nMaxPvtStoreSlotsDwarf = 15\n" +
+		"DwarfRecipeLimit = 16\nCommonRecipeLimit = 0\n"
+	if err := os.WriteFile(configPath, []byte(props), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadStorageSlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadStorageSlots() error = %v", err)
+	}
+	want := player.StorageSlots{
+		WarehouseNoDwarf: 11, WarehouseDwarf: 12, Freight: 13,
+		PrivateStoreNoDwarf: 14, PrivateStoreDwarf: 15,
+		DwarfRecipe: 16, CommonRecipe: 0, Configured: true,
+	}
+	if got != want {
+		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, want)
+	}
+}
+
+func TestLoadStorageSlotsDefaults(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "players.properties")
+	if err := os.WriteFile(configPath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := loadStorageSlots(gameServerPaths{PlayersConfigPath: configPath})
+	if err != nil {
+		t.Fatalf("loadStorageSlots() error = %v", err)
+	}
+	if got != player.DefaultStorageSlots {
+		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, player.DefaultStorageSlots)
+	}
+}

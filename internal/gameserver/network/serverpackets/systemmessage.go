@@ -97,6 +97,7 @@ const (
 	SystemMessageCannotDiscardThisItem             = 98
 	SystemMessageCannotDestroyNumberIncorrect      = 163
 	SystemMessageHeroWeaponsCantDestroyed          = 1845
+	SystemMessagePetSummonedMayNotDestroyed        = 557
 	SystemMessageItemMissingToLearnSkill           = 276
 	SystemMessageLearnedSkill                      = 277
 	SystemMessageNotEnoughSPToLearnSkill           = 278

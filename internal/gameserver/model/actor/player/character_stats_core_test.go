@@ -2,6 +2,7 @@ package player
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"reflect"
@@ -1403,10 +1404,6 @@ func TestApplyDeathExpKarmaLossKarmaPositive(t *testing.T) {
 	for _, e := range event.Of[event.KarmaChanged](rec) {
 		karmaNotified = append(karmaNotified, e.Karma)
 	}
-	var lossNotified [][2]int64
-	for _, e := range event.Of[event.ExpSPLost](rec) {
-		lossNotified = append(lossNotified, [2]int64{e.Exp, int64(e.SP)})
-	}
 
 	// span = 3000-1000 = 2000; percentLost = 10.0*2.0 = 20.0; lostExp =
 	// round(2000*20/100) = 400.
@@ -1420,11 +1417,48 @@ func TestApplyDeathExpKarmaLossKarmaPositive(t *testing.T) {
 	if len(karmaNotified) != 1 || karmaNotified[0] != 87 {
 		t.Fatalf("karma-change notifications = %v, want [87]", karmaNotified)
 	}
-	if len(lossNotified) != 1 || lossNotified[0] != [2]int64{400, 0} {
-		t.Fatalf("exp-loss notifications = %v, want [[400 0]]", lossNotified)
+	// The loss is a negative experience add (Player.java:2925), so it sends
+	// UserInfo (PlayerStatus.java:478-485) and no EXP_DECREASED_BY_S1, which
+	// only PlayerStatus.removeExpAndSp sends. The karma change sends its own.
+	if lost := event.Count[event.ExpSPLost](rec); lost != 0 {
+		t.Fatalf("exp-loss notifications = %d, want 0", lost)
+	}
+	if updates := event.Count[event.UserInfoChanged](rec); updates != 2 {
+		t.Fatalf("UserInfo updates = %d, want 2 (karma, then exp)", updates)
 	}
 	if broadcasts := event.Count[event.RelationChanged](rec); broadcasts != 1 {
 		t.Fatalf("relation broadcasts = %d, want 1", broadcasts)
+	}
+}
+
+// TestApplyDeathExpKarmaLossDropsLossBelowZero pins the negative add's
+// overflow branch (PlayableStatus.java:70-72): a loss larger than the
+// character's whole experience is dropped, not floored, and UserInfo still
+// goes out (PlayerStatus.java:478-485).
+func TestApplyDeathExpKarmaLossDropsLossBelowZero(t *testing.T) {
+	table, err := NewLevelTable(map[int]Level{
+		1: {RequiredExpToLevelUp: 0, ExpLossAtDeath: 10},
+		2: {RequiredExpToLevelUp: 3000},
+	})
+	if err != nil {
+		t.Fatalf("NewLevelTable() error = %v", err)
+	}
+	c := &Character{ID: 1, CharLevel: 1, Exp: 100}
+	c.levelTable = table
+	c.allowDelevel = true
+	rec := recordEvents(c)
+
+	// lostExp = round(3000*10/100) = 300 > 100.
+	c.applyDeathExpKarmaLoss(&Character{ID: 2})
+
+	if c.Exp != 100 || c.CharLevel != 1 {
+		t.Fatalf("after death Exp = %d, level %d; want unchanged 100 at level 1", c.Exp, c.CharLevel)
+	}
+	if c.ExpBeforeDeath != 100 {
+		t.Fatalf("ExpBeforeDeath = %d, want 100", c.ExpBeforeDeath)
+	}
+	if got := progressionTrace(rec); !slices.Equal(got, []string{"userinfo"}) {
+		t.Fatalf("progression events = %v, want [userinfo]", got)
 	}
 }
 
@@ -1597,7 +1631,8 @@ func TestApplyDeathExpKarmaLossSnapshotsExpBeforeDeath(t *testing.T) {
 }
 
 // TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot matches
-// Player.restoreExp (Player.java:2865-2872).
+// Player.restoreExp (Player.java:2865-2872), which adds the experience
+// through PlayerStatus.addExp alone.
 func TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
 	killer := &Character{ID: 2}
@@ -1607,11 +1642,6 @@ func TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot(t *testing.T) {
 
 	c.RestoreExp(50)
 
-	var gained []int64
-	for _, e := range event.Of[event.ExpSPGained](rec) {
-		gained = append(gained, e.Exp)
-	}
-
 	// restored = round((1500-1100)*50/100) = 200.
 	if want := int64(1300); c.Exp != want {
 		t.Fatalf("Exp after RestoreExp(50) = %d, want %d", c.Exp, want)
@@ -1619,8 +1649,10 @@ func TestRestoreExpAddsPercentOfLostExpAndClearsSnapshot(t *testing.T) {
 	if c.ExpBeforeDeath != 0 {
 		t.Fatalf("ExpBeforeDeath after RestoreExp = %d, want 0", c.ExpBeforeDeath)
 	}
-	if len(gained) != 1 || gained[0] != 200 {
-		t.Fatalf("exp-gain notifications = %v, want [200]", gained)
+	// A bare experience add (Player.java:2869): UserInfo, and no reward
+	// message, which only addExpAndSp sends.
+	if got := progressionTrace(rec); !slices.Equal(got, []string{"userinfo"}) {
+		t.Fatalf("progression events = %v, want [userinfo]", got)
 	}
 }
 
@@ -5956,45 +5988,101 @@ func TestRemoveExpAndSpNotifiesLoss(t *testing.T) {
 	})
 }
 
-// TestRewardExpAndSpUpdatesUserInfo pins the client notification a kill
-// reward owes the player: without it the client keeps showing the
-// experience, SP and level it was last told about.
+// TestRewardExpAndSpUpdatesUserInfo pins what an experience/SP add sends and
+// in which order, including the adds that change nothing. The expected
+// traces follow the reference path step by step:
+//   - PlayableStatus.addExpAndSp (PlayableStatus.java:118-130) runs
+//     addExp for exp >= 0, then addSp for sp >= 0;
+//   - PlayerStatus.addExp (PlayerStatus.java:478-485) sends UserInfo whenever
+//     PlayableStatus.addExp returns true, which it always does — a zero add
+//     applies nothing, and one that would overflow returns true unapplied
+//     (PlayableStatus.java:70-93); a level change inside it sends its own
+//     UserInfo first (PlayerStatus.java:606-661);
+//   - PlayableStatus.addSp (PlayableStatus.java:173-187) fails only with SP
+//     at Integer.MAX_VALUE; otherwise it calls PlayerStatus.setSp
+//     (PlayerStatus.java:881-891), which sends StatusUpdate(SP) with the new
+//     total, even for a zero add;
+//   - PlayerStatus.addExpAndSp (PlayerStatus.java:501-520) sends the reward
+//     message when either add returned true.
 func TestRewardExpAndSpUpdatesUserInfo(t *testing.T) {
 	table := realLevelTable(t)
+	atLevel10 := table.RequiredExpForLevel(10)
+	capExp := table.RequiredExpForHighestLevel()
 
-	t.Run("with level table, no level gained", func(t *testing.T) {
-		c := newProgressionCharacter()
-		c.AddExpAndSpWith(table, nil, table.RequiredExpForLevel(10), 0)
-		rec := recordEvents(c)
-		c.RewardExpAndSp(table, 1, 10)
-		if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
-			t.Errorf("UserInfo updates = %d, want 1", updates)
-		}
-	})
+	tests := []struct {
+		name     string
+		table    *LevelTable
+		startExp int64
+		startSP  int
+		addExp   int64
+		addSP    int
+		want     []string
+	}{
+		{
+			name: "normal reward", table: table, startExp: atLevel10, startSP: 1000, addExp: 1, addSP: 10,
+			want: []string{"userinfo", "sp 1010", "gain 1/10"},
+		},
+		{
+			name: "zero reward", table: table, startExp: atLevel10, startSP: 1000,
+			want: []string{"userinfo", "sp 1000", "gain 0/0"},
+		},
+		{
+			name: "sp at ceiling", table: table, startExp: atLevel10, startSP: maxSP, addSP: 5,
+			want: []string{"userinfo", "gain 0/5"},
+		},
+		{
+			name: "exp clamped to nothing at the cap", table: table, startExp: capExp - 1, startSP: 1000, addExp: 100,
+			want: []string{"userinfo", "sp 1000", "gain 100/0"},
+		},
+		{
+			name: "exp rejected", table: table, startExp: atLevel10, startSP: 1000, addExp: -1, addSP: 10,
+			want: []string{"sp 1010", "gain -1/10"},
+		},
+		{name: "both rejected", table: table, startExp: atLevel10, startSP: 1000, addExp: -1, addSP: -1},
+		{
+			name: "level gained", table: table, startExp: atLevel10, startSP: 1000, addExp: table.RequiredExpForLevel(11) - atLevel10, addSP: 10,
+			want: []string{"leveledup", "userinfo", "userinfo", "sp 1010", fmt.Sprintf("gain %d/10", table.RequiredExpForLevel(11)-atLevel10)},
+		},
+		{
+			name: "without level table", startSP: 1000, addExp: 100, addSP: 10,
+			want: []string{"userinfo", "sp 1010", "gain 0/10"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newProgressionCharacter()
+			c.Exp, c.SP = tc.startExp, tc.startSP
+			if tc.table != nil {
+				c.CharLevel = tc.table.levelForExp(tc.startExp)
+			}
+			rec := recordEvents(c)
+			c.RewardExpAndSp(tc.table, tc.addExp, tc.addSP)
+			if got := progressionTrace(rec); !slices.Equal(got, tc.want) {
+				t.Fatalf("progression events = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
 
-	// A reward that levels the character sends UserInfo twice: the level
-	// change pushes one describing the new level, and the experience add
-	// pushes its own afterwards. Both are self-only and descriptive, so the
-	// second restates the first rather than contradicting it.
-	t.Run("with level table, level gained", func(t *testing.T) {
-		c := newProgressionCharacter()
-		rec := recordEvents(c)
-		if !c.RewardExpAndSp(table, table.RequiredExpForLevel(2), 10) {
-			t.Fatal("RewardExpAndSp did not report a level increase")
+// progressionTrace lists, in order, the client-facing progression events rec
+// saw.
+func progressionTrace(rec *event.Recorder) []string {
+	var out []string
+	for _, e := range rec.Events() {
+		switch e := e.(type) {
+		case event.UserInfoChanged:
+			out = append(out, "userinfo")
+		case event.SPChanged:
+			out = append(out, fmt.Sprintf("sp %d", e.SP))
+		case event.ExpSPGained:
+			out = append(out, fmt.Sprintf("gain %d/%d", e.Exp, e.SP))
+		case event.ExpSPLost:
+			out = append(out, fmt.Sprintf("lost %d/%d", e.Exp, e.SP))
+		case event.LeveledUp:
+			out = append(out, "leveledup")
 		}
-		if updates := event.Count[event.UserInfoChanged](rec); updates != 2 {
-			t.Errorf("UserInfo updates = %d, want 2", updates)
-		}
-	})
-
-	t.Run("without level table", func(t *testing.T) {
-		c := newProgressionCharacter()
-		rec := recordEvents(c)
-		c.RewardExpAndSp(nil, 100, 10)
-		if updates := event.Count[event.UserInfoChanged](rec); updates != 1 {
-			t.Errorf("UserInfo updates = %d, want 1", updates)
-		}
-	})
+	}
+	return out
 }
 
 // ---- from race_test.go ----
@@ -6720,10 +6808,11 @@ func (s *userInfoSPSink) Emit(e event.Event) {
 	}
 }
 
-// TestLevelUpUserInfoPrecedesSPGain pins the SP a level-up UserInfo carries:
-// the level change is sent while the experience lands, before the SP add
-// (PlayerStatus.addExp, then PlayableStatus.addSp), so it still shows the old
-// SP; only the closing UserInfo shows the gain.
+// TestLevelUpUserInfoPrecedesSPGain pins the SP both UserInfos of a
+// level-up reward carry: the level change's and the experience add's own are
+// sent while the experience lands, before the SP add (PlayerStatus.addExp,
+// then PlayableStatus.addSp), so both still show the old SP; the new total
+// reaches the client in the StatusUpdate(SP) that follows.
 func TestLevelUpUserInfoPrecedesSPGain(t *testing.T) {
 	table := realLevelTable(t)
 	c := newProgressionCharacter()
@@ -6732,8 +6821,8 @@ func TestLevelUpUserInfoPrecedesSPGain(t *testing.T) {
 
 	c.AddExpAndSpWith(table, levelStepTemplate(81), table.RequiredExpForLevel(2), 40)
 
-	if len(sink.sp) != 2 || sink.sp[0] != 0 || sink.sp[1] != 40 {
-		t.Fatalf("UserInfo SP values = %v, want [0 40]", sink.sp)
+	if len(sink.sp) != 2 || sink.sp[0] != 0 || sink.sp[1] != 0 {
+		t.Fatalf("UserInfo SP values = %v, want [0 0]", sink.sp)
 	}
 }
 

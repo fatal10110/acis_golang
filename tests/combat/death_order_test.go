@@ -29,7 +29,7 @@ func indexOfSystemMessage(frames [][]byte, from int, messageID int) int {
 // TestPlayerKillSendsDieBeforeDeathCosts pins the client-visible order of a
 // player kill: the victim's Die reaches both clients before the killer's PK
 // karma update, and on the victim before its charge reset and experience
-// loss, which keep that relative order. Values and persistence are the ones
+// loss UserInfo, which keep that relative order. Values and persistence are the ones
 // the death-cost and PK suites already pin.
 func TestPlayerKillSendsDieBeforeDeathCosts(t *testing.T) {
 	t.Parallel()
@@ -77,11 +77,13 @@ func TestPlayerKillSendsDieBeforeDeathCosts(t *testing.T) {
 	if charges < 0 {
 		t.Fatal("charge-reset EtcStatusUpdate never followed Die")
 	}
-	if early := indexOfSystemMessage(victimFrames[:die], 0, serverpackets.SystemMessageExpDecreasedByS1); early >= 0 {
-		t.Fatalf("experience-loss message at frame %d preceded Die at %d", early, die)
+	// The experience loss is a negative experience add: UserInfo, and no
+	// EXP_DECREASED_BY_S1 (Player.java:2925, PlayerStatus.java:478-485).
+	if lost := indexOfSystemMessage(victimFrames, 0, serverpackets.SystemMessageExpDecreasedByS1); lost >= 0 {
+		t.Fatalf("death sent EXP_DECREASED_BY_S1 at frame %d; the reference sends none", lost)
 	}
-	if lost := indexOfSystemMessage(victimFrames, charges+1, serverpackets.SystemMessageExpDecreasedByS1); lost < 0 {
-		t.Fatal("experience-loss message never followed the charge reset")
+	if lost := indexOf(victimFrames, charges+1, serverpackets.OpcodeUserInfo, -1); lost < 0 {
+		t.Fatal("experience-loss UserInfo never followed the charge reset")
 	}
 
 	killerFrames := readQuiet(killer)

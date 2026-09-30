@@ -110,6 +110,14 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	// leave a stale enchant selection active.
 	l.cancelActiveEnchant(live)
 
+	// The pet's own collar stays with its owner. The reference drops this
+	// hand-over without an answer, as it does a transfer that fails below,
+	// and a drag into the pet's window is not an action click, so no
+	// pending action waits on it.
+	if live.ControlItemInUse(req.ObjectID) {
+		return
+	}
+
 	res, ok, err := l.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
