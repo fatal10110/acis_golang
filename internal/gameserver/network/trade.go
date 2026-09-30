@@ -249,9 +249,13 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
-	// The partner is found (a partner who left and is back online counts):
-	// the reference drops its scroll-of-enchant selection before confirming.
-	l.cancelActiveEnchant(partner)
+	// The reference drops the partner's scroll-of-enchant selection before
+	// confirming. A partner who left and is back online is a new login the
+	// reference never reaches: its cancel acts on the departed player the
+	// trade still names, so the new login keeps its selection.
+	if !session.PartnerLeft(live.ObjectID()) {
+		l.cancelActiveEnchant(partner)
+	}
 
 	result := l.tradeBook().Confirm(live.ObjectID())
 	switch result.Status {

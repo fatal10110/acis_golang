@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -92,5 +93,43 @@ func TestTradeConfirmCancelsBothEnchantSelections(t *testing.T) {
 		if rest := drainFrames(t, who.client); len(rest) == 0 {
 			t.Fatalf("%s got nothing after the enchant cancel, want the confirm notice", who.name)
 		}
+	}
+}
+
+// TestTradeConfirmKeepsReloggedPartnerEnchant pins TradeDone(1) against a
+// partner who restarted with the window open and came back: the partner
+// cancel reaches only the departed login, so the new login's scroll
+// selection survives the remaining trader's confirm, silently.
+func TestTradeConfirmKeepsReloggedPartnerEnchant(t *testing.T) {
+	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
+	weapon := h.srv.GiveItem(t, h.secondID, enchantWeaponD, 1)
+	scroll := h.srv.GiveItem(t, h.secondID, enchantScrollD, 1)
+	h.enterAll(t)
+	h.startTrade(t)
+
+	h.second.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeRestartResponse, "RestartResponse")
+	h.awaitOffline(t, h.secondID)
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+	startInWorld(t, h.second)
+	drainUntilQuiet(t, h.first)
+	drainUntilQuiet(t, h.second)
+
+	selectEnchantScroll(t, h.second, scroll)
+	h.first.Send(encodeTradeDone(1))
+	assertCancelPair(t, h.first, "TraderOne")
+	assertSilent(t, h.second, "relogged partner after the old session's confirm")
+
+	// The selection is still live: enchanting the +0 sword (inside the safe
+	// range) succeeds without a new scroll prompt.
+	h.second.Send(encodeRequestEnchantItem(weapon))
+	drainUntilQuiet(t, h.second)
+	sword := h.srv.PlayerInventory(t, h.secondID).ItemByObjectID(weapon)
+	if sword == nil || sword.Snapshot().EnchantLevel != 1 {
+		t.Fatalf("sword after the kept selection = %+v, want +1", sword)
+	}
+	if held := h.srv.PlayerInventory(t, h.secondID).ItemByObjectID(scroll); held != nil {
+		t.Fatalf("scroll after the enchant = %+v, want consumed", held.Snapshot())
 	}
 }
