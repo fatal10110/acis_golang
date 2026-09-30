@@ -194,6 +194,14 @@ func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
 // where it stands while out of range and casting once in range.
 func (l *GameClientLink) thinkParkedCast(live *livePlayer) {
 	if itemAICastBusy(live) {
+		// A THINK on the action in flight does not keep a cast queued
+		// behind it in the reference AI: thinking an attack mid-swing
+		// requeues the attack over the cast, thinking a cast mid-cast goes
+		// idle and clears the queue, and both answer ActionFailed. Keeping
+		// the cast queued and silent here cannot be told apart in play: a
+		// player's only THINK is the ImmobileUntilAttacked exit, whose
+		// start aborted every swing and cast and whose hold denies new
+		// ones, so no swing or cast is in flight when it runs.
 		return
 	}
 	if live.DenyAIAction() || live.Character.AllSkillsDisabled() {
