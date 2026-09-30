@@ -20,20 +20,11 @@ func (l *GameClientLink) requestLinkHTML(live *livePlayer, req clientpackets.Req
 	if !ok {
 		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", req.Link)
 	}
-	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, html, 0))
+	sendValidatedHTML(live, 0, html, 0)
 }
 
-func (l *GameClientLink) requestBypassToServer(live *livePlayer, req clientpackets.RequestBypassToServer) {
-	if live == nil || l.html == nil || req.Command == "" {
-		return
-	}
-	const playerHelp = "player_help "
-	if !strings.HasPrefix(req.Command, playerHelp) {
-		return
-	}
-	l.sendPlayerHelp(live, strings.TrimPrefix(req.Command, playerHelp))
-}
-
+// sendPlayerHelp opens a help page. Its links are not validated, so the
+// bypass whitelist is left as it was.
 func (l *GameClientLink) sendPlayerHelp(live *livePlayer, requestedPath string) {
 	if strings.Contains(requestedPath, "..") {
 		return

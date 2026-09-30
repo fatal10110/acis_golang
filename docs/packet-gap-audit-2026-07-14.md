@@ -145,7 +145,7 @@ counted as gaps because the live augmentation validation/apply/remove flow is no
 
 Implemented and wired M3 data/UI client packets in Go:
 
-- `RequestBypassToServer` (`player_help` HTML bypass only; admin, NPC, quest, community-board, hero, olympiad, and manor bypass owners remain deferred until those systems exist)
+- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link` and karma-gate answers; the other NPC dialog commands and the admin, quest, community-board, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
 - `RequestLinkHtml`
 - `RequestAllyCrest`
 - `RequestExPledgeCrestLarge`

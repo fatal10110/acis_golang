@@ -194,7 +194,7 @@ func (l *GameClientLink) thinkStaticInteract(live *livePlayer, obj *staticobject
 		if !ok {
 			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
 		}
-		live.SendFrame(serverpackets.FrameNpcHtmlMessage(obj.ObjectID(), html, 0))
+		sendValidatedHTML(live, obj.ObjectID(), html, 0)
 	}
 	live.tryToIdle(false)
 }
@@ -613,12 +613,13 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 }
 
 // playerCanAttemptInteract reports whether live may interact at all: not
-// while running a private store or trading.
+// while running a private store, trading, or holding an unexpired trade
+// request it sent or received.
 func (l *GameClientLink) playerCanAttemptInteract(live *livePlayer) bool {
 	if live.Operating() {
 		return false
 	}
-	return l.trades == nil || !l.trades.HasActive(live.ObjectID())
+	return l.trades == nil || !l.trades.ProcessingTransaction(live.ObjectID())
 }
 
 // playerCanDoInteract is the interact attempt gate plus the 150 3D
