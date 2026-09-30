@@ -441,19 +441,20 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 				t.Fatalf("EnterWorld frame %d (want %#x) never arrived", i, opcode)
 			}
 			// Skip nearby CharInfo/NPCInfo (owner, pets, NPCs) interleaved ahead
-			// of this client's own EnterWorld burst. A weighted seed's load
-			// gauge also lands ahead of the burst (#2535), never inside it.
-			skip := frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeNPCInfo ||
-				(i == 0 && frame[0] == serverpackets.OpcodeStatusUpdate)
-			if !skip {
+			// of this client's own EnterWorld burst.
+			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeNPCInfo {
 				break
 			}
+		}
+		// A weighted seed's load gauge lands between UserInfo and ItemList.
+		if opcode == serverpackets.OpcodeItemList {
+			frame = gameservertest.ReadLoginWeightRefresh(t, c, frame)
 		}
 		if frame[0] != opcode {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeNPCInfo, serverpackets.OpcodeStatusUpdate)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeNPCInfo)
 		}
 	}
 }

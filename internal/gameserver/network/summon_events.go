@@ -177,10 +177,10 @@ func (s *summonSink) Emit(ev event.Event) {
 	case event.StatusChanged:
 		l.broadcastSummonStatus(actor)
 	case event.HPChanged:
-		// A vitals change first updates the health bar of the players
-		// targeting the summon, then refreshes its owner and observers.
+		// A vitals change updates the health bar of the players targeting
+		// the summon; the StatusChanged that follows refreshes its owner
+		// and observers.
 		s.broadcastHP()
-		l.broadcastSummonStatus(actor)
 	case event.OwnerInfoChanged:
 		sendSummonInfosToOwner(actor)
 	case event.AbnormalEffectChanged:

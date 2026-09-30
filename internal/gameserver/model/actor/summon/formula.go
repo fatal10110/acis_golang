@@ -130,7 +130,7 @@ func (a *Actor) statsModified(runSpeed bool) {
 	a.refreshMoveSpeed()
 	if runSpeed && a.ownerDiscovered.Load() {
 		a.emit(event.OwnerInfoChanged{})
-		a.emit(event.StatusChanged{})
+		a.UpdateStatus()
 	}
 }
 
@@ -354,10 +354,15 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 }
 
 // MoveSpeed returns this summon's current move speed from its template
-// run speed: a summon stays in run stance, and the RUN_SPEED stat
-// finalizes the speed, narrowed to float32 like the client-facing speed.
+// run speed: a summon stays in run stance, a pet's weight-penalty band
+// scales the base, and the RUN_SPEED stat finalizes the speed, narrowed to
+// float32 like the client-facing speed.
 func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
-	return float64(float32(a.calcStat(stat.RunSpeed, float64(int(baseRunSpeed)))))
+	base := float64(int(baseRunSpeed))
+	if band := a.weightPenalty.Load(); band != weightPenaltyNone {
+		base = float64(float32(base * weightPenaltySpeed[band]))
+	}
+	return float64(float32(a.calcStat(stat.RunSpeed, base)))
 }
 
 // MovementSpeedMultiplier is the current move speed over the template run

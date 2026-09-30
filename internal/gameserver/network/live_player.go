@@ -15,7 +15,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -71,11 +70,12 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
-	// replayingEffects is set while EnterWorld replays the saved effects,
-	// before the player is in the world. Their start hooks change its
-	// appearance, but it has no observers yet and the EnterWorld UserInfo
-	// that follows carries the result, so the appearance refresh stays
-	// silent. Written on the owner's queue; atomic for the Emit readers.
+	// replayingEffects is set while EnterWorld replays the saved effects
+	// and then decides the weight penalty band, before the player is in the
+	// world. The effects' start hooks change its appearance and the band
+	// may move, but it has no observers yet and the EnterWorld frames that
+	// follow carry the result, so both refreshes stay silent. Written on the
+	// owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	isGM             bool
@@ -115,14 +115,20 @@ type livePlayer struct {
 	deferredUseItem *useItemIntention
 	// deferredAction runs a player request held until a swing, cast or posture settles.
 	deferredAction func()
-	// deferredInteract is an interact with the player's own summon queued
-	// as the next intention; see showOwnedPetStatus.
-	deferredInteract *petInteractIntention
+	// deferredInteract is an interact queued as the next intention; see
+	// tryToInteract.
+	deferredInteract *interactIntention
 	// held is the current intention when it is one no other slot records:
 	// a walk to a point or an equip toggle left current; see heldIntention.
 	held          heldIntention
 	pickupLocked  bool
 	pickupLockGen uint64
+
+	// currentFolk is the civilian NPC this player last selected. Selecting
+	// another kind of object keeps it; clearing the selection drops it.
+	// Trainer, shop and other service requests act on it while
+	// playerCanDoInteract(p, currentFolk) holds.
+	currentFolk atomic.Pointer[npc.Folk]
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.
@@ -145,10 +151,10 @@ type livePlayer struct {
 	// this player's own.
 	teleportMu sync.Mutex
 
-	// petInteractMu is taken from another actor's queue for the same reason
+	// interactMu is taken from another actor's queue for the same reason
 	// as pickupMu.
-	petInteractMu sync.Mutex
-	petInteract   *summon.Actor
+	interactMu sync.Mutex
+	interact   interactTarget
 
 	// cubicsMu is taken from another actor's queue: another player's cubic
 	// skill grants p a cubic (syncCubicTargets), and a summon-friend cast
@@ -287,8 +293,8 @@ func (p *livePlayer) Stop() {
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
-	p.takeDeferredPetInteract()
-	p.takePetInteract()
+	p.takeDeferredInteract()
+	p.takeInteract()
 	if p.combat != nil {
 		p.combat.Stop()
 	}
@@ -526,16 +532,16 @@ func (p *livePlayer) hasDeferredAction() bool {
 	return p.deferredAction != nil
 }
 
-// deferPetInteract stores the owner's interact with its own summon pet as
-// the next intention, replacing whatever was queued before.
-func (p *livePlayer) deferPetInteract(pet *summon.Actor, shift bool) {
+// deferInteract stores an interact with target as the next intention,
+// replacing whatever was queued before.
+func (p *livePlayer) deferInteract(target interactTarget, shift bool) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.clearNextIntentionLocked()
-	p.deferredInteract = &petInteractIntention{pet: pet, shift: shift}
+	p.deferredInteract = &interactIntention{target: target, shift: shift}
 }
 
-func (p *livePlayer) takeDeferredPetInteract() *petInteractIntention {
+func (p *livePlayer) takeDeferredInteract() *interactIntention {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	interact := p.deferredInteract
@@ -543,34 +549,34 @@ func (p *livePlayer) takeDeferredPetInteract() *petInteractIntention {
 	return interact
 }
 
-// hasDeferredPetInteract reports whether an interact with the player's own
-// summon is queued as the next intention.
-func (p *livePlayer) hasDeferredPetInteract() bool {
+// hasDeferredInteract reports whether an interact is queued as the next
+// intention.
+func (p *livePlayer) hasDeferredInteract() bool {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	return p.deferredInteract != nil
 }
 
-func (p *livePlayer) setPetInteract(pet *summon.Actor) {
-	p.petInteractMu.Lock()
-	defer p.petInteractMu.Unlock()
-	p.petInteract = pet
+func (p *livePlayer) setInteract(target interactTarget) {
+	p.interactMu.Lock()
+	defer p.interactMu.Unlock()
+	p.interact = target
 }
 
-// hasPetInteract reports whether a walk toward the player's own summon
-// holds the interact intention.
-func (p *livePlayer) hasPetInteract() bool {
-	p.petInteractMu.Lock()
-	defer p.petInteractMu.Unlock()
-	return p.petInteract != nil
+// hasInteract reports whether a walk toward an interact target holds the
+// interact intention.
+func (p *livePlayer) hasInteract() bool {
+	p.interactMu.Lock()
+	defer p.interactMu.Unlock()
+	return p.interact != nil
 }
 
-func (p *livePlayer) takePetInteract() *summon.Actor {
-	p.petInteractMu.Lock()
-	defer p.petInteractMu.Unlock()
-	pet := p.petInteract
-	p.petInteract = nil
-	return pet
+func (p *livePlayer) takeInteract() interactTarget {
+	p.interactMu.Lock()
+	defer p.interactMu.Unlock()
+	target := p.interact
+	p.interact = nil
+	return target
 }
 
 // thinkAttack re-thinks p's attack intention from a movement-arrived,
@@ -615,8 +621,8 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
-	p.takeDeferredPetInteract()
-	p.takePetInteract()
+	p.takeDeferredInteract()
+	p.takeInteract()
 	if p.combat != nil {
 		p.combat.Stop()
 	}
@@ -632,14 +638,14 @@ func (p *livePlayer) tryToIdle(denied bool) {
 func (p *livePlayer) clearParkedApproaches() {
 	p.dropHeldIntention()
 	p.takePickup()
-	p.takePetInteract()
+	p.takeInteract()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
 	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
-	p.takeDeferredPetInteract()
+	p.takeDeferredInteract()
 	p.endFollow()
 }
 
