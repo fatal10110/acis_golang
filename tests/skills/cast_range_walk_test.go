@@ -4,9 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -208,4 +211,146 @@ func TestMoveReplacesCastApproach(t *testing.T) {
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("casting after a move replaced the approach")
 	}
+}
+
+// TestRootedCastOutOfRangeAnsweredActionFailed pins the immobile caster: a
+// rooted player casting the nuke on a monster beyond cast range is answered
+// ActionFailed and walks nowhere, casts nothing and pays nothing. The
+// reference (PlayerMove.maybeMoveToPawn with isMovementDisabled) returns
+// with no packet; the Go server still answers the request.
+func TestRootedCastOutOfRangeAnsweredActionFailed(t *testing.T) {
+	t.Parallel()
+	srv, c, objID, origin, _, _ := rangeWalkCaster(t, 800)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		root, err := effect.New(effect.Skill{ID: 101, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "Root", Time: 30})
+		if err != nil {
+			t.Errorf("new root effect: %v", err)
+			return
+		}
+		root.Effector, root.Effected = pc, pc
+		pc.EffectList().Add(root)
+	})
+	drainUntilQuiet(t, c)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		if !pc.MovementDisabled() {
+			t.Error("MovementDisabled() = false after Root landed, want true")
+		}
+	})
+	mpBefore := srv.PlayerCurrentMP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(rangeWalkNukeID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "rooted out-of-range cast")
+	srv.Advance(t, 10*time.Second)
+	for _, frame := range readFrameLog(c) {
+		if frame[0] == serverpackets.OpcodeMoveToPawn || frame[0] == serverpackets.OpcodeMoveToLocation || frame[0] == serverpackets.OpcodeMagicSkillUse {
+			t.Fatalf("frame %#x after the rooted refusal, want no walk and no cast", frame[0])
+		}
+	}
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("casting after the rooted refusal")
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
+		t.Fatalf("MP after the rooted refusal = %d, want %d untouched", got, mpBefore)
+	}
+	if x, y, z := srv.PlayerPosition(t, objID); (location.Location{X: x, Y: y, Z: z}) != origin {
+		t.Fatalf("player at (%d,%d,%d) after the rooted refusal, want still at %+v", x, y, z, origin)
+	}
+}
+
+// TestShiftCastMidApproachStopsWalk pins the idle half of the shift-held
+// refusal (PlayerAI.thinkCast into CreatureAI.thinkIdle's move stop): the
+// same nuke sent with shift while its approach walk is under way answers
+// TARGET_TOO_FAR, stops the walk where the player stands, and the dropped
+// approach casts nothing once its old arrival time has passed.
+func TestShiftCastMidApproachStopsWalk(t *testing.T) {
+	t.Parallel()
+	srv, c, objID, origin, _, _ := rangeWalkCaster(t, 800)
+	mpBefore := srv.PlayerCurrentMP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(rangeWalkNukeID, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToPawn, "cast approach")
+	tickPlayerWalk(t, srv, objID)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestMagicSkillUse(rangeWalkNukeID, false, true))
+	log := assertShiftRefusalStopsWalk(t, srv, c, objID, origin)
+	if at := log.index(isMagicSkillUseOf(objID, rangeWalkNukeID)); at >= 0 {
+		t.Fatalf("MagicSkillUse at frame %d after the shift-held refusal dropped the approach", at)
+	}
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("casting after the shift-held refusal dropped the approach")
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
+		t.Fatalf("MP after the shift-held refusal = %d, want %d untouched", got, mpBefore)
+	}
+}
+
+// TestShiftGroundCastMidApproachStopsWalk is TestShiftCastMidApproachStopsWalk
+// for the GROUND branch: a shift-held signet request while the approach to
+// the signet point is under way stops the walk and casts nothing.
+func TestShiftGroundCastMidApproachStopsWalk(t *testing.T) {
+	t.Parallel()
+	srv := bootBlockedGroundCast(t, &gameservertest.GateGeo{})
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	x, y, z := srv.PlayerPosition(t, objID)
+	origin := location.Location{X: x, Y: y, Z: z}
+
+	c.Send(encodeRequestExMagicSkillUseGround(int32(x+800), int32(y), int32(z), 5, false, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "ground-cast approach")
+	tickPlayerWalk(t, srv, objID)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeRequestExMagicSkillUseGround(int32(x+800), int32(y), int32(z), 5, false, true))
+	log := assertShiftRefusalStopsWalk(t, srv, c, objID, origin)
+	if at := log.index(func(frame []byte) bool { return frame[0] == serverpackets.OpcodeMagicSkillUse }); at >= 0 {
+		t.Fatalf("MagicSkillUse at frame %d after the shift-held refusal dropped the approach", at)
+	}
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("casting after the shift-held refusal dropped the approach")
+	}
+}
+
+// tickPlayerWalk moves the player's walk under way two interpolation ticks
+// along its path.
+func tickPlayerWalk(t *testing.T, srv *gameservertest.Server, objID int32) {
+	t.Helper()
+	mover := srv.PlayerMove(t, objID)
+	for i := range 2 {
+		if _, moving := mover.UpdatePosition(move.PositionUpdateInterval); !moving {
+			t.Fatalf("UpdatePosition() tick %d moving = false, want the approach under way", i+1)
+		}
+	}
+}
+
+// assertShiftRefusalStopsWalk reads TARGET_TOO_FAR then the player's
+// StopMove, checks the player stopped short of where it started walking to
+// and stays there past the old arrival time, walking nowhere. It returns the
+// frames sent over that time.
+func assertShiftRefusalStopsWalk(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, origin location.Location) frameLog {
+	t.Helper()
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageTargetTooFar)
+	stop := c.Read()
+	assertFrameOpcode(t, stop, serverpackets.OpcodeStopMove, "shift-held refusal StopMove")
+	if id := wireReader(stop[1:]).ReadInt32(); id != objID {
+		t.Fatalf("StopMove object = %d, want the player %d", id, objID)
+	}
+	mover := srv.PlayerMove(t, objID)
+	stopped := mover.Position()
+	if stopped == origin {
+		t.Fatalf("player still at %+v, want the approach to have left it before the refusal", origin)
+	}
+	if mover.Moving() {
+		t.Fatal("still walking after the shift-held refusal")
+	}
+	srv.Advance(t, 10*time.Second)
+	if got := mover.Position(); got != stopped {
+		t.Fatalf("player at %+v after the old arrival time, want stopped at %+v", got, stopped)
+	}
+	log := readFrameLog(c)
+	for _, frame := range log {
+		if frame[0] == serverpackets.OpcodeMoveToPawn || frame[0] == serverpackets.OpcodeMoveToLocation || frame[0] == serverpackets.OpcodeStopMove {
+			t.Fatalf("walk frame %#x after the shift-held refusal's StopMove, want none", frame[0])
+		}
+	}
+	return log
 }
