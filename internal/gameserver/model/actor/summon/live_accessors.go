@@ -43,11 +43,14 @@ func (a *Actor) InitMovement(origin location.Location, baseRunSpeed float64, geo
 
 // refreshMoveSpeed hands the current move speed to the movement
 // simulation, re-timing a leg in flight. It does nothing before
-// InitMovement.
+// InitMovement. Stat funcs are added and removed from different queues;
+// speedMu keeps an older reading from landing after a newer one.
 func (a *Actor) refreshMoveSpeed() {
 	if !a.movementReady.Load() {
 		return
 	}
+	a.speedMu.Lock()
+	defer a.speedMu.Unlock()
 	a.movement.SetSpeed(a.MoveSpeed(a.baseRunSpeed))
 }
 

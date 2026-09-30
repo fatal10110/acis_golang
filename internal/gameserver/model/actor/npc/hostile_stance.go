@@ -57,19 +57,41 @@ func (h *Hostile) setWalkOrRun(running bool) {
 // speed, whichever its stance picks, through the RUN_SPEED stat, narrowed
 // to float32 like the client-facing speed.
 func (h *Hostile) MoveSpeed() float64 {
+	speed, _ := h.moveSpeedAndBase()
+	return speed
+}
+
+// MovementSpeedMultiplier is the current move speed over the base speed
+// the stance picks, or 0 when that base is 0. The client scales the base
+// run and walk speeds it is sent by this value.
+func (h *Hostile) MovementSpeedMultiplier() float32 {
+	speed, base := h.moveSpeedAndBase()
+	if base == 0 {
+		return 0
+	}
+	return float32(speed) / float32(base)
+}
+
+// moveSpeedAndBase reads the stance once and returns the move speed with
+// the template base it was computed from.
+func (h *Hostile) moveSpeedAndBase() (float64, int) {
 	base := int(h.Instance.Template.WalkSpeed)
 	if h.Running() {
 		base = int(h.Instance.Template.RunSpeed)
 	}
-	return float64(float32(h.calcStat(stat.RunSpeed, float64(base))))
+	return float64(float32(h.calcStat(stat.RunSpeed, float64(base)))), base
 }
 
 // refreshMoveSpeed hands the current move speed to the movement
 // simulation, re-timing a leg in flight, so the server keeps pace with the
-// speed the client animates.
+// speed the client animates. Stance and stat changes refresh from
+// different queues; speedMu keeps an older reading from landing after a
+// newer one.
 func (h *Hostile) refreshMoveSpeed() {
 	if h.Live == nil {
 		return
 	}
+	h.speedMu.Lock()
+	defer h.speedMu.Unlock()
 	h.Move().SetSpeed(h.MoveSpeed())
 }

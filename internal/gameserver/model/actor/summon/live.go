@@ -129,6 +129,10 @@ type Actor struct {
 	// only once movementReady (stored after it) reports true.
 	baseRunSpeed  float64
 	movementReady atomic.Bool
+	// speedMu serializes refreshMoveSpeed's read of the stats with its
+	// hand-off to the movement, so the last refresh to run always sets the
+	// speed that the latest stat funcs give.
+	speedMu sync.Mutex
 	// queue is the queue this summon's work runs on: its owner's, set once
 	// before the summon is published, and a queue of its own once its corpse
 	// outlives its owner's session (AdoptCorpseQueue), revived or not.

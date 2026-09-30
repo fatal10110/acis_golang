@@ -1790,6 +1790,17 @@ func TestFrameServerObjectInfo(t *testing.T) {
 	}
 }
 
+// TestFrameNPCInfoWritesMovementSpeedMultiplier pins the movement
+// multiplier the client scales the base run/walk speeds by.
+func TestFrameNPCInfoWritesMovementSpeedMultiplier(t *testing.T) {
+	want := float64(float32(66) / 60)
+	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{RunSpd: 120, WalkSpd: 60, MoveMultiplier: want}))
+	const multiplierOffset = 1 + 18*4
+	if got := math.Float64frombits(binary.LittleEndian.Uint64(payload[multiplierOffset:])); got != want {
+		t.Fatalf("movement speed multiplier = %v, want %v", got, want)
+	}
+}
+
 func TestFrameNPCInfoWritesAttackSpeedMultiplier(t *testing.T) {
 	payload := framePayload(t, FrameNPCInfo(NPCInfoSnapshot{}))
 	const multiplierOffset = 1 + 18*4
@@ -1986,7 +1997,7 @@ func TestFramePetInfo(t *testing.T) {
 		SummonType: 2, ObjectID: 20, TemplateID: 12077,
 		X: 100, Y: 200, Z: -50, Heading: 123,
 		MAtkSpd: 333, PAtkSpd: 300,
-		RunSpd: 120, WalkSpd: 60,
+		RunSpd: 120, WalkSpd: 60, MoveMultiplier: float64(float32(132) / 120),
 		CollisionRadius: 8, CollisionHeight: 20,
 		InCombat: true, AlikeDead: false,
 		Name: "Wolf", Title: "",
@@ -2023,7 +2034,7 @@ func TestFramePetInfo(t *testing.T) {
 		want = appendPetInfoInt32(want, int32(s.RunSpd))
 		want = appendPetInfoInt32(want, int32(s.WalkSpd))
 	}
-	want = appendPetInfoFloat64(want, 1)
+	want = appendPetInfoFloat64(want, s.MoveMultiplier)
 	want = appendPetInfoFloat64(want, 1)
 	want = appendPetInfoFloat64(want, s.CollisionRadius)
 	want = appendPetInfoFloat64(want, s.CollisionHeight)

@@ -117,6 +117,10 @@ type Hostile struct {
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
 	running        atomic.Bool
+	// speedMu serializes refreshMoveSpeed's read of the stance and stats
+	// with its hand-off to the movement, so the last refresh to run always
+	// sets the speed that the latest stance and stat funcs give.
+	speedMu sync.Mutex
 	// inCombat reports an attack stance, which the stance tracker ends.
 	inCombat atomic.Bool
 
@@ -445,7 +449,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
 		X: x, Y: y, Z: z, Heading: h.Heading(),
 		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: h.AttackSpeed(),
-		RunSpd: h.RunSpeed(), WalkSpd: int(tmpl.WalkSpeed),
+		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed), MoveMultiplier: float64(h.MovementSpeedMultiplier()),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,

@@ -21,6 +21,7 @@ type PetInfoSnapshot struct {
 	X, Y, Z, Heading  int
 	MAtkSpd, PAtkSpd  int
 	RunSpd, WalkSpd   int
+	MoveMultiplier    float64
 	CollisionRadius   float64
 	CollisionHeight   float64
 	InCombat          bool
@@ -100,8 +101,8 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteInt32(int32(s.RunSpd))
 	w.WriteInt32(int32(s.WalkSpd))
 
-	w.WriteFloat64(1) // movement speed multiplier: no summon-specific haste modeled yet, matches NpcInfo's own constant 1
-	w.WriteFloat64(1) // attack speed multiplier: same as above
+	w.WriteFloat64(s.MoveMultiplier)
+	w.WriteFloat64(1) // attack speed multiplier
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
 	w.WriteInt32(0) // weapon: Summon.getWeapon() is always 0 (base class, no override)
