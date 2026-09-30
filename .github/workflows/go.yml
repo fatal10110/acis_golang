@@ -56,7 +56,11 @@ jobs:
           # never refreshed. Cache per shard and commit instead.
           cache: false
 
+      # main builds cold, so the cache it saves holds only its own build.
+      # Restoring the previous one there would carry every earlier object
+      # forward and grow the cache without bound.
       - name: Restore Go cache
+        if: github.event_name != 'push'
         uses: actions/cache/restore@v4
         with:
           path: |
