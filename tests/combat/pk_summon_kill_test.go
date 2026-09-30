@@ -40,12 +40,13 @@ func pkServitorTemplate() *npc.Template {
 
 // bootServitorPKKillScene boots the PK kill scene with the killer knowing
 // the servitor summon of cat, summons the servitor and waits for every
-// client to go quiet. The owner starts karma-free and flagged.
-func bootServitorPKKillScene(t *testing.T, cat *npc.Template) (*pkKillScene, *summon.Actor) {
+// client to go quiet. The owner starts karma-free and flagged. extra adds
+// skill definitions the owner also knows.
+func bootServitorPKKillScene(t *testing.T, cat *npc.Template, extra ...modelskill.Definition) (*pkKillScene, *summon.Actor) {
 	t.Helper()
 	s := bootPKKillSceneWith(t, []gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{cat})),
-	}, pkServitorSkills()...)
+	}, append(pkServitorSkills(), extra...)...)
 	s.c.Send(encodeRequestMagicSkillUse(pkServitorSummonSkill, false, false))
 	var servitor *summon.Actor
 	s.srv.AdvanceUntil(t, "servitor in world state", func() bool {
@@ -177,5 +178,72 @@ func TestServitorHitPKKillTakesTheOwnersKnifeOffBeforeItsAbsorbedHP(t *testing.T
 	}
 	if n := s.flags.Len(); n != 0 {
 		t.Fatalf("PvP flag task tracks %d players after the servitor's lethal hit, want none", n)
+	}
+}
+
+// pkServitorProcSkill is the lethal skill the servitor's on-hit chance
+// trigger casts on the target its hit landed on.
+const pkServitorProcSkill = 4712
+
+// TestServitorProcPKKillTakesTheOwnersKnifeOffBeforeTheProcsDamageMessage
+// has the same owner command its servitor's auto-attack on the innocent
+// player while the servitor holds an ON_HIT chance trigger. The victim's
+// raised max HP outlasts the hit itself, so the servitor's triggered skill
+// makes the kill. As for the servitor's skill kill, the karma gain takes
+// the owner's knife off and resets the flag inside the proc's killing blow
+// (Playable.doDie → onKillUpdatePvPKarma): both reach the owner before the
+// proc's SUMMON_GAVE_DAMAGE_S1, which the triggered skill's handler sends
+// after its damage.
+func TestServitorProcPKKillTakesTheOwnersKnifeOffBeforeTheProcsDamageMessage(t *testing.T) {
+	t.Parallel()
+	s, servitor := bootServitorPKKillScene(t, pkServitorTemplate(), modelskill.Definition{
+		ID: pkServitorProcSkill, Level: 1, Activation: modelskill.ActivationActive,
+		Target: modelskill.TargetOne, Offensive: true, SkillType: "PDAM",
+		StaticHitTime: true, StaticReuse: true, Power: 1_000_000,
+	})
+	trigger, err := effect.New(effect.Skill{ID: 445, Level: 1}, modelskill.EffectTemplate{
+		Name: "ChanceSkillTrigger", Time: 60, Icon: true, StackType: "servitor_proc", StackOrder: 1,
+		TriggeredID: pkServitorProcSkill, TriggeredLevel: 1, ChanceType: "ON_HIT", ActivationChance: -1,
+	})
+	if err != nil {
+		t.Fatalf("effect.New(ChanceSkillTrigger): %v", err)
+	}
+	trigger.Effector, trigger.Effected = servitor, servitor
+	onPlayerQueue(t, s.srv, s.objID, func(*player.Character) {
+		// Every swing lands without a critical: hit and critical rolls
+		// alternate within a swing.
+		calls := 0
+		servitor.SetRollSource(func(int) int {
+			calls++
+			if calls%2 == 1 {
+				return 0
+			}
+			return 999
+		})
+		servitor.EffectList().Add(trigger)
+	})
+	onPlayerQueue(t, s.srv, s.victimID, func(pc *player.Character) {
+		pc.AddStatFuncs([]effect.Mod{{Stat: stat.MaxHP, Op: effect.OpAdd, Value: 10_000}})
+		pc.SetHP(pc.MaxHPValue())
+	})
+	drainUntilQuiet(t, s.vc)
+	drainUntilQuiet(t, s.c)
+
+	selectPlayerTarget(t, s.c, s.victimID)
+	s.c.Send(encodeRequestActionUse(pkServitorAttackAction, true))
+	assertKarmaChangeFrames(t, s.c, s.objID, 240)
+	s.srv.Settle(t)
+
+	frames, aborted := s.assertKnifeTakenOff(t)
+	flagReset := indexOf(frames, aborted+1, serverpackets.OpcodeUserInfo, -1)
+	damage := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageSummonGaveDamageS1)
+	if flagReset < 0 || damage < flagReset {
+		t.Fatalf("frames after the karma change = %x, want S1_DISARMED and the flag reset's UserInfo before the proc's SUMMON_GAVE_DAMAGE_S1", opcodesOf(frames))
+	}
+	if servitor.Dead() {
+		t.Fatal("servitor died in the scenario")
+	}
+	if karma := s.karma(); karma != 240 {
+		t.Fatalf("owner karma = %d after the servitor proc's PK kill, want 240", karma)
 	}
 }
