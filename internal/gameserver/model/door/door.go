@@ -113,6 +113,15 @@ type Object struct {
 
 	sink  event.Sink
 	owner StateOwner
+	sight Sight
+}
+
+// Sight is the geodata line-of-sight query a door answers skill sight with:
+// mutual sight between two points, each raised by the eye height its
+// collision height gives, with ignore's own geodata edits left out of the
+// query when ignore is non-nil.
+type Sight interface {
+	CanSeeActorIgnoring(ox, oy, oz int, oCollisionHeight float64, tx, ty, tz int, tCollisionHeight float64, ignore GeoShape) bool
 }
 
 // StateOwner applies a door's open/close change together with everything
@@ -210,6 +219,10 @@ func (o *Object) Attach(sink event.Sink) { o.sink = sink }
 // SetOwner installs the owner that applies this door's state changes. Call
 // it once, before the door is spawned.
 func (o *Object) SetOwner(owner StateOwner) { o.owner = owner }
+
+// SetSight installs the geodata query CanSeeTarget runs. Call it once,
+// before the door is spawned.
+func (o *Object) SetSight(sight Sight) { o.sight = sight }
 
 // BroadcastStatus reports this door's current open/close state to observers.
 func (o *Object) BroadcastStatus() {

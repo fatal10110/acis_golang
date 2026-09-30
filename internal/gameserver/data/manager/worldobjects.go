@@ -206,12 +206,21 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 		obj.Attach(w.newSink(obj))
 	}
 	obj.SetOwner(w)
+	obj.SetSight(doorSight{geo: w.geo})
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
 	}
 	w.scheduleDoorTimer(obj)
 	return obj, nil
+}
+
+// doorSight runs a door's line-of-sight queries on the world geodata.
+type doorSight struct{ geo *engine.Engine }
+
+func (s doorSight) CanSeeActorIgnoring(ox, oy, oz int, oh float64, tx, ty, tz int, th float64, ignore door.GeoShape) bool {
+	// A nil ignore converts to a nil dynamic.Object: nothing is left out.
+	return s.geo.CanSeeActorIgnoring(ox, oy, oz, oh, tx, ty, tz, th, ignore)
 }
 
 func (w *WorldObjects) spawnStaticObject(tmpl *staticobject.Template, ids idAllocator) (*staticobject.Object, error) {
