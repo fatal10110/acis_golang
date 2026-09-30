@@ -110,13 +110,12 @@ func TestWeaponUseItemWaitsOutStandUp(t *testing.T) {
 	startInWorld(t, c)
 	sitAndSettle(t, srv)
 
-	changePosture(t, c, true)
-	standAt := c.Now()
+	standSent := standUp(t, c)
 	c.Send(encodeUseItem(sword, false))
 	assertRightHandEmpty(t, srv, objID, "mid-stand-up")
 
 	readUntilEquipped(t, c, swordID)
-	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+	if elapsed := c.Now().Sub(standSent); elapsed < sitStandDelay {
 		t.Fatalf("queued sword went on %v after the stand-up, want no earlier than %v", elapsed, sitStandDelay)
 	}
 	sawUserInfo := false

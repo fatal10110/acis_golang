@@ -160,14 +160,16 @@ func TestSkillBarCastDuringStandUpRunsWhenUp(t *testing.T) {
 	srv.Advance(t, sitStandDelay)
 	drainUntilQuiet(t, c)
 
+	// Measured from before the request: the server starts the stand-up no
+	// earlier, while the ChangeWaitType reply arrives after it did.
+	standSent := c.Now()
 	c.Send(encodeRequestChangeWaitType(true))
 	readMatching(t, c, time.Second, "stand ChangeWaitType", isWaitType(serverpackets.WaitStanding))
-	standAt := c.Now()
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued skill-bar cast")
 
 	readMatching(t, c, 2*sitStandDelay, "queued skill-bar cast", isSkillUse(gateActiveSkillID))
-	if elapsed := c.Now().Sub(standAt); elapsed < sitStandDelay {
+	if elapsed := c.Now().Sub(standSent); elapsed < sitStandDelay {
 		t.Fatalf("queued skill-bar cast ran %v after stand-up, want no earlier than %v", elapsed, sitStandDelay)
 	}
 }
