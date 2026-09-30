@@ -135,8 +135,9 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		live.zoneActor.sendCurrentCompass()
 	}
 	l.updateLivePlayerPosition(live, target, heading)
-	// An accepted teleport ends any open trade for both sides, naming the
-	// one who moved.
+	// A completed teleport drops the scroll-of-enchant selection, then ends
+	// any open trade for both sides, naming the one who moved.
+	l.cancelActiveEnchant(live)
 	l.cancelActiveTrade(live)
 }
 

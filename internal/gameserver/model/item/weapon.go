@@ -99,6 +99,10 @@ func (w WeaponType) Mask() int32 {
 	return 1 << uint(w)
 }
 
+// Enchant4SkillLevel is the enchant level from which an equipped weapon
+// grants its WeaponDetail.Enchant4Skill.
+const Enchant4SkillLevel = 4
+
 // WeaponDetail is the weapon-specific data a KindWeapon Template carries;
 // nil for every other Kind.
 type WeaponDetail struct {
@@ -119,7 +123,8 @@ type WeaponDetail struct {
 	ReducedSoulshotCount  int32
 
 	// Enchant4Skill is the passive skill granted while the weapon is
-	// enchanted +4 or higher; nil when the template grants none.
+	// enchanted Enchant4SkillLevel or higher; nil when the template grants
+	// none.
 	Enchant4Skill *SkillRef
 
 	// OnCastSkill/OnCritSkill are the skills the weapon triggers on spell

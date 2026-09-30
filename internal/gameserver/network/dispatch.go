@@ -98,6 +98,9 @@ const (
 // gameplay flags GameClientLink needs, so its constructor doesn't grow one
 // bool/float parameter per config key.
 type PlayerConfig struct {
+	// Enchant holds the scroll-of-enchant rates and limits; nil uses the
+	// shipped defaults.
+	Enchant               *enchantflow.Config
 	WeightLimitMultiplier float64
 	// InventorySlots is the base player inventory slot count by race.
 	InventorySlots player.InventorySlots
@@ -434,7 +437,11 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		noCipher:     cfg.NoCipher,
 	}
 	// Built here, not lazily: every client goroutine shares this link.
-	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant)
+	enchantCfg := enchantflow.DefaultConfig()
+	if cfg.PlayerConfig.Enchant != nil {
+		enchantCfg = *cfg.PlayerConfig.Enchant
+	}
+	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {

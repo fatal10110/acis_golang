@@ -22,7 +22,7 @@ func (l *GameClientLink) enchantStateStore() *enchantflow.State {
 
 func (l *GameClientLink) enchantService() *enchantflow.Service {
 	if l.enchant == nil {
-		l.enchant = enchantflow.NewService(l.enchantStateStore(), l.ids, l.rollEnchant)
+		l.enchant = enchantflow.NewService(l.enchantStateStore(), l.ids, l.rollEnchant, enchantflow.DefaultConfig())
 	}
 	return l.enchant
 }
@@ -31,7 +31,7 @@ func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instanc
 	if live == nil || scroll == nil {
 		return false
 	}
-	result, ok := l.enchantService().UseScroll(live.ObjectID(), scroll)
+	result, ok := l.enchantService().UseScroll(live.ObjectID(), live.Inventory(), scroll)
 	if !ok {
 		return false
 	}
@@ -42,8 +42,10 @@ func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instanc
 	return true
 }
 
+// enchantLiveItem answers RequestEnchantItem. A dead player may enchant too:
+// the reference gates the request on the store/trade state only.
 func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, req clientpackets.RequestEnchantItem) {
-	if !liveItemOpsAllowed(live) || req.ObjectID == 0 {
+	if live == nil || req.ObjectID == 0 {
 		return
 	}
 	inv := live.Inventory()
@@ -51,7 +53,16 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 		return
 	}
 
-	result, err := l.enchantService().EnchantItem(live.ObjectID(), inv, req.ObjectID)
+	playerID := live.ObjectID()
+	result, err := l.enchantService().EnchantItem(enchantflow.Request{
+		PlayerID: playerID,
+		Inv:      inv,
+		ObjectID: req.ObjectID,
+		Busy:     live.Operating() || (l.trades != nil && l.trades.ProcessingTransaction(playerID)),
+		TradeActive: func() bool {
+			return l.trades != nil && l.trades.HasActive(playerID)
+		},
+	})
 	if err != nil {
 		l.log.Error().Err(err).Msg("enchant item")
 	}
@@ -62,11 +73,13 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	l.applyEnchantSteps(live, result.Steps)
 }
 
+// cancelActiveEnchant drops live's scroll selection, telling the client when
+// there was one.
 func (l *GameClientLink) cancelActiveEnchant(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	result := l.enchantService().Cancel(live.ObjectID())
+	result := l.enchantService().Cancel(live.ObjectID(), live.Inventory())
 	l.applyEnchantSteps(live, result.Steps)
 }
 
@@ -79,7 +92,40 @@ func (l *GameClientLink) applyEnchantSteps(live *livePlayer, steps []enchantflow
 			live.SendFrame(serverpackets.FrameEnchantResult(enchantResult(step.EnchantResult)))
 		case enchantflow.StepBroadcastEquipment:
 			l.broadcastEquipmentChange(live)
+		case enchantflow.StepGrantEnchantSkill:
+			l.applyEnchantSkillChange(live, step.Template, true)
+		case enchantflow.StepRevokeEnchantSkill:
+			l.applyEnchantSkillChange(live, step.Template, false)
+		case enchantflow.StepUnequipped:
+			// The reference does not refresh the grade penalty for an item
+			// a failed enchant destroys, so only the equip side effects are
+			// undone here.
+			l.applyEquipItemStats(live, live.Inventory(), invops.Result{EquipmentChanged: true, Changed: step.Unequipped})
+		case enchantflow.StepCancelTrade:
+			l.cancelActiveTrade(live)
 		}
+	}
+}
+
+// applyEnchantSkillChange adds or removes tmpl's +4 enchant skill after an
+// enchant attempt on the equipped weapon, resending SkillList whenever the
+// weapon has a loaded one.
+func (l *GameClientLink) applyEnchantSkillChange(live *livePlayer, tmpl *item.Template, grant bool) {
+	if l.skills == nil {
+		return
+	}
+	var resend bool
+	if grant {
+		var err error
+		resend, err = l.skills.GrantEnchant4Skill(live.Character, tmpl)
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("grant enchant skill")
+		}
+	} else {
+		resend = l.skills.RevokeEnchant4Skill(live.Character, tmpl)
+	}
+	if resend {
+		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	}
 }
 
@@ -105,6 +151,10 @@ func (l *GameClientLink) sendEnchantMessage(live *livePlayer, message enchantflo
 		live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageEnchantmentFailedS1S2Evaporated, message.Number, message.ItemID))
 	case enchantflow.MessageEnchantmentFailedS1Evaporated:
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEnchantmentFailedS1Evaporated, message.ItemID))
+	case enchantflow.MessageCannotEnchantWhileStore:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEnchantWhileStore))
+	case enchantflow.MessageTradeAttemptFailed:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTradeAttemptFailed))
 	}
 }
 

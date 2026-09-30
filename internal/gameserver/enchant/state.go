@@ -49,3 +49,16 @@ func (s *State) Clear(playerID int32) bool {
 	delete(s.active, playerID)
 	return true
 }
+
+// ClearIf removes playerID's selection only while it is still
+// scrollObjectID, so a stale read cannot drop a newer selection.
+func (s *State) ClearIf(playerID, scrollObjectID int32) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.active[playerID] == scrollObjectID {
+		delete(s.active, playerID)
+	}
+}

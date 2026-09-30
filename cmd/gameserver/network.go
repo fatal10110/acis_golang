@@ -90,7 +90,9 @@ func provideGameClientLink(
 	pool *sim.Pool,
 	log zerolog.Logger,
 ) (*network.GameClientLink, error) {
+	enchantCfg := gameplay.Enchant
 	playerConfig := network.PlayerConfig{
+		Enchant:                    &enchantCfg,
 		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
 		DeathPenaltyChance:         int(gameplay.DeathPenaltyChance),
 		MaxBuffsAmount:             int(gameplay.MaxBuffsAmount),

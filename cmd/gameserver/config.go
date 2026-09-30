@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -62,6 +63,7 @@ type gameplayConfig struct {
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
+	Enchant                  enchant.Config
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -143,6 +145,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.DisableRaidCurse, err = loadDisableRaidCurse(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -268,6 +273,32 @@ func loadWeightLimitMultiplier(paths gameServerPaths) (weightLimitMultiplier, er
 		return 0, err
 	}
 	return weightLimitMultiplier(config.NewFields(props, "weight limit").Float64("WeightLimit", 1)), nil
+}
+
+// loadEnchantConfig reads the scroll-of-enchant rates and limits from
+// players.properties.
+func loadEnchantConfig(paths gameServerPaths) (enchant.Config, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return enchant.Config{}, err
+	}
+	def := enchant.DefaultConfig()
+	fields := config.NewFields(props, "enchant")
+	cfg := enchant.Config{
+		ChanceMagicWeapon:       fields.Float64("EnchantChanceMagicWeapon", def.ChanceMagicWeapon),
+		ChanceMagicWeapon15Plus: fields.Float64("EnchantChanceMagicWeapon15Plus", def.ChanceMagicWeapon15Plus),
+		ChanceWeapon:            fields.Float64("EnchantChanceNonMagicWeapon", def.ChanceWeapon),
+		ChanceWeapon15Plus:      fields.Float64("EnchantChanceNonMagicWeapon15Plus", def.ChanceWeapon15Plus),
+		ChanceArmor:             fields.Float64("EnchantChanceArmor", def.ChanceArmor),
+		MaxWeapon:               fields.Int("EnchantMaxWeapon", def.MaxWeapon),
+		MaxArmor:                fields.Int("EnchantMaxArmor", def.MaxArmor),
+		SafeMax:                 fields.Int("EnchantSafeMax", def.SafeMax),
+		SafeMaxFull:             fields.Int("EnchantSafeMaxFull", def.SafeMaxFull),
+	}
+	if err := fields.Err(); err != nil {
+		return enchant.Config{}, err
+	}
+	return cfg, nil
 }
 
 // loadInventorySlots reads the base player inventory slot counts by race.
