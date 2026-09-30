@@ -256,8 +256,6 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		if tmpl.Pet != nil {
 			if row, ok := tmpl.Pet.Levels[a.Level()]; ok {
 				maxFed = row.MaxMeal
-			}
-			if row, ok := tmpl.Pet.Levels[a.Level()]; ok {
 				expForThisLevel = row.MaxExp
 			}
 			if row, ok := tmpl.Pet.Levels[a.Level()+1]; ok {
