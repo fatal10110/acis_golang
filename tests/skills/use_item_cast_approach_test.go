@@ -23,9 +23,8 @@ const approachSwordID int32 = 30
 // on. PlayerAI.thinkUseItem (PlayerAI.java:505-519) toggles the sword and
 // does not re-issue a previous CAST, so USE_ITEM stays current and the
 // arrival (CreatureAI.onEvtArrived, CreatureAI.java:55-69) never casts.
-// The reference's arrival THINK also toggles the sword a second time
-// (thinkUseItem on the still-current USE_ITEM); that re-toggle is tracked
-// by #2877, so the sword stays on here.
+// The arrival THINK runs thinkUseItem on the still-current USE_ITEM, which
+// toggles the sword a second time, off again (#2877).
 //
 // The control walks the same way without the toggle and casts on arrival.
 func TestWeaponUseItemDropsGroundCastApproach(t *testing.T) {
@@ -86,8 +85,12 @@ func TestWeaponUseItemDropsGroundCastApproach(t *testing.T) {
 			if cast >= 0 {
 				t.Fatalf("MagicSkillUse at frame %d after the toggle replaced the cast approach", cast)
 			}
-			if at := log.index(isSystemMessage(serverpackets.SystemMessageS1Equipped)); at < 0 {
+			equipped := log.index(isSystemMessage(serverpackets.SystemMessageS1Equipped))
+			if equipped < 0 {
 				t.Fatal("no S1_EQUIPPED for the mid-walk sword")
+			}
+			if disarmed := log.index(isSystemMessage(serverpackets.SystemMessageS1Disarmed)); disarmed < equipped {
+				t.Fatalf("S1_DISARMED at frame %d, want after S1_EQUIPPED at %d: the arrival toggles the sword again", disarmed, equipped)
 			}
 			if srv.PlayerCastingNow(t, objID) {
 				t.Fatal("casting after the arrival")
@@ -95,8 +98,8 @@ func TestWeaponUseItemDropsGroundCastApproach(t *testing.T) {
 			if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
 				t.Fatalf("MP after the arrival = %d, want %d untouched", got, mpBefore)
 			}
-			if worn := srv.PlayerInventory(t, objID).ItemAt(itemcontainer.RHand); worn == nil || worn.ObjectID != sword {
-				t.Fatalf("right hand after the arrival = %v, want the sword", worn)
+			if worn := srv.PlayerInventory(t, objID).ItemAt(itemcontainer.RHand); worn != nil {
+				t.Fatalf("right hand after the arrival = %v, want the sword off again", worn)
 			}
 		})
 	}

@@ -116,8 +116,11 @@ type livePlayer struct {
 	// deferredInteract is an interact with the player's own summon queued
 	// as the next intention; see showOwnedPetStatus.
 	deferredInteract *petInteractIntention
-	pickupLocked     bool
-	pickupLockGen    uint64
+	// held is the current intention when it is one no other slot records:
+	// a walk to a point or an equip toggle left current; see heldIntention.
+	held          heldIntention
+	pickupLocked  bool
+	pickupLockGen uint64
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.
@@ -275,6 +278,7 @@ func onLive(live *livePlayer, fn func()) bool {
 }
 
 func (p *livePlayer) Stop() {
+	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
@@ -361,6 +365,14 @@ func (p *livePlayer) takePickup() *pickupIntention {
 	pickup := p.pickup
 	p.pickup = nil
 	return pickup
+}
+
+// hasPickup reports whether a walk toward a ground item holds the pickup
+// intention.
+func (p *livePlayer) hasPickup() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.pickup != nil
 }
 
 func (p *livePlayer) deferPickup(ctx context.Context, target world.Tracked, shift bool) {
@@ -507,6 +519,14 @@ func (p *livePlayer) setPetInteract(pet *summon.Actor) {
 	p.petInteract = pet
 }
 
+// hasPetInteract reports whether a walk toward the player's own summon
+// holds the interact intention.
+func (p *livePlayer) hasPetInteract() bool {
+	p.petInteractMu.Lock()
+	defer p.petInteractMu.Unlock()
+	return p.petInteract != nil
+}
+
 func (p *livePlayer) takePetInteract() *summon.Actor {
 	p.petInteractMu.Lock()
 	defer p.petInteractMu.Unlock()
@@ -549,6 +569,7 @@ func (p *livePlayer) tryToIdle(denied bool) {
 		return
 	}
 	busy := p.CastingNow() || (p.attack != nil && p.attack.AttackingNow()) || inPostureTransition(p)
+	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
@@ -566,10 +587,11 @@ func (p *livePlayer) tryToIdle(denied bool) {
 }
 
 // clearParkedApproaches drops pickup, pet-interact, and deferred-magic and
-// item-cast approach slots, the follow intention, current or queued, and a
-// queued pickup, equip toggle or summon interact, so a later walk or chase
-// cannot inherit them.
+// item-cast approach slots, the follow intention, current or queued, a
+// queued pickup, equip toggle or summon interact, and a held walk or equip
+// toggle, so a later walk or chase cannot inherit them.
 func (p *livePlayer) clearParkedApproaches() {
+	p.dropHeldIntention()
 	p.takePickup()
 	p.takePetInteract()
 	p.takeDeferredPickup()

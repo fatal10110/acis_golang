@@ -68,6 +68,7 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	// combat.Stop() above cancelled any move in flight, so parked approach
 	// slots must not survive this new accepted walk.
 	live.clearParkedApproaches()
+	live.holdMoveTo(target)
 	// Face the destination from the same server-authoritative origin the
 	// walk itself started from.
 	live.Character.SetHeading(origin.HeadingTo(target))
@@ -237,6 +238,7 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	live.takeDeferredFollow()
 	live.takeDeferredUseItem()
 	live.takeDeferredPetInteract()
+	live.dropHeldIntention()
 	live.endFollow()
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
