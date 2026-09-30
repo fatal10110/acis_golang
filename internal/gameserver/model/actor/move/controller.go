@@ -202,7 +202,9 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // whether the caller should wait for that movement instead of attacking
 // now. A target with no known position/footprint can't be followed and
 // reports false. A target already converged on (movement already under way
-// toward its current position) is left alone rather than re-issued.
+// toward its current position) is left alone rather than re-issued, except
+// by a player free to move: every think of a player's attack re-sends its
+// pawn walk toward the target from where the player stands now.
 //
 // An actor that cannot move, or an NPC whose current intention holds its
 // ground, never starts a follow: out of range it still reports true, so the
@@ -226,7 +228,8 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 	if isNPC && !disabled && !holds {
 		unseen = func() bool { return !npcActor.CanSee(target) }
 	}
-	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen, false)
+	reissue := !disabled && c.selfFollowsByPawn()
+	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen, reissue)
 }
 
 // HoldOffensiveFollow is MaybeStartOffensiveFollow for an intention that
