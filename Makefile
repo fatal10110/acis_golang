@@ -1,6 +1,6 @@
 GO ?= go
 
-.PHONY: hooks test test-unit test-internal test-one test-race test-db-up test-db-down
+.PHONY: hooks test test-unit test-internal test-one test-race fuzz test-db-up test-db-down
 
 # Enable the formatting and lint pre-commit hook for this clone.
 hooks:
@@ -28,6 +28,31 @@ test-one:
 # Full run with the race detector enabled.
 test-race:
 	$(GO) test -race ./...
+
+# Inbound-packet fuzz targets as package:Target pairs; `go test -fuzz` takes
+# one package and one target per run. `go test` alone runs only their seeds.
+FUZZ_TARGETS = \
+	./internal/commons/wire:FuzzFrameReader \
+	./internal/commons/wire:FuzzReader \
+	./internal/commons/crypt:FuzzLinkCryptDecrypt \
+	./internal/loginserver/crypt:FuzzLoginCryptDecrypt \
+	./internal/loginserver/network/clientpackets:FuzzLoginClientPackets \
+	./internal/gameserver/network/clientpackets:FuzzGameClientPackets \
+	./internal/link:FuzzLinkPackets
+FUZZTIME ?= 60s
+
+# Fuzz every inbound-packet target for FUZZTIME each, or one with
+# FUZZ=<Target>: make fuzz FUZZ=FuzzLinkPackets FUZZTIME=5m
+# Needs no database. A failing input is saved under the package's
+# testdata/fuzz/ directory and replays in every later `go test`.
+fuzz:
+	@ran=0; for t in $(FUZZ_TARGETS); do \
+		pkg=$${t%%:*}; name=$${t##*:}; \
+		if [ -n "$(FUZZ)" ] && [ "$(FUZZ)" != "$$name" ]; then continue; fi; \
+		ran=1; echo "== $$name ($$pkg, $(FUZZTIME))"; \
+		$(GO) test "$$pkg" -run '^$$' -fuzz "^$$name\$$" -fuzztime $(FUZZTIME) || exit 1; \
+	done; \
+	[ $$ran = 1 ] || { echo "unknown FUZZ=$(FUZZ); targets: $(foreach t,$(FUZZ_TARGETS),$(lastword $(subst :, ,$(t))))"; exit 1; }
 
 DOCKER_COMPOSE ?= $(shell command -v docker-compose >/dev/null 2>&1 && echo docker-compose || echo "docker compose")
 

@@ -49,3 +49,7 @@ Tests are behavior-first: full-flow scenarios in `tests/<domain>/` drive real pa
 For edit feedback, `make test-unit` runs the DB-free pure-core selection. `make test-internal`
 runs the broader non-behavior packages, which can still use sockets and MariaDB. `make test` and
 `make test-race` remain the complete gates; start the shared database first with `make test-db-up`.
+
+`make fuzz` fuzzes the inbound framing, decryption, and packet decoders of the login, game, and
+GS-LS link listeners for `FUZZTIME` (default `60s`) per target; `make fuzz FUZZ=FuzzLinkPackets`
+runs one. Plain `go test` runs only their seed corpora.

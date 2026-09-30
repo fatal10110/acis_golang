@@ -4,6 +4,7 @@
 package decodefuzz
 
 import (
+	"runtime"
 	"runtime/metrics"
 	"testing"
 )
@@ -18,10 +19,12 @@ const (
 	// which charges small objects a whole span at a time.
 	fixedBudget = 64 << 10
 	// attempts is how many times a step may run before an over-budget
-	// reading counts. The heap counter is process-wide, and while fuzzing
-	// the engine's own goroutines allocate alongside the step; a step whose
+	// reading counts. The heap counter is process-wide: while fuzzing, the
+	// engine's own goroutines allocate alongside the step, and a garbage
+	// collection cycle in flight charges whole spans as caches refill. Each
+	// retry therefore starts from a completed collection. A step whose
 	// allocation really scales with its input exceeds the budget on every
-	// run, while that noise does not repeat.
+	// run; that noise does not.
 	attempts = 3
 )
 
@@ -40,7 +43,10 @@ func Bounded(t testing.TB, name string, input []byte, step func()) {
 	budget := uint64(fixedBudget + perByteBudget*len(input))
 	sample := []metrics.Sample{{Name: heapAllocsMetric}}
 	var grew uint64
-	for range attempts {
+	for attempt := range attempts {
+		if attempt > 0 {
+			runtime.GC()
+		}
 		metrics.Read(sample)
 		before := sample[0].Value.Uint64()
 		step()
