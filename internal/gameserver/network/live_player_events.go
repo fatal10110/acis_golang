@@ -115,6 +115,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.finishDeferredMagicSkill(live)
 			l.finishDeferredItemAICast(live)
 			l.finishDeferredFollow(live)
+			l.finishDeferredPetInteract(live)
 			l.finishDeferredUseItem(live, resumePosture)
 		}
 	case event.ReviveRequested:
@@ -278,28 +279,22 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Evaded:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageAvoidedS1Attack, e.Attacker.CharacterName()))
 	case event.AttackFinished:
-		l.finishDeferredPickup(live)
-		magicHeld := l.finishDeferredMagicSkill(live)
-		itemHeld := l.finishDeferredItemAICast(live)
-		followHeld := l.finishDeferredFollow(live)
-		// A queued cast or follow took the intention the swing had when it
-		// was queued; whether it started now, was refused, or is held for
-		// PostureSettled, the attack does not swing again. A queued equip
-		// toggle resumes the attack itself once it has run.
-		if magicHeld || itemHeld || followHeld || l.finishDeferredUseItem(live, resumeAttack) {
+		// A queued pickup, cast, follow or summon interact took the
+		// intention the swing had when it was queued; whether it started
+		// now, was refused, or is held for PostureSettled, the attack does
+		// not swing again. A queued equip toggle resumes the attack itself
+		// once it has run.
+		if l.finishQueuedBehindAttack(live) {
 			return
 		}
 		live.finishAttack()
 	case event.BowShotFinished:
 		// A shot's end runs whatever was queued behind it, while the bow
-		// still reloads: a pickup, cast, follow or equip toggle starts now,
-		// and an attack is re-thought, which the running reuse answers with
-		// ActionFailed. The toggle re-thinks the attack itself.
-		l.finishDeferredPickup(live)
-		magicHeld := l.finishDeferredMagicSkill(live)
-		itemHeld := l.finishDeferredItemAICast(live)
-		followHeld := l.finishDeferredFollow(live)
-		if magicHeld || itemHeld || followHeld || l.finishDeferredUseItem(live, resumeAttack) {
+		// still reloads: a pickup, cast, follow, summon interact or equip
+		// toggle starts now, and an attack is re-thought, which the running
+		// reuse answers with ActionFailed. The toggle re-thinks the attack
+		// itself.
+		if l.finishQueuedBehindAttack(live) {
 			return
 		}
 		if live.combat != nil && live.combat.ThinkQueued() {
@@ -430,6 +425,18 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etc))
 }
 
+// finishQueuedBehindAttack runs the intention queued behind a swing or a
+// bow shot that just ended, if any, and reports whether one was waiting:
+// the queue holds at most one, which replaces the attack.
+func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
+	return l.finishDeferredPickup(live) ||
+		l.finishDeferredMagicSkill(live) ||
+		l.finishDeferredItemAICast(live) ||
+		l.finishDeferredFollow(live) ||
+		l.finishDeferredPetInteract(live) ||
+		l.finishDeferredUseItem(live, resumeAttack)
+}
+
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
 // target ends.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
@@ -443,6 +450,9 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 		return
 	}
 	if l.finishDeferredFollow(live) {
+		return
+	}
+	if l.finishDeferredPetInteract(live) {
 		return
 	}
 	if l.finishDeferredUseItem(live, resumeNothing) {
