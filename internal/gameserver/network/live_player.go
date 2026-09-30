@@ -411,6 +411,17 @@ func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	return req
 }
 
+// deferredMagicSkillID reports the skill id of the request queued as the
+// next CAST intention, if any.
+func (p *livePlayer) deferredMagicSkillID() (int32, bool) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	if p.deferredMagic == nil {
+		return 0, false
+	}
+	return p.deferredMagic.req.SkillID, true
+}
+
 // hasDeferredMagicSkill reports whether a skill request is queued as the
 // next CAST intention.
 func (p *livePlayer) hasDeferredMagicSkill() bool {
@@ -686,7 +697,11 @@ func (p *livePlayer) fusesTarget(id int32) bool {
 // with live as the sink its abort, stop and finish events reach.
 func (l *GameClientLink) castController(live *livePlayer) *actorcast.Controller {
 	if live.cast == nil {
-		live.cast = actorcast.NewController(actorcast.PlayerActor{Character: live.Character}, live)
+		actor := actorcast.PlayerActor{Character: live.Character}
+		if live.attack != nil {
+			actor.Attack = live.attack
+		}
+		live.cast = actorcast.NewController(actor, live)
 		live.cast.SetQueue(live.Queue())
 		live.Character.SetCastController(live.cast)
 	}

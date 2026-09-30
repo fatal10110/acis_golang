@@ -14,6 +14,8 @@ import (
 // contract.
 type PlayerActor struct {
 	Character *player.Character
+	// Attack is the player's swing state; nil never swings.
+	Attack interface{ AttackingNow() bool }
 }
 
 func (a PlayerActor) AttackSpeed(magic bool) int {
