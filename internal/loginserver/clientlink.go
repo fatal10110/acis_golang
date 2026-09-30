@@ -523,18 +523,28 @@ type failedAttempt struct {
 }
 
 // failedAttemptWindow is how long an IP's failed-attempt count survives
-// without a further failure. Counts are kept per IP until the ban threshold
-// or a successful login clears them; the window only exists so an address
-// that fails a few times and never returns does not hold memory forever.
+// without a further failure; ok is false when counts never expire. Counts
+// are kept per IP until the ban threshold or a successful login clears
+// them; the window only exists so an address that fails a few times and
+// never returns does not hold memory forever.
 //
-// Deliberate trade-off: an address whose consecutive failures are always
-// more than one window apart never reaches the ban. The window is at least
-// loginBlockAfterBan, so pacing below the threshold that slowly yields fewer
-// attempts per unit of time than tripping the ban and waiting it out, and at
-// least an hour, so any client retrying faster than that sees the same
-// threshold, LoginFail replies, and ban timing as with an unexpiring count.
-func (l *ClientLink) failedAttemptWindow() time.Duration {
-	return max(l.loginBlockAfterBan, minFailedAttemptWindow)
+// Deliberate trade-off: with temporary bans, an address whose consecutive
+// failures are always more than one window apart never reaches the ban. The
+// window is at least loginBlockAfterBan, so pacing below the threshold that
+// slowly yields fewer attempts per unit of time than tripping the ban and
+// waiting it out, and at least an hour, so any client retrying faster than
+// that sees the same threshold, LoginFail replies, and ban timing as with an
+// unexpiring count.
+//
+// A non-positive loginBlockAfterBan makes the ban permanent, so no pacing
+// may ever earn more than loginTryBeforeBan attempts: counts never expire
+// and the memory bound does not apply. The ban list already keeps one
+// permanent entry per banned address in that configuration.
+func (l *ClientLink) failedAttemptWindow() (window time.Duration, ok bool) {
+	if l.loginBlockAfterBan <= 0 {
+		return 0, false
+	}
+	return max(l.loginBlockAfterBan, minFailedAttemptWindow), true
 }
 
 // recordFailedAttempt counts a failed credential attempt from ip at now and
@@ -542,14 +552,14 @@ func (l *ClientLink) failedAttemptWindow() time.Duration {
 // failed-attempt window.
 func (l *ClientLink) recordFailedAttempt(ip net.IP, now time.Time) {
 	key := ip.String()
-	window := l.failedAttemptWindow()
+	window, expires := l.failedAttemptWindow()
 
 	l.failedMu.Lock()
 	if l.failedAttempts == nil {
 		l.failedAttempts = make(map[string]failedAttempt)
 	}
 	entry := l.failedAttempts[key]
-	if now.Sub(entry.last) > window {
+	if expires && now.Sub(entry.last) > window {
 		entry.count = 0
 	}
 	entry.count++
@@ -575,10 +585,14 @@ func (l *ClientLink) clearFailedAttempts(ip net.IP) {
 }
 
 // sweepFailedAttempts drops every failed-attempt count idle for longer than
-// the failed-attempt window at now, the same test recordFailedAttempt
-// applies on the next failure, so a sweep never changes when a ban fires.
+// the failed-attempt window at now: the same test recordFailedAttempt
+// applies on the next failure, so a swept count is one that failure would
+// have discarded anyway.
 func (l *ClientLink) sweepFailedAttempts(now time.Time) {
-	window := l.failedAttemptWindow()
+	window, expires := l.failedAttemptWindow()
+	if !expires {
+		return
+	}
 
 	l.failedMu.Lock()
 	defer l.failedMu.Unlock()

@@ -578,18 +578,62 @@ func failedAttemptCount(l *ClientLink) int {
 	return len(l.failedAttempts)
 }
 
+// testFailedAttemptWindow returns l's expiring failed-attempt window,
+// failing the test when the configuration keeps counts forever.
+func testFailedAttemptWindow(t *testing.T, l *ClientLink) time.Duration {
+	t.Helper()
+	window, ok := l.failedAttemptWindow()
+	if !ok {
+		t.Fatalf("failed-attempt counts never expire with block %v", l.loginBlockAfterBan)
+	}
+	return window
+}
+
 func TestClientLinkFailedAttemptWindow(t *testing.T) {
 	l, _ := newFailedAttemptLink()
-	if got := l.failedAttemptWindow(); got != time.Hour {
+	if got := testFailedAttemptWindow(t, l); got != time.Hour {
 		t.Fatalf("default window = %v, want 1h", got)
 	}
 	l.loginBlockAfterBan = 3 * time.Hour
-	if got := l.failedAttemptWindow(); got != 3*time.Hour {
+	if got := testFailedAttemptWindow(t, l); got != 3*time.Hour {
 		t.Fatalf("window with 3h block = %v, want 3h (never shorter than the ban)", got)
 	}
+	l.loginBlockAfterBan = time.Second
+	if got := testFailedAttemptWindow(t, l); got != time.Hour {
+		t.Fatalf("window with 1s block = %v, want the 1h floor", got)
+	}
+	for _, block := range []time.Duration{0, -time.Second} {
+		l.loginBlockAfterBan = block
+		if window, ok := l.failedAttemptWindow(); ok {
+			t.Fatalf("permanent-ban block %v expires counts after %v, want never", block, window)
+		}
+	}
+}
+
+// TestClientLinkPermanentBanCountsNeverExpire: with a permanent ban, pacing
+// failures more than an hour apart must still reach the threshold, and a
+// sweep must keep the count.
+func TestClientLinkPermanentBanCountsNeverExpire(t *testing.T) {
+	l, bans := newFailedAttemptLink()
 	l.loginBlockAfterBan = 0
-	if got := l.failedAttemptWindow(); got != time.Hour {
-		t.Fatalf("window with zero block = %v, want 1h", got)
+	ip := net.ParseIP("192.0.2.5")
+	t0 := time.Now()
+	gap := minFailedAttemptWindow + time.Second
+
+	for i := range DefaultLoginTryBeforeBan - 1 {
+		at := t0.Add(time.Duration(i) * gap)
+		l.recordFailedAttempt(ip, at)
+		l.sweepFailedAttempts(at.Add(gap))
+		if bans.IsBanned(ip) {
+			t.Fatalf("attempt %d banned before the threshold", i+1)
+		}
+	}
+	if got := failedAttemptCount(l); got != 1 {
+		t.Fatalf("tracked addresses after sweeps = %d, want 1", got)
+	}
+	l.recordFailedAttempt(ip, t0.Add(time.Duration(DefaultLoginTryBeforeBan-1)*gap))
+	if !bans.IsBanned(ip) {
+		t.Fatal("failures paced more than an hour apart were never banned under a permanent-ban config")
 	}
 }
 
@@ -599,7 +643,7 @@ func TestClientLinkFailedAttemptWindow(t *testing.T) {
 // while an address still inside the window keeps its count toward the ban.
 func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
 	l, bans := newFailedAttemptLink()
-	window := l.failedAttemptWindow()
+	window := testFailedAttemptWindow(t, l)
 	t0 := time.Now()
 
 	const cycled = 2000
@@ -637,7 +681,7 @@ func TestClientLinkSubThresholdFailuresFromManyIPsAreSwept(t *testing.T) {
 
 func TestClientLinkFailedAttemptsWithinWindowStillBan(t *testing.T) {
 	l, bans := newFailedAttemptLink()
-	window := l.failedAttemptWindow()
+	window := testFailedAttemptWindow(t, l)
 	ip := net.ParseIP("192.0.2.2")
 	t0 := time.Now()
 
@@ -652,7 +696,7 @@ func TestClientLinkFailedAttemptsWithinWindowStillBan(t *testing.T) {
 
 func TestClientLinkFailedAttemptsIdlePastWindowRestartCount(t *testing.T) {
 	l, bans := newFailedAttemptLink()
-	window := l.failedAttemptWindow()
+	window := testFailedAttemptWindow(t, l)
 	ip := net.ParseIP("192.0.2.3")
 	t0 := time.Now()
 
@@ -677,7 +721,7 @@ func TestClientLinkPurgeLoopSweepsFailedAttempts(t *testing.T) {
 	_, l, _, _, _ := newTestClientLink(t, newFakeAccountStore(), false, func(l *ClientLink) {
 		l.loginTimeout = 20 * time.Millisecond
 		l.failedAttempts = map[string]failedAttempt{
-			"192.0.2.4": {count: 1, last: time.Now().Add(-2 * l.failedAttemptWindow())},
+			"192.0.2.4": {count: 1, last: time.Now().Add(-2 * testFailedAttemptWindow(t, l))},
 		}
 	})
 
@@ -692,6 +736,7 @@ func TestClientLinkPurgeLoopSweepsFailedAttempts(t *testing.T) {
 
 func TestClientLinkFailedAttemptsConcurrentAccess(t *testing.T) {
 	l, _ := newFailedAttemptLink()
+	window := testFailedAttemptWindow(t, l)
 	var wg sync.WaitGroup
 	for g := range 8 {
 		wg.Go(func() {
@@ -702,7 +747,7 @@ func TestClientLinkFailedAttemptsConcurrentAccess(t *testing.T) {
 				if i%3 == 0 {
 					l.clearFailedAttempts(ip)
 				}
-				l.sweepFailedAttempts(now.Add(2 * l.failedAttemptWindow()))
+				l.sweepFailedAttempts(now.Add(2 * window))
 			}
 		})
 	}
