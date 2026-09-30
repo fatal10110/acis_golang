@@ -79,6 +79,14 @@ type HitLanded struct {
 	Reflected bool
 }
 
+// HitDamageApplied reports that one of a player's physical hits has just
+// taken its damage off its target, ahead of the damage the target reflects,
+// the HP the player absorbs and the procs the hit sets off. It is emitted on
+// the player's own queue, so the receiver runs there what the damage left
+// owed to the player, such as the side effects of a PK kill the hit made.
+// Only player attack controllers emit it.
+type HitDamageApplied struct{}
+
 // AttackStanceRequested reports that the actor landed a damaging physical
 // hit, or finished an offensive cast whose launch resolved a target: it
 // enters its attack stance, or refreshes the one it holds. A summon's stance
@@ -112,6 +120,7 @@ func (ShotsRechargeRequested) event() {}
 func (BowShotFinished) event()        {}
 func (HitDealt) event()               {}
 func (HitLanded) event()              {}
+func (HitDamageApplied) event()       {}
 func (AttackStanceRequested) event()  {}
 func (Attacked) event()               {}
 func (Evaded) event()                 {}

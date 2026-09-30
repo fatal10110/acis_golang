@@ -70,8 +70,9 @@ func (l *GameClientLink) settlePvPChanges(live *livePlayer) {
 // every equipped item whose conditions it no longer meets comes off, then
 // its PvP flag task stops and the flag resets. The kill can run on another
 // actor's queue, so this queues the work; a task of live's own runs it
-// before its next skill message (playerMessageSink), the way the reference
-// runs it inside the killing blow.
+// inside the killing blow: right after its physical hit's damage
+// (HitDamageApplied), and before each message of its cast's hit, its own
+// procs and its cubics' skills.
 func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
 	l.queuePvPChange(live, pvpChange{reset: true})
 }

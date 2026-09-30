@@ -528,6 +528,9 @@ func (c *Controller) deliverHit(hit Hit, onHitTimer func()) {
 	}
 	reflected := c.reflectedDamage(hit)
 	hit.Target.TakeDamage(hit.Damage, c.actor)
+	if c.player != nil {
+		c.emit(event.HitDamageApplied{})
+	}
 	if reflected > 0 {
 		c.actor.TakeDamage(reflected, hit.Target)
 	}

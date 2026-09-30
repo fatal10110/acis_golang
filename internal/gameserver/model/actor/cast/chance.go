@@ -33,9 +33,13 @@ type ChanceProcs struct {
 	// delivers one. apply hands each skill-handler message to the sink it
 	// is given the moment the handler produces it, so the message keeps its
 	// place among the frames the skill's own state changes send at once; a
-	// message the sink took is left out of the returned result. Nil runs
-	// apply without a sink and drops the result.
-	Deliver func(caster handlerskill.Creature, apply func(sink handlerskill.MessageSink) EffectResult)
+	// message the sink took is left out of the returned result. ownHit
+	// reports that caster is the attacker or the skill caster whose hit set
+	// the proc off, not the creature that was hit nor the effector of a
+	// trigger effect: a player's hits and casts run on its own queue, so a
+	// player proc with ownHit set runs there too. Nil runs apply without a
+	// sink and drops the result.
+	Deliver func(caster handlerskill.Creature, ownHit bool, apply func(sink handlerskill.MessageSink) EffectResult)
 }
 
 // ChanceConditionFailed is a triggered cast refused by one of its skill's
@@ -112,11 +116,11 @@ func (p *ChanceProcs) AttackHit(attacker any, hit event.HitLanded) {
 		landed |= eventsOf(modelskill.TriggerOnCrit)
 	}
 	attacked := eventsOf(modelskill.TriggerOnAttacked, modelskill.TriggerOnAttackedHit)
-	p.fire(attacker, target, landed)
+	p.fire(attacker, true, target, landed)
 	if hit.Reflected {
-		p.fire(attacker, target, attacked)
+		p.fire(attacker, true, target, attacked)
 	}
-	p.fire(target, attacker, attacked)
+	p.fire(target, false, attacker, attacked)
 	if hit.Crit {
 		p.weaponCritSkill(attacker, target)
 	}
@@ -150,8 +154,8 @@ func (p *ChanceProcs) skillHit(caster any, targets []skilltarget.Actor, def mode
 		if !target.Dead() {
 			p.weaponMagicSkill(caster, target, def)
 		}
-		p.fire(caster, target, cast)
-		p.fire(target, caster, taken)
+		p.fire(caster, true, target, cast)
+		p.fire(target, false, caster, taken)
 	}
 }
 
@@ -210,7 +214,7 @@ func (p *ChanceProcs) weaponCritSkill(attackerObj, targetObj any) {
 	if !landed {
 		return
 	}
-	p.deliver(caster, func(handlerskill.MessageSink) EffectResult {
+	p.deliver(caster, true, func(handlerskill.MessageSink) EffectResult {
 		return handlerEffectResult(handlerskill.LandCritSkill(caster, target, def, shield))
 	})
 }
@@ -237,14 +241,14 @@ func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, 
 		}
 	}
 	if caster.Kind() == actor.KindPlayer {
-		p.deliver(caster, func(handlerskill.MessageSink) EffectResult {
+		p.deliver(caster, true, func(handlerskill.MessageSink) EffectResult {
 			return EffectResult{Messages: []any{WeaponSkillActivated{Skill: def}}}
 		})
 	}
 	if p.Skills == nil {
 		return
 	}
-	p.deliver(caster, func(sink handlerskill.MessageSink) EffectResult {
+	p.deliver(caster, true, func(sink handlerskill.MessageSink) EffectResult {
 		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: sink})
 		if !ok {
 			return EffectResult{}
@@ -254,8 +258,9 @@ func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, 
 }
 
 // fire runs owner's procs whose trigger event is in events, each against
-// target.
-func (p *ChanceProcs) fire(ownerObj, targetObj any, events chanceEvents) {
+// target. ownerHit reports that owner is the attacker or caster whose
+// hit set the procs off.
+func (p *ChanceProcs) fire(ownerObj any, ownerHit bool, targetObj any, events chanceEvents) {
 	if events == 0 {
 		return
 	}
@@ -270,13 +275,13 @@ func (p *ChanceProcs) fire(ownerObj, targetObj any, events chanceEvents) {
 	for _, e := range owner.EffectList().ChanceTriggers() {
 		cond, ok := e.ChanceCondition()
 		if ok && p.rolls(owner, cond, events) {
-			p.castEffectTrigger(owner, e, target)
+			p.castEffectTrigger(owner, ownerHit, e, target)
 		}
 	}
 	for _, def := range p.chanceSkills(owner) {
 		cond, ok, err := modelskill.ParseChanceCondition(def.ChanceType, def.ActivationChance)
 		if ok && err == nil && p.rolls(owner, cond, events) {
-			p.castChanceSkill(owner, def, target)
+			p.castChanceSkill(owner, ownerHit, def, target)
 		}
 	}
 }
@@ -314,20 +319,20 @@ type heldItems interface {
 // castChanceSkill casts owner's passive chance skill def, or the skill it
 // names to trigger, on target. def must first allow the weapon and shield
 // owner holds, then pass its <cond> clauses.
-func (p *ChanceProcs) castChanceSkill(owner chanceOwner, def modelskill.Definition, target skilltarget.Actor) {
+func (p *ChanceProcs) castChanceSkill(owner chanceOwner, ownHit bool, def modelskill.Definition, target skilltarget.Actor) {
 	var held int32
 	if h, ok := owner.(heldItems); ok {
 		held = h.HeldItemTypeMask()
 	}
 	if !WeaponAllowed(def, held) {
-		p.deliver(owner, func(handlerskill.MessageSink) EffectResult {
+		p.deliver(owner, ownHit, func(handlerskill.MessageSink) EffectResult {
 			return EffectResult{Messages: []any{ChanceWeaponNotAllowed{Skill: def}}}
 		})
 		return
 	}
 	if caster, ok := owner.(conditions.Source); ok {
 		if clause, ok := conditions.EvaluateSkill(def, caster, target); !ok {
-			p.deliver(owner, func(handlerskill.MessageSink) EffectResult {
+			p.deliver(owner, ownHit, func(handlerskill.MessageSink) EffectResult {
 				return EffectResult{Messages: []any{ChanceConditionFailed{Skill: def, Clause: clause}}}
 			})
 			return
@@ -340,13 +345,14 @@ func (p *ChanceProcs) castChanceSkill(owner chanceOwner, def modelskill.Definiti
 		}
 		def = triggered
 	}
-	p.cast(owner, owner, def, target)
+	p.cast(owner, owner, ownHit, def, target)
 }
 
 // castEffectTrigger casts the skill chance-skill-trigger effect e names on
 // target. A self-targeted skill is cast by owner, any other by the effect's
-// effector.
-func (p *ChanceProcs) castEffectTrigger(owner chanceOwner, e *effect.Effect, target skilltarget.Actor) {
+// effector, which is the hit's attacker or caster only when it is owner
+// itself.
+func (p *ChanceProcs) castEffectTrigger(owner chanceOwner, ownerHit bool, e *effect.Effect, target skilltarget.Actor) {
 	if e.Template.TriggeredID <= 1 {
 		return
 	}
@@ -362,12 +368,13 @@ func (p *ChanceProcs) castEffectTrigger(owner chanceOwner, e *effect.Effect, tar
 		}
 		caster = effector
 	}
-	p.cast(owner, caster, def, target)
+	p.cast(owner, caster, ownerHit && caster.ObjectID() == owner.ObjectID(), def, target)
 }
 
 // cast fires def from caster at the targets it resolves from owner and
-// target. The skill's reuse starts even when it finds no target.
-func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, def modelskill.Definition, target skilltarget.Actor) {
+// target. The skill's reuse starts even when it finds no target. ownHit
+// reports that caster is the attacker or caster whose hit set it off.
+func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, ownHit bool, def modelskill.Definition, target skilltarget.Actor) {
 	key := ReuseKey(def)
 	if caster.SkillDisabled(key) {
 		return
@@ -395,7 +402,7 @@ func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, def modelskil
 	owner.BroadcastSkillLaunched(int32(def.ID), int32(def.Level), ids)
 	x, y, z := affected[0].Position()
 	owner.BroadcastSkillUse(ids[0], x, y, z, int32(def.ID), int32(def.Level), 0, 0)
-	p.deliver(caster, func(sink handlerskill.MessageSink) EffectResult {
+	p.deliver(caster, ownHit, func(sink handlerskill.MessageSink) EffectResult {
 		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: castTargets, Sink: sink})
 		if !ok {
 			return EffectResult{}
@@ -404,12 +411,12 @@ func (p *ChanceProcs) cast(owner chanceOwner, caster chanceCaster, def modelskil
 	})
 }
 
-func (p *ChanceProcs) deliver(caster handlerskill.Creature, apply func(handlerskill.MessageSink) EffectResult) {
+func (p *ChanceProcs) deliver(caster handlerskill.Creature, ownHit bool, apply func(handlerskill.MessageSink) EffectResult) {
 	if p.Deliver == nil {
 		apply(nil)
 		return
 	}
-	p.Deliver(caster, apply)
+	p.Deliver(caster, ownHit, apply)
 }
 
 func (p *ChanceProcs) definition(id, level int) (modelskill.Definition, bool) {
