@@ -82,15 +82,17 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 		return true
 	}
+	// Only a swing in flight refuses: the attack stance that outlives it
+	// does not.
+	if live.attack != nil && live.attack.AttackingNow() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
+		return true
+	}
 
 	switch summonItem.SummonType {
 	case summonItemTypeDecorative:
 		return l.useDecorativeSummonItem(live, inv, inst, summonItem)
 	case summonItemTypeWyvern:
-		if live.Character.InCombat() {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
-			return true
-		}
 		live.move.Stop()
 		l.mountWyvern(live, summonItem.NPCID, inst.ObjectID)
 		return true
@@ -116,14 +118,22 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			StopMovement: l.stopMovementForCast(live),
 		},
 	})
+	// SUMMON_A_PET follows every attempt, refused or started: after the
+	// refusal's answer, or after the cast-start packets.
+	summonAPet := serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet)
 	if err != nil {
-		sendMagicCastFailure(live, started.Definition, err)
+		// A refusal at the cost and condition checks names its reason
+		// alone; one at the attempt gate also releases the client's action.
+		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
+			sendMagicCastFailureReason(live, started.Definition, err)
+		} else {
+			sendMagicCastFailure(live, started.Definition, err)
+		}
+		live.SendFrame(summonAPet)
 		return true
 	}
 	target := started.Target
 	plan := started.Plan
-
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet))
 
 	casterObject := skillCastObject(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -137,7 +147,11 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 			false,
 		)
 	})
+	if plan.GaugeDuration > 0 {
+		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
+	}
 	sendSkillItemCharge(live, def, plan.ItemCharge)
+	live.SendFrame(summonAPet)
 
 	targetIDs := []int32{target.ObjectID()}
 	controller.Schedule(plan, actorcast.Hooks{
