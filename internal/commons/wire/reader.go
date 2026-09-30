@@ -4,12 +4,24 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // ErrShortPacket is returned when a read would go past the end of the
 // payload — a malformed or truncated inbound packet.
 var ErrShortPacket = errors.New("wire: short read")
+
+// ErrStringTooLong is returned when a string field runs past MaxStringUnits
+// code units without its terminator.
+var ErrStringTooLong = errors.New("wire: string exceeds maximum length")
+
+// MaxStringUnits is the most UTF-16 code units ReadString accepts before the
+// terminator: the longest string one frame's payload can carry. It keeps a
+// Reader over an arbitrary buffer from scanning or decoding past what any
+// single packet could legitimately hold.
+const MaxStringUnits = (MaxFrameLength - FrameHeaderSize) / 2
 
 // Reader decodes little-endian primitives from a packet payload, in the
 // order they were written.
@@ -34,10 +46,11 @@ func NewPacketReader(payload []byte) *Reader {
 	return r
 }
 
-// Err reports the first short-read error encountered, if any. Once set,
-// every subsequent read returns the type's zero value instead of panicking
-// or reading out of bounds, so a decoder can perform a run of reads and
-// check Err once at the end rather than after every call.
+// Err reports the first decode error encountered (ErrShortPacket or
+// ErrStringTooLong), if any. Once set, every subsequent read returns the
+// type's zero value instead of panicking or reading out of bounds, so a
+// decoder can perform a run of reads and check Err once at the end rather
+// than after every call.
 func (r *Reader) Err() error {
 	return r.err
 }
@@ -111,14 +124,67 @@ func (r *Reader) ReadBytes(n int) []byte {
 
 // ReadString reads a null-terminated UTF-16LE string: 16-bit code units up
 // to but excluding the trailing 0x0000 unit, which is consumed.
+//
+// The terminator is located before anything is allocated, so a field with
+// no terminator (ErrShortPacket) or with more than MaxStringUnits code units
+// before it (ErrStringTooLong) is rejected without allocating and returns "".
+// An accepted string is decoded into a single exactly sized allocation.
 func (r *Reader) ReadString() string {
-	var units []uint16
+	if r.err != nil {
+		return ""
+	}
+	rest := r.buf[r.pos:]
+	units := 0
 	for {
-		u := r.ReadUint16()
-		if r.err != nil || u == 0 {
+		off := 2 * units
+		if off+2 > len(rest) {
+			r.err = ErrShortPacket
+			return ""
+		}
+		if rest[off] == 0 && rest[off+1] == 0 {
 			break
 		}
-		units = append(units, u)
+		if units == MaxStringUnits {
+			r.err = ErrStringTooLong
+			return ""
+		}
+		units++
 	}
-	return string(utf16.Decode(units))
+	r.pos += 2*units + 2
+	return decodeUTF16LE(rest[:2*units])
+}
+
+// decodeUTF16LE converts an even-length UTF-16LE byte run to a string,
+// replacing unpaired surrogates with U+FFFD as utf16.Decode does. It sizes
+// the result exactly first so the string is built in one allocation.
+func decodeUTF16LE(b []byte) string {
+	size := 0
+	for i := 0; i < len(b); {
+		c, w := utf16LERune(b[i:])
+		size += utf8.RuneLen(c)
+		i += w
+	}
+	var sb strings.Builder
+	sb.Grow(size)
+	for i := 0; i < len(b); {
+		c, w := utf16LERune(b[i:])
+		sb.WriteRune(c)
+		i += w
+	}
+	return sb.String()
+}
+
+// utf16LERune decodes the code point starting at b and reports how many
+// bytes it spans: 4 for a valid surrogate pair, otherwise 2.
+func utf16LERune(b []byte) (rune, int) {
+	c := rune(binary.LittleEndian.Uint16(b))
+	if !utf16.IsSurrogate(c) {
+		return c, 2
+	}
+	if len(b) >= 4 {
+		if pair := utf16.DecodeRune(c, rune(binary.LittleEndian.Uint16(b[2:]))); pair != utf8.RuneError {
+			return pair, 4
+		}
+	}
+	return utf8.RuneError, 2
 }
