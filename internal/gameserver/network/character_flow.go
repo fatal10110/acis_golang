@@ -327,11 +327,17 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate
 	// frame (if any effect was restored) right where the reference sends it,
 	// ahead of EtcStatusUpdate.
+	live.replayingEffects.Store(true)
 	if l.skills != nil {
-		live.replayingEffects.Store(true)
 		l.skills.ReplayEffects(c)
-		live.replayingEffects.Store(false)
 	}
+	// Decide the restored load's penalty band only now that the replayed
+	// effects and the equipped items have set the weight limit, and inside
+	// the silent replay window: the EtcStatusUpdate below and every later
+	// login frame carry the band, and sendLoginWeight reports the change
+	// between UserInfo and ItemList.
+	c.RefreshWeightPenalty()
+	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
@@ -370,8 +376,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 // UserInfo and its ItemList: StatusUpdate(CUR_LOAD) for any carried weight,
 // then the penalty band's refresh (UserInfo, EtcStatusUpdate, CharInfo to
 // every player that already sees live) when that load sits in a band.
-// attachLivePlayer computed both silently, so every earlier login frame
-// already carries them and this is the client's first report of the change.
+// Both were decided silently earlier in the login, so every earlier login
+// frame already carries them and this is the client's first report of the
+// change.
 func (l *GameClientLink) sendLoginWeight(live *livePlayer) {
 	weight := live.CurrentWeight()
 	if weight == 0 {
@@ -653,16 +660,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		rt.MountData = mountDataTable{npcs: l.npcs}
 	}
 	c.Configure(rt)
-	// Restored rows leave the carried weight at 0. Compute it and its penalty
-	// band here, while the inventory has no live delivery target and the
-	// character no event sink, so both stay silent: every login frame (the
-	// first EtcStatusUpdate, the spawn CharInfo, the burst UserInfo) carries
-	// the real load and band, and finishEnterWorld reports the change itself
-	// between UserInfo and ItemList.
+	// Restored rows leave the carried weight at 0. Compute it here, while the
+	// inventory has no live delivery target, so it stays silent: every login
+	// frame carries the real load, and finishEnterWorld reports it between
+	// UserInfo and ItemList. The penalty band waits for the restored stats
+	// that move the weight limit (finishEnterWorld, after the effect replay).
 	if inv := c.Inventory(); inv != nil {
 		inv.UpdateWeight()
 	}
-	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 
 	x, y, z := c.Position()

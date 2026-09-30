@@ -71,11 +71,12 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
-	// replayingEffects is set while EnterWorld replays the saved effects,
-	// before the player is in the world. Their start hooks change its
-	// appearance, but it has no observers yet and the EnterWorld UserInfo
-	// that follows carries the result, so the appearance refresh stays
-	// silent. Written on the owner's queue; atomic for the Emit readers.
+	// replayingEffects is set while EnterWorld replays the saved effects
+	// and then decides the weight penalty band, before the player is in the
+	// world. The effects' start hooks change its appearance and the band
+	// may move, but it has no observers yet and the EnterWorld frames that
+	// follow carry the result, so both refreshes stay silent. Written on the
+	// owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	isGM             bool
