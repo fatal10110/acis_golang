@@ -744,6 +744,8 @@ type Server struct {
 	heldLanes    [persist.Lanes]atomic.Int32 // HoldPersistenceLane holds per lane
 	log          zerolog.Logger
 	sendObserver *atomic.Pointer[func(payload []byte)]
+	// refreshRecommendations runs the link's daily recommendation refresh.
+	refreshRecommendations func(context.Context) error
 
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
@@ -1651,6 +1653,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
+	gclConfig.Macros = gamesql.NewMacroStore(db)
+	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances
@@ -1869,6 +1873,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		waitHandlers:     waitHandlers,
 		sendObserver:     sendObserver,
 	}
+	srv.refreshRecommendations = gcl.RefreshDailyRecommendations
 	srv.addClient(c)
 	return srv
 }

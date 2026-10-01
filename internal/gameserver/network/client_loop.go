@@ -1421,6 +1421,42 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.deleteShortcut(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestMakeMacro:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestMakeMacro)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.makeMacro(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestDeleteMacro:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestDeleteMacro)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.deleteMacro(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestEvaluate:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEvaluate)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.evaluate(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestChangePetName:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestChangePetName)
 			if err != nil {

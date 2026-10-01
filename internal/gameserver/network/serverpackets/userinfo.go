@@ -59,8 +59,8 @@ const teamBlue = 1
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
 // field list: systems this server hasn't built yet (clans, hero/noble
-// status, fishing, recommendations) always report their at-rest default,
-// matching a freshly entered character that has none of them. The
+// status, fishing) always report their at-rest default, matching a freshly
+// entered character that has none of them. The
 // attributes and combat stats are Character's live values, so gear, buffs,
 // level and passives all reach the status window.
 type UserInfoSnapshot struct {
@@ -236,9 +236,9 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteUint8(0) // in party-match room: party matching is not modeled
 	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(0)
-	w.WriteInt32(0)  // clan privileges: clans are not modeled
-	w.WriteUint16(0) // recommendations left: recommendations are not modeled
-	w.WriteUint16(0) // recommendations received: recommendations are not modeled
+	w.WriteInt32(0) // clan privileges: clans are not modeled
+	w.WriteUint16(uint16(c.RecommendationsLeft()))
+	w.WriteUint16(uint16(c.RecommendationsHave()))
 	if mountID := c.MountNPCID(); mountID > 0 {
 		w.WriteInt32(mountID + mountNpcIdOffset)
 	} else {
