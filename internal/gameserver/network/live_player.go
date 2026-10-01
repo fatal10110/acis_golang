@@ -319,6 +319,7 @@ func (p *livePlayer) Stop() {
 	p.takePickup()
 	p.takeDeferredPickup()
 	p.takeDeferredMagicSkill()
+	p.takeDeferredItemAICast()
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()
