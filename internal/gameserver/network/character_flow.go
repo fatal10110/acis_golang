@@ -192,38 +192,42 @@ func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
 	return l.hennaTable.Find(symbolID)
 }
 
-// enterWorld sends the EnterWorld packet burst for c and registers it in the
-// live world state.
-func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
+// restoreSelected restores the character c a selection picked: its items,
+// skills, shortcuts, hennas, macros, recipes, recommendations and storage,
+// attached as a live player with its own queue, and its row marked online.
+// The player is neither spawned nor registered in the world here; the
+// selection registers it and EnterWorld spawns it. Every failure returns
+// nil: no live player is handed back, and none is registered.
+func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
 	tmpl, ok := l.templates.Get(c.ClassID())
 	if !ok {
-		l.log.Error().Int("class_id", c.ClassID()).Msg("enter world: no template loaded")
+		l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 		return nil, false
 	}
 	items, err := l.items.ListByOwner(ctx, c.ID)
 	if err != nil {
-		l.log.Error().Err(err).Msg("enter world: list items")
+		l.log.Error().Err(err).Msg("select character: list items")
 		return nil, false
 	}
 	items = l.restoreItemRows(c.ID, items)
 	if l.skills != nil {
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore known skills")
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore known skills")
 		}
 		if err := l.skills.RestoreSkillState(ctx, c); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore skill state")
 		}
 		// Re-derive level-unlocked skills on every login, right after the
 		// character data is restored, so a free grant
 		// added by an in-session level-up — which lives in memory only —
 		// comes back instead of vanishing on relog.
 		if err := l.giveOrRewardSkills(c, tmpl); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: give skills")
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: give skills")
 			return nil, false
 		}
 		if level := c.DeathPenaltyLevel(); level > 0 {
 			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, 0, level); err != nil {
-				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore death-penalty passive stats")
+				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore death-penalty passive stats")
 				return nil, false
 			}
 		}
@@ -235,7 +239,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	if l.shortcuts != nil {
 		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
-			l.log.Error().Err(listErr).Msg("enter world: list shortcuts")
+			l.log.Error().Err(listErr).Msg("select character: list shortcuts")
 			shortcuts = nil
 		} else {
 			shortcuts = restored
@@ -244,7 +248,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	if l.hennas != nil {
 		rows, listErr := l.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
-			l.log.Error().Err(listErr).Msg("enter world: list hennas")
+			l.log.Error().Err(listErr).Msg("select character: list hennas")
 		} else {
 			c.RestoreHennas(rows, l.findHenna)
 		}
@@ -260,38 +264,36 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	storage := l.restoreStorage(ctx, client.AccountName(), c, items)
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
-		l.log.Error().Err(err).Msg("enter world: attach live player")
+		l.log.Error().Err(err).Msg("select character: attach live player")
 		return nil, false
 	}
 	live.storage = storage
 	live.macros = macros
 	if l.roster != nil {
-		// Mark the row online at login (the online status is updated when a
-		// client enters the world), so external DB consumers
+		// The row is marked online at selection, so external DB consumers
 		// see online=1 without waiting for the first periodic save.
 		if err := l.roster.SaveOnlineRecency(ctx, c); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: save player online recency")
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: save player online recency")
 		}
-	}
-	// From here on the player has a queue: the rest of the login runs on it,
-	// and this goroutine waits, so the burst keeps its order.
-	entered := false
-	onLive(live, func() { entered = l.finishEnterWorld(client, c, live) })
-	if !entered {
-		// Hand the partially attached player back rather than nil: by now it
-		// owns an actor queue, shadow-item tracking and, past world.Spawn,
-		// world/clock/autosave registrations. The caller's deferred
-		// detachLivePlayer is what releases them. Dropping live here would
-		// leave the queue behind and let the shadow-item task keep decaying
-		// — and finally destroy — an offline character's equipment.
-		return live, false
 	}
 	return live, true
 }
 
-// finishEnterWorld publishes the attached player live into the world and
-// sends the rest of the EnterWorld burst, on live's queue. It reports false
-// when the login cannot complete.
+// enterWorld spawns the selected, already registered live into the world
+// and sends the EnterWorld packet burst. It reports false when the login
+// cannot complete; live, attached at selection, stays the caller's to
+// detach either way.
+func (l *GameClientLink) enterWorld(client *Client, live *livePlayer) bool {
+	// The player has a queue: the login runs on it, and this goroutine
+	// waits, so the burst keeps its order.
+	entered := false
+	onLive(live, func() { entered = l.finishEnterWorld(client, live.Character, live) })
+	return entered
+}
+
+// finishEnterWorld spawns the attached player live into the world and sends
+// the EnterWorld burst, on live's queue. It reports false when the login
+// cannot complete.
 func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, live *livePlayer) bool {
 	// Same constructor RequestItemList uses, so the login snapshot comes from
 	// the live inventory instead of the raw restored rows. Built before the
@@ -359,7 +361,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.reclaimPetCorpse(live)
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
-		l.world.AddPlayer(live)
+		// Registered since its selection; from here on it is in the world
+		// for the view refreshes its burst carried until now.
+		live.entered.Store(true)
 		if live.zoneActor != nil {
 			live.zoneActor.revalidate(l.zones)
 		}

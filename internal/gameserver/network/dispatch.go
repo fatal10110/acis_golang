@@ -46,6 +46,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -309,6 +310,7 @@ type GameClientLink struct {
 	petItems         *petitem.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
+	rooms            *roomRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
 	clanWarehouses   clanWarehouseBook
@@ -615,6 +617,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
+		rooms:            partymatch.NewRegistry[*livePlayer](),
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
 		characters:       cfg.Characters,

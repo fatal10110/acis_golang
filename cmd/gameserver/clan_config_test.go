@@ -49,5 +49,10 @@ func clanConfigDefaults(joinDays int, withdraw bool) clan.Config {
 		WarPenaltyDays:                  5,
 		LifeCrystalNeeded:               true,
 		MembersCanWithdrawFromWarehouse: withdraw,
+		AllyJoinDaysWhenLeft:            1,
+		AllyJoinDaysWhenDismissed:       1,
+		AcceptClanDaysWhenDismissed:     1,
+		CreateAllyDaysWhenDissolved:     10,
+		MaxClansInAlly:                  3,
 	}
 }

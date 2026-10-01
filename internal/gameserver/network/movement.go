@@ -232,14 +232,15 @@ func (l *GameClientLink) sendModifiedStats(live *livePlayer, attrs []event.Statu
 }
 
 // liveInWorld reports whether live is the player the world currently holds
-// under its object id, the gate for server-initiated view refreshes that the
-// entry burst otherwise carries.
+// under its object id and its login has spawned it, the gate for
+// server-initiated view refreshes that the entry burst otherwise carries. A
+// selected player is registered before it is spawned.
 func (l *GameClientLink) liveInWorld(live *livePlayer) bool {
 	if l.world == nil {
 		return true
 	}
 	current, ok := l.world.Player(live.ObjectID())
-	return ok && current == live
+	return ok && current == live && live.entered.Load()
 }
 
 // changeLiveWaitType sits live down or stands it up and broadcasts the new

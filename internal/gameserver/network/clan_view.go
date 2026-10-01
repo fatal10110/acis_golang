@@ -18,6 +18,11 @@ func (l *GameClientLink) clanFields(c *player.Character) serverpackets.ClanField
 	}
 	info := cl.Info()
 	m, _ := cl.Member(c.ID)
+	// A clan in no alliance shows no alliance crest, whatever its row
+	// still holds.
+	if info.AllyID == 0 {
+		info.AllyCrestID = 0
+	}
 	return serverpackets.ClanFields{
 		CrestID: info.CrestID, CrestLargeID: info.CrestLarge,
 		AllyID: info.AllyID, AllyCrestID: info.AllyCrestID,

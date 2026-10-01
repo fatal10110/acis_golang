@@ -94,7 +94,6 @@ M2 required client packets are complete:
 
 Missing M3 data/UI client packets:
 
-- `RequestSetAllyCrest`
 - `RequestBuyProcure`
 - `RequestBuySeed`
 - `RequestProcureCropList`
@@ -123,6 +122,7 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestAllyCrest`
 - `RequestExPledgeCrestLarge`
 - `RequestPledgeCrest`
+- `RequestSetAllyCrest` (alliance crest upload and deletion by the leader of the alliance's leading clan: the image saved to the crest cache under a fresh id, every alliance clan's `ally_crest_id` stored, the replaced image deleted, and every online member of the alliance refreshed)
 - `RequestSetPledgeCrest` and `RequestExSetPledgeCrestLarge` (clan crest upload and deletion: dissolution, privilege and clan level 3 checks, the image saved to the crest cache under a fresh id, the clan_data column stored, and every online member's UserInfo and CharInfo refreshed)
 - `RequestShowBoard` and `RequestBBSwrite` (the community board, behind `EnableCommunityBoard`: the home, mail, friends/block and clan boards answer with `ShowBoard`; the memo, favorites and region boards show the board's unknown-command page until #3201 and #3202; with the board off every board command answers `CB_OFFLINE`)
 - `RequestCursedWeaponList`

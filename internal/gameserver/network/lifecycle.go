@@ -48,6 +48,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// TaskEffects.Save runs on this queue too, so every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
 	live.markDetaching()
+	// Out of party matching while still in sight, so its observers see it
+	// leave its room; marked as departing first, so no room or waiting
+	// list takes it back in.
+	l.leavePartyMatch(live)
 
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log
@@ -124,8 +128,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		// is flushed below, and before live is despawned. A dead pet's
 		// items stay with its corpse, saved under its collar, on the lane
 		// awaited with the row.
+		//
+		// A summon whose owner already left is a pet an earlier session left
+		// behind, which live has not taken over: it stays for the next
+		// login, as when live leaves before its login reached the takeover.
 		if obj, ok := l.world.Summon(live.ObjectID()); ok {
-			if s, ok := obj.(*summon.Actor); ok {
+			if s, ok := obj.(*summon.Actor); ok && !s.OwnerLeft() {
 				if inv := s.PetInventory(); inv != nil {
 					owners = append(owners, inv.OwnerID())
 				}

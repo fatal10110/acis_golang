@@ -122,6 +122,9 @@ type Character struct {
 	fallingUntil time.Time
 	// blockingAll is the block-everything mode; see character_blockall.go.
 	blockingAll atomic.Bool
+	// partyRoom is the party-matching room the character is in; see
+	// character_partyroom.go.
+	partyRoom atomic.Int32
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method

@@ -166,8 +166,14 @@ func TestLogoutAfterRestartKeepsConnectionOpen(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("select opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
-	if _, ok := srv.State.Player(objID); ok {
-		t.Fatalf("world.Player(%d) present before EnterWorld", objID)
+	// Selected, the character is registered but not spawned until
+	// EnterWorld.
+	srv.AwaitHandled(t)
+	if _, ok := srv.State.Player(objID); !ok {
+		t.Fatalf("world.Player(%d) missing after the selection", objID)
+	}
+	if _, ok := srv.State.Object(objID); ok {
+		t.Fatalf("world.Object(%d) spawned before EnterWorld", objID)
 	}
 }
 

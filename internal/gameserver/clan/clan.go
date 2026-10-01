@@ -122,7 +122,11 @@ type Info struct {
 	AllyID           int32
 	AllyName         string
 	AllyCrestID      int32
-	AtWar            bool
+	// AllyPenaltyExpiry is the epoch millisecond the clan's alliance
+	// penalty, of kind AllyPenaltyType, ends; 0 when it has none.
+	AllyPenaltyExpiry int64
+	AllyPenaltyType   int
+	AtWar             bool
 }
 
 // ID is the clan's id.
@@ -166,7 +170,9 @@ func (cl *Clan) infoLocked() Info {
 		CrestID: cl.crestID, CrestLarge: cl.crestLargeID,
 		Rank: cl.rank, Reputation: cl.reputation,
 		DissolvingExpiry: cl.dissolvingExpiry,
-		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID, AtWar: len(cl.wars) > 0,
+		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID,
+		AllyPenaltyExpiry: cl.allyPenaltyExpiry, AllyPenaltyType: cl.allyPenaltyType,
+		AtWar: len(cl.wars) > 0,
 	}
 	if leader, ok := cl.members[cl.leaderID]; ok {
 		info.LeaderName = leader.Name
