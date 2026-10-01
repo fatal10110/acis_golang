@@ -596,9 +596,9 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 	if mover == nil || zones == nil {
 		return
 	}
-	mover.SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
+	mover.SetWaterSurface(func(position location.Location) (int, bool) {
 		water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
-		if !ok || groundZ-water.WaterLevel() >= -20 {
+		if !ok {
 			return 0, false
 		}
 		return water.WaterLevel(), true

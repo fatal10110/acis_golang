@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -35,14 +36,34 @@ const walkStartUpdates = 5
 // maxTravelTicks is the largest position-update count a duration can hold.
 const maxTravelTicks = float64(time.Duration(1<<63-1) / PositionUpdateInterval)
 
-// Pawn is the target of a pawn walk: the walk ends once its last leg brings
-// the walker within the walk's offset of the pawn's current position. A
-// tracking pawn walk (MoveToPawnWithPathOutcome) also re-aims at that
-// position on every position update of its last leg.
+// Pawn is the target of a pawn walk: the walk toward a creature pawn ends
+// once its last leg brings the walker within the walk's offset of the pawn's
+// current position, and the walk toward any other pawn (a static object)
+// runs onto the pawn's point. A tracking pawn walk
+// (MoveToPawnWithPathOutcome) also re-aims at that position on every
+// position update of its last leg.
 type Pawn interface {
 	ObjectID() int32
+	Kind() actor.Kind
 	Position() (x, y, z int)
 }
+
+// MoveType is how a mover travels: on the ground, swimming or flying.
+type MoveType uint8
+
+const (
+	// MoveGround walks on the geodata floor and measures distances on the
+	// ground plane.
+	MoveGround MoveType = iota
+	// MoveSwim moves through a water zone.
+	MoveSwim
+	// MoveFly moves through the air.
+	MoveFly
+)
+
+// waterDepthMin is how far below a water zone's surface the floor must lie
+// for the surface to cap a mover's height.
+const waterDepthMin = 20
 
 const worldZMax = 16410
 
@@ -74,6 +95,12 @@ type TargetSnapshot struct {
 // like a walk to a fixed point and never re-aims; only its stop follows the
 // pawn.
 //
+// A mover standing in a water zone swims, and one SetFlying marks flies (a
+// swimmer counts as swimming even while flying). A swimming or flying mover
+// measures its legs, steps and pawn stops in 3D, moves its height straight
+// toward the destination's instead of along the geodata floor, and is never
+// stopped by a closed geodata line under way.
+//
 // A mover given SetSpeeds (a player) steps by the player rules: each update
 // measures its delta from the current cell and rounds the next one, advances
 // by the time it stands for, and retargeting a walk in flight first advances
@@ -87,24 +114,26 @@ type TargetSnapshot struct {
 // route is exhausted, including when an earlier tick on that same request
 // was blocked.
 type CreatureMove struct {
-	geo          Geo
-	waterSurface func(location.Location, int) (int, bool)
+	geo   Geo
+	water func(location.Location) (int, bool)
 
-	mu                   sync.Mutex
-	origin, destination  location.Location
-	waypoints            []location.Location
-	accurateX, accurateY float64
-	speed                float64
-	moving               bool
-	routeBlocked         bool
-	followTarget         int32
-	followOffset         int
-	followMode           FollowMode
+	mu                              sync.Mutex
+	origin, destination             location.Location
+	waypoints                       []location.Location
+	accurateX, accurateY, accurateZ float64
+	flying                          bool
+	speed                           float64
+	moving                          bool
+	routeBlocked                    bool
+	followTarget                    int32
+	followOffset                    int
+	followMode                      FollowMode
 	// pawn is the target a pawn walk stops at, nil for a walk to a fixed
-	// point; pawnTracks marks a tracking pawn walk; pawnGen tells one pawn
-	// walk from the next.
+	// point; pawnStop is how far short of it the walk stops, its offset for
+	// a creature pawn and 0 for any other; pawnTracks marks a tracking pawn
+	// walk; pawnGen tells one pawn walk from the next.
 	pawn       Pawn
-	pawnOffset int
+	pawnStop   int
 	pawnTracks bool
 	pawnGen    uint64
 	// startSpeed, when hasStartSpeed, is the speed the first
@@ -163,11 +192,18 @@ func (m *CreatureMove) Init(origin location.Location, speed float64, geo Geo) er
 	}
 	m.origin = origin
 	m.destination = origin
-	m.accurateX = float64(origin.X)
-	m.accurateY = float64(origin.Y)
+	m.setAccurateLocked(origin)
 	m.speed = speed
 	m.geo = geo
 	return nil
+}
+
+// setAccurateLocked reseeds the accurate position at the cell at. Callers
+// hold mu or own the state exclusively.
+func (m *CreatureMove) setAccurateLocked(at location.Location) {
+	m.accurateX = float64(at.X)
+	m.accurateY = float64(at.Y)
+	m.accurateZ = float64(at.Z)
 }
 
 // Speed returns the speed movement updates currently use.
@@ -293,12 +329,12 @@ func (m *CreatureMove) travelTicksLocked(distance float64) float64 {
 
 // arrivalDelayLocked is how long the rest of the active leg takes from the
 // accurate position, at least one position update; on the last leg of a
-// tracking pawn walk only up to the offset short of the destination. It is 0
-// when the leg cannot finish at the current speeds. Callers hold mu.
+// tracking pawn walk only up to where it stops short of the destination. It
+// is 0 when the leg cannot finish at the current speeds. Callers hold mu.
 func (m *CreatureMove) arrivalDelayLocked() time.Duration {
-	distance := math.Hypot(float64(m.destination.X)-m.accurateX, float64(m.destination.Y)-m.accurateY)
+	distance := m.leftLocked(m.moveTypeLocked(), m.accurateX, m.accurateY)
 	if m.onTrackedPawnLegLocked() {
-		distance = max(distance-float64(m.pawnOffset), 0)
+		distance = max(distance-float64(m.pawnStop), 0)
 	}
 	ticks := m.travelTicksLocked(distance)
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
@@ -342,12 +378,74 @@ func (m *CreatureMove) Queue() *sim.Queue {
 	return m.queue
 }
 
-// SetWaterSurface records the query used to cap underwater movement at a
-// water surface. A nil query leaves ground movement capped at the world max.
-func (m *CreatureMove) SetWaterSurface(query func(location.Location, int) (int, bool)) {
+// SetWaterSurface records the query for the water zone at a position: its
+// surface level, and whether the position lies in one. A mover standing in a
+// water zone swims, capped at the surface while the floor lies deeper than
+// waterDepthMin below it. A nil query leaves the mover on the ground, capped
+// at the world max.
+func (m *CreatureMove) SetWaterSurface(query func(location.Location) (int, bool)) {
 	m.mu.Lock()
-	m.waterSurface = query
+	m.water = query
 	m.mu.Unlock()
+}
+
+// SetFlying records whether the mover flies (a wyvern rider).
+func (m *CreatureMove) SetFlying(flying bool) {
+	m.mu.Lock()
+	m.flying = flying
+	m.mu.Unlock()
+}
+
+// MoveType reports how the mover travels from where it stands now.
+func (m *CreatureMove) MoveType() MoveType {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.moveTypeLocked()
+}
+
+// moveTypeLocked is the mover's MoveType at its origin: swimming in a water
+// zone, else flying when SetFlying marks it, else on the ground. Callers
+// hold mu.
+func (m *CreatureMove) moveTypeLocked() MoveType {
+	if m.water != nil {
+		if _, ok := m.water(m.origin); ok {
+			return MoveSwim
+		}
+	}
+	if m.flying {
+		return MoveFly
+	}
+	return MoveGround
+}
+
+// span is the length of the leg (dx, dy, dz) a mover of type t covers: on
+// the ground plane for a ground mover, through space otherwise.
+func span(t MoveType, dx, dy, dz float64) float64 {
+	if t == MoveGround {
+		return math.Hypot(dx, dy)
+	}
+	return math.Sqrt(dx*dx + dy*dy + dz*dz)
+}
+
+// between is the length of the leg from a to b a mover of type t covers.
+func between(t MoveType, a, b location.Location) float64 {
+	return span(t, float64(b.X)-float64(a.X), float64(b.Y)-float64(a.Y), float64(b.Z)-float64(a.Z))
+}
+
+// leftLocked is how far a mover of type t standing at (x, y) and the
+// origin's height has left to the destination. Callers hold mu.
+func (m *CreatureMove) leftLocked(t MoveType, x, y float64) float64 {
+	return span(t, float64(m.destination.X)-x, float64(m.destination.Y)-y, float64(m.destination.Z)-float64(m.origin.Z))
+}
+
+// inRadius reports whether a lies strictly within radius of b as a mover of
+// type t measures it: on the ground plane for a ground mover, in 3D
+// otherwise.
+func inRadius(t MoveType, a, b location.Location, radius int) bool {
+	if t == MoveGround {
+		return a.In2DRadius(b, radius)
+	}
+	return a.In3DRadius(b, radius)
 }
 
 // CanMoveTo reports whether a straight-line geodata walk from the current
@@ -372,8 +470,7 @@ func (m *CreatureMove) SetPosition(position location.Location) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.origin = position
-	m.accurateX = float64(position.X)
-	m.accurateY = float64(position.Y)
+	m.setAccurateLocked(position)
 	if m.destination == position {
 		// Position reports arrival at the active destination; any queued
 		// segments are dropped, since the caller is the authoritative
@@ -434,8 +531,9 @@ func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (
 
 // MoveToPawnWithPathOutcome starts a tracking pawn walk straight toward
 // pawn's current position: on its last leg every position update re-aims it
-// at where pawn stands then, and the walk ends once within offset of pawn
-// (2D). It otherwise reports like MoveToLocationWithPathOutcome.
+// at where pawn stands then, and the walk ends once within offset of a
+// creature pawn (2D on the ground, 3D swimming or flying), or on the point of
+// any other pawn. It otherwise reports like MoveToLocationWithPathOutcome.
 func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
 	m.mu.Lock()
@@ -446,7 +544,8 @@ func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.M
 // ChasePawnWithPathOutcome starts a chase pawn walk toward pawn's current
 // position, routed like MoveToLocationWithPathOutcome: the destination stays
 // where pawn stood at the request, and the walk ends on its last leg at the
-// first position within offset of where pawn stands then (2D).
+// first position within offset of where a creature pawn stands then (2D on
+// the ground, 3D swimming or flying).
 func (m *CreatureMove) ChasePawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
 	m.mu.Lock()
@@ -463,7 +562,10 @@ const (
 )
 
 func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn, offset int, tracks bool) (event.Move, pathFindResult, error) {
-	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
+	moveType := m.moveTypeLocked()
+	if moveType == MoveGround {
+		target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
+	}
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination, and the start-speed update count running. Only a
 	// fresh request (not currently moving) clears them. A player's walk in
@@ -480,11 +582,10 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	}
 
 	// Same-cell requests complete on the next movement tick.
-	if target.X == m.origin.X && target.Y == m.origin.Y {
+	if target.X == m.origin.X && target.Y == m.origin.Y && (moveType == MoveGround || target.Z == m.origin.Z) {
 		m.waypoints = nil
 		m.destination = target
-		m.accurateX = float64(m.origin.X)
-		m.accurateY = float64(m.origin.Y)
+		m.setAccurateLocked(m.origin)
 		m.setPawnLocked(pawn, offset, tracks)
 		m.moving = true
 		m.rescheduleLocked(PositionUpdateInterval)
@@ -503,15 +604,14 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 		destination, waypoints, outcome = m.resolvePathLocked(target)
 	}
 
-	distance := math.Hypot(float64(destination.X)-float64(m.origin.X), float64(destination.Y)-float64(m.origin.Y))
+	distance := between(moveType, m.origin, destination)
 	ticks := m.travelTicksLocked(distance)
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
 		return event.Move{}, outcome, errors.New("move: duration exceeds limit")
 	}
 	duration := time.Duration(ticks) * PositionUpdateInterval
 	origin := m.origin
-	m.accurateX = float64(origin.X)
-	m.accurateY = float64(origin.Y)
+	m.setAccurateLocked(origin)
 	m.destination = destination
 	m.waypoints = waypoints
 	m.setPawnLocked(pawn, offset, tracks)
@@ -527,10 +627,14 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 }
 
 // setPawnLocked makes the request a pawn walk toward pawn, tracking it when
-// tracks, or a walk to a fixed point when pawn is nil. Callers hold mu.
+// tracks, or a walk to a fixed point when pawn is nil. Only a creature pawn
+// stops the walk offset short of it. Callers hold mu.
 func (m *CreatureMove) setPawnLocked(pawn Pawn, offset int, tracks bool) {
 	m.pawn = pawn
-	m.pawnOffset = offset
+	m.pawnStop = 0
+	if pawn != nil && pawn.Kind().Creature() {
+		m.pawnStop = offset
+	}
 	m.pawnTracks = pawn != nil && tracks
 	m.pawnGen++
 }
@@ -603,25 +707,33 @@ func (m *CreatureMove) onArrive(seq uint64) {
 
 // stopShortOfPawnLocked ends the last leg of a tracking pawn walk whose
 // arrival timer elapsed before a position update ended it: the actor stops
-// offset short of the destination on the line toward it, or where it stands
-// when already that close. A tracking pawn walk heads straight through
-// closed lines, so a closed line to that stop ends the walk blocked where
-// the actor stands, as the position update meeting it would. Callers hold
-// mu.
+// the walk's stop distance short of the destination on the line toward it
+// (on the destination itself for a pawn that is not a creature), or where
+// it stands when already that close. A tracking pawn walk heads straight
+// through closed lines, so a closed line to that stop ends a ground walk
+// blocked where the actor stands, as the position update meeting it would.
+// Callers hold mu.
 func (m *CreatureMove) stopShortOfPawnLocked() func() {
+	moveType, maxZ := m.moveTypeLocked(), m.maxZLocked()
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
-	if left := math.Hypot(dx, dy); left > float64(m.pawnOffset) {
-		fraction := (left - float64(m.pawnOffset)) / left
+	dz := float64(m.destination.Z) - float64(m.origin.Z)
+	if left := span(moveType, dx, dy, dz); left > float64(m.pawnStop) {
+		fraction := (left - float64(m.pawnStop)) / left
 		accurateX := m.accurateX + dx*fraction
 		accurateY := m.accurateY + dy*fraction
 		x, y := int(accurateX), int(accurateY)
-		z := min(int(m.geo.Height(x, y, m.origin.Z+2*block.CellHeight)), m.maxZLocked())
-		if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, x, y, z) {
-			m.routeBlocked = true
-			return m.stopBlockedLocked()
+		var z int
+		if moveType == MoveGround {
+			z = min(int(m.geo.Height(x, y, m.origin.Z+2*block.CellHeight)), maxZ)
+			if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, x, y, z) {
+				m.routeBlocked = true
+				return m.stopBlockedLocked()
+			}
+		} else {
+			z = min(m.origin.Z+int(dz*fraction+0.5), maxZ)
 		}
-		m.accurateX, m.accurateY = accurateX, accurateY
+		m.accurateX, m.accurateY, m.accurateZ = accurateX, accurateY, float64(z)
 		m.origin = location.Location{X: x, Y: y, Z: z}
 	}
 	return m.endLocked()
@@ -651,8 +763,7 @@ func (m *CreatureMove) finishLocked() func() {
 	// Snap to the just-completed segment's destination.
 	m.destination.Z = min(m.destination.Z, m.maxZLocked())
 	m.origin = m.destination
-	m.accurateX = float64(m.destination.X)
-	m.accurateY = float64(m.destination.Y)
+	m.setAccurateLocked(m.destination)
 
 	// Advance through any remaining waypoints. Zero-distance segments are
 	// skipped silently; a positive-distance segment becomes the active
@@ -662,7 +773,7 @@ func (m *CreatureMove) finishLocked() func() {
 	for len(m.waypoints) > 0 {
 		next := m.waypoints[0]
 		m.waypoints = m.waypoints[1:]
-		distance := math.Hypot(float64(next.X)-float64(m.origin.X), float64(next.Y)-float64(m.origin.Y))
+		distance := between(m.moveTypeLocked(), m.origin, next)
 		ticks := m.travelTicksLocked(distance)
 		if math.IsNaN(ticks) || ticks > maxTravelTicks {
 			// Unrepresentable next-segment duration: stop here, drop tail.
@@ -672,8 +783,7 @@ func (m *CreatureMove) finishLocked() func() {
 			// Zero-distance segment: snap forward and continue.
 			m.destination = next
 			m.origin = next
-			m.accurateX = float64(next.X)
-			m.accurateY = float64(next.Y)
+			m.setAccurateLocked(next)
 			continue
 		}
 		m.destination = next
@@ -696,9 +806,11 @@ func (m *CreatureMove) finishLocked() func() {
 // waypoint — including when the current leg is blocked and a later waypoint
 // remains — returns the next segment's event with true.
 //
-// On the last leg of a pawn walk the walk ends at the first position within
-// the walk's offset of the pawn's current position; a tracking pawn walk
-// first re-aims the leg at that position.
+// On the last leg of a pawn walk toward a creature the walk ends at the
+// first position within the walk's offset of the pawn's current position (2D
+// on the ground, 3D swimming or flying); a walk toward any other pawn runs
+// onto its point. A tracking pawn walk first re-aims the leg at that
+// position.
 //
 // A player's update stands for step of walking, less what retarget updates
 // since the last one already walked.
@@ -757,9 +869,9 @@ func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 	} else {
 		passed = m.updateSpeedLocked() * step.Seconds()
 	}
-	maxZ := m.maxZLocked()
-	next, nextAccurateX, nextAccurateY, reached := m.stepLocked(passed, maxZ)
-	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
+	moveType, maxZ := m.moveTypeLocked(), m.maxZLocked()
+	next, nextAccurate, reached := m.stepLocked(passed, moveType, maxZ)
+	if moveType == MoveGround && !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
 		m.routeBlocked = true
 		ok, hook := m.startNextWaypointLocked()
 		if !ok {
@@ -780,10 +892,9 @@ func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 		return u
 	}
 
-	m.accurateX = nextAccurateX
-	m.accurateY = nextAccurateY
+	m.accurateX, m.accurateY, m.accurateZ = nextAccurate[0], nextAccurate[1], nextAccurate[2]
 	m.origin = next
-	if lastPawnLeg && next.In2DRadius(pawnAt, m.pawnOffset) {
+	if lastPawnLeg && m.pawnStop > 0 && inRadius(moveType, next, pawnAt, m.pawnStop) {
 		u.hook = m.endLocked()
 		return u
 	}
@@ -795,14 +906,19 @@ func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 	return u
 }
 
-// stepLocked is where advancing passed units toward the destination lands,
-// with the accurate position there; reached reports that the step covers
-// the rest of the leg, landing on the destination itself. It snaps the
-// destination to the floor capped at maxZ first. A player measures the step
-// from its current cell and rounds the cell it lands on; any other mover
-// measures it from its accurate position and truncates. Callers hold mu.
-func (m *CreatureMove) stepLocked(passed float64, maxZ int) (next location.Location, accurateX, accurateY float64, reached bool) {
-	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), maxZ)
+// stepLocked is where a mover of type moveType advancing passed units
+// toward the destination lands, with the accurate position (x, y, z) there;
+// reached reports that the step covers the rest of the leg, landing on the
+// destination itself. A ground mover snaps the destination to the floor
+// capped at maxZ first, and lands on the floor; a swimming or flying one
+// measures the leg in 3D and moves its height toward the destination's,
+// capped at maxZ. A player measures the step from its current cell and
+// rounds the cell it lands on; any other mover measures it from its
+// accurate position and truncates. Callers hold mu.
+func (m *CreatureMove) stepLocked(passed float64, moveType MoveType, maxZ int) (next location.Location, accurate [3]float64, reached bool) {
+	if moveType == MoveGround {
+		m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), maxZ)
+	}
 	fromX, fromY := m.accurateX, m.accurateY
 	player := m.playerStepsLocked()
 	if player {
@@ -810,20 +926,33 @@ func (m *CreatureMove) stepLocked(passed float64, maxZ int) (next location.Locat
 	}
 	dx := float64(m.destination.X) - fromX
 	dy := float64(m.destination.Y) - fromY
-	left := math.Hypot(dx, dy)
+	dz := float64(m.destination.Z) - float64(m.origin.Z)
+	left := span(moveType, dx, dy, dz)
 	if left == 0 || passed >= left {
-		return m.destination, m.accurateX, m.accurateY, true
+		next = m.destination
+		next.Z = min(next.Z, maxZ)
+		return next, [3]float64{m.accurateX, m.accurateY, m.accurateZ}, true
 	}
 	fraction := passed / left
-	accurateX = m.accurateX + dx*fraction
-	accurateY = m.accurateY + dy*fraction
+	accurate = [3]float64{m.accurateX + dx*fraction, m.accurateY + dy*fraction, m.accurateZ + dz*fraction}
 	if player {
-		next.X, next.Y = roundHalfUp(accurateX), roundHalfUp(accurateY)
+		next.X, next.Y = roundHalfUp(accurate[0]), roundHalfUp(accurate[1])
 	} else {
-		next.X, next.Y = int(accurateX), int(accurateY)
+		next.X, next.Y = int(accurate[0]), int(accurate[1])
 	}
-	next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
-	return next, accurateX, accurateY, false
+	// Only a player swimming or flying carries its accurate height from one
+	// step to the next; any other step starts from the cell it stands on.
+	switch {
+	case moveType == MoveGround:
+		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
+		accurate[2] = float64(next.Z)
+	case player:
+		next.Z = min(roundHalfUp(accurate[2]), maxZ)
+	default:
+		next.Z = min(m.origin.Z+int(dz*fraction+0.5), maxZ)
+		accurate[2] = float64(next.Z)
+	}
+	return next, accurate, false
 }
 
 // catchUpLocked is the update a player's walk in flight runs before a
@@ -836,13 +965,13 @@ func (m *CreatureMove) catchUpLocked() {
 	elapsed := m.nowLocked().Sub(m.lastUpdate)
 	m.sinceTick += elapsed
 	m.updates++
-	maxZ := m.maxZLocked()
-	next, accurateX, accurateY, _ := m.stepLocked(playerPassed(m.updateSpeedLocked(), elapsed), maxZ)
-	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
+	moveType, maxZ := m.moveTypeLocked(), m.maxZLocked()
+	next, accurate, _ := m.stepLocked(playerPassed(m.updateSpeedLocked(), elapsed), moveType, maxZ)
+	if moveType == MoveGround && !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
 		m.routeBlocked = true
 		return
 	}
-	m.accurateX, m.accurateY = accurateX, accurateY
+	m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
 	m.origin = next
 }
 
@@ -874,11 +1003,15 @@ func (m *CreatureMove) walkingPawn() (Pawn, uint64) {
 	return m.pawn, m.pawnGen
 }
 
+// maxZLocked is the highest a step from the origin may land: the surface of
+// the water zone the mover stands in when the floor lies deeper than
+// waterDepthMin below it, else the world max. Callers hold mu.
 func (m *CreatureMove) maxZLocked() int {
-	if m.waterSurface == nil {
+	if m.water == nil {
 		return worldZMax
 	}
-	if surface, ok := m.waterSurface(m.origin, int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))); ok {
+	surface, ok := m.water(m.origin)
+	if ok && int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))-surface < -waterDepthMin {
 		return surface
 	}
 	return worldZMax
@@ -915,11 +1048,10 @@ func (m *CreatureMove) startNextWaypointLocked() (ok bool, action func()) {
 	}
 	next := m.waypoints[0]
 	m.waypoints = m.waypoints[1:]
-	m.accurateX = float64(m.origin.X)
-	m.accurateY = float64(m.origin.Y)
+	m.setAccurateLocked(m.origin)
 	m.destination = next
 
-	distance := math.Hypot(float64(next.X)-float64(m.origin.X), float64(next.Y)-float64(m.origin.Y))
+	distance := between(m.moveTypeLocked(), m.origin, next)
 	ticks := m.travelTicksLocked(distance)
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
 		m.waypoints = nil
@@ -1057,7 +1189,7 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (e
 		return event.Move{}, false, nil
 	}
 
-	if m.origin.In2DRadius(target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
+	if inRadius(m.moveTypeLocked(), m.origin, target.Position, followRange(m.followOffset, actorRadius, target.CollisionRadius)) {
 		return event.Move{}, false, nil
 	}
 

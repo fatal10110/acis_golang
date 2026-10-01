@@ -540,11 +540,12 @@ func (c *Character) moveSpeedFrom(base int) float64 {
 
 // refreshMoveSpeed hands the current move speed to the live movement
 // simulation, so the server keeps pace with what the client is told, along
-// with the speed a move starts at.
+// with the speed a move starts at and whether the character flies.
 func (c *Character) refreshMoveSpeed() {
 	if c.Live == nil {
 		return
 	}
+	c.Move().SetFlying(c.Flying())
 	c.Move().SetSpeeds(c.MoveSpeed(), c.moveStartSpeed())
 }
 
