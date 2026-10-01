@@ -171,7 +171,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	buyLists, err := gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"))
+	buyLists, err := gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), items)
 	if err != nil {
 		return nil, err
 	}
