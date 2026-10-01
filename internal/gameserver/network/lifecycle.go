@@ -139,6 +139,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	owners = append(owners, l.releaseStorage(live)...)
 	if l.world != nil {
 		l.world.Despawn(live)
+		// Out of sight, still listed online: drop its friend invitations and
+		// tell its friends it left.
+		l.leaveFriends(live)
 		l.world.RemovePlayer(live.ObjectID())
 	}
 	l.leaveParty(live)

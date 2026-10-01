@@ -58,6 +58,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -98,6 +99,7 @@ type options struct {
 	freeTeleport           bool
 	teleportClock          func() time.Time
 	tradeClock             func() time.Time
+	friendInviteClock      func() time.Time
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
@@ -262,6 +264,13 @@ func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable,
 // time.Now), so a scenario can let a request expire without waiting.
 func WithTradeClock(now func() time.Time) Option {
 	return func(o *options) { o.tradeClock = now }
+}
+
+// WithFriendInviteClock times friend invitations out against now (nil
+// means time.Now), so a scenario can let an invitation expire without
+// waiting.
+func WithFriendInviteClock(now func() time.Time) Option {
+	return func(o *options) { o.friendInviteClock = now }
 }
 
 // WithZones supplies the zone index wired into the link (default: none, so
@@ -693,6 +702,8 @@ type Server struct {
 	BuyListStock     *merchant.Stock
 	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	Relations        *relation.Manager         // friend and block lists the link was wired with
+	relationRows     *gamesql.RelationStore
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -1420,6 +1431,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
+	relationRows := gamesql.NewRelationStore(db)
+	loadedRelations, err := relationRows.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load character relations: %v", err)
+	}
+	relations := relation.NewManager(loadedRelations)
 	if o.seedShortcuts != nil {
 		o.seedShortcuts(shortcuts)
 	}
@@ -1633,6 +1650,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
+	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances
@@ -1808,6 +1826,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autoLoot:         o.autoLoot,
 		DB:               db,
 		Chars:            chars,
+		Relations:        relations,
+		relationRows:     relationRows,
 		Items:            items,
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,
@@ -1906,4 +1926,13 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 	go func() { _ = gsLink.Serve(ctx, ln) }()
 
 	return ln.Addr().String(), servers, sessions
+}
+
+// SaveRelations writes the friend and block lists to character_relations,
+// as the shutdown save does.
+func (s *Server) SaveRelations(tb testing.TB) {
+	tb.Helper()
+	if err := s.relationRows.Save(context.Background(), s.Relations.Rows()); err != nil {
+		tb.Fatalf("save character relations: %v", err)
+	}
 }

@@ -46,6 +46,7 @@ const (
 	gameServerStopTimeout = network.LivePlayerPersistWait + // listener: each connection's exit waits for its player's saves, in parallel
 		debugHTTPStopTimeout +
 		shutdownSaveTimeout + // spawn_data
+		shutdownSaveTimeout + // character_relations
 		simPoolStopTimeout +
 		task.ItemInstanceSaveTimeout + // item ticker finishing an in-flight save
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
@@ -184,8 +185,9 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideSkillPersistence,
 			providePlayerClock,
 			provideMerchant,
+			provideRelations,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startDebugHTTP, startGameServer),
 	}
 }

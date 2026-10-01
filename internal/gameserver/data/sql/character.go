@@ -237,7 +237,8 @@ func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAcc
 
 // Purge removes the character row for objectID together with every row it
 // owns - its items, shortcuts, hennas, recipe book, subclasses, skills,
-// skill-save state, pets, and item augmentations - as one transaction, so a failure or
+// skill-save state, pets, item augmentations, and the friend and block
+// relations naming it on either side - as one transaction, so a failure or
 // cancellation partway through leaves all of them in place instead of
 // orphaning owned rows behind a deleted character. Pets and augmentations are deleted
 // before items, since both key off the character's still-live item ids. It
@@ -288,6 +289,9 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_subclasses WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d subclasses: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_relations WHERE char_id = ? OR friend_id = ?", objectID, objectID); err != nil {
+		return false, fmt.Errorf("purge character %d relations: %w", objectID, err)
 	}
 
 	if err := tx.Commit(); err != nil {

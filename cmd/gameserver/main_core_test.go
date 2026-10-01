@@ -54,9 +54,10 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 			network.LivePlayerPersistWait, "",
 			"waits for the connection handlers; each exit waits at most LivePlayerPersistWait for its player's saves, in parallel, and cancelling closes the login link so its writes fail fast",
 		},
-		"startDebugHTTP":      {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
-		"startNpcPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
-		"startSimPool":        {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
+		"startDebugHTTP":           {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
+		"startNpcPersistence":      {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
+		"startRelationPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "character_relations save"},
+		"startSimPool":             {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
 		"startTicker": {
 			task.ItemInstanceSaveTimeout, "",
 			"StopAndWait waits for one in-flight tick; the item tick is the only one with database I/O, bounded by ItemInstanceSaveTimeout, and the rest are in-memory",

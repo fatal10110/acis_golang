@@ -113,6 +113,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x59: true, // destroy item
 		0x5c: true, // move in vehicle
 		0x5d: true, // cannot move in vehicle
+		0x5e: true, // friend invite
+		0x5f: true, // answer friend invite
+		0x60: true, // friend list
+		0x61: true, // friend delete
 		0x63: true, // request quest list
 		0x64: true, // abort quest
 		0x68: true, // request pledge crest
@@ -140,6 +144,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9d: true, // request skill reuse timers
 		0x9e: true, // package sendable item list
 		0x9f: true, // package send
+		0xa0: true, // block list commands
 		0xa7: true, // multisell exchange
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
@@ -160,6 +165,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
 		0xca: true, // game guard reply
+		0xcc: true, // friend message
 		0xcd: true, // show mini map
 		0xcf: true, // record info (view refresh)
 		0xd0: true, // extended packets

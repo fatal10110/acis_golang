@@ -1529,6 +1529,72 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestPackageSend(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestFriendInvite:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestFriendInvite)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleRequestFriendInvite(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAnswerFriendInvite:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAnswerFriendInvite)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleRequestAnswerFriendInvite(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestFriendList:
+			// The request carries no body.
+			if live != nil {
+				onLive(live, func() { l.handleRequestFriendList(live) })
+			}
+
+		case clientpackets.OpcodeRequestFriendDel:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestFriendDel)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleRequestFriendDel(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestBlock:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestBlock)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleRequestBlock(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestSendL2FriendSay:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSendL2FriendSay)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleRequestSendL2FriendSay(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestShowMiniMap:
 			// The request carries no body; with no player in the world
 			// nothing answers, as the specified handler does.

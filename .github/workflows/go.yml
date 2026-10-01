@@ -31,7 +31,7 @@ jobs:
             pool: ./tests/combat ./tests/items
           - name: rest
             pkgs: ""
-            pool: ./tests/character ./tests/lifecycle ./tests/trade
+            pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
     services:
       mariadb:
         image: mariadb:11
