@@ -32,6 +32,18 @@ func (c *Character) SetAutoSoulShot(itemID int32, enabled bool) {
 	delete(c.autoSoulShots, itemID)
 }
 
+// RemoveAutoSoulShot turns automatic use of itemID off and reports whether
+// it was on.
+func (c *Character) RemoveAutoSoulShot(itemID int32) bool {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if !c.autoSoulShots[itemID] {
+		return false
+	}
+	delete(c.autoSoulShots, itemID)
+	return true
+}
+
 // AutoSoulShotEnabled reports whether itemID is active for automatic shot use.
 func (c *Character) AutoSoulShotEnabled(itemID int32) bool {
 	c.stateMu.RLock()
