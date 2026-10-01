@@ -219,33 +219,13 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(check.Price)))
 	}
 	if inst.Equipped() {
-		l.disarmWeapon(live)
+		l.disarm(live, false)
 	}
 	inv.RemoveAugmentation(inst)
 	l.applyPersistActions(append(persist, invops.Update(inst)))
 	live.SendFrame(serverpackets.FrameExVariationCancelResult(1))
 	l.refreshItemShortcuts(live, inst.ObjectID)
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAugmentationRemovedFromS1, inst.TemplateID))
-}
-
-// disarmWeapon takes live's weapon off, naming it, and refreshes its
-// appearance for everyone around. It refuses, changing nothing, while a
-// cursed weapon is held; otherwise the attack in progress stops first.
-func (l *GameClientLink) disarmWeapon(live *livePlayer) {
-	if live.Character.CursedWeaponEquipped() {
-		return
-	}
-	if live.attack != nil {
-		live.attack.Stop()
-	}
-	if inv := live.Inventory(); inv != nil && l.inventory != nil {
-		if res, ok := l.inventory.UnequipBodySlot(inv, int32(item.SlotRHand)); ok && len(res.Changed) > 0 {
-			l.applyEquipStatChanges(live, inv, res)
-			removed := res.Changed[0].Snapshot()
-			sendUnequippedMessage(live, removed.TemplateID, removed.EnchantLevel)
-		}
-	}
-	l.broadcastCharacterInfo(live)
 }
 
 // refreshItemShortcuts resends every shortcut pointing at the item
