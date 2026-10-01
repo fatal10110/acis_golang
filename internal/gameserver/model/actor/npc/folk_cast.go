@@ -39,6 +39,11 @@ type FolkAI interface {
 // tick.
 const castDesireDecay = 66000
 
+// routeDesireWeight is the weight of a route walker's wish to walk its
+// route, which it holds for as long as it lives: only a heavier cast desire
+// takes it off the route.
+const routeDesireWeight = 1_000_000
+
 // folkCast is a civilian NPC's cast runtime: the controller its casts run
 // on and the desires its AI picks them from. The controller is set once
 // before the NPC is published; desires is safe for concurrent use; step
@@ -50,6 +55,9 @@ type folkCast struct {
 
 	desires *ai.DesireQueue
 	step    int
+	// offRoute marks a route walker its AI took off its route to act on a
+	// cast desire; it stays on the AI task until it is back on it.
+	offRoute bool
 
 	// currentMu guards current, the cast desire the AI last acted on (nil
 	// when none): a cast break from another actor's queue closes it.
@@ -111,6 +119,7 @@ func (f *Folk) AbortCast() {
 	f.queue.Post(func() {
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
+		f.cast.offRoute = false
 		if f.cast.ai != nil {
 			f.cast.ai.Remove(f)
 		}
@@ -122,24 +131,29 @@ func (f *Folk) Tick() {}
 
 // TickThink runs one AI tick on f's queue: invalid cast desires are
 // dropped, the heaviest one left is acted on unless a cast is in flight,
-// and every third tick the cast desires lose weight. An NPC with no desire
-// left leaves the AI task.
+// and every third tick the cast desires lose weight, an NPC still acting on
+// one switching to its run stance. An NPC with no desire left leaves the AI
+// task once back on its route.
 func (f *Folk) TickThink() error {
 	f.runAI()
 	f.cast.step++
 	if f.cast.step%3 == 0 {
 		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
+		if f.currentDesire() != nil {
+			f.forceRunStance()
+		}
 		f.cast.step = 0
 	}
-	if f.cast.desires.Len() == 0 && !f.CastingNow() && f.cast.ai != nil {
+	if f.cast.desires.Len() == 0 && !f.CastingNow() && !f.cast.offRoute && f.cast.ai != nil {
 		f.setCurrentDesire(nil)
 		f.cast.ai.Remove(f)
 	}
 	return nil
 }
 
-// runAI prunes f's cast desires and acts on the heaviest one when f is not
-// casting.
+// runAI prunes f's cast desires and, when f is not casting, acts on the
+// heaviest one; a route walker acts on it only when it outweighs the walk,
+// and otherwise goes back to its route.
 func (f *Folk) runAI() {
 	castAI := f.cast.castAI
 	if castAI == nil {
@@ -154,17 +168,50 @@ func (f *Folk) runAI() {
 	if f.denyAIAction() || f.CastingNow() {
 		return
 	}
+	f.cancelFollow()
 	desire, ok := f.cast.desires.Peek()
-	if !ok {
+	if !ok || (f.walksRoute() && desire.Weight <= routeDesireWeight) {
+		f.setCurrentDesire(nil)
+		f.backOnRoute()
 		return
 	}
+	f.leaveRoute()
 	f.setCurrentDesire(desire)
 	f.thinkCast(desire)
 }
 
-// thinkCast acts on a cast desire: f stays put while its target is out of
-// the skill's range, stops and faces its target for a cast long enough to
-// show, and when the final gates refuse turns toward its target instead.
+// walksRoute reports whether f walks a route.
+func (f *Folk) walksRoute() bool {
+	return f.motion != nil && f.motion.cfg.Route != nil
+}
+
+// leaveRoute takes a route walker off its route while it acts on a cast
+// desire.
+func (f *Folk) leaveRoute() {
+	if !f.walksRoute() {
+		return
+	}
+	f.cast.offRoute = true
+	f.motion.cfg.Route.LeaveRoute(f.motion.walker)
+}
+
+// backOnRoute sends a route walker its AI took off its route back to it,
+// from the route node nearest to where it stands.
+func (f *Folk) backOnRoute() {
+	if !f.cast.offRoute {
+		return
+	}
+	f.cast.offRoute = false
+	if err := f.motion.cfg.Route.ResumeRoute(f.motion.walker); err != nil {
+		f.motion.cfg.Log.Warn().Err(err).Msg("npc: folk route resume")
+	}
+}
+
+// thinkCast acts on a cast desire: f closes in on a target out of the
+// skill's range, or in range but out of its sight, in its run stance, and
+// waits for it where it cannot walk; in reach it stops and faces its target
+// for a cast long enough to show, and when the final gates refuse turns
+// toward its target instead.
 func (f *Folk) thinkCast(d *ai.Desire) {
 	castAI := f.cast.castAI
 	target, ref := d.FinalTarget, d.Skill
@@ -175,11 +222,10 @@ func (f *Folk) thinkCast(d *ai.Desire) {
 		return
 	}
 	castRange := castAI.Range(ref)
-	if f.outOfReach(target, castRange) {
-		// ponytail: a civilian NPC that can move closes in on its target
-		// before casting, and a route walker a cast stopped resumes its route
-		// afterwards (#3126). No cast reaches either until scripts cast
-		// through Folk (#166), so the NPC waits for its target here.
+	if f.waitsFor(target, castRange) {
+		// The stance switches first, so the walk toward target runs.
+		f.forceRunStance()
+		f.closeIn(target, castRange)
 		return
 	}
 	self := target.ObjectID() == f.ObjectID()
@@ -196,6 +242,35 @@ func (f *Folk) thinkCast(d *ai.Desire) {
 		return
 	}
 	castAI.Cast(target, ref)
+}
+
+// waitsFor reports whether f waits for target instead of casting at
+// castRange: target is out of reach, or in reach but out of sight of an f
+// free to walk to it.
+func (f *Folk) waitsFor(target attackable.Combatant, castRange int) bool {
+	if castRange < 0 {
+		return false
+	}
+	if f.outOfReach(target, castRange) {
+		return true
+	}
+	m := f.motion
+	return m != nil && !m.MovementDisabled() && m.IntentionMovesToTarget() && !f.canSee(target)
+}
+
+// closeIn has an f free to walk follow target, to castRange of it or, when
+// already in reach, to its body.
+func (f *Folk) closeIn(target attackable.Combatant, castRange int) {
+	if f.motion != nil {
+		_, _ = f.motion.ctl.MaybeStartOffensiveFollow(target, castRange)
+	}
+}
+
+// cancelFollow drops f's offensive follow, leaving a walk under way going.
+func (f *Folk) cancelFollow() {
+	if f.motion != nil {
+		f.motion.ctl.CancelFollow()
+	}
 }
 
 // denyAIAction reports a state in which the NPC's AI does nothing: a
@@ -239,6 +314,12 @@ func (f *Folk) broadcastMoveToPawn(target attackable.Combatant) {
 	tx, ty, tz := target.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
 	f.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
+}
+
+func (f *Folk) currentDesire() *ai.Desire {
+	f.cast.currentMu.Lock()
+	defer f.cast.currentMu.Unlock()
+	return f.cast.current
 }
 
 func (f *Folk) setCurrentDesire(d *ai.Desire) {

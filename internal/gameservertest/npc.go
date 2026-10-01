@@ -658,6 +658,9 @@ type RouteFolkSpawn struct {
 	// Path answers the route walker's reachability checks; nil for every
 	// node reachable.
 	Path task.WalkerPath
+	// Skills gives the NPC the production cast runtime over these
+	// definitions; nil leaves it without one.
+	Skills actorcast.Definitions
 }
 
 // SpawnRouteFolkNPC is SpawnRouteFolkNPCAt with the spawn heading, geodata
@@ -686,7 +689,9 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	}
 	inst.Home, inst.HasHome, inst.WalkMode = spec.At, true, spec.WalkMode
 	inst.SpawnHeading = spec.Heading
-	f, err := s.folkSpawner(walker, geo).Spawn(inst, spec.At, spec.Heading)
+	spawner := s.folkSpawner(walker, geo)
+	spawner.Skills = spec.Skills
+	f, err := spawner.Spawn(inst, spec.At, spec.Heading)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -37,8 +39,18 @@ type FolkMovement struct {
 	// Control receives event.Arrived, on Queue, each time a walk reaches
 	// its destination, after the NPC's position settles there.
 	Control event.Sink
+	// Route is the route walk the NPC steps off while it acts on a cast
+	// desire, and back onto once none outweighs the walk; nil for none.
+	Route FolkRoute
 	// Log reports a failed-pathfinding streak that overflows.
 	Log zerolog.Logger
+}
+
+// FolkRoute is the route walk task a walking civilian NPC is registered
+// with (see task.Walker).
+type FolkRoute interface {
+	LeaveRoute(task.WalkerActor)
+	ResumeRoute(task.WalkerActor) error
 }
 
 // folkMotion is a walking civilian NPC's movement: the moving actor its
@@ -141,8 +153,24 @@ func (m *folkMotion) BroadcastMove(ev event.Move) { m.emit(ev) }
 // BroadcastStop shows observers a stop in place.
 func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }
 
-// OwnsOffensiveFollowTicker reports false: the NPC never follows a target.
+// OwnsOffensiveFollowTicker reports false: the controller rechecks the
+// offensive follow a cast desire starts.
 func (m *folkMotion) OwnsOffensiveFollowTicker() bool { return false }
+
+// OffensiveFollowLead reports true: as any NPC, the NPC reaches fifty
+// further for a target on the move.
+func (*folkMotion) OffensiveFollowLead() bool { return true }
+
+// IntentionMovesToTarget reports whether the cast desire the NPC's AI acts
+// on lets it walk to its target.
+func (m *folkMotion) IntentionMovesToTarget() bool {
+	m.cast.currentMu.Lock()
+	defer m.cast.currentMu.Unlock()
+	return m.cast.current != nil && m.cast.current.MoveToTarget
+}
+
+// CanSee reports whether the NPC has line of sight to target.
+func (m *folkMotion) CanSee(target attackable.Combatant) bool { return m.canSee(target) }
 
 // MovementDisabled reports a template that cannot move, a dead NPC or a
 // teleport under way; nothing else immobilizes a civilian NPC.
