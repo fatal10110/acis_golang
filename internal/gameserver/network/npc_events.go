@@ -131,10 +131,16 @@ func (s *hostileSink) stopAttackStance() {
 	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(s.h.ObjectID()) })
 }
 
-// broadcast fans one lazily built frame out over a detached snapshot of the
-// NPC's known list, so no region lock is held while frames are sent.
+// broadcast fans one lazily built frame out to the NPC's observers.
 func (s *hostileSink) broadcast(build func() wire.Frame) {
-	known := s.known.SnapshotCopy(s.world, s.h)
+	broadcastKnown(&s.known, s.world, s.h, build)
+}
+
+// broadcastKnown fans one lazily built frame out over a detached snapshot of
+// t's known list, taken through buf, so no region lock is held while frames
+// are sent.
+func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked, build func() wire.Frame) {
+	known := buf.SnapshotCopy(state, t)
 	defer known.Release()
 	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, o := range known.Tracked() {

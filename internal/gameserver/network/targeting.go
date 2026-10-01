@@ -485,9 +485,10 @@ func (l *GameClientLink) finishDeferredInteract(live *livePlayer) bool {
 // and locks further input. A player that cannot act, sits, flies, runs a
 // private store or trades gets nothing more. Out of approach range, a
 // movable player walks toward the target unless shift is held. In range,
-// the player still inside interaction distance faces the target and acts
-// on it. Every outcome but the approach walk, or a player that cannot move
-// holding the interact, ends it idle.
+// the player still inside interaction distance acts on the target: it
+// faces a standing target, and stops in place (StopMove) without turning
+// for a walking NPC. Every outcome but the approach walk, or a player that
+// cannot move holding the interact, ends it idle.
 func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {
@@ -514,13 +515,17 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 		endInteractIdle(live)
 		return
 	}
-	// A moving NPC target is answered StopMove instead; no interact target
-	// moves yet.
-	at := live.CurrentLocation()
-	live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID(), interactionDistance, at)
-	})
+	// A walking NPC is answered with the player's StopMove, without turning
+	// toward it; any other target is faced with MoveToPawn.
+	if f, ok := target.(*npc.Folk); ok && f.IsMoving() {
+		live.BroadcastStop()
+	} else {
+		at := live.CurrentLocation()
+		live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID(), interactionDistance, at)
+		})
+	}
 	l.onInteract(live, target)
 	endInteractIdle(live)
 }

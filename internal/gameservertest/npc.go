@@ -3,6 +3,7 @@ package gameservertest
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
@@ -15,8 +16,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // hostileNPCSpawn is the fixed spawn point every fixture NPC uses: inside
@@ -543,4 +546,77 @@ func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Lo
 	}
 	s.State.Spawn(f, at.X, at.Y, at.Z, 0)
 	return f
+}
+
+// SpawnRouteFolkNPCAt places a civilian NPC built from tmpl at at through
+// the production civilian spawner, with routes as the walker route data, and
+// returns it with the route walker task it walks under. A template whose
+// alias names a route in routes walks it from the moment it spawns,
+// shown to its observers. walkMode puts it in walk stance, as the spawner
+// does for the reference's walking ids.
+func (s *Server) SpawnRouteFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location, routes route.WalkerRoutes, walkMode bool) (*npc.Folk, *task.Walker) {
+	t.Helper()
+	return s.SpawnRouteFolkNPC(t, RouteFolkSpawn{Template: tmpl, At: at, Routes: routes, WalkMode: walkMode})
+}
+
+// RouteFolkSpawn describes a civilian NPC SpawnRouteFolkNPC places.
+type RouteFolkSpawn struct {
+	Template *npc.Template
+	At       location.Location
+	// Heading is the spawn heading, faced again on arriving back at At.
+	Heading int
+	// Routes is the walker route data.
+	Routes route.WalkerRoutes
+	// WalkMode puts the NPC in walk stance.
+	WalkMode bool
+	// Geo is the geodata the NPC walks and teleports on; nil for the
+	// always-passable Geo.
+	Geo move.Geo
+	// Path answers the route walker's reachability checks; nil for every
+	// node reachable.
+	Path task.WalkerPath
+}
+
+// SpawnRouteFolkNPC is SpawnRouteFolkNPCAt with the spawn heading, geodata
+// and route reachability spec gives.
+func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk, *task.Walker) {
+	t.Helper()
+	now := time.Now
+	if s.queues.inline != nil {
+		now = s.queues.inline.Now
+	}
+	geo := spec.Geo
+	if geo == nil {
+		geo = Geo{}
+	}
+	path := spec.Path
+	if path == nil {
+		path = task.GeoPath{Geo: Geo{}}
+	}
+	walker, err := task.NewWalker(spec.Routes, path, now, s.State)
+	if err != nil {
+		t.Fatalf("new walker: %v", err)
+	}
+	inst, err := npc.NewInstance(s.NewObjectID(), spec.Template)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	inst.Home, inst.HasHome, inst.WalkMode = spec.At, true, spec.WalkMode
+	inst.SpawnHeading = spec.Heading
+	spawner := gamemanager.FolkSpawner{
+		State:               s.State,
+		Walker:              walker,
+		Geo:                 geo,
+		Positions:           s.positions,
+		Queues:              s.queues,
+		NewSink:             network.FolkSinks(s.State),
+		Zones:               s.zones,
+		MaxGeoPathFailCount: s.maxGeoPathFail,
+		Log:                 s.log,
+	}
+	f, err := spawner.Spawn(inst, spec.At, spec.Heading)
+	if err != nil {
+		t.Fatalf("spawn folk npc: %v", err)
+	}
+	return f, walker
 }

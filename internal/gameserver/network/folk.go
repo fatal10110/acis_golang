@@ -4,7 +4,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -43,6 +45,45 @@ func (l *GameClientLink) broadcastFolkFrame(f *npc.Folk, build func() wire.Frame
 			}
 		})
 	})
+}
+
+// FolkSinks returns the event-sink factory for route-walking civilian NPCs
+// spawned into state.
+func FolkSinks(state *world.State) func(*npc.Folk) event.Sink {
+	return func(f *npc.Folk) event.Sink { return &folkSink{world: state, f: f} }
+}
+
+// folkSink maps one walking civilian NPC's events to packets for its
+// observers.
+type folkSink struct {
+	world *world.State
+	f     *npc.Folk
+	known world.KnownBuffer
+}
+
+// Emit maps ev to the frame every known observer receives.
+func (s *folkSink) Emit(ev event.Event) {
+	f := s.f
+	frames := serverpackets.NpcFrameBuilder{}
+	switch e := ev.(type) {
+	case event.Move:
+		s.broadcast(func() wire.Frame { return frames.Move(f.ObjectID(), e) })
+	case event.Stopped:
+		x, y, z := f.Position()
+		at := location.Location{X: x, Y: y, Z: z}
+		s.broadcast(func() wire.Frame { return frames.Stop(f.ObjectID(), at, f.Heading()) })
+	case event.Teleported:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(f.ObjectID(), e.To, false) })
+	case event.SocialAction:
+		s.broadcast(func() wire.Frame { return frames.SocialAction(f.ObjectID(), e.ID) })
+	case event.NpcSay:
+		s.broadcast(func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text) })
+	}
+}
+
+// broadcast fans one lazily built frame out to the NPC's observers.
+func (s *folkSink) broadcast(build func() wire.Frame) {
+	broadcastKnown(&s.known, s.world, s.f, build)
 }
 
 // chatRules are the karma gates on service NPC dialogs.

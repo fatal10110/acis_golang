@@ -161,13 +161,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	}
 	live.SetQueue(queue)
 	if zones != nil {
-		live.Move().SetWaterSurface(func(position location.Location, groundZ int) (int, bool) {
-			water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
-			if !ok || groundZ-water.WaterLevel() >= -20 {
-				return 0, false
-			}
-			return water.WaterLevel(), true
-		})
+		live.Move().SetWaterSurface(waterSurface(zones))
 	}
 
 	locRef := &locatedRef{}

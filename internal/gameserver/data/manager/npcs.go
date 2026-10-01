@@ -58,9 +58,10 @@ type KillRewardConfig struct {
 //
 // A combat-capable entry becomes a npc.Hostile with an AI loop, decay and
 // respawn. A civilian service NPC (a shop, trainer, gatekeeper, village
-// master and the like) becomes a npc.Folk that stands at its spawn point
-// for players to talk to. Any other non-combat instance type (castle
-// artifacts, siege flags, towers) is counted and skipped.
+// master and the like) becomes a npc.Folk for players to talk to: it
+// stands at its spawn point, or walks its route when its template alias
+// names one in the walker route data. Any other non-combat instance type
+// (castle artifacts, siege flags, towers) is counted and skipped.
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {
@@ -86,6 +87,8 @@ type Npcs struct {
 	// newSink builds the event sink each spawned NPC reports through; nil
 	// leaves spawned NPCs silent.
 	newSink func(*npc.Hostile) event.Sink
+	// folk places civilian NPCs, walking the route walkers.
+	folk    FolkSpawner
 	rewards KillRewardConfig
 	spawns  *Spawns
 	now     func() time.Time
@@ -123,7 +126,7 @@ type Npcs struct {
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
 func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, 20, 30, 0, npc.DefaultRaidMultipliers(), effects, queues, zoneIndexes...)
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), effects, queues, zoneIndexes...)
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.
@@ -133,12 +136,13 @@ type Queues interface {
 
 // NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot
 // base, RandomWalkRate and raid base multipliers, each running its work on a
-// queue from queues.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, effects, queues, zoneIndexes...)
+// queue from queues. newFolkSink builds the sink a route-walking civilian NPC
+// shows its movement through.
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, effects, queues, zoneIndexes...)
 }
 
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -225,6 +229,18 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		castEffects:         castEffects,
 		slot:                make(map[string]slotInfo),
 		live:                make(map[int32]string),
+	}
+	n.folk = FolkSpawner{
+		State:               state,
+		Walker:              walker,
+		Geo:                 geo,
+		Positions:           positions,
+		Queues:              queues,
+		NewSink:             newFolkSink,
+		Zones:               zones,
+		Skills:              castDefs,
+		MaxGeoPathFailCount: maxGeoPathFailCount,
+		Log:                 log,
 	}
 
 	for _, maker := range spawns.Table().Makers() {

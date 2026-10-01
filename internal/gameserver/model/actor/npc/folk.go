@@ -77,15 +77,20 @@ const magicAttackSpeedBase = 333
 // socialInterval is the least time between two talk animations of one NPC.
 const socialInterval = 12 * time.Second
 
-// Folk is a live civilian NPC. It stands where it spawned, is shown to
-// nearby players, can be selected, and answers a player's interact with
-// its chat window. It takes no part in combat: nothing damages it, it
-// holds no effects, and it never casts, so its stats are fixed at spawn.
+// Folk is a live civilian NPC. It stands where it spawned, or walks its
+// route when given movement (EnableMovement), is shown to nearby players,
+// can be selected, and answers a player's interact with its chat window. It
+// takes no part in combat: nothing damages it, it holds no effects, and it
+// never casts, so its stats are fixed at spawn.
 type Folk struct {
 	world.Presence
 	Instance *Instance
 	fixedStats
 	inPeace bool
+
+	// motion is the movement of a route walker; nil for a standing NPC.
+	// EnableMovement sets it before the NPC is published.
+	motion *folkMotion
 
 	// lastSocial is the Unix millisecond time of the last talk animation.
 	lastSocial atomic.Int64
@@ -96,6 +101,8 @@ type Folk struct {
 type fixedStats struct {
 	maxHP, pAtkSpd, mAtkSpd          int
 	moveMultiplier, atkSpdMultiplier float64
+	// moveSpeed is the speed the NPC walks or runs at, by its stance.
+	moveSpeed float64
 }
 
 // settleFixedStats finalizes inst's stats through the builtin stat funcs
@@ -134,6 +141,7 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 	if base != 0 {
 		speed := float32(calc(stat.RunSpeed, float64(base)))
 		fs.moveMultiplier = float64(speed / float32(base))
+		fs.moveSpeed = float64(speed)
 	}
 	return fs, nil
 }

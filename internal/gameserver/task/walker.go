@@ -147,6 +147,13 @@ func (w *Walker) StartRoute(actor WalkerActor, routeName, npcName string) error 
 	return w.moveToNextPoint(entry)
 }
 
+// HasRoute reports whether routeName holds nodes for npcName, the route
+// StartRoute would walk.
+func (w *Walker) HasRoute(routeName, npcName string) bool {
+	_, err := w.nodes(routeName, npcName)
+	return err == nil
+}
+
 // StopRoute removes actor from route walking.
 func (w *Walker) StopRoute(actor WalkerActor) {
 	if actor == nil {
