@@ -1,11 +1,18 @@
 package player
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
 )
 
 // ---- from character_mount_test.go ----
@@ -41,12 +48,45 @@ func TestCharacterSpawnProtectionMakesItInvulnerable(t *testing.T) {
 	}
 }
 
-// TestCharacterStopFakeDeathBroadcastsAfterDeath pins the get-up on a dead
-// character: the get-up and revive visuals still go out, once each, and it
-// takes the standing posture with no stand-up transition.
-func TestCharacterStopFakeDeathBroadcastsAfterDeath(t *testing.T) {
-	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+// Reference fake-death timeline (Player.startFakeDeath and
+// Player.stopFakeDeath, Player.java:7017-7056): the lie-down task sets
+// _isSitting after (int)(3000 / mult) ms and the get-up task clears
+// _isStandingNow and _isFakeDeath after (int)(2500 / mult) ms, dead or
+// alive. Neither task is ever cancelled, and stopFakeDeath does not touch
+// the lie-down's, so a get-up during the lie-down still ends seated and a
+// second stopFakeDeath does not move the first get-up's end.
+
+// fakeDeathTimingCharacter is a character whose run speed makes the
+// movement speed multiplier its DEX bonus, on a queue whose clock the test
+// advances. It returns the clock and the reference lie-down and get-up
+// lengths, (int)(3000 / mult) and (int)(2500 / mult) ms.
+func fakeDeathTimingCharacter(t *testing.T) (c *Character, clock *sim.Inline, lieDown, getUp time.Duration) {
+	t.Helper()
+	tmpl := combatTemplate()
+	tmpl.RunSpeed, tmpl.WalkSpeed = 120, 80
+	c = liveCharacter(1, tmpl, combatItems())
+	live, err := creature.NewLive(location.Location{}, 0, permissiveGeo{}, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock = sim.NewInline(time.Unix(0, 0))
+	live.SetQueue(clock.NewQueue("test"))
+	c.Live = live
+	mult := float32(statbonus.DEXBonus[tmpl.DEX])
+	if mult == 1 {
+		t.Fatalf("DEX %d gives multiplier 1; the lengths would not tell the multiplier apart", tmpl.DEX)
+	}
+	return c, clock, time.Duration(int32(3000/mult)) * time.Millisecond, time.Duration(int32(2500/mult)) * time.Millisecond
+}
+
+// TestStopFakeDeathOnCorpseHoldsFakeDeathForGetUp pins the get-up on a dead
+// character: the get-up and revive visuals go out once each, it takes the
+// standing posture and gets up, and it plays dead until the get-up ends,
+// through a revive in between.
+func TestStopFakeDeathOnCorpseHoldsFakeDeathForGetUp(t *testing.T) {
+	c, clock, lieDown, getUp := fakeDeathTimingCharacter(t)
 	c.StartFakeDeath()
+	clock.Advance(lieDown)
 	rec := recordEvents(c)
 	if !c.MarkDead() {
 		t.Fatal("MarkDead() = false, want true")
@@ -61,9 +101,213 @@ func TestCharacterStopFakeDeathBroadcastsAfterDeath(t *testing.T) {
 	if got := event.Of[event.StanceChanged](rec)[0]; got.Stance != event.StanceFakeDeathStop {
 		t.Fatalf("stance = %v, want StanceFakeDeathStop", got.Stance)
 	}
-	if !c.Standing() || c.StandingNow() || c.FakeDead() {
-		t.Fatalf("dead get-up Standing=%v StandingNow=%v FakeDead=%v, want standing at once, not faking",
+	if !c.Standing() || !c.StandingNow() || !c.FakeDead() {
+		t.Fatalf("dead get-up Standing=%v StandingNow=%v FakeDead=%v, want standing, getting up, playing dead",
 			c.Standing(), c.StandingNow(), c.FakeDead())
+	}
+
+	if !c.Revive() {
+		t.Fatal("Revive() = false, want true")
+	}
+	clock.Advance(getUp - time.Millisecond)
+	if !c.FakeDead() || !c.AlikeDead() {
+		t.Fatalf("1ms before the get-up ends FakeDead=%v AlikeDead=%v, want both true", c.FakeDead(), c.AlikeDead())
+	}
+	clock.Advance(time.Millisecond)
+	if c.FakeDead() || c.AlikeDead() || c.StandingNow() || !c.Standing() {
+		t.Fatalf("after the get-up FakeDead=%v AlikeDead=%v StandingNow=%v Standing=%v, want up and not playing dead",
+			c.FakeDead(), c.AlikeDead(), c.StandingNow(), c.Standing())
+	}
+	if got := event.Count[event.PostureSettled](rec); got != 1 {
+		t.Fatalf("PostureSettled events = %d, want 1 at the get-up's end", got)
+	}
+}
+
+// TestStopFakeDeathWithoutLiveRuntimeEndsFakeDeath pins a character with no
+// live runtime: it has no queue to end a get-up on, so it leaves fake death
+// at once.
+func TestStopFakeDeathWithoutLiveRuntimeEndsFakeDeath(t *testing.T) {
+	c := liveCharacter(1, combatTemplate(), combatItems())
+	c.Live = nil
+	c.StartFakeDeath()
+	if !c.FakeDead() {
+		t.Fatal("FakeDead() = false after StartFakeDeath")
+	}
+	c.StopFakeDeath()
+	if c.FakeDead() {
+		t.Fatal("FakeDead() = true after StopFakeDeath with no live runtime")
+	}
+}
+
+// TestRepeatedGetUpKeepsFirstEnd pins a repeated get-up request: it
+// re-sends the get-up and revive visuals and restarts the grace, and the
+// first get-up still ends fake death on time, dead or alive. The repeat's
+// own get-up ends later on its own.
+func TestRepeatedGetUpKeepsFirstEnd(t *testing.T) {
+	for _, dead := range []bool{false, true} {
+		t.Run(fmt.Sprintf("dead=%v", dead), func(t *testing.T) {
+			c, clock, lieDown, getUp := fakeDeathTimingCharacter(t)
+			c.StartFakeDeath()
+			clock.Advance(lieDown)
+			c.StopFakeDeath()
+			if dead && !c.MarkDead() {
+				t.Fatal("MarkDead() = false, want true")
+			}
+			clock.Advance(getUp / 2)
+			c.stateMu.Lock()
+			c.recentFakeDeathUntil = time.Time{}
+			c.stateMu.Unlock()
+			rec := recordEvents(c)
+
+			c.GetUpFromFakeDeath()
+			if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 1 || revives != 1 {
+				t.Fatalf("repeated get-up broadcasts = stances:%d revives:%d, want one each", stances, revives)
+			}
+			if !c.RecentFakeDeath() {
+				t.Fatal("RecentFakeDeath() = false after a repeated get-up request")
+			}
+			clock.Advance(getUp - getUp/2 - time.Millisecond)
+			if !c.FakeDead() {
+				t.Fatal("FakeDead() = false 1ms before the first get-up ends")
+			}
+			clock.Advance(time.Millisecond)
+			if c.FakeDead() || c.StandingNow() {
+				t.Fatalf("at the first get-up's end FakeDead=%v StandingNow=%v, want the repeat not to move it", c.FakeDead(), c.StandingNow())
+			}
+			if got := event.Count[event.PostureSettled](rec); got != 1 {
+				t.Fatalf("PostureSettled events at the first get-up's end = %d, want 1", got)
+			}
+			clock.Advance(getUp / 2)
+			if got := event.Count[event.PostureSettled](rec); got != 2 {
+				t.Fatalf("PostureSettled events after the repeat's get-up = %d, want 2", got)
+			}
+		})
+	}
+}
+
+// TestLaterGetUpEndsFakeDeathBegunMeanwhile pins the repeat's own get-up:
+// a Fake Death cast again after the first get-up ended has its fake death
+// ended by it, while the new lie-down and the effect go on
+// (Player.isFakeDeath is the flag alone, Player.java:2141-2144).
+func TestLaterGetUpEndsFakeDeathBegunMeanwhile(t *testing.T) {
+	c, clock, lieDown, getUp := fakeDeathTimingCharacter(t)
+	c.StartFakeDeath()
+	clock.Advance(lieDown)
+	c.StopFakeDeath()
+	clock.Advance(getUp / 2)
+	c.GetUpFromFakeDeath()
+	clock.Advance(getUp - getUp/2)
+	if c.FakeDead() {
+		t.Fatal("FakeDead() = true after the first get-up ended")
+	}
+
+	e, err := effect.New(effect.Skill{ID: 60}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Effected = c
+	c.EffectList().Add(e)
+	clock.Advance(0)
+	if !c.FakeDead() || !c.SittingNow() {
+		t.Fatalf("Fake Death cast again FakeDead=%v SittingNow=%v, want lying down", c.FakeDead(), c.SittingNow())
+	}
+	clock.Advance(getUp / 2)
+	if !c.EffectList().IsAffected(effect.FlagFakeDeath) {
+		t.Fatal("the repeat's get-up ended the Fake Death effect")
+	}
+	if c.FakeDead() || c.AlikeDead() {
+		t.Fatalf("after the repeat's get-up FakeDead=%v AlikeDead=%v with the effect on, want both false", c.FakeDead(), c.AlikeDead())
+	}
+	if !c.SittingNow() {
+		t.Fatal("the repeat's get-up ended the new lie-down")
+	}
+}
+
+// TestShorterLaterGetUpEndsFakeDeathFirst pins two get-ups of different
+// lengths: a later get-up made shorter by a higher movement speed
+// multiplier ends fake death before the first one would.
+func TestShorterLaterGetUpEndsFakeDeathFirst(t *testing.T) {
+	c, clock, lieDown, getUp := fakeDeathTimingCharacter(t)
+	c.StartFakeDeath()
+	clock.Advance(lieDown)
+	c.armorGradePenalty = 2
+	c.StopFakeDeath()
+	c.armorGradePenalty = 0
+	clock.Advance(time.Millisecond)
+	c.GetUpFromFakeDeath()
+
+	clock.Advance(getUp - time.Millisecond)
+	if !c.FakeDead() {
+		t.Fatal("FakeDead() = false 1ms before the shorter get-up ends")
+	}
+	clock.Advance(time.Millisecond)
+	if c.FakeDead() {
+		t.Fatal("FakeDead() = true at the shorter get-up's end, want it to end fake death before the longer one")
+	}
+}
+
+// TestFakeDeadFollowsFakeDeathNotItsEffect pins isFakeDeath() to the
+// player's own flag (Player.isFakeDeath, Player.java:2141-2144): the Fake
+// Death effect's start sets it, and it holds after the effect ends until
+// the get-up does. Being alike dead, the player cannot attack
+// (Creature.isAttackingDisabled, Creature.java:628-631).
+func TestFakeDeadFollowsFakeDeathNotItsEffect(t *testing.T) {
+	c, clock, _, getUp := fakeDeathTimingCharacter(t)
+	e, err := effect.New(effect.Skill{ID: 60}, modelskill.EffectTemplate{Name: "FakeDeath"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.Effected = c
+	c.EffectList().Add(e)
+	clock.Advance(0)
+	if !c.FakeDead() || !c.AlikeDead() || !c.AttackDisabled() {
+		t.Fatalf("with Fake Death on FakeDead=%v AlikeDead=%v AttackDisabled=%v, want all true", c.FakeDead(), c.AlikeDead(), c.AttackDisabled())
+	}
+
+	c.EffectList().Remove(e)
+	clock.Advance(0)
+	if !c.FakeDead() || !c.AlikeDead() || !c.AttackDisabled() {
+		t.Fatalf("during the get-up FakeDead=%v AlikeDead=%v AttackDisabled=%v, want all true", c.FakeDead(), c.AlikeDead(), c.AttackDisabled())
+	}
+	clock.Advance(getUp)
+	if c.FakeDead() || c.AlikeDead() || c.AttackDisabled() {
+		t.Fatalf("after the get-up FakeDead=%v AlikeDead=%v AttackDisabled=%v, want all false", c.FakeDead(), c.AlikeDead(), c.AttackDisabled())
+	}
+}
+
+// TestStopFakeDeathDuringLieDownEndsSeated pins a get-up during the
+// lie-down: the lie-down runs on beside it and seats the character when it
+// ends, whichever ends first; the get-up still ends fake death.
+func TestStopFakeDeathDuringLieDownEndsSeated(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// stopAfter is how far into the lie-down the get-up starts.
+		stopAfter func(lieDown, getUp time.Duration) time.Duration
+	}{
+		{"get-up ends first", func(time.Duration, time.Duration) time.Duration { return 0 }},
+		{"lie-down ends first", func(lieDown, _ time.Duration) time.Duration { return lieDown - time.Millisecond }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, clock, lieDown, getUp := fakeDeathTimingCharacter(t)
+			c.StartFakeDeath()
+			stopAt := tc.stopAfter(lieDown, getUp)
+			clock.Advance(stopAt)
+			rec := recordEvents(c)
+			c.StopFakeDeath()
+			if !c.Standing() || !c.SittingNow() || !c.StandingNow() {
+				t.Fatalf("get-up during the lie-down Standing=%v SittingNow=%v StandingNow=%v, want standing with both under way",
+					c.Standing(), c.SittingNow(), c.StandingNow())
+			}
+
+			clock.Advance(max(lieDown, stopAt+getUp))
+			if c.Standing() || !c.Seated() || c.FakeDead() || c.SittingNow() || c.StandingNow() {
+				t.Fatalf("after both ended Standing=%v Seated=%v FakeDead=%v SittingNow=%v StandingNow=%v, want seated, not playing dead",
+					c.Standing(), c.Seated(), c.FakeDead(), c.SittingNow(), c.StandingNow())
+			}
+			if got := event.Count[event.PostureSettled](rec); got != 2 {
+				t.Fatalf("PostureSettled events = %d, want 2 (lie-down and get-up)", got)
+			}
+		})
 	}
 }
 
@@ -95,99 +339,6 @@ func TestDieDuringFakeDeathGetUpGetsUpAgain(t *testing.T) {
 	}
 	if revives := event.Count[event.FakeDeathRevived](rec); stops != 1 || revives != 1 {
 		t.Fatalf("death during the get-up sent stops:%d revives:%d, want one each", stops, revives)
-	}
-}
-
-// TestStopFakeDeathWithoutGetUpEndsFakeDeath pins the two StopFakeDeath
-// branches that schedule no get-up and so must end fake death themselves: a
-// character killed while playing dead, which must not stay fake-dead after
-// a revive, and a character with no live runtime.
-func TestStopFakeDeathWithoutGetUpEndsFakeDeath(t *testing.T) {
-	t.Run("dead", func(t *testing.T) {
-		c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
-		c.StartFakeDeath()
-		if !c.FakeDead() {
-			t.Fatal("FakeDead() = false after StartFakeDeath")
-		}
-		if !c.MarkDead() {
-			t.Fatal("MarkDead() = false, want true")
-		}
-		c.StopFakeDeath()
-		if c.FakeDead() {
-			t.Fatal("FakeDead() = true after a dead character left fake death")
-		}
-		if !c.Revive() {
-			t.Fatal("Revive() = false, want true")
-		}
-		if c.FakeDead() || c.AlikeDead() {
-			t.Fatalf("revived character FakeDead=%v AlikeDead=%v, want both false", c.FakeDead(), c.AlikeDead())
-		}
-	})
-	t.Run("no live runtime", func(t *testing.T) {
-		c := liveCharacter(1, combatTemplate(), combatItems())
-		c.Live = nil
-		c.StartFakeDeath()
-		if !c.FakeDead() {
-			t.Fatal("FakeDead() = false after StartFakeDeath")
-		}
-		c.StopFakeDeath()
-		if c.FakeDead() {
-			t.Fatal("FakeDead() = true after StopFakeDeath with no live runtime")
-		}
-	})
-}
-
-// TestRepeatFakeDeathStopOnlyDuringGetUp pins a repeated get-up request
-// (Player.stopFakeDeath during its own get-up): it re-sends the get-up and
-// revive visuals and restarts the grace, and leaves the running get-up to
-// end fake death. Outside the get-up, or once dead, it does nothing.
-func TestRepeatFakeDeathStopOnlyDuringGetUp(t *testing.T) {
-	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
-	rec := recordEvents(c)
-	c.StartFakeDeath()
-	if c.RepeatFakeDeathStop() {
-		t.Fatal("RepeatFakeDeathStop() = true while lying down")
-	}
-	c.StopFakeDeath()
-	c.recentFakeDeathUntil = time.Time{}
-	stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec)
-	c.stateMu.RLock()
-	gen := c.postureGen
-	c.stateMu.RUnlock()
-
-	if !c.RepeatFakeDeathStop() {
-		t.Fatal("RepeatFakeDeathStop() = false during the get-up")
-	}
-	if got, want := event.Count[event.StanceChanged](rec), stances+1; got != want {
-		t.Fatalf("stance broadcasts = %d, want %d", got, want)
-	}
-	if got, want := event.Count[event.FakeDeathRevived](rec), revives+1; got != want {
-		t.Fatalf("revive broadcasts = %d, want %d", got, want)
-	}
-	if !c.RecentFakeDeath() {
-		t.Fatal("RecentFakeDeath() = false after a repeated get-up request")
-	}
-	c.stateMu.RLock()
-	sameGetUp := c.postureGen == gen && c.standingNow
-	c.stateMu.RUnlock()
-	if !sameGetUp || !c.FakeDead() {
-		t.Fatalf("repeated get-up request replaced the get-up (same=%v FakeDead=%v)", sameGetUp, c.FakeDead())
-	}
-
-	c.settlePosture(gen, true)
-	if c.FakeDead() {
-		t.Fatal("FakeDead() = true after the original get-up ended")
-	}
-	if c.RepeatFakeDeathStop() {
-		t.Fatal("RepeatFakeDeathStop() = true after the get-up ended")
-	}
-
-	d := attachIdleLive(t, liveCharacter(2, combatTemplate(), combatItems()))
-	d.StartFakeDeath()
-	d.StopFakeDeath()
-	d.MarkDead()
-	if d.RepeatFakeDeathStop() {
-		t.Fatal("RepeatFakeDeathStop() = true on a dead character")
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -41,7 +40,7 @@ func (l *GameClientLink) storeActionUse(live *livePlayer, actionID int32) bool {
 	default:
 		return false
 	}
-	if live.Dead() || live.EffectList().IsAffected(effect.FlagFakeDeath) || liveOutOfControl(live) {
+	if live.Dead() || live.FakeDead() || liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return true
 	}

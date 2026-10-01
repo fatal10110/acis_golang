@@ -119,12 +119,14 @@ func onlineVictim(t *testing.T, srv *gameservertest.Server, id int32) *player.Ch
 }
 
 // assertDeathFrames checks the victim's own client and the observer saw
-// want, and that the victim ends standing and no longer playing dead.
+// want, and that the victim is dead, standing, and still playing dead: the
+// death's get-up holds fake death until it ends (Player.stopFakeDeath,
+// Player.java:7035-7056).
 func assertDeathFrames(t *testing.T, self, observer *scriptedClient, victim *player.Character, want []fakeDeathFrame) {
 	t.Helper()
 	assertFramesOnly(t, self, observer, victim.ObjectID(), want)
-	if !victim.Dead() || !victim.Standing() || victim.FakeDead() {
-		t.Fatalf("victim Dead=%v Standing=%v FakeDead=%v, want dead, standing, not playing dead",
+	if !victim.Dead() || !victim.Standing() || !victim.FakeDead() {
+		t.Fatalf("victim Dead=%v Standing=%v FakeDead=%v, want dead, standing, still playing dead",
 			victim.Dead(), victim.Standing(), victim.FakeDead())
 	}
 }
@@ -207,7 +209,8 @@ func TestLethalHitWhilePlayingDeadSendsGetUps(t *testing.T) {
 
 // TestKillDuringLieDownLeavesSeatedCorpse kills a player still lying down
 // into fake death: the get-ups go out and the corpse takes the standing
-// posture, but the lie-down runs on and seats it when it ends.
+// posture, but the lie-down runs on beside the death's get-up and seats it
+// when it ends; the get-up's end ends fake death.
 func TestKillDuringLieDownLeavesSeatedCorpse(t *testing.T) {
 	t.Parallel()
 	srv, c, vc, attacker, iv := bootPvPPair(t)
@@ -225,7 +228,7 @@ func TestKillDuringLieDownLeavesSeatedCorpse(t *testing.T) {
 		}
 	})
 	assertDeathFrames(t, vc, c, victim, []fakeDeathFrame{frameStopFake, frameRevive, frameDie, frameStopFake, frameRevive})
-	srv.AdvanceUntil(t, "lie-down ended", func() bool { return !victim.SittingNow() })
+	srv.AdvanceUntil(t, "lie-down and get-up ended", func() bool { return !victim.SittingNow() && !victim.StandingNow() })
 	if victim.Standing() || !victim.Seated() || victim.FakeDead() {
 		t.Fatalf("corpse after the lie-down Standing=%v Seated=%v FakeDead=%v, want seated, not playing dead",
 			victim.Standing(), victim.Seated(), victim.FakeDead())
