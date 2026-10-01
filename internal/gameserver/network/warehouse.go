@@ -68,6 +68,8 @@ type activeStore struct {
 	// private marks the player's private warehouse; every other store is
 	// a public one, which only tradable items enter.
 	private bool
+	// clanID is the clan whose warehouse store is, 0 for any other store.
+	clanID int32
 	// fits reports whether slots more stacks fit in store.
 	fits func(slots int) bool
 }
@@ -135,10 +137,6 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 // warehouseBypass runs a warehouse keeper's storage command for live at f.
 // It reports false when the command aborted, so that nothing more is
 // sent.
-//
-// The clan commands answer a clanless player's refusal.
-// ponytail: a clan member's clan warehouse command needs the clan system
-// (#3016); it is logged and the client released until that lands.
 func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply npc.BypassReply) bool {
 	freight := l.playerConfig.freight()
 	switch reply.Warehouse {
@@ -156,17 +154,9 @@ func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply np
 		live.tempInventoryDisable()
 		l.sendDepositList(live, serverpackets.WarehousePrivate, true)
 	case npc.WithdrawClan:
-		if live.Character.ClanID() == 0 {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoRightToUseClanWarehouse))
-			return true
-		}
-		l.log.Debug().Int32("object_id", live.ObjectID()).Msg("warehouse: clan warehouse not modeled (#3016)")
+		l.clanWarehouseBypass(live, true)
 	case npc.DepositClan:
-		if live.Character.ClanID() == 0 {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse))
-			return true
-		}
-		l.log.Debug().Int32("object_id", live.ObjectID()).Msg("warehouse: clan warehouse not modeled (#3016)")
+		l.clanWarehouseBypass(live, false)
 	case npc.WithdrawFreight:
 		if !freight.Allow {
 			return true
@@ -290,6 +280,12 @@ func (l *GameClientLink) warehouseRequestGate(live *livePlayer) (activeStore, bo
 	if active.store == nil {
 		return activeStore{}, false
 	}
+	// Leaving a clan drops its warehouse; one whose leave is still on its
+	// way to this queue is dropped here.
+	if active.clanID != 0 && !l.clanService().InClan(live.Character, active.clanID) {
+		live.storage.active = activeStore{}
+		return activeStore{}, false
+	}
 	f := live.currentFolk.Load()
 	if f == nil || !f.Warehouse() || !l.playerCanDoInteract(live, f) {
 		return activeStore{}, false
@@ -335,7 +331,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 		return
 	}
 	active, ok := l.warehouseRequestGate(live)
-	if !ok {
+	if !ok || (active.clanID != 0 && !l.clanWithdrawGate(live, active)) {
 		return
 	}
 	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
