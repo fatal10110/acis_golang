@@ -19,16 +19,16 @@ import (
 
 // Merchant fixture items.
 const (
-	potionID    int32 = 1060 // stackable, weight 5
-	swordID     int32 = 2369 // D grade one-hander, weight 1000
-	tunicID     int32 = 1104 // D grade chest piece
-	shirtID     int32 = 1101 // no-grade chest piece
-	anvilID     int32 = 1900 // stackable, too heavy to carry
-	ticketID    int32 = 3960 // a siege guard ticket
-	arrowID     int32 = 17   // stackable, three in stock
-	cGradeAxeID int32 = 160  // C grade weapon, above a no-expertise player
-	otherListID       = 2
-	shopListID        = 1
+	shopPotionID int32 = 1060 // stackable, weight 5
+	shopSwordID  int32 = 2369 // D grade one-hander, weight 1000
+	shopTunicID  int32 = 1104 // D grade chest piece
+	shirtID      int32 = 1101 // no-grade chest piece
+	anvilID      int32 = 1900 // stackable, too heavy to carry
+	ticketID     int32 = 3960 // a siege guard ticket
+	arrowID      int32 = 17   // stackable, three in stock
+	cGradeAxeID  int32 = 160  // C grade weapon, above a no-expertise player
+	otherListID        = 2
+	shopListID         = 1
 )
 
 func merchantItems() *item.Table {
@@ -51,9 +51,9 @@ func merchantItems() *item.Table {
 		}
 	}
 	return item.NewTable([]*item.Template{
-		etc(item.AdenaID, 0), etc(potionID, 5), etc(anvilID, 1_000_000), etc(ticketID, 0), etc(arrowID, 1),
-		weapon(swordID, item.CrystalD), weapon(cGradeAxeID, item.CrystalC),
-		chest(tunicID, item.CrystalD), chest(shirtID, item.CrystalNone),
+		etc(item.AdenaID, 0), etc(shopPotionID, 5), etc(anvilID, 1_000_000), etc(ticketID, 0), etc(arrowID, 1),
+		weapon(shopSwordID, item.CrystalD), weapon(cGradeAxeID, item.CrystalC),
+		chest(shopTunicID, item.CrystalD), chest(shirtID, item.CrystalNone),
 	})
 }
 
@@ -62,10 +62,10 @@ func merchantItems() *item.Table {
 // pieces, the heavy anvil, a siege guard ticket and three arrows.
 func shopList() buylist.List {
 	return buylist.List{ID: shopListID, NPCID: merchantID, Products: []buylist.Product{
-		{BuyListID: shopListID, ItemID: potionID, Price: 50, MaxCount: -1, RestockDelayMillis: -60000},
-		{BuyListID: shopListID, ItemID: swordID, Price: 1000, MaxCount: 2, RestockDelayMillis: 3600000},
+		{BuyListID: shopListID, ItemID: shopPotionID, Price: 50, MaxCount: -1, RestockDelayMillis: -60000},
+		{BuyListID: shopListID, ItemID: shopSwordID, Price: 1000, MaxCount: 2, RestockDelayMillis: 3600000},
 		{BuyListID: shopListID, ItemID: cGradeAxeID, Price: 5000, MaxCount: -1, RestockDelayMillis: -60000},
-		{BuyListID: shopListID, ItemID: tunicID, Price: 300, MaxCount: -1, RestockDelayMillis: -60000},
+		{BuyListID: shopListID, ItemID: shopTunicID, Price: 300, MaxCount: -1, RestockDelayMillis: -60000},
 		{BuyListID: shopListID, ItemID: shirtID, Price: 100, MaxCount: -1, RestockDelayMillis: -60000},
 		{BuyListID: shopListID, ItemID: anvilID, Price: 1, MaxCount: -1, RestockDelayMillis: -60000},
 		{BuyListID: shopListID, ItemID: ticketID, Price: 100, MaxCount: -1, RestockDelayMillis: -60000},
@@ -76,7 +76,7 @@ func shopList() buylist.List {
 // otherList belongs to another NPC.
 func otherList() buylist.List {
 	return buylist.List{ID: otherListID, NPCID: merchantID + 1, Products: []buylist.Product{
-		{BuyListID: otherListID, ItemID: potionID, Price: 10, MaxCount: -1},
+		{BuyListID: otherListID, ItemID: shopPotionID, Price: 10, MaxCount: -1},
 	}}
 }
 
@@ -258,10 +258,10 @@ func TestMerchantBuyOpensTheBuyWindow(t *testing.T) {
 		t.Fatalf("BuyList = money %d list %d header %d rows %d, want 10000/1/8/8", money, listID, header, len(rows))
 	}
 	want := []buyListRow{
-		{potionID, 0, 50, 0},
-		{swordID, 2, 1000, int32(item.SlotRHand)},
+		{shopPotionID, 0, 50, 0},
+		{shopSwordID, 2, 1000, int32(item.SlotRHand)},
 		{cGradeAxeID, 0, 5000, int32(item.SlotRHand)},
-		{tunicID, 0, 300, int32(item.SlotChest)},
+		{shopTunicID, 0, 300, int32(item.SlotChest)},
 		{shirtID, 0, 100, int32(item.SlotChest)},
 		{anvilID, 0, 1, 0},
 		{ticketID, 0, 100, 0},
@@ -321,7 +321,7 @@ func TestMerchantBuyPaysAndGrants(t *testing.T) {
 	w := bootShop(t, 10000)
 	w.openBuy(t, "1")
 
-	frames := w.send(t, encodeRequestBuyItem(shopListID, buyRow{potionID, 3}, buyRow{swordID, 1}, buyRow{ticketID, 2}))
+	frames := w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopPotionID, 3}, buyRow{shopSwordID, 1}, buyRow{ticketID, 2}))
 	html, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage)
 	if !ok {
 		t.Fatalf("purchase = %x, want the -bought page", opcodes(frames))
@@ -333,7 +333,7 @@ func TestMerchantBuyPaysAndGrants(t *testing.T) {
 		t.Fatalf("purchase = %x, want it to end with the ItemList", got)
 	}
 	// 3 * 50 + 1000 + 2 * 100 (siege guard rate 1).
-	if adena, potions, swords, tickets := w.countOf(t, item.AdenaID), w.countOf(t, potionID), w.countOf(t, swordID), w.countOf(t, ticketID); adena != 10000-1350 || potions != 3 || swords != 1 || tickets != 2 {
+	if adena, potions, swords, tickets := w.countOf(t, item.AdenaID), w.countOf(t, shopPotionID), w.countOf(t, shopSwordID), w.countOf(t, ticketID); adena != 10000-1350 || potions != 3 || swords != 1 || tickets != 2 {
 		t.Fatalf("after the purchase: adena %d potions %d swords %d tickets %d, want 8650/3/1/2", adena, potions, swords, tickets)
 	}
 
@@ -343,8 +343,8 @@ func TestMerchantBuyPaysAndGrants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := merchant.StockRow{ListID: shopListID, ItemID: swordID, Count: 1, NextRestock: w.clock.Now().Add(time.Hour)}
-	if len(rows) != 1 || !rows[0].NextRestock.Equal(want.NextRestock) || rows[0].Count != 1 || rows[0].ListID != shopListID || rows[0].ItemID != swordID {
+	want := merchant.StockRow{ListID: shopListID, ItemID: shopSwordID, Count: 1, NextRestock: w.clock.Now().Add(time.Hour)}
+	if len(rows) != 1 || !rows[0].NextRestock.Equal(want.NextRestock) || rows[0].Count != 1 || rows[0].ListID != shopListID || rows[0].ItemID != shopSwordID {
 		t.Fatalf("buylists rows = %+v, want [%+v]", rows, want)
 	}
 	items, err := w.srv.Items.ListByOwner(context.Background(), w.player)
@@ -355,7 +355,7 @@ func TestMerchantBuyPaysAndGrants(t *testing.T) {
 	for _, it := range items {
 		saved[it.TemplateID] += it.Count
 	}
-	if saved[item.AdenaID] != 8650 || saved[potionID] != 3 || saved[swordID] != 1 || saved[ticketID] != 2 {
+	if saved[item.AdenaID] != 8650 || saved[shopPotionID] != 3 || saved[shopSwordID] != 1 || saved[ticketID] != 2 {
 		t.Fatalf("saved items = %v", saved)
 	}
 }
@@ -371,14 +371,14 @@ func TestMerchantBuyRefusals(t *testing.T) {
 	w := bootShop(t, 1200)
 	w.openBuy(t, "1")
 
-	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{swordID, 2})), serverpackets.SystemMessageYouHaveExceededQuantityThatCanBeInputted)
+	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopSwordID, 2})), serverpackets.SystemMessageYouHaveExceededQuantityThatCanBeInputted)
 	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{anvilID, 1})), serverpackets.SystemMessageWeightLimitExceeded)
-	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{swordID, 1}, buyRow{potionID, 5})), serverpackets.SystemMessageYouNotEnoughAdena)
+	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopSwordID, 1}, buyRow{shopPotionID, 5})), serverpackets.SystemMessageYouNotEnoughAdena)
 	for _, req := range [][]byte{
 		encodeRequestBuyItem(shopListID, buyRow{arrowID, 4}),
-		encodeRequestBuyItem(shopListID, buyRow{potionID, 1}, buyRow{shirtID + 1, 1}),
-		encodeRequestBuyItem(otherListID, buyRow{potionID, 1}),
-		encodeRequestBuyItem(99, buyRow{potionID, 1}),
+		encodeRequestBuyItem(shopListID, buyRow{shopPotionID, 1}, buyRow{shirtID + 1, 1}),
+		encodeRequestBuyItem(otherListID, buyRow{shopPotionID, 1}),
+		encodeRequestBuyItem(99, buyRow{shopPotionID, 1}),
 	} {
 		if got := w.send(t, req); len(got) != 0 {
 			t.Fatalf("refused purchase = %x, want nothing", opcodes(got))
@@ -386,16 +386,16 @@ func TestMerchantBuyRefusals(t *testing.T) {
 	}
 
 	w.srv.SetInventorySlotLimit(t, w.player, 2)
-	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{potionID, 1}, buyRow{shirtID, 1})), serverpackets.SystemMessageSlotsFull)
+	assertSystemMessages(t, w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopPotionID, 1}, buyRow{shirtID, 1})), serverpackets.SystemMessageSlotsFull)
 	w.srv.SetInventorySlotLimit(t, w.player, 80)
 
 	// Out of reach: the merchant steps away from the player.
 	far := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 1000)
 	w.selectFolk(t, far)
-	if got := w.send(t, encodeRequestBuyItem(shopListID, buyRow{potionID, 1})); len(got) != 0 {
+	if got := w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopPotionID, 1})); len(got) != 0 {
 		t.Fatalf("purchase out of reach = %x, want nothing", opcodes(got))
 	}
-	if adena, potions, swords := w.countOf(t, item.AdenaID), w.countOf(t, potionID), w.countOf(t, swordID); adena != 1200 || potions != 0 || swords != 0 {
+	if adena, potions, swords := w.countOf(t, item.AdenaID), w.countOf(t, shopPotionID), w.countOf(t, shopSwordID); adena != 1200 || potions != 0 || swords != 0 {
 		t.Fatalf("after the refusals: adena %d potions %d swords %d, want 1200/0/0", adena, potions, swords)
 	}
 }
@@ -408,14 +408,14 @@ func TestMerchantStockSellsOutAndRestocks(t *testing.T) {
 	t.Parallel()
 	w := bootShop(t, 10000)
 	w.openBuy(t, "1")
-	w.send(t, encodeRequestBuyItem(shopListID, buyRow{swordID, 1}, buyRow{swordID, 1}))
-	if swords := w.countOf(t, swordID); swords != 2 {
+	w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopSwordID, 1}, buyRow{shopSwordID, 1}))
+	if swords := w.countOf(t, shopSwordID); swords != 2 {
 		t.Fatalf("swords = %d, want 2", swords)
 	}
 
 	_, _, header, rows := decodeBuyList(t, w.openBuy(t, "1")[0])
 	for _, row := range rows {
-		if row.itemID == swordID {
+		if row.itemID == shopSwordID {
 			t.Fatalf("sold-out sword still shown: %+v", row)
 		}
 	}
@@ -431,7 +431,7 @@ func TestMerchantStockSellsOutAndRestocks(t *testing.T) {
 	w.clock.advance(time.Second)
 	w.srv.BuyListStock.Restock()
 	_, _, _, rows = decodeBuyList(t, w.openBuy(t, "1")[0])
-	if len(rows) != 8 || rows[1].itemID != swordID || rows[1].count != 2 {
+	if len(rows) != 8 || rows[1].itemID != shopSwordID || rows[1].count != 2 {
 		t.Fatalf("rows after the restock = %+v, want the sword back at 2", rows)
 	}
 	w.srv.FlushPersistence(t)
@@ -448,15 +448,15 @@ func TestMerchantStockRestoresSavedRows(t *testing.T) {
 	base := time.Unix(1_800_000_000, 0)
 	t.Run("restock ahead", func(t *testing.T) {
 		t.Parallel()
-		w := bootShop(t, 10000, gameservertest.WithBuyListRows(merchant.StockRow{ListID: shopListID, ItemID: swordID, Count: 1, NextRestock: base.Add(time.Minute)}))
-		if _, _, _, rows := decodeBuyList(t, w.openBuy(t, "1")[0]); rows[1].itemID != swordID || rows[1].count != 1 {
+		w := bootShop(t, 10000, gameservertest.WithBuyListRows(merchant.StockRow{ListID: shopListID, ItemID: shopSwordID, Count: 1, NextRestock: base.Add(time.Minute)}))
+		if _, _, _, rows := decodeBuyList(t, w.openBuy(t, "1")[0]); rows[1].itemID != shopSwordID || rows[1].count != 1 {
 			t.Fatalf("restored sword row = %+v, want count 1", rows[1])
 		}
 	})
 	t.Run("restock passed", func(t *testing.T) {
 		t.Parallel()
-		w := bootShop(t, 10000, gameservertest.WithBuyListRows(merchant.StockRow{ListID: shopListID, ItemID: swordID, Count: 0, NextRestock: base.Add(-time.Minute)}))
-		if _, _, _, rows := decodeBuyList(t, w.openBuy(t, "1")[0]); rows[1].itemID != swordID || rows[1].count != 2 {
+		w := bootShop(t, 10000, gameservertest.WithBuyListRows(merchant.StockRow{ListID: shopListID, ItemID: shopSwordID, Count: 0, NextRestock: base.Add(-time.Minute)}))
+		if _, _, _, rows := decodeBuyList(t, w.openBuy(t, "1")[0]); rows[1].itemID != shopSwordID || rows[1].count != 2 {
 			t.Fatalf("expired sword row = %+v, want count 2", rows[1])
 		}
 		if saved, err := w.srv.BuyListRows.LoadStock(context.Background()); err != nil || len(saved) != 0 {
@@ -523,7 +523,7 @@ func TestMerchantTryOn(t *testing.T) {
 	cfg := merchant.Config{SiegeGuardsPriceRate: 1, AllowWear: true, WearDelay: time.Second, WearPrice: 10}
 	w := bootShop(t, 25, gameservertest.WithMerchantConfig(cfg))
 
-	frames := w.send(t, encodeRequestPreviewItem(shopListID, swordID, tunicID, potionID))
+	frames := w.send(t, encodeRequestPreviewItem(shopListID, shopSwordID, shopTunicID, shopPotionID))
 	if got := opcodes(frames); string(got) != string([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeShopPreviewInfo}) {
 		t.Fatalf("try-on = %x, want SystemMessage then ShopPreviewInfo", got)
 	}
@@ -540,7 +540,7 @@ func TestMerchantTryOn(t *testing.T) {
 	}
 	// Wire order REAR, LEAR, NECK, RFINGER, LFINGER, HEAD, RHAND, LHAND,
 	// GLOVES, CHEST, ...: the sword in RHAND, the tunic in CHEST.
-	if want := [17]int32{6: swordID, 9: tunicID}; shown != want {
+	if want := [17]int32{6: shopSwordID, 9: shopTunicID}; shown != want {
 		t.Fatalf("ShopPreviewInfo = %v, want %v", shown, want)
 	}
 	if adena := w.countOf(t, item.AdenaID); adena != 5 {
@@ -554,8 +554,8 @@ func TestMerchantTryOn(t *testing.T) {
 		t.Fatalf("after the try-on end = %x, want UserInfo", info)
 	}
 
-	assertSystemMessages(t, w.send(t, encodeRequestPreviewItem(shopListID, tunicID, shirtID)), serverpackets.SystemMessageYouCanNotTryThoseItemsOnAtTheSameTime)
-	assertSystemMessages(t, w.send(t, encodeRequestPreviewItem(shopListID, swordID)), serverpackets.SystemMessageYouNotEnoughAdena, serverpackets.SystemMessageYouNotEnoughAdena)
+	assertSystemMessages(t, w.send(t, encodeRequestPreviewItem(shopListID, shopTunicID, shirtID)), serverpackets.SystemMessageYouCanNotTryThoseItemsOnAtTheSameTime)
+	assertSystemMessages(t, w.send(t, encodeRequestPreviewItem(shopListID, shopSwordID)), serverpackets.SystemMessageYouNotEnoughAdena, serverpackets.SystemMessageYouNotEnoughAdena)
 	if got := opcodes(w.send(t, encodeRequestPreviewItem(shopListID))); string(got) != string(releaseOnly) {
 		t.Fatalf("empty try-on = %x, want ActionFailed", got)
 	}
@@ -570,7 +570,7 @@ func TestMerchantTryOn(t *testing.T) {
 // not a GM, with nothing answered.
 func TestMerchantPricing(t *testing.T) {
 	t.Parallel()
-	gmShop := buylist.List{ID: 3, NPCID: -1, Products: []buylist.Product{{BuyListID: 3, ItemID: potionID, MaxCount: -1}}}
+	gmShop := buylist.List{ID: 3, NPCID: -1, Products: []buylist.Product{{BuyListID: 3, ItemID: shopPotionID, MaxCount: -1}}}
 	cfg := merchant.DefaultConfig()
 	cfg.SiegeGuardsPriceRate = 1.5
 	w := bootShop(t, 1000, gameservertest.WithMerchantConfig(cfg), gameservertest.WithBuyLists(gmShop))
@@ -583,10 +583,10 @@ func TestMerchantPricing(t *testing.T) {
 		t.Fatalf("after 3 tickets: adena %d tickets %d, want 550/3", adena, tickets)
 	}
 
-	if got := w.send(t, encodeRequestBuyItem(3, buyRow{potionID, 1})); len(got) != 0 {
+	if got := w.send(t, encodeRequestBuyItem(3, buyRow{shopPotionID, 1})); len(got) != 0 {
 		t.Fatalf("unpriced item = %x, want nothing", opcodes(got))
 	}
-	if potions := w.countOf(t, potionID); potions != 0 {
+	if potions := w.countOf(t, shopPotionID); potions != 0 {
 		t.Fatalf("potions = %d, want 0", potions)
 	}
 }
