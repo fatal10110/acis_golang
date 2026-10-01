@@ -1239,8 +1239,14 @@ const shutdownDrainTimeout = 10 * time.Second
 // ItemInstances save, tracked ground items back into items_on_ground — and
 // then tears the stack down. Restart tests call it on the first Boot cycle
 // so the second Boot restores what the first died holding.
+//
+// It first settles, as the production stop order closes the listener and
+// stops the actor pool before those saves: a request still being handled —
+// a drop whose DropItem frame is already out but whose ground item is not
+// yet tracked — finishes before anything is snapshotted.
 func (s *Server) Shutdown(tb testing.TB) {
 	tb.Helper()
+	s.Settle(tb)
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 	defer cancel()
 	if err := s.ItemInstances.Save(ctx); err != nil {
