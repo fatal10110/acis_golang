@@ -669,6 +669,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// the client on stale counts until that item changes again.
 			var failed bool
 			onLive(live, func() {
+				// A shop or warehouse window just opened keeps the request
+				// unanswered, as the reference does: no list, no
+				// ActionFailed. The inventory button leaves no client
+				// action pending.
+				if live.inventoryDisabled.Load() {
+					return
+				}
 				// The reference's ItemList constructor recomputes carried
 				// weight on every send, not only at login.
 				if inv := live.Inventory(); inv != nil {
@@ -1230,6 +1237,32 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.handleRequestChangePetName(ctx, live, req)
 			}
 
+		case clientpackets.OpcodeRequestBuyItem:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuyItem, error) {
+				return clientpackets.DecodeRequestBuyItem(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestBuyItem(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPreviewItem:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPreviewItem)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPreviewItem(live, req) })
+			}
+
 		case clientpackets.OpcodeDlgAnswer:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeDlgAnswer)
 			if err != nil {
@@ -1258,7 +1291,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
-			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeSendWarehouseDeposit,

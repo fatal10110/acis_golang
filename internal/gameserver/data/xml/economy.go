@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 )
 
@@ -222,7 +223,9 @@ func LoadRecipes(path string) (*recipe.Table, error) {
 }
 
 // LoadBuyLists parses buyLists.xml and returns buylists keyed by list id.
-func LoadBuyLists(path string) (*buylist.Table, error) {
+// If items is non-nil, a product naming an item with no loaded template
+// fails the load.
+func LoadBuyLists(path string, items *item.Table) (*buylist.Table, error) {
 	var file buyListFile
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("buy lists: %w", err)
@@ -243,6 +246,13 @@ func LoadBuyLists(path string) (*buylist.Table, error) {
 		list, err := buylist.NewList(set, products)
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		if items != nil {
+			for _, p := range list.Products {
+				if _, ok := items.Get(p.ItemID); !ok {
+					return nil, fmt.Errorf("xml: %s: buylist %d: product item %d has no item template", path, list.ID, p.ItemID)
+				}
+			}
 		}
 		lists = append(lists, list)
 	}

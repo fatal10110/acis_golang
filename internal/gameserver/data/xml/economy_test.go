@@ -4,9 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
+	"github.com/rs/zerolog"
 )
 
 func TestLoadEconomyData(t *testing.T) {
@@ -37,15 +39,25 @@ func TestLoadEconomyData(t *testing.T) {
 	})
 
 	t.Run("buylists", func(t *testing.T) {
-		table, err := LoadBuyLists(filepath.Join(xmlDir, "buyLists.xml"))
+		// Every shipped product resolves to a loaded item template.
+		items, err := LoadItemTemplates(filepath.Join(xmlDir, "items"), zerolog.Nop())
+		if err != nil {
+			t.Fatalf("LoadItemTemplates error: %v", err)
+		}
+		table, err := LoadBuyLists(filepath.Join(xmlDir, "buyLists.xml"), items)
 		if err != nil {
 			t.Fatalf("LoadBuyLists error: %v", err)
 		}
 		if got, want := table.Len(), 687; got != want {
 			t.Fatalf("Len() = %d, want %d", got, want)
 		}
-		if got, want := table.ProductCount(), 18812; got != want {
+		// 18812 <product> elements, 9 of them repeating an item id already
+		// in their list: a repeat replaces the earlier product in place.
+		if got, want := table.ProductCount(), 18803; got != want {
 			t.Fatalf("ProductCount() = %d, want %d", got, want)
+		}
+		if gm, ok := table.Find(300531); !ok || len(gm.Products) != 42 || gm.Products[34].ItemID != 7684 || gm.Products[41].ItemID != 7725 {
+			t.Fatalf("buylist 300531 = %+v, %v; want 42 products, item 7684 kept at its first position 34", gm, ok)
 		}
 		list, ok := table.Find(1)
 		if !ok {
@@ -193,6 +205,27 @@ func TestBuildAugmentationStatGroupTableRouting(t *testing.T) {
 	}
 }
 
+// A product naming an item with no loaded template fails the load, naming
+// the buylist and the item.
+func TestLoadBuyListsDanglingItem(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "buyLists.xml")
+	content := `<list><buyList id="7" npcId="30001"><product id="57" price="1"/><product id="99999" price="1"/></buyList></list>`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err := LoadBuyLists(path, itemTableWithIDs([]int32{57}))
+	if err == nil {
+		t.Fatal("LoadBuyLists with a product naming no item template = nil error")
+	}
+	if msg := err.Error(); !strings.Contains(msg, "buylist 7") || !strings.Contains(msg, "item 99999") {
+		t.Fatalf("LoadBuyLists error = %q, want it to name buylist 7 and item 99999", msg)
+	}
+	if _, err := LoadBuyLists(path, itemTableWithIDs([]int32{57, 99999})); err != nil {
+		t.Fatalf("LoadBuyLists with every template loaded: %v", err)
+	}
+}
+
 func TestLoadEconomyDataErrors(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -217,7 +250,7 @@ func TestLoadEconomyDataErrors(t *testing.T) {
 			file:    "buyLists.xml",
 			content: `<list><buyList id="1"><product id="1"/></buyList></list>`,
 			load: func(path string) error {
-				_, err := LoadBuyLists(path)
+				_, err := LoadBuyLists(path, nil)
 				return err
 			},
 		},

@@ -3,6 +3,7 @@ package serverpackets
 import (
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -47,51 +48,42 @@ type TradeItemUpdateEntry struct {
 	AvailableCount int
 }
 
-// siegeGuardItemIDMin and siegeGuardItemIDMax bound the buylist item IDs
-// that price with the siege-guard rate multiplier (BuyList.java:47).
-const (
-	siegeGuardItemIDMin = 3960
-	siegeGuardItemIDMax = 4026
-)
-
-// FrameBuyList builds the BuyList packet for a merchant buylist.
-// siegeGuardsPriceRate mirrors Config.RATE_SIEGE_GUARDS_PRICE (default 1.0).
-func FrameBuyList(list buylist.List, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) (wire.Frame, error) {
+// FrameBuyList builds the BuyList packet for a merchant buylist. count
+// gives each product's current stock; a limited product at 0 is left out,
+// though the header still counts every product of the list. Each price
+// carries taxRate, and a siege guard ticket's also siegeGuardsPriceRate
+// (RateSiegeGuardsPrice).
+func FrameBuyList(list buylist.List, count func(buylist.Product) int, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeBuyList)
-	if err := writeBuyList(w, list, currentMoney, taxRate, siegeGuardsPriceRate, templates); err != nil {
+	if err := writeBuyList(w, list, count, currentMoney, taxRate, siegeGuardsPriceRate, templates); err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
-func writeBuyList(w *wire.Writer, list buylist.List, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) error {
+func writeBuyList(w *wire.Writer, list buylist.List, count func(buylist.Product) int, currentMoney int, taxRate, siegeGuardsPriceRate float64, templates *item.Table) error {
 	w.WriteInt32(int32(currentMoney))
 	w.WriteInt32(int32(list.ID))
-	count, err := wire.Uint16Count(len(list.Products))
+	n, err := wire.Uint16Count(len(list.Products))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	w.WriteUint16(n)
 	for _, product := range list.Products {
-		if product.LimitedStock() && product.MaxCount <= 0 {
+		stock := count(product)
+		if stock <= 0 && product.LimitedStock() {
 			continue
 		}
 		tmpl, ok := templates.Get(product.ItemID)
 		if !ok {
 			return fmt.Errorf("serverpackets: BuyList: no template loaded for item template %d", product.ItemID)
 		}
-		count := product.MaxCount
-		if count < 0 {
-			count = 0
+		price := float64(product.Price) * (1 + taxRate)
+		if product.SiegeGuardTicket() {
+			price = float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate)
 		}
-		var price int32
-		if product.ItemID >= siegeGuardItemIDMin && product.ItemID <= siegeGuardItemIDMax {
-			price = int32(float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate))
-		} else {
-			price = int32(float64(product.Price) * (1 + taxRate))
-		}
-		writeShopItem(w, tmpl, product.ItemID, product.ItemID, count, 0, 0, 0, price)
+		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.JavaInt(price))
 	}
 	return nil
 }

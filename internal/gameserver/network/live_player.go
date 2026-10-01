@@ -71,6 +71,10 @@ type livePlayer struct {
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
 	petRestoreInFlight atomic.Bool
+	// inventoryDisabled is set while a shop or warehouse window keeps item
+	// list requests unanswered (see tempInventoryDisable). Set on the
+	// owner's queue; atomic for any reader.
+	inventoryDisabled atomic.Bool
 	// replayingEffects is set while EnterWorld replays the saved effects
 	// and then decides the weight penalty band, before the player is in the
 	// world. The effects' start hooks change its appearance and the band

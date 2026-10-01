@@ -39,6 +39,15 @@ import (
 // closes its sell window when it sends the request, leaving no click
 // pending. tests/npcs asserts that silence.
 //
+// RequestBuyItem and RequestPreviewItem answer most refusals with nothing
+// (an unknown list, an untargeted or unreachable merchant, an item off the
+// list, a count over the stock), as the reference does, and RequestItemList
+// answers nothing while a shop window keeps the inventory disabled
+// (RequestItemList.java:21-22). A shop window's submit and the inventory
+// button register no pending client action, so that silence is reference
+// parity; tests/npcs/merchant_test.go pins each silent branch. The
+// try-on's empty request is answered and probed here.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
@@ -85,6 +94,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
+		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {
@@ -126,5 +136,16 @@ func encodeActionOn(objectID int32, shift bool) []byte {
 func encodeRequestRecipeBookOpen(typ int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestRecipeBookOpen)
 	w.WriteInt32(typ)
+	return w.Bytes()
+}
+
+func encodeRequestPreviewItem(listID int32, itemIDs ...int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPreviewItem)
+	w.WriteInt32(0)
+	w.WriteInt32(listID)
+	w.WriteInt32(int32(len(itemIDs)))
+	for _, id := range itemIDs {
+		w.WriteInt32(id)
+	}
 	return w.Bytes()
 }

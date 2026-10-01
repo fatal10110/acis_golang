@@ -20,7 +20,7 @@ const (
 	// BypassPage opens HTML alone.
 	BypassPage
 	// BypassRefused answers nothing: a Link naming a path that climbs out of
-	// the page tree.
+	// the page tree, or a shop command naming no buylist.
 	BypassRefused
 	// BypassAborted is a command so malformed its handling stops outright:
 	// nothing is sent, not even the dispatcher's closing ActionFailed.
@@ -28,6 +28,10 @@ const (
 	// BypassSellList opens the merchant's sell window on the talker's
 	// sellable items. With none to offer, HTML, when set, is shown instead.
 	BypassSellList
+	// BypassBuyList opens the buy window of buylist ListID.
+	BypassBuyList
+	// BypassWearList opens the try-on window of buylist ListID.
+	BypassWearList
 )
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -45,6 +49,8 @@ type BypassReply struct {
 	// no field: the interact gate ahead of every dialog command already
 	// refuses one.
 	CancelEnchant bool
+	// ListID is the buylist BypassBuyList and BypassWearList name.
+	ListID int
 }
 
 // fishermanCommands are the fisherman's own commands, run before the
@@ -89,6 +95,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 		return reply
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
+	if kind == "Merchant" || kind == "Fisherman" {
+		if shop, ok := merchantCommand(reply, rules, command); ok {
+			return shop
+		}
+	}
 	switch {
 	case strings.HasPrefix(command, "SkillList"), strings.HasPrefix(command, "EnchantSkillList"),
 		strings.EqualFold(command, "TerritoryStatus"), strings.HasPrefix(command, "Quest"):
@@ -119,4 +130,35 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 		return reply
 	}
 	return reply
+}
+
+// merchantCommand answers a merchant's shop commands, split on spaces with
+// the command name matched in any case: Buy <listId> opens a buy window
+// and, while the server allows it, Wear <listId> a try-on window. A shop
+// command naming no list answers nothing of its own, and one whose list id
+// does not parse aborts. It reports false for any other command.
+func merchantCommand(reply BypassReply, rules ChatRules, command string) (BypassReply, bool) {
+	tokens := strings.FieldsFunc(command, func(r rune) bool { return r == ' ' })
+	if len(tokens) == 0 {
+		return reply, false
+	}
+	switch {
+	case strings.EqualFold(tokens[0], "Buy"):
+		reply.Outcome = BypassBuyList
+	case strings.EqualFold(tokens[0], "Wear") && rules.AllowWear:
+		reply.Outcome = BypassWearList
+	default:
+		return reply, false
+	}
+	if len(tokens) < 2 {
+		reply.Outcome = BypassRefused
+		return reply, true
+	}
+	id, err := strconv.ParseInt(tokens[1], 10, 32)
+	if err != nil {
+		reply.Outcome = BypassAborted
+		return reply, true
+	}
+	reply.ListID = int(id)
+	return reply, true
 }

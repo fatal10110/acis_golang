@@ -3,6 +3,7 @@ package serverpackets
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"math"
 	"testing"
 	"time"
@@ -2308,17 +2309,25 @@ func TestFrameDismount(t *testing.T) {
 }
 
 // ---- from shop_trade_test.go ----
+
+// TestFrameBuyList pins the BuyList rows: each limited product shows its
+// current count and one sold out is left out while the header still counts
+// it (BuyList.java:30-34), and an unlimited product shows count 0.
 func TestFrameBuyList(t *testing.T) {
 	templates := item.NewTable([]*item.Template{
 		{ID: 57, Kind: item.KindEtcItem, Slot: item.SlotNone},
 		{ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand},
+		{ID: 2369, Kind: item.KindWeapon, Slot: item.SlotRHand},
 	})
 	list := buylist.List{ID: 101, Products: []buylist.Product{
 		{ItemID: 57, Price: 1, MaxCount: -1},
 		{ItemID: 2368, Price: 625, MaxCount: 3},
+		{ItemID: 2369, Price: 900, MaxCount: 5},
 	}}
+	stock := map[int32]int{2368: 2, 2369: 0}
+	count := func(p buylist.Product) int { return stock[p.ItemID] }
 
-	frame, err := FrameBuyList(list, 123456, 0.10, 1.0, templates)
+	frame, err := FrameBuyList(list, count, 123456, 0.10, 1.0, templates)
 	if err != nil {
 		t.Fatalf("FrameBuyList: %v", err)
 	}
@@ -2327,14 +2336,16 @@ func TestFrameBuyList(t *testing.T) {
 	want := []byte{OpcodeBuyList}
 	want = binary.LittleEndian.AppendUint32(want, 123456)
 	want = binary.LittleEndian.AppendUint32(want, 101)
-	want = binary.LittleEndian.AppendUint16(want, 2)
+	want = binary.LittleEndian.AppendUint16(want, 3)
 	want = appendShopTradeItem(want, item.CategoryMoneyOrEtcItem, 57, 57, 0, item.SubCategoryMoney, item.SlotNone, 0, 0, 0, 1)
-	want = appendShopTradeItem(want, item.CategoryWeaponOrJewelry, 2368, 2368, 3, item.SubCategoryWeapon, item.SlotLRHand, 0, 0, 0, 687)
+	want = appendShopTradeItem(want, item.CategoryWeaponOrJewelry, 2368, 2368, 2, item.SubCategoryWeapon, item.SlotLRHand, 0, 0, 0, 687)
 
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameBuyList() = %x, want %x", got, want)
 	}
 }
+
+func noStock(buylist.Product) int { return 0 }
 
 // TestFrameBuyListSiegeGuardPrice proves siege-guard buylist items (IDs
 // 3960-4026) price with Config.RATE_SIEGE_GUARDS_PRICE in addition to tax,
@@ -2352,7 +2363,7 @@ func TestFrameBuyListSiegeGuardPrice(t *testing.T) {
 		{ItemID: 4027, Price: 1000, MaxCount: -1},
 	}}
 
-	frame, err := FrameBuyList(list, 0, 0.10, 2.0, templates)
+	frame, err := FrameBuyList(list, noStock, 0, 0.10, 2.0, templates)
 	if err != nil {
 		t.Fatalf("FrameBuyList: %v", err)
 	}
@@ -2511,7 +2522,7 @@ func TestFrameTradeUpdatePackets(t *testing.T) {
 }
 
 func TestFrameShopTradeMissingTemplate(t *testing.T) {
-	if _, err := FrameBuyList(buylist.List{ID: 1, Products: []buylist.Product{{ItemID: 9, MaxCount: -1}}}, 0, 0, 1.0, item.NewTable(nil)); err == nil {
+	if _, err := FrameBuyList(buylist.List{ID: 1, Products: []buylist.Product{{ItemID: 9, MaxCount: -1}}}, noStock, 0, 0, 1.0, item.NewTable(nil)); err == nil {
 		t.Fatal("FrameBuyList: want missing-template error")
 	}
 	if _, err := FrameSellList(0, []*item.Instance{{TemplateID: 9}}, item.NewTable(nil)); err == nil {
@@ -4046,5 +4057,47 @@ func TestFrameRecipeBookPackets(t *testing.T) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameRecipeItemMakeInfo() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameShopPreviewList pins the try-on window bytes: four fixed bytes
+// after the opcode, the adena, the list id, then the equipable products of
+// a grade within the expertise level, each with its type2, a 16-bit slot
+// and the wear price (ShopPreviewList.java).
+func TestFrameShopPreviewList(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1101, Kind: item.KindArmor, Slot: item.SlotChest, Crystal: item.CrystalNone},
+		{ID: 2369, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalD},
+		{ID: 160, Kind: item.KindWeapon, Slot: item.SlotRHand, Crystal: item.CrystalC},
+		{ID: 1060, Kind: item.KindEtcItem, Slot: item.SlotNone, Stackable: true},
+		{ID: 8177, Kind: item.KindArmor, Slot: item.SlotHairAll, Crystal: item.CrystalNone},
+	})
+	list := buylist.List{ID: 7, Products: []buylist.Product{{ItemID: 1101}, {ItemID: 2369}, {ItemID: 160}, {ItemID: 1060}, {ItemID: 8177}}}
+	frame, err := FrameShopPreviewList(list, 5000, 1, 10, templates)
+	if err != nil {
+		t.Fatalf("FrameShopPreviewList: %v", err)
+	}
+	want, _ := hex.DecodeString("ef" + "c0130000" + "88130000" + "07000000" + "0300" +
+		"4d040000" + "0100" + "0004" + "0a000000" +
+		"41090000" + "0000" + "8000" + "0a000000" +
+		"f11f0000" + "0200" + "0000" + "0a000000")
+	if got := framePayload(t, frame); !bytes.Equal(got, want) {
+		t.Fatalf("FrameShopPreviewList = %x, want %x", got, want)
+	}
+}
+
+// TestFrameShopPreviewInfo pins the tried-on items packet: the slot count
+// 17, then the item id at each paperdoll position in the order REAR, LEAR,
+// NECK, RFINGER, LFINGER, HEAD, RHAND, LHAND, GLOVES, CHEST, LEGS, FEET,
+// CLOAK, FACE, HAIR, HAIRALL, UNDER (ShopPreviewInfo.java).
+func TestFrameShopPreviewInfo(t *testing.T) {
+	var items [item.PaperdollSlots]int32
+	items[0], items[1], items[2], items[7], items[10] = 100, 101, 102, 2369, 1101
+	want, _ := hex.DecodeString("f0" + "11000000" +
+		"66000000" + "65000000" + "00000000" + "00000000" + "00000000" + "00000000" +
+		"41090000" + "00000000" + "00000000" + "4d040000" + "00000000" + "00000000" +
+		"00000000" + "00000000" + "00000000" + "00000000" + "64000000")
+	if got := framePayload(t, FrameShopPreviewInfo(items)); !bytes.Equal(got, want) {
+		t.Fatalf("FrameShopPreviewInfo = %x, want %x", got, want)
 	}
 }

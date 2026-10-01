@@ -131,6 +131,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xae: true, // recipe craft window
 		0xaf: true, // craft a recipe
 		0xc5: true, // dialog answer
+		0xc6: true, // try on merchant items
 		0xca: true, // game guard reply
 		0xcd: true, // show mini map
 		0xd0: true, // extended packets

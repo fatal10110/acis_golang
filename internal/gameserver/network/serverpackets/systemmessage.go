@@ -428,3 +428,10 @@ func FrameSystemMessageStringSkillName(id int, text string, skillID, level int32
 	w.WriteInt32(level)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
+
+// Merchant buy and try-on refusals and the try-on's end; no parameter.
+const (
+	SystemMessageYouHaveExceededQuantityThatCanBeInputted = 1036
+	SystemMessageNoLongerTryingOn                         = 1306
+	SystemMessageYouCanNotTryThoseItemsOnAtTheSameTime    = 1368
+)

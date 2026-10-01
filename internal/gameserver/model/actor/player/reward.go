@@ -1,6 +1,10 @@
 package player
 
-import "math"
+import (
+	"math"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
+)
 
 // killLevelPenaltyThreshold is how many levels an attacker can outlevel its
 // kill before the exp/sp reward starts falling off.
@@ -46,18 +50,5 @@ func KillRewardExpAndSp(expReward, spReward float64, damage, totalDamage float64
 	if spF <= 0 {
 		spF = 0
 	}
-	return int64(rewardInt32(xp)), int(rewardInt32(spF))
-}
-
-func rewardInt32(v float64) int32 {
-	if math.IsNaN(v) {
-		return 0
-	}
-	if v > math.MaxInt32 {
-		return math.MaxInt32
-	}
-	if v < math.MinInt32 {
-		return math.MinInt32
-	}
-	return int32(v)
+	return int64(commons.JavaInt(xp)), int(commons.JavaInt(spF))
 }

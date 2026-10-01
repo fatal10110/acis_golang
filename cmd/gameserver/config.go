@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -66,6 +67,7 @@ type gameplayConfig struct {
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
 	Enchant                  enchant.Config
+	Merchant                 merchant.Config
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -156,6 +158,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Merchant, err = loadMerchantConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -426,6 +431,23 @@ func loadRateKarmaExpLost(paths gameServerPaths) (rateKarmaExpLost, error) {
 		return 0, err
 	}
 	return rateKarmaExpLost(config.NewFields(props, "rate karma exp lost").Float64("RateKarmaExpLost", 1)), nil
+}
+
+// loadMerchantConfig reads the server.properties shop settings.
+func loadMerchantConfig(paths gameServerPaths) (merchant.Config, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return merchant.Config{}, err
+	}
+	def := merchant.DefaultConfig()
+	f := config.NewFields(props, "merchant")
+	cfg := merchant.Config{
+		SiegeGuardsPriceRate: f.Float64("RateSiegeGuardsPrice", def.SiegeGuardsPriceRate),
+		AllowWear:            f.Bool("AllowWear", def.AllowWear),
+		WearDelay:            time.Duration(f.Int("WearDelay", int(def.WearDelay/time.Second))) * time.Second,
+		WearPrice:            f.Int("WearPrice", def.WearPrice),
+	}
+	return cfg, f.Err()
 }
 
 // characterSelectDelay is the reuse delay shared by one client's

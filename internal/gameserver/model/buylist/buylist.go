@@ -42,6 +42,12 @@ func (p Product) LimitedStock() bool {
 	return p.MaxCount > -1
 }
 
+// SiegeGuardTicket reports whether the product is one of the item ids,
+// 3960 to 4026, whose price scales by the siege guards price rate.
+func (p Product) SiegeGuardTicket() bool {
+	return p.ItemID >= 3960 && p.ItemID <= 4026
+}
+
 // List is one NPC buylist and its products.
 type List struct {
 	ID       int
@@ -50,6 +56,8 @@ type List struct {
 }
 
 // NewList builds a List from one folded <buyList> element and its products.
+// A product whose item id repeats an earlier one replaces it in place: the
+// list keeps the first position and the last definition.
 func NewList(set *commons.StatSet, products []Product) (List, error) {
 	id, err := set.GetInt("id")
 	if err != nil {
@@ -59,7 +67,23 @@ func NewList(set *commons.StatSet, products []Product) (List, error) {
 	if err != nil {
 		return List{}, fmt.Errorf("buylist %d: %w", id, err)
 	}
-	return List{ID: id, NPCID: npcID, Products: products}, nil
+	return List{ID: id, NPCID: npcID, Products: dedupeProducts(products)}, nil
+}
+
+// dedupeProducts keeps one product per item id, at the position its id
+// first appears, holding its last definition.
+func dedupeProducts(products []Product) []Product {
+	at := make(map[int32]int, len(products))
+	out := products[:0:0]
+	for _, p := range products {
+		if i, ok := at[p.ItemID]; ok {
+			out[i] = p
+			continue
+		}
+		at[p.ItemID] = len(out)
+		out = append(out, p)
+	}
+	return out
 }
 
 // AllowsNPC reports whether npcID can use this list.
@@ -109,4 +133,11 @@ func (t *Table) ProductCount() int {
 func (t *Table) Find(id int) (List, bool) {
 	l, ok := t.byID[id]
 	return l, ok
+}
+
+// Each calls fn for every buylist, in no particular order.
+func (t *Table) Each(fn func(List)) {
+	for _, l := range t.byID {
+		fn(l)
+	}
 }
