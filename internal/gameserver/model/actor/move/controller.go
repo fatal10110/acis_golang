@@ -53,6 +53,11 @@ type npcOffensiveFollowActor interface {
 	CanSee(attackable.Combatant) bool
 }
 
+// visibleActor is an actor that can be off the grid or hidden from it.
+type visibleActor interface {
+	Visible() bool
+}
+
 type targetKnower interface {
 	Knows(attackable.Combatant) bool
 }
@@ -471,7 +476,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			outcome pathFindResult
 			err     error
 		)
-		before := c.move.Position()
+		before := c.move.catchUpCount()
 		switch {
 		case pawnMove:
 			ev, outcome, err = c.move.MoveToPawnWithPathOutcome(target, offset)
@@ -514,7 +519,7 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return nil
 	}
 
-	before := c.move.Position()
+	before := c.move.catchUpCount()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
 	c.syncRetarget(before)
 	if err != nil {
@@ -531,7 +536,7 @@ func (c *Controller) MoveHome(home location.Location) error {
 // point and counts as a geo-path failure for actors that recover from
 // repeated stalls.
 func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
-	before := c.move.Position()
+	before := c.move.catchUpCount()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	c.syncRetarget(before)
 	if err != nil {
@@ -556,7 +561,7 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clearFollow()
-	before := c.move.Position()
+	before := c.move.catchUpCount()
 	ev, outcome, err := c.move.MoveToPawnWithPathOutcome(target, offset)
 	c.syncRetarget(before)
 	if err != nil {
@@ -574,7 +579,7 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 // accepted move's Event, for callers that need the move detail alongside
 // acceptance (task.Walker's WalkerActor contract).
 func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, error) {
-	before := c.move.Position()
+	before := c.move.catchUpCount()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
 	c.syncRetarget(before)
 	if err != nil {
@@ -586,12 +591,24 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, 
 	return ev, nil
 }
 
-// syncRetarget moves the actor's world presence to the cell a player's walk
-// in flight advanced to before a move request retargeted it, if it moved.
-func (c *Controller) syncRetarget(before location.Location) {
-	if at := c.move.Position(); at != before {
-		c.self.SyncPosition(at)
+// syncRetarget moves the actor's world presence to where a player's walk in
+// flight stepped before a move request retargeted it, once a catch-up ran
+// since before (a catchUpCount reading). That catch-up is a movement step
+// even when it stayed on the same cell.
+func (c *Controller) syncRetarget(before uint64) {
+	if c.move.catchUpCount() != before {
+		c.self.SyncPosition(c.move.Position())
 	}
+}
+
+// mayCatchUp reports whether the actor is visible and knows pawn (nil for a
+// fixed point), so a request heading for it may run the retarget catch-up
+// of the walk in flight. An actor with no visibility counts as visible.
+func (c *Controller) mayCatchUp(pawn Pawn) bool {
+	if self, ok := c.self.(visibleActor); ok && !self.Visible() {
+		return false
+	}
+	return pawn == nil || c.knowsPawn(pawn)
 }
 
 func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
