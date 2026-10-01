@@ -103,6 +103,7 @@ func recommendationColumns(t *testing.T, srv *gameservertest.Server, id int32) (
 // ignored, the record of who was recommended survives a relog, and the
 // daily refresh resets online and stored characters alike.
 func TestRecommendationFlow(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Giver", 20, 0),
 		gameservertest.WithWantChars(1),

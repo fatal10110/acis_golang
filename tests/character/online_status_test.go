@@ -24,6 +24,7 @@ func persistedOnline(t *testing.T, srv *gameservertest.Server, objID int32) int 
 // online=1 while the character is in game and online=0 again after logout,
 // so external DB consumers see presence the whole session long.
 func TestOnlineFlagTracksGamePresence(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -58,6 +59,7 @@ func TestOnlineFlagTracksGamePresence(t *testing.T) {
 // survive the session and the session's own elapsed time to be added on
 // every save: playtime must never silently reset to zero or stand still.
 func TestOnlineTimeAccruesAcrossSessions(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	objID := srv.SoleObjectID(t)
 

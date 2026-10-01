@@ -19,6 +19,7 @@ import (
 // outlives its expiry while its trade window is open, so one that timed out
 // cancels the same way.
 func TestLogoutHoldingPartyInviteCancelsTrade(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		elapsed time.Duration

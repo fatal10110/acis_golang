@@ -132,7 +132,7 @@ func TestFrameCharSelected(t *testing.T) {
 	x, y, z := c.Position()
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
-	want = append(want, encodeUTF16Z("Hero")...)
+	want = append(want, encodeUTF16Z(c.Title())...)
 	want = binary.LittleEndian.AppendUint32(want, 999) // session id
 	want = binary.LittleEndian.AppendUint32(want, uint32(5))
 	want = binary.LittleEndian.AppendUint32(want, 0) // unknown

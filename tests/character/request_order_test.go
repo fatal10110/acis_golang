@@ -16,6 +16,7 @@ import (
 // hands each in-world frame to the player's queue and waits for it before
 // reading the next one.
 func TestInWorldRequestsAnswerInSendOrder(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

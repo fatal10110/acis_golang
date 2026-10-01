@@ -65,6 +65,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
+	loginsql "github.com/fatal10110/acis_golang/internal/loginserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -1483,7 +1484,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		cursed = o.cursedWeapons[0]
 	}
 
-	loginAddr, servers, sessions := startLoginServerAcceptor(t)
+	loginAddr, servers, sessions := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
 	servers.Register(1, HexID)
 
 	validator := network.NewSessionValidator()
@@ -1693,6 +1694,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
+	gclConfig.AccessLevels = chars
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
@@ -1944,7 +1946,9 @@ var sharedRSAKeys = sync.OnceValues(manager.NewRSAKeyPool)
 
 // startLoginServerAcceptor mirrors the login-side GS-LS acceptor the network
 // package's own tests use, so Boot completes a real login handshake.
-func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
+//
+// accounts takes the account access levels the game server sends.
+func startLoginServerAcceptor(t *testing.T, accounts *loginsql.AccountStore) (addr string, servers *manager.ServerRegistry, sessions *manager.SessionStore) {
 	t.Helper()
 
 	dir := t.TempDir()
@@ -1968,7 +1972,7 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 	sessions = manager.NewSessionStore()
 	bans := manager.NewIPBanList(zerolog.Nop())
 
-	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, nil, nil, false, nil, loginserver.NewLinkRoster(), zerolog.Nop())
+	gsLink := loginserver.NewGameServerLink(servers, names, keys, sessions, bans, accounts, nil, false, nil, loginserver.NewLinkRoster(), zerolog.Nop())
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

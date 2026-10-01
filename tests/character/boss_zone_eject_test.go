@@ -51,6 +51,7 @@ func assertEjectFrame(t *testing.T, frames [][]byte, objID int32, xMin, xMax int
 }
 
 func TestBossZoneWalkInEjectsToOustLocation(t *testing.T) {
+	t.Parallel()
 	oust := location.Location{X: -500, Y: 20, Z: 30}
 	zones, _ := bossEjectZone(t, oust, 100)
 	srv, _, objID := bootInZones(t, zones)
@@ -64,6 +65,7 @@ func TestBossZoneWalkInEjectsToOustLocation(t *testing.T) {
 }
 
 func TestBossZoneLoginEjectsAfterExpiredPermission(t *testing.T) {
+	t.Parallel()
 	oust := location.Location{X: -5000, Y: 20, Z: 30}
 	zones, boss := bossEjectZone(t, oust, -100)
 	srv := gameservertest.Boot(t,
@@ -84,6 +86,7 @@ func TestBossZoneLoginEjectsAfterExpiredPermission(t *testing.T) {
 }
 
 func TestBossZoneTeleportRejoinEjectsToTown(t *testing.T) {
+	t.Parallel()
 	// One zero coordinate selects the town fallback in BossZone.onEnter.
 	zones, boss := bossEjectZone(t, location.Location{X: 0, Y: 900, Z: 30}, 100)
 	area, err := restart.NewArea([]location.Point{{X: 0, Y: -200}, {X: 1100, Y: -200}, {X: 1100, Y: 200}, {X: 0, Y: 200}}, -10_000, 10_000, map[player.Race]string{player.RaceHuman: "town"})

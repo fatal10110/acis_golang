@@ -14,6 +14,7 @@ import (
 )
 
 func TestValidatePositionFallDamage(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()
@@ -68,6 +69,7 @@ func TestValidatePositionFallDamage(t *testing.T) {
 }
 
 func TestValidatePositionFallDamageUsesFallStat(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	character.AddStatFuncs([]effect.Mod{{Stat: stat.Fall, Op: effect.OpMul, Value: 0.6}})
 	drainQuiet(t, srv.Client) // the stat func change's own UserInfo
@@ -88,6 +90,7 @@ func TestValidatePositionFallDamageUsesFallStat(t *testing.T) {
 }
 
 func TestValidatePositionFemaleSafeFallHeight(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacterSex("Newbie", 5, 0, player.SexFemale),
 		gameservertest.WithWantChars(1),
@@ -118,6 +121,7 @@ func TestValidatePositionFemaleSafeFallHeight(t *testing.T) {
 }
 
 func TestValidatePositionFallCannotKillAndDeadPlayerDoesNotFall(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	x, y, z := srv.PlayerPosition(t, objID)
 	frames := validatePositionReplies(t, srv.Client, location.Location{X: x, Y: y, Z: z - 10_000})
@@ -143,6 +147,7 @@ func TestValidatePositionFallCannotKillAndDeadPlayerDoesNotFall(t *testing.T) {
 }
 
 func TestValidatePositionFallDamageDisabledStillOpensWindow(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex(), gameservertest.WithFallingDamage(false))
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()
@@ -158,6 +163,7 @@ func TestValidatePositionFallDamageDisabledStillOpensWindow(t *testing.T) {
 }
 
 func TestValidatePositionFallDamageIntegerOverflow(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()

@@ -18,6 +18,7 @@ import (
 // the requester hears nothing, no S1_DENIED_TRADE_REQUEST and no trade. Both
 // are free to trade again afterwards.
 func TestAnswerAfterRequestExpired(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		response int32
