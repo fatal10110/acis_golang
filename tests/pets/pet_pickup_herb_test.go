@@ -148,15 +148,18 @@ func withoutOpcode(frames [][]byte, opcode byte) [][]byte {
 }
 
 // requirePetStatusUpdate checks the closing status frame every herb pickup
-// sends for the pet, handled or not. It pins the current Go frame, a plain
-// StatusUpdate, and not the reference one: after destroying the herb the
-// reference sends PetStatusUpdate to the owner and SummonInfo to other
-// players. Tracked by #3007.
+// sends the owner for the pet, handled or not: after destroying the herb,
+// SummonAI.thinkPickUp calls SummonStatus.broadcastStatusUpdate
+// (SummonStatus.java:51-56), whose Summon.updateAndBroadcastStatus
+// (Summon.java:606-612) refreshes the owner's pet window with
+// PetStatusUpdate.
 func requirePetStatusUpdate(t *testing.T, frame []byte, wolf *summon.Actor) {
 	t.Helper()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeStatusUpdate, "pet StatusUpdate")
-	if got := wire.NewReader(frame[1:]).ReadInt32(); got != wolf.ObjectID() {
-		t.Fatalf("StatusUpdate object = %d, want pet %d", got, wolf.ObjectID())
+	assertFrameOpcode(t, frame, serverpackets.OpcodePetStatusUpdate, "PetStatusUpdate")
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // summon type
+	if got := r.ReadInt32(); got != wolf.ObjectID() {
+		t.Fatalf("PetStatusUpdate object = %d, want pet %d", got, wolf.ObjectID())
 	}
 }
 
@@ -178,7 +181,7 @@ func (h *petWorld) requireHerbGone(t *testing.T, wolf *summon.Actor, groundID, t
 // TestPetPickupConsumesHerb commands the wolf to loot a tradable herb. The
 // herb is used on the spot by the pet (SummonAI.thinkPickUp → ItemSkills):
 // the pet casts the herb skill on itself, the owner reads PET_USES_S1, and
-// the pet's status is rebroadcast. The herb never enters the pet inventory
+// the owner's pet window is refreshed with PetStatusUpdate. The herb never enters the pet inventory
 // and the heal-over-time lands on the pet, not the owner.
 func TestPetPickupConsumesHerb(t *testing.T) {
 	t.Parallel()
@@ -190,9 +193,9 @@ func TestPetPickupConsumesHerb(t *testing.T) {
 	// flow's frames are the rest.
 	rest := withoutOpcode(requirePickupHead(t, h.petPickup(t, groundID), wolf, groundID), serverpackets.OpcodePetInfo)
 	if got, want := frameOpcodes(rest), []byte{
-		serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeStatusUpdate,
+		serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodePetStatusUpdate,
 	}; !slices.Equal(got, want) {
-		t.Fatalf("herb use frames = %x, want MagicSkillUse, PET_USES_S1, StatusUpdate (%x)", got, want)
+		t.Fatalf("herb use frames = %x, want MagicSkillUse, PET_USES_S1, PetStatusUpdate (%x)", got, want)
 	}
 	r := wire.NewReader(rest[0][1:])
 	if caster, target, skill, level := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); caster != wolf.ObjectID() || target != wolf.ObjectID() || skill != petHerbSkill || level != 1 {
@@ -220,7 +223,7 @@ func TestPetPickupNonTradableHerbIsNotForPets(t *testing.T) {
 
 	rest := requirePickupHead(t, h.petPickup(t, groundID), wolf, groundID)
 	if len(rest) != 2 {
-		t.Fatalf("non-tradable herb frames = %x, want ITEM_NOT_FOR_PETS then StatusUpdate", frameOpcodes(rest))
+		t.Fatalf("non-tradable herb frames = %x, want ITEM_NOT_FOR_PETS then PetStatusUpdate", frameOpcodes(rest))
 	}
 	assertStaticSystemMessage(t, rest[0], serverpackets.SystemMessageItemNotForPets)
 	requirePetStatusUpdate(t, rest[1], wolf)
@@ -242,13 +245,13 @@ func TestPetPickupHerbUnderReuseReportsReuse(t *testing.T) {
 
 	used := withoutOpcode(requirePickupHead(t, h.petPickup(t, first), wolf, first), serverpackets.OpcodePetInfo)
 	if len(used) != 3 || used[0][0] != serverpackets.OpcodeMagicSkillUse {
-		t.Fatalf("first herb frames = %x, want MagicSkillUse, PET_USES_S1, StatusUpdate", frameOpcodes(used))
+		t.Fatalf("first herb frames = %x, want MagicSkillUse, PET_USES_S1, PetStatusUpdate", frameOpcodes(used))
 	}
 	assertSystemMessageSkill(t, used[1], serverpackets.SystemMessagePetUsesS1, reuseHerbSkill, 1)
 
 	rest := requirePickupHead(t, h.petPickup(t, second), wolf, second)
 	if len(rest) != 2 {
-		t.Fatalf("reused herb frames = %x, want S1_PREPARED_FOR_REUSE then StatusUpdate", frameOpcodes(rest))
+		t.Fatalf("reused herb frames = %x, want S1_PREPARED_FOR_REUSE then PetStatusUpdate", frameOpcodes(rest))
 	}
 	assertSystemMessageSkill(t, rest[0], serverpackets.SystemMessageS1PreparedForReuse, reuseHerbSkill, 1)
 	requirePetStatusUpdate(t, rest[1], wolf)
@@ -256,23 +259,52 @@ func TestPetPickupHerbUnderReuseReportsReuse(t *testing.T) {
 }
 
 // TestPetPickupUnhandledHerbIsAcknowledged loots a herb with no attached
-// skill. The reference's ItemSkills logs the missing skill and does nothing
-// else; the pet has still taken and destroyed the herb. The ActionFailed
-// ahead of the status frame is a known Go-only divergence that the reference
-// does not send; this test pins current behavior until #3007 removes it.
+// skill while another player targets the pet and a third only sees it. The
+// reference's ItemSkills.useItem (ItemSkills.java:45-49) logs the missing
+// skill and returns without a packet; the pet has still taken and destroyed
+// the herb, and SummonStatus.broadcastStatusUpdate closes the pickup:
+//   - CUR_HP StatusUpdate to the players targeting the pet
+//     (CreatureStatus.java:459-469; a summon's bar gate is never calibrated,
+//     so it always reports),
+//   - PetStatusUpdate to the owner, and SummonInfo (NpcInfo) to every other
+//     player that knows the pet (Summon.updateAndBroadcastStatus,
+//     Summon.java:606-612).
+//
+// No ActionFailed reaches the owner, and the bystander gets no StatusUpdate.
 func TestPetPickupUnhandledHerbIsAcknowledged(t *testing.T) {
 	t.Parallel()
 	h, wolf := bootHerbWolf(t)
+	watcher := h.joinSecondPlayer(t, "Watcher")
+	bystander := h.joinBystander(t)
+	selectPet(t, watcher.client, wolf)
 	groundID := h.seedGroundNearOwner(t, emptyHerbID, 1)
+	drainUntilQuiet(t, watcher.client)
+	drainUntilQuiet(t, bystander)
 
 	rest := requirePickupHead(t, h.petPickup(t, groundID), wolf, groundID)
-	if len(rest) != 2 {
-		t.Fatalf("unhandled herb frames = %x, want ActionFailed then StatusUpdate", frameOpcodes(rest))
+	if len(rest) != 1 {
+		t.Fatalf("unhandled herb frames = %x, want only PetStatusUpdate", frameOpcodes(rest))
 	}
-	// Go-only ActionFailed, pinned as a known divergence (#3007).
-	assertFrameOpcode(t, rest[0], serverpackets.OpcodeActionFailed, "ActionFailed")
-	requirePetStatusUpdate(t, rest[1], wolf)
+	requirePetStatusUpdate(t, rest[0], wolf)
 	h.requireHerbGone(t, wolf, groundID, emptyHerbID)
+
+	id := wolf.ObjectID()
+	frames := drainFrames(t, watcher.client)
+	updates, at := statusUpdatesFor(frames, id)
+	assertCurHPUpdates(t, "watcher", updates, curHPFixture(id, int32(wolf.HP())))
+	if info := frameIndex(frames, serverpackets.OpcodeNPCInfo, id); info < 0 || at[0] > info {
+		t.Fatalf("watcher frames = %x; want the pet's CUR_HP StatusUpdate, then its NpcInfo", frameOpcodes(frames))
+	}
+	if _, ok := firstOpcode(frames, serverpackets.OpcodePetStatusUpdate); ok {
+		t.Fatalf("watcher got a PetStatusUpdate, which only the owner may: %x", frameOpcodes(frames))
+	}
+
+	frames = drainFrames(t, bystander)
+	updates, _ = statusUpdatesFor(frames, id)
+	assertCurHPUpdates(t, "bystander", updates)
+	if n := countNPCInfoFor(frames, id); n != 1 {
+		t.Fatalf("bystander got %d pet NpcInfo (frames %x), want 1", n, frameOpcodes(frames))
+	}
 }
 
 // TestPetPickupMergesIntoCarriedStack has the wolf loot adena the owner

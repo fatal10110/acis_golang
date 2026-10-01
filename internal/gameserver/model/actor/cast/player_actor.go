@@ -136,9 +136,16 @@ func (a PlayerActor) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Dur
 	}
 }
 
-func (PlayerActor) MagicMuted() bool { return false }
+// MagicMuted reports an active effect that blocks the player's magic skills.
+func (a PlayerActor) MagicMuted() bool {
+	return a.Character != nil && a.Character.EffectList().IsAffected(effect.FlagMuted)
+}
 
-func (PlayerActor) PhysicalMuted() bool { return false }
+// PhysicalMuted reports an active effect that blocks the player's physical
+// skills.
+func (a PlayerActor) PhysicalMuted() bool {
+	return a.Character != nil && a.Character.EffectList().IsAffected(effect.FlagPhysicalMuted)
+}
 
 func (PlayerActor) SpiritshotCharged() bool { return false }
 
