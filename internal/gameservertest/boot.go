@@ -1843,6 +1843,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedClans != nil {
 		o.seedClans(db)
 	}
+	clanNow := time.Now()
+	if err := clanStore.DeleteExpiredWars(context.Background(), clanNow.UnixMilli()); err != nil {
+		t.Fatalf("delete expired clan wars: %v", err)
+	}
 	clanRows, err := clanStore.Load(context.Background())
 	if err != nil {
 		t.Fatalf("load clans: %v", err)
@@ -1852,7 +1856,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			return o.skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
 		})
 	}
-	gclConfig.Clans.Table().Restore(clanRows, time.Now(), clanConfig.JoinDays)
+	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
 	gclConfig.Clans.DropMissingCrests(crests)
 
 	c := testsupport.Dial(t, ln.Addr().String())

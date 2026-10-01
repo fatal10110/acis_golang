@@ -574,6 +574,39 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.requestPledgeSetMemberPowerGrade(live, req) })
 				}
+			case clientpackets.OpcodeRequestPledgeWarList:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeWarList)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestPledgeWarList(live, req) })
+				}
+			case clientpackets.OpcodeRequestPledgeReorganizeMember:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeReorganizeMember)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestPledgeReorganizeMember(live, req) })
+				}
+			case clientpackets.OpcodeRequestPledgeSetAcademyMaster:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeSetAcademyMaster)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestPledgeSetAcademyMaster(live, req) })
+				}
 			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {
 					continue
@@ -1788,6 +1821,38 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		case clientpackets.OpcodeRequestPledgeMemberList:
 			if live != nil {
 				onLive(live, func() { l.requestPledgeMemberList(live) })
+			}
+
+		case clientpackets.OpcodeRequestStartPledgeWar, clientpackets.OpcodeRequestStopPledgeWar,
+			clientpackets.OpcodeRequestSurrenderPledgeWar:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeWarName)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				switch opcode {
+				case clientpackets.OpcodeRequestStartPledgeWar:
+					onLive(live, func() { l.requestStartPledgeWar(live, req) })
+				case clientpackets.OpcodeRequestStopPledgeWar:
+					onLive(live, func() { l.requestStopPledgeWar(live, req) })
+				default:
+					onLive(live, func() { l.requestSurrenderPledgeWar(live, req) })
+				}
+			}
+
+		case clientpackets.OpcodeRequestReplyStartPledgeWar, clientpackets.OpcodeRequestReplyStopPledgeWar,
+			clientpackets.OpcodeRequestReplySurrenderPledgeWar:
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeWarReply); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestReplyPledgeWar(live, opcode) })
 			}
 
 		case clientpackets.OpcodeRequestShowMiniMap:

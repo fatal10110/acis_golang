@@ -19,7 +19,8 @@ import (
 // before it spawns: the clan's skill list, then live is given the clan
 // skills its rank reaches (shown by the burst's SkillList), its fellow
 // members learn it logged in, and it gets its own roster row and the
-// roster. The siege state (#3150) joins here once it exists.
+// rosters, the main clan's then each sub-unit's. The siege state (#3150)
+// joins here once it exists.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
 	cl, ok := l.clanService().ClanOf(c)
@@ -37,7 +38,9 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
-	client.Session.SendFrame(l.framePledgeMemberList(cl, live))
+	for _, frame := range l.pledgeListFrames(cl, live) {
+		client.Session.SendFrame(frame)
+	}
 }
 
 // leaveClanOnLogout marks live offline in its clan and shows the rest of
@@ -124,6 +127,9 @@ func sendJoinRefusal(to *livePlayer, cl *clan.Clan, target string, refusal clan.
 		frame = serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1ClanIsFull, cl.Name())
 	case clan.JoinSubunitFull:
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageSubclanIsFull)
+	case clan.JoinAcademyRequirements:
+		to.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1NotMeetAcademyRequirements, target))
+		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageAcademyRequirements)
 	default:
 		return
 	}
@@ -185,10 +191,9 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListAdd(row) })
 	l.broadcastToClan(cl, 0, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
-	live.SendFrame(l.framePledgeMemberList(cl))
-	// The clan-war name tags of players around live refresh here once clan
-	// wars exist (#149).
+	l.sendPledgeLists(live, cl)
 	l.broadcastCharacterInfo(live)
+	l.refreshWarTags(live, cl)
 }
 
 // sendLeftClan shows live, on its own queue, that it is out of cl: the
@@ -224,6 +229,7 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListDelete(c.Name) })
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveWithdrawnFromClan))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMustWaitBeforeJoiningAnotherClan))
+	l.refreshWarTags(live, cl)
 }
 
 // requestOustPledgeMember expels the member live names from live's clan.
@@ -271,12 +277,15 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 		})
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSucceededInExpellingClanMember))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMustWaitBeforeAcceptingNewMember))
+	// The players around the expelling member, not the expelled one, see
+	// their war tags refreshed.
+	l.refreshWarTags(live, cl)
 }
 
-// requestPledgeMemberList sends live its clan's roster.
+// requestPledgeMemberList sends live its clan's rosters.
 func (l *GameClientLink) requestPledgeMemberList(live *livePlayer) {
 	if cl, ok := l.clanService().ClanOf(live.Character); ok {
-		live.SendFrame(l.framePledgeMemberList(cl))
+		l.sendPledgeLists(live, cl)
 	}
 }
 
@@ -328,8 +337,7 @@ func (l *GameClientLink) requestPledgeMemberPowerInfo(live *livePlayer, req clie
 	live.SendFrame(serverpackets.FramePledgeReceivePowerInfo(int32(m.PowerGrade), m.Name, cl.RankPrivileges(m.PowerGrade)))
 }
 
-// requestPledgeMemberInfo sends live a member's detail card. A sub-unit's
-// name is not known until sub-units load (#149).
+// requestPledgeMemberInfo sends live a member's detail card.
 func (l *GameClientLink) requestPledgeMemberInfo(live *livePlayer, req clientpackets.RequestPledgeMemberName) {
 	cl, ok := l.clanService().ClanOf(live.Character)
 	if !ok {
@@ -339,6 +347,12 @@ func (l *GameClientLink) requestPledgeMemberInfo(live *livePlayer, req clientpac
 	if !ok {
 		return
 	}
+	live.SendFrame(l.frameMemberInfo(cl, m))
+}
+
+// frameMemberInfo builds m's detail card: its clan's name, or its
+// sub-unit's.
+func (l *GameClientLink) frameMemberInfo(cl *clan.Clan, m clan.Member) wire.Frame {
 	title := m.Title
 	if m.Online {
 		if member, ok := l.livePlayerByID(m.ObjectID); ok {
@@ -351,8 +365,10 @@ func (l *GameClientLink) requestPledgeMemberInfo(live *livePlayer, req clientpac
 	}
 	if m.PledgeType == clan.SubunitMain {
 		info.PledgeName = cl.Name()
+	} else if unit, ok := cl.Subunit(m.PledgeType); ok {
+		info.PledgeName = unit.Name
 	}
-	live.SendFrame(serverpackets.FramePledgeReceiveMemberInfo(info))
+	return serverpackets.FramePledgeReceiveMemberInfo(info)
 }
 
 // mentorName is the name of m's apprentice, else of its sponsor; "Error"

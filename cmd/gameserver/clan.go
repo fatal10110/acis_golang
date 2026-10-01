@@ -31,18 +31,25 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 	cfg := clan.Config{
 		JoinDays:          f.Int("DaysBeforeJoinAClan", 5),
 		CreateDays:        f.Int("DaysBeforeCreateAClan", 10),
+		MembersForWar:     f.Int("ClanMembersForWar", 15),
+		WarPenaltyDays:    f.Int("ClanWarPenaltyWhenEnded", 5),
 		LifeCrystalNeeded: players.Bool("LifeCrystalNeeded", true),
 	}
 	return cfg, f.Err()
 }
 
 // provideClans restores every clan from the database, after the id factory
-// has dropped the clans whose leader no longer exists, clears the crest ids
+// has dropped the clans whose leader no longer exists and the war
+// penalties that ran out while the server was down, clears the crest ids
 // whose image the crest cache does not hold, and returns the clan service
 // writing through the persistence worker. A stored clan skill whose
 // definition is not loaded is skipped.
 func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worker *persist.Worker, cfg clan.Config, crests *datacache.Crests, data *gameData, log zerolog.Logger) (*clan.Service, error) {
 	store := gamesql.NewClanStore(pool)
+	now := time.Now()
+	if err := store.DeleteExpiredWars(ctx, now.UnixMilli()); err != nil {
+		return nil, fmt.Errorf("restore clans: %w", err)
+	}
 	snap, err := store.Load(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("restore clans: %w", err)
@@ -52,7 +59,7 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 		return ok
 	})
 	table := clan.NewTable()
-	table.Restore(snap, time.Now(), cfg.JoinDays)
+	table.Restore(snap, now, cfg.JoinDays)
 	log.Info().Int("clans", table.Len()).Msg("clans loaded")
 	service := clan.NewService(table, store, worker, ids, cfg, time.Now, log)
 	service.DropMissingCrests(crests)
