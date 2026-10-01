@@ -231,6 +231,18 @@ func (c *Controller) SetPositionUpdates(updates PositionUpdateRegistry) {
 // follows it anyway, down to the target's own footprint, and reports true so
 // it does not swing or cast through the obstacle.
 func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	return c.maybeStartOffensiveFollow(target, attackRange, false)
+}
+
+// RecheckOffensiveFollow is one run of an offensive follow task the actor's
+// own AI ticks (see Actor.OwnsOffensiveFollowTicker): MaybeStartOffensiveFollow,
+// except that a swimming or flying actor measures whether target is already
+// in reach in 3D.
+func (c *Controller) RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	return c.maybeStartOffensiveFollow(target, attackRange, true)
+}
+
+func (c *Controller) maybeStartOffensiveFollow(target attackable.Combatant, attackRange int, tick bool) (bool, error) {
 	// Read before mu: MovementDisabled reads the actor's effect state, and
 	// effect hooks stop this controller (taking mu) from other queues.
 	disabled := c.self.MovementDisabled()
@@ -244,7 +256,7 @@ func (c *Controller) MaybeStartOffensiveFollow(target attackable.Combatant, atta
 		unseen = func() bool { return !npcActor.CanSee(target) }
 	}
 	reissue := !disabled && c.selfFollowsByPawn()
-	return c.maybeStartFollow(target, attackRange, FollowOffensive, blocked, unseen, reissue)
+	return c.maybeStartFollow(target, attackRange, FollowOffensive, tick, blocked, unseen, reissue)
 }
 
 // HoldOffensiveFollow is MaybeStartOffensiveFollow for an intention that
@@ -256,7 +268,7 @@ func (c *Controller) HoldOffensiveFollow(target attackable.Combatant, attackRang
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Blocked, the follow returns before any follow, movement or error.
-	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, true, nil, false)
+	outOfRange, _ := c.maybeStartFollow(target, attackRange, FollowOffensive, false, true, nil, false)
 	return outOfRange
 }
 
@@ -281,7 +293,7 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 		c.startPawnFriendlyFollow(target, offset)
 		return true, nil
 	}
-	return c.maybeStartFollow(target, offset, FollowFriendly, false, nil, false)
+	return c.maybeStartFollow(target, offset, FollowFriendly, false, false, nil, false)
 }
 
 // CancelFriendlyFollow drops a player's friendly follow task, leaving a walk
@@ -336,7 +348,7 @@ func (c *Controller) pawnFriendlyFollowTick() {
 	sx, sy, sz := c.self.Position()
 	tx, ty, tz := other.Position()
 	dest := location.Location{X: tx, Y: ty, Z: tz}
-	if (location.Location{X: sx, Y: sy, Z: sz}).In2DRadius(dest, c.friendlyOffset) {
+	if inRadius(c.move.MoveType(), location.Location{X: sx, Y: sy, Z: sz}, dest, c.friendlyOffset) {
 		return
 	}
 	ev, outcome, err := c.move.MoveToPawnWithPathOutcome(target, c.friendlyOffset)
@@ -381,13 +393,16 @@ func (c *Controller) followingLocked(target attackable.Combatant, mode FollowMod
 	return target != nil && c.move.FollowMode() == mode && c.move.FollowTarget() == target.ObjectID()
 }
 
-// maybeStartFollow resolves one follow request. blocked means the actor
+// maybeStartFollow resolves one follow request. tick marks a run of the
+// offensive follow task rather than its start; a friendly follow request and
+// a follow task run measure whether target is in reach in 3D while the actor
+// swims or flies. blocked means the actor
 // cannot move and has no follow toward target running: an out-of-range
 // target then reports true without starting a follow or a move. unseen,
 // when set, reports that an offensive target already in reach is out of
 // sight, so the actor still closes in to the target's footprint. reissue
 // re-sends the walk even when one toward the target's position is under way.
-func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, blocked bool, unseen func() bool, reissue bool) (bool, error) {
+func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, mode FollowMode, tick, blocked bool, unseen func() bool, reissue bool) (bool, error) {
 	if offset < 0 {
 		return false, nil
 	}
@@ -406,11 +421,14 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	if mode == FollowOffensive && c.selfHasOffensiveFollowLead() && target.IsMoving() {
 		totalRadius += 50
 	}
-	inRange := origin.In2DRadius(dest, totalRadius)
-	if mode == FollowOffensive {
-		if actor, ok := c.self.(pawnFollowActor); ok && actor.OffensiveFollowIsPawnMove() {
-			inRange = origin.In3DRadius(dest, totalRadius)
-		}
+	var inRange bool
+	switch {
+	case mode == FollowOffensive && c.selfFollowsByPawn():
+		inRange = origin.In3DRadius(dest, totalRadius)
+	case mode == FollowFriendly || tick:
+		inRange = inRadius(c.move.MoveType(), origin, dest, totalRadius)
+	default:
+		inRange = origin.In2DRadius(dest, totalRadius)
 	}
 	if inRange {
 		if mode == FollowFriendly {
@@ -715,7 +733,7 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	c.offensiveFollowElapsed = 0
-	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil, false)
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, true, false, nil, false)
 }
 
 // startOffensiveFollow arms the offensive follow task toward target at

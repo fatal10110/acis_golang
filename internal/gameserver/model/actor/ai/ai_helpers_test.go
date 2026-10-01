@@ -332,6 +332,11 @@ type summonMove struct {
 	friendlyRange  int
 }
 
+// RecheckOffensiveFollow records like MaybeStartOffensiveFollow.
+func (m *summonMove) RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
+	return m.MaybeStartOffensiveFollow(target, attackRange)
+}
+
 func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error) {
 	m.friendlyTarget = target
 	m.friendlyRange = offset

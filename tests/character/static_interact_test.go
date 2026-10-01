@@ -20,7 +20,9 @@ import (
 // PlayerMove.java:335-352, MoveToPawn at offset 100), unless shift is held;
 // in range and within Npc.INTERACTION_DISTANCE (150), it faces the object
 // with MoveToPawn(actor, target, 150) before StaticObject.onInteract
-// (StaticObject.java:24-35) answers.
+// (StaticObject.java:24-35) answers. The approach ends on the object's
+// point: only a Creature pawn stops the walk at its offset
+// (CreatureMove.isOnLastPawnMoveGeoPath, CreatureMove.java:468-471).
 
 // bootBodied boots the one character with the datapack human fighter body
 // (radius 9 male), which the shared class template leaves at zero: the
@@ -156,10 +158,11 @@ func TestTownMapClickFromAfarWalksThenShowsMap(t *testing.T) {
 	}
 	assertMoveToPawn(t, frameWithOpcode(t, frames, serverpackets.OpcodeMoveToPawn), objID, mapObject.ObjectID(), 150)
 	assertTownMap(t, frameWithOpcode(t, frames, serverpackets.OpcodeShowTownMap))
+	// A static object is no creature: the approach walks onto its point
+	// rather than stopping 100 short of it (isOnLastPawnMoveGeoPath).
 	at := mover.Position()
-	x, y, z := mapObject.Position()
-	if !location.In3DRadius(at.X, at.Y, at.Z, x, y, z, 150) {
-		t.Fatalf("arrived at %v, outside 150 of the town map at (%d,%d,%d)", at, x, y, z)
+	if x, y, _ := mapObject.Position(); at.X != x || at.Y != y {
+		t.Fatalf("arrived at %v, want the town map's point (%d,%d)", at, x, y)
 	}
 }
 

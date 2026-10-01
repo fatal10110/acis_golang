@@ -765,6 +765,10 @@ func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, 
 	return false, nil
 }
 
+func (inertSummonMoveController) RecheckOffensiveFollow(attackable.Combatant, int) (bool, error) {
+	return false, nil
+}
+
 // summonAIActor adapts a live summon to the shared periodic AI task. The
 // task owns tick scheduling; the summon AI owns its intention state.
 type summonAIActor struct {

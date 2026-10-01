@@ -25,8 +25,9 @@ type FolkMovement struct {
 	// Sink receives the NPC's moves, stops, teleports and route lines for
 	// its observers; nil leaves them unseen.
 	Sink event.Sink
-	// WaterSurface caps a walk under water at the surface; nil for none.
-	WaterSurface func(position location.Location, groundZ int) (int, bool)
+	// WaterSurface reports the water zone at a position and its surface
+	// level, where the NPC swims; nil for none.
+	WaterSurface func(location.Location) (int, bool)
 	// InWater reports whether a teleport destination lies in water, where
 	// it keeps its own height; nil for never.
 	InWater func(location.Location) bool
