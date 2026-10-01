@@ -61,4 +61,5 @@ const (
 	OpcodeRequestPreviewItem      = 0xc6
 	OpcodeGameGuardReply          = 0xca
 	OpcodeRequestShowMiniMap      = 0xcd
+	OpcodeRequestRecordInfo       = 0xcf
 )

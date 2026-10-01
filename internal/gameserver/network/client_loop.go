@@ -1524,6 +1524,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.showMiniMap(live, serverpackets.RegularMapID) })
 			}
 
+		case clientpackets.OpcodeRequestRecordInfo:
+			// The request carries no body; with no player in the world
+			// nothing answers, as the specified handler does.
+			if live != nil {
+				onLive(live, func() { l.requestRecordInfo(live) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeDummy23,

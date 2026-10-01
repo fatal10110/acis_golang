@@ -132,6 +132,9 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
+		// The view resync answers with UserInfo, then each known object;
+		// the player here knows nothing.
+		{"RequestRecordInfo with nothing in view", wire.NewPacketWriter(clientpackets.OpcodeRequestRecordInfo).Bytes(), []byte{serverpackets.OpcodeUserInfo}},
 		// The sell command puts the player in sell set-up; the buy command
 		// that follows is refused without a message of its own.
 		{"RequestActionUse private store sell", encodeRequestActionUse(10, false, false), []byte{serverpackets.OpcodePrivateStoreManageListSell}},

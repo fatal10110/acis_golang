@@ -16,7 +16,36 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (p *livePlayer) Discover(obj world.Tracked) {
+func (p *livePlayer) Discover(obj world.Tracked) { p.sendInfoFrom(obj, false) }
+
+// requestRecordInfo answers the client's view resync: live's UserInfo, then
+// everything live knows resent as it was first seen.
+func (l *GameClientLink) requestRecordInfo(live *livePlayer) {
+	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	live.refreshInfos(l.world)
+}
+
+// refreshInfos resends p everything it knows, each object as p first saw
+// it: its info packet and what it is doing. A known player in observer mode
+// is left out. It runs on p's queue.
+func (p *livePlayer) refreshInfos(w *world.State) {
+	sim.AssertOwner(p.Queue())
+	if w == nil {
+		return
+	}
+	w.ForEachKnown(p, func(obj world.Tracked) {
+		if o, ok := obj.(*livePlayer); ok && o.ObserverMode() {
+			return
+		}
+		p.sendInfoFrom(obj, true)
+	})
+}
+
+// sendInfoFrom sends p obj's info packet and, for a creature, what it is
+// doing (describeState). onQueue reports that the caller runs on p's own
+// queue, where an owned pet's item list and state follow its PetInfo at
+// once; otherwise they are posted there.
+func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	switch o := obj.(type) {
 	case *livePlayer:
 		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
@@ -38,7 +67,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *npc.Folk:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
-		p.describeState(o, nil)
+		p.describeState(o, o.CastControl())
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {
 			o.MarkDiscoveredByOwner()
@@ -52,11 +81,16 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 					// the snapshot is always taken and sent on p's queue. The
 					// pet's state follows its item list there.
 					seen := p.petSightings.Add(1)
-					p.Queue().Post(func() {
+					sendList := func() {
 						if p.sendPetItemList(inv, seen) {
 							p.describeState(o, o.CastControl())
 						}
-					})
+					}
+					if onQueue {
+						sendList()
+					} else {
+						p.Queue().Post(sendList)
+					}
 					return
 				}
 				p.describeState(o, o.CastControl())
