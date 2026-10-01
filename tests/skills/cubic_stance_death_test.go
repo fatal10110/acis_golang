@@ -193,9 +193,9 @@ func TestOwnerDeathRemovesIdleStormCubic(t *testing.T) {
 
 // TestOwnerDeathRemovesLifeCubicSilently: the Life Cubic is removed at the
 // death itself, not on its next action tick, and the removal broadcasts
-// nothing (stopCubics(false); Cubic.stop(false), Cubic.java:272-283): no
-// UserInfo beyond the death's own frames, and none one interval later from
-// a lazy expiry.
+// nothing (stopCubics(false); Cubic.stop(false), Cubic.java:272-283): the
+// death sends only its own single UserInfo, and none follows one interval
+// later from a lazy expiry.
 func TestOwnerDeathRemovesLifeCubicSilently(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootCubicSummoner(t, 900*time.Second, 900*time.Second)
@@ -210,15 +210,21 @@ func TestOwnerDeathRemovesLifeCubicSilently(t *testing.T) {
 	if got := liveCubicIDs(t, srv, objID); len(got) != 0 {
 		t.Fatalf("cubics right after the death = %v, want none", got)
 	}
-	// The death's own frames run up to and including Die; the cubic goes
-	// with it, so nothing after Die may refresh the owner's appearance.
+	// The death itself sends exactly one UserInfo, ahead of Die: the
+	// appearance refresh after its effects are stripped (Character.Die emits
+	// EffectsStripped before Die). The cubic removal runs in the same Died
+	// handling, so a broadcast of its own would show up as a second one,
+	// either side of Die.
 	frames := queueFrames(t, c)
 	die := slices.IndexFunc(frames, func(f []byte) bool { return f[0] == serverpackets.OpcodeDie })
 	if die < 0 {
 		t.Fatalf("death sent no Die (frames %x)", opcodesOf(frames))
 	}
-	if n := countOpcode(frames[die+1:], serverpackets.OpcodeUserInfo); n != 0 {
-		t.Fatalf("death sent %d UserInfo after Die, want 0: the cubic removal broadcasts nothing (frames %x)", n, opcodesOf(frames))
+	if n := countOpcode(frames, serverpackets.OpcodeUserInfo); n != 1 {
+		t.Fatalf("death sent %d UserInfo, want 1 (the effects-strip refresh): the cubic removal broadcasts nothing (frames %x)", n, opcodesOf(frames))
+	}
+	if n := countOpcode(frames[:die], serverpackets.OpcodeUserInfo); n != 1 {
+		t.Fatalf("death's UserInfo does not precede Die (frames %x)", opcodesOf(frames))
 	}
 
 	srv.Advance(t, 2*lifeCubicInterval*time.Second)
