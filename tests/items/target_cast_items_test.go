@@ -205,7 +205,8 @@ func TestChestKeyRefusals(t *testing.T) {
 
 // TestSoulCrystalCastsOnTarget uses a Red Soul Crystal with Ctrl on a
 // targeted monster: Soul Crystal (2096) starts on it with Ctrl as its
-// force-use flag, costs its 26 MP, and leaves the crystal in place.
+// force-use flag, costs its 26 MP, starts its 3 s reuse, and leaves the
+// crystal in place.
 func TestSoulCrystalCastsOnTarget(t *testing.T) {
 	t.Parallel()
 	srv := bootTargetCastItems(t)
@@ -229,7 +230,33 @@ func TestSoulCrystalCastsOnTarget(t *testing.T) {
 	if got := srv.PlayerCurrentMP(t, objID); got != mp-26 {
 		t.Fatalf("MP after Soul Crystal = %d, want %d", got, mp-26)
 	}
+
+	// Soul Crystal's 3 s reuse is running: using the crystal again at once
+	// is refused with S1_PREPARED_FOR_REUSE, starts no cast and spends no
+	// MP.
+	c.Send(encodeUseItem(crystal, true))
+	for {
+		frame := c.ReadWithTimeout(3 * time.Second)
+		if frame == nil {
+			t.Fatal("repeated crystal use: no S1_PREPARED_FOR_REUSE")
+		}
+		if frame[0] == serverpackets.OpcodeMagicSkillUse {
+			if caster, _, _, _, _, _ := decodeMagicSkillUse(frame); caster == objID {
+				t.Fatal("repeated crystal use inside the reuse sent MagicSkillUse")
+			}
+		}
+		if frame[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, frame) == serverpackets.SystemMessageS1PreparedForReuse {
+			assertSystemMessageSkill(t, frame, serverpackets.SystemMessageS1PreparedForReuse, 2096, 1)
+			break
+		}
+	}
 	drainUntilQuiet(t, c)
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("repeated crystal use inside the reuse started a cast")
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != mp-26 {
+		t.Fatalf("MP after the refused repeat = %d, want %d", got, mp-26)
+	}
 	assertItemCount(t, srv, objID, crystal, 1)
 }
 

@@ -2,6 +2,7 @@ package skills
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -44,7 +45,16 @@ func TestSpoilRefusedOnNonMonsterTarget(t *testing.T) {
 				return
 			}
 			assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-			assertNoActionFailedUntilQuiet(t, c, "Spoil on a "+tc.kind)
+			// Nor does the refusal hand on to Spoil's nextActionAttack: none
+			// of these NPCs is attackable without Ctrl.
+			for frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(300 * time.Millisecond) {
+				switch {
+				case frame[0] == serverpackets.OpcodeActionFailed:
+					t.Fatalf("Spoil on a %s sent ActionFailed after the rejection message", tc.kind)
+				case frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == objID:
+					t.Fatalf("Spoil on a %s handed on to an attack", tc.kind)
+				}
+			}
 			if srv.PlayerCastingNow(t, objID) {
 				t.Fatalf("Spoil on a %s started a cast", tc.kind)
 			}
