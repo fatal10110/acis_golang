@@ -56,7 +56,7 @@ func interactNow(t *testing.T, h *petWorld, pet *summon.Actor, shift bool, what 
 	t.Helper()
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), shift))
-	frames := readImmediate(h.client)
+	frames := h.srv.ReadQueued(t, h.client)
 	if !hasOpcode(frames, serverpackets.OpcodeActionFailed) {
 		t.Fatalf("pet click %s = opcodes %x, want ActionFailed first", what, frameOpcodes(frames))
 	}
@@ -68,7 +68,7 @@ func selectPetNow(t *testing.T, h *petWorld, pet *summon.Actor) {
 	t.Helper()
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
-	for _, f := range readImmediate(h.client) {
+	for _, f := range h.srv.ReadQueued(t, h.client) {
 		if f[0] == serverpackets.OpcodePetStatusShow {
 			t.Fatal("selecting the pet opened its status window")
 		}
@@ -179,7 +179,7 @@ func TestOwnedPetInteractDuringChaseEndsTheAttack(t *testing.T) {
 			h.client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
 			drainUntilQuiet(t, h.client)
 			h.client.Send(encodeAction(hostile.ObjectID(), int32(px), int32(py), int32(pz), false))
-			readImmediate(h.client)
+			h.srv.ReadQueued(t, h.client)
 			if !h.srv.PlayerMove(t, h.ownerID).Moving() {
 				t.Fatal("the owner is not chasing the monster")
 			}
@@ -329,7 +329,7 @@ func TestOwnedPetInteractDropsGroundCastApproach(t *testing.T) {
 	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeRequestExMagicSkillUseGround(int32(px+600), int32(py), int32(pz), replaceGroundSkillID))
-	if frames := readImmediate(h.client); !hasOpcode(frames, serverpackets.OpcodeMoveToLocation) {
+	if frames := h.srv.ReadQueued(t, h.client); !hasOpcode(frames, serverpackets.OpcodeMoveToLocation) {
 		t.Fatalf("ground cast out of range = opcodes %x, want the approach walk", frameOpcodes(frames))
 	}
 	if !h.srv.PlayerMove(t, h.ownerID).Moving() {

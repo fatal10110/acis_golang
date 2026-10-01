@@ -97,7 +97,7 @@ func TestHeldCollarResumedWhileTeleportingGoesIdle(t *testing.T) {
 	startOwnerStandUp(t, h)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertHeldCollar(t, h, readImmediate(h.client), "collar mid stand-up")
+	assertHeldCollar(t, h, h.srv.ReadQueued(t, h.client), "collar mid stand-up")
 	owner := h.character(t)
 	if !owner.SetTeleporting(true) {
 		t.Fatal("SetTeleporting(true) reported no change")
@@ -128,7 +128,7 @@ func TestHeldCollarDroppedByTeleport(t *testing.T) {
 	startOwnerStandUp(t, h)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertHeldCollar(t, h, readImmediate(h.client), "collar mid stand-up")
+	assertHeldCollar(t, h, h.srv.ReadQueued(t, h.client), "collar mid stand-up")
 
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	h.character(t).TeleportTo(x+300, y, z, 0)

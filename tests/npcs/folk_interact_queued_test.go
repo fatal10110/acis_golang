@@ -41,17 +41,6 @@ func encodeRequestMagicSkillUse(skillID int32) []byte {
 	return w.Bytes()
 }
 
-// readImmediate collects the frames already on their way to c, letting at
-// most a millisecond pass on the driven clock: nothing a swing, cast or
-// posture change in flight schedules comes due meanwhile.
-func readImmediate(c *testsupport.ScriptedClient) [][]byte {
-	var frames [][]byte
-	for frame := c.ReadWithTimeout(time.Millisecond); frame != nil; frame = c.ReadWithTimeout(time.Millisecond) {
-		frames = append(frames, frame)
-	}
-	return frames
-}
-
 // readUntilOpcode reads frames up to and including the first want.
 func readUntilOpcode(t *testing.T, c *testsupport.ScriptedClient, want byte, what string) [][]byte {
 	t.Helper()
@@ -91,7 +80,7 @@ func isTalkFrame(frame []byte, playerID int32, f *npc.Folk) bool {
 func (w *folkWorld) clickFolkQueued(t *testing.T, f *npc.Folk, what string) {
 	t.Helper()
 	w.c.Send(encodeAction(f.ObjectID(), w.at, false))
-	frames := readImmediate(w.c)
+	frames := w.srv.ReadQueued(t, w.c)
 	if _, ok := firstOpcode(frames, serverpackets.OpcodeActionFailed); !ok {
 		t.Fatalf("folk click %s = opcodes %x, want ActionFailed", what, opcodes(frames))
 	}
@@ -170,7 +159,7 @@ func TestFolkTalkMidSwingRunsAtSwingEnd(t *testing.T) {
 
 	// Selecting the NPC leaves the swing and the attack running.
 	w.c.Send(encodeAction(f.ObjectID(), w.at, false))
-	readImmediate(w.c)
+	w.srv.ReadQueued(t, w.c)
 	w.clickFolkQueued(t, f, "mid-swing")
 
 	frames := readUntilOpcode(t, w.c, serverpackets.OpcodeNpcHtmlMessage, "chat window after the swing")
@@ -232,7 +221,7 @@ func TestFolkTalkMidCastRunsAtCastEnd(t *testing.T) {
 
 	w.c.Send(encodeRequestMagicSkillUse(longCastSkillID))
 	readUntilOpcode(t, w.c, serverpackets.OpcodeMagicSkillUse, "long cast MagicSkillUse")
-	readImmediate(w.c)
+	w.srv.ReadQueued(t, w.c)
 	if !srv.PlayerCastingNow(t, w.player) {
 		t.Fatal("long cast not in flight")
 	}
