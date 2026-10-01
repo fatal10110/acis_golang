@@ -318,10 +318,13 @@ func TestStandRequestDuringFakeDeathGetUpAnswersAtSettlement(t *testing.T) {
 		StartFakeDeath() bool
 		StopFakeDeath() bool
 		StandingNow() bool
+		SittingNow() bool
 	})
 	fake.StartFakeDeath()
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "fake death")
-	srv.Advance(t, 3*time.Second)
+	// The lie-down lasts 3000ms over the movement speed multiplier; a get-up
+	// started before it ends would leave the player seated when it does.
+	srv.AdvanceUntil(t, "fake-death lie-down ended", func() bool { return !fake.SittingNow() })
 	fake.StopFakeDeath()
 	mustReadOpcode(t, c, serverpackets.OpcodeChangeWaitType, "fake death get-up")
 	if !fake.StandingNow() {

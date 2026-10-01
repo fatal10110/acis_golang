@@ -178,7 +178,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.awardKillerPvPKill(killer)
 	c.ClearCharges()
 	if fakeDead {
-		c.stopFakeDeathOnDeath()
+		c.GetUpFromFakeDeath()
 	}
 	c.applyDeathExpKarmaLoss(killer)
 	c.emit(event.FusionCastersStopRequested{})
@@ -190,16 +190,6 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	// The retained effects' icons are resent once the death has settled.
 	c.UpdateEffectIcons()
 	return true
-}
-
-// stopFakeDeathOnDeath gets a player that died playing dead up out of fake
-// death once more: a Fake Death a blessing kept through the death ends,
-// with its own get-up, then the recent-fake-death grace restarts and the
-// get-up and revive visuals go out again.
-func (c *Character) stopFakeDeathOnDeath() {
-	c.EffectList().StopByType(effect.TypeFakeDeath)
-	c.MarkRecentFakeDeath()
-	c.StopFakeDeath()
 }
 
 // Kill runs c's death sequence at once, whatever its HP, crediting killer;

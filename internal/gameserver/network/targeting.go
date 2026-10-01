@@ -17,7 +17,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -669,14 +668,13 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// Standing up rejects only on real death, not fake death, and instead
-	// stops the fake-death toggle: removing the FAKE_DEATH effect runs its
-	// exit hook, which stands the player back up and broadcasts the revive
-	// visual. Once the
-	// effect is gone the player is still getting up, and the request is
-	// refused below as a stand while not seated.
-	if stand && !live.Dead() && live.EffectList().IsAffected(effect.FlagFakeDeath) {
-		live.EffectList().StopByType(effect.TypeFakeDeath)
+	// A stand while lying in fake death gets up out of it instead of
+	// standing up: the Fake Death effect, if still on, ends with its own
+	// get-up, then the player gets up again. During a get-up the player is
+	// not seated, and the request is refused below as a stand while not
+	// seated.
+	if stand && live.Seated() && live.FakeDead() {
+		live.GetUpFromFakeDeath()
 		return
 	}
 	if !stand {

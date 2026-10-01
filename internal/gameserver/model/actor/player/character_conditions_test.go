@@ -22,7 +22,6 @@ func TestCharacterCrowdControlGettersTrackActiveEffectsAndClearOnRemoval(t *test
 		{"Sleeping", "Sleep", (*Character).Sleeping},
 		{"Afraid", "Fear", (*Character).Afraid},
 		{"ImmobileUntilAttacked", "ImmobileUntilAttacked", (*Character).ImmobileUntilAttacked},
-		{"FakeDead", "FakeDeath", (*Character).FakeDead},
 	}
 
 	for _, tt := range tests {
@@ -117,7 +116,6 @@ func TestCharacterAttackDisabledMatchesReferenceTerms(t *testing.T) {
 		{"Sleep", true},
 		{"Paralyze", true},
 		{"Fear", true},
-		{"FakeDeath", true},
 		{"Root", false},
 	}
 	for _, tt := range effects {
@@ -348,14 +346,15 @@ func TestCharacterAlikeDeadUnionsRealDeathAndFakeDeath(t *testing.T) {
 		t.Fatal("AlikeDead() = true on a fresh character")
 	}
 
-	e := addCharacterEffect(t, c, "FakeDeath")
+	c.StartFakeDeath()
 	if !c.AlikeDead() {
-		t.Fatal("AlikeDead() = false with an active fake-death effect, want true")
+		t.Fatal("AlikeDead() = false while playing dead, want true")
 	}
 
-	c.EffectList().Remove(e)
+	c.StopFakeDeath()
+	c.endFakeDeathGetUp()
 	if c.AlikeDead() {
-		t.Fatal("AlikeDead() = true after the fake-death effect was removed")
+		t.Fatal("AlikeDead() = true after the fake-death get-up ended")
 	}
 
 	c.MarkDead()

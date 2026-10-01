@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 func (c *Character) initStateLocked() {
@@ -102,7 +103,7 @@ func (c *Character) changePosture(standing, always bool) bool {
 	changed := c.standing != standing
 	c.standing = standing
 	if changed || always {
-		c.beginPostureTransitionLocked(standing, sitStandDelay, false)
+		c.beginPostureTransitionLocked(standing, sitStandDelay)
 	}
 	return changed
 }
@@ -132,49 +133,45 @@ func (c *Character) StandingNow() bool {
 
 // beginPostureTransitionLocked starts a sit-down (standing false) or
 // stand-up transition, replacing any transition still running. It ends
-// after delay with a PostureSettled event; endsFakeDeath makes its end also
-// end fake death. A character without a live runtime has no queue to end it
-// on and starts none, so it reports false and the caller settles at once.
-// c.stateMu must be held.
-func (c *Character) beginPostureTransitionLocked(standing bool, delay time.Duration, endsFakeDeath bool) bool {
+// after delay with a PostureSettled event. A character without a live
+// runtime has no queue to end it on and starts none. c.stateMu must be held.
+func (c *Character) beginPostureTransitionLocked(standing bool, delay time.Duration) {
 	if c.Live == nil {
-		return false
+		return
 	}
 	c.postureGen++
 	gen := c.postureGen
 	c.sittingNow, c.standingNow = !standing, standing
-	c.afterLocked(delay, func() { c.settlePosture(gen, endsFakeDeath) })
-	return true
+	c.afterLocked(delay, func() { c.settlePosture(gen, standing) })
 }
 
 // settlePosture ends the transition gen started, unless a later transition
 // replaced it. A sit-down's end leaves the character seated, even when a
-// get-up out of fake death on its corpse took the standing posture
-// meanwhile without replacing the lie-down.
-func (c *Character) settlePosture(gen uint64, endsFakeDeath bool) {
+// get-up out of fake death took the standing posture meanwhile: the get-up
+// runs beside the lie-down and does not replace it.
+func (c *Character) settlePosture(gen uint64, standing bool) {
 	c.stateMu.Lock()
 	if gen != c.postureGen {
 		c.stateMu.Unlock()
 		return
 	}
-	if c.sittingNow {
+	if standing {
+		c.standingNow = false
+	} else {
+		c.sittingNow = false
 		c.standing = false
-	}
-	c.sittingNow, c.standingNow = false, false
-	if endsFakeDeath {
-		c.fakeDeath = false
 	}
 	c.stateMu.Unlock()
 	c.emit(event.PostureSettled{})
 }
 
 // FakeDead reports whether the character plays dead: from the start of
-// fake death until its stand-up ends, which outlasts the effect itself.
+// fake death until a get-up out of it ends, which outlasts the effect
+// itself.
 func (c *Character) FakeDead() bool {
 	c.stateMu.RLock()
-	live, faking := c.Live, c.fakeDeath
-	c.stateMu.RUnlock()
-	return faking || live.FakeDead()
+	defer c.stateMu.RUnlock()
+	return c.fakeDeath
 }
 
 // StartFakeDeath lies down into fake death, starts the lie-down transition
@@ -186,26 +183,31 @@ func (c *Character) StartFakeDeath() bool {
 	changed := c.standing
 	c.standing = false
 	c.fakeDeath = true
-	c.beginPostureTransitionLocked(false, delay, false)
+	c.beginPostureTransitionLocked(false, delay)
 	c.stateMu.Unlock()
 	c.broadcastStanceChange(event.StanceFakeDeathStart)
 	return changed
 }
 
 // StopFakeDeath gets up out of fake death and sends the get-up and revive
-// visuals, dead or alive. A living character plays dead until the stand-up
-// ends. A dead one takes the standing posture with no stand-up and leaves
-// fake death at once, so a later revive finds it not faking; a lie-down
-// still running goes on and seats it when it ends.
+// visuals, dead or alive. The character takes the standing posture and
+// plays dead until the get-up ends, a corpse included, so a restart request
+// in that window only gets it up again. The get-up runs beside a lie-down
+// still under way, which seats the character when it ends. Every call
+// starts its own get-up and nothing cancels one: the first to end ends fake
+// death, and a later one ends any fake death begun in between. A character
+// without a live runtime leaves fake death at once.
 func (c *Character) StopFakeDeath() bool {
-	dead := c.Dead()
 	delay := fakeDeathDelay(fakeDeathStandMillis, c.MovementSpeedMultiplier())
 	c.stateMu.Lock()
 	c.initStateLocked()
 	changed := !c.standing
 	c.standing = true
-	if dead || !c.beginPostureTransitionLocked(true, delay, true) {
+	if c.Live == nil {
 		c.fakeDeath = false
+	} else {
+		c.standingNow = true
+		c.afterLocked(delay, c.endFakeDeathGetUp)
 	}
 	c.stateMu.Unlock()
 	c.broadcastStanceChange(event.StanceFakeDeathStop)
@@ -213,26 +215,24 @@ func (c *Character) StopFakeDeath() bool {
 	return changed
 }
 
-// RepeatFakeDeathStop answers another get-up request made while the
-// character is already getting up out of fake death: it restarts the
-// recent-fake-death grace and sends the get-up and revive visuals again. The
-// running get-up is left alone and still ends fake death on time. It
-// reports false and does nothing outside such a get-up, or on a dead
-// character.
-func (c *Character) RepeatFakeDeathStop() bool {
-	if c.Dead() {
-		return false
-	}
-	c.stateMu.RLock()
-	gettingUp := c.fakeDeath && c.standingNow
-	c.stateMu.RUnlock()
-	if !gettingUp {
-		return false
-	}
+// endFakeDeathGetUp ends a get-up StopFakeDeath started, and fake death
+// with it.
+func (c *Character) endFakeDeathGetUp() {
+	c.stateMu.Lock()
+	c.fakeDeath = false
+	c.standingNow = false
+	c.stateMu.Unlock()
+	c.emit(event.PostureSettled{})
+}
+
+// GetUpFromFakeDeath answers a request to leave fake death made while the
+// character plays dead, and a death that finds it playing dead: a Fake
+// Death effect still on ends, its exit getting the character up once, then
+// the recent-fake-death grace restarts and the character gets up again.
+func (c *Character) GetUpFromFakeDeath() {
+	c.EffectList().StopByType(effect.TypeFakeDeath)
 	c.MarkRecentFakeDeath()
-	c.broadcastStanceChange(event.StanceFakeDeathStop)
-	c.emit(event.FakeDeathRevived{})
-	return true
+	c.StopFakeDeath()
 }
 
 // fakeDeathDelay is millis divided by the movement speed multiplier,

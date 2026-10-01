@@ -46,13 +46,13 @@ func intakePlayerOf(t *testing.T, srv *gameservertest.Server, id int32) intakePl
 
 // bootPvPPair boots a level-5 attacker whose every swing lands without a
 // critical, and a level-40 victim at full HP and CP carrying karma, which the attacker's auto-attack keeps
-// going against without force.
-func bootPvPPair(t *testing.T) (srv *gameservertest.Server, c, vc *scriptedClient, attacker, victim intakePlayer) {
+// going against without force. opts add to the boot options.
+func bootPvPPair(t *testing.T, opts ...gameservertest.Option) (srv *gameservertest.Server, c, vc *scriptedClient, attacker, victim intakePlayer) {
 	t.Helper()
-	srv = gameservertest.Boot(t,
+	srv = gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Attacker", 5, 0),
 		gameservertest.WithWantChars(1),
-	)
+	}, opts...)...)
 	c = srv.Client
 	attackerID := srv.SoleObjectID(t)
 	victimID := srv.SeedCharacterFor(t, "victim", "Victim", 40, 0).ID

@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -32,15 +31,10 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	if live == nil {
 		return
 	}
-	// A request while playing dead gets up out of fake death. One made
-	// during the get-up only restarts the grace and re-sends the get-up
-	// visuals; the running get-up still ends fake death on time.
+	// A request while playing dead, a corpse still getting up out of fake
+	// death included, only gets up out of it.
 	if live.FakeDead() {
-		if live.EffectList().IsAffected(effect.FlagFakeDeath) {
-			live.EffectList().StopByType(effect.TypeFakeDeath)
-		} else {
-			live.RepeatFakeDeathStop()
-		}
+		live.GetUpFromFakeDeath()
 		return
 	}
 	if !live.Dead() {

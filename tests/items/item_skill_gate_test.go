@@ -420,9 +420,12 @@ func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
 	srv.Advance(t, 3*time.Second)
 	drainUntilQuiet(t, c)
 
+	// The stand's stopFakeDeath(true) exits the effect, whose own get-up
+	// nests inside it, so two get-ups go out (PlayerAI.thinkStand,
+	// EffectFakeDeath.onExit).
 	c.Send(encodeRequestChangeWaitType(true))
-	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeChangeWaitType] != 1 {
-		t.Fatalf("fake-death stop ChangeWaitType count = %d, want 1", seen[serverpackets.OpcodeChangeWaitType])
+	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeChangeWaitType] != 2 {
+		t.Fatalf("fake-death stop ChangeWaitType count = %d, want 2", seen[serverpackets.OpcodeChangeWaitType])
 	}
 
 	c.Send(encodeUseItem(scroll, false))
