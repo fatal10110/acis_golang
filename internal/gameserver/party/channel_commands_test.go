@@ -107,9 +107,9 @@ func TestDisbandChannel(t *testing.T) {
 	}
 }
 
-// TestChannelView pins the channel overview: its leader, every party's
+// TestChannelViewParties pins the channel overview: its leader, every party's
 // leader and size in join order, and the member count over all of them.
-func TestChannelView(t *testing.T) {
+func TestChannelViewParties(t *testing.T) {
 	r, ms := threeChannelParties(t)
 	r.Answer(ms[0], &member{id: 7, name: "G"}, true)
 	if _, ok := r.Channel(99); ok {

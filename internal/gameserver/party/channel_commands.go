@@ -1,36 +1,5 @@
 package party
 
-// ChannelView is a copy of one command channel.
-type ChannelView[M Member] struct {
-	Leader M
-	// MembersCount counts the members of every party in the channel.
-	MembersCount int
-	Parties      []ChannelPartyView[M]
-}
-
-// ChannelPartyView is one party of a command channel.
-type ChannelPartyView[M Member] struct {
-	Leader M
-	Count  int
-}
-
-// Channel returns a copy of the command channel memberID's party is in.
-func (r *Registry[M]) Channel(memberID int32) (ChannelView[M], bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	g := r.byMember[memberID]
-	if g == nil || g.channel == nil {
-		return ChannelView[M]{}, false
-	}
-	c := g.channel
-	view := ChannelView[M]{Leader: c.leader, Parties: make([]ChannelPartyView[M], len(c.parties))}
-	for i, p := range c.parties {
-		view.Parties[i] = ChannelPartyView[M]{Leader: p.leader, Count: len(p.members)}
-		view.MembersCount += len(p.members)
-	}
-	return view, true
-}
-
 // LeaveChannel takes the party leader leads out of its command channel,
 // disbanding the channel when only two parties were in it. The party is
 // told it left, then the parties still in the channel are told whose party
