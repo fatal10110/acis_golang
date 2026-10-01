@@ -106,3 +106,46 @@ func readyTradeSession(t *testing.T, ctx context.Context, link *GameClientLink, 
 	}
 	return ready.Session
 }
+
+// TestSettleConfirmedTradeCancelsWhenOfferedScrollBecameSelected pins the
+// settlement half of the selected-enchant-scroll clause: a scroll offered
+// while free but selected for enchanting by the time both sides confirmed
+// fails the re-check, so the whole trade is cancelled and nothing moves. No
+// packet sequence reaches this today (TradeDone clears both selections and
+// UseItem refuses a scroll while a trade is open), so the selection is set
+// on the enchant state directly.
+func TestSettleConfirmedTradeCancelsWhenOfferedScrollBecameSelected(t *testing.T) {
+	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
+	const scrollID = 600
+	first.Inventory().AddNew(955, 3, scrollID)
+
+	link.handleTradeRequest(first, clientpackets.TradeRequest{ObjectID: second.ObjectID()})
+	link.handleAnswerTradeRequest(second, clientpackets.AnswerTradeRequest{Response: 1})
+	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: scrollID, Count: 3})
+	link.handleTradeDone(context.Background(), second, clientpackets.TradeDone{Response: 1})
+	ready := link.trades.Confirm(first.ObjectID())
+	if ready.Status != tradebook.DoneReady {
+		t.Fatalf("Confirm status = %v, want ready", ready.Status)
+	}
+	if n := len(ready.Session.FirstOffer.Items); n != 1 {
+		t.Fatalf("first offer holds %d rows, want the scroll", n)
+	}
+
+	link.enchantStateStore().Select(first.ObjectID(), scrollID)
+	testsupport.ResetCapture(firstCap, secondCap)
+
+	link.settleConfirmedTrade(ready.Session, first.ObjectID())
+
+	for _, frames := range [][][]byte{firstCap.Frames(), secondCap.Frames()} {
+		testsupport.AssertOpcodeSequence(t, frames,
+			serverpackets.OpcodeSendTradeDone, serverpackets.OpcodeSystemMessage)
+		assertTradeDoneFrame(t, frames[0], false)
+		assertSystemMessageStringFrame(t, frames[1], serverpackets.SystemMessageS1CanceledTrade, "TraderOne")
+	}
+	if held := first.Inventory().ItemByObjectID(scrollID); held == nil || held.Count != 3 {
+		t.Fatalf("offered scroll after cancelled settlement = %+v, want all 3 still held", held)
+	}
+	if got := second.Inventory().ItemByTemplateID(955); got != nil {
+		t.Fatalf("partner received %+v, want nothing moved", got)
+	}
+}

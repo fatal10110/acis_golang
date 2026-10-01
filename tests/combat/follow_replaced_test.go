@@ -33,7 +33,8 @@ func bootFollowSkillPair(t *testing.T) clickPair {
 }
 
 // startFollowing has the attacker follow the victim 300 units away and
-// waits for it to catch up.
+// waits for it to catch up: its follow walk has ended, so a later move is a
+// new follow step, not the rest of this one.
 func (p clickPair) startFollowing(t *testing.T) {
 	t.Helper()
 	p.walkVictimAway(t, 300)
@@ -44,9 +45,12 @@ func (p clickPair) startFollowing(t *testing.T) {
 	p.tickUntil(t, "the follower reaching the target", func() bool {
 		// 2D: the follow walk now stops short of the target mid-leg, where
 		// the test geodata's echoed height hint has lifted Z every update.
+		// Being in range is not enough: on the wall clock the walk's
+		// arrival timer, not these ticks, may be what ends it, so the
+		// follower can still be walking the last of the leg.
 		ax, ay, _ := p.srv.PlayerPosition(t, p.attackerID)
 		vx, vy, _ := p.srv.PlayerPosition(t, p.victimID)
-		return location.In2DRadius(ax, ay, vx, vy, playerFollowOffset+60)
+		return location.In2DRadius(ax, ay, vx, vy, playerFollowOffset+60) && !p.srv.PlayerMove(t, p.attackerID).Moving()
 	})
 	drainUntilQuiet(t, p.c)
 }

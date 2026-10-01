@@ -22,12 +22,13 @@ type IPBanList struct {
 	mu   sync.Mutex
 	bans map[string]time.Time // key: addr.String(); zero Time means the ban never expires
 
+	now func() time.Time // time.Now outside tests
 	log zerolog.Logger
 }
 
 // NewIPBanList returns an empty IPBanList.
 func NewIPBanList(log zerolog.Logger) *IPBanList {
-	return &IPBanList{bans: make(map[string]time.Time), log: log}
+	return &IPBanList{bans: make(map[string]time.Time), now: time.Now, log: log}
 }
 
 // LoadIPBanList reads path, one address per line, and returns an IPBanList
@@ -72,7 +73,7 @@ func LoadIPBanList(path string, log zerolog.Logger) *IPBanList {
 func (l *IPBanList) Ban(addr net.IP, d time.Duration) {
 	until := time.Time{}
 	if d > 0 {
-		until = time.Now().Add(d)
+		until = l.now().Add(d)
 	}
 	l.set(addr, until)
 }
@@ -92,12 +93,40 @@ func (l *IPBanList) IsBanned(addr net.IP) bool {
 	if !banned {
 		return false
 	}
-	if !until.IsZero() && time.Now().After(until) {
+	if !until.IsZero() && l.now().After(until) {
 		delete(l.bans, key)
 		l.log.Info().Str("address", key).Msg("removed expired IP address ban")
 		return false
 	}
 	return true
+}
+
+// SweepExpired removes every temporary ban whose expiry has passed at now,
+// logging each removal as IsBanned does. Permanent bans are never removed.
+// Without it an expired ban stays in memory until its address is checked
+// again, so an address banned once that never returns would hold its entry
+// for the life of the process.
+//
+// Removing an expired ban early must not change any outcome. IsBanned
+// already reports an expired ban as lifted, but while the entry exists, Ban
+// keeps it and a new ban for that address has no effect. Only a connection
+// accepted before the ban was added can reach Ban without an IsBanned call
+// clearing the entry first; once no such connection remains, sweeping the
+// entry is unobservable. retain reports, for an address key (addr.String()),
+// whether a connection from that address may still be open; those expired
+// entries are left in place for IsBanned or a later sweep. retain runs with
+// the list's lock held and must not call back into the list.
+func (l *IPBanList) SweepExpired(now time.Time, retain func(addr string) bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	for key, until := range l.bans {
+		if until.IsZero() || !now.After(until) || retain(key) {
+			continue
+		}
+		delete(l.bans, key)
+		l.log.Info().Str("address", key).Msg("removed expired IP address ban")
+	}
 }
 
 func (l *IPBanList) set(addr net.IP, until time.Time) {

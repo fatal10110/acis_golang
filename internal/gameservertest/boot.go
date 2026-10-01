@@ -130,6 +130,7 @@ type options struct {
 	recipes                *recipe.Table
 	hennas                 *henna.Table
 	craftingDisabled       bool
+	discardItemDisabled    bool
 	manufactureDelay       time.Duration
 	craftRoll              func(n int) int
 	multisells             *multisell.Table
@@ -483,6 +484,12 @@ func WithCraftingDisabled() Option {
 	return func(o *options) { o.craftingDisabled = true }
 }
 
+// WithDiscardItemDisabled sets server.properties AllowDiscardItem = False:
+// only a GM may drop items (default: anyone may).
+func WithDiscardItemDisabled() Option {
+	return func(o *options) { o.discardItemDisabled = true }
+}
+
 // WithManufactureDelay sets the reuse delay between two crafts on one
 // client (default 0: every craft request is taken).
 func WithManufactureDelay(d time.Duration) Option {
@@ -829,6 +836,13 @@ func (s *Server) SetPlayerInCombat(tb testing.TB, objID int32, inCombat bool) {
 	tb.Helper()
 	setter := s.onlineCharacter(tb, objID)
 	setter.SetInCombat(inCombat)
+}
+
+// SetPlayerFishing toggles the live player's fishing flag, the precondition
+// of the while-fishing gates.
+func (s *Server) SetPlayerFishing(tb testing.TB, objID int32, fishing bool) {
+	tb.Helper()
+	s.onlineCharacter(tb, objID).SetFishing(fishing)
 }
 
 // SeedGroundItem places an item instance directly on the ground at the given
@@ -1522,7 +1536,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

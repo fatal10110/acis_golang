@@ -304,6 +304,32 @@ func TestLoadKarmaPlayerCanTradeUsesPlayersProperties(t *testing.T) {
 	}
 }
 
+// TestLoadAllowDiscardItemUsesServerProperties pins the drop switch:
+// server.properties turns it off, and a file without the key keeps the
+// shipped default of allowing drops.
+func TestLoadAllowDiscardItemUsesServerProperties(t *testing.T) {
+	for _, tc := range []struct {
+		body string
+		want bool
+	}{
+		{"AllowDiscardItem = False\n", false},
+		{"AllowDiscardItem = True\n", true},
+		{"MultipleItemDrop = False\n", true},
+	} {
+		configPath := filepath.Join(t.TempDir(), "server.properties")
+		if err := os.WriteFile(configPath, []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := loadAllowDiscardItem(gameServerPaths{ConfigPath: configPath})
+		if err != nil {
+			t.Fatalf("loadAllowDiscardItem(%q) error = %v", tc.body, err)
+		}
+		if bool(got) != tc.want {
+			t.Fatalf("loadAllowDiscardItem(%q) = %v, want %v", tc.body, got, tc.want)
+		}
+	}
+}
+
 func TestLoadDeathPenaltyChanceUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	if err := os.WriteFile(configPath, []byte("DeathPenaltyChance = 73\n"), 0o600); err != nil {

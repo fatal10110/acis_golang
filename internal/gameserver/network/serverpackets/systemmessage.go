@@ -148,6 +148,7 @@ const (
 	SystemMessageUseOfItemWillBeAuto               = 1433
 	SystemMessageAutoUseOfItemCancelled            = 1434
 	SystemMessageOnlyFishingSkillsNow              = 1448
+	SystemMessageCannotDoWhileFishing2             = 1470
 	SystemMessageCannotDoWhileFishing              = 1471
 	SystemMessageItemCantBeEquippedForOlympiad     = 1507
 	SystemMessageItemUnavailableForOlympiad        = 1508
