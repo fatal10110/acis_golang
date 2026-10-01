@@ -286,6 +286,12 @@ func (l *GameClientLink) resumeItemAICast(live *livePlayer, itemCast *itemAICast
 		sendMagicCastFailureReason(live, itemCast.skill, err)
 		return
 	}
+	if itemCast.summon {
+		if run := l.beginSummonCreatureCast(live, itemCast.inventory, itemCast.item, itemCast.skill); run != nil {
+			run()
+		}
+		return
+	}
 	run, rejected, failed := l.beginItemAICast(live, itemCast.inventory, itemCast.item, itemCast.selected, itemCast.skill, itemCast.ctrl)
 	if failed || rejected || run == nil {
 		return

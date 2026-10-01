@@ -1,6 +1,8 @@
 package network
 
 import (
+	"errors"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -59,8 +61,10 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	}
 
 	// The gates below are shared by every summon kind, in the reference's
-	// order, ahead of the per-kind branches.
-	if !live.Character.Standing() {
+	// order, ahead of the per-kind branches. Only a settled seat refuses: a
+	// sit-down or stand-up still in progress passes, and holds a collar's
+	// cast below.
+	if live.Character.Seated() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 		return true
 	}
@@ -107,6 +111,37 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return false
 	}
 
+	// SUMMON_A_PET follows every attempt, refused, held or started: after
+	// the refusal's answer, after the held cast's ActionFailed, or after the
+	// cast-start packets.
+	if itemAICastBusy(live) {
+		// A sit-down or stand-up in progress holds the cast, once it passes
+		// the attempt gate, as the next CAST intention; it runs when the
+		// transition settles.
+		if l.attemptItemAICast(live, live.Character, def) {
+			live.deferSummonCreatureCast(inv, inst, def)
+			sendMagicActionFailed(live)
+		}
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet))
+		return true
+	}
+	run := l.beginSummonCreatureCast(live, inv, inst, def)
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet))
+	if run != nil {
+		run()
+	}
+	return true
+}
+
+// errCollarGone refuses a collar's cast once the collar has left the
+// caster's inventory.
+var errCollarGone = errors.New("summon: collar no longer in inventory")
+
+// beginSummonCreatureCast starts collar's SUMMON_CREATURE cast on live
+// itself, answering a refusal, and returns the cast's Schedule, or nil when
+// it was refused. A collar that left inv since it was used refuses the cast
+// with NOT_ENOUGH_ITEMS.
+func (l *GameClientLink) beginSummonCreatureCast(live *livePlayer, inv *itemcontainer.Inventory, collar *item.Instance, def skillref.Definition) func() {
 	controller := l.castController(live)
 	started, err := actorcast.StartItemSkill(actorcast.ItemSkillRequest{
 		Controller:  controller,
@@ -116,21 +151,26 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		Definitions: l.skills,
 		Hooks: actorcast.StartHooks{
 			StopMovement: l.stopMovementForCast(live),
+			AfterCanCast: func() error {
+				if inv.ItemByObjectID(collar.ObjectID) == nil {
+					return errCollarGone
+				}
+				return nil
+			},
 		},
 	})
-	// SUMMON_A_PET follows every attempt, refused or started: after the
-	// refusal's answer, or after the cast-start packets.
-	summonAPet := serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet)
 	if err != nil {
 		// A refusal at the cost and condition checks names its reason
 		// alone; one at the attempt gate also releases the client's action.
-		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
+		switch {
+		case errors.Is(err, errCollarGone):
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		case started.CanCastFailure && magicCastFailureReasonOnly(err):
 			sendMagicCastFailureReason(live, started.Definition, err)
-		} else {
+		default:
 			sendMagicCastFailure(live, started.Definition, err)
 		}
-		live.SendFrame(summonAPet)
-		return true
+		return nil
 	}
 	target := started.Target
 	plan := started.Plan
@@ -151,30 +191,30 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.GaugeDuration), millis(plan.GaugeDuration)))
 	}
 	sendSkillItemCharge(live, def, plan.ItemCharge)
-	live.SendFrame(summonAPet)
 
 	targetIDs := []int32{target.ObjectID()}
-	controller.Schedule(plan, actorcast.Hooks{
-		Launch: func() bool {
-			l.broadcastLiveFrame(live, func() wire.Frame {
-				return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
-			})
-			return true
-		},
-		Hit: func() {
-			// SUMMON_CREATURE's own handler (handler/skill/summon.go)
-			// resolves the item back to a pet template and spawns it —
-			// ApplyEffectsResult drives that the same way it drives every
-			// other skill's Hit-phase effects.
-			result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, def, inst)
-			l.sendSkillHandlerResult(live, result)
-			l.syncCubicTargets(live, result, def)
-		},
-		Failed: func(err error) {
-			sendMagicCastFailureReason(live, def, err)
-		},
-	})
-	return true
+	return func() {
+		controller.Schedule(plan, actorcast.Hooks{
+			Launch: func() bool {
+				l.broadcastLiveFrame(live, func() wire.Frame {
+					return serverpackets.FrameMagicSkillLaunched(live.ObjectID(), int32(def.ID), int32(def.Level), targetIDs)
+				})
+				return true
+			},
+			Hit: func() {
+				// SUMMON_CREATURE's own handler (handler/skill/summon.go)
+				// resolves the item back to a pet template and spawns it —
+				// ApplyEffectsResult drives that the same way it drives every
+				// other skill's Hit-phase effects.
+				result := actorcast.ApplyItemEffectsResult(l.castEffects(), live.Character, target, def, collar)
+				l.sendSkillHandlerResult(live, result)
+				l.syncCubicTargets(live, result, def)
+			},
+			Failed: func(err error) {
+				sendMagicCastFailureReason(live, def, err)
+			},
+		})
+	}
 }
 
 func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, summonItem item.SummonItem) bool {
