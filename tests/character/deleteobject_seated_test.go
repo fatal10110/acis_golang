@@ -18,6 +18,7 @@ import (
 var spawnOrigin = location.Location{X: 10, Y: 20, Z: 30}
 
 func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
+	t.Parallel()
 	t.Run("throne seated", func(t *testing.T) {
 		srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 		sitter := srv.Client
@@ -64,6 +65,7 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 // flag: a throne-seated player's removal uses stand-then-delete (0), while
 // a standing or ground-sitting player uses delete-outright (1).
 func TestLogoutDeleteObjectSeatedFlag(t *testing.T) {
+	t.Parallel()
 	t.Run("throne seated", func(t *testing.T) {
 		srv, c, observer, objID := bootObserverPair(t)
 		sitOnChair(t, c, observer, spawnChair(t, srv, c, observer))

@@ -125,6 +125,7 @@ func macroIDs(list []sentMacro) []int32 {
 // edit gets its message, deleting a macro drops its shortcuts first, and
 // the result survives a relog.
 func TestMacroFlowRestoresEditsDeletesAndReloads(t *testing.T) {
+	t.Parallel()
 	logs := &logBuffer{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),

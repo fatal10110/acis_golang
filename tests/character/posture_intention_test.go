@@ -15,6 +15,7 @@ import (
 )
 
 func TestStandRequestWaitsForSitDown(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -35,6 +36,7 @@ func TestStandRequestWaitsForSitDown(t *testing.T) {
 }
 
 func TestMoveRequestWaitsForStandUp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -60,6 +62,7 @@ func TestMoveRequestWaitsForStandUp(t *testing.T) {
 }
 
 func TestMoveRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -86,6 +89,7 @@ func TestMoveRequestDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 }
 
 func TestSitRequestWaitsForStandUp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -108,6 +112,7 @@ func TestSitRequestWaitsForStandUp(t *testing.T) {
 }
 
 func TestQueuedSitKeepsChairSelectedAtRequest(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -140,6 +145,7 @@ func TestQueuedSitKeepsChairSelectedAtRequest(t *testing.T) {
 }
 
 func TestChairReleasedAfterStandUp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -168,6 +174,7 @@ func TestChairReleasedAfterStandUp(t *testing.T) {
 }
 
 func TestDamageDuringSitDownDoesNotStandPlayer(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -210,6 +217,7 @@ func TestDamageDuringSitDownDoesNotStandPlayer(t *testing.T) {
 }
 
 func TestChairInteractAfterStandUpDoesNotSit(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -245,6 +253,7 @@ func TestChairInteractAfterStandUpDoesNotSit(t *testing.T) {
 }
 
 func TestTownMapInteractWaitsForStandUp(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -279,6 +288,7 @@ func TestTownMapInteractWaitsForStandUp(t *testing.T) {
 }
 
 func TestChairInteractDuringSitDownIsRejectedAtSettlement(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)
@@ -306,6 +316,7 @@ func TestChairInteractDuringSitDownIsRejectedAtSettlement(t *testing.T) {
 }
 
 func TestStandRequestDuringFakeDeathGetUpAnswersAtSettlement(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)

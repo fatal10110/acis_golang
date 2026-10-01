@@ -13,6 +13,7 @@ import (
 // mid-session request, world entry, and the live actor's presence in world
 // state.
 func TestCreateSelectEnterWorldFullFlow(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t)
 	c := srv.Client
 

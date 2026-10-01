@@ -16,6 +16,7 @@ type regenPlayer interface {
 }
 
 func TestPlayerRegenTickRestoresResourcesAndSendsStatus(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

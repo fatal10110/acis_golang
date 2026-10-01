@@ -18,6 +18,7 @@ import (
 // own request is untouched by the target's exit, so it stays busy until the
 // request expires.
 func TestTargetRelogDropsPendingRequest(t *testing.T) {
+	t.Parallel()
 	// No character-select reuse delay, so the restart can select again at once.
 	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
 	h.enterAll(t)
@@ -48,6 +49,7 @@ func TestTargetRelogDropsPendingRequest(t *testing.T) {
 // cancel names itself — while the new login hears none of it and its own
 // request carries on.
 func TestRequesterRelogLeavesRequestBehind(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
 	adena := h.srv.GiveItem(t, h.secondID, item.AdenaID, 100)
 	h.enterAll(t)
@@ -87,6 +89,7 @@ func TestRequesterRelogLeavesRequestBehind(t *testing.T) {
 // requester restarted: the denial belongs to the login that asked, so the
 // new login under its id hears nothing, and neither does the target.
 func TestRequesterRelogDenialReachesNoOne(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
 	h.enterAll(t)
 	h.sendRequest(t)

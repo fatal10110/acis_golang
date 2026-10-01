@@ -20,6 +20,7 @@ const heavyIngot = 9500
 // tick, InventoryUpdate first and StatusUpdate(CUR_LOAD) after it, exactly as
 // for any other inventory change.
 func TestTradeSettleLeavesWeightToInventoryTick(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	ingots := h.srv.GiveItem(t, h.secondID, heavyIngot, 4)
@@ -64,6 +65,7 @@ func TestTradeSettleLeavesWeightToInventoryTick(t *testing.T) {
 // cancels the trade for both players, the cancel every other path sends, and
 // neither side's items move.
 func TestTradeCancelsWhenOfferedItemLeavesBeforeSettle(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	ingots := h.srv.GiveItem(t, h.secondID, heavyIngot, 4)

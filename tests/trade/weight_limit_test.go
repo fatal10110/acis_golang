@@ -61,6 +61,7 @@ func bootWeightTraders(t *testing.T, m float64, wantLimit int, opts ...gameserve
 // moves. The first trader is also at its two-slot limit and the ingots would
 // need a new slot: the weight check runs first, so no SLOTS_FULL follows.
 func TestTradeRefusedWhenReceiverOverWeightLimit(t *testing.T) {
+	t.Parallel()
 	h, _, _ := bootWeightTraders(t, 0.002, 63, gameservertest.WithInventorySlots(2, 2))
 
 	confirmBoth(t, h)
@@ -94,6 +95,7 @@ func TestTradeRefusedWhenReceiverOverWeightLimit(t *testing.T) {
 // under a WeightLimit multiplier that lifts the limit to 95 leaves the first
 // trader at 70 carried, so it settles and the ingots move.
 func TestTradeSettlesWithinRaisedWeightLimit(t *testing.T) {
+	t.Parallel()
 	h, _, _ := bootWeightTraders(t, 0.003, 95)
 
 	confirmBoth(t, h)

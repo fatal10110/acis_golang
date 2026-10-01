@@ -15,6 +15,7 @@ import (
 // stacks cannot take a new one, both players read SlotsFull, the exchange
 // ends failed for both, and neither side's items move.
 func TestTradeRefusedWhenReceiverInventoryFull(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithInventorySlots(2, 2))
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	ingots := h.srv.GiveItem(t, h.secondID, heavyIngot, 4)

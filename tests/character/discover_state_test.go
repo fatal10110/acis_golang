@@ -16,6 +16,7 @@ import (
 // runner is not frozen until its next move. A standing player is shown with
 // CharInfo alone.
 func TestEnteringPlayerSeesRunningPlayerMove(t *testing.T) {
+	t.Parallel()
 	t.Run("running", func(t *testing.T) {
 		srv := gameservertest.Boot(t, gameservertest.WithCharacter("Runner", 1, 0), gameservertest.WithWantChars(1))
 		runner := srv.Client

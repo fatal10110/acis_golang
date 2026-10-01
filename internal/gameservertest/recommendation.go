@@ -23,8 +23,20 @@ func (s *Server) RefreshDailyRecommendations(tb testing.TB) {
 // RefreshDailyRecommendations.
 func (s *Server) StartDailyRecommendationRefresh(tb testing.TB) (wait func()) {
 	tb.Helper()
+	// The refresh pauses every lane until the held one reaches the pause,
+	// so until it returns no lane is free for a catch-up to flush: count
+	// them all as held, or every client read waits out catchUpTimeout.
+	for i := range s.heldLanes {
+		s.heldLanes[i].Add(1)
+	}
 	done := make(chan error, 1)
-	go func() { done <- s.refreshRecommendations(context.Background()) }()
+	go func() {
+		err := s.refreshRecommendations(context.Background())
+		for i := range s.heldLanes {
+			s.heldLanes[i].Add(-1)
+		}
+		done <- err
+	}()
 	return func() {
 		tb.Helper()
 		if err := <-done; err != nil {

@@ -127,6 +127,7 @@ func findShortCut(entries []shortCutInitEntry, typ serverpackets.ShortcutType, i
 // outside the inventory is answered on the bar but never kept), deletion, and the
 // surviving rows coming back on the next enter-world burst.
 func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
+	t.Parallel()
 	const staleObjectID int32 = 999
 	const missingObjectID int32 = 998
 

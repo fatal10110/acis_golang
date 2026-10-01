@@ -15,6 +15,7 @@ import (
 // and requires the resulting position to become observable in world state,
 // not just in the client's own packet stream.
 func TestMovementUpdatesWorldState(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 
@@ -40,6 +41,7 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 // while it flies (or rides a boat), so a swimmer over deep water climbs past
 // the surface to the height it asked for.
 func TestSwimmingPlayerRisesPastWaterSurface(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +80,7 @@ func TestSwimmingPlayerRisesPastWaterSurface(t *testing.T) {
 // starting a walk, regardless of how far the server-authoritative position
 // actually is from either coordinate.
 func TestMoveBackwardToLocationRejectsBeyond9900Units(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 
@@ -100,6 +103,7 @@ func TestMoveBackwardToLocationRejectsBeyond9900Units(t *testing.T) {
 // blocked-arrival branch: observers get MoveToLocation to the cell the
 // walk actually stopped on, not StopMove.
 func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
+	t.Parallel()
 	geo := &gameservertest.GateGeo{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
@@ -145,6 +149,7 @@ func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
 // updates of a move advance at its walk speed, the following ones at its run
 // speed.
 func TestRunStartsAtWalkSpeed(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 

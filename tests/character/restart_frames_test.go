@@ -10,6 +10,7 @@ import (
 )
 
 func TestRestartDropsTeardownFramesForSelfButNotWatcher(t *testing.T) {
+	t.Parallel()
 	srv, c, watcher, objectID := bootObserverPair(t)
 	monster := srv.SpawnHostileNPCAt(t, location.Location{X: 40, Y: 20, Z: 30})
 	drainQuiet(t, c)
