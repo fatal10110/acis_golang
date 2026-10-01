@@ -436,15 +436,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 				return
 			}
-			// The selection restores the character in full; a restore that
-			// fails closes the connection, the partial attachment left for
-			// the deferred detach above.
+			// The selection restores the character in full. A restore that
+			// fails attaches nothing, and closes the connection.
 			selected, ok := l.restoreSelected(ctx, client, c)
-			entering = selected
 			if !ok {
 				client.closeNow()
 				return
 			}
+			entering = selected
 			session.SendFrame(serverpackets.FrameSSQInfo())
 			client.SetState(StateEntering)
 			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{

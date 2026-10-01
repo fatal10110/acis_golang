@@ -196,8 +196,8 @@ func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
 // skills, shortcuts, hennas, macros, recipes, recommendations and storage,
 // attached as a live player with its own queue, and its row marked online.
 // The player is neither spawned nor registered in the world here; the
-// selection registers it and EnterWorld spawns it. On failure it returns
-// whatever it already attached, for the caller's detach to release.
+// selection registers it and EnterWorld spawns it. Every failure returns
+// nil: no live player is handed back, and none is registered.
 func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
 	tmpl, ok := l.templates.Get(c.ClassID())
 	if !ok {
