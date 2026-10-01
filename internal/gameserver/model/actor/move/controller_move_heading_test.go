@@ -148,3 +148,79 @@ func TestControllerRefusedMoveKeepsHeading(t *testing.T) {
 		t.Fatalf("heading = %d with broadcasts %v, want %d and none", self.heading, self.atBroadcast, staleHeading)
 	}
 }
+
+// pawnHeadingSelf is a pawn-following (player-shaped) walker that records
+// the heading it faces at each movement broadcast.
+type pawnHeadingSelf struct {
+	knowingFollowSelf
+	heading     int
+	atBroadcast []int
+}
+
+func (s *pawnHeadingSelf) SetHeading(h int) { s.heading = h }
+
+func (s *pawnHeadingSelf) BroadcastMove(ev event.Move) {
+	s.atBroadcast = append(s.atBroadcast, s.heading)
+	s.knowingFollowSelf.BroadcastMove(ev)
+}
+
+// A player's friendly follow turns toward the target before each walk its
+// follow task starts (PlayerMove.maybeMoveToPawn: setHeadingTo(tx, ty) ahead
+// of the MoveToPawn broadcast), both on the tick run when the follow is armed
+// and on a later once-a-second tick, so a stop before the first position
+// update carries the walk's direction rather than the stale heading.
+func TestControllerPlayerFriendlyFollowFacesTargetAtBroadcast(t *testing.T) {
+	const staleHeading = 12345
+	newController := func(t *testing.T) (*Controller, *pawnHeadingSelf) {
+		t.Helper()
+		self := &pawnHeadingSelf{heading: staleHeading}
+		mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mover.SetQueue(newMoveClock().q)
+		controller, err := NewController(mover, self, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return controller, self
+	}
+
+	t.Run("first tick", func(t *testing.T) {
+		controller, self := newController(t)
+		target := &followTarget{x: -300, y: 300}
+		if following, err := controller.MaybeStartFriendlyFollow(target, 40); err != nil || !following {
+			t.Fatalf("MaybeStartFriendlyFollow() = %v, %v; want the follow armed", following, err)
+		}
+		want := location.Location{}.HeadingTo(location.Location{X: -300, Y: 300})
+		if len(self.moves) != 1 || self.moves[0].FollowTarget != target.ObjectID() {
+			t.Fatalf("move broadcasts = %+v, want one pawn move toward the target", self.moves)
+		}
+		if len(self.atBroadcast) != 1 || self.atBroadcast[0] != want {
+			t.Fatalf("heading at the follow broadcast = %v, want [%d] (stale heading %d)", self.atBroadcast, want, staleHeading)
+		}
+	})
+
+	t.Run("later tick", func(t *testing.T) {
+		controller, self := newController(t)
+		target := &followTarget{x: 30}
+		if following, err := controller.MaybeStartFriendlyFollow(target, 40); err != nil || !following {
+			t.Fatalf("MaybeStartFriendlyFollow() = %v, %v; want the follow armed", following, err)
+		}
+		if len(self.moves) != 0 {
+			t.Fatalf("move broadcasts in range = %d, want 0", len(self.moves))
+		}
+		self.heading = staleHeading
+		target.x, target.y = 0, -300
+		for range 10 {
+			controller.PositionUpdate()
+		}
+		want := location.Location{}.HeadingTo(location.Location{Y: -300})
+		if len(self.moves) != 1 || self.moves[0].FollowTarget != target.ObjectID() {
+			t.Fatalf("move broadcasts = %+v, want one pawn move from the 1 s tick", self.moves)
+		}
+		if len(self.atBroadcast) != 1 || self.atBroadcast[0] != want {
+			t.Fatalf("heading at the tick's follow broadcast = %v, want [%d] (stale heading %d)", self.atBroadcast, want, staleHeading)
+		}
+	})
+}
