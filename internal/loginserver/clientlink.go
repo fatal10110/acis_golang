@@ -265,8 +265,9 @@ func (l *ClientLink) clearHolder(account string, c *clientConn) {
 }
 
 // clientConn is one connected login client. Its handler goroutine owns the
-// protocol flow; the purge loop may additionally call kick from outside,
-// so sends are serialized by sendMu.
+// protocol flow; the purge loop and a duplicate login's eviction may
+// additionally close it from outside, so sends and the close are serialized
+// by sendMu.
 type clientConn struct {
 	conn        net.Conn
 	remoteIP    net.IP
@@ -284,12 +285,20 @@ type clientConn struct {
 	loginKey1   int32
 	loginKey2   int32
 
+	// sendMu guards closed and serializes every write and the close.
+	// closed is set by the first closeWith; from then on nothing else is
+	// written, so that close's packet is the last frame the client sees.
 	sendMu sync.Mutex
+	closed bool
 }
 
+// send writes payload unless the connection has already been closed.
 func (c *clientConn) send(payload []byte) error {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
+	if c.closed {
+		return net.ErrClosed
+	}
 	return c.sendLocked(payload)
 }
 
@@ -306,27 +315,40 @@ func (c *clientConn) sendLocked(payload []byte) error {
 // kick replies LoginFail AccessFailed and closes the connection; safe to
 // call while the handler goroutine is blocked reading.
 func (c *clientConn) kick() {
-	c.closeWith(serverpackets.LoginFailAccessFailed)
+	c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 }
 
-// closeWith replies LoginFail with reason and closes the connection; safe
-// to call while the handler goroutine is blocked reading. The close happens
-// under sendMu, so LoginFail is the last frame: a handler reply racing it
-// fails on the closed connection instead of following it.
-func (c *clientConn) closeWith(reason serverpackets.LoginFailReason) {
+// closeWith writes the final packet, when payload is non-nil, and closes
+// the connection. The first close wins: once the connection is closed, a
+// later closeWith does nothing and send refuses, so the client never
+// receives anything after a final packet. Safe to call from any goroutine,
+// including while the handler goroutine is blocked reading.
+func (c *clientConn) closeWith(payload []byte) {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
-	_ = c.sendLocked(serverpackets.EncodeLoginFail(reason))
+	if c.closed {
+		return
+	}
+	c.closed = true
+	if payload != nil {
+		_ = c.sendLocked(payload)
+	}
 	c.conn.Close()
 }
 
 func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	var c *clientConn
 	defer func() {
-		if c != nil {
-			l.unregisterPurgeable(c)
+		if c == nil {
+			conn.Close()
+			return
 		}
-		if c != nil && c.account != "" {
+		// Close first: a handler that ended without a final packet still
+		// closes through closeWith, so a racing kick or eviction cannot
+		// write after it.
+		c.closeWith(nil)
+		l.unregisterPurgeable(c)
+		if c.account != "" {
 			l.clearHolder(c.account, c)
 			// An account that joined a game server keeps its session until
 			// the server claims it; once the connection has also outstayed
@@ -336,7 +358,6 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 				l.sessions.Delete(c.account)
 			}
 		}
-		conn.Close()
 	}()
 
 	ip := remoteIP(conn)
@@ -435,7 +456,7 @@ func (l *ClientLink) onAuthGameGuard(c *clientConn, payload []byte) bool {
 	if req.SessionID != c.sessionID {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Int32("got", req.SessionID).Int32("want", c.sessionID).
 			Msg("login client failed the GameGuard session-id check")
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
 	if err := c.send(serverpackets.EncodeGGAuth(c.sessionID)); err != nil {
@@ -452,7 +473,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	req, err := clientpackets.DecodeRequestAuthLogin(payload, c.key.Private)
 	if err != nil {
 		l.log.Warn().Str("ip", c.remoteIP.String()).Err(err).Msg("login client")
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
 
@@ -462,7 +483,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	}
 
 	if account.AccessLevel < 0 {
-		_ = c.send(serverpackets.EncodeAccountKicked(serverpackets.AccountKickedPermanentlyBanned))
+		c.closeWith(serverpackets.EncodeAccountKicked(serverpackets.AccountKickedPermanentlyBanned))
 		return false
 	}
 
@@ -471,7 +492,7 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	if serverID, online := l.servers.AccountServerID(account.Login); online {
 		l.log.Info().Str("account", account.Login).Int("server_id", serverID).
 			Msg("login for an account already on a game server")
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		if entry, ok := l.servers.Get(serverID); ok && entry.Authed && l.roster != nil {
 			l.roster.kick(serverID, account.Login)
 		}
@@ -504,9 +525,9 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 		// connection's socket, which can block on a stalled reader, and
 		// this mutex gates every account's login.
 		if old != nil {
-			old.closeWith(serverpackets.LoginFailAccountInUse)
+			old.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		}
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		return false
 	}
 
@@ -528,38 +549,38 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 	case errors.Is(err, loginsql.ErrAccountNotFound):
 		if !l.autoCreateAccounts {
 			l.recordFailedAttempt(c.remoteIP, time.Now())
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
 			return model.Account{}, false
 		}
 		hashed, herr := l.hashPassword(req.Password)
 		if herr != nil {
 			l.log.Error().Err(herr).Msg("hash password for auto-created account")
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
 			return model.Account{}, false
 		}
 		account, err = l.accounts.CreateAccount(ctx, req.Username, hashed, time.Now())
 		if err != nil {
 			l.log.Error().Str("account", req.Username).Err(err).Msg("auto-create account")
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
 			return model.Account{}, false
 		}
 		return account, true
 
 	case err != nil:
 		l.log.Error().Str("account", req.Username).Err(err).Msg("look up account")
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
 		return model.Account{}, false
 
 	default:
 		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {
 			l.recordFailedAttempt(c.remoteIP, time.Now())
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailPasswordWrong))
 			return model.Account{}, false
 		}
 		l.clearFailedAttempts(c.remoteIP)
 		if err := l.accounts.SetLastActive(ctx, account.Login, time.Now()); err != nil {
 			l.log.Error().Str("account", account.Login).Err(err).Msg("set last-active time")
-			_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 			return model.Account{}, false
 		}
 		return account, true
@@ -663,7 +684,7 @@ func (l *ClientLink) onRequestServerList(c *clientConn, payload []byte) bool {
 		return true
 	}
 	if req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2 {
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
 	entries := l.serverEntries(c.accessLevel, c.remoteIP)
@@ -746,13 +767,13 @@ func (l *ClientLink) onRequestServerLogin(ctx context.Context, c *clientConn, pa
 		return true
 	}
 	if !l.skipLicenceCheck && (req.SessionKey1 != c.loginKey1 || req.SessionKey2 != c.loginKey2) {
-		_ = c.send(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 		return false
 	}
 
 	serverID := int(req.ServerID)
 	if !l.loginPossible(c, serverID) {
-		_ = c.send(serverpackets.EncodePlayFail(serverpackets.PlayFailTooManyPlayers))
+		c.closeWith(serverpackets.EncodePlayFail(serverpackets.PlayFailTooManyPlayers))
 		return false
 	}
 
