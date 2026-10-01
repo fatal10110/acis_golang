@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
+	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -334,6 +335,9 @@ type GameClientLink struct {
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
 
+	// board is the community board; see community_board.go.
+	board communityBoard
+
 	// relations, friendInvites and characters back the friend and block
 	// lists; see friends.go.
 	relations     *relation.Manager
@@ -520,6 +524,15 @@ type GameClientLinkConfig struct {
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
+	// Board is the community board's settings; the zero value keeps the
+	// board off.
+	Board bbs.Config
+	// Mailbox holds the board's mail; nil, as while the board is off,
+	// holds none.
+	Mailbox *bbs.Mailbox
+	// ShowServerNews shows the server news page at login when no clan
+	// notice is shown.
+	ShowServerNews bool
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -629,6 +642,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)
+	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, serverNews: cfg.ShowServerNews}
 	link.clans = cfg.Clans
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)

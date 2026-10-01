@@ -83,6 +83,8 @@ type livePlayer struct {
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	macros           *macro.List
+	// board is the player's community board session; owned by its queue.
+	board boardSession
 	// access is the character's access level, resolved at login and
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.

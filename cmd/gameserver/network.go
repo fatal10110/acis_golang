@@ -100,6 +100,7 @@ func provideGameClientLink(
 	relations *relation.Manager,
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
+	board communityBoard,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -221,6 +222,10 @@ func provideGameClientLink(
 		Characters:   characters,
 		Clans:        clans,
 		AccessLevels: characters,
+
+		Board:          board.Config,
+		Mailbox:        board.Mailbox,
+		ShowServerNews: board.ShowServerNews,
 	})
 	if err != nil {
 		return nil, err
