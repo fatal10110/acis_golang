@@ -497,27 +497,52 @@ func (s *Server) TickEffects() {
 // intervals.
 func (s *Server) TickPositions() {
 	if s.queues.advanceThen != nil {
-		if err := s.catchUp(); err != nil {
+		if err := s.tickPositionsDriven(move.PositionUpdateInterval); err != nil {
 			panic(err)
 		}
-		s.queues.advanceThen(move.PositionUpdateInterval, s.positions.Tick)
-	} else {
-		s.positionTicks.Lock()
-		next := s.positionTicks.last.Add(move.PositionUpdateInterval)
-		if now := time.Now(); next.Before(now) {
-			next = now.Add(move.PositionUpdateInterval)
-		}
-		time.Sleep(time.Until(next))
-		if err := s.awaitHandled(); err != nil {
-			panic(err)
-		}
-		s.positionTicks.last = time.Now()
-		s.positions.Tick()
-		s.positionTicks.Unlock()
+		return
 	}
+	s.positionTicks.Lock()
+	next := s.positionTicks.last.Add(move.PositionUpdateInterval)
+	if now := time.Now(); next.Before(now) {
+		next = now.Add(move.PositionUpdateInterval)
+	}
+	time.Sleep(time.Until(next))
+	if err := s.awaitHandled(); err != nil {
+		panic(err)
+	}
+	s.positionTicks.last = time.Now()
+	s.positions.Tick()
+	s.positionTicks.Unlock()
 	if err := s.queues.settle(); err != nil {
 		panic(err)
 	}
+}
+
+// TickPositionsAfter is TickPositions on the driven clock with d, rather
+// than one interval, passing before the tick, so a test can pin how a
+// player's update walks an uneven gap such as the real pool's scheduling
+// jitter. It fails the test on the real pool, whose ticks keep the
+// production ticker's fixed rate.
+func (s *Server) TickPositionsAfter(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if s.queues.advanceThen == nil {
+		tb.Fatal("TickPositionsAfter needs the driven clock")
+	}
+	if err := s.tickPositionsDriven(d); err != nil {
+		tb.Fatal(err)
+	}
+}
+
+// tickPositionsDriven moves the driven clock by d, runs one production
+// movement-correction tick ahead of the timers due at that instant, and
+// waits for the posted ticks to run.
+func (s *Server) tickPositionsDriven(d time.Duration) error {
+	if err := s.catchUp(); err != nil {
+		return err
+	}
+	s.queues.advanceThen(d, s.positions.Tick)
+	return s.queues.settle()
 }
 
 // parkedMove is a MoveController that never moves.
