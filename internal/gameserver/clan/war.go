@@ -72,10 +72,17 @@ func (cl *Clan) AttackerList() []int32 {
 	return hashSetOrder(cl.attackers)
 }
 
-// hashSetOrder lists ids in the order the war lists reach the client:
-// hash-bucket order of a table of 16 buckets doubled whenever it is three
-// quarters full, a bucket being the low bits of the id folded with its
-// high half. Ids sharing a bucket follow in ascending order.
+// hashSetOrder lists ids in the order the reference's war sets hold them
+// right after boot: hash-bucket order of a table of 16 buckets doubled
+// whenever it is three quarters full, a bucket being the low bits of the
+// id folded with its high half, and ids sharing a bucket in ascending
+// order. It drifts from the reference later in two ways, both cosmetic
+// (only the order of clans in the war window): the reference table never
+// shrinks, so a clan that once held 12 or more wars keeps its larger
+// table after they end, where this recomputes the size from the current
+// count; and inside a bucket the reference keeps insertion order, which
+// is ascending only for the rows restored at boot, while a war declared
+// later sorts here by id rather than after its bucket-mates.
 func hashSetOrder(ids map[int32]struct{}) []int32 {
 	buckets := uint32(16)
 	for len(ids) >= int(buckets-buckets/4) {
