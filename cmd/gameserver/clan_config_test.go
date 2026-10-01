@@ -16,20 +16,38 @@ func TestLoadClanConfigWarehouseWithdrawalRight(t *testing.T) {
 		props string
 		want  clan.Config
 	}{
-		{"", clan.Config{JoinDays: 5, CreateDays: 10}},
-		{"DaysBeforeJoinAClan = 2\nMembersCanWithdrawFromClanWH = True\n", clan.Config{JoinDays: 2, CreateDays: 10, MembersCanWithdrawFromWarehouse: true}},
-		{"MembersCanWithdrawFromClanWH = False\n", clan.Config{JoinDays: 5, CreateDays: 10}},
+		{"", clanConfigDefaults(5, false)},
+		{"DaysBeforeJoinAClan = 2\nMembersCanWithdrawFromClanWH = True\n", clanConfigDefaults(2, true)},
+		{"MembersCanWithdrawFromClanWH = False\n", clanConfigDefaults(5, false)},
 	} {
-		path := filepath.Join(t.TempDir(), "clans.properties")
+		dir := t.TempDir()
+		path := filepath.Join(dir, "clans.properties")
 		if err := os.WriteFile(path, []byte(tc.props), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		got, err := loadClanConfig(gameServerPaths{ClansConfigPath: path}, zerolog.Nop())
+		players := filepath.Join(dir, "players.properties")
+		if err := os.WriteFile(players, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got, err := loadClanConfig(gameServerPaths{ClansConfigPath: path, PlayersConfigPath: players}, zerolog.Nop())
 		if err != nil {
 			t.Fatalf("loadClanConfig(%q) error = %v", tc.props, err)
 		}
 		if got != tc.want {
 			t.Fatalf("loadClanConfig(%q) = %+v, want %+v", tc.props, got, tc.want)
 		}
+	}
+}
+
+// clanConfigDefaults is loadClanConfig's result for a clans.properties that
+// sets only the join days and the warehouse withdrawal right.
+func clanConfigDefaults(joinDays int, withdraw bool) clan.Config {
+	return clan.Config{
+		JoinDays:                        joinDays,
+		CreateDays:                      10,
+		MembersForWar:                   15,
+		WarPenaltyDays:                  5,
+		LifeCrystalNeeded:               true,
+		MembersCanWithdrawFromWarehouse: withdraw,
 	}
 }
