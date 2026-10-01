@@ -67,6 +67,14 @@ type TargetSnapshot struct {
 // lives in destination; the remaining ones queue in waypoints. The arrived
 // hook fires only when the final segment completes, not once per segment.
 //
+// A pawn walk never path-finds: it heads straight for its pawn, and a line
+// that closes ends it blocked on the position update that meets it.
+//
+// A mover given SetSpeeds (a player) steps by the player rules: each update
+// measures its delta from the current cell and rounds the next one, advances
+// by the time it stands for, and retargeting a walk in flight first advances
+// it by the time passed since the last update.
+//
 // The arrival timer preserves progress when no position-update task is
 // wired. When it is wired, UpdatePosition advances origin at the fixed
 // movement correction cadence and may complete the move first. A blocked
@@ -100,10 +108,16 @@ type CreatureMove struct {
 	startSpeed    float64
 	hasStartSpeed bool
 	updates       int
-	owner         moveOwner
-	timer         *sim.Timer
-	moveSeq       uint64
-	queue         *sim.Queue
+	// lastUpdate is when the last position update, or the move start, ran
+	// on the queue clock; sinceTick is how much of the next position
+	// update's interval the retarget updates since the last one already
+	// walked. Player movers only.
+	lastUpdate time.Time
+	sinceTick  time.Duration
+	owner      moveOwner
+	timer      *sim.Timer
+	moveSeq    uint64
+	queue      *sim.Queue
 }
 
 // moveOwner is the controller a CreatureMove reports its movement milestones
@@ -174,10 +188,11 @@ func (m *CreatureMove) SetSpeed(speed float64) {
 	m.retimeLocked()
 }
 
-// SetSpeeds is SetSpeed for a mover whose moves start slower: the first
-// walkStartUpdates position updates of each move advance at startSpeed, the
-// rest at speed. The count restarts only once a move stops, so retargeting
-// a walk in flight keeps its pace.
+// SetSpeeds is SetSpeed for a player's mover, whose moves start slower: the
+// first walkStartUpdates position updates of each move advance at
+// startSpeed, the rest at speed. The count restarts only once a move stops,
+// so retargeting a walk in flight keeps its pace. It also makes the mover
+// step by the player rules (see CreatureMove).
 func (m *CreatureMove) SetSpeeds(speed, startSpeed float64) {
 	if !validSpeed(speed) || !validSpeed(startSpeed) {
 		return
@@ -191,6 +206,37 @@ func (m *CreatureMove) SetSpeeds(speed, startSpeed float64) {
 	m.startSpeed = startSpeed
 	m.hasStartSpeed = true
 	m.retimeLocked()
+}
+
+// playerStepsLocked reports that the mover steps by the player rules, which
+// SetSpeeds opts it into. Callers hold mu.
+func (m *CreatureMove) playerStepsLocked() bool {
+	return m.hasStartSpeed
+}
+
+// nowLocked reads the queue clock, or the zero time with no queue. Callers
+// hold mu.
+func (m *CreatureMove) nowLocked() time.Time {
+	if m.queue == nil {
+		return time.Time{}
+	}
+	return m.queue.Now()
+}
+
+// playerPassed is how far a player's position update covering elapsed
+// advances at speed: the elapsed whole milliseconds, at least one, of the
+// speed per second.
+func playerPassed(speed float64, elapsed time.Duration) float64 {
+	ms := elapsed.Milliseconds()
+	if ms <= 0 {
+		ms = 1
+	}
+	return speed / (1000 / float64(ms))
+}
+
+// roundHalfUp rounds v to the nearest integer, halves toward +Inf.
+func roundHalfUp(v float64) int {
+	return int(math.Floor(v + 0.5))
 }
 
 func validSpeed(speed float64) bool {
@@ -397,10 +443,17 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination, and the start-speed update count running. Only a
-	// fresh request (not currently moving) clears them.
+	// fresh request (not currently moving) clears them. A player's walk in
+	// flight first advances by the time passed since its last update.
 	if !m.moving {
 		m.routeBlocked = false
 		m.updates = 0
+		m.sinceTick = 0
+	} else if m.playerStepsLocked() {
+		m.catchUpLocked()
+	}
+	if m.playerStepsLocked() {
+		m.lastUpdate = m.nowLocked()
 	}
 
 	// Same-cell requests complete on the next movement tick.
@@ -419,7 +472,13 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 		return event.Move{}, pathDirect, errors.New("move: actor cannot move at zero speed")
 	}
 
-	destination, waypoints, outcome := m.resolvePathLocked(target)
+	// A pawn walk heads straight for the pawn: a closed line ends it blocked
+	// on the update that meets it, never routed around.
+	destination, outcome := target, pathDirect
+	var waypoints []location.Location
+	if pawn == nil {
+		destination, waypoints, outcome = m.resolvePathLocked(target)
+	}
 
 	distance := math.Hypot(float64(destination.X)-float64(m.origin.X), float64(destination.Y)-float64(m.origin.Y))
 	ticks := m.travelTicksLocked(distance)
@@ -521,16 +580,23 @@ func (m *CreatureMove) onArrive(seq uint64) {
 // stopShortOfPawnLocked ends the last leg of a pawn walk whose arrival
 // timer elapsed before a position update ended it: the actor stops offset
 // short of the destination on the line toward it, or where it stands when
-// already that close. Callers hold mu.
+// already that close. A pawn walk heads straight through closed lines, so a
+// closed line to that stop ends the walk blocked where the actor stands,
+// as the position update meeting it would. Callers hold mu.
 func (m *CreatureMove) stopShortOfPawnLocked() func() {
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
 	if left := math.Hypot(dx, dy); left > float64(m.pawnOffset) {
 		fraction := (left - float64(m.pawnOffset)) / left
-		m.accurateX += dx * fraction
-		m.accurateY += dy * fraction
-		x, y := int(m.accurateX), int(m.accurateY)
+		accurateX := m.accurateX + dx*fraction
+		accurateY := m.accurateY + dy*fraction
+		x, y := int(accurateX), int(accurateY)
 		z := min(int(m.geo.Height(x, y, m.origin.Z+2*block.CellHeight)), m.maxZLocked())
+		if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, x, y, z) {
+			m.routeBlocked = true
+			return m.stopBlockedLocked()
+		}
+		m.accurateX, m.accurateY = accurateX, accurateY
 		m.origin = location.Location{X: x, Y: y, Z: z}
 	}
 	return m.endLocked()
@@ -608,7 +674,29 @@ func (m *CreatureMove) finishLocked() func() {
 // On the last leg of a pawn walk the update first re-aims the leg at the
 // pawn's current position, and the walk ends at the first position within
 // the walk's offset of the pawn.
+//
+// A player's update stands for step of walking, less what retarget updates
+// since the last one already walked.
 func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
+	u := m.updatePosition(step)
+	if u.hook != nil {
+		u.hook()
+	}
+	return u.ev, u.moving
+}
+
+// positionUpdate is one position update's outcome. hook is the milestone to
+// run once the caller has applied the step; pawnStep reports a step of a pawn
+// walk, from the cell from to the cell to, the walker turns along.
+type positionUpdate struct {
+	ev       event.Move
+	moving   bool
+	hook     func()
+	pawnStep bool
+	from, to location.Location
+}
+
+func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 	// Read the pawn's position before taking mu: it may take the pawn's
 	// own locks.
 	m.mu.Lock()
@@ -621,14 +709,12 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
 	}
 
 	m.mu.Lock()
+	defer m.mu.Unlock()
 	if !m.moving {
-		m.mu.Unlock()
-		return event.Move{}, false
+		return positionUpdate{}
 	}
 	if step <= 0 {
-		ev := m.currentEventLocked()
-		m.mu.Unlock()
-		return ev, true
+		return positionUpdate{ev: m.currentEventLocked(), moving: true}
 	}
 	m.updates++
 
@@ -636,58 +722,35 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
 	if tracking {
 		m.destination = pawnAt
 	}
-	maxZ := m.maxZLocked()
-	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), maxZ)
-	dx := float64(m.destination.X) - m.accurateX
-	dy := float64(m.destination.Y) - m.accurateY
-	left := math.Hypot(dx, dy)
-	passed := m.updateSpeedLocked() * step.Seconds()
-	nextAccurateX, nextAccurateY := m.accurateX, m.accurateY
-	next := m.destination
-	if left != 0 && passed < left {
-		fraction := passed / left
-		nextAccurateX += dx * fraction
-		nextAccurateY += dy * fraction
-		next.X = int(nextAccurateX)
-		next.Y = int(nextAccurateY)
-		next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
+	var passed float64
+	if m.playerStepsLocked() {
+		passed = playerPassed(m.updateSpeedLocked(), step-m.sinceTick)
+		m.sinceTick = 0
+		m.lastUpdate = m.nowLocked()
+	} else {
+		passed = m.updateSpeedLocked() * step.Seconds()
 	}
+	maxZ := m.maxZLocked()
+	next, nextAccurateX, nextAccurateY, reached := m.stepLocked(passed, maxZ)
 	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
 		m.routeBlocked = true
-		ok, action := m.startNextWaypointLocked()
+		ok, hook := m.startNextWaypointLocked()
 		if !ok {
-			action = m.stopBlockedLocked()
-			m.mu.Unlock()
-			if action != nil {
-				action()
-			}
-			return event.Move{}, false
+			return positionUpdate{hook: m.stopBlockedLocked()}
 		}
-		ev := m.currentEventLocked()
-		m.mu.Unlock()
-		if action != nil {
-			action()
-		}
-		return ev, true
+		return positionUpdate{ev: m.currentEventLocked(), moving: true, hook: hook}
 	}
-	if left == 0 || passed >= left {
-		action := m.finishLocked()
+	u := positionUpdate{pawnStep: tracking, from: m.origin, to: next}
+	if reached {
+		u.hook = m.finishLocked()
 		if !m.moving {
-			m.mu.Unlock()
-			if action != nil {
-				action()
-			}
-			return event.Move{}, false
+			return u
 		}
 		// Advanced to the next waypoint segment; report it and fire the
 		// segment-advanced hook (if any) so the client is told about the new
 		// leg the same tick the server itself commits to it.
-		ev := m.currentEventLocked()
-		m.mu.Unlock()
-		if action != nil {
-			action()
-		}
-		return ev, true
+		u.ev, u.moving = m.currentEventLocked(), true
+		return u
 	}
 
 	m.accurateX = nextAccurateX
@@ -695,19 +758,65 @@ func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
 	m.origin = next
 	if tracking {
 		if next.In2DRadius(pawnAt, m.pawnOffset) {
-			action := m.endLocked()
-			m.mu.Unlock()
-			if action != nil {
-				action()
-			}
-			return event.Move{}, false
+			u.hook = m.endLocked()
+			return u
 		}
 		// The re-aimed leg's arrival moves with the pawn.
 		m.retimeLocked()
 	}
-	ev := m.currentEventLocked()
-	m.mu.Unlock()
-	return ev, true
+	u.ev, u.moving = m.currentEventLocked(), true
+	return u
+}
+
+// stepLocked is where advancing passed units toward the destination lands,
+// with the accurate position there; reached reports that the step covers
+// the rest of the leg, landing on the destination itself. It snaps the
+// destination to the floor capped at maxZ first. A player measures the step
+// from its current cell and rounds the cell it lands on; any other mover
+// measures it from its accurate position and truncates. Callers hold mu.
+func (m *CreatureMove) stepLocked(passed float64, maxZ int) (next location.Location, accurateX, accurateY float64, reached bool) {
+	m.destination.Z = min(int(m.geo.Height(m.destination.X, m.destination.Y, m.destination.Z)), maxZ)
+	fromX, fromY := m.accurateX, m.accurateY
+	player := m.playerStepsLocked()
+	if player {
+		fromX, fromY = float64(m.origin.X), float64(m.origin.Y)
+	}
+	dx := float64(m.destination.X) - fromX
+	dy := float64(m.destination.Y) - fromY
+	left := math.Hypot(dx, dy)
+	if left == 0 || passed >= left {
+		return m.destination, m.accurateX, m.accurateY, true
+	}
+	fraction := passed / left
+	accurateX = m.accurateX + dx*fraction
+	accurateY = m.accurateY + dy*fraction
+	if player {
+		next.X, next.Y = roundHalfUp(accurateX), roundHalfUp(accurateY)
+	} else {
+		next.X, next.Y = int(accurateX), int(accurateY)
+	}
+	next.Z = min(int(m.geo.Height(next.X, next.Y, m.origin.Z+2*block.CellHeight)), maxZ)
+	return next, accurateX, accurateY, false
+}
+
+// catchUpLocked is the update a player's walk in flight runs before a
+// retarget: it advances toward the current destination, without re-aiming a
+// pawn walk, by the time passed since the last update, and counts as a
+// position update. A closed line leaves the walker in place and the walk
+// blocked. It runs no milestone, even on reaching the destination. Callers
+// hold mu.
+func (m *CreatureMove) catchUpLocked() {
+	elapsed := m.nowLocked().Sub(m.lastUpdate)
+	m.sinceTick += elapsed
+	m.updates++
+	maxZ := m.maxZLocked()
+	next, accurateX, accurateY, _ := m.stepLocked(playerPassed(m.updateSpeedLocked(), elapsed), maxZ)
+	if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
+		m.routeBlocked = true
+		return
+	}
+	m.accurateX, m.accurateY = accurateX, accurateY
+	m.origin = next
 }
 
 // abandonPawnWalk ends the pawn walk gen where the actor stands, as an

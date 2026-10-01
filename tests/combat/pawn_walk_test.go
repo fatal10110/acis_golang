@@ -128,14 +128,20 @@ func pawnMoveFrom(frames [][]byte, from int, mover, target int32, distance int, 
 // PlayerAI.thinkAttack, PlayerAI.java:170-197): PlayerMove.maybeMoveToPawn
 // (PlayerMove.java:335-352) re-runs moveToPawn (PlayerMove.java:49-109),
 // which broadcasts a fresh MoveToPawn from where the player stands now,
-// although the target has not moved.
+// although the target has not moved. Standing now includes the walk the
+// time since the last position update covered (updatePosition(true),
+// PlayerMove.java:60-61).
 func TestAttackClickMidApproachResendsMoveToPawn(t *testing.T) {
 	t.Parallel()
 	srv, c, objID, hostileID := rethinkApproach(t, nil)
-	here := srv.PlayerMove(t, objID).Position()
+	before := srv.PlayerMove(t, objID).Position()
 
-	c.Send(encodeAction(hostileID, int32(here.X), int32(here.Y), int32(here.Z), false))
+	c.Send(encodeAction(hostileID, int32(before.X), int32(before.Y), int32(before.Z), false))
 	srv.Settle(t)
+	here := srv.PlayerMove(t, objID).Position()
+	if here.X <= before.X || here.Y != before.Y {
+		t.Fatalf("re-think walk starts at %+v, want ahead of %+v on the approach line", here, before)
+	}
 	frames := readQuiet(c)
 	if pawnMoveFrom(frames, 0, objID, hostileID, physicalAttackRange(t, srv, objID), here) < 0 {
 		t.Fatalf("no fresh MoveToPawn from %+v after the repeated attack click: opcodes %v", here, opcodes(frames))
@@ -153,10 +159,10 @@ func TestWeaponEquipMidApproachResendsMoveToPawn(t *testing.T) {
 	srv, c, objID, hostileID := rethinkApproach(t, func(srv *gameservertest.Server, objID int32) {
 		sword = srv.GiveItem(t, objID, 30, 1)
 	})
-	here := srv.PlayerMove(t, objID).Position()
 
 	c.Send(encodeUseItem(sword, false))
 	srv.Settle(t)
+	here := srv.PlayerMove(t, objID).Position()
 	frames := readQuiet(c)
 	equipped := indexOfSystemMessage(frames, 0, serverpackets.SystemMessageS1Equipped)
 	if equipped < 0 {
@@ -164,5 +170,97 @@ func TestWeaponEquipMidApproachResendsMoveToPawn(t *testing.T) {
 	}
 	if pawnMoveFrom(frames, equipped+1, objID, hostileID, physicalAttackRange(t, srv, objID), here) < 0 {
 		t.Fatalf("no fresh MoveToPawn from %+v after S1_EQUIPPED: opcodes %v", here, opcodes(frames))
+	}
+}
+
+// wallX is where pawnWallGeo's wall stands, between playerOrigin and a
+// target 500 units east of the fixture spawn.
+const wallX = 300
+
+// pawnWallGeo is flat ground with a wall along X = wallX: a straight line
+// crossing it is closed, and the pathfinder offers a detour around it.
+type pawnWallGeo struct{ flatGeo }
+
+// pawnWallDetour is the detour pawnWallGeo's pathfinder offers.
+var pawnWallDetour = []location.Location{
+	{X: playerOrigin.X, Y: hostileY + 400, Z: hostileZ},
+	{X: hostileX + 500, Y: hostileY + 400, Z: hostileZ},
+	{X: hostileX + 500, Y: hostileY, Z: hostileZ},
+}
+
+func (pawnWallGeo) CanMove(ox, _, _, tx, _, _ int) bool { return (ox < wallX) == (tx < wallX) }
+
+func (pawnWallGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
+	return append([]location.Location(nil), pawnWallDetour...), true
+}
+
+// TestAttackApproachStopsAtWall pins the player's attack approach against a
+// closed line (#2965): PlayerAI.thinkAttack (PlayerAI.java:188) walks by
+// PlayerMove.maybeMoveToPawn, whose moveToPawn (PlayerMove.java:49-108)
+// clears the geo path and heads straight for the target, never
+// path-finding; the first step into the wall ends the walk blocked
+// (PlayerMove.java:285-289), and ARRIVED_BLOCKED on an ATTACK only sends the
+// same-cell MoveToLocation correction (PlayerAI.java:95-96, CreatureAI.java:
+// 72-75). Nothing walks the player on: the player has no follow task
+// (offensiveFollowTask is only reached through maybeStartOffensiveFollow,
+// which PlayerAI's thinkAttack/thinkCast never call).
+func TestAttackApproachStopsAtWall(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithGeo(pawnWallGeo{}),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+
+	targetHostile(t, c, hostile.ObjectID())
+	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	approach := mustRead(t, c, "MoveToPawn")
+	assertFrameOpcode(t, approach, serverpackets.OpcodeMoveToPawn, "approach")
+	if i := pawnMoveFrom([][]byte{approach}, 0, objID, hostile.ObjectID(), physicalAttackRange(t, srv, objID), playerOrigin); i < 0 {
+		t.Fatalf("approach is not the player's MoveToPawn toward the hostile from %+v", playerOrigin)
+	}
+
+	mover := srv.PlayerMove(t, objID)
+	for i := 0; mover.Moving(); i++ {
+		if i == 300 {
+			t.Fatalf("approach still under way at %+v after 30 s of position updates", mover.Position())
+		}
+		srv.TickPositions()
+	}
+	stop := mover.Position()
+	// One position update covers well under 30 units at the fixture's speed.
+	if stop.X >= wallX || stop.X < wallX-30 || stop.Y != playerOrigin.Y {
+		t.Fatalf("approach stopped at %+v, want on the straight line just short of the wall at X %d", stop, wallX)
+	}
+	for range 20 {
+		srv.TickPositions()
+	}
+	if got := mover.Position(); got != stop || mover.Moving() {
+		t.Fatalf("player at %+v (moving %v) after more position updates, want left at %+v", got, mover.Moving(), stop)
+	}
+
+	frames := readQuiet(c)
+	corrections := 0
+	for _, f := range frames {
+		switch f[0] {
+		case serverpackets.OpcodeMoveToPawn:
+			t.Fatalf("MoveToPawn sent again after the approach: opcodes %v", opcodes(frames))
+		case serverpackets.OpcodeMoveToLocation:
+			id, dest, origin := moveToLocationCoords(t, f)
+			if id != objID {
+				continue
+			}
+			if dest != stop || origin != stop {
+				t.Fatalf("player MoveToLocation %+v -> %+v, want only the same-cell correction at %+v (no detour)", origin, dest, stop)
+			}
+			corrections++
+		}
+	}
+	if corrections != 1 {
+		t.Fatalf("blocked corrections = %d, want 1: opcodes %v", corrections, opcodes(frames))
 	}
 }

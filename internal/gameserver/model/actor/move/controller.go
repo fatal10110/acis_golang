@@ -149,7 +149,17 @@ func (c *Controller) segmentAdvanced(ev event.Move) {
 // blocked reports an in-flight move stopped by a newly blocked geodata path.
 // The sink owes observers BroadcastBlockedCorrection, ordered around its own
 // reaction; with no sink the correction is sent here.
+//
+// A player's attack approach ends with it: the player stays where the walk
+// stopped until its attack thinks again.
 func (c *Controller) blocked() {
+	if c.selfFollowsByPawn() {
+		c.mu.Lock()
+		if c.move.FollowMode() == FollowOffensive {
+			c.clearFollow()
+		}
+		c.mu.Unlock()
+	}
 	if c.sink == nil {
 		c.BroadcastBlockedCorrection()
 		return
@@ -432,11 +442,13 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			outcome pathFindResult
 			err     error
 		)
+		before := c.move.Position()
 		if pawnMove {
 			ev, outcome, err = c.move.MoveToPawnWithPathOutcome(target, offset)
 		} else {
 			ev, outcome, err = c.move.MoveToLocationWithPathOutcome(dest)
 		}
+		c.syncRetarget(before)
 		if err != nil {
 			// Can't actually approach (for example, zero speed): don't
 			// report "still moving" — that would strand the caller waiting
@@ -470,7 +482,9 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return nil
 	}
 
+	before := c.move.Position()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(home)
+	c.syncRetarget(before)
 	if err != nil {
 		return err
 	}
@@ -485,7 +499,9 @@ func (c *Controller) MoveHome(home location.Location) error {
 // point and counts as a geo-path failure for actors that recover from
 // repeated stalls.
 func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
+	before := c.move.Position()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+	c.syncRetarget(before)
 	if err != nil {
 		return false, nil
 	}
@@ -508,7 +524,9 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.clearFollow()
+	before := c.move.Position()
 	ev, outcome, err := c.move.MoveToPawnWithPathOutcome(target, offset)
+	c.syncRetarget(before)
 	if err != nil {
 		return false
 	}
@@ -524,7 +542,9 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 // accepted move's Event, for callers that need the move detail alongside
 // acceptance (task.Walker's WalkerActor contract).
 func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, error) {
+	before := c.move.Position()
 	ev, outcome, err := c.move.MoveToLocationWithPathOutcome(target)
+	c.syncRetarget(before)
 	if err != nil {
 		return event.Move{}, err
 	}
@@ -532,6 +552,14 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, 
 	c.self.BroadcastMove(ev)
 	c.addPositionUpdate()
 	return ev, nil
+}
+
+// syncRetarget moves the actor's world presence to the cell a player's walk
+// in flight advanced to before a move request retargeted it, if it moved.
+func (c *Controller) syncRetarget(before location.Location) {
+	if at := c.move.Position(); at != before {
+		c.self.SyncPosition(at)
+	}
 }
 
 func (c *Controller) applyPathFindOutcome(outcome pathFindResult) {
@@ -605,38 +633,39 @@ func (c *Controller) Queue() *sim.Queue {
 // does on each routed waypoint. It returns false once the move has
 // stopped.
 //
-// Reaching the destination fires the arrived hook synchronously inside
-// UpdatePosition, before this returns — including the controller's own
-// removePositionUpdate call. If that hook (an NPC's AI, say) starts a new
-// move as a result, c.move is moving again by the time UpdatePosition
-// returns, so the fresh state here — not the stale result of this tick —
-// decides whether to unregister.
+// Reaching the destination fires the arrived hook synchronously, before
+// this returns — including the controller's own removePositionUpdate call.
+// If that hook (an NPC's AI, say) starts a new move as a result, c.move is
+// moving again by the time the hook returns, so the fresh state here — not
+// the stale result of this tick — decides whether to unregister.
 //
 // A pawn walk whose pawn the actor no longer knows ends first, where the
-// actor stands, as an arrival; while it goes on, each update turns the actor
-// toward the step it took.
+// actor stands, as an arrival; while it goes on, each step it takes turns
+// the actor toward the cell it steps to, the step that ends the walk
+// included, before the walk's milestone runs.
 func (c *Controller) PositionUpdate() bool {
 	pawn, gen := c.move.walkingPawn()
 	if pawn != nil && !c.knowsPawn(pawn) {
 		c.move.abandonPawnWalk(gen)
-		pawn = nil
 	}
-	before := c.move.Position()
-	ev, moving := c.move.UpdatePosition(PositionUpdateInterval)
+	u := c.move.updatePosition(PositionUpdateInterval)
+	if u.pawnStep {
+		c.self.SetHeading(u.from.HeadingTo(u.to))
+	}
+	if u.hook != nil {
+		u.hook()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.recheckOffensiveFollow()
 	c.recheckFriendlyFollow()
-	if !moving {
+	if !u.moving {
 		if !c.move.Moving() && !c.tracksFollowLocked() {
 			c.removePositionUpdate()
 		}
 		return c.move.Moving() || c.tracksFollowLocked()
 	}
-	if pawn != nil && ev.Origin != before {
-		c.self.SetHeading(before.HeadingTo(ev.Origin))
-	}
-	c.self.SyncPosition(ev.Origin)
+	c.self.SyncPosition(u.ev.Origin)
 	return true
 }
 
@@ -671,18 +700,17 @@ func (c *Controller) recheckOffensiveFollow() {
 		return
 	}
 	c.offensiveFollowElapsed = 0
-	// A player's recheck re-sends its pawn walk whenever the target is out
-	// of reach: the walk already tracks the target, so its destination
-	// alone no longer tells whether the target moved.
-	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil, c.selfFollowsByPawn())
+	_, _ = c.maybeStartFollow(c.offensiveTarget, c.offensiveRange, FollowOffensive, false, nil, false)
 }
 
 // startOffensiveFollow arms the offensive follow task toward target at
-// offset, tracking it for rechecks unless the actor's own AI owns them.
+// offset, tracking it for rechecks unless the actor's own AI owns them. A
+// player's approach runs no recheck: its pawn walk tracks the target, and
+// only the attack's own next think walks it again.
 func (c *Controller) startOffensiveFollow(target attackable.Combatant, offset int) {
 	c.friendlyTarget = nil
 	c.move.StartOffensiveFollow(target.ObjectID(), offset)
-	if !c.selfOwnsOffensiveFollowTicker() {
+	if !c.selfOwnsOffensiveFollowTicker() && !c.selfFollowsByPawn() {
 		c.offensiveTarget = target
 		c.offensiveRange = offset
 	}

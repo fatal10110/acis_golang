@@ -24,10 +24,11 @@ const (
 )
 
 // rangeWalkCaster boots a caster who knows the nuke and the buff, in world,
-// with a monster spawned dx units east of it and selected.
-func rangeWalkCaster(t *testing.T, dx int) (srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, origin, at location.Location, hostileID int32) {
+// with a monster spawned dx units east of it and selected. opts add to the
+// boot options.
+func rangeWalkCaster(t *testing.T, dx int, opts ...gameservertest.Option) (srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, origin, at location.Location, hostileID int32) {
 	t.Helper()
-	srv = gameservertest.Boot(t,
+	srv = gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
@@ -43,6 +44,7 @@ func rangeWalkCaster(t *testing.T, dx int) (srv *gameservertest.Server, c *tests
 				Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
 			},
 		})),
+	}, opts...)...,
 	)
 	c, objID = srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, rangeWalkNukeID, 1)
@@ -353,4 +355,75 @@ func assertShiftRefusalStopsWalk(t *testing.T, srv *gameservertest.Server, c *te
 		}
 	}
 	return log
+}
+
+// castWallGeo is open ground with a wall along X = wall: a straight line
+// crossing it is closed, and the pathfinder offers a detour around it.
+type castWallGeo struct {
+	gameservertest.Geo
+	wall int
+}
+
+func (g castWallGeo) CanMove(ox, _, _, tx, _, _ int) bool { return (ox < g.wall) == (tx < g.wall) }
+
+func (g castWallGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
+	return []location.Location{
+		{X: origin.X, Y: origin.Y + 400, Z: origin.Z},
+		{X: target.X, Y: target.Y + 400, Z: target.Z},
+		target,
+	}, true
+}
+
+// TestCastApproachBehindWallEndsBlocked pins a cast approach against a closed
+// line (#2965): PlayerAI.thinkCast walks by PlayerMove.maybeMoveToPawn
+// (PlayerAI.java:261), whose moveToPawn (PlayerMove.java:49-108) heads
+// straight for the target without path-finding; the first step into the
+// wall ends the walk blocked (PlayerMove.java:285-289), and ARRIVED_BLOCKED
+// on a CAST answers DIST_TOO_FAR_CASTING_STOPPED with the same-cell
+// MoveToLocation correction (PlayerAI.java:90-94), casting nothing.
+func TestCastApproachBehindWallEndsBlocked(t *testing.T) {
+	t.Parallel()
+	const wall = 310
+	srv, c, objID, origin, at, hostileID := rangeWalkCaster(t, 800, gameservertest.WithGeo(castWallGeo{wall: wall}))
+	if origin.X >= wall || at.X <= wall {
+		t.Fatalf("fixture: caster at %+v and monster at %+v not on both sides of the wall at X %d", origin, at, wall)
+	}
+	mpBefore := srv.PlayerCurrentMP(t, objID)
+
+	c.Send(encodeRequestMagicSkillUse(rangeWalkNukeID, false, false))
+	assertMoveToPawn(t, c.Read(), objID, hostileID, rangeWalkRange, origin)
+	mover := srv.PlayerMove(t, objID)
+	for i := 0; mover.Moving(); i++ {
+		if i == 300 {
+			t.Fatalf("approach still under way at %+v after 30 s of position updates", mover.Position())
+		}
+		srv.TickPositions()
+	}
+	stop := mover.Position()
+	if stop.X >= wall || stop.X < wall-30 || stop.Y != origin.Y {
+		t.Fatalf("approach stopped at %+v, want on the straight line just short of the wall at X %d", stop, wall)
+	}
+
+	log := readFrameLog(c)
+	tooFar := log.index(isSystemMessage(serverpackets.SystemMessageDistTooFarCastingStopped))
+	if tooFar < 0 {
+		t.Fatalf("no DIST_TOO_FAR_CASTING_STOPPED after the blocked approach (%d frames)", len(log))
+	}
+	correction := log.index(func(frame []byte) bool { return frame[0] == serverpackets.OpcodeMoveToLocation })
+	if correction < tooFar {
+		t.Fatalf("MoveToLocation at frame %d, want the correction after DIST_TOO_FAR_CASTING_STOPPED at %d", correction, tooFar)
+	}
+	r := wireReader(log[correction][1:])
+	id := r.ReadInt32()
+	dest := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	from := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
+	if id != objID || dest != stop || from != stop {
+		t.Fatalf("MoveToLocation = object %d %+v -> %+v, want the player's same-cell correction at %+v", id, from, dest, stop)
+	}
+	if at := log.index(isMagicSkillUseOf(objID, rangeWalkNukeID)); at >= 0 {
+		t.Fatalf("MagicSkillUse at frame %d after the blocked approach", at)
+	}
+	if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
+		t.Fatalf("MP after the blocked approach = %d, want %d untouched", got, mpBefore)
+	}
 }
