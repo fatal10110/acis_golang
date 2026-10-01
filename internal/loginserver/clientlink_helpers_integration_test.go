@@ -39,6 +39,10 @@ type fakeAccountStore struct {
 	accounts      map[string]model.Account
 	lastActive    map[string]time.Time
 	lastActiveErr error
+	// accountErr fails every lookup; createErr fails every creation.
+	accountErr  error
+	createErr   error
+	createCalls int
 }
 
 func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
@@ -52,6 +56,9 @@ func newFakeAccountStore(accs ...model.Account) *fakeAccountStore {
 func (s *fakeAccountStore) Account(_ context.Context, login string) (model.Account, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.accountErr != nil {
+		return model.Account{}, s.accountErr
+	}
 	a, ok := s.accounts[login]
 	if !ok {
 		return model.Account{}, loginsql.ErrAccountNotFound
@@ -62,6 +69,10 @@ func (s *fakeAccountStore) Account(_ context.Context, login string) (model.Accou
 func (s *fakeAccountStore) CreateAccount(_ context.Context, login, hashedPassword string, _ time.Time) (model.Account, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.createCalls++
+	if s.createErr != nil {
+		return model.Account{}, s.createErr
+	}
 	a := model.NewAccount(login, hashedPassword, 0, 1)
 	s.accounts[login] = a
 	return a, nil
@@ -91,6 +102,12 @@ func (s *fakeAccountStore) get(login string) (model.Account, bool) {
 	defer s.mu.Unlock()
 	a, ok := s.accounts[login]
 	return a, ok
+}
+
+func (s *fakeAccountStore) creations() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.createCalls
 }
 
 func (s *fakeAccountStore) getLastActive(login string) (time.Time, bool) {
@@ -200,6 +217,20 @@ func (f *fakeLoginClient) expectClosed() {
 	if n, err := f.conn.Read(buf); n != 0 || err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
 		f.t.Fatalf("expected connection to close, got n=%d err=%v", n, err)
 	}
+}
+
+// expectLoginFail reads the next frame and requires LoginFail with reason,
+// followed by the server closing the connection.
+func (f *fakeLoginClient) expectLoginFail(reason serverpackets.LoginFailReason) {
+	f.t.Helper()
+	reply := f.read()
+	if reply[0] != serverpackets.OpcodeLoginFail {
+		f.t.Fatalf("opcode = %#x, want LoginFail (%#x)", reply[0], serverpackets.OpcodeLoginFail)
+	}
+	if got := loginFailReason(f.t, reply); got != reason {
+		f.t.Fatalf("LoginFail reason = %d, want %d", got, reason)
+	}
+	f.expectClosed()
 }
 
 func encodeAuthGameGuard(sessionID int32) []byte {
