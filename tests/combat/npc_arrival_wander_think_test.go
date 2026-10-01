@@ -95,10 +95,20 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 		t.Fatal("IsMoving() = true one wander timer after the sleep exit, want it standing")
 	}
 
-	// The firing walks with no AI cycle; check the walk before any read
-	// can move the clock past a short walk's arrival.
+	advanceTo(t, srv, hostile, promoted.Add(wanderTimer-time.Second))
+	assertNoWanderWalk(t, c, "the promotion, before its wander timer ran out")
+	if !hostile.Now().Before(promoted.Add(wanderTimer)) {
+		t.Fatalf("clock %v already at the promotion's firing %v", hostile.Now(), promoted.Add(wanderTimer))
+	}
+
+	// The firing walks with no AI cycle. A driven clock runs it inside the
+	// advance, so the walk is checked before any read can move the clock
+	// past a short walk's arrival. On the wall clock the advance only sleeps
+	// until the firing is due: its callback may still be on its way, and a
+	// short walk may already have arrived, so the walk's MoveToLocation is
+	// the proof there.
 	advanceTo(t, srv, hostile, promoted.Add(wanderTimer))
-	if !hostile.IsMoving() {
+	if srv.DrivesClock() && !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false when the promotion's wander timer ran out, want the next random walk")
 	}
 	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation one wander timer after the promotion")
