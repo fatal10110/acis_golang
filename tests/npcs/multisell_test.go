@@ -163,7 +163,7 @@ func bootMultisell(t *testing.T, character gameservertest.Option, stacks [][2]in
 	if seed != nil {
 		seed(srv, w.items)
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
 	w.merchant = w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)

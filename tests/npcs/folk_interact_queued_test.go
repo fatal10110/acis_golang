@@ -224,7 +224,7 @@ func TestFolkTalkMidCastRunsAtCastEnd(t *testing.T) {
 	if err := srv.KnownSkills.SetKnownSkill(context.Background(), w.player, 0, longCastSkillID, 1); err != nil {
 		t.Fatalf("seed known skill: %v", err)
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)
