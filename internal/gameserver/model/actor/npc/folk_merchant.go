@@ -10,6 +10,7 @@ var merchantKinds = map[InstanceKind]struct{}{
 	"CastleChamberlain":  {},
 	"ClanHallManagerNpc": {},
 	"ManorManagerNpc":    {},
+	"WyvernManagerNpc":   {},
 }
 
 // Merchant reports whether f is a merchant type, one a buylist purchase or
