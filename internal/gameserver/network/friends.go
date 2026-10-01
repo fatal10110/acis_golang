@@ -58,20 +58,6 @@ func (l *GameClientLink) characterNames(ids []int32) map[int32]string {
 	return names
 }
 
-// livePlayerByName returns the online player named name, matched
-// case-insensitively.
-func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
-	if l.world == nil {
-		return nil, false
-	}
-	obj, ok := l.world.PlayerByName(name)
-	if !ok {
-		return nil, false
-	}
-	live, ok := obj.(*livePlayer)
-	return live, ok
-}
-
 // friendListEntries is id's friend list as FriendList sends it: a friend
 // whose character no longer exists keeps its row with an empty name.
 //

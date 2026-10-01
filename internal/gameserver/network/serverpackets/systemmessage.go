@@ -541,7 +541,6 @@ const (
 // Friend list, block list and block-everything messages.
 const (
 	SystemMessageS1AddedToFriends                   = 132
-	SystemMessageWaitingForAnotherReply             = 164
 	SystemMessageS1JoinedAsFriend                   = 479
 	SystemMessageS1DeletedFromFriendsList           = 481
 	SystemMessageCannotAddYourselfToFriendsList     = 482
