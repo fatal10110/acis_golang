@@ -555,6 +555,16 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 	if c == nil {
 		return nil
 	}
+	return skillListEntriesGreyed(c, skills, c.WearingFormalWear())
+}
+
+// skillListEntriesGreyed is skillListEntries with the formal wear flag
+// given, for a SkillList sent while the paperdoll is still between two
+// states.
+func skillListEntriesGreyed(c *player.Character, skills *skillstate.Persistence, formalWear bool) []serverpackets.SkillListEntry {
+	if c == nil {
+		return nil
+	}
 	levels := c.SkillLevels()
 	if len(levels) == 0 {
 		return nil
@@ -567,7 +577,7 @@ func skillListEntries(c *player.Character, skills *skillstate.Persistence) []ser
 
 	// Worn formal wear greys out every skill. The negative-reputation clan
 	// skill flag is not modeled yet.
-	disabled := c.WearingFormalWear()
+	disabled := formalWear
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {
 		level := levels[id]
