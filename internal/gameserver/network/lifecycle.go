@@ -48,6 +48,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// TaskEffects.Save runs on this queue too, so every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
 	live.markDetaching()
+	// Out of party matching while still in sight, so its observers see it
+	// leave its room; marked as departing first, so no room or waiting
+	// list takes it back in.
+	l.leavePartyMatch(live)
 
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log

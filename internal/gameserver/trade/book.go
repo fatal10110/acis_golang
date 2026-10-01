@@ -21,6 +21,7 @@ const (
 	KindTrade RequestKind = iota
 	KindParty
 	KindCommandChannel
+	KindPartyRoom
 )
 
 // pendingRequest is a request as its target holds it.

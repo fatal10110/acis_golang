@@ -410,6 +410,7 @@ func (r *Registry[M]) changeLeader(out *notices, g *group[M], player M) {
 		out.add(InfoRefresh[M]{Member: m})
 		out.add(Msg[M]{To: []M{m}, ID: MsgBecameLeader, Name: player.CharacterName()})
 	}
+	out.add(LeaderChanged[M]{Leader: player})
 }
 
 func (g *group[M]) view() View[M] {

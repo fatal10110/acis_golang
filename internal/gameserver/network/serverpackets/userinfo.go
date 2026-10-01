@@ -250,7 +250,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 		w.WriteUint16(uint16(id))
 	}
 
-	w.WriteUint8(0) // in party-match room: party matching is not modeled
+	w.WriteUint8(boolUint8(c.PartyRoom() > 0))
 	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(0)
 	w.WriteInt32(s.Clan.Privileges)

@@ -97,6 +97,10 @@ type ChannelPartyUpdate[M Member] struct {
 	Added  bool
 }
 
+// LeaderChanged reports Leader as its party's new leader, once every
+// member has been told.
+type LeaderChanged[M Member] struct{ Leader M }
+
 // Formed reports a new party; its members' positions start being shared.
 type Formed struct{ ID ID }
 
@@ -113,5 +117,6 @@ func (FusionStop[M]) isNotice()         {}
 func (ChannelOpen[M]) isNotice()        {}
 func (ChannelClose[M]) isNotice()       {}
 func (ChannelPartyUpdate[M]) isNotice() {}
+func (LeaderChanged[M]) isNotice()      {}
 func (Formed) isNotice()                {}
 func (Dispersed) isNotice()             {}

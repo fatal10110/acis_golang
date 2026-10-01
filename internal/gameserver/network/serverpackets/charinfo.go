@@ -122,7 +122,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	for _, id := range cubicIDs {
 		w.WriteUint16(uint16(id))
 	}
-	w.WriteUint8(0) // party match room
+	w.WriteUint8(boolUint8(c.PartyRoom() > 0))
 	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(uint8(c.RecommendationsLeft()))
 	w.WriteUint16(uint16(c.RecommendationsHave()))
