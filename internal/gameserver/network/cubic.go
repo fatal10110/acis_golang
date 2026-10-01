@@ -44,6 +44,12 @@ func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.E
 // Cubics()/AttackStance.Add), while an already-active id only has its
 // disappear timer reset, its original granting level and fire behavior left
 // untouched.
+//
+// The cubic list can change on another queue (a party member's mass cubic
+// admits into live's list from the caster's queue), so every list read and
+// runtime change happens under cubicsMu: whichever sync runs last sees the
+// final list, stops every runtime it no longer holds, and never starts a
+// runtime for an id that was evicted meanwhile.
 func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def modelskill.Definition) {
 	if live == nil {
 		return
@@ -64,40 +70,46 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 			evicted.Stop()
 		}
 	}
+	if !slices.Contains(active, int(id)) {
+		live.cubicsMu.Unlock()
+		return
+	}
 	runtime, exists := live.cubics[id]
 	if !exists {
 		interval := time.Duration(def.CubicActivationTime) * time.Second
 		runtime = cubic.NewRuntime(id, actorcast.CubicGrantedLevel(def), def.CubicActivationChance, interval, func() {
 			l.fireCubic(live, id, runtime)
 		}, func() {
-			l.expireCubic(live, id)
+			l.expireCubic(live, id, runtime)
 		}, live.Queue())
 		live.cubics[id] = runtime
 	}
-	live.cubicsMu.Unlock()
-
 	runtime.RefreshDisappear(lifetime)
 	if id == cubic.Life {
 		runtime.Action()
 	}
+	live.cubicsMu.Unlock()
 }
 
 // expireCubic runs when a cubic's granted lifetime elapses: it drops the id
 // from the owner's cubic list and live runtime map and refreshes the
 // character info the client sees, matching Cubic.stop() removing itself
-// from CubicList and broadcasting.
-func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID) {
+// from CubicList and broadcasting. runtime is the cubic that expired: once
+// it has been stopped or replaced (evicted, then the same id granted again),
+// its late timer leaves the current cubic of that id alone.
+func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
 	if live == nil {
 		return
 	}
-	live.Character.RemoveCubic(id)
 	live.cubicsMu.Lock()
-	runtime := live.cubics[id]
-	delete(live.cubics, id)
-	live.cubicsMu.Unlock()
-	if runtime != nil {
-		runtime.Stop()
+	if live.cubics[id] != runtime {
+		live.cubicsMu.Unlock()
+		return
 	}
+	delete(live.cubics, id)
+	live.Character.RemoveCubic(id)
+	live.cubicsMu.Unlock()
+	runtime.Stop()
 	l.broadcastCharacterInfo(live)
 }
 
@@ -113,15 +125,16 @@ func (live *livePlayer) Cubics() []task.AttackStanceCubic {
 	return out
 }
 
-// cubicStillActive reports whether id is still one of live's active
-// cubics, so a deferred effect scheduled cubicCastDelay ago can tell its
-// cubic wasn't stopped (owner death, logout, natural expiry) in the
-// meantime.
-func (live *livePlayer) cubicStillActive(id cubic.ID) bool {
+// cubicStillActive reports whether runtime is still live's active cubic of
+// id, so a deferred effect scheduled cubicCastDelay ago can tell its cubic
+// wasn't stopped (owner death, logout, natural expiry, eviction) in the
+// meantime. It compares the runtime itself, not just the id: an evicted
+// cubic's pending effect must not land because the same id was granted
+// again within the delay.
+func (live *livePlayer) cubicStillActive(id cubic.ID, runtime *cubic.Runtime) bool {
 	live.cubicsMu.Lock()
 	defer live.cubicsMu.Unlock()
-	_, ok := live.cubics[id]
-	return ok
+	return live.cubics[id] == runtime
 }
 
 // fireCubic runs one action tick for live's cubic id, matching
@@ -142,7 +155,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	if live.Character.Dead() {
 		// Matches Cubic.fireAction's own isDead()/isOnline() self-check:
 		// a dead owner stops the cubic outright rather than firing.
-		l.expireCubic(live, id)
+		l.expireCubic(live, id, runtime)
 		return
 	}
 
@@ -202,7 +215,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 			// stopCubics() stops each runtime's timers but never removes
 			// it from live.cubics, so cubicStillActive alone would still
 			// report true after the session detached.
-			if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
+			if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 				return
 			}
 			// The heal sends a healed player its own status; the owner gets
@@ -216,7 +229,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		return
 	}
 	live.after(cubicCastDelay, func() {
-		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id) {
+		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
 		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))

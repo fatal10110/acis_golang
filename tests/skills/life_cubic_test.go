@@ -83,8 +83,9 @@ const (
 
 // cubicSummonSkills is a self Life Cubic and a self Storm Cubic summon, both
 // instant, plus the Life Cubic's heal, so a caster with no Cubic Mastery can
-// fill its one-cubic list and then summon past it.
-func cubicSummonSkills() []modelskill.Definition {
+// fill its one-cubic list and then summon past it. stormLifetime is the
+// Storm Cubic's granted lifetime.
+func cubicSummonSkills(stormLifetime time.Duration) []modelskill.Definition {
 	return []modelskill.Definition{
 		{
 			ID: summonLifeCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
@@ -95,19 +96,19 @@ func cubicSummonSkills() []modelskill.Definition {
 		{
 			ID: summonStormCubicSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 			SkillType: "SUMMON", IsCubic: true, NpcID: int(cubic.Storm), MPConsume: stormCubicMPCost,
-			CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: 900_000,
+			CubicActivationTime: lifeCubicInterval, SummonTotalLifeTime: int(stormLifetime / time.Millisecond),
 			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
 		{ID: lifeCubicHealSkill, Level: 1, Power: lifeCubicHealPower},
 	}
 }
 
-func bootCubicSummoner(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+func bootCubicSummoner(t *testing.T, stormLifetime time.Duration) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 20, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, cubicSummonSkills())),
+		gameservertest.WithSkills(skillPersistence(t, cubicSummonSkills(stormLifetime))),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, summonLifeCubicSkill, 1)
@@ -152,7 +153,7 @@ func assertNoCubicSummoningFailed(t *testing.T, frames [][]byte) {
 // heal again.
 func TestSelfCubicCastPastFullListEvictsOldest(t *testing.T) {
 	t.Parallel()
-	srv, c, objID := bootCubicSummoner(t)
+	srv, c, objID := bootCubicSummoner(t, 900*time.Second)
 	setPlayerRollSource(t, srv, objID, func(int) int { return 0 })
 	damageToHealHeadroom(t, srv, objID, int32(srv.PlayerMaxHP(t, objID)/2))
 	drainUntilQuiet(t, c)
@@ -191,16 +192,22 @@ func TestSelfCubicCastPastFullListEvictsOldest(t *testing.T) {
 }
 
 // TestSelfCubicRecastOnFullListRefreshes: recasting the held cubic while the
-// list is full is not refused either; addOrRefreshCubic (CubicList.java:47-49)
-// only resets that cubic's disappear task and broadcasts nothing.
+// list is full is not refused either. addOrRefreshCubic (CubicList.java:47-49)
+// only restarts that cubic's disappear task (Cubic.refreshDisappearTask,
+// cancel then reschedule for the full lifetime) and broadcasts nothing: the
+// cubic outlives its first grant and expires one lifetime after the recast.
 func TestSelfCubicRecastOnFullListRefreshes(t *testing.T) {
 	t.Parallel()
-	srv, c, objID := bootCubicSummoner(t)
+	const lifetime = 10 * time.Second
+	srv, c, objID := bootCubicSummoner(t, lifetime)
 
 	c.Send(encodeRequestMagicSkillUse(summonStormCubicSkill, false, false))
 	srv.Advance(t, time.Second)
 	drainUntilQuiet(t, c)
+	srv.Advance(t, 5*time.Second)
+	drainUntilQuiet(t, c)
 
+	// Six seconds into a ten-second grant: the recast restarts the lifetime.
 	c.Send(encodeRequestMagicSkillUse(summonStormCubicSkill, false, false))
 	srv.Advance(t, time.Second)
 	frames := queueFrames(t, c)
@@ -211,7 +218,16 @@ func TestSelfCubicRecastOnFullListRefreshes(t *testing.T) {
 	if n := countOpcode(frames, serverpackets.OpcodeUserInfo); n != 0 {
 		t.Fatalf("refresh sent %d UserInfo, want 0 (only a newly admitted cubic broadcasts)", n)
 	}
+
+	// Past the first grant's end (10s) but inside the refreshed one (6s+10s).
+	srv.Advance(t, 6*time.Second)
 	if got := liveCubicIDs(t, srv, objID); !slices.Equal(got, []int{int(cubic.Storm)}) {
-		t.Fatalf("cubics after the refresh = %v, want [%d]", got, cubic.Storm)
+		t.Fatalf("cubics after the first grant's lifetime = %v, want [%d] still held by the refresh", got, cubic.Storm)
+	}
+
+	// Past the refreshed lifetime: the cubic expires.
+	srv.Advance(t, 5*time.Second)
+	if got := liveCubicIDs(t, srv, objID); len(got) != 0 {
+		t.Fatalf("cubics after the refreshed lifetime = %v, want none", got)
 	}
 }
