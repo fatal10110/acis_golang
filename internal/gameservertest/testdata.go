@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,7 +22,18 @@ import (
 type Geo struct{}
 
 func (Geo) CanMove(int, int, int, int, int, int) bool { return true }
-func (Geo) Height(_, _, z int) int16                  { return int16(z) }
+
+// Height answers the probe height itself, clamped to the int16 range a
+// geodata height holds.
+func (Geo) Height(_, _, z int) int16 {
+	if z > math.MaxInt16 {
+		return math.MaxInt16
+	}
+	if z < math.MinInt16 {
+		return math.MinInt16
+	}
+	return int16(z)
+}
 
 // GateGeo is an always-passable Geo until Block closes every straight-line
 // walk, so a suite can start a move then fire the in-flight blocked path.

@@ -311,7 +311,9 @@ func TestBypassRefusedWhileTradeRequestPending(t *testing.T) {
 
 // TestBypassCommandFamilies pins the families whose systems are not in
 // place: each is answered ActionFailed. A Quest command must be on the
-// last page, like an npc_ one, and is dropped silently when it is not.
+// last page, like an npc_ one, and is dropped silently when it is not. An
+// admin_ command from a player without the access rights is refused with a
+// message only.
 func TestBypassCommandFamilies(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
@@ -319,7 +321,8 @@ func TestBypassCommandFamilies(t *testing.T) {
 	assertAnswer(t, w.bypass(t, "Quest Q001_LettersOfLove 30048-03.htm"), nil, nil, "")
 	w.openAnyNpcPage(t)
 	assertAnswer(t, w.bypass(t, "Quest Q001_LettersOfLove 30048-03.htm"), releaseOnly, nil, "")
-	for _, command := range []string{"admin_admin", "bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block", "manor_menu_select?ask=1", "_match?class=88&page=1", "_diary?class=88&page=1", "arenachange 1"} {
+	assertAnswer(t, w.bypass(t, "admin_admin"), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
+	for _, command := range []string{"bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block", "manor_menu_select?ask=1", "_match?class=88&page=1", "_diary?class=88&page=1", "arenachange 1"} {
 		assertAnswer(t, w.bypass(t, command), releaseOnly, nil, "")
 	}
 	assertAnswer(t, w.bypass(t, "unknown_command"), nil, nil, "")

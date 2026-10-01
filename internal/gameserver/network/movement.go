@@ -36,6 +36,10 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 	// Convert the floor-level target Z the client sent into head-level Z
 	// before pathing.
 	target.Z += int(live.CollisionHeight())
+	// A player in a teleport mode jumps to the point instead, however far.
+	if l.moveByTeleport(live, target) {
+		return
+	}
 	// Reject any target farther than 9900 units from the packet's own
 	// origin (not the
 	// server-authoritative position used below to simulate the walk).

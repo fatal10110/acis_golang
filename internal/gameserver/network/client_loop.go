@@ -1181,6 +1181,24 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			onLive(live, func() { l.requestBypassToServer(live, req) })
 			l.finishPendingClassChange(live)
 
+		case clientpackets.OpcodeSendBypassBuildCmd:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeSendBypassBuildCmd)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.sendBypassBuildCmd(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestGmList:
+			// The request carries no body.
+			if live != nil {
+				onLive(live, func() { l.requestGmList(live) })
+			}
+
 		case clientpackets.OpcodeRequestTargetCancel:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)
 			if err != nil {

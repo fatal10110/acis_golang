@@ -93,6 +93,8 @@ type options struct {
 	htmlPages              map[string]string
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
+	gmStartupUnlisted      bool
+	gmAudit                zerolog.Logger
 	restarts               *restart.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
@@ -244,6 +246,14 @@ func WithKarmaTrade(allowed bool) Option {
 // persisted access level against at login (default: none, so every
 // character plays under the attribute defaults).
 func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = data } }
+
+// WithGMStartupUnlisted sets players.properties GMStartupAutoList = False:
+// a game master logs in hidden from /gmlist.
+func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlisted = true } }
+
+// WithGMAudit records every admin command run to log (server.properties
+// GMAudit = True); by default nothing is recorded.
+func WithGMAudit(log zerolog.Logger) Option { return func(o *options) { o.gmAudit = log } }
 
 // WithRestartPoints supplies the restart-point table wired into the link
 // (default: none, so restart requests answer ActionFailed).
@@ -1635,7 +1645,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
@@ -1648,6 +1658,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		SkillEnchantRoll: o.skillEnchantRoll,
 		Levels:           levels,
 		Admin:            o.admin,
+		GMAudit:          o.gmAudit,
 		Log:              o.log,
 	}
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll

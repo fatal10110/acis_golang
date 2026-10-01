@@ -79,6 +79,7 @@ type gameplayConfig struct {
 	Merchant                 merchant.Config
 	Freight                  network.FreightConfig
 	AugmentationChances      augmentation.Chances
+	Admin                    adminConfig
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -202,6 +203,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.AugmentationChances, err = loadAugmentationChances(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Admin, err = loadAdminConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
