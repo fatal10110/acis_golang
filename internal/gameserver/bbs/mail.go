@@ -111,14 +111,18 @@ const (
 // noSubject stands in for an empty subject.
 const noSubject = "(no subject)"
 
-// Mailbox holds every character's mail. mu guards boxes, lastID and every
-// filed mail: a sender's queue files mail into other characters' boxes
-// while their own queues read them.
+// Mailbox holds every character's mail. mu guards boxes, lastID,
+// unstoredSends and every filed mail: a sender's queue files mail into
+// other characters' boxes while their own queues read them.
 type Mailbox struct {
 	mu sync.Mutex
 	// boxes is each owner's mail in ascending id order.
 	boxes  map[int32][]*Mail
 	lastID int32
+	// unstoredSends is, per sender, when each delivered mail too wide to
+	// store went out. Such a mail files no sent-box copy, so these times
+	// stand in for the copies in the daily limit.
+	unstoredSends map[int32][]time.Time
 
 	store  MailStore
 	writes Writer
@@ -127,7 +131,7 @@ type Mailbox struct {
 
 // NewMailbox returns an empty mailbox writing through store on writes.
 func NewMailbox(store MailStore, writes Writer, log zerolog.Logger) *Mailbox {
-	return &Mailbox{boxes: map[int32][]*Mail{}, store: store, writes: writes, log: log}
+	return &Mailbox{boxes: map[int32][]*Mail{}, unstoredSends: map[int32][]time.Time{}, store: store, writes: writes, log: log}
 }
 
 // Restore files rows, the stored mail, once at boot before any player
@@ -270,7 +274,9 @@ const (
 	SendTooManyRecipients
 )
 
-// CheckSend returns why senderID may not send a mail to names at now.
+// CheckSend returns why senderID may not send a mail to names at now. A
+// delivered mail too wide to store counts against the daily limit as its
+// sent-box copy would have.
 func (m *Mailbox) CheckSend(senderID int32, gm bool, names []string, now time.Time) SendRefusal {
 	since := now.Add(-24 * time.Hour)
 	m.mu.Lock()
@@ -280,6 +286,13 @@ func (m *Mailbox) CheckSend(senderID int32, gm bool, names []string, now time.Ti
 			sent++
 		}
 	}
+	sends := slices.DeleteFunc(m.unstoredSends[senderID], func(at time.Time) bool { return !at.After(since) })
+	if len(sends) == 0 {
+		delete(m.unstoredSends, senderID)
+	} else {
+		m.unstoredSends[senderID] = sends
+	}
+	sent += len(sends)
 	m.mu.Unlock()
 	switch {
 	case sent >= dailySendLimit:
@@ -340,7 +353,8 @@ type Sender struct {
 // recipient's outcome and whether the copy was filed. A game master skips
 // every check but the invalid target. Only a mail whose fields fit their
 // columns is stored; one that does not reaches its recipients for the run
-// but files no sent-box copy.
+// but files no sent-box copy. It still counts against the sender's daily
+// limit, which the reference reaches only by storing a truncated row.
 func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, message string, now time.Time) ([]Delivery, bool) {
 	subject = trimOr(subject, subjectLength, noSubject)
 	message = strings.ReplaceAll(message, "\n", "<br1>")
@@ -364,7 +378,11 @@ func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, mes
 			Recipients: list, Subject: subject, Message: message, Sent: now, Unread: true,
 		}, stored)
 	}
-	if !delivered || !stored {
+	if !delivered {
+		return deliveries, false
+	}
+	if !stored {
+		m.unstoredSends[sender.ID] = append(m.unstoredSends[sender.ID], now)
 		return deliveries, false
 	}
 	m.fileLocked(Mail{

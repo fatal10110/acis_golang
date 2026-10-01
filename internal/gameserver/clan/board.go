@@ -94,7 +94,7 @@ func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 
 // MembersInTableOrder returns the roster in the order of the hash table it
 // is kept in, as Clans orders the registry: the order a clan mail
-// addresses the members in.
+// addresses the members in. Like Clans, it approximates that order.
 func (cl *Clan) MembersInTableOrder() []Member {
 	members := cl.Members()
 	buckets := registryBuckets(len(members))
@@ -107,7 +107,9 @@ func (cl *Clan) MembersInTableOrder() []Member {
 // Clans returns every clan in registry order: by bucket of the hash table
 // the registry is kept in (an id folded onto its own high half, masked to
 // the table size), lowest bucket first, and by ascending id within a
-// bucket.
+// bucket. The order is approximate: the table size is recomputed from the
+// current count, where the reference's table never shrinks after a clan
+// leaves it, and a reference resize can reverse the order within a bucket.
 func (t *Table) Clans() []*Clan {
 	clans := t.allClans()
 	buckets := registryBuckets(len(clans))
