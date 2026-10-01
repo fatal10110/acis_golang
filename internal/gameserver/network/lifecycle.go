@@ -34,6 +34,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// Stop any in-flight attack/movement timers before the session detaches
 	// below — otherwise a timer goroutine can still fire after detach.
 	live.Stop()
+	live.stopCubics()
 	// The selection is dropped while live is still placed, so its
 	// neighborhood gets TargetUnselected before live's DeleteObject.
 	live.forgetTarget(live.Target())
