@@ -30,9 +30,13 @@ import (
 //     stopEffects(FAKE_DEATH) exits it first, nesting one more pair;
 //   - stopFakeDeath always broadcasts ChangeWaitType(WT_STOP_FAKEDEATH)
 //     then Revive, dead or not (Player.java:7035-7056);
-//   - a hit on a seated player broadcasts ChangeWaitType(WT_STANDING)
-//     first (PlayerStatus.java:124-125, Player.standUp Player.java:1574-1591),
-//     leaving fake death and its effect in place.
+//   - a landed hit notifies its target ATTACKED before it reduces the
+//     target's HP (CreatureAttack.doHit, CreatureAttack.java:240 then :263);
+//     PlayerAI.onEvtAttacked (PlayerAI.java:148-158) runs the stand
+//     intention on a sitting player, and thinkStand (PlayerAI.java:490-504)
+//     calls stopFakeDeath(true) on one playing dead, so the hit's damage
+//     then finds it standing and sends no ChangeWaitType(WT_STANDING)
+//     (PlayerStatus.java:124-125).
 //
 // Each frame is broadcast to the dying player's own client and to every
 // player that knows it.
@@ -188,8 +192,10 @@ func TestKillWhilePlayingDeadBlessedSendsGetUpsAfterDie(t *testing.T) {
 }
 
 // TestLethalHitWhilePlayingDeadSendsGetUps lands a killing swing on a
-// player lying in fake death: the hit stands it up, the stripped Fake
-// Death gets it up before Die, and the death gets it up once more after.
+// player lying in fake death: the hit's stand intention, ahead of its
+// damage, gets it up twice (the Fake Death effect's exit, then the stand's
+// own get-up), the damage stands nobody up and kills it, and the death gets
+// it up once more after Die; the strip finds no Fake Death left.
 func TestLethalHitWhilePlayingDeadSendsGetUps(t *testing.T) {
 	t.Parallel()
 	srv, c, vc, _, iv := bootPvPPair(t)
@@ -204,7 +210,7 @@ func TestLethalHitWhilePlayingDeadSendsGetUps(t *testing.T) {
 
 	attackPlayer(t, c, victim.ObjectID())
 	srv.AdvanceUntil(t, "victim killed", victim.Dead)
-	assertDeathFrames(t, vc, c, victim, []fakeDeathFrame{frameStand, frameStopFake, frameRevive, frameDie, frameStopFake, frameRevive})
+	assertDeathFrames(t, vc, c, victim, []fakeDeathFrame{frameStopFake, frameRevive, frameStopFake, frameRevive, frameDie, frameStopFake, frameRevive})
 }
 
 // TestKillDuringLieDownLeavesSeatedCorpse kills a player still lying down
