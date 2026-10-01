@@ -512,7 +512,7 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 	// A walking NPC is answered with the player's StopMove, without turning
 	// toward it; any other target is faced with MoveToPawn.
 	if f, ok := target.(*npc.Folk); ok && f.IsMoving() {
-		live.BroadcastStop()
+		l.broadcastLiveStopMove(live, live.CurrentLocation(), live.CurrentHeading())
 	} else {
 		at := live.CurrentLocation()
 		live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
@@ -603,7 +603,7 @@ func (l *GameClientLink) onPlayerArrivedBlocked(live *livePlayer) bool {
 		if !l.playerCanDoInteract(live, target) {
 			return false
 		}
-		live.BroadcastStop()
+		l.broadcastLiveStopMove(live, live.CurrentLocation(), live.CurrentHeading())
 		// onInteract has no world-presence check: a summon's PetStatusShow
 		// uses the snapshot summon even if it has already left the world.
 		l.onInteract(live, target)

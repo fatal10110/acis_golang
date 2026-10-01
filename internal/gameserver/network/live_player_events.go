@@ -122,6 +122,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return serverpackets.FrameValidateLocation(live.ObjectID(), live.CurrentLocation(), live.CurrentHeading())
 		})
 	case event.Stopped:
+		// Stopping a move revalidates the zones at once, before observers
+		// see the stop.
+		l.revalidateZones(live, live.CurrentLocation(), revalidateForce)
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	case event.AutoAttackStopped:
@@ -328,7 +331,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.TeleportRequested:
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
 	case event.Relocated:
-		l.revalidateZones(live, e.Previous)
+		reason := revalidateStep
+		if e.Placed {
+			reason = revalidatePlaced
+		}
+		l.revalidateZones(live, e.Previous, reason)
 	case event.AttackStanceRequested:
 		l.startLiveAutoAttack(live)
 	case event.Attacked:

@@ -398,5 +398,5 @@ func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position loc
 	if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
 		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
 	}
-	l.revalidateZones(live, previous)
+	l.revalidateZones(live, previous, revalidateForce)
 }

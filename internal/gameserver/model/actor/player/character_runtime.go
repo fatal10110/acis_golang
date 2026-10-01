@@ -455,8 +455,15 @@ func (c *Character) ForEachKnownCombatantInRadius(radius int, fn func(attackable
 	})
 }
 
-// SyncPosition moves this player's live world-grid presence to position.
+// SyncPosition moves this player's live world-grid presence to position, a
+// movement step.
 func (c *Character) SyncPosition(position location.Location) {
+	c.relocate(position, false)
+}
+
+// relocate moves this player's live world-grid presence to position; placed
+// marks a position set outside movement.
+func (c *Character) relocate(position location.Location, placed bool) {
 	previous := c.CurrentLocation()
 	c.locMu.Lock()
 	c.Location = position
@@ -465,7 +472,7 @@ func (c *Character) SyncPosition(position location.Location) {
 		return
 	}
 	_ = c.world.Move(c, position.X, position.Y, position.Z)
-	c.emit(event.Relocated{Previous: previous})
+	c.emit(event.Relocated{Previous: previous, Placed: placed})
 }
 
 // SetLastKnownPosition records position and heading as this player's last

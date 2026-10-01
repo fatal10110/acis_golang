@@ -47,6 +47,13 @@ const autosaveSaveTimeout = 5 * time.Second
 // offGrid is set from a teleport's grid leave until the Appearing rejoin.
 // The player holds no zone in between, so position updates must not enter
 // any.
+//
+// steps counts the movement steps since the zones were last revalidated: a
+// step revalidates them only every zoneStepsPerRevalidation steps, while
+// spawning, a teleport landing, a move's end or stop and a region change
+// revalidate them at once and restart the count. While the player is
+// teleporting the count still runs but no zone is revalidated, as a
+// teleport stops the player's move before it leaves the grid.
 type liveZoneActor struct {
 	// deliveryMu keeps compass sends in the same order as zone transitions.
 	// mu protects the zone state and is released before sending a frame.
@@ -55,8 +62,29 @@ type liveZoneActor struct {
 	live        *livePlayer
 	flags       zone.Flags
 	offGrid     bool
+	steps       int
 	lastCompass int32
 }
+
+// zoneStepsPerRevalidation is how many movement steps pass per zone
+// revalidation.
+const zoneStepsPerRevalidation = 5
+
+// zoneRevalidation is why a player's position changed, which decides when
+// its zones are revalidated.
+type zoneRevalidation uint8
+
+const (
+	// revalidateStep is a movement step: it revalidates on every
+	// zoneStepsPerRevalidation-th step.
+	revalidateStep zoneRevalidation = iota
+	// revalidateForce is a move's end: it revalidates at once.
+	revalidateForce
+	// revalidatePlaced is a position set outside movement (a forced
+	// flight's landing): it revalidates only when it changes region, and
+	// does not count as a step.
+	revalidatePlaced
+)
 
 func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() }
 func (a *liveZoneActor) Position() location.Location { return a.live.CurrentLocation() }
@@ -75,6 +103,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 		a.mu.Unlock()
 		return
 	}
+	a.steps = 0
 	if ix != nil {
 		ix.Revalidate(a)
 	}
@@ -84,7 +113,11 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	a.sendCompass(code, changed, flagPvP)
 }
 
-func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location) {
+// revalidateMove revalidates the player's zones after its position changed
+// from previous for reason. A region change revalidates the zones of both
+// regions at once and restarts the step count; a step then counts toward
+// the next revalidation.
+func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location, reason zoneRevalidation) {
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
@@ -92,8 +125,24 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 		a.mu.Unlock()
 		return
 	}
-	if ix != nil {
-		ix.RevalidateMove(a, previous)
+	// A teleport in progress keeps the count but revalidates no zone: the
+	// move it stops must not enter the zones of a position it is leaving.
+	teleporting := a.live.Teleporting()
+	pos := a.Position()
+	if reason == revalidateForce || world.RegionKey(previous.X, previous.Y) != world.RegionKey(pos.X, pos.Y) {
+		a.steps = 0
+		if ix != nil && !teleporting {
+			ix.RevalidateMove(a, previous)
+		}
+	}
+	if reason == revalidateStep {
+		a.steps++
+		if a.steps >= zoneStepsPerRevalidation {
+			a.steps = 0
+			if ix != nil && !teleporting {
+				ix.Revalidate(a)
+			}
+		}
 	}
 	a.syncFlags()
 	code, changed, flagPvP := a.compassUpdate()
@@ -132,6 +181,7 @@ func (a *liveZoneActor) rejoin(ix *zone.Index) {
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	a.offGrid = false
+	a.steps = 0
 	if ix != nil {
 		ix.Revalidate(a)
 	}
@@ -376,6 +426,9 @@ func (e *TaskEffects) Expire(actorID int32, inst *item.Instance) {
 func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 	live := a.live
 	live.SetInWater(a.flags.Has(zone.FlagWater))
+	if live.Live != nil {
+		live.Move().SetSwimming(swimming)
+	}
 	l := live.link
 	if l == nil {
 		return
@@ -449,9 +502,9 @@ func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {
 	})
 }
 
-func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location) {
+func (l *GameClientLink) revalidateZones(live *livePlayer, previous location.Location, reason zoneRevalidation) {
 	if live != nil && live.zoneActor != nil {
-		live.zoneActor.revalidateMove(l.zones, previous)
+		live.zoneActor.revalidateMove(l.zones, previous, reason)
 	}
 }
 
