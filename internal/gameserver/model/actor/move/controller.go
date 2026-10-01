@@ -670,6 +670,9 @@ func (c *Controller) Queue() *sim.Queue {
 // as an arrival. While a tracking pawn walk goes on, each step it takes
 // turns the actor toward the cell it steps to, the step that ends the walk
 // included, before the walk's milestone runs.
+//
+// A player's update walks the queue-clock time since its last update (see
+// CreatureMove); any other mover's walks PositionUpdateInterval.
 func (c *Controller) PositionUpdate() bool {
 	var (
 		u         positionUpdate
@@ -679,7 +682,7 @@ func (c *Controller) PositionUpdate() bool {
 		u, abandoned = c.move.abandonPawnWalk(gen)
 	}
 	if !abandoned {
-		u = c.move.updatePosition(PositionUpdateInterval)
+		u = c.move.updatePosition(PositionUpdateInterval, true)
 	}
 	if u.pawnStep {
 		c.self.SetHeading(u.from.HeadingTo(u.to))

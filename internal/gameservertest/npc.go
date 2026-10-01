@@ -475,11 +475,46 @@ func (s *Server) TickEffects() {
 	}
 }
 
-// TickPositions runs one production movement-correction tick for every
-// actor with movement in flight — interpolation, arrival and the offensive
-// follow re-check — and waits for the posted ticks to run.
+// TickPositions lets one position-update interval pass for the actor queues
+// and runs one production movement-correction tick for every actor with
+// movement in flight at its end — interpolation, arrival and the offensive
+// follow re-check — then waits for the posted ticks to run. A player's
+// update walks the queue-clock time since its last one, so the interval is
+// what a tick stands for.
+//
+// On the driven clock the clock moves by exactly the interval, as Advance
+// does, and the tick runs ahead of the timers due at the same instant, as
+// the production ticker posts its ticks just ahead of a move's own timing:
+// a player's update walks exactly the interval (less what a retarget since
+// the last tick already walked), and a move started right before a run of
+// ticks ends on the tick that reaches its end, not on its arrival timer.
+//
+// On the real pool a run of ticks keeps a fixed rate, as the production
+// ticker does: each is posted one interval after the one before, or one
+// interval after the call when the one before is longer ago than that (or
+// there is none). A player's update then walks about the interval on the
+// wall clock, and the updates since a move started at least as many
+// intervals.
 func (s *Server) TickPositions() {
-	s.positions.Tick()
+	if s.queues.advanceThen != nil {
+		if err := s.catchUp(); err != nil {
+			panic(err)
+		}
+		s.queues.advanceThen(move.PositionUpdateInterval, s.positions.Tick)
+	} else {
+		s.positionTicks.Lock()
+		next := s.positionTicks.last.Add(move.PositionUpdateInterval)
+		if now := time.Now(); next.Before(now) {
+			next = now.Add(move.PositionUpdateInterval)
+		}
+		time.Sleep(time.Until(next))
+		if err := s.awaitHandled(); err != nil {
+			panic(err)
+		}
+		s.positionTicks.last = time.Now()
+		s.positions.Tick()
+		s.positionTicks.Unlock()
+	}
 	if err := s.queues.settle(); err != nil {
 		panic(err)
 	}

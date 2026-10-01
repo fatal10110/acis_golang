@@ -24,10 +24,13 @@ const SimExecutorEnv = "ACIS_SIM_EXECUTOR"
 // Settle can wait for the work already posted to them.
 type queues struct {
 	newQueue func(id string) *sim.Queue
-	// inline and advance are set on the inline executor: the loop, and a
-	// call that moves its clock by d on the runner and runs what comes due.
-	inline  *sim.Inline
-	advance func(d time.Duration)
+	// inline, advance and advanceThen are set on the inline executor: the
+	// loop, a call that moves its clock by d on the runner and runs what
+	// comes due, and one that runs then at the new instant ahead of the
+	// timers due exactly at it.
+	inline      *sim.Inline
+	advance     func(d time.Duration)
+	advanceThen func(d time.Duration, then func())
 
 	mu  sync.Mutex
 	all []*sim.Queue
@@ -103,6 +106,7 @@ func startInline(tb testing.TB) *queues {
 	inline := sim.NewInline(time.Now())
 	type step struct {
 		d    time.Duration
+		then func()
 		done chan struct{}
 	}
 	steps := make(chan step)
@@ -113,7 +117,14 @@ func startInline(tb testing.TB) *queues {
 			inline.Advance(0) // runs tasks and the timers already due
 			select {
 			case s := <-steps:
-				inline.Advance(s.d)
+				if s.then == nil {
+					inline.Advance(s.d)
+				} else {
+					// The timers due at the new instant fire on the next
+					// pass, after the tasks then posts.
+					inline.AdvanceBefore(s.d)
+					s.then()
+				}
 				close(s.done)
 			case <-stop:
 				inline.Run()
@@ -126,11 +137,20 @@ func startInline(tb testing.TB) *queues {
 		close(stop)
 		<-stopped
 	})
-	return &queues{newQueue: inline.NewQueue, inline: inline, advance: func(d time.Duration) {
-		s := step{d: d, done: make(chan struct{})}
+	run := func(s step) {
 		steps <- s
 		<-s.done
-	}}
+	}
+	return &queues{
+		newQueue: inline.NewQueue,
+		inline:   inline,
+		advance: func(d time.Duration) {
+			run(step{d: d, done: make(chan struct{})})
+		},
+		advanceThen: func(d time.Duration, then func()) {
+			run(step{d: d, then: then, done: make(chan struct{})})
+		},
+	}
 }
 
 // OpenActorQueues counts the actor queues created so far that still accept a

@@ -3,7 +3,6 @@ package pets
 import (
 	"math"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -18,7 +17,6 @@ func petCoveredInOneSecond(t *testing.T, h *petWorld, petActor *summon.Actor) fl
 	t.Helper()
 	from := petActor.Move().Position()
 	for range 10 {
-		h.srv.Advance(t, 100*time.Millisecond)
 		h.srv.TickPositions()
 	}
 	return from.Distance2D(petActor.Move().Position())

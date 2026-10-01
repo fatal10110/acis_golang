@@ -35,7 +35,6 @@ func coveredInOneSecond(t *testing.T, srv *gameservertest.Server, hostile *npc.H
 	t.Helper()
 	from := hostile.Move().Position()
 	for range 10 {
-		srv.Advance(t, 100*time.Millisecond)
 		srv.TickPositions()
 	}
 	return from.Distance2D(hostile.Move().Position())

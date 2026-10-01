@@ -178,7 +178,19 @@ func TestRunStartsAtWalkSpeed(t *testing.T) {
 		accurate += speed / 10
 		// The player's cell is the accurate position rounded half up
 		// (PlayerMove.updatePosition's Math.round, PlayerMove.java:272).
-		if got, want := mover.Position().X, int(math.Floor(accurate+0.5)); got != want {
+		// Each update walks the time since the last one: exactly the tick
+		// interval on the driven clock. On the real pool the updates since
+		// the walk started cover at least as many intervals, so the walk
+		// phase gets at least as far; how much of the wall-clock time falls
+		// in each phase is not pinned there.
+		got, want := mover.Position().X, int(math.Floor(accurate+0.5))
+		if !srv.DrivesClock() {
+			if update <= 5 && got < want {
+				t.Fatalf("X after update %d = %d, want at least %d (walk %v)", update, got, want, character.WalkSpeed())
+			}
+			continue
+		}
+		if got != want {
 			t.Fatalf("X after update %d = %d, want %d (walk %v, run %v)", update, got, want, character.WalkSpeed(), character.RunSpeed())
 		}
 	}

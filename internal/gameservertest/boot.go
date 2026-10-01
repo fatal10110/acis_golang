@@ -708,6 +708,12 @@ type Server struct {
 	autosaveClock    *autosaveClock
 	persist          *persist.Worker
 	logs             *lockedBuffer
+	// positionTicks is when TickPositions last posted a tick on the real
+	// pool, guarded by its mutex.
+	positionTicks struct {
+		sync.Mutex
+		last time.Time
+	}
 	// effectEnv is the Env every effect list this server builds shares.
 	effectEnv effect.Env
 	// castEffects is the link's hostile-NPC cast seam, as boot wires it.

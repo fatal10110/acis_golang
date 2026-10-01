@@ -86,7 +86,6 @@ func (p clickPair) tickUntil(t *testing.T, what string, cond func() bool) {
 		if passed >= 15*time.Second {
 			t.Fatalf("%s not observed within 15s", what)
 		}
-		p.srv.Advance(t, move.PositionUpdateInterval)
 		p.srv.TickPositions()
 	}
 }
