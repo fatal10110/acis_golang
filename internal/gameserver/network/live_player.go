@@ -180,8 +180,8 @@ type livePlayer struct {
 	interact   interactTarget
 
 	// cubicsMu is taken from another actor's queue: another player's cubic
-	// skill grants p a cubic (syncCubicTargets), and a summon-friend cast
-	// teleports p, which stops them (TeleportRequested → Stop).
+	// skill grants p a cubic, or evicts one, from the caster's queue
+	// (syncCubicTargets).
 	cubicsMu sync.Mutex
 	cubics   map[cubic.ID]*cubic.Runtime
 }
@@ -343,7 +343,8 @@ func (p *livePlayer) Stop() {
 	// Free the chair for others but keep seated identity so observers still
 	// receive the stand-then-delete animation when this player despawns.
 	p.freeChair()
-	p.stopCubics()
+	// Cubics are left alone: a teleport halts p too, and its cubics keep
+	// acting and ageing across it. Detach stops them (stopCubics).
 }
 
 // detached reports whether p's session has begun detaching (logout).
@@ -362,7 +363,8 @@ func (p *livePlayer) markDetaching() {
 // recurring action tick never fires against a session that has already
 // logged out. Stopping immediately here is equivalent to the action tick's
 // own dead/online self-check on its next scheduled run, and avoids a stale
-// timer outliving the session.
+// timer outliving the session. Only detach calls it: a teleport keeps every
+// cubic running.
 func (p *livePlayer) stopCubics() {
 	p.cubicsMu.Lock()
 	defer p.cubicsMu.Unlock()
