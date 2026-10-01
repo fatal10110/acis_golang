@@ -274,9 +274,9 @@ func parseIntPairAttr(a *attrValues, key string) (int32, int32) {
 func buildDrop(attrs []xml.Attr) (item.Drop, error) {
 	a := newAttrValues(foldAttrs(attrs), "drop")
 	d := item.Drop{
-		ItemID: a.int32("itemid"),
-		Min:    a.int32("min"),
-		Max:    a.int32("max"),
+		ItemID: a.int32Literal("itemid"),
+		Min:    a.int32Literal("min"),
+		Max:    a.int32Literal("max"),
 		Chance: a.float64("chance"),
 	}
 	if err := a.Err(); err != nil {

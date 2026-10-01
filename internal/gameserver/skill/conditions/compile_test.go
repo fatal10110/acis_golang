@@ -1,6 +1,7 @@
 package conditions
 
 import (
+	"fmt"
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -460,5 +461,54 @@ func TestEvaluateSkillReportsFirstFailingClause(t *testing.T) {
 	}
 	if _, ok := EvaluateSkill(modelskill.Definition{}, nil, nil); !ok {
 		t.Fatal("skill with no conditions refused")
+	}
+}
+
+// TestCompileIntegersFollowReferenceGrammar pins the condition integer
+// reads to the reference (Java probe, OpenJDK 21.0.11): Integer.decode
+// literals, except the two forces, which are Byte.decode and so stop at the
+// signed 8-bit range, and the id lists, which skip empty entries between
+// adjacent commas but reject an entry that is blank after trimming.
+func TestCompileIntegersFollowReferenceGrammar(t *testing.T) {
+	accepted := []struct {
+		name string
+		node modelskill.Condition
+		want Condition
+	}{
+		{"octal level", leaf("player", map[string]string{"level": "010"}), Level{Level: 8}},
+		{"hash hex level", leaf("player", map[string]string{"level": "#10"}), Level{Level: 16}},
+		{"negative hex level", leaf("player", map[string]string{"level": "-0x10"}), Level{Level: -16}},
+		{"battle force at byte max", leaf("player", map[string]string{"battle_force": "0x7f"}), ForceBuff{BattleForce: 127}},
+		{"spell force octal byte max", leaf("player", map[string]string{"spell_force": "0177"}), ForceBuff{SpellForce: 127}},
+		{"list skips empty entries", leaf("target", map[string]string{"npcId": "1,,0x10, 010"}), TargetNpcID{IDs: []int{1, 16, 8}}},
+	}
+	for _, tc := range accepted {
+		c, err := Compile(tc.node)
+		if err != nil {
+			t.Errorf("%s: %v", tc.name, err)
+			continue
+		}
+		if fmt.Sprintf("%#v", c) != fmt.Sprintf("%#v", tc.want) {
+			t.Errorf("%s: compiled %#v, want %#v", tc.name, c, tc.want)
+		}
+	}
+
+	rejected := []struct {
+		name string
+		node modelskill.Condition
+	}{
+		{"binary prefix", leaf("player", map[string]string{"level": "0b1"})},
+		{"octal prefix", leaf("player", map[string]string{"level": "0o10"})},
+		{"digit separator", leaf("player", map[string]string{"level": "1_0"})},
+		{"sign after prefix", leaf("player", map[string]string{"level": "0x-1"})},
+		{"bad octal digit", leaf("player", map[string]string{"level": "08"})},
+		{"battle force past byte max", leaf("player", map[string]string{"battle_force": "128"})},
+		{"spell force past byte max", leaf("player", map[string]string{"spell_force": "0x80"})},
+		{"blank list entry", leaf("target", map[string]string{"npcId": "1, ,2"})},
+	}
+	for _, tc := range rejected {
+		if c, err := Compile(tc.node); err == nil {
+			t.Errorf("%s: compiled to %#v, want an error", tc.name, c)
+		}
 	}
 }

@@ -16,9 +16,9 @@ type boatRouteFile struct {
 type boatItineraryElement struct {
 	Dock1   string             `xml:"dock1,attr"`
 	Dock2   string             `xml:"dock2,attr"`
-	Item1   coord32            `xml:"item1,attr"`
-	Item2   coord32            `xml:"item2,attr"`
-	Heading *coord32           `xml:"heading,attr"`
+	Item1   literal32          `xml:"item1,attr"`
+	Item2   literal32          `xml:"item2,attr"`
+	Heading *literal32         `xml:"heading,attr"`
 	Routes  []boatRouteElement `xml:"route"`
 }
 

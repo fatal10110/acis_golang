@@ -182,7 +182,7 @@ func TestLoadEconomyData(t *testing.T) {
 
 func TestBuildAugmentationStatGroupTableRouting(t *testing.T) {
 	t.Parallel()
-	order := coord(0)
+	order := literal32(0)
 	group, err := buildAugmentationStatGroup(augmentationSetElement{
 		Order: &order,
 		Stats: []augmentationStatElement{{
