@@ -243,3 +243,42 @@ func TestClientLinkEvictionWriteDoesNotBlockOtherLogins(t *testing.T) {
 		t.Fatalf("opcode = %#x, want LoginOk (%#x): another account's login was blocked by the stalled eviction write", reply[0], serverpackets.OpcodeLoginOk)
 	}
 }
+
+// TestClientLinkEvictionOfStalledHolderDoesNotDelayNewClient drives a
+// double-login collision whose previous holder never drains its socket: the
+// new client is still refused with AccountInUse and closed at once, while
+// the holder is left to close with its own AccountInUse.
+func TestClientLinkEvictionOfStalledHolderDoesNotDelayNewClient(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, false)
+
+	// net.Pipe is synchronous: a write to it blocks until a read that
+	// never happens here.
+	stalled, holderEnd := net.Pipe()
+	t.Cleanup(func() { stalled.Close(); holderEnd.Close() })
+	crypt, err := logincrypt.NewLoginCrypt(testSessionKey)
+	if err != nil {
+		t.Fatalf("NewLoginCrypt: %v", err)
+	}
+	holder := &clientConn{conn: stalled, crypt: crypt}
+	l.authMu.Lock()
+	l.holders = map[string]*clientConn{"player1": holder}
+	sessions.Put("player1", link.SessionKey{LoginKey1: 1, LoginKey2: 2})
+	l.authMu.Unlock()
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	c.expectLoginFail(serverpackets.LoginFailAccountInUse)
+
+	final := holder.closeRequest.Load()
+	if final == nil {
+		t.Fatal("previous holder was not asked to close")
+	}
+	if (*final)[0] != serverpackets.OpcodeLoginFail || loginFailReason(t, *final) != serverpackets.LoginFailAccountInUse {
+		t.Fatalf("previous holder's final packet = % X, want LoginFail AccountInUse", *final)
+	}
+	if _, ok := sessions.Get("player1"); ok {
+		t.Fatal("session for player1 remained mapped")
+	}
+}
