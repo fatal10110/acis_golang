@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -32,8 +33,16 @@ type FolkSpawner struct {
 	// through; nil leaves them unseen.
 	NewSink func(*npc.Folk) event.Sink
 	Zones   *zone.Index
-	// Skills resolves template passives into the NPC's stats.
+	// Skills resolves template passives into the NPC's stats and the skills
+	// it casts; nil leaves it without a cast runtime.
 	Skills actorcast.Definitions
+	// CastEffects dispatches the effects of the NPC's casts.
+	CastEffects actorcast.EffectHandlers
+	// AI ticks the NPC while it holds cast desires; nil leaves them unacted
+	// on.
+	AI *task.AI
+	// Items resolves the template's held weapon and shield.
+	Items *item.Table
 	// Effects is the server's effect-list context.
 	Effects effect.Env
 	// MaxBuffsAmount is the configured base buff-slot count.
@@ -55,12 +64,32 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Queue:          s.Queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)),
 		Effects:        s.Effects,
 		MaxBuffsAmount: s.MaxBuffsAmount,
+		Items:          s.Items,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)
 	}
+	if s.AI != nil {
+		rt.AI = s.AI
+	}
+	if los, ok := s.Geo.(npc.LineOfSight); ok {
+		rt.LOS = los
+	}
 	if err := f.Attach(rt); err != nil {
 		return nil, err
+	}
+	if s.Skills != nil {
+		ctl := actorcast.NewController(actorcast.FolkActor{Folk: f}, f.CastEvents())
+		ctl.SetQueue(rt.Queue)
+		f.SetCaster(ctl, &actorcast.AIController{
+			Controller:  ctl,
+			Definitions: s.Skills,
+			Effects:     s.CastEffects,
+			Caster:      f,
+			// Target-addressed messages, such as a restored resource, reach
+			// a player target whoever casts.
+			OnHitResult: s.CastEffects.OnHitResult,
+		})
 	}
 	alias := inst.Template.Alias
 	if s.Walker == nil || alias == "" || !s.Walker.HasRoute(alias, alias) {

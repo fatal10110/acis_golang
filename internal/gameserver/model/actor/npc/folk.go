@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -80,9 +81,10 @@ const socialInterval = 12 * time.Second
 // Folk is a live civilian NPC. It stands where it spawned, or walks its
 // route when given movement (EnableMovement), is shown to nearby players,
 // can be selected, and answers a player's interact with its chat window.
-// It never attacks or casts, but any other creature may attack it by force:
-// it takes damage, never below 1 HP, regenerates, and holds the buffs and
-// debuffs cast on it (no other effect lands on it).
+// It never attacks, but casts the skills a dialog command or script asks of
+// it once given a cast runtime (SetCaster). Any other creature may attack
+// it by force: it takes damage, never below 1 HP, regenerates, and holds
+// the buffs and debuffs cast on it (no other effect lands on it).
 type Folk struct {
 	world.Presence
 	Instance *Instance
@@ -96,6 +98,8 @@ type Folk struct {
 	lastSocial atomic.Int64
 
 	folkCombat
+
+	cast folkCast
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
@@ -118,6 +122,7 @@ func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, e
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	f := &Folk{Instance: inst, inPeace: inPeace}
+	f.cast.desires = ai.NewDesireQueue()
 	f.initCombat(mods)
 	return f, nil
 }

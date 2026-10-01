@@ -70,6 +70,9 @@ const (
 	// BypassSubclass runs a village master's subclass command; see
 	// ParseSubclassCommand.
 	BypassSubclass
+	// BypassCPRecovery runs an arena manager's paid CP restore; see
+	// Folk.CPRecovery.
+	BypassCPRecovery
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -132,9 +135,11 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // multisell <list> and exc_multisell <list> open a multisell list, Augment
 // 1 and Augment 2 open the augmentation and removal windows,
 // teleport_request opens the destination list, and teleport <index> and
-// instant_teleport <index> take the talker to a destination. A village
-// master's Subclass commands go to the subclass dialog. Every other command
-// belongs to a system not in place yet.
+// instant_teleport <index> take the talker to a destination, and
+// CPRecovery has an arena manager restore the talker's CP for a fee and
+// answers nothing at any other NPC. A village master's Subclass commands go
+// to the subclass dialog. Every other command belongs to a system not in
+// place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -273,9 +278,12 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "instant_teleport"):
 		return teleportCommand(reply, BypassInstantTeleport, command)
 	}
-	// ponytail: CPRecovery, an arena manager's paid CP restore, is cast by
-	// the NPC; civilian NPCs cast nothing until #3038 gives them a cast
-	// runtime, so it is logged with every other unported command.
+	if strings.HasPrefix(command, "CPRecovery") {
+		reply.Outcome = BypassRefused
+		if arenaManager(f.NpcID()) {
+			reply.Outcome = BypassCPRecovery
+		}
+	}
 	return reply
 }
 
