@@ -35,9 +35,9 @@ func encodeAction(objectID int32) []byte {
 }
 
 // TestSelectedCharacterIsFoundBeforeEnterWorld pins a character between its
-// selection and EnterWorld: lookups by name and id find it, so a friend's
-// private message reaches its client and the friend's /friendlist shows it
-// online; it is not spawned yet, so the friend neither sees nor can click it,
+// selection and EnterWorld: lookups by name and id find it, so a whisper
+// and a friend's private message reach its client and the friend's
+// /friendlist shows it online; it is not spawned yet, so the friend neither sees nor can click it,
 // and its friends hear of it only when it enters.
 func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
 	p := bootPair(t)
@@ -56,6 +56,11 @@ func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
 		t.Fatal("selected character spawned before EnterWorld")
 	}
 	assertSilent(t, p.alice, "friend of a character that only selected")
+
+	p.alice.Send(encodeTell("psst", "bobby"))
+	assertSay(t, p.bobby, p.aliceID, sayTell, "Alice", "psst")
+	assertSay(t, p.alice, p.aliceID, sayTell, "->Bobby", "psst")
+	assertSilent(t, p.alice, "sender of a whisper to a selected character")
 
 	p.alice.Send(encodeFriendSay("hello", "bobby"))
 	assertFriendSay(t, p.bobby.Read(), 0, "bobby", "Alice", "hello")
@@ -129,6 +134,8 @@ func TestDisconnectBeforeEnterWorldLeavesNothingRegistered(t *testing.T) {
 	}
 	assertFriendStatus(t, frames[i], false, "Bobby", p.bobbyID)
 
+	p.alice.Send(encodeTell("psst", "Bobby"))
+	assertStaticSystemMessage(t, p.alice.Read(), serverpackets.SystemMessageTargetNotFound)
 	p.alice.Send(encodeFriendSay("hello", "Bobby"))
 	assertStaticSystemMessage(t, p.alice.Read(), serverpackets.SystemMessageTargetNotFound)
 }
