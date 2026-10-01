@@ -1897,3 +1897,63 @@ func TestInventoryLimiterReplacesSlotLimit(t *testing.T) {
 		t.Fatal("clearing the limiter did not restore WeightLimit")
 	}
 }
+
+type removalRecorder struct {
+	inventoryDeliveryRecorder
+	removed []int32
+}
+
+func (r *removalRecorder) InventoryItemsRemoved(_ *Inventory, objectIDs []int32) {
+	r.removed = append(r.removed, objectIDs...)
+}
+
+// TestInventory_RemovalDeliveryHearsEveryInstanceThatLeaves pins which
+// mutations report an instance leaving: a whole destroy, drop, transfer,
+// exchange move and DestroyAllItems do; a partial count change of a stack
+// that stays does not.
+func TestInventory_RemovalDeliveryHearsEveryInstanceThatLeaves(t *testing.T) {
+	templates := item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 2, Kind: item.KindEtcItem, EtcItem: &item.EtcItemDetail{}},
+	})
+	const owner = 0x10000001
+	rec := &removalRecorder{}
+	inv := NewPlayerInventoryWithDelivery(owner, templates, rec, nil)
+	other := NewPlayerInventory(owner+1, templates)
+
+	stack := inv.AddNew(1, 10, 0x30000001)
+	single := inv.AddNew(2, 1, 0x30000002)
+	dropped := inv.AddNew(2, 1, 0x30000003)
+	moved := inv.AddNew(2, 1, 0x30000004)
+	traded := inv.AddNew(2, 1, 0x30000005)
+	rest := inv.AddNew(2, 1, 0x30000006)
+	expect := func(step string, want ...int32) {
+		t.Helper()
+		if !slices.Equal(rec.removed, want) {
+			t.Fatalf("%s: removed = %v, want %v", step, rec.removed, want)
+		}
+		rec.removed = nil
+	}
+
+	inv.DestroyItem(stack, 4)
+	inv.DropItem(stack.ObjectID, 2, 0x30000010)
+	inv.TransferItem(stack.ObjectID, 1, other, 0x30000011)
+	expect("partial changes")
+
+	inv.DestroyItem(single, 1)
+	expect("whole destroy", single.ObjectID)
+	inv.DropItem(dropped.ObjectID, 1, 0)
+	expect("drop", dropped.ObjectID)
+	inv.TransferItem(moved.ObjectID, 1, other, 0)
+	expect("transfer", moved.ObjectID)
+	Exchange(inv, other, func(a, b Held) {
+		if _, ok := a.Transfer(traded.ObjectID, 1, b, 0); !ok {
+			t.Fatal("exchange transfer failed")
+		}
+	})
+	expect("exchange", traded.ObjectID)
+	inv.DestroyAllItems()
+	if len(rec.removed) != 2 || !slices.Contains(rec.removed, stack.ObjectID) || !slices.Contains(rec.removed, rest.ObjectID) {
+		t.Fatalf("DestroyAllItems: removed = %v, want %d and %d", rec.removed, stack.ObjectID, rest.ObjectID)
+	}
+}

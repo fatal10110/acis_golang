@@ -81,7 +81,7 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 	if !ok {
 		return
 	}
-	l.deleteRecipeShortcuts(live, r.ID)
+	l.deleteTargetShortcuts(live, shortcut.Recipe, int32(r.ID))
 	if l.recipeBooks != nil {
 		recipeID := r.ID
 		l.queueRowWrite(live.ObjectID(), "delete recipe", func(ctx context.Context, ownerID int32) error {
@@ -90,27 +90,6 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1HasBeenDeleted, r.ItemID))
 	sendRecipeBook(live, r.Dwarven)
-}
-
-// deleteRecipeShortcuts removes every RECIPE shortcut pointing at
-// recipeID. Each removal deletes its row and tells the client, then
-// re-announces every active automatic shot, as any shortcut deletion does.
-func (l *GameClientLink) deleteRecipeShortcuts(live *livePlayer, recipeID int) {
-	if live.shortcuts == nil {
-		return
-	}
-	for _, sc := range live.shortcuts.DeleteTarget(shortcut.Recipe, int32(recipeID)) {
-		if l.shortcuts != nil {
-			slot, page := sc.Slot, sc.Page
-			l.queueRowWrite(live.ObjectID(), "delete recipe shortcut", func(ctx context.Context, ownerID int32) error {
-				return l.shortcuts.Delete(ctx, ownerID, slot, page)
-			})
-		}
-		live.SendFrame(serverpackets.FrameShortCutDelete(sc.Slot, sc.Page))
-		for _, shotID := range live.AutoSoulShotIDs() {
-			live.SendFrame(serverpackets.FrameExAutoSoulShot(shotID, true))
-		}
-	}
 }
 
 // sendRecipeItemMakeInfo answers RequestRecipeItemMakeInfo with the craft
