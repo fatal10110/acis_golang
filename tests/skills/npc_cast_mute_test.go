@@ -82,3 +82,62 @@ func TestCastStoppingEffectsStopNPCCast(t *testing.T) {
 		})
 	}
 }
+
+// TestMutedNPCDropsBlockedCastDesire lands Mute, PhysicalMute and
+// SilenceMagicPhysical on a monster before it thinks. The think first drops
+// every CAST desire the monster cannot cast right now
+// (NpcAI.thinkAttack's removeIf on meetsHpMpDisabledConditions): Mute
+// blocks a magic skill, PhysicalMute a physical one, SilenceMagicPhysical
+// both. A dropped desire starts no cast; a skill the effect leaves alone
+// casts as usual.
+func TestMutedNPCDropsBlockedCastDesire(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		effect  string
+		magic   bool
+		blocked bool
+	}{
+		{effect: "Mute", magic: true, blocked: true},
+		{effect: "Mute", magic: false},
+		{effect: "PhysicalMute", magic: false, blocked: true},
+		{effect: "PhysicalMute", magic: true},
+		{effect: "SilenceMagicPhysical", magic: true, blocked: true},
+		{effect: "SilenceMagicPhysical", magic: false, blocked: true},
+	} {
+		kind := "physical"
+		if tt.magic {
+			kind = "magic"
+		}
+		t.Run(tt.effect+" before "+kind+" cast", func(t *testing.T) {
+			t.Parallel()
+			srv, hostile := bootNPCDesireCasterWith(t, tt.magic)
+			c := srv.Client
+
+			e, err := effect.New(effect.Skill{ID: 1064, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: tt.effect, Time: 30})
+			if err != nil {
+				t.Fatalf("effect.New(%s): %v", tt.effect, err)
+			}
+			e.Effector, e.Effected = hostile, hostile
+			onNPCQueue(t, hostile, func() { hostile.EffectList().Add(e) })
+			drainUntilQuiet(t, c)
+
+			thinkOnNPCQueue(t, hostile)
+			cast := false
+			for {
+				frame := c.ReadWithTimeout(300 * time.Millisecond)
+				if frame == nil {
+					break
+				}
+				if frame[0] == serverpackets.OpcodeMagicSkillUse {
+					cast = true
+				}
+			}
+			if cast == tt.blocked {
+				t.Fatalf("monster MagicSkillUse under %s = %v, want %v", tt.effect, cast, !tt.blocked)
+			}
+			if got := hasCastDesire(hostile); got == tt.blocked {
+				t.Fatalf("CAST desire held under %s = %v, want %v", tt.effect, got, !tt.blocked)
+			}
+		})
+	}
+}

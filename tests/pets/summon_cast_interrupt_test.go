@@ -287,3 +287,65 @@ func TestCastStoppingEffectsStopPetCast(t *testing.T) {
 		})
 	}
 }
+
+// TestMutedPetStrikeRefused lands Mute, PhysicalMute and
+// SilenceMagicPhysical on a pet before its owner orders a strike. The
+// strike is refused at canCast (meetsHpMpDisabledConditions: Mute blocks a
+// magic skill, PhysicalMute a physical one, SilenceMagicPhysical both),
+// which has no message of its own: the pet turns to its target with
+// MoveToPawn (PlayableAI.thinkCast), no cast starts and nothing lands. A
+// strike the effect leaves alone starts.
+func TestMutedPetStrikeRefused(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		effect  string
+		magic   bool
+		refused bool
+	}{
+		{effect: "Mute", magic: true, refused: true},
+		{effect: "Mute", magic: false},
+		{effect: "PhysicalMute", magic: false, refused: true},
+		{effect: "PhysicalMute", magic: true},
+		{effect: "SilenceMagicPhysical", magic: true, refused: true},
+		{effect: "SilenceMagicPhysical", magic: false, refused: true},
+	} {
+		kind := "physical"
+		if tt.magic {
+			kind = "magic"
+		}
+		t.Run(tt.effect+" before "+kind+" strike", func(t *testing.T) {
+			t.Parallel()
+			var (
+				h        *petWorld
+				petActor *summon.Actor
+				hostile  *npc.Hostile
+			)
+			if tt.magic {
+				h, petActor, hostile = bootMagicStriker(t, 99)
+			} else {
+				h, petActor, hostile = bootWolfStriker(t)
+			}
+			landOnPet(t, h, petActor, tt.effect)
+			drainUntilQuiet(t, h.client)
+
+			h.client.Send(encodeRequestActionUse(wolfStrikeAction, false))
+			frames := drainFrames(t, h.client)
+			started := false
+			for _, frame := range frames {
+				if frame[0] == serverpackets.OpcodeMagicSkillUse && wire.NewReader(frame[1:]).ReadInt32() == petActor.ObjectID() {
+					started = true
+				}
+			}
+			if started == tt.refused {
+				t.Fatalf("pet MagicSkillUse under %s = %v, want %v", tt.effect, started, !tt.refused)
+			}
+			if !tt.refused {
+				return
+			}
+			if hasOpcode(frames, serverpackets.OpcodeSystemMessage) || !hasOpcode(frames, serverpackets.OpcodeMoveToPawn) {
+				t.Fatalf("muted strike = opcodes %x, want MoveToPawn toward the target and no system message", frameOpcodes(frames))
+			}
+			assertStrikeAborted(t, h, petActor, hostile)
+		})
+	}
+}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // SummonActor adapts a live summon to the timed cast controller.
@@ -60,8 +61,18 @@ func (a SummonActor) AddSkillReuse(r modelskill.Ref, k int32, d time.Duration) {
 		a.Summon.AddSkillReuse(r, k, d)
 	}
 }
-func (SummonActor) MagicMuted() bool          { return false }
-func (SummonActor) PhysicalMuted() bool       { return false }
+
+// MagicMuted reports an active effect that blocks the summon's magic skills.
+func (a SummonActor) MagicMuted() bool {
+	return a.Summon != nil && a.Summon.EffectList().IsAffected(effect.FlagMuted)
+}
+
+// PhysicalMuted reports an active effect that blocks the summon's physical
+// skills.
+func (a SummonActor) PhysicalMuted() bool {
+	return a.Summon != nil && a.Summon.EffectList().IsAffected(effect.FlagPhysicalMuted)
+}
+
 func (a SummonActor) SpiritshotCharged() bool { return a.Summon != nil && a.Summon.SpiritshotCharged() }
 
 func (a SummonActor) BlessedSpiritshotCharged() bool {
