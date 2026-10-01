@@ -1319,31 +1319,33 @@ func TestCharacterDieClearsCharges(t *testing.T) {
 }
 
 // ---- from character_cubic_test.go ----
-func TestCharacter_CubicListFull_DefaultCapIsOne(t *testing.T) {
+// The cubic cap follows CubicList.isFull (size() > Cubic Mastery level,
+// CubicList.java:110-113): addOrRefreshCubic (CubicList.java:45-59) polls
+// and stops the oldest cubic before admitting past the cap.
+func TestCharacter_AddOrRefreshCubic_NoMasteryEvictsOldest(t *testing.T) {
 	c := &Character{}
-	if c.CubicListFull() {
-		t.Fatal("CubicListFull() on an empty list = true, want false")
-	}
-	if _, added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
-		t.Fatal("AddOrRefreshCubic() first add reported added=false")
-	}
+	c.AddOrRefreshCubic(cubic.Storm, false)
 	// With no Cubic Mastery (skill 143), size(1) > level(0): full.
-	if !c.CubicListFull() {
-		t.Fatal("CubicListFull() after one cubic with no mastery = false, want true")
+	if _, added := c.AddOrRefreshCubic(cubic.Life, false); !added {
+		t.Fatal("AddOrRefreshCubic(Life) on a full list reported added=false, want the oldest evicted")
+	}
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Life)}) {
+		t.Fatalf("CubicIDs() = %v, want [%d]", got, cubic.Life)
 	}
 }
 
-func TestCharacter_CubicListFull_MasteryRaisesCap(t *testing.T) {
+func TestCharacter_AddOrRefreshCubic_MasteryRaisesCap(t *testing.T) {
 	c := &Character{}
 	c.SetSkillLevel(cubicMasterySkillID, 1)
 
 	c.AddOrRefreshCubic(cubic.Storm, false)
-	if c.CubicListFull() {
-		t.Fatal("CubicListFull() after one cubic at mastery level 1 = true, want false")
-	}
 	c.AddOrRefreshCubic(cubic.Vampiric, false)
-	if !c.CubicListFull() {
-		t.Fatal("CubicListFull() after two cubics at mastery level 1 = false, want true")
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Storm), int(cubic.Vampiric)}) {
+		t.Fatalf("CubicIDs() at mastery level 1 = %v, want both cubics", got)
+	}
+	c.AddOrRefreshCubic(cubic.Life, false)
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Vampiric), int(cubic.Life)}) {
+		t.Fatalf("CubicIDs() past the mastery-1 cap = %v, want the oldest (Storm) evicted", got)
 	}
 }
 
