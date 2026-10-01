@@ -135,8 +135,8 @@ import (
 // whisper, a flooded channel, a party, clan or command-channel line from a
 // player outside one, a hero line from a non-hero, and a channel with no
 // handler. Chat registers no pending client action (the client prints the
-// line only when the server sends it back). tests/social, tests/party and
-// tests/clan assert those silences.
+// line only when the server sends it back). tests/social asserts those
+// silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
