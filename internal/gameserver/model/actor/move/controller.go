@@ -151,6 +151,12 @@ func (c *Controller) broadcastMoveStart(ev event.Move) {
 	c.self.BroadcastMove(ev)
 }
 
+// pawnStepped turns the actor toward a step its tracking pawn walk took on
+// the arrival timer, as PositionUpdate does for the steps it takes.
+func (c *Controller) pawnStepped(from, to location.Location) {
+	c.self.SetHeading(from.HeadingTo(to))
+}
+
 // blocked reports an in-flight move stopped by a newly blocked geodata path.
 // The sink owes observers BroadcastBlockedCorrection, ordered around its own
 // reaction; with no sink the correction is sent here.

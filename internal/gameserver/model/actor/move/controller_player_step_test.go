@@ -226,8 +226,10 @@ func TestPlayerPlainWalkStillRoutes(t *testing.T) {
 // straight through walls, and only the position update stepping into one
 // moves the player in the reference (PlayerMove.updatePosition, PlayerMove.
 // java:285-289 blocks at canMoveToTarget). Here the walker stands at X 150,
-// one step short of its stop at X 160 behind a wall at X 155, and the timer
-// fires before the next update: the walk ends blocked at X 150.
+// one step short of the boundary at X 160 behind a wall at X 155, and the
+// timer, due one update past the step within the offset, fires with no
+// update run: its first step meets the wall and the walk ends blocked at
+// X 150.
 func TestPawnWalkArrivalTimerDoesNotCrossWall(t *testing.T) {
 	geo := &recordingGeo{canMoveAt: func(ox, _, _, tx, _, _ int) bool { return (ox < 155) == (tx < 155) }}
 	controller, mover, _, sink, clock := newPlayerStepController(t, 100, geo)
@@ -240,7 +242,7 @@ func TestPawnWalkArrivalTimerDoesNotCrossWall(t *testing.T) {
 	if p := mover.Position(); p.X != 150 {
 		t.Fatalf("after 15 updates at %+v, want X 150", p)
 	}
-	clock.in.Advance(100 * time.Millisecond) // the timer beats the next tick
+	clock.in.Advance(2 * PositionUpdateInterval) // no update runs before the timer
 	if p := mover.Position(); p.X != 150 {
 		t.Fatalf("arrival timer moved the walker to %+v through the wall at X 155, want it left at X 150", p)
 	}
@@ -261,8 +263,9 @@ func TestPawnWalkArrivalTimerDoesNotCrossWall(t *testing.T) {
 	}
 }
 
-// With an open line the arrival timer still ends the pawn walk at the
-// offset short of the pawn, as an arrival.
+// With an open line the arrival timer ends the pawn walk where the updates
+// would, at the first step strictly within the offset (X 170, 30 from the
+// pawn; X 160 is exactly 40 away), as an arrival.
 func TestPawnWalkArrivalTimerStopsShortOnOpenGround(t *testing.T) {
 	geo := &recordingGeo{canMove: true}
 	controller, mover, _, sink, clock := newPlayerStepController(t, 100, geo)
@@ -272,9 +275,9 @@ func TestPawnWalkArrivalTimerStopsShortOnOpenGround(t *testing.T) {
 	for range 15 {
 		clock.tick(controller)
 	}
-	clock.in.Advance(100 * time.Millisecond)
-	if p := mover.Position(); p.X != 160 || mover.Moving() {
-		t.Fatalf("after the timer at %+v (moving %v), want stopped at X 160", p, mover.Moving())
+	clock.in.Advance(2 * PositionUpdateInterval)
+	if p := mover.Position(); p.X != 170 || mover.Moving() {
+		t.Fatalf("after the timer at %+v (moving %v), want stopped at X 170", p, mover.Moving())
 	}
 	for _, e := range sink.events {
 		if _, ok := e.(event.MoveBlocked); ok {

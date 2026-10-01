@@ -51,6 +51,20 @@ func (g Geo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) locatio
 	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
+// SpawnZ is the height the class template spawns new characters at.
+const SpawnZ = 30
+
+// FlatGeo is Geo over one flat floor at Z. Geo, like a region with no
+// geodata, answers the probe height itself, so a ground walk, which reads
+// each step's floor from above the walker (curZ + 2*CellHeight), climbs with
+// every step it takes; FlatGeo's walks keep to the floor.
+type FlatGeo struct {
+	Geo
+	Z int
+}
+
+func (g FlatGeo) Height(int, int, int) int16 { return int16(g.Z) }
+
 // Templates builds the single class template (id 0) every suite's characters
 // use: level-1 human fighter stats with the shared acquire-skill grants.
 func Templates(t testing.TB) *player.TemplateTable {
@@ -137,7 +151,7 @@ func ClassTemplate() *player.Template {
 		PDef:                 fixturePDef,
 		MAtk:                 fixtureMAtk,
 		MDef:                 fixtureMDef,
-		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: SpawnZ}},
 		RunSpeed:             120,
 		WalkSpeed:            60,
 		SwimSpeed:            50,
@@ -170,7 +184,7 @@ func fighterLineTemplate(id int) *player.Template {
 		PDef:                 fixturePDef,
 		MAtk:                 fixtureMAtk,
 		MDef:                 fixtureMDef,
-		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: SpawnZ}},
 		RunSpeed:             120,
 		WalkSpeed:            60,
 		SwimSpeed:            50,
@@ -193,7 +207,7 @@ func duelistTemplate() *player.Template {
 		PDef:                 fixturePDef,
 		MAtk:                 fixtureMAtk,
 		MDef:                 fixtureMDef,
-		Spawns:               []location.Location{{X: 10, Y: 20, Z: 30}},
+		Spawns:               []location.Location{{X: 10, Y: 20, Z: SpawnZ}},
 		RunSpeed:             120,
 		WalkSpeed:            60,
 		SwimSpeed:            50,

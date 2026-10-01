@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 const (
@@ -137,7 +138,7 @@ func TestFolkClickSelectsThenTalks(t *testing.T) {
 // walks toward the NPC stopping 100 short, and the arrival talks.
 func TestFolkOutOfReachWalksThenTalks(t *testing.T) {
 	t.Parallel()
-	w := bootFolkWorld(t, merchantPages())
+	w := bootFolkWorld(t, merchantPages(), gameservertest.WithGeo(gameservertest.FlatGeo{Z: gameservertest.SpawnZ}))
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 400)
 	w.selectFolk(t, f)
 

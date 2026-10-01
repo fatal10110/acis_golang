@@ -59,12 +59,18 @@ func unlockSkill(id int32, skillType string, level, power int) modelskill.Defini
 // through the production world-object owner.
 func bootUnlock(t *testing.T, def modelskill.Definition, doors ...*door.Template) (*gameservertest.Server, int32) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	return bootUnlockOpts(t, nil, def, doors...)
+}
+
+// bootUnlockOpts is bootUnlock with extra boot options.
+func bootUnlockOpts(t *testing.T, extra []gameservertest.Option, def modelskill.Definition, doors ...*door.Template) (*gameservertest.Server, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
 		gameservertest.WithDoors(doors...),
-	)
+	}, extra...)...)
 	objID := srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
 	if len(doors) == 0 {

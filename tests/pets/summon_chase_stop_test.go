@@ -15,12 +15,6 @@ import (
 func TestPetAttackChaseStopsWithinAttackRange(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
-	if !h.srv.DrivesClock() {
-		// On the wall clock the update that ends the chase races the
-		// arrival timer, which lands it on the monster's cell instead
-		// (#3131).
-		t.Skip("ordering the last position update ahead of the arrival timer needs the driven clock")
-	}
 	pet, _ := h.spawnWolf(t)
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	placePet(t, pet, location.Location{X: px, Y: py, Z: pz})

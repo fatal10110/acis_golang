@@ -31,6 +31,8 @@ func rangeWalkCaster(t *testing.T, dx int, opts ...gameservertest.Option) (srv *
 	srv = gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
+		// The approach walk keeps to the spawn's floor; opts may replace it.
+		gameservertest.WithGeo(gameservertest.FlatGeo{Z: gameservertest.SpawnZ}),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
 			{
 				ID: rangeWalkNukeID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,

@@ -40,7 +40,8 @@ func doorWalkCaster(t *testing.T, dx int) (srv *gameservertest.Server, c *testsu
 		tmpl.Coordinates[i].X += tmpl.Position.X - unlockDoorX
 		tmpl.Coordinates[i].Y += tmpl.Position.Y
 	}
-	srv, objID = bootUnlock(t, def, tmpl)
+	// The approach walk keeps to the spawn's floor.
+	srv, objID = bootUnlockOpts(t, []gameservertest.Option{gameservertest.WithGeo(gameservertest.FlatGeo{Z: doorWalkSpawn.Z})}, def, tmpl)
 	c = srv.Client
 	gate, ok := srv.WorldObjects.Door(unlockDoorID)
 	if !ok {

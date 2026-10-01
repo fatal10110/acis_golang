@@ -27,11 +27,6 @@ func TestAttackApproachTracksMovedTarget(t *testing.T) {
 		gameservertest.WithWantChars(1),
 		gameservertest.WithGeo(flatGeo{}),
 	)
-	if !srv.DrivesClock() {
-		// On the wall clock the update that ends the walk races the arrival
-		// timer, which stops it on the range boundary instead (#3131).
-		t.Skip("ordering the last position update ahead of the arrival timer needs the driven clock")
-	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	startInWorld(t, c)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX + 500, Y: hostileY, Z: hostileZ})
