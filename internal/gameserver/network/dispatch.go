@@ -28,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
@@ -247,6 +248,7 @@ type GameClientLink struct {
 	world         *world.State
 	npcs          *npc.Table
 	summonItems   *item.SummonItemTable
+	doors         door.StateOwner
 	petStore      petStore
 	geo           move.Geo
 	zones         *zone.Index
@@ -365,6 +367,7 @@ type GameClientLinkConfig struct {
 	World         *world.State
 	NPCs          *npc.Table
 	SummonItems   *item.SummonItemTable
+	Doors         door.StateOwner
 	PetStore      petStore
 	Geo           move.Geo
 	Zones         *zone.Index
@@ -483,6 +486,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
 		summonItems:   cfg.SummonItems,
+		doors:         cfg.Doors,
 		petStore:      cfg.PetStore,
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
