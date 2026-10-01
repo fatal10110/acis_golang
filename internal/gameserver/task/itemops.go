@@ -14,7 +14,9 @@ import (
 // exclude every open operation. A handler's write (its Widen to its last
 // place) runs inside its own operation and reads rows of the owners that
 // operation holds: an operation names the owners whose containers it mutates
-// (BeginOperation), and two operations sharing an owner never run at once.
+// and the rows it takes from outside them (BeginOperationTaking), holds the
+// owners of every bound row its write widens to, and two operations sharing
+// an owner never run at once.
 //
 // Without it, a write can read one of an operation's rows in that span and
 // see no group: either it reads the row after the mutation, before the
@@ -157,74 +159,144 @@ func (g *operationGate) parked() (ops, reads int) {
 // mutates or after its rows are bound and placed, never in between: that
 // operation's write reads the row as it was before this one, or widens to
 // every row this one bound. The operation also holds the owners of every row
-// still bound to a row of theirs by a write that has not landed (Bind),
+// still bound to a row of theirs by a write that has not landed (Bind) —
+// the owner the row was bound under and the owner its instance has now —
 // because its own write widens to those rows and reads them as well.
 //
 // The owners are taken all at once, so operations never deadlock on each
 // other. An operation opened while another is open on the same goroutine
-// names no owners: the outer one names every owner the whole operation
-// mutates and already holds them, and naming one again would wait for itself.
-// While open, an operation must not wait for a persistence write to run — the
-// write waits for it to end — nor for anything a goroutine may hold while it
-// waits here, such as a lock its caller took before BeginOperation.
+// names no owners and takes no rows (BeginOperationTaking): the outer one
+// names every owner the whole operation mutates and already holds them, and
+// naming one again would wait for itself. While open, an operation must not
+// wait for a persistence write to run — the write waits for it to end — nor
+// for anything a goroutine may hold while it waits here, such as a lock its
+// caller took before BeginOperation.
 //
 // Defer the returned func: an operation left open stops every persistence
 // write and every operation on its owners. It is safe to call more than once.
 func (i *ItemInstances) BeginOperation(owners ...int32) (end func()) {
+	return i.BeginOperationTaking(nil, owners...)
+}
+
+// BeginOperationTaking is BeginOperation for an operation that also writes
+// rows from outside its owners' containers: taken names them, as a pickup
+// names the ground item it takes into the inventory. Such a row can still be
+// bound (Bind) to rows of other owners — a stack its dropper had just
+// received in a trade whose write has not landed — and the operation's write
+// widens to them, so the operation holds the owners of every row bound to a
+// taken one as well.
+func (i *ItemInstances) BeginOperationTaking(taken []int32, owners ...int32) (end func()) {
 	if i == nil {
 		return func() {}
 	}
-	held := i.ops.beginOperation(func() []int32 { return i.boundOwners(owners) })
+	held := i.ops.beginOperation(func() []int32 { return i.boundOwners(owners, taken) })
 	var once sync.Once
 	return func() { once.Do(func() { i.ops.endOperation(held) }) }
 }
 
 // boundOwners returns owners, without repeats or the ownerless 0, together
-// with the owner of every row bound (Bind) to a row of one of them, and so on
-// until no group adds an owner. It runs under the gate's lock, which is taken
-// before groupsMu, never after.
-func (i *ItemInstances) boundOwners(owners []int32) []int32 {
+// with the owners of every group (Bind) that holds one of taken or a row of
+// one of those owners, and so on until no group adds an owner. A row counts
+// for both the owner it was bound under and the owner its instance has now:
+// a row that changed hands outside an operation after its binding is written
+// by its new owner's operations, which widen to its group.
+//
+// It runs under the gate's lock, which is taken before groupsMu, never after.
+// The instances' owners are read once groupsMu is released, so groupsMu is
+// never held while waiting on an instance's lock.
+func (i *ItemInstances) boundOwners(owners, taken []int32) []int32 {
 	out := make([]int32, 0, len(owners))
 	for _, owner := range owners {
-		if owner != 0 && !slices.Contains(out, owner) {
-			out = append(out, owner)
-		}
+		out = appendOwner(out, owner)
 	}
-	if len(out) == 0 {
+	if len(out) == 0 && len(taken) == 0 {
 		return nil
 	}
-	i.groupsMu.Lock()
-	defer i.groupsMu.Unlock()
+	groups := i.boundGroupOwners()
 	for grew := true; grew; {
 		grew = false
-		seen := make(map[*rowGroup]struct{}, len(i.groups))
-		for _, g := range i.groups {
-			if _, ok := seen[g]; ok {
+		for n, g := range groups {
+			if g == nil || !g.touches(out, taken) {
 				continue
 			}
-			seen[g] = struct{}{}
-			if !groupTouches(g, out) {
-				continue
-			}
-			for _, row := range g.rows {
-				if row.OwnerID != 0 && !slices.Contains(out, row.OwnerID) {
-					out = append(out, row.OwnerID)
+			groups[n] = nil
+			for _, owner := range g.owners {
+				if !slices.Contains(out, owner) {
+					out = append(out, owner)
 					grew = true
 				}
 			}
 		}
 	}
+	if len(out) == 0 {
+		return nil
+	}
 	return out
 }
 
-// groupTouches reports whether a row of g belongs to one of owners.
-func groupTouches(g *rowGroup, owners []int32) bool {
-	for _, row := range g.rows {
-		if slices.Contains(owners, row.OwnerID) {
+// groupOwners is one bound group as boundOwners sees it: its rows' ids and
+// every owner one of its rows belongs to, at its binding or now.
+type groupOwners struct {
+	ids    []int32
+	owners []int32
+}
+
+// touches reports whether g holds one of taken or a row of one of owners.
+func (g *groupOwners) touches(owners, taken []int32) bool {
+	for _, owner := range g.owners {
+		if slices.Contains(owners, owner) {
+			return true
+		}
+	}
+	for _, id := range g.ids {
+		if slices.Contains(taken, id) {
 			return true
 		}
 	}
 	return false
+}
+
+// boundGroupOwners lists every group bound (Bind) to a write that has not
+// landed, with its rows' ids and owners.
+func (i *ItemInstances) boundGroupOwners() []*groupOwners {
+	i.groupsMu.Lock()
+	seen := make(map[*rowGroup]struct{}, len(i.groups))
+	copied := make([][]BoundRow, 0, len(i.groups))
+	for _, g := range i.groups {
+		if _, ok := seen[g]; ok {
+			continue
+		}
+		seen[g] = struct{}{}
+		rows := make([]BoundRow, 0, len(g.rows))
+		for _, row := range g.rows {
+			rows = append(rows, row)
+		}
+		copied = append(copied, rows)
+	}
+	i.groupsMu.Unlock()
+
+	out := make([]*groupOwners, 0, len(copied))
+	for _, rows := range copied {
+		group := &groupOwners{ids: make([]int32, 0, len(rows))}
+		for _, row := range rows {
+			group.ids = append(group.ids, row.ObjectID)
+			group.owners = appendOwner(group.owners, row.OwnerID)
+			if row.Inst != nil {
+				group.owners = appendOwner(group.owners, row.Inst.Snapshot().OwnerID)
+			}
+		}
+		out = append(out, group)
+	}
+	return out
+}
+
+// appendOwner appends owner to owners unless it is the ownerless 0 or
+// already there.
+func appendOwner(owners []int32, owner int32) []int32 {
+	if owner == 0 || slices.Contains(owners, owner) {
+		return owners
+	}
+	return append(owners, owner)
 }
 
 // OperationOpen reports whether any multi-row operation is open

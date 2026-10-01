@@ -215,7 +215,10 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	end := l.itemInstances.BeginOperation(petInv.OwnerID())
+	// The ground item's row comes from outside the pet's inventory, and may
+	// still be bound to the trade that gave it to its dropper, so the
+	// operation names it too.
+	end := l.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
 	defer end()
 	result, failure := petitem.PickupGround(pet, petInv, ground)
 	switch failure {
