@@ -4101,3 +4101,74 @@ func TestFrameShopPreviewInfo(t *testing.T) {
 		t.Fatalf("FrameShopPreviewInfo = %x, want %x", got, want)
 	}
 }
+
+// TestFrameSymbolMakerPackets pins the four symbol maker windows:
+// HennaEquipList (0xe2: adena, max slots, count, then symbol, dye, 10,
+// price, 1 per symbol), HennaUnequipList (0xe5: adena, empty slots, count,
+// then symbol, dye, 5, price/5, 1), and HennaItemInfo (0xe3) and
+// HennaItemUnequipInfo (0xe6): symbol, dye, dye count, price, 1, adena, then
+// per attribute in INT, STR, CON, MEN, DEX, WIT order the current value as
+// an int32 and the changed value's low byte, so a value below zero wraps.
+func TestFrameSymbolMakerPackets(t *testing.T) {
+	h := henna.Henna{SymbolID: 1, DyeID: 4445, DrawPrice: 37000, STR: 1, CON: -3}
+	other := henna.Henna{SymbolID: 7, DyeID: 4451, DrawPrice: 37000, INT: 1, MEN: -3}
+
+	got := framePayload(t, FrameHennaEquipList(148000, 2, []henna.Henna{h, other}))
+	want := []byte{
+		0xe2,
+		0x20, 0x42, 0x02, 0x00, // 148000 adena
+		0x02, 0x00, 0x00, 0x00,
+		0x02, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x5d, 0x11, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x88, 0x90, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x07, 0x00, 0x00, 0x00, 0x63, 0x11, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x88, 0x90, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameHennaEquipList() = %x, want %x", got, want)
+	}
+
+	got = framePayload(t, FrameHennaUnequipList(5, 1, []henna.Henna{h}))
+	want = []byte{
+		0xe5,
+		0x05, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x5d, 0x11, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0xe8, 0x1c, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameHennaUnequipList() = %x, want %x", got, want)
+	}
+
+	now := HennaStats{INT: 21, STR: 40, CON: 2, MEN: 25, DEX: 30, WIT: 11}
+	head := []byte{
+		0x01, 0x00, 0x00, 0x00, 0x5d, 0x11, 0x00, 0x00,
+	}
+	got = framePayload(t, FrameHennaItemInfo(h, 9, now))
+	want = append([]byte{0xe3}, head...)
+	want = append(want,
+		0x0a, 0x00, 0x00, 0x00, 0x88, 0x90, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,
+		21, 0, 0, 0, 21,
+		40, 0, 0, 0, 41,
+		2, 0, 0, 0, 0xff, // CON 2 - 3 wraps to 255
+		25, 0, 0, 0, 25,
+		30, 0, 0, 0, 30,
+		11, 0, 0, 0, 11,
+	)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameHennaItemInfo() = %x, want %x", got, want)
+	}
+
+	got = framePayload(t, FrameHennaItemUnequipInfo(h, 9, now))
+	want = append([]byte{0xe6}, head...)
+	want = append(want,
+		0x05, 0x00, 0x00, 0x00, 0xe8, 0x1c, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,
+		21, 0, 0, 0, 21,
+		40, 0, 0, 0, 39,
+		2, 0, 0, 0, 5,
+		25, 0, 0, 0, 25,
+		30, 0, 0, 0, 30,
+		11, 0, 0, 0, 11,
+	)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameHennaItemUnequipInfo() = %x, want %x", got, want)
+	}
+}

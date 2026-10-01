@@ -30,6 +30,18 @@ func (c *Character) HennaSnapshot() henna.Snapshot {
 	return c.HennaList().Snapshot(c.ClassID, level)
 }
 
+// HennaMaxSlots returns how many dyes the current class may wear.
+func (c *Character) HennaMaxSlots() int {
+	level, _ := ClassLevel(c.ClassID)
+	return henna.MaxSlots(level)
+}
+
+// HennaEmptySlots returns how many more dyes the current class may draw.
+func (c *Character) HennaEmptySlots() int {
+	level, _ := ClassLevel(c.ClassID)
+	return c.HennaList().EmptySlots(level)
+}
+
 // AddHenna equips h into the first empty slot allowed by class level.
 func (c *Character) AddHenna(h henna.Henna) (dbSlot int, ok bool) {
 	level, _ := ClassLevel(c.ClassID)

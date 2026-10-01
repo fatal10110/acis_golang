@@ -104,12 +104,6 @@ Missing M3 data/UI client packets:
 - `RequestProcureCropList`
 - `RequestSetSeed`
 - `RequestSetCrop`
-- `RequestHennaItemList`
-- `RequestHennaItemInfo`
-- `RequestHennaEquip`
-- `RequestHennaUnequipList`
-- `RequestHennaUnequipInfo`
-- `RequestHennaUnequip`
 - `RequestRecipeShopMessageSet`
 - `RequestRecipeShopListSet`
 - `RequestRecipeShopManageQuit`
@@ -249,10 +243,6 @@ Missing M3 data/UI server packets:
 - `MultiSellList`
 - `SellListProcure`
 - `BuyListSeed`
-- `HennaEquipList`
-- `HennaItemInfo`
-- `HennaUnequipList`
-- `HennaItemUnequipInfo`
 - `RecipeShopItemInfo`
 - `RecipeShopManageList`
 - `RecipeShopMsg`
@@ -374,6 +364,7 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, and summon/pet casts remain deferred to the M6 cast/effect runtime. The player cast now runs the real timed Launch/Hit/Finish lifecycle with abort/interrupt broadcasting `MagicSkillCanceled`, `SystemMessage`, and `ActionFailed` (#1000, #1002).
 - `RequestEnchantItem` is wired through the enchant-scroll `UseItem` path, `ChooseInventoryItem`, scroll ownership/count validation, item enchantability/grade/type gates, scroll consumption, item enchant persistence, blessed reset, normal break/crystal reward, `EnchantResult`, `InventoryUpdate`, `SystemMessage`, and self `UserInfo`. Config-file overrides for enchant rates, store/trade-state gates, and +4 dual/+6 armor-set passive skill side effects remain deferred to their owning systems.
 - `RequestPetUseItem`, `RequestGiveItemToPet`, `RequestGetItemFromPet`, and `RequestPetGetItem` are wired for active-pet lookup, pet inventory transfer/equip mutation, immediate visible ground-item pickup, item persistence, `GetItem`, `DeleteObject`, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet AI movement-to-pickup, drop-protection/looter gates, pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.
+- `RequestHennaItemList`, `RequestHennaItemInfo`, `RequestHennaEquip`, `RequestHennaUnequipList`, `RequestHennaUnequipInfo` and `RequestHennaUnequip` are wired to the dye symbol flow against the loaded `hennas.xml`, answering `HennaEquipList`, `HennaItemInfo`, `HennaUnequipList`, `HennaItemUnequipInfo`, `HennaInfo`, self `UserInfo`, `SystemMessage` and batched `InventoryUpdate`; draws and deletions persist `character_hennas`. The symbol maker's `Draw` and `RemoveList` dialog commands open the two windows.
 - `RequestRecipeBookOpen`, `RequestRecipeBookDestroy`, `RequestRecipeItemMakeInfo` and `RequestRecipeItemMakeSelf` are wired to the persisted recipe book (`character_recipebook`) and self crafting, answering `RecipeBookItemList`, `RecipeItemMakeInfo`, `SystemMessage`, MP `StatusUpdate` and batched `InventoryUpdate`. The Common/Dwarven Craft skills and recipe items (the `Recipes` item handler) open and fill the book. Private workshop (recipe shop) packets and the manufacture store state remain with the private-store work.
 - `RequestShortCutReg` and `RequestShortCutDel` are wired for persisted client shortcut entries, including starter shortcut creation, EnterWorld restoration, `ShortCutRegister`, and `ShortCutDelete`. A recipe shortcut is kept only while the recipe book holds its recipe. Item reuse timers, macro bodies, and soulshot auto-use side effects remain deferred to their owning systems.
 - `RequestChangePetName` remains deferred because the Go runtime has no active pet naming state, pet-name uniqueness query, NPC-name lookup by name, or control-item custom type update flow.

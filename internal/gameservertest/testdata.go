@@ -135,11 +135,18 @@ func ClassTemplate() *player.Template {
 }
 
 // fighterLineTemplate fills the intermediate warrior-profession templates
-// the duelist line requires the table to carry.
+// the duelist line requires the table to carry, with the shipped human
+// fighter base attributes the symbol windows report.
 func fighterLineTemplate(id int) *player.Template {
 	return &player.Template{
 		ID:                   id,
 		BaseLevel:            1,
+		STR:                  40,
+		CON:                  43,
+		DEX:                  30,
+		INT:                  21,
+		WIT:                  11,
+		MEN:                  25,
 		HPTable:              []float64{80},
 		MPTable:              []float64{30},
 		CPTable:              []float64{32},

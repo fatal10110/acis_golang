@@ -32,6 +32,11 @@ const (
 	BypassBuyList
 	// BypassWearList opens the try-on window of buylist ListID.
 	BypassWearList
+	// BypassHennaDraw opens the symbol maker's draw window.
+	BypassHennaDraw
+	// BypassHennaRemoveList opens the symbol maker's deletion window, or
+	// says the talker wears no symbol.
+	BypassHennaRemoveList
 )
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -61,7 +66,8 @@ var fishermanCommands = []string{"FishSkillList", "FishingChampionship", "Fishin
 // link after the object id, sent by a talker carrying karma. A shop,
 // fisherman, gatekeeper or warehouse keeper first applies its karma gate
 // to every command, answering with its refusal page when that page exists.
-// The generic commands follow: Chat <n> opens chat page n (page 0 when n
+// A symbol maker's Draw and RemoveList open its windows. The generic
+// commands follow: Chat <n> opens chat page n (page 0 when n
 // does not parse), Link <path> opens data/html/<path>. Every other command
 // belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) BypassReply {
@@ -93,6 +99,16 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 			reply.HTML = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
 		}
 		return reply
+	}
+	if kind == "SymbolMaker" {
+		switch command {
+		case "Draw":
+			reply.Outcome = BypassHennaDraw
+			return reply
+		case "RemoveList":
+			reply.Outcome = BypassHennaRemoveList
+			return reply
+		}
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
 	if kind == "Merchant" || kind == "Fisherman" {
