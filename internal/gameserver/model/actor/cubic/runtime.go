@@ -23,10 +23,14 @@ type Runtime struct {
 	// construction, distinct from any later-fired skill's own data.
 	Level            int
 	ActivationChance int
-	interval         time.Duration
-	fire             func()
-	disappear        func()
-	queue            *sim.Queue
+	// MAtk is the cubic's own magic attack, the granting skill's power
+	// truncated to a whole number: the M.Atk its landing rolls use. It is
+	// set once, before the runtime's timers start.
+	MAtk      int
+	interval  time.Duration
+	fire      func()
+	disappear func()
+	queue     *sim.Queue
 
 	// mu is taken from other actors' queues: a party member's cubic cast
 	// refreshes the timers, or stops an evicted cubic's, on the caster's

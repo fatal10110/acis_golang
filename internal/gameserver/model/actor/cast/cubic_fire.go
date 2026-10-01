@@ -194,11 +194,13 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // The returned EffectResult carries AttackFailed (and any other handler
 // outcome) back to the caller: a failed offensive continuous roll must
 // still reach the owner as ATTACK_FAILED, not be dropped silently.
-// The cast is marked Cubic: the continuous and disabler cubic branches
-// read the owner's blessed-spiritshot charge but never spend it.
+// The skill goes through the registry's cubic dispatch (UseCubic) with
+// mAtk, the cubic's own M.Atk fixed when it was granted: its landing rolls
+// and damage come from the cubic, and it never spends the owner's
+// spiritshot.
 // sink, when non-nil, delivers each handler message as it is produced, in
 // place of EffectResult.Messages.
-func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target, sink handlerskill.MessageSink) EffectResult {
+func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, mAtk float64, target Target, sink handlerskill.MessageSink) EffectResult {
 	if skills == nil {
 		return EffectResult{}
 	}
@@ -206,7 +208,7 @@ func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creatur
 	if !ok {
 		return EffectResult{}
 	}
-	result, ok := skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}, Cubic: true, Sink: sink})
+	result, ok := skills.UseCubic(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{actor}, Sink: sink}, mAtk)
 	if !ok {
 		return EffectResult{}
 	}
