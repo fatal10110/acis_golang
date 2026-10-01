@@ -139,9 +139,9 @@ func (c *Controller) segmentAdvanced(ev event.Move) {
 	// waypoint rather than a follow target.
 	ev.FollowTarget = 0
 	ev.FollowOffset = 0
-	// Reference rotates toward the new leg immediately before
-	// broadcasting it (CreatureMove.java moveToNextRoutePoint,
-	// setHeadingTo(destination) directly above the MoveToLocation send).
+	// Rotate toward the new leg immediately before broadcasting it: the
+	// heading is set to the destination directly before the
+	// MoveToLocation send.
 	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
 	c.self.BroadcastMove(ev)
 }
@@ -629,8 +629,8 @@ func (c *Controller) Queue() *sim.Queue {
 // animation instead of just correcting server-side state — but crossing a
 // geopath segment boundary inside UpdatePosition does rebroadcast (via
 // segmentAdvanced), deliberately, so the
-// client restarts its per-leg animation the same way the reference client
-// does on each routed waypoint. It returns false once the move has
+// client restarts its per-leg animation on each routed waypoint. It returns
+// false once the move has
 // stopped.
 //
 // Reaching the destination fires the arrived hook synchronously, before

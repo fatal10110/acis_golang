@@ -45,14 +45,13 @@ func (c *Character) CurrentTarget() world.Tracked { return c.Target() }
 // SetTarget implements retargetableOnAggression's setter. A nil t clears
 // the selection.
 //
-// Reference: Player.setTarget (Player.java:2439-2510) is the single packet
-// funnel for every selection, click-driven or domain-driven alike — a
-// non-null Creature target gets ValidateLocation (conditional)/
-// MyTargetSelected/StatusUpdate/broadcast TargetSelected (:2474-2493), a
-// null target gets ActionFailed and a conditional broadcast TargetUnselected
-// (:2495-2503). Creature.setTarget's plain field write (Creature.java:
-// 1353-1358) is only what the Summon runtime path hits, since no Playable
-// subclass overrides it. A Retargeted event carries the selection to the
+// Setting a player's target is the single packet funnel for every
+// selection, click-driven or domain-driven alike — a non-null Creature
+// target gets ValidateLocation (conditional)/MyTargetSelected/StatusUpdate/
+// broadcast TargetSelected, a null target gets ActionFailed and a
+// conditional broadcast TargetUnselected. A plain target field write is
+// only what the Summon runtime path hits, since no other playable kind
+// adds the funnel. A Retargeted event carries the selection to the
 // network layer, which reproduces that funnel; StoreTarget is the fallback
 // for a character with no sink attached (e.g. tests).
 func (c *Character) SetTarget(t world.Tracked) {

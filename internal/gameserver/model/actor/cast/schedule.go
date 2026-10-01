@@ -13,7 +13,7 @@ type Hooks struct {
 	// Launch runs when the cast reaches its launch point, after the actor
 	// has committed to it. Returning false means the target was lost or is
 	// no longer valid, which stops the cast instead of continuing to Hit —
-	// mirroring the oracle's mid-cast target/range/line-of-sight recheck.
+	// the mid-cast target/range/line-of-sight recheck.
 	// A nil Launch always continues.
 	Launch func() bool
 	// Hit runs once Controller.Hit has consumed the final MP/HP cost, and

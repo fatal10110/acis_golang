@@ -110,7 +110,7 @@ func (a *Actor) applyDeathPenalty() {
 // experience its level and the next one start at.
 func petDeathPenalty(level int, levelExp, nextLevelExp int64) int64 {
 	percentLost := -0.07*float64(level) + 6.5
-	// Rounds half up, as the reference's Math.round does.
+	// Rounds half up.
 	return int64(math.Floor(float64(nextLevelExp-levelExp)*percentLost/100 + 0.5))
 }
 

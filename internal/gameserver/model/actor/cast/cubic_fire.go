@@ -26,20 +26,18 @@ type CubicFireOwner interface {
 }
 
 // CubicGrantedLevel resolves the level a granted cubic actually fires its
-// skills at, matching L2SkillSummon.useSkill's skillLevel adjustment: skill
-// 4338 (Life Cubic for Beginners) always grants level 8, and any
-// granting-skill level above 100 (enchanted skill levels) collapses through
-// the reference's own truncating-integer-division formula before ever
-// reaching CubicList.addOrRefreshCubic.
+// skills at: skill 4338 (Life Cubic for Beginners) always grants level 8,
+// and any granting-skill level above 100 (enchanted skill levels) collapses
+// through a truncating integer-division formula before the cubic is added
+// or refreshed.
 func CubicGrantedLevel(def modelskill.Definition) int {
 	switch {
 	case int(def.ID) == 4338:
 		return 8
 	case def.Level > 100:
-		// Java: Math.round(((getLevel() - 100) / 7) + 8) — all-int
-		// arithmetic, truncating toward zero; the Math.round call is a
-		// no-op since the operand is already an integer by then. Go's
-		// integer division truncates toward zero the same way.
+		// ((level - 100) / 7) + 8 in all-int arithmetic, truncating toward
+		// zero; rounding the result is a no-op since it is already an
+		// integer. Go's integer division truncates toward zero the same way.
 		return (def.Level-100)/7 + 8
 	default:
 		return def.Level
@@ -66,9 +64,9 @@ func DecideCubicFire(owner CubicFireOwner, skillIDs []int, activationChance int)
 	return skillID, target, true
 }
 
-// DecideLifeCubicTarget mirrors Cubic.pickFriendlyTarget's no-party
-// fallback: heal the owner if under full HP, gated by the reference's
-// HP-ratio-banded probability roll. The party-scan branch needs the
+// DecideLifeCubicTarget is the life cubic's no-party friendly-target
+// fallback: heal the owner if under full HP, gated by an HP-ratio-banded
+// probability roll. The party-scan branch needs the
 // milestone-M8 party system and isn't reachable yet.
 func DecideLifeCubicTarget(owner CubicFireOwner) (Target, bool) {
 	self, ok := owner.(Target)
@@ -100,10 +98,10 @@ func DecideLifeCubicTarget(owner CubicFireOwner) (Target, bool) {
 	return self, true
 }
 
-// pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
-// selected target, if within range and not already dead. The reference's
-// full isAttackableWithoutForceBy alignment/karma matrix is not replicated
-// here — deferred, see fatal10110/acis_golang#1129.
+// pickCubicEnemyTarget picks a cubic's enemy target: the owner's currently
+// selected target, if within range and not already dead. The full
+// attackable-without-force alignment/karma matrix is not replicated here —
+// deferred, see fatal10110/acis_golang#1129.
 func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
 	selected := owner.Target()
 	if selected == nil {
@@ -162,18 +160,17 @@ func ApplyCubicHeal(power float32, target Target) (healed bool) {
 // ApplyCubicEffect dispatches a non-Life cubic's fired skill directly to
 // its pre-resolved single target, bypassing the normal target-type
 // resolution phase ApplyEffectsResult runs (the cubic already picked its
-// own target via DecideCubicFire), matching Cubic.fireAction's default
-// SkillHandler dispatch.
+// own target via DecideCubicFire), as a cubic's default skill-handler
+// dispatch does.
 // A cubic's own target selection resolves world objects rather than the
 // cast-participant surface a skill handler acts on, so a target that isn't
 // actor-shaped is dropped here instead of reaching the handlers as a value
 // none of their assertions can match.
 // The returned EffectResult carries AttackFailed (and any other handler
-// outcome) back to the caller, matching useContinuousSkill (Cubic.java:439-444):
-// a failed offensive continuous roll must still reach the owner as
-// ATTACK_FAILED, not be dropped silently.
-// The cast is marked Cubic: the reference's continuous and disabler cubic
-// branches read the owner's blessed-spiritshot charge but never spend it.
+// outcome) back to the caller: a failed offensive continuous roll must
+// still reach the owner as ATTACK_FAILED, not be dropped silently.
+// The cast is marked Cubic: the continuous and disabler cubic branches
+// read the owner's blessed-spiritshot charge but never spend it.
 // sink, when non-nil, delivers each handler message as it is produced, in
 // place of EffectResult.Messages.
 func ApplyCubicEffect(skills *handlerskill.Registry, caster handlerskill.Creature, def modelskill.Definition, target Target, sink handlerskill.MessageSink) EffectResult {

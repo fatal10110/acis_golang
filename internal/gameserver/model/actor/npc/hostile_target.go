@@ -25,7 +25,7 @@ func (h *Hostile) Aggressive() bool {
 // Excluded unconditionally: a nil target and an already-dead target. A
 // candidate already the FinalTarget of a queued, non-moving ATTACK Desire
 // is excluded too when that already starts or maintains an offensive
-// follow (Npc.java:2107-2110, CreatureMove.maybeStartOffensiveFollow):
+// follow (the queued-desire follow gate):
 // this NPC is already committed to closing on it, so re-validating it
 // against the rules below is redundant. A non-NPC target must also be
 // within rangeVal and, unless this NPC is raid-related or its template can
@@ -39,17 +39,17 @@ func (h *Hostile) Aggressive() bool {
 // when this NPC isn't aggressive. A surviving candidate must still be
 // within line of sight.
 //
-// This ports the reference server's default targeting rule. Door exclusion
+// This is the default NPC targeting rule. Door exclusion
 // needs no explicit check: door.Object doesn't implement
 // attackable.Combatant, so a door can never be passed as target here. A
 // non-NPC target still within its post-fake-death grace period is excluded
-// too, matching the reference's recent-fake-death check. Not modeled: the
+// too (the recent-fake-death check). Not modeled: the
 // remaining Player-only sub-checks (appearance invisibility, allied-Varka/
 // allied-Ketra exclusion, rift-room memo), Guard's aggressive-Monster
 // branch (gated by a config flag that ships disabled by default, and needs
 // npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
 // config flag (allowPeaceful is a caller-supplied parameter here rather
-// than the reference's own config-driven default). The follow gate's
+// than a config-driven default). The follow gate's
 // distance decision reuses move.Controller.MaybeStartOffensiveFollow, which
 // reads the current intention's move-to-target flag, not the queued hold
 // desire's.
@@ -104,7 +104,7 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 }
 
 // inRangeAndUnconcealed applies the range and silent-move gates the
-// reference rule reserves for non-NPC targets.
+// targeting rule reserves for non-NPC targets.
 func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal int) bool {
 	if rangeVal < 0 {
 		return false
@@ -131,27 +131,26 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 	return target.Karma() > 0 && h.CanSee(target)
 }
 
-// siegeGuardAutoAttackTargetValid ports SiegeGuard.canAutoAttack(Creature)
-// (SiegeGuard.java:82-96): the dedicated one-argument auto-attack rule a
-// SiegeGuard kind uses in place of AutoAttackTargetValid above, reachable
-// only through the one-argument reconsider-target path below. The
-// three-argument RandomizeHate path (Npc.canAutoAttack(Creature, int,
-// boolean)) keeps calling AutoAttackTargetValid unchanged for SiegeGuard,
-// same as every other kind.
+// siegeGuardAutoAttackTargetValid is the dedicated one-argument auto-attack
+// rule a SiegeGuard kind uses in place of AutoAttackTargetValid above,
+// reachable only through the one-argument reconsider-target path below.
+// The three-argument RandomizeHate path (target, range, allowPeaceful)
+// keeps calling AutoAttackTargetValid unchanged for SiegeGuard, same as
+// every other kind.
 //
 // Rejects a target with no acting player (an NPC target) or an alike-dead
 // acting player, and an acting player silently moving beyond 250 units;
-// otherwise requires siege attackability (target.isAttackableBy(this)) and
-// line of sight. The reference resolves target.getActingPlayer() once and
-// checks the alike-dead/silent-moving/distance gates against that acting
+// otherwise requires siege attackability (target attackable by this guard)
+// and line of sight. The target's acting player is resolved once and the
+// alike-dead/silent-moving/distance gates are checked against that acting
 // player, not against target directly — for a Summon/Pet target this is the
 // owning player, matching AutoAttackTargetValid's own Owner()
-// resolution above; only the closing isAttackableBy/canSeeTarget calls use
-// the raw target. Not modeled: the acting player's invisibility check
-// (targetPlayer.getAppearance().isVisible()) — no player appearance state
-// exists yet (#907); and the clan/siege-side DEFENDER/OWNER exclusion inside
-// Playable.isAttackableBy's SiegeGuard branch — no castle/siege state exists
-// yet (#232/#234), so target.isAttackableBy(this) here falls through to
+// resolution above; only the closing attackability and line-of-sight checks
+// use the raw target. Not modeled: the acting player's invisibility check —
+// no player appearance state exists yet (#907); and the clan/siege-side
+// DEFENDER/OWNER exclusion inside a playable's siege-guard attackability
+// branch — no castle/siege state exists yet (#232/#234), so the
+// attackability check here falls through to
 // whatever general AttackableBy the target exposes.
 func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) bool {
 	if target == nil {
@@ -182,24 +181,24 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 	return h.CanSee(target)
 }
 
-// ReconsiderTarget ports Npc.java's AggroList.reconsiderTarget(range), used
+// ReconsiderTarget is in-range target reconsideration, used
 // when this NPC can no longer act on its current target (e.g. an
 // immobilize state): first tries to pick a replacement from its own hate
 // list (see ai.Attackable.ReconsiderTarget / attackable.ThreatTable.
-// ReconsiderTarget), gated by canAutoAttack(target) — this NPC's template
-// aggro range, allowPeaceful false — plus rangeVal as an extra distance
-// filter applied only when rangeVal > 0 (0 disables it, matching the
-// reference's "range > 0" guard). If the hate list yields nothing and this
+// ReconsiderTarget), gated by the auto-attack rule (AutoAttackTargetValid,
+// or the siege guard's own rule) — this NPC's template aggro range,
+// allowPeaceful false — plus rangeVal as an extra distance filter applied
+// only when rangeVal > 0 (0 disables it). If the hate list yields nothing and this
 // NPC isn't a SiegeGuard and is aggressive, it falls back to scanning known
 // creatures within its template aggro range for the first (lowest
 // ObjectID, for a reproducible pick under Go's unordered world scan)
-// canAutoAttack-valid candidate, granting it 1 hate to simulate an
+// auto-attack-valid candidate, granting it 1 hate to simulate an
 // aggro-range entrance. Reports the new target and whether one was found.
 //
-// No caller in the Java reference actually invokes reconsiderTarget despite
-// its javadoc describing the immobilize use case (verified: zero call
-// sites anywhere in aCis_gameserver); this ships as the same available,
-// unwired API the reference itself carries — see acis_golang#977.
+// Nothing in the specified server actually calls target reconsideration,
+// although its documentation describes the immobilize use case (verified:
+// zero call sites); this ships as the same available, unwired API — see
+// acis_golang#977.
 func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
 	valid := func(target attackable.Combatant) bool {
 		if h.SiegeGuard() {

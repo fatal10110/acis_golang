@@ -283,8 +283,8 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		spiritshotRate:     spiritshotRate,
 	}
 	h.maxBuffsAmount.Store(maxBuffCount)
-	// RaidBoss.java/GrandBoss.java call setRaidRelated() in their
-	// constructors; minions are marked at spawn (see SetRaidRelated).
+	// Raid and grand bosses are raid-related from construction; minions
+	// are marked at spawn (see SetRaidRelated).
 	h.raidRelated.Store(h.RaidBoss())
 	h.coreAIDisabled.Store(h.Box() || kind == "HalishaChest")
 	h.health = creature.NewHealth(&h.hp)
@@ -583,7 +583,7 @@ func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 
 // AddCombatDamageHate records attacker's combat damage against this NPC,
 // queuing its ATTACKED-event attack Desire at attackedHateWeight's
-// approximation of the reference's per-script onAttacked formula (see
+// approximation of the per-script attacked-hate formula (see
 // ai.Attackable.AddCombatDamageHate).
 func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
 	h.brain.AddCombatDamageHate(attacker, damage, h.attackedHateWeight(attacker, damage))
@@ -785,10 +785,11 @@ func (h *Hostile) ClearAggroTables() {
 	h.brain.Hates().Clear()
 }
 
-// RandomizeHate ports Npc.java's AggroList.randomizeAttack(), the behavior
-// behind EffectRandomizeHate: swaps a random valid attacker into the
-// most-hated slot ahead of the current target, gated by the same
-// canAutoAttack(target, PARTY_RANGE, true) rule reconsiderTarget uses.
+// RandomizeHate is attack randomization, the behavior behind the
+// randomize-hate effect: swaps a random valid attacker into the most-hated
+// slot ahead of the current target, gated by the same AutoAttackTargetValid
+// rule ReconsiderTarget uses, here at party range with peaceful targets
+// allowed.
 // Reports whether a swap happened.
 func (h *Hostile) RandomizeHate() bool {
 	return h.brain.RandomizeHate(func(target attackable.Combatant) bool {
@@ -876,7 +877,7 @@ func (h *Hostile) OnActiveRegion() {
 
 // SleepWhenRegionInactive reports whether the AI task should pause this NPC
 // while no player is near its region. noSleepMode NPCs and off-territory NPCs
-// keep ticking, matching the oracle's deactivation exemption.
+// keep ticking: they are exempt from deactivation.
 func (h *Hostile) SleepWhenRegionInactive() bool {
 	return !h.Instance.Template.NoSleepMode && h.InTerritory()
 }
@@ -927,8 +928,8 @@ func (h *Hostile) SetRaidRelated(v bool) {
 	h.raidRelated.Store(v)
 }
 
-// RaidBoss reports whether this NPC is a raid or grand boss itself (Java
-// isRaidBoss), as opposed to RaidRelated, which also covers its minions.
+// RaidBoss reports whether this NPC is a raid or grand boss itself, as
+// opposed to RaidRelated, which also covers its minions.
 func (h *Hostile) RaidBoss() bool {
 	switch hostileKind(h.Instance) {
 	case "RaidBoss", "GrandBoss":

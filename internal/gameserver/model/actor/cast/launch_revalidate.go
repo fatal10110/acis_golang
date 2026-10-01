@@ -8,14 +8,14 @@ import (
 
 // LaunchAbortReason identifies which of the launch-phase mid-cast
 // revalidation gates stopped a cast, so a caller can map it to the
-// reference's distinct system messages (or none, for a lost target).
+// distinct system messages (or none, for a lost target).
 type LaunchAbortReason int
 
 const (
 	// LaunchAbortNone means every gate passed; the cast continues.
 	LaunchAbortNone LaunchAbortReason = iota
 	// LaunchAbortTargetLost means the target is no longer known to the
-	// caster. No system message accompanies this in the reference.
+	// caster. No system message accompanies this.
 	LaunchAbortTargetLost
 	// LaunchAbortTooFar means the target left the skill's escape range.
 	LaunchAbortTooFar
@@ -36,9 +36,9 @@ type LaunchCaster interface {
 	skilltarget.Actor
 }
 
-// RevalidateLaunch runs the oracle's launch-phase mid-cast recheck
-// (CreatureCast.onMagicLaunch: target-lost, escape range, line of sight,
-// peace zone), skipped entirely when target is the caster itself. A target
+// RevalidateLaunch runs the launch-phase mid-cast recheck (target-lost,
+// escape range, line of sight, peace zone), skipped entirely when target
+// is the caster itself. A target
 // that is not a creature (a door) is never lost, has no collision radius and
 // no peace zone of its own.
 func RevalidateLaunch(caster LaunchCaster, target Target, def modelskill.Definition) LaunchAbortReason {

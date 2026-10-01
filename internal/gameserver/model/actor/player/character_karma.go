@@ -32,15 +32,12 @@ func calculateKarmaGain(pkCount int, summon bool) int {
 }
 
 // awardKillerPKKarma grants killer PK-kill karma when c (the victim who
-// just died) had zero karma and no PvP flag of its own, mirroring the
-// reference's onKillUpdatePvPKarma "otherwise, killer is considered as a
-// PKer" branch (Player.java:2814: `targetPlayer.getKarma() == 0 &&
-// targetPlayer.getPvpFlag() == 0`): a player killing a karma-free,
-// non-flagged player gains karma and a PK-kill count. An actively-flagged,
-// karma-free victim instead takes the reference's PvP-point branch
-// (checkIfPvP); see awardKillerPvPKill.
+// just died) had zero karma and no PvP flag of its own: a player killing a
+// karma-free, non-flagged player is considered a PKer and gains karma and
+// a PK-kill count. An actively-flagged, karma-free victim instead takes
+// the PvP-point branch; see awardKillerPvPKill.
 //
-// The reference also routes a kill through other karma-free outcomes when
+// A kill also takes other karma-free outcomes when
 // either side is dueling, when the kill happens in a PvP/siege zone, when
 // the killer wields a cursed weapon, or when the kill is a clan-war kill.
 // None of those states are tracked on Character yet, so this only ever
@@ -94,11 +91,11 @@ func (c *Character) publishPKKarma(karma int) {
 
 // awardKillerPvPKill grants the killer a PvP-kill point for an actively
 // PvP-flagged, karma-free victim, or a karma-positive victim when the
-// configured AwardPKKillPVPPoint option is enabled. It mirrors the
-// reference's onKillUpdatePvPKarma condition (Player.java:2802-2812).
-// Only the killer's own UserInfo is resent; no karma or PvP flag changes.
+// configured AwardPKKillPVPPoint option is enabled: the PvP-kill condition
+// of a kill's PvP/karma update. Only the killer's own UserInfo is resent;
+// no karma or PvP flag changes.
 //
-// The reference gates the whole method behind cursed-weapon, duel, and
+// That whole update is gated behind cursed-weapon, duel, and
 // PvP/siege-zone early returns, and this branch's own condition also
 // allows an at-war clan kill. That state is not tracked on Character yet;
 // it remains owned by the clan subsystem.

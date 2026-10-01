@@ -124,9 +124,8 @@ func (c *Character) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Dura
 }
 
 // HasSkillReuse reports whether a reuse timer is currently recorded for key,
-// regardless of whether it has already expired. Matches Java's
-// Player.getReuseTimeStamp().containsKey(hash) guard against re-arming an
-// equip-delay timer that is already present.
+// regardless of whether it has already expired. It guards against
+// re-arming an equip-delay timer that is already present.
 func (c *Character) HasSkillReuse(key int32) bool {
 	c.skills.mu.Lock()
 	defer c.skills.mu.Unlock()
@@ -198,9 +197,8 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 }
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
-// Matches Java's Creature.isSkillDisabled: the AllSkillsDisabled lock only
-// short-circuits every key when at least one skill is already tracked as
-// disabled (Creature.java:1586-1590) — with no skill on cooldown at all, the
+// The AllSkillsDisabled lock only short-circuits every key when at least
+// one skill is already tracked as disabled — with no skill on cooldown at all, the
 // lock has no effect here.
 func (c *Character) SkillDisabled(key int32) bool {
 	now := c.Now()

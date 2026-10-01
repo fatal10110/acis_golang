@@ -24,14 +24,11 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 }
 
 // applyDeathExpKarmaLoss computes and applies the experience and karma cost
-// of this character's death, mirroring Player.applyDeathPenalty and
-// updateKarmaLoss (Player.java:2649-2651, 2874-2926, 2749-2757). It is a
-// no-op for an environmental death (killer == nil, Player.java:2615's
-// `if (killer != null)` guard); any other death first clears the previous
+// of this character's death. It is a no-op for an environmental death
+// (killer == nil); any other death first clears the previous
 // death's exp snapshot, so a later resurrection restores nothing unless this
 // death takes exp. The loss is skipped while the delevel gate is closed: the
-// AllowDelevel config off, or the Lucky skill still active below level 10
-// (Player.java:2650).
+// AllowDelevel config off, or the Lucky skill still active below level 10.
 //
 // Inside a PvP zone two deaths cost nothing: in a siege zone, one while a
 // Charm of Courage is held, which uses the charm up; in any other PvP zone
@@ -39,7 +36,7 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 // zone without the charm still loses exp, at a quarter of the normal rate.
 //
 // Deferred pending owning subsystems: the mutual-clan-war halving of
-// percentLost (Player.java:2906, `atWar`) — clan-war state isn't tracked yet
+// percentLost — clan-war state isn't tracked yet
 // (#149).
 //
 // The siege-zone and festival-participant reductions are wired: InSiegeZone
@@ -95,8 +92,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	span := table.ExpSpanAtLevel(c.CharLevel)
 	lostExp := int64(math.Round(float64(span) * percentLost / 100))
 
-	// Snapshot the pre-loss exp for a later resurrection to restore from
-	// (Player.java:2919, `setExpBeforeDeath(getStatus().getExp())`).
+	// Snapshot the pre-loss exp for a later resurrection to restore from.
 	c.ExpBeforeDeath = c.Exp
 
 	c.updateKarmaLoss(table, lostExp, &hooks)
@@ -108,7 +104,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 }
 
 // RestoreExp restores restorePercent (0-100) of the experience lost in this
-// character's last death, matching Player.restoreExp (Player.java:2865-2872).
+// character's last death.
 // It is a no-op unless a death has left ExpBeforeDeath set, and always
 // clears ExpBeforeDeath afterward.
 func (c *Character) RestoreExp(restorePercent float64) {
@@ -145,13 +141,12 @@ func (c *Character) UpdateKarmaLoss(table *LevelTable, exp int64) {
 }
 
 // updateKarmaLoss reduces this character's karma by an experience amount
-// (gained from a kill or lost to a death), matching Player.updateKarmaLoss
-// (Player.java:2749-2757) and Formulas.calculateKarmaLost
-// (Formulas.java:1267-1270). A cursed-weapon holder keeps its karma; that
+// (gained from a kill or lost to a death), through the karma-lost formula.
+// A cursed-weapon holder keeps its karma; that
 // gate stays dormant until cursed weapons are modeled (#225).
 //
 // The caller holds progressionMu; the karma announcement, UserInfo and
-// relation broadcast run from hooks, in Player.setKarma's order.
+// relation broadcast run from hooks, in the karma-change order.
 func (c *Character) updateKarmaLoss(table *LevelTable, lostExp int64, hooks *progressionHooks) {
 	if c.KarmaPoints <= 0 || c.CursedWeaponEquipped() {
 		return
