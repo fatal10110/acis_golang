@@ -17,8 +17,8 @@ import (
 // pending client action, and only asks again on the player's next drop.
 
 // newAugmentService builds the refine service from cfg's augmentation
-// data; without data there is nothing to roll from and every request is
-// refused as unsuitable.
+// data; without data there is nothing to roll from, the confirmation steps
+// answer nothing and every refine fails.
 func newAugmentService(cfg GameClientLinkConfig) *augment.Service {
 	if cfg.Augmentations == nil {
 		return nil
@@ -84,13 +84,7 @@ func augmentMessageID(m augment.Message) int {
 // into the augmentation window is accepted, or refused with its reason.
 func (l *GameClientLink) confirmAugmentTarget(live *livePlayer, req clientpackets.RequestConfirmTargetItem) {
 	inv := live.Inventory()
-	if inv == nil {
-		return
-	}
-	if l.augment == nil {
-		if inv.ItemByObjectID(req.ObjectID) != nil {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotSuitableItem))
-		}
+	if inv == nil || l.augment == nil {
 		return
 	}
 	check := l.augment.ConfirmTarget(l.augmentState(live), live.ObjectID(), inv, req.ObjectID)
