@@ -1665,6 +1665,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if ai != nil {
 		gclConfig.AI = ai
 	}
+	if worldObjects != nil {
+		gclConfig.Doors = worldObjects
+	}
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
