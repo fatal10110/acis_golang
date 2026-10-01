@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -587,18 +586,7 @@ func (l *GameClientLink) unsummonServitor(live *livePlayer) {
 
 // stopAllCubics ends every cubic of live, telling its observers once.
 func (l *GameClientLink) stopAllCubics(live *livePlayer) {
-	ids := live.CubicIDs()
-	for _, id := range ids {
-		live.Character.RemoveCubic(cubic.ID(id))
-	}
-	live.cubicsMu.Lock()
-	runtimes := live.cubics
-	live.cubics = nil
-	live.cubicsMu.Unlock()
-	for _, runtime := range runtimes {
-		runtime.Stop()
-	}
-	if len(ids) > 0 {
+	if live.removeAllCubics() {
 		l.broadcastCharacterInfo(live)
 	}
 }
