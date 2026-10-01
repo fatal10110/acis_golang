@@ -78,6 +78,33 @@ func TestTrainerLearnNeedsCurrentFolkInReach(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
+// TestTrainerLearnOfNotNextLevelAnswersNothing pins the silent learn
+// refusal (RequestAcquireSkill case 0 returns with no packet when the
+// requested level is not one above the known one): at a trainer in reach a
+// level that skips the next one, and a level already known, answer nothing,
+// charge no SP and teach nothing.
+func TestTrainerLearnOfNotNextLevelAnswersNothing(t *testing.T) {
+	t.Parallel()
+	srv, c, objID := bootLearner(t, generalLearnOpts(t, 100)...)
+	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, 0)
+
+	c.Send(encodeRequestAcquireSkill(3, 2, 0))
+	assertSilent(t, c, "AcquireSkill of a level past the next one")
+	assertLiveSP(t, srv, objID, 100)
+	assertKnownSkills(t, srv, objID, map[int]int{})
+
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	assertSPStatus(t, c.Read(), objID, 50)
+	drainUntilQuiet(t, c)
+	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
+
+	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	assertSilent(t, c, "AcquireSkill of a level already known")
+	assertLiveSP(t, srv, objID, 50)
+	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
+}
+
 // TestTrainerEnchantNeedsCurrentFolkInReach pins the enchant gate: with no
 // NPC selected, or with the selected one out of interaction distance, the
 // info and enchant requests answer nothing and change nothing.

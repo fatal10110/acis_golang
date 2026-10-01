@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -131,4 +132,20 @@ func assertEmptyListClose(t *testing.T, c *testsupport.ScriptedClient, messageID
 	assertStaticSystemMessage(t, c.Read(), messageID)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAcquireSkillDone, "AcquireSkillDone")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "ActionFailed")
+}
+
+// assertLiveSP asserts the online character's SP.
+func assertLiveSP(t *testing.T, srv *gameservertest.Server, objID int32, want int) {
+	t.Helper()
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatalf("world.Player(%d) missing", objID)
+	}
+	c, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T is not an online character", objID, obj)
+	}
+	if got := c.ProgressionValues().SP; got != want {
+		t.Fatalf("SP = %d, want %d", got, want)
+	}
 }
