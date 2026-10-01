@@ -73,8 +73,10 @@ func (a characterStatActor) IsMoving() bool {
 // whether it is currently moving.
 func (a characterStatActor) IsRunning() bool { return a.c.Running() }
 
-// IsRiding satisfies conditions.Actor.
-func (a characterStatActor) IsRiding() bool { return a.c.MountNPCID() != 0 }
+// IsRiding satisfies conditions.Actor: only a strider is ridden. A wyvern
+// rider is flying, not riding, so it fails riding="true" and passes
+// riding="false".
+func (a characterStatActor) IsRiding() bool { return a.c.MountType() == MountTypeStrider }
 
 // IsFlying satisfies conditions.Actor.
 func (a characterStatActor) IsFlying() bool { return a.c.Flying() }
