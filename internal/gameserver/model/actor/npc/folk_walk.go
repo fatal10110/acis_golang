@@ -125,12 +125,8 @@ func (m *folkMotion) SyncPosition(position location.Location) {
 	}
 }
 
-// BroadcastMove turns the NPC toward the walk's destination and shows
-// observers the walk.
-func (m *folkMotion) BroadcastMove(ev event.Move) {
-	m.SetHeading(ev.Origin.HeadingTo(ev.Destination))
-	m.emit(ev)
-}
+// BroadcastMove shows observers the walk.
+func (m *folkMotion) BroadcastMove(ev event.Move) { m.emit(ev) }
 
 // BroadcastStop shows observers a stop in place.
 func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }
