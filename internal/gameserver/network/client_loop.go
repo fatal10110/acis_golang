@@ -269,7 +269,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				chars = list
 				continue
 			}
-			if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
+			// A clan's members and leader may not be deleted. The roster
+			// held in memory is the stored one plus every change since,
+			// fresher than the character list read above.
+			if cl, member := l.clanService().Table().MemberClan(c.ID); member {
+				reason := serverpackets.CharDeleteFailReasonClanMemberMayNotDelete
+				if cl.IsLeader(c.ID) {
+					reason = serverpackets.CharDeleteFailReasonClanLeaderMayNotDelete
+				}
+				session.SendFrame(serverpackets.FrameCharDeleteFail(reason))
+			} else if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
 				l.log.Error().Err(err).Msg("mark character for deletion")
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 			} else {
@@ -400,6 +409,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			c = fresh
 			chars[req.Slot] = fresh
+			l.clanService().RestoreMembership(c, time.Now())
 			tmpl, ok := l.templates.Get(c.ClassID())
 			if !ok {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
@@ -502,6 +512,38 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
 					session.SendFrame(frame)
+				}
+			case clientpackets.OpcodeRequestPledgePowerGrades:
+				if live != nil {
+					onLive(live, func() { l.requestPledgePowerGradeList(live) })
+				}
+			case clientpackets.OpcodeRequestPledgeMemberPower, clientpackets.OpcodeRequestPledgeMemberDetail:
+				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestPledgeMemberName, error) {
+					return clientpackets.DecodeRequestPledgeMemberName(p, second)
+				})
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					if second == clientpackets.OpcodeRequestPledgeMemberPower {
+						onLive(live, func() { l.requestPledgeMemberPowerInfo(live, req) })
+					} else {
+						onLive(live, func() { l.requestPledgeMemberInfo(live, req) })
+					}
+				}
+			case clientpackets.OpcodeRequestPledgeSetGrade:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeSetMemberPowerGrade)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestPledgeSetMemberPowerGrade(live, req) })
 				}
 			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {
@@ -1649,6 +1691,76 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.handleRequestSendL2FriendSay(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestJoinPledge:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestJoinPledge)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestJoinPledge(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAnswerJoinPledge:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAnswerJoinPledge)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestAnswerJoinPledge(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestOustPledgeMember:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestOustPledgeMember)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestOustPledgeMember(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPledgeInfo:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeInfo)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPledgeInfo(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPledgePower:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgePower)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPledgePower(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestWithdrawPledge:
+			if live != nil {
+				onLive(live, func() { l.requestWithdrawPledge(live) })
+			}
+
+		case clientpackets.OpcodeRequestPledgeMemberList:
+			if live != nil {
+				onLive(live, func() { l.requestPledgeMemberList(live) })
+			}
+
 		case clientpackets.OpcodeRequestShowMiniMap:
 			// The request carries no body; with no player in the world
 			// nothing answers, as the specified handler does.
@@ -1689,7 +1801,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 func clearsSpawnProtection(opcode byte) bool {
 	switch opcode {
 	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
-		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing:
+		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing,
+		clientpackets.OpcodeRequestPledgeInfo:
 		return false
 	default:
 		return true

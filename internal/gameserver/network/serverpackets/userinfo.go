@@ -58,9 +58,9 @@ const teamBlue = 1
 
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
-// field list: systems this server hasn't built yet (clans, hero/noble
-// status, fishing) always report their at-rest default, matching a freshly
-// entered character that has none of them. The
+// field list: systems this server hasn't built yet (hero/noble status,
+// fishing) always report their at-rest default, matching a freshly entered
+// character that has none of them. The
 // attributes and combat stats are Character's live values, so gear, buffs,
 // level and passives all reach the status window.
 type UserInfoSnapshot struct {
@@ -74,7 +74,26 @@ type UserInfoSnapshot struct {
 	// protection is active: TeamType.BLUE when spawn protection is enabled
 	// and currently held, the unassigned team otherwise.
 	SpawnProtectedTeam bool
+	// Clan is Character's clan as the status window shows it; zero when
+	// clanless.
+	Clan ClanFields
 }
+
+// ClanFields is the clan part of a player's UserInfo and CharInfo.
+type ClanFields struct {
+	CrestID      int32
+	CrestLargeID int32
+	AllyID       int32
+	AllyCrestID  int32
+	// Leader sets the clan-leader relation bit in UserInfo.
+	Leader bool
+	// Privileges is the member's privilege mask, UserInfo only.
+	Privileges int32
+	PledgeType int32
+}
+
+// clanLeaderRelation is UserInfo's relation bit for a clan leader.
+const clanLeaderRelation = 0x40
 
 // EncodeUserInfo builds the UserInfo packet payload for an unframed send,
 // or nil when s cannot be encoded.
@@ -209,13 +228,19 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(int32(c.Face))
 	w.WriteInt32(boolInt32(s.IsGM))
 
-	w.WriteString(c.Title)
+	w.WriteString(c.Title())
 
-	w.WriteInt32(int32(c.ClanID))
-	w.WriteInt32(0) // clan crest id: clans are not modeled
-	w.WriteInt32(0) // ally id: clans are not modeled
-	w.WriteInt32(0) // ally crest id: clans are not modeled
-	w.WriteInt32(0) // relation flags: clan leadership/siege state is not modeled
+	w.WriteInt32(c.ClanID())
+	w.WriteInt32(s.Clan.CrestID)
+	w.WriteInt32(s.Clan.AllyID)
+	w.WriteInt32(s.Clan.AllyCrestID)
+	// The siege-state relation bits join the leader's once sieges exist
+	// (#3150).
+	if s.Clan.Leader {
+		w.WriteInt32(clanLeaderRelation)
+	} else {
+		w.WriteInt32(0)
+	}
 	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(uint8(c.OperateType()))
 	w.WriteUint8(0) // crystallize flag: not modeled
@@ -236,7 +261,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteUint8(0) // in party-match room: party matching is not modeled
 	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(0)
-	w.WriteInt32(0) // clan privileges: clans are not modeled
+	w.WriteInt32(s.Clan.Privileges)
 	w.WriteUint16(uint16(c.RecommendationsLeft()))
 	w.WriteUint16(uint16(c.RecommendationsHave()))
 	if mountID := c.MountNPCID(); mountID > 0 {
@@ -255,7 +280,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	} else {
 		w.WriteUint8(0) // team: teams (duel/event) are not modeled
 	}
-	w.WriteInt32(0) // large clan crest id: clans are not modeled
+	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(0) // noble flag: nobility is not modeled
 	w.WriteUint8(0) // hero flag: heroism is not modeled
 	w.WriteUint8(0) // fishing flag: fishing is not modeled
@@ -264,8 +289,8 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0) // fishing stance z: fishing is not modeled
 	w.WriteInt32(defaultNameColor)
 	w.WriteUint8(boolUint8(c.Running()))
-	w.WriteInt32(0) // pledge class: clans are not modeled
-	w.WriteInt32(0) // pledge type: clans are not modeled
+	w.WriteInt32(int32(c.PledgeClass()))
+	w.WriteInt32(s.Clan.PledgeType)
 	w.WriteInt32(defaultTitleColor)
 	w.WriteInt32(0) // cursed weapon stage: cursed weapons are not modeled
 	return nil

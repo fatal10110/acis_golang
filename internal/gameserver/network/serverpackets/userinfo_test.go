@@ -212,8 +212,10 @@ func TestFrameUserInfo(t *testing.T) {
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 100,
 		KarmaPoints: 0, PKKills: 1, PvPKills: 2,
-		ClanID: 5, Title: "Hero", AccessLevel: 1,
+		AccessLevel: 1,
 	}
+	c.SetTitle("Hero")
+	c.SetClanID(5)
 	c.SetResourceValues(player.Resources{
 		MaxHP: 80, CurrentHP: 75,
 		MaxMP: 30, CurrentMP: 30,
@@ -317,9 +319,9 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Face))
 	want = binary.LittleEndian.AppendUint32(want, 1) // IsGM flag
 
-	want = append(want, encodeUTF16Z(c.Title)...)
+	want = append(want, encodeUTF16Z("Hero")...)
 
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClanID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(5))
 	want = binary.LittleEndian.AppendUint32(want, 0) // clan crest id
 	want = binary.LittleEndian.AppendUint32(want, 0) // ally id
 	want = binary.LittleEndian.AppendUint32(want, 0) // ally crest id

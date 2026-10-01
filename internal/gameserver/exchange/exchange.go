@@ -215,12 +215,12 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 			return Outcome{Notices: []any{QuantityExceeded{}}}
 		}
 		if e.ItemID == clanReputationID {
-			if c.ClanID == 0 {
+			if c.ClanID() == 0 {
 				return Outcome{Notices: []any{NotClanMember{}}}
 			}
-			// ponytail: clan reputation (#149). Without the clan system
-			// neither the leader nor the clan's score is known, so the
-			// price is never payable.
+			// ponytail: clan reputation (#3151). clan.Service knows the
+			// leader and the clan's score, but it is not wired into the
+			// exchange yet, so the price is never payable.
 			return Outcome{Notices: []any{ClanReputationTooLow{}}}
 		}
 		enchant := -1
@@ -395,9 +395,9 @@ func consume(inv *itemcontainer.Inventory, inst *item.Instance, count int, out *
 func (s *Service) giveProducts(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
 	for _, p := range entry.Products {
 		if p.ItemID == clanReputationID {
-			// ponytail: clan reputation (#149). The points would go to the
-			// player's clan, which the clan system does not hold yet; no
-			// shipped list pays them.
+			// ponytail: clan reputation (#3151). The points would go to the
+			// player's clan through clan.Service, which is not wired into
+			// the exchange yet; no shipped list pays them.
 			continue
 		}
 		count := p.Count * amount

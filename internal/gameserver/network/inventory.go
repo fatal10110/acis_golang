@@ -747,7 +747,7 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	if l.world == nil {
 		return
 	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items}
+	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameCharInfo(info)
 	}, func(send func(frameReceiver)) {

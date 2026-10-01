@@ -156,13 +156,13 @@ func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply np
 		live.tempInventoryDisable()
 		l.sendDepositList(live, serverpackets.WarehousePrivate, true)
 	case npc.WithdrawClan:
-		if live.Character.ClanID == 0 {
+		if live.Character.ClanID() == 0 {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoRightToUseClanWarehouse))
 			return true
 		}
 		l.log.Debug().Int32("object_id", live.ObjectID()).Msg("warehouse: clan warehouse not modeled (#3016)")
 	case npc.DepositClan:
-		if live.Character.ClanID == 0 {
+		if live.Character.ClanID() == 0 {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse))
 			return true
 		}

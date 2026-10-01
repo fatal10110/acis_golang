@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -98,6 +99,7 @@ func provideGameClientLink(
 	pool *sim.Pool,
 	relations *relation.Manager,
 	characters *gamesql.CharacterStore,
+	clans *clan.Service,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 ) (*network.GameClientLink, error) {
@@ -209,6 +211,7 @@ func provideGameClientLink(
 
 		Relations:  relations,
 		Characters: characters,
+		Clans:      clans,
 	})
 	if err != nil {
 		return nil, err

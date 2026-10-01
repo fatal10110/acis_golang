@@ -114,14 +114,14 @@ func TestFrameCharSelected(t *testing.T) {
 	c := &player.Character{
 		ID:       0x10000001,
 		Name:     "Newbie",
-		Title:    "Hero",
-		ClanID:   5,
 		Sex:      player.SexMale,
 		Race:     player.RaceHuman,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 		SP:       7, Exp: 12345, CharLevel: 3,
 		KarmaPoints: 1, PKKills: 2,
 	}
+	c.SetTitle("Hero")
+	c.SetClanID(5)
 	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
 	tmpl := &player.Template{STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 11, MEN: 25}
 
@@ -132,9 +132,9 @@ func TestFrameCharSelected(t *testing.T) {
 	x, y, z := c.Position()
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
-	want = append(want, encodeUTF16Z(c.Title)...)
+	want = append(want, encodeUTF16Z("Hero")...)
 	want = binary.LittleEndian.AppendUint32(want, 999) // session id
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClanID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(5))
 	want = binary.LittleEndian.AppendUint32(want, 0) // unknown
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))

@@ -115,7 +115,13 @@ type Roster struct {
 
 	deleteAfter time.Duration
 	now         func() time.Time
+	// purged learns of every character deleted for good; nil for none.
+	purged func(objectID int32)
 }
+
+// SetPurged has fn learn of every character deleted for good, after its
+// rows are gone. It is set once at boot, before any client connects.
+func (r *Roster) SetPurged(fn func(objectID int32)) { r.purged = fn }
 
 // NewRoster returns a Roster backed by the given stores and lookup tables.
 // deleteAfter is the grace period MarkForDeletion schedules (see
@@ -323,16 +329,18 @@ func (r *Roster) Load(ctx context.Context, objectID int32) (*player.Character, e
 // removes all of them as one atomic unit, so an error here never leaves
 // items or shortcuts orphaned behind a deleted character.
 func (r *Roster) purge(ctx context.Context, objectID int32) error {
-	_, err := r.characters.Purge(ctx, objectID)
-	return err
+	if _, err := r.characters.Purge(ctx, objectID); err != nil {
+		return err
+	}
+	if r.purged != nil {
+		r.purged(objectID)
+	}
+	return nil
 }
 
 // MarkForDeletion schedules objectID for deletion after the Roster's grace
-// period, or purges it immediately when that period is zero.
-//
-// Deletion should also be blocked for a clan's leader or member; without a
-// clan system yet, every character is treated as clan-free and deletion
-// always proceeds.
+// period, or purges it immediately when that period is zero. The caller
+// refuses a clan member's deletion first.
 func (r *Roster) MarkForDeletion(ctx context.Context, objectID int32) error {
 	if r.deleteAfter <= 0 {
 		return r.purge(ctx, objectID)

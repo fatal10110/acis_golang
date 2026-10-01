@@ -16,6 +16,9 @@ type CharInfoSnapshot struct {
 	Character *player.Character
 	Template  *player.Template
 	Items     []*item.Instance
+	// Clan is Character's clan as others see it; Leader and Privileges are
+	// not shown.
+	Clan ClanFields
 }
 
 // FrameCharInfo builds a CharInfo packet for a visible player.
@@ -97,11 +100,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(c.HairStyle))
 	w.WriteInt32(int32(c.HairColor))
 	w.WriteInt32(int32(c.Face))
-	w.WriteString(c.Title)
-	w.WriteInt32(int32(c.ClanID))
-	w.WriteInt32(0) // clan crest id
-	w.WriteInt32(0) // ally id
-	w.WriteInt32(0) // ally crest id
+	w.WriteString(c.Title())
+	w.WriteInt32(c.ClanID())
+	w.WriteInt32(s.Clan.CrestID)
+	w.WriteInt32(s.Clan.AllyID)
+	w.WriteInt32(s.Clan.AllyCrestID)
 	w.WriteInt32(0) // relation flags
 	w.WriteUint8(boolUint8(c.Standing()))
 	w.WriteUint8(boolUint8(c.Running()))
@@ -128,7 +131,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(0) // enchant effect
 	w.WriteUint8(0) // team
-	w.WriteInt32(0) // large clan crest id
+	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(0) // noble
 	w.WriteUint8(0) // hero
 	w.WriteUint8(0) // fishing
@@ -137,8 +140,8 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(0)
 	w.WriteInt32(defaultNameColor)
 	w.WriteInt32(int32(c.CurrentHeading()))
-	w.WriteInt32(0) // pledge class
-	w.WriteInt32(0) // pledge type
+	w.WriteInt32(int32(c.PledgeClass()))
+	w.WriteInt32(s.Clan.PledgeType)
 	w.WriteInt32(defaultTitleColor)
 	w.WriteInt32(0) // cursed weapon stage
 	return nil

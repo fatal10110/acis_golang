@@ -274,6 +274,41 @@ const characterRelationsSchema = "CREATE TABLE IF NOT EXISTS `character_relation
 	"  PRIMARY KEY (`char_id`,`friend_id`)\n" +
 	")"
 
+// clanDataSchema mirrors the shipped clan_data table definition verbatim.
+const clanDataSchema = "CREATE TABLE IF NOT EXISTS `clan_data` (\n" +
+	"  `clan_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `clan_name` VARCHAR(20),\n" +
+	"  `clan_level` INT NOT NULL DEFAULT 0,\n" +
+	"  `reputation_score` INT NOT NULL DEFAULT 0,\n" +
+	"  `hasCastle` TINYINT NOT NULL DEFAULT 0,\n" +
+	"  `ally_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `ally_name` VARCHAR(20),\n" +
+	"  `leader_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `new_leader_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `crest_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `crest_large_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `ally_crest_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `auction_bid_at` INT NOT NULL DEFAULT 0,\n" +
+	"  `ally_penalty_expiry_time` BIGINT NOT NULL DEFAULT 0,\n" +
+	"  `ally_penalty_type` INT NOT NULL DEFAULT 0,\n" +
+	"  `char_penalty_expiry_time` BIGINT NOT NULL DEFAULT 0,\n" +
+	"  `dissolving_expiry_time` BIGINT NOT NULL DEFAULT 0,\n" +
+	"  `enabled` TINYINT NOT NULL DEFAULT 0,\n" +
+	"  `notice` TEXT,\n" +
+	"  `introduction` TEXT,\n" +
+	"  PRIMARY KEY (`clan_id`),\n" +
+	"  KEY `leader_id` (`leader_id`),\n" +
+	"  KEY `ally_id` (`ally_id`)\n" +
+	")"
+
+// clanPrivsSchema mirrors the shipped clan_privs table definition verbatim.
+const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
+	"  `clan_id` INT NOT NULL DEFAULT'0',\n" +
+	"  `ranking` INT NOT NULL DEFAULT '0',\n" +
+	"  `privs` INT NOT NULL DEFAULT '0',\n" +
+	"  PRIMARY KEY (`clan_id`,`ranking`)\n" +
+	")"
+
 // sevenSignsStatusSeed seeds the single status row the gameserver reads and
 // writes, matching the shipped schema seed.
 const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
@@ -306,6 +341,7 @@ var schemaStmts = []string{
 	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
+	clanDataSchema, clanPrivsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

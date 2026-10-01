@@ -116,6 +116,14 @@ import (
 // well: the reference returns without an answer, and neither the macro
 // window nor the recommend command registers a pending client action.
 // tests/character asserts both silences.
+//
+// The clan window requests are absent too when they name no clan, member or
+// pending invitation (RequestJoinPledge from a clanless player,
+// RequestAnswerJoinPledge with nothing pending, the roster, rank and member
+// cards, RequestPledgeInfo for an unknown clan, RequestPledgePower set by a
+// non-leader, an expulsion naming nobody): the reference answers each with
+// nothing, and the clan window holds no pending action. tests/clan asserts
+// those silences and every refusal that does answer.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -166,6 +174,8 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestFriendDel naming no friend", encodeNamedRequest(clientpackets.OpcodeRequestFriendDel, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestBlock naming no character", encodeRequestBlock(clientpackets.BlockAdd, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestSendL2FriendSay to no friend", encodeRequestSendL2FriendSay("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 	}
 
 	for _, tc := range cases {
@@ -257,5 +267,11 @@ func encodeRequestMakeMacro(name string) []byte {
 	w.WriteString("")
 	w.WriteUint8(0)
 	w.WriteUint8(0)
+	return w.Bytes()
+}
+
+func encodeRequestOustPledgeMember(name string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestOustPledgeMember)
+	w.WriteString(name)
 	return w.Bytes()
 }

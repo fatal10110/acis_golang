@@ -73,6 +73,9 @@ const (
 	// BypassCPRecovery runs an arena manager's paid CP restore; see
 	// Folk.CPRecovery.
 	BypassCPRecovery
+	// BypassClan runs a village master's clan command; see
+	// VillageMasterClanCommand.
+	BypassClan
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -149,6 +152,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if f.VillageMaster() && strings.HasPrefix(command, "Subclass") {
 		reply.Outcome = BypassSubclass
+		return reply
+	}
+	if f.VillageMaster() && VillageMasterClanCommand(command) {
+		reply.Outcome = BypassClan
 		return reply
 	}
 	chat := folkChats[kind]

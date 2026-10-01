@@ -350,6 +350,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	c.RefreshWeightPenalty()
 	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
+	l.enterWorldClan(client, live)
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
 		// character is restored and before it enters the world.
@@ -381,6 +382,11 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
+	// A character still serving a clan join penalty is reminded it was
+	// expelled or left.
+	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
+		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
+	}
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
@@ -526,6 +532,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Items:              live.inventoryItems(),
 		IsGM:               live.access.IsGM,
 		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
+		Clan:               l.clanFields(live.Character),
 	}
 }
 

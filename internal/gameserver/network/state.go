@@ -84,6 +84,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x20: true, // request linked html
 		0x21: true, // request bypass command
 		0x23: true, // dummy packet
+		0x24: true, // invite into a clan
+		0x25: true, // answer a clan invitation
+		0x26: true, // withdraw from the clan
+		0x27: true, // expel a clan member
 		0x29: true, // invite to party
 		0x2a: true, // answer party invitation
 		0x2b: true, // leave party
@@ -99,6 +103,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x36: true, // cannot move anymore
 		0x37: true, // cancel target
 		0x38: true, // say2 chat (opcode mapped; not yet wired, see wiresafe.go)
+		0x3c: true, // clan member list
 		0x3e: true, // dummy packet
 		0x3f: true, // request skill list
 		0x42: true, // get on vehicle
@@ -120,6 +125,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x61: true, // friend delete
 		0x63: true, // request quest list
 		0x64: true, // abort quest
+		0x66: true, // clan name card
 		0x68: true, // request pledge crest
 		0x6b: true, // acquire skill info
 		0x6c: true, // acquire skill
@@ -165,6 +171,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xbd: true, // symbol deletion window
 		0xbe: true, // symbol deletion details
 		0xbf: true, // delete a symbol
+		0xc0: true, // clan rank privileges
 		0xc1: true, // create or edit a macro
 		0xc2: true, // delete a macro
 		0xc5: true, // dialog answer

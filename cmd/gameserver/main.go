@@ -91,6 +91,7 @@ type gameServerPaths struct {
 	HexIDPath         string
 	GeoConfigPath     string
 	NpcsConfigPath    string
+	ClansConfigPath   string
 	DataRoot          string
 	LogRoot           string
 	DebugAddr         string
@@ -109,6 +110,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.HexIDPath, "hexid", "config/hexid.txt", "game server hexid properties file")
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
+	flag.StringVar(&paths.ClansConfigPath, "clans-config", "config/clans.properties", "clan properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
 	flag.StringVar(&paths.DebugAddr, "debug-addr", "", "optional host:port serving pprof and expvar")
@@ -153,6 +155,8 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gamesql.NewSubclassStore,
 			gamesql.NewPetStore,
 			provideIDAllocator,
+			loadClanConfig,
+			provideClans,
 			provideRoster,
 			providePvPFlags,
 			provideInventoryUpdates,

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -307,6 +308,7 @@ type GameClientLink struct {
 	trades           *tradebook.Book
 	parties          *partyRegistry
 	partyPositions   partyPositions
+	clans            *clan.Service
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
 	targets          *skilltarget.Registry
@@ -503,6 +505,9 @@ type GameClientLinkConfig struct {
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
+	// Clans is the clan registry and its rules; nil runs with no clan at
+	// all and nothing written.
+	Clans *clan.Service
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -610,6 +615,14 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)
+	link.clans = cfg.Clans
+	if link.clans == nil {
+		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
+	}
+	if link.roster != nil {
+		clans := link.clans
+		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
+	}
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {

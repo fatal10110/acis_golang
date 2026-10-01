@@ -21,6 +21,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -134,6 +135,9 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	clanConfig             *clan.Config
+	seedClans              func(db *sql.DB)
+	clanClock              func() time.Time
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
 	wantChars              int
@@ -492,6 +496,23 @@ func WithHennaSeed(seed func(db *sql.DB, hennas *gamesql.HennaStore)) Option {
 	return func(o *options) { o.seedHennas = seed }
 }
 
+// WithClanConfig sets the clans.properties join and creation penalties.
+func WithClanConfig(cfg clan.Config) Option {
+	return func(o *options) { o.clanConfig = &cfg }
+}
+
+// WithClanSeed writes clan rows once the seeded characters are stored and
+// before the clans are restored from them.
+func WithClanSeed(seed func(db *sql.DB)) Option {
+	return func(o *options) { o.seedClans = seed }
+}
+
+// WithClanClock times clan invitations out on now instead of the wall
+// clock.
+func WithClanClock(now func() time.Time) Option {
+	return func(o *options) { o.clanClock = now }
+}
+
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
@@ -714,6 +735,7 @@ type Server struct {
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
 	relationRows     *gamesql.RelationStore
+	Clans            *clan.Service
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -1661,6 +1683,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GMAudit:          o.gmAudit,
 		Log:              o.log,
 	}
+	// The clans are restored once the characters are seeded, below.
+	clanStore := gamesql.NewClanStore(db)
+	clanConfig := clan.DefaultConfig()
+	if o.clanConfig != nil {
+		clanConfig = *o.clanConfig
+	}
+	gclConfig.Clans = clan.NewService(clan.NewTable(), clanStore, persistWorker, ids, clanConfig, o.clanClock, o.log)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
@@ -1809,6 +1838,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedHennas != nil {
 		o.seedHennas(db, hennas)
 	}
+	if o.seedClans != nil {
+		o.seedClans(db)
+	}
+	clanRows, err := clanStore.Load(context.Background())
+	if err != nil {
+		t.Fatalf("load clans: %v", err)
+	}
+	gclConfig.Clans.Table().Restore(clanRows, time.Now(), clanConfig.JoinDays)
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
@@ -1835,6 +1872,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Client:           c,
 		State:            state,
 		WorldObjects:     worldObjects,
+		Clans:            gclConfig.Clans,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,
