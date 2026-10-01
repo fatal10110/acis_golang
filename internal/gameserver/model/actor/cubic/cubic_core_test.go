@@ -287,6 +287,24 @@ func TestRuntime_StopCancelsBothTimers(t *testing.T) {
 	}
 }
 
+// A stopped cubic is gone for good (Cubic.stop): a late Action() or
+// RefreshDisappear() from a caller still holding the runtime, such as an
+// attack-stance snapshot taken before an eviction, must not revive it.
+func TestRuntime_StopIsTerminal(t *testing.T) {
+	in, q := newRuntimeClock()
+	fireCount, disappeared := 0, 0
+	r := NewRuntime(Storm, 1, 30, time.Second, func() { fireCount++ }, func() { disappeared++ }, q)
+
+	r.Stop()
+	r.Action()
+	r.RefreshDisappear(time.Second)
+	in.Advance(time.Minute)
+
+	if fireCount != 0 || disappeared != 0 {
+		t.Fatalf("after Stop() then Action()/RefreshDisappear(): fireCount = %d, disappeared = %d; want 0, 0", fireCount, disappeared)
+	}
+}
+
 // TestRuntime_StopActionThenActionDuringFireDoesNotOrphanATimer covers
 // StopAction() immediately followed by Action() while a tick's fire() is
 // still running. Without the generation guard, the in-flight tick's own

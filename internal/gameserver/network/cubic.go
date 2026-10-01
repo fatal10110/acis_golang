@@ -96,7 +96,7 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 // character info the client sees, matching Cubic.stop() removing itself
 // from CubicList and broadcasting. runtime is the cubic that expired: once
 // it has been stopped or replaced (evicted, then the same id granted again),
-// its late timer leaves the current cubic of that id alone.
+// its late timer only stops it and leaves the current cubic of that id alone.
 func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
 	if live == nil {
 		return
@@ -104,6 +104,7 @@ func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID, runtime *cub
 	live.cubicsMu.Lock()
 	if live.cubics[id] != runtime {
 		live.cubicsMu.Unlock()
+		runtime.Stop()
 		return
 	}
 	delete(live.cubics, id)

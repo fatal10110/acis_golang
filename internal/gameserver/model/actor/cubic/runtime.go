@@ -33,6 +33,10 @@ type Runtime struct {
 	// summon-friend teleport stops them on the summoner's.
 	mu      sync.Mutex
 	running bool
+	// stopped is set once by Stop: a stopped cubic is gone for good, so a
+	// late Action() or RefreshDisappear() from another queue that still
+	// holds this runtime does not bring it back.
+	stopped bool
 	// generation increments on every Action()/StopAction() call, so a tick
 	// scheduled by a now-superseded Action() call can tell it is stale and
 	// must not reschedule itself. Without this, a StopAction() immediately
@@ -61,7 +65,7 @@ func (r *Runtime) ID() int { return int(r.id) }
 func (r *Runtime) Action() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.running {
+	if r.running || r.stopped {
 		return
 	}
 	r.running = true
@@ -123,16 +127,21 @@ func (r *Runtime) StopAction() {
 func (r *Runtime) RefreshDisappear(lifetime time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.stopped {
+		return
+	}
 	if r.disappearTimer != nil {
 		r.disappearTimer.Stop()
 	}
 	r.disappearTimer = r.queue.After(lifetime, r.disappear)
 }
 
-// Stop cancels both timers, matching Cubic.stop().
+// Stop cancels both timers for good, matching Cubic.stop(): a stopped
+// runtime never starts or re-arms again.
 func (r *Runtime) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	r.stopped = true
 	r.running = false
 	r.generation++
 	if r.actionTimer != nil {
