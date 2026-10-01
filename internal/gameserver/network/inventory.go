@@ -697,13 +697,6 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	})
 }
 
-// liveItemOpsAllowed reports whether live may currently manipulate items at
-// all: not gone and not dead. Drop/destroy/crystallize/enchant/pet-use gate
-// on this alone — RequestDropItem.java:36 checks isDead() only,
-// RequestDestroyItem.java/RequestEnchantItem.java check nothing, and
-// RequestPetUseItem.java:34 checks isAlikeDead()||pet.isDead(). Pickup does
-// not gate on this alone; see liveItemInteractionAllowed and
-// livePickupBlockedDeferrable's comment (pickup.go).
 // busyTrading reports whether live runs or is setting up a private store or
 // workshop, or is tied up in a direct trade or a pending trade request.
 func (l *GameClientLink) busyTrading(live *livePlayer) bool {
@@ -716,6 +709,13 @@ func (l *GameClientLink) processingTransaction(live *livePlayer) bool {
 	return l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
 }
 
+// liveItemOpsAllowed reports whether live may currently manipulate items at
+// all: not gone and not dead. Drop/destroy/crystallize/enchant/pet-use gate
+// on this alone — RequestDropItem.java:36 checks isDead() only,
+// RequestDestroyItem.java/RequestEnchantItem.java check nothing, and
+// RequestPetUseItem.java:34 checks isAlikeDead()||pet.isDead(). Pickup does
+// not gate on this alone; see liveItemInteractionAllowed and
+// livePickupBlockedDeferrable's comment (pickup.go).
 func liveItemOpsAllowed(live *livePlayer) bool {
 	return live != nil && !live.AlikeDead()
 }
