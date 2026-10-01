@@ -585,6 +585,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.cancelAugment(live, req) })
 				}
+			case clientpackets.OpcodeRequestChangePartyLeader, clientpackets.OpcodeRequestExAskJoinMPCC,
+				clientpackets.OpcodeRequestExAcceptJoinMPCC, clientpackets.OpcodeRequestExOustFromMPCC,
+				clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo:
+				if !l.dispatchPartyExtended(client, live, second, payload) {
+					return
+				}
 			case clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
 					continue
@@ -1336,6 +1342,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() { l.petGetItem(ctx, live, req) })
+
+		case clientpackets.OpcodeRequestJoinParty, clientpackets.OpcodeRequestAnswerJoinParty,
+			clientpackets.OpcodeRequestWithdrawParty, clientpackets.OpcodeRequestOustPartyMember:
+			if !l.dispatchParty(client, live, opcode, payload) {
+				return
+			}
 
 		case clientpackets.OpcodeTradeRequest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeTradeRequest)

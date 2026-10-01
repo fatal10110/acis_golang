@@ -38,6 +38,12 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// The selection is dropped while live is still placed, so its
 	// neighborhood gets TargetUnselected before live's DeleteObject.
 	live.forgetTarget(live.Target())
+	// Leaving while holding a request still to answer, a trade or party
+	// invitation alike, cancels the open trade; otherwise it stays open on
+	// the partner's side.
+	if l.trades != nil && l.trades.HoldsRequest(live.ObjectID()) {
+		l.cancelActiveTrade(live)
+	}
 	l.leaveActiveTrade(live)
 	// TaskEffects.Save runs on this queue too, so every autosave job is
 	// already on the lane, or will never be, before the jobs below (#1948).
@@ -135,6 +141,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
 	}
+	l.leaveParty(live)
 	// Stop the periodic effect sweep from reaching this character's list:
 	// it left world.State above, but a still-held buff/debuff keeps the
 	// list registered with task.Effects (see effect.List.Untrack) until

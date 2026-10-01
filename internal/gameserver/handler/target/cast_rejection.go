@@ -149,8 +149,8 @@ type spoilOwned interface {
 }
 
 // sweepOwnershipRejection lets a player sweep only a monster they spoiled
-// themselves. The area corpse sweep skips this gate. Until parties exist
-// (#146) the spoiler's party members are not let in either. A monster that
+// themselves. The area corpse sweep skips this gate. The spoiler's party
+// and command channel members are not let in yet (#3157). A monster that
 // cannot name its spoiler refuses the sweep.
 func sweepOwnershipRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
 	if skill == nil || skill.SkillType != "SWEEP" || caster.Kind() != actor.KindPlayer || !target.MonsterKind() {

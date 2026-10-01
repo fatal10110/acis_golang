@@ -26,9 +26,9 @@ func relationBits(karma int, pvpFlag task.PvPFlagState) int32 {
 }
 
 // relationAutoAttackable mirrors the PvP-zone and terminal branches of
-// Playable.isAttackableWithoutForceBy. Party and command-channel exemptions
-// remain unavailable until #146; other earlier branches are tracked by their
-// respective subsystems.
+// Playable.isAttackableWithoutForceBy. The party and command-channel
+// exemptions read the party registry once #2466 wires them; other earlier
+// branches are tracked by their respective subsystems.
 func relationAutoAttackable(karma int, pvpFlag task.PvPFlagState, subjectInPvPZone, observerInPvPZone bool) bool {
 	return subjectInPvPZone && observerInPvPZone || karma > 0 || pvpFlag != task.PvPFlagNone
 }

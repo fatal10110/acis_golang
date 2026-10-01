@@ -41,6 +41,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -297,6 +298,8 @@ type GameClientLink struct {
 	inventory        *invops.Service
 	petItems         *petitem.Service
 	trades           *tradebook.Book
+	parties          *partyRegistry
+	partyPositions   partyPositions
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
 	targets          *skilltarget.Registry
@@ -430,7 +433,8 @@ type GameClientLinkConfig struct {
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
-	// TradeClock times direct-trade requests out; nil means time.Now.
+	// TradeClock times direct-trade, party and command channel requests
+	// out; nil means time.Now.
 	TradeClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
@@ -527,6 +531,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
+		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{

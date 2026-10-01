@@ -11,8 +11,21 @@ import (
 // RequestTimeout is how long a pending direct-trade request remains usable.
 const RequestTimeout = 15 * time.Second
 
+// RequestKind is what a pending request asks its target for. Every kind
+// shares one slot per player: a player answers one request at a time, and
+// waits on one it sent.
+type RequestKind uint8
+
+// Request kinds.
+const (
+	KindTrade RequestKind = iota
+	KindParty
+	KindCommandChannel
+)
+
 // pendingRequest is a request as its target holds it.
 type pendingRequest struct {
+	kind        RequestKind
 	requesterID int32
 	expiresAt   time.Time
 	// requesterLeft marks a requester that left the world after asking. The
@@ -125,10 +138,66 @@ func (b *Book) Request(requesterID, targetID int32) RequestResult {
 		return RequestResult{Status: RequestTargetBusy}
 	}
 
-	expiresAt := b.now().Add(RequestTimeout)
-	b.pendingByTarget[targetID] = pendingRequest{requesterID: requesterID, expiresAt: expiresAt}
-	b.pendingByRequester[requesterID] = outgoingRequest{targetID: targetID, expiresAt: expiresAt}
+	b.recordLocked(KindTrade, requesterID, targetID)
 	return RequestResult{Status: RequestStarted}
+}
+
+func (b *Book) recordLocked(kind RequestKind, requesterID, targetID int32) {
+	expiresAt := b.now().Add(RequestTimeout)
+	b.pendingByTarget[targetID] = pendingRequest{kind: kind, requesterID: requesterID, expiresAt: expiresAt}
+	b.pendingByRequester[requesterID] = outgoingRequest{targetID: targetID, expiresAt: expiresAt}
+}
+
+// Invite records a pending request of a kind other than a trade. Unlike a
+// trade request it leaves open trade sessions out: it is refused only while
+// targetID, or requesterID when checkRequester is set, is processing a
+// request (ProcessingRequest).
+func (b *Book) Invite(kind RequestKind, requesterID, targetID int32, checkRequester bool) RequestResult {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.purgeExpiredLocked(b.now())
+	switch {
+	case checkRequester && b.processingRequestLocked(requesterID):
+		return RequestResult{Status: RequestRequesterBusy}
+	case b.processingRequestLocked(targetID):
+		return RequestResult{Status: RequestTargetBusy}
+	}
+	b.recordLocked(kind, requesterID, targetID)
+	return RequestResult{Status: RequestStarted}
+}
+
+// TakeInvite consumes the request of kind targetID holds and returns its
+// requester. A request of another kind stays pending and reports false, as
+// does one whose requester left the world after asking.
+func (b *Book) TakeInvite(kind RequestKind, targetID int32) (int32, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.purgeExpiredLocked(b.now())
+	pending, ok := b.pendingByTarget[targetID]
+	if !ok || pending.kind != kind {
+		return 0, false
+	}
+	delete(b.pendingByTarget, targetID)
+	if out, ok := b.pendingByRequester[pending.requesterID]; ok && !pending.requesterLeft && out.targetID == targetID {
+		delete(b.pendingByRequester, pending.requesterID)
+	}
+	if pending.requesterLeft {
+		return 0, false
+	}
+	return pending.requesterID, true
+}
+
+// HoldsRequest reports whether playerID holds a request it has not
+// answered.
+func (b *Book) HoldsRequest(playerID int32) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.purgeExpiredLocked(b.now())
+	_, ok := b.pendingByTarget[playerID]
+	return ok
 }
 
 // Answer accepts or rejects a pending direct-trade request.
@@ -147,6 +216,10 @@ func (b *Book) Answer(targetID int32, accept bool) AnswerResult {
 
 	now := b.now()
 	pending, ok := b.pendingByTarget[targetID]
+	if ok && pending.kind != KindTrade {
+		// Another kind of request is not this answer's to consume.
+		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
+	}
 	delete(b.pendingByTarget, targetID)
 	if !ok || !now.Before(pending.expiresAt) {
 		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
@@ -206,6 +279,10 @@ func (b *Book) ProcessingRequest(playerID int32) bool {
 	defer b.mu.Unlock()
 
 	b.purgeExpiredLocked(b.now())
+	return b.processingRequestLocked(playerID)
+}
+
+func (b *Book) processingRequestLocked(playerID int32) bool {
 	if _, ok := b.pendingByTarget[playerID]; ok {
 		return true
 	}
@@ -571,8 +648,15 @@ func (o *offer) snapshot() Offer {
 // purgeExpiredLocked drops expired requests from both sides. Each side
 // expires on its own: a request either participant left behind is held on
 // one side only.
+//
+// A request held by a target with a trade window open outlives its expiry
+// on the target's side until that window closes: the target can still
+// answer it, and is still processing it.
 func (b *Book) purgeExpiredLocked(now time.Time) {
 	for targetID, pending := range b.pendingByTarget {
+		if s := b.active[targetID]; s != nil && !s.locked {
+			continue
+		}
 		if !now.Before(pending.expiresAt) {
 			delete(b.pendingByTarget, targetID)
 		}

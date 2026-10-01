@@ -178,6 +178,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 	case event.VitalsChanged:
 		sendLiveStatus(live)
+		l.sendPartyVitals(live)
 	case event.EffectIconsChanged:
 		l.updateLiveAbnormalEffect(live)
 	case event.AbnormalEffectChanged:
@@ -247,6 +248,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.applyLiveDeathPenalty(live, e)
 	case event.LevelChanged:
 		l.refreshLiveLevelSkills(live)
+		if l.parties != nil {
+			l.parties.RecalculateLevel(live.ObjectID())
+		}
 	case event.ShortBuff:
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(e.SkillID, e.Level, e.DurationSeconds))
 	case event.RegenMax:
