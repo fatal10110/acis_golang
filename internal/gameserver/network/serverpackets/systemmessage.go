@@ -324,6 +324,15 @@ func FrameSystemMessageParams(id int, params ...SystemMessageParam) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
+// Multisell exchange system message ids.
+const (
+	SystemMessageYouAreNotAClanMember           = 212  // no parameter
+	SystemMessageAcquiredS1S2                   = 371  // number (enchant) then item-name parameter
+	SystemMessageExceededQuantityThatCanBeInput = 1036 // no parameter
+	SystemMessageSuccessfullyTradedWithNpc      = 1656 // no parameter
+	SystemMessageClanReputationScoreTooLow      = 1860 // no parameter
+)
+
 // SystemMessage parameter types used by focused packet helpers.
 const (
 	SystemMessageParamText       = 0

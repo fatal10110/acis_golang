@@ -62,6 +62,8 @@ type gameplayConfig struct {
 	ServerBypassDelay        serverBypassDelay
 	ManufactureDelay         manufactureDelay
 	CraftingEnabled          craftingEnabled
+	MultisellDelay           multisellDelay
+	BlacksmithUseRecipes     blacksmithUseRecipes
 	SpawnMultiplier          spawnMultiplier
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
@@ -143,6 +145,12 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.CraftingEnabled, err = loadCraftingEnabled(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.BlacksmithUseRecipes, err = loadBlacksmithUseRecipes(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
@@ -497,6 +505,30 @@ func loadCraftingEnabled(paths gameServerPaths) (craftingEnabled, error) {
 		return false, err
 	}
 	return craftingEnabled(config.NewFields(props, "crafting enabled").Bool("CraftingEnabled", true)), nil
+}
+
+// multisellDelay is the reuse delay between two multisell exchanges on one
+// client session, read from server.properties.
+type multisellDelay time.Duration
+
+func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
+}
+
+// blacksmithUseRecipes makes a multisell exchange take the ingredients
+// marked maintainIngredient too, read from players.properties.
+type blacksmithUseRecipes bool
+
+func loadBlacksmithUseRecipes(paths gameServerPaths) (blacksmithUseRecipes, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return blacksmithUseRecipes(config.NewFields(props, "blacksmith use recipes").Bool("BlacksmithUseRecipes", true)), nil
 }
 
 // loadPetConfig takes the process logger for the same reason as

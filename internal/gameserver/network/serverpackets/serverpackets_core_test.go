@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -20,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -4448,5 +4450,113 @@ func TestFrameUserAndCharInfoCarryOperateType(t *testing.T) {
 		if idle[at-1] != 0 {
 			t.Fatalf("%s byte before the operate type = %d, want mount type 0", name, idle[at-1])
 		}
+	}
+}
+
+// ---- multisell ----
+
+func multisellIngredient(t *testing.T, items *item.Table, attrs ...string) multisell.Ingredient {
+	t.Helper()
+	set := commons.NewStatSet()
+	for i := 0; i+1 < len(attrs); i += 2 {
+		set.Set(attrs[i], attrs[i+1])
+	}
+	in, err := multisell.NewIngredient(set, items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return in
+}
+
+// TestFrameMultiSellList pins MultiSellList (0xd0) against the reference
+// writeImpl: list id, 1-based page, finished flag, page size 40, entry
+// count; per entry its 1-based number across the list, two zero ints, the
+// stackable byte, product and ingredient counts (2 bytes each); per product
+// item id (2 bytes), body part, type2 (2 bytes), count, enchant (2 bytes)
+// and two zero ints; per ingredient the same without the body part. An
+// item without a template writes body part 0 and type2 65535. A prepared
+// entry drops its tax adena and merges its adena at the end.
+func TestFrameMultiSellList(t *testing.T) {
+	items := item.NewTable([]*item.Template{
+		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
+		{ID: 1000, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
+	})
+	sword := multisellIngredient(t, items, "id", "1000", "count", "1")
+	unknown := multisellIngredient(t, items, "id", "4242", "count", "3")
+	entries := []multisell.Entry{multisell.NewEntry(
+		[]multisell.Ingredient{
+			multisellIngredient(t, items, "id", "57", "count", "500"),
+			multisellIngredient(t, items, "id", "57", "count", "9000", "isTaxIngredient", "true"),
+			unknown,
+			multisellIngredient(t, items, "id", "57", "count", "20"),
+		},
+		[]multisell.Ingredient{sword},
+	)}
+	for range 40 {
+		entries = append(entries, multisell.NewEntry([]multisell.Ingredient{sword}, []multisell.Ingredient{unknown}))
+	}
+	list := (&multisell.List{ID: -7, Entries: entries}).Prepare()
+
+	got := framePayload(t, FrameMultiSellList(list, 0))
+	want := []byte{OpcodeMultiSellList}
+	for _, v := range []int32{-7, 1, 0, 40, 40} {
+		want = binary.LittleEndian.AppendUint32(want, uint32(v))
+	}
+	want = binary.LittleEndian.AppendUint32(want, 1)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = append(want, 0)                              // a weapon product does not stack
+	want = binary.LittleEndian.AppendUint16(want, 1)    // products
+	want = binary.LittleEndian.AppendUint16(want, 2)    // ingredients: the unknown item, then adena 520
+	want = binary.LittleEndian.AppendUint16(want, 1000) // product: sword
+	want = binary.LittleEndian.AppendUint32(want, uint32(item.SlotRHand))
+	want = binary.LittleEndian.AppendUint16(want, uint16(item.SubCategoryWeapon))
+	want = binary.LittleEndian.AppendUint32(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = append(want, make([]byte, 8)...)
+	want = binary.LittleEndian.AppendUint16(want, 4242) // ingredient without a template
+	want = binary.LittleEndian.AppendUint16(want, 65535)
+	want = binary.LittleEndian.AppendUint32(want, 3)
+	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = append(want, make([]byte, 8)...)
+	want = binary.LittleEndian.AppendUint16(want, uint16(item.AdenaID))
+	want = binary.LittleEndian.AppendUint16(want, uint16(item.SubCategoryMoney))
+	want = binary.LittleEndian.AppendUint32(want, 520)
+	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = append(want, make([]byte, 8)...)
+	if !bytes.Equal(got[:len(want)], want) {
+		t.Fatalf("MultiSellList page 1 head =\n% x\nwant\n% x", got[:len(want)], want)
+	}
+
+	got = framePayload(t, FrameMultiSellList(list, 40))
+	want = []byte{OpcodeMultiSellList}
+	for _, v := range []int32{-7, 2, 1, 40, 1, 41, 0, 0} {
+		want = binary.LittleEndian.AppendUint32(want, uint32(v))
+	}
+	want = append(want, 1) // an unknown product reads as stackable
+	want = binary.LittleEndian.AppendUint16(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 4242)
+	want = binary.LittleEndian.AppendUint32(want, 0)
+	want = binary.LittleEndian.AppendUint16(want, 65535)
+	want = binary.LittleEndian.AppendUint32(want, 3)
+	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = append(want, make([]byte, 8)...)
+	want = binary.LittleEndian.AppendUint16(want, 1000)
+	want = binary.LittleEndian.AppendUint16(want, uint16(item.SubCategoryWeapon))
+	want = binary.LittleEndian.AppendUint32(want, 1)
+	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = append(want, make([]byte, 8)...)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("MultiSellList page 2 =\n% x\nwant\n% x", got, want)
+	}
+
+	got = framePayload(t, FrameMultiSellList(&multisell.List{ID: 5}, 0))
+	want = []byte{OpcodeMultiSellList}
+	for _, v := range []int32{5, 1, 1, 40, 0} {
+		want = binary.LittleEndian.AppendUint32(want, uint32(v))
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("empty MultiSellList = % x, want % x", got, want)
 	}
 }

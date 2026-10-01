@@ -78,6 +78,9 @@ func (i Ingredient) Weight() int32 {
 	return i.template.Weight
 }
 
+// PageSize is how many entries one MultiSellList page carries.
+const PageSize = 40
+
 // Entry is one multisell exchange option: ordered ingredients consumed and
 // ordered products produced.
 type Entry struct {
@@ -108,6 +111,51 @@ func (e Entry) TaxAmount() int {
 	return 0
 }
 
+// prepare returns e as a talker is shown it. Its adena ingredients leave
+// their places: the tax ingredients are dropped, as no castle collects tax
+// yet, and the rest become one adena ingredient at the end. When enchant is
+// set, every armor or weapon ingredient and product takes its level.
+//
+// ponytail: castle taxes (#239). Under a castle with an owner, a list
+// applying taxes adds its tax ingredients at the castle's rate, rounded
+// half up, to that adena ingredient, and the exchange pays the castle.
+func (e Entry) prepare(enchant *int) Entry {
+	out := Entry{Ingredients: make([]Ingredient, 0, len(e.Ingredients)+1), stackable: true}
+	adena := 0
+	var adenaTemplate *item.Template
+	for _, in := range e.Ingredients {
+		if in.ItemID == item.AdenaID {
+			adenaTemplate = in.template
+			if !in.TaxIngredient {
+				adena += in.Count
+			}
+			continue
+		}
+		out.Ingredients = append(out.Ingredients, in.prepared(enchant))
+	}
+	if adena > 0 {
+		out.Ingredients = append(out.Ingredients, Ingredient{ItemID: item.AdenaID, Count: adena, template: adenaTemplate})
+	}
+	out.Products = make([]Ingredient, 0, len(e.Products))
+	for _, p := range e.Products {
+		if !p.Stackable() {
+			out.stackable = false
+		}
+		out.Products = append(out.Products, p.prepared(enchant))
+	}
+	return out
+}
+
+// prepared is a copy of i at no enchant level, or at enchant's when set
+// and i is an armor or weapon.
+func (i Ingredient) prepared(enchant *int) Ingredient {
+	i.EnchantLevel = 0
+	if enchant != nil && i.ArmorOrWeapon() {
+		i.EnchantLevel = *enchant
+	}
+	return i
+}
+
 // List is one loaded multisell list keyed by its filename hash.
 type List struct {
 	ID                  int32
@@ -115,6 +163,50 @@ type List struct {
 	MaintainEnchantment bool
 	Entries             []Entry
 	NPCIDs              []int32
+}
+
+// Held is one inventory item an inventory-only list is matched against.
+type Held struct {
+	ItemID       int32
+	EnchantLevel int
+}
+
+// Prepare returns the list as a talker is shown it.
+func (l *List) Prepare() *List {
+	out := l.preparedHeader()
+	out.Entries = make([]Entry, 0, len(l.Entries))
+	for _, e := range l.Entries {
+		out.Entries = append(out.Entries, e.prepare(nil))
+	}
+	return out
+}
+
+// PrepareFor returns the inventory-only form of the list: for each held
+// item in order, every entry taking that item as an ingredient, in list
+// order. On a list that maintains enchantment, those entries' armor and
+// weapon ingredients and products take the held item's level.
+func (l *List) PrepareFor(held []Held) *List {
+	out := l.preparedHeader()
+	for _, h := range held {
+		var enchant *int
+		if l.MaintainEnchantment {
+			enchant = &h.EnchantLevel
+		}
+		for _, e := range l.Entries {
+			for _, in := range e.Ingredients {
+				if in.ItemID == h.ItemID {
+					out.Entries = append(out.Entries, e.prepare(enchant))
+					break
+				}
+			}
+		}
+	}
+	return out
+}
+
+// preparedHeader is the list's header as prepared: it applies no taxes.
+func (l *List) preparedHeader() *List {
+	return &List{ID: l.ID, MaintainEnchantment: l.MaintainEnchantment, NPCIDs: l.NPCIDs}
 }
 
 // NPCAllowed reports whether npcID may open the list.

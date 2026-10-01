@@ -55,3 +55,11 @@ func ClassLevel(id int) (int, bool) {
 	}
 	return level, true
 }
+
+// LowLevelNewbie reports whether c is a newbie of level 6 to 25: one who
+// has made at most the first occupation change.
+func (c *Character) LowLevelNewbie() bool {
+	tier, _ := ClassLevel(c.ClassID)
+	level := c.Level()
+	return tier <= 1 && level >= 6 && level <= 25
+}

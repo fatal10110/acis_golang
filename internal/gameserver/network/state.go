@@ -136,6 +136,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9d: true, // request skill reuse timers
 		0x9e: true, // package sendable item list
 		0x9f: true, // package send
+		0xa7: true, // multisell exchange
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window
