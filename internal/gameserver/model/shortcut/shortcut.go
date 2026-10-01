@@ -58,26 +58,22 @@ type Shortcut struct {
 	SharedReuseGroup int32
 }
 
-// NewRegistration validates and builds a client shortcut registration.
-// hasItem mirrors ShortcutList.addShortcut's ITEM branch
-// (ShortcutList.java:62-98): an ITEM registration for an objectId not in the
-// player's live inventory is dropped rather than persisted.
-func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillLevel func(int32) int, hasItem func(int32) bool) (Shortcut, bool) {
+// NewRegistration validates and builds a client shortcut registration: a
+// page out of range, an unknown type or a skill the player lacks is refused.
+// Whether an ITEM, MACRO or RECIPE target still exists is not checked here:
+// such a shortcut is answered on the bar first, and only kept when its
+// target is held.
+func NewRegistration(slot, page int32, typ Type, id, characterType int32, skillLevel func(int32) int) (Shortcut, bool) {
 	if page < 0 || page > MaxRegistrationPage || typ < Item || typ > Recipe {
 		return Shortcut{}, false
 	}
 	level := int32(-1)
-	switch typ {
-	case Skill:
+	if typ == Skill {
 		if skillLevel == nil {
 			return Shortcut{}, false
 		}
 		level = int32(skillLevel(id))
 		if level <= 0 {
-			return Shortcut{}, false
-		}
-	case Item:
-		if hasItem == nil || !hasItem(id) {
 			return Shortcut{}, false
 		}
 	}
@@ -177,17 +173,19 @@ func (l *List) Has(slot, page int32) bool {
 	return ok
 }
 
-// Delete removes one shortcut by slot and page.
-func (l *List) Delete(slot, page int32) bool {
+// Delete removes the shortcut at slot and page and returns it, or false
+// when that slot is empty.
+func (l *List) Delete(slot, page int32) (Shortcut, bool) {
 	if l == nil || l.bySlot == nil {
-		return false
+		return Shortcut{}, false
 	}
 	key := slotKey(slot, page)
-	if _, ok := l.bySlot[key]; !ok {
-		return false
+	sc, ok := l.bySlot[key]
+	if !ok {
+		return Shortcut{}, false
 	}
 	delete(l.bySlot, key)
-	return true
+	return sc, true
 }
 
 // DeleteTarget removes every shortcut of type typ pointing at id and returns

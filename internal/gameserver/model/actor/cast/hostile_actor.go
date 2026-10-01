@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -88,8 +89,18 @@ func (a HostileActor) AddSkillReuse(r modelskill.Ref, k int32, d time.Duration) 
 		a.Hostile.AddSkillReuse(r, k, d)
 	}
 }
-func (HostileActor) MagicMuted() bool    { return false }
-func (HostileActor) PhysicalMuted() bool { return false }
+
+// MagicMuted reports an active effect that blocks the NPC's magic skills.
+func (a HostileActor) MagicMuted() bool {
+	return a.Hostile != nil && a.Hostile.EffectList().IsAffected(effect.FlagMuted)
+}
+
+// PhysicalMuted reports an active effect that blocks the NPC's physical
+// skills.
+func (a HostileActor) PhysicalMuted() bool {
+	return a.Hostile != nil && a.Hostile.EffectList().IsAffected(effect.FlagPhysicalMuted)
+}
+
 func (a HostileActor) SpiritshotCharged() bool {
 	return a.Hostile != nil && a.Hostile.SpiritshotCharged()
 }
@@ -102,7 +113,6 @@ func (HostileActor) ItemCount(int) int                       { return 0 }
 func (HostileActor) ConsumeItem(int, int) bool               { return false }
 
 // HostileActor casters hold no cubics, ground signet, skill lock or charges.
-func (HostileActor) CubicListFull() bool           { return false }
 func (HostileActor) ExitSignetGround()             {}
 func (HostileActor) AllSkillsDisabled() bool       { return false }
 func (HostileActor) EnableAllSkills()              {}

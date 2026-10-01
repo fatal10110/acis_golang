@@ -1319,31 +1319,33 @@ func TestCharacterDieClearsCharges(t *testing.T) {
 }
 
 // ---- from character_cubic_test.go ----
-func TestCharacter_CubicListFull_DefaultCapIsOne(t *testing.T) {
+// The cubic cap follows CubicList.isFull (size() > Cubic Mastery level,
+// CubicList.java:110-113): addOrRefreshCubic (CubicList.java:45-59) polls
+// and stops the oldest cubic before admitting past the cap.
+func TestCharacter_AddOrRefreshCubic_NoMasteryEvictsOldest(t *testing.T) {
 	c := &Character{}
-	if c.CubicListFull() {
-		t.Fatal("CubicListFull() on an empty list = true, want false")
-	}
-	if _, added := c.AddOrRefreshCubic(cubic.Storm, false); !added {
-		t.Fatal("AddOrRefreshCubic() first add reported added=false")
-	}
+	c.AddOrRefreshCubic(cubic.Storm, false)
 	// With no Cubic Mastery (skill 143), size(1) > level(0): full.
-	if !c.CubicListFull() {
-		t.Fatal("CubicListFull() after one cubic with no mastery = false, want true")
+	if _, added := c.AddOrRefreshCubic(cubic.Life, false); !added {
+		t.Fatal("AddOrRefreshCubic(Life) on a full list reported added=false, want the oldest evicted")
+	}
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Life)}) {
+		t.Fatalf("CubicIDs() = %v, want [%d]", got, cubic.Life)
 	}
 }
 
-func TestCharacter_CubicListFull_MasteryRaisesCap(t *testing.T) {
+func TestCharacter_AddOrRefreshCubic_MasteryRaisesCap(t *testing.T) {
 	c := &Character{}
 	c.SetSkillLevel(cubicMasterySkillID, 1)
 
 	c.AddOrRefreshCubic(cubic.Storm, false)
-	if c.CubicListFull() {
-		t.Fatal("CubicListFull() after one cubic at mastery level 1 = true, want false")
-	}
 	c.AddOrRefreshCubic(cubic.Vampiric, false)
-	if !c.CubicListFull() {
-		t.Fatal("CubicListFull() after two cubics at mastery level 1 = false, want true")
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Storm), int(cubic.Vampiric)}) {
+		t.Fatalf("CubicIDs() at mastery level 1 = %v, want both cubics", got)
+	}
+	c.AddOrRefreshCubic(cubic.Life, false)
+	if got := c.CubicIDs(); !slices.Equal(got, []int{int(cubic.Vampiric), int(cubic.Life)}) {
+		t.Fatalf("CubicIDs() past the mastery-1 cap = %v, want the oldest (Storm) evicted", got)
 	}
 }
 
@@ -3002,19 +3004,60 @@ func TestCharacterSpawnProtectionMakesItInvulnerable(t *testing.T) {
 	}
 }
 
-func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
-	c := &Character{ID: 1}
-	c.SetStanding(false)
+// TestCharacterStopFakeDeathBroadcastsAfterDeath pins the get-up on a dead
+// character: the get-up and revive visuals still go out, once each, and it
+// takes the standing posture with no stand-up transition.
+func TestCharacterStopFakeDeathBroadcastsAfterDeath(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	c.StartFakeDeath()
 	rec := recordEvents(c)
 	if !c.MarkDead() {
 		t.Fatal("MarkDead() = false, want true")
 	}
 
-	if c.StopFakeDeath() {
-		t.Fatal("StopFakeDeath() = true for a dead character, want false")
+	if !c.StopFakeDeath() {
+		t.Fatal("StopFakeDeath() = false for a dead character lying down, want the posture changed")
 	}
-	if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 0 || revives != 0 {
-		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want none", stances, revives)
+	if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 1 || revives != 1 {
+		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want one each", stances, revives)
+	}
+	if got := event.Of[event.StanceChanged](rec)[0]; got.Stance != event.StanceFakeDeathStop {
+		t.Fatalf("stance = %v, want StanceFakeDeathStop", got.Stance)
+	}
+	if !c.Standing() || c.StandingNow() || c.FakeDead() {
+		t.Fatalf("dead get-up Standing=%v StandingNow=%v FakeDead=%v, want standing at once, not faking",
+			c.Standing(), c.StandingNow(), c.FakeDead())
+	}
+}
+
+// TestDieDuringFakeDeathGetUpGetsUpAgain pins the death of a player still
+// getting up out of fake death (Player.doDie, Player.java:2609-2613): the
+// flag still holds, so the death sends one more get-up and revive and
+// restarts the recent-fake-death grace (Player.stopFakeDeath,
+// Player.java:7035-7056).
+func TestDieDuringFakeDeathGetUpGetsUpAgain(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	c.StartFakeDeath()
+	c.StopFakeDeath()
+	c.stateMu.Lock()
+	c.recentFakeDeathUntil = time.Time{}
+	c.stateMu.Unlock()
+	rec := recordEvents(c)
+
+	if !c.Die(nil) {
+		t.Fatal("Die() = false on a living character")
+	}
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false after dying during the get-up, want the grace restarted")
+	}
+	stops := 0
+	for _, e := range event.Of[event.StanceChanged](rec) {
+		if e.Stance == event.StanceFakeDeathStop {
+			stops++
+		}
+	}
+	if revives := event.Count[event.FakeDeathRevived](rec); stops != 1 || revives != 1 {
+		t.Fatalf("death during the get-up sent stops:%d revives:%d, want one each", stops, revives)
 	}
 }
 

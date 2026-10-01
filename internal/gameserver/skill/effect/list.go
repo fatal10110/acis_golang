@@ -265,7 +265,7 @@ var crowdControlVisuals = [...]struct {
 	{FlagRooted, 0x000200},                    // root
 	{FlagSleep, 0x000080},                     // sleep
 	{FlagConfused | FlagFear, 0x000020},       // fear
-	{flagMuted | flagPhysicalMuted, 0x000100}, // mute
+	{FlagMuted | FlagPhysicalMuted, 0x000100}, // mute
 	{FlagMeditating, 0x020000},                // floatroot
 }
 

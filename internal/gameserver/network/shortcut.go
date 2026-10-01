@@ -26,22 +26,22 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	}
 	sc, ok := shortcut.NewRegistration(req.Slot, req.Page, shortcut.Type(req.Type), req.ID, req.CharacterType, func(id int32) int {
 		return live.SkillLevel(int(id))
-	}, func(objectID int32) bool {
-		return live.Inventory().ItemByObjectID(objectID) != nil
 	})
 	if !ok {
 		return
 	}
-	// A recipe the book does not hold still shows on the bar, but is
-	// neither kept nor saved: the reference answers ShortCutRegister
-	// before its integrity check drops the entry.
-	if sc.Type == shortcut.Recipe && !live.RecipeBook().Has(int(sc.ID)) {
-		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
+	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
+	// An item no longer held or a recipe the book lacks still shows on the
+	// bar for this session, but is neither kept nor saved: the reference
+	// answers ShortCutRegister before its integrity check drops the entry.
+	switch {
+	case sc.Type == shortcut.Item && live.Inventory().ItemByObjectID(sc.ID) == nil:
+		return
+	case sc.Type == shortcut.Recipe && !live.RecipeBook().Has(int(sc.ID)):
 		return
 	}
 	live.shortcuts.Register(sc)
 	l.saveShortcut(live, sc, "register shortcut")
-	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
 }
 
 // deleteShortcut mirrors the reference behavior: a delete on a page outside
@@ -52,21 +52,54 @@ func (l *GameClientLink) deleteShortcut(live *livePlayer, req clientpackets.Requ
 	if live == nil || !shortcut.ValidDeletePage(req.Page) {
 		return
 	}
-	if !live.shortcuts.Has(req.Slot, req.Page) {
+	sc, ok := live.shortcuts.Delete(req.Slot, req.Page)
+	if !ok {
 		return
 	}
-	live.shortcuts.Delete(req.Slot, req.Page)
+	l.shortcutDeleted(live, sc)
+}
+
+// deleteTargetShortcuts removes every shortcut of type typ pointing at id,
+// as the bar loses an item that left the inventory or a recipe that left
+// the book. It runs on live's queue.
+func (l *GameClientLink) deleteTargetShortcuts(live *livePlayer, typ shortcut.Type, id int32) {
+	if live.shortcuts == nil {
+		return
+	}
+	for _, sc := range live.shortcuts.DeleteTarget(typ, id) {
+		l.shortcutDeleted(live, sc)
+	}
+}
+
+// shortcutDeleted finishes the deletion of sc, already taken off live's
+// bar: it drops the row and tells the client. Deleting the shortcut of a
+// shot still held also turns that shot's automatic use off. Every deletion
+// then re-announces each shot still on automatic use.
+func (l *GameClientLink) shortcutDeleted(live *livePlayer, sc shortcut.Shortcut) {
 	if l.shortcuts != nil {
-		ownerID, slot, page := live.ObjectID(), req.Slot, req.Page
-		l.persist.Enqueue(ownerID, func() {
-			ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
-			defer cancel()
-			if err := l.shortcuts.Delete(ctx, ownerID, slot, page); err != nil {
-				l.log.Error().Err(err).Int32("object_id", ownerID).Msg("delete shortcut")
-			}
+		slot, page := sc.Slot, sc.Page
+		l.queueRowWrite(live.ObjectID(), "delete shortcut", func(ctx context.Context, ownerID int32) error {
+			return l.shortcuts.Delete(ctx, ownerID, slot, page)
 		})
 	}
-	live.SendFrame(serverpackets.FrameShortCutDelete(req.Slot, req.Page))
+	if sc.Type == shortcut.Item {
+		if inv := live.Inventory(); inv != nil {
+			if inst := inv.ItemByObjectID(sc.ID); inst != nil && isShotItem(inv.Templates(), inst.TemplateID) && live.RemoveAutoSoulShot(inst.TemplateID) {
+				live.SendFrame(serverpackets.FrameExAutoSoulShot(inst.TemplateID, false))
+			}
+		}
+	}
+	live.SendFrame(serverpackets.FrameShortCutDelete(sc.Slot, sc.Page))
+	for _, shotID := range live.AutoSoulShotIDs() {
+		live.SendFrame(serverpackets.FrameExAutoSoulShot(shotID, true))
+	}
+}
+
+// isShotItem reports whether templateID is a soulshot, spiritshot or
+// beast shot.
+func isShotItem(templates *item.Table, templateID int32) bool {
+	tmpl, ok := templates.Get(templateID)
+	return ok && tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemShot
 }
 
 // refreshSkillShortcuts re-points every shortcut slot bound to skillID at its

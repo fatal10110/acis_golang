@@ -141,7 +141,9 @@ func (c *Character) revive() bool {
 // player's own session and every observer, so the corpse-fall animation
 // plays live and reaches clients before any death side effect's updates. A
 // rider's mount stops eating. The killer's PK/PvP credit follows, then this
-// player's own costs: charges, the experience/karma loss, the stop of every
+// player's own costs: charges, a further get-up out of fake death for a
+// player that was playing dead (the stripped Fake Death sent its own get-up
+// before the death packet), the experience/karma loss, the stop of every
 // fusion channel on this player, and the death-penalty level, whose karma
 // gate reads the karma left after that loss. A player whose Phoenix Blessing
 // survived the death is then offered its own resurrection, and the effect
@@ -157,6 +159,9 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	if !c.MarkDead() {
 		return false
 	}
+	c.stateMu.RLock()
+	fakeDead := c.fakeDeath
+	c.stateMu.RUnlock()
 	c.BroadcastStatus()
 	c.StopCast()
 	blessingStops, stripped := c.EffectList().StopOnDeath()
@@ -172,6 +177,9 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.awardKillerPKKarma(killer)
 	c.awardKillerPvPKill(killer)
 	c.ClearCharges()
+	if fakeDead {
+		c.stopFakeDeathOnDeath()
+	}
 	c.applyDeathExpKarmaLoss(killer)
 	c.emit(event.FusionCastersStopRequested{})
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
@@ -182,6 +190,16 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	// The retained effects' icons are resent once the death has settled.
 	c.UpdateEffectIcons()
 	return true
+}
+
+// stopFakeDeathOnDeath gets a player that died playing dead up out of fake
+// death once more: a Fake Death a blessing kept through the death ends,
+// with its own get-up, then the recent-fake-death grace restarts and the
+// get-up and revive visuals go out again.
+func (c *Character) stopFakeDeathOnDeath() {
+	c.EffectList().StopByType(effect.TypeFakeDeath)
+	c.MarkRecentFakeDeath()
+	c.StopFakeDeath()
 }
 
 // Kill runs c's death sequence at once, whatever its HP, crediting killer;
