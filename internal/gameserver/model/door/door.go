@@ -15,8 +15,8 @@ import (
 )
 
 // ErrEmptyFootprint reports a door whose triangulated footprint sampled to
-// no geodata cells, matching the condition DoorData.java:113-123 logs and
-// skips rather than treating as fatal.
+// no geodata cells. The door loader logs and skips such a door rather than
+// treating it as fatal.
 var ErrEmptyFootprint = errors.New("door: empty geo shape")
 
 // Kind classifies a door template as a regular door or a wall.

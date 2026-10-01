@@ -12,8 +12,8 @@ const triangulationMaxLoops = 100
 // is rejected after triangulationMaxLoops ear-search passes.
 //
 // Every intermediate product is computed in int32 so that oversized world
-// coordinates wrap exactly where the reference's 32-bit integer arithmetic
-// wraps: the orientation and convexity tests multiply an absolute
+// coordinates wrap exactly as 32-bit integer arithmetic wraps: the
+// orientation and convexity tests multiply an absolute
 // coordinate by an edge delta, which can exceed int32 for a wide polygon,
 // and the resulting sign is what decides the clipping order.
 func Triangulate(points []Point) ([]Triangle, error) {

@@ -297,7 +297,7 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	}
 	// Last element wins: the StatSet this replaced was built by merging every
 	// <position>/<stats> child in document order, so a later child's attrs
-	// overwrote an earlier one's, matching the Java reference loader.
+	// overwrote an earlier one's.
 	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)

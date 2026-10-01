@@ -94,8 +94,8 @@ type walkerActorRef struct {
 	// chase and MoveHome leash-return use the same underlying
 	// move.Controller and fire the identical hook. Set true here, cleared
 	// by routeAwareMoveController whenever AI starts a non-route move.
-	// Mirrors aCis NpcAI.onEvtArrived's own gate: it only continues
-	// route-node logic when the current AI intention is MOVE_ROUTE.
+	// Arrival only continues route-node logic when the current AI intention
+	// is MOVE_ROUTE.
 	routeMove *atomic.Bool
 }
 
@@ -209,12 +209,12 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			Definitions: castDefs,
 			Effects:     castEffects,
 			Caster:      hostile,
-			// Creature.sendPacket is a no-op in the reference for a
-			// non-Player, non-Summon-owner caster, so caster-addressed
-			// messages (ATTACK_FAILED, MISSED_TARGET, ...) still have no
-			// forward target here. But target-addressed messages
-			// (MagicResist, ManaDrain) are delivered by ID lookup against
-			// the real target independent of caster type (Manadam.java:68),
+			// A packet sent to a non-Player, non-Summon-owner caster goes
+			// nowhere, so caster-addressed messages (ATTACK_FAILED,
+			// MISSED_TARGET, ...) still have no forward target here. But
+			// target-addressed messages (MagicResist, ManaDrain) are
+			// delivered by ID lookup against the real target independent of
+			// caster type,
 			// so OnHitResult is wired to the boot-provided delivery hook
 			// (issue #2350) rather than left unset.
 			OnHitResult: castEffects.OnHitResult,
@@ -293,9 +293,9 @@ func (c *hostileControl) Emit(ev event.Event) {
 		// Every AI cast abort path (Launch revalidation failure,
 		// insufficient MP/HP at Hit, a damage-break interrupt) routes
 		// through Controller.Stop/Interrupt, which reports an abort only when
-		// a cast was actually in flight — matching CreatureCast.stop()
-		// broadcasting MagicSkillCanceled behind the same isCastingNow()
-		// guard (CreatureCast.java:416-419), inherited unmodified by NpcCast.
+		// a cast was actually in flight — MagicSkillCanceled is broadcast
+		// only behind that same casting-now guard, for an NPC as for any
+		// other creature.
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
 	}
 }
@@ -312,18 +312,17 @@ func (c *hostileControl) runAI() {
 	}
 }
 
-// walkerWalkModeIDs are the template ids aCis Walkers.java's onCreated forces
-// into walk stance (setWalkOrRun(false)) instead of every other NPC's
-// default run stance; matches Walkers.java's WALKING_NPCS constant.
+// walkerWalkModeIDs are the walker template ids that spawn in walk stance
+// instead of every other NPC's default run stance.
 var walkerWalkModeIDs = map[int32]bool{
 	31357: true, 31358: true, 31359: true, 31360: true, 31362: true,
 	31364: true, 31365: true, 31525: true, 32072: true, 32128: true,
 }
 
 // startWalkerRoute registers ref for route walking if inst's template alias
-// resolves in walkerRoutes.xml (aCis Walkers.java: every spawned NPC whose
-// template alias has route data gets an immediate route-move desire; both
-// the route name and its per-NPC key are that alias). The caller must have
+// resolves in walkerRoutes.xml (every spawned NPC whose template alias has
+// route data gets an immediate route-move desire; both the route name and
+// its per-NPC key are that alias). The caller must have
 // already placed ref's Hostile into world.State — Walker only ticks actors
 // it can find in-region, so calling this before the spawn lands is a
 // silent no-op forever, not a delayed start. Most templates have no alias,

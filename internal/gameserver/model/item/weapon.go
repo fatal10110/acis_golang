@@ -65,9 +65,8 @@ const weaponTypeCount = int(weaponTypeEnd)
 // ParseWornKindMask resolves a skill <using kind="..."/> attribute — a
 // comma-separated list of WeaponType and/or ArmorType names — to the OR of
 // their worn-mask bits, for a direct intersect check against
-// Inventory.wornMask. An unrecognized token contributes no bits, matching
-// DocumentBase.parseUsingCondition's silent-skip behavior in the Java
-// reference (a typoed kind name is logged there, never rejected).
+// Inventory.wornMask. An unrecognized token contributes no bits: a typoed
+// kind name is skipped, never rejected.
 func ParseWornKindMask(kind string) int32 {
 	var mask int32
 	for _, tok := range strings.Split(kind, ",") {

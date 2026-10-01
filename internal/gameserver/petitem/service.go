@@ -103,8 +103,8 @@ func (s *Service) GiveToPet(playerInv, petInv *itemcontainer.Inventory, pet *sum
 // CheckGive runs the non-mutating precondition checks for a give-to-pet
 // request without performing the transfer. Split out from GiveToPet so
 // callers can cancel an active enchant selection between validation and
-// mutation, matching the reference's Player.cancelActiveEnchant() call
-// placed after preconditions pass but before Player.transferItem().
+// mutation: the selection is cancelled after the preconditions pass but
+// before the item is transferred.
 func (s *Service) CheckGive(playerInv, petInv *itemcontainer.Inventory, pet *summon.Actor, owner positioned, objectID int32, count int) GiveFailure {
 	if playerInv == nil || petInv == nil || pet == nil || count <= 0 {
 		return GiveNoop
@@ -154,21 +154,17 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 
 // GetFromPet transfers one item from a pet inventory to its owner's
 // inventory, unequipping it from the pet first if it was worn. Container.
-// Transfer only touches the container's item map — unlike Java's
-// Inventory.removeItem override (Inventory.java:84-105), it never clears a
+// Transfer only touches the container's item map — it never clears a
 // paperdoll slot pointing at the transferred instance — so an equipped item
-// must be unequipped explicitly here, matching Pet.transferItem's wasWorn
-// tracking and PET_TOOK_OFF_S1 notification (Pet.java:456-472).
+// must be unequipped explicitly here; the reported WasWorn drives the
+// PET_TOOK_OFF_S1 notification.
 //
 // wasWorn is only captured as a boolean before the transfer is attempted;
 // the actual paperdoll-clearing mutation runs only once s.transfer reports
-// GiveOK, mirroring where Java's own paperdoll-clearing side effect fires —
-// inside ItemContainer.transferItem's removeItem call
-// (ItemContainer.java:279/292), which only runs on the confirmed-success
-// path, after the item is reconfirmed still present. A failed transfer
-// (e.g. the item was concurrently removed from petInv between this lookup
-// and transfer's own re-check) must leave the pet's equip state untouched,
-// same as Java. The clear uses ClearWornSlot rather than UnequipSlot: by
+// GiveOK — the confirmed-success path, after the item is reconfirmed still
+// present. A failed transfer (e.g. the item was concurrently removed from
+// petInv between this lookup and transfer's own re-check) must leave the
+// pet's equip state untouched. The clear uses ClearWornSlot rather than UnequipSlot: by
 // this point the transfer has already moved inst into playerInv and set
 // its Location there, and UnequipSlot's own SetLocation(petInv.Location(),
 // 0) would incorrectly move it back.
@@ -216,11 +212,11 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	}
 
 	st := inst.Snapshot()
-	// RequestPetUseItem.java:40 gates both the equip and consumable-dispatch
-	// branches below on item.getItem().checkCondition(pet, pet, true) for a
-	// not-yet-equipped item. Item.checkCondition (Item.java:455-459) sends
-	// PET_CANNOT_USE_ITEM to the pet's owner on failure rather than staying
-	// silent, so this reuses UsePetCannotUseItem rather than a bare no-op.
+	// Both the equip and consumable-dispatch branches below are gated on
+	// the item's use conditions, checked against the pet, for a
+	// not-yet-equipped item. A failed condition sends PET_CANNOT_USE_ITEM
+	// to the pet's owner rather than staying silent, so this reuses
+	// UsePetCannotUseItem rather than a bare no-op.
 	if !st.Equipped() && !checkUseConditions(pet, tmpl.UseConditions) {
 		return UseResult{ItemID: inst.TemplateID}, UsePetCannotUseItem
 	}

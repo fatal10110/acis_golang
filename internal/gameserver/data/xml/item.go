@@ -74,9 +74,8 @@ type condNode struct {
 // A directory that can't be listed or a file whose XML is not well-formed
 // fails the whole load: the caller gets an actionable error rather than a
 // partially populated table. An individual <item> element that can't be
-// turned into a Template is logged and skipped, matching DocumentItem.java's
-// per-item try/catch ("Cannot create item {}."); the rest of the file and
-// other files continue loading.
+// turned into a Template is logged and skipped on its own; the rest of the
+// file and other files continue loading.
 //
 // log receives skipped-item diagnostics; the zero logger discards them.
 func LoadItemTemplates(dir string, log zerolog.Logger) (*item.Table, error) {
@@ -330,13 +329,12 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 			}
 
 			if strings.EqualFold(opEl.XMLName.Local, "effect") {
-				// DocumentBase.attachEffect (java/.../DocumentBase.java:201-307)
-				// parses and validates an <effect> element the same as any
-				// func tag, but only attaches the resulting EffectTemplate
-				// when the enclosing template is an L2Skill; Item has no
-				// attach(EffectTemplate) overload, so on an <item> the
-				// parsed template is validated then discarded. Reproduce
-				// that: validate required attrs, no attachment.
+				// An <effect> element is parsed and validated the same as
+				// any func tag, but the resulting effect template is only
+				// attached when the enclosing template is a skill; an item
+				// has no effect templates, so on an <item> the parsed
+				// template is validated then discarded: validate required
+				// attrs, no attachment.
 				if err := validateItemEffect(id, opEl); err != nil {
 					return nil, nil, err
 				}
@@ -345,8 +343,7 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 
 			op, err := item.ParseFuncOp(opEl.XMLName.Local)
 			if err != nil {
-				// Unrecognized <for> children are silently ignored,
-				// matching DocumentBase.java's tolerant sibling loop.
+				// Unrecognized <for> children are silently ignored.
 				continue
 			}
 			vals := foldAttrs(opEl.Attrs)
@@ -384,11 +381,10 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	return modifiers, useConditions, nil
 }
 
-// validateItemEffect validates a <for> block's <effect> child the way
-// DocumentBase.attachEffect validates one (name and val are required,
-// java/.../DocumentBase.java:204,224-229) without attaching anything: Item
-// has no attach(EffectTemplate) overload, so Java parses and discards the
-// EffectTemplate for an item template rather than storing it. This only
+// validateItemEffect validates a <for> block's <effect> child (name and val
+// are required) without attaching anything: an item has no effect
+// templates, so the effect is parsed and discarded for an item template
+// rather than stored. This only
 // checks the effect element's own required attrs, not its nested func/cond
 // children (ponytail: no shipped item XML carries <effect> today; deepen
 // if a future datapack file nests funcs inside one).

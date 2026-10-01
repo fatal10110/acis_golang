@@ -52,11 +52,10 @@ func NewPrivate(set *commons.StatSet) (Private, error) {
 }
 
 // NewEntry builds one spawn entry from its XML attributes and already-parsed
-// child blocks. multiplier is Config.SPAWN_MULTIPLIER (MultiSpawn.java:64):
-// it Java-rounds Total only when positions is empty, matching the reference
-// distinction between a fixed/weighted "pos" list (coords != null, total
-// kept as declared) and a coordinate-less territory spawn (coords == null,
-// total scaled).
+// child blocks. multiplier is the configured spawn multiplier: it scales and
+// rounds Total only when positions is empty, distinguishing a fixed/weighted
+// "pos" list (total kept as declared) from a coordinate-less territory spawn
+// (total scaled).
 func NewEntry(set *commons.StatSet, positions []Position, privates []Private, aiParams map[string]string, multiplier float64) (Entry, error) {
 	idf := commons.NewFields(set, "spawn entry")
 	npcID := idf.Int32("id")
@@ -124,8 +123,7 @@ func ParsePositions(raw string) ([]Position, error) {
 		return nil, fmt.Errorf("spawn: malformed pos %q", raw)
 	}
 
-	// Java (SpawnManager.java:205-213) sizes the weighted array at
-	// loc.length/5 and loops i < loc.length/5: a token count of 5 or more
+	// The weighted list holds count/5 tuples: a token count of 5 or more
 	// that isn't a multiple of 5 yields floor(count/5) complete tuples, and
 	// the remainder tokens are silently dropped without being parsed.
 	groups := len(parts) / 5
