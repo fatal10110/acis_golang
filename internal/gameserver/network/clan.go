@@ -16,16 +16,19 @@ import (
 // next click.
 
 // enterWorldClan sends the clan part of the login burst, on live's queue
-// before it spawns: its fellow members learn it logged in, then it gets its
-// own roster row and the roster. Clan skills (#717) and the siege state
-// (#3150) join here once they exist.
+// before it spawns: the clan's skill list, then live is given the clan
+// skills its rank reaches (shown by the burst's SkillList), its fellow
+// members learn it logged in, and it gets its own roster row and the
+// roster. The siege state (#3150) joins here once it exists.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
 	cl, ok := l.clanService().ClanOf(c)
 	if !ok {
 		return
 	}
+	client.Session.SendFrame(framePledgeSkillList(cl))
 	cl.SetOnline(c.ID, clan.LiveMember(c))
+	l.giveClanSkills(live, cl, c.PledgeClass())
 	m, _ := cl.Member(c.ID)
 	row := liveMemberRow(c, m)
 	l.broadcastToClan(cl, c.ID,
@@ -154,9 +157,14 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 	if !ok {
 		return
 	}
+	// The clan's skills are given against the rank live held before it
+	// joined, as the reference grants them before it recomputes the rank;
+	// no SkillList follows.
+	rank := c.PledgeClass()
 	if refusal := l.clanService().Join(cl, invite.RequesterID, c, sent.PledgeType, time.Now()); refusal != clan.JoinAllowed {
 		sendJoinRefusal(requester, cl, c.Name, refusal)
 	} else {
+		l.giveClanSkills(live, cl, rank)
 		l.sendJoinedClan(live, cl)
 	}
 	l.clanService().Invites().Answered(c.ID)
@@ -183,9 +191,11 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 	l.broadcastCharacterInfo(live)
 }
 
-// sendLeftClan shows live, on its own queue, that it is out of its clan:
-// its skills without the clan's, its status, and its clan window closed.
-func (l *GameClientLink) sendLeftClan(live *livePlayer) {
+// sendLeftClan shows live, on its own queue, that it is out of cl: the
+// clan's skills taken, its skill list, its status, and its clan window
+// closed.
+func (l *GameClientLink) sendLeftClan(live *livePlayer, cl *clan.Clan) {
+	l.takeClanSkills(live, cl)
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.broadcastCharacterInfo(live)
 	live.SendFrame(serverpackets.FramePledgeShowMemberListDeleteAll())
@@ -206,7 +216,7 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotLeaveDuringCombat))
 		return
 	}
-	l.sendLeftClan(live)
+	l.sendLeftClan(live, cl)
 	l.broadcastToClan(cl, 0,
 		func() wire.Frame {
 			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasWithdrawnFromTheClan, c.Name)
@@ -250,7 +260,7 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 	if target != nil {
 		postLive(target, func() {
 			l.clanService().ApplyLeft(target.Character, m, now)
-			l.sendLeftClan(target)
+			l.sendLeftClan(target, cl)
 			target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
 		})
 	}

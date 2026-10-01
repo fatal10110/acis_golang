@@ -59,6 +59,8 @@ func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, comman
 		}
 	case "cancel_clan_leader_change":
 		l.cancelClanLeaderNomination(live, f)
+	case "learn_clan_skills":
+		l.showPledgeSkillList(live)
 	}
 }
 
@@ -145,7 +147,7 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 		case clan.LevelFailed:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToIncreaseClanLevel))
 		case clan.ReputationChanged:
-			l.sendReputationChange(cl, n)
+			l.sendReputationChange(cl, n, live)
 		case clan.ReputationDeducted:
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DeductedFromClanRep, int32(n.Points)))
 		case clan.LevelRaised:
@@ -154,7 +156,9 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 			if clan.TellsLeaderAboutReputation(n.Level) {
 				live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanCanAccumulateReputation))
 			}
-			l.broadcastToClan(cl, 0,
+			// Queued behind the clan skill changes a reputation price may
+			// have posted to each member.
+			l.broadcastToClanQueued(cl, live,
 				func() wire.Frame { return framePledgeShowInfoUpdate(cl) },
 				func() wire.Frame {
 					return serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanLevelIncreased)
@@ -165,23 +169,6 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 			})
 		}
 	}
-}
-
-// sendReputationChange shows cl's online members its new reputation: when
-// the score crossed 0 each first learns its clan skills turned off or on,
-// with its skill list, then all get the clan's header.
-func (l *GameClientLink) sendReputationChange(cl *clan.Clan, change clan.ReputationChanged) {
-	if change.Crossed != 0 {
-		message := serverpackets.SystemMessageClanSkillsActivatedReputation
-		if change.Crossed < 0 {
-			message = serverpackets.SystemMessageReputationLowClanSkillsDeactivated
-		}
-		for _, member := range l.onlineClanMembers(cl, 0) {
-			member.SendFrame(serverpackets.FrameSystemMessage(message))
-			member.SendFrame(serverpackets.FrameSkillList(skillListEntries(member.Character, l.skills)))
-		}
-	}
-	l.broadcastToClan(cl, 0, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
 }
 
 // nominateClanLeader names the member called name as live's clan's next

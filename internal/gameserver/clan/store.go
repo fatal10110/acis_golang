@@ -43,6 +43,9 @@ type Store interface {
 	// UpdateCrest stores one of the clan's own crest id columns: the
 	// pledge, large pledge or alliance crest, as typ names it.
 	UpdateCrest(ctx context.Context, clanID int32, typ datacache.CrestType, crestID int32) error
+	// SaveSkill stores a clan skill at its level, replacing the level
+	// stored before.
+	SaveSkill(ctx context.Context, clanID int32, sk Skill) error
 }
 
 // Writer runs a store write later, on ownerID's lane, so writes for one

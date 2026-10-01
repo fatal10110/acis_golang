@@ -28,21 +28,24 @@ type clanSeed struct {
 // seedClan stores s with the founder as its leader before the clans are
 // restored.
 func seedClan(t *testing.T, s clanSeed) gameservertest.Option {
-	return gameservertest.WithClanSeed(func(db *sql.DB) {
-		exec := func(query string, args ...any) {
-			if _, err := db.ExecContext(context.Background(), query, args...); err != nil {
-				t.Fatalf("%s: %v", query, err)
-			}
+	return gameservertest.WithClanSeed(func(db *sql.DB) { seedClanRows(t, s, db) })
+}
+
+// seedClanRows stores s with the founder as its leader.
+func seedClanRows(t *testing.T, s clanSeed, db *sql.DB) {
+	exec := func(query string, args ...any) {
+		if _, err := db.ExecContext(context.Background(), query, args...); err != nil {
+			t.Fatalf("%s: %v", query, err)
 		}
-		exec(`UPDATE characters SET clanid = ?, power_grade = 0 WHERE char_name = 'Founder'`, seededClanID)
-		exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, reputation_score, dissolving_expiry_time, leader_id)
-			SELECT ?, 'Seeded', ?, ?, ?, obj_Id FROM characters WHERE char_name = 'Founder'`,
-			seededClanID, s.level, s.reputation, s.dissolving)
-		for i := range s.fillers {
-			exec(`INSERT INTO characters (account_name, obj_Id, char_name, level, clanid, power_grade) VALUES ('filler', ?, ?, 40, ?, 6)`,
-				900000+i, "Filler"+strconv.Itoa(i), seededClanID)
-		}
-	})
+	}
+	exec(`UPDATE characters SET clanid = ?, power_grade = 0 WHERE char_name = 'Founder'`, seededClanID)
+	exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, reputation_score, dissolving_expiry_time, leader_id)
+		SELECT ?, 'Seeded', ?, ?, ?, obj_Id FROM characters WHERE char_name = 'Founder'`,
+		seededClanID, s.level, s.reputation, s.dissolving)
+	for i := range s.fillers {
+		exec(`INSERT INTO characters (account_name, obj_Id, char_name, level, clanid, power_grade) VALUES ('filler', ?, ?, 40, ?, 6)`,
+			900000+i, "Filler"+strconv.Itoa(i), seededClanID)
+	}
 }
 
 // clanLevelItems boots the shared item catalog plus the three items clan

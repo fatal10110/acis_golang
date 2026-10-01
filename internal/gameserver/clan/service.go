@@ -21,10 +21,13 @@ type Config struct {
 	// CreateDays is DaysBeforeCreateAClan: how long a leader that left its
 	// clan waits to found another.
 	CreateDays int
+	// LifeCrystalNeeded is players.properties LifeCrystalNeeded: learning a
+	// clan skill also takes one of the skill's item from the leader.
+	LifeCrystalNeeded bool
 }
 
-// DefaultConfig is the shipped clans.properties.
-func DefaultConfig() Config { return Config{JoinDays: 1, CreateDays: 10} }
+// DefaultConfig is the shipped clans.properties and LifeCrystalNeeded.
+func DefaultConfig() Config { return Config{JoinDays: 1, CreateDays: 10, LifeCrystalNeeded: true} }
 
 // IDAllocator hands out object ids; a new clan's id comes from the same
 // space as every other persisted object's.
