@@ -144,6 +144,7 @@ type options struct {
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	serverNews             bool
+	announcements          string
 	clanClock              func() time.Time
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
@@ -541,6 +542,13 @@ func WithServerNews(shown bool) Option {
 	return func(o *options) { o.serverNews = shown }
 }
 
+// WithAnnouncements boots with file as the announcements.xml content
+// (default: a file holding none). The server rewrites the copy at
+// Server.AnnounceFile, never the datapack's.
+func WithAnnouncements(file string) Option {
+	return func(o *options) { o.announcements = file }
+}
+
 // WithClanClock times clan invitations out on now instead of the wall
 // clock.
 func WithClanClock(now func() time.Time) Option {
@@ -772,6 +780,7 @@ type Server struct {
 	Petitions        *petition.Manager // petitions the link was wired with
 	petitionRows     *gamesql.PetitionStore
 	Clans            *clan.Service
+	AnnounceFile     string // the announcements.xml the server reads and rewrites
 	account          string
 	templates        *player.TemplateTable
 	itemTable        *item.Table
@@ -1776,6 +1785,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// The mail is restored once the characters are seeded, below.
 	mailStore := gamesql.NewMailStore(db)
 	gclConfig.Board, gclConfig.ShowServerNews = o.board, o.serverNews
+	announcementsPath := filepath.Join(t.TempDir(), "announcements.xml")
+	gclConfig.Announcements = bootAnnouncements(t, announcementsPath, o.announcements, queues.NewQueue("announcements"), state, o.log)
 	if o.board.Enabled {
 		gclConfig.Mailbox = bbs.NewMailbox(mailStore, persistWorker, o.log)
 	}
@@ -2032,6 +2043,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		waitHandlers:     waitHandlers,
 		sendObserver:     sendObserver,
 	}
+	srv.AnnounceFile = announcementsPath
 	srv.refreshRecommendations = gcl.RefreshDailyRecommendations
 	srv.addClient(c)
 	return srv

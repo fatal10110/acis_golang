@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -103,6 +104,7 @@ func provideGameClientLink(
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
 	board communityBoard,
+	announcements *announcement.Registry,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -229,6 +231,7 @@ func provideGameClientLink(
 		Board:          board.Config,
 		Mailbox:        board.Mailbox,
 		ShowServerNews: board.ShowServerNews,
+		Announcements:  announcements,
 	})
 	if err != nil {
 		return nil, err

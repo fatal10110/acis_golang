@@ -195,8 +195,9 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideRelations,
 			providePetitions,
 			provideCommunityBoard,
+			provideAnnouncements,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startDebugHTTP, startGameServer),
 	}
 }
