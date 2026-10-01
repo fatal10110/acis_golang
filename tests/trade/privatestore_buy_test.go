@@ -29,6 +29,7 @@ func openBuyStore(t *testing.T, h *traders, rows ...buyRow) (ownerFrames, otherF
 // past what is still wanted is refused; the last 2 fill the list and close
 // the store.
 func TestPrivateBuyStoreBuysUntilFilled(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.srv.GiveItem(t, h.firstID, potionID, 1)
 	h.srv.GiveItem(t, h.firstID, item.AdenaID, 1000)
@@ -91,6 +92,7 @@ func TestPrivateBuyStoreBuysUntilFilled(t *testing.T) {
 // THE_PURCHASE_PRICE_IS_HIGHER_THAN_MONEY and shows the manage window again;
 // selling into it then finds no store.
 func TestBuyStoreListRefusals(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.srv.GiveItem(t, h.firstID, potionID, 1)
 	h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
@@ -120,6 +122,7 @@ func TestBuyStoreListRefusals(t *testing.T) {
 // YOU_ARE_NOT_AUTHORIZED_TO_DO_THAT) and cannot buy from or sell into
 // another player's store.
 func TestPrivateStoreTransactionRight(t *testing.T) {
+	t.Parallel()
 	t.Run("listing", func(t *testing.T) {
 		h := bootTraders(t, gameservertest.WithAdmin(shippedAccessLevels(t)))
 		setCharacterColumn(t, h, h.firstID, "accesslevel", testGMLevel)
@@ -169,6 +172,7 @@ func TestPrivateStoreTransactionRight(t *testing.T) {
 // CANNOT_TRADE_DISCARD_DROP_ITEM_WHILE_IN_SHOPMODE; the target hears
 // nothing either way.
 func TestTradeRequestRefusedAroundStores(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 	for _, tc := range []struct {

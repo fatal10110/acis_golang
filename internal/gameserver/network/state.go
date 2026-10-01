@@ -114,6 +114,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x48: true, // validate position
 		0x4a: true, // start rotating
 		0x4b: true, // finish rotating
+		0x53: true, // upload pledge crest
 		0x58: true, // enchant item
 		0x59: true, // destroy item
 		0x5b: true, // admin command typed in chat

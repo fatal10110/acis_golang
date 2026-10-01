@@ -95,6 +95,7 @@ func assertLiveMoveSpeed(t *testing.T, when string, character *player.Character,
 // scales the base speed by (100 + move_bonus) / 100, which the UserInfo
 // movement multiplier and the server's own movement both follow.
 func TestSwampSlowsTheMoveSpeedMultiplier(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(2_000, 4_000, -1_000, 1_000, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +137,7 @@ func TestSwampSlowsTheMoveSpeedMultiplier(t *testing.T) {
 // entry UserInfo scales the land multiplier by swim/run, and the server
 // moves the player at its swim speed.
 func TestWaterMoveSpeedMultiplierUsesSwimSpeed(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, waterZones(t, 2_000, 4_000))
 	_, y, z := srv.PlayerPosition(t, objID)
 	land := userInfoSpeedsAmong(t, appear(t, srv.Client), "on land")[0]

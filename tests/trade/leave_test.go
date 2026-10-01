@@ -21,6 +21,7 @@ const silenceWindow = 300 * time.Millisecond
 // clients get SendTradeDone failure plus the canceled-trade message naming
 // the one who moved, and a later add-item from the partner is swallowed.
 func TestTeleportCancelsOpenTrade(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.secondID, item.AdenaID, 100)
 	h.enterAll(t)
@@ -72,6 +73,7 @@ func TestTeleportCancelsOpenTrade(t *testing.T) {
 // it on its next add-item: TARGET_IS_NOT_FOUND_IN_THE_GAME, then the cancel
 // pair naming the partner itself, and the session is gone.
 func TestLogoutLeavesPartnerWindowOpen(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	h.enterAll(t)
@@ -95,6 +97,7 @@ func TestLogoutLeavesPartnerWindowOpen(t *testing.T) {
 // alone, the window stays open, and TradeDone(0) then cancels naming the
 // remaining trader.
 func TestLogoutPartnerConfirmIsTargetNotFound(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 	h.startTrade(t)
@@ -122,6 +125,7 @@ func TestLogoutPartnerConfirmIsTargetNotFound(t *testing.T) {
 // departed partner's re-check and cancels naming itself. Nothing the
 // departed side offered moves.
 func TestRelogDoesNotRejoinDepartedTrade(t *testing.T) {
+	t.Parallel()
 	// No character-select reuse delay, so the restart can select again at once.
 	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
 	firstAdena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)

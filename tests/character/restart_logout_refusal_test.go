@@ -41,6 +41,7 @@ func assertStaticSystemMessage(t *testing.T, frame []byte, messageID int) {
 // scroll refuses both restart (RestartResponse(false), no message) and
 // logout (ActionFailed) while leaving the session and world state intact.
 func TestEnchantSelectionBlocksRestartAndLogout(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
@@ -81,6 +82,7 @@ func TestEnchantSelectionBlocksRestartAndLogout(t *testing.T) {
 // NO_RESTART zone restart answers NO_RESTART_HERE + RestartResponse(false)
 // and logout answers NO_LOGOUT_HERE + ActionFailed.
 func TestNoRestartZoneBlocksRestartAndLogout(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(-100000, 100000, -100000, 100000, -100000, 100000)
 	if err != nil {
 		t.Fatalf("build zone form: %v", err)

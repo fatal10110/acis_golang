@@ -12,21 +12,41 @@ type Circle struct {
 }
 
 // NewCircle builds a Circle centered on (x, y). The radius must be
-// positive.
+// positive, and the centre and radius must fit in 32 bits: that bound keeps
+// every squared distance and bounding-box edge clear of int64 overflow.
 func NewCircle(x, y, rad int) (Circle, error) {
 	if rad <= 0 {
 		return Circle{}, fmt.Errorf("geometry: circle radius must be positive, got %d", rad)
 	}
+	if rad > math.MaxInt32 {
+		return Circle{}, fmt.Errorf("geometry: circle radius %d exceeds the 32-bit range", rad)
+	}
+	if !fitsInt32(x) || !fitsInt32(y) {
+		return Circle{}, fmt.Errorf("geometry: circle centre (%d, %d) is outside the 32-bit range", x, y)
+	}
 	return Circle{x: x, y: y, rad: rad, radSq: int64(rad) * int64(rad)}, nil
+}
+
+func fitsInt32(v int) bool { return v >= math.MinInt32 && v <= math.MaxInt32 }
+
+// sqDist returns the squared distance from the centre to (px, py), or
+// math.MaxInt64 when the point lies more than the radius away on either
+// axis. Such a point is outside the disc, and skipping the squares there
+// keeps them below int64 overflow for any centre and point in the 32-bit
+// range.
+func (c Circle) sqDist(px, py int) int64 {
+	dx, dy, r := int64(px-c.x), int64(py-c.y), int64(c.rad)
+	if dx < -r || dx > r || dy < -r || dy > r {
+		return math.MaxInt64
+	}
+	return dx*dx + dy*dy
 }
 
 // Contains reports whether (x, y) lies inside the disc: squared planar
 // distance at most radius squared. Integer squared distances stay well
-// below 2^53, so this matches a double-precision evaluation exactly.
-func (c Circle) Contains(x, y int) bool {
-	dx, dy := int64(c.x-x), int64(c.y-y)
-	return dx*dx+dy*dy <= c.radSq
-}
+// below 2^53 for world coordinates, so this matches a double-precision
+// evaluation exactly.
+func (c Circle) Contains(x, y int) bool { return c.sqDist(x, y) <= c.radSq }
 
 // Area is the disc's area.
 func (c Circle) Area() float64 { return math.Pi * float64(c.rad) * float64(c.rad) }
@@ -40,11 +60,7 @@ func (c Circle) IntersectsRect(ax1, ax2, ay1, ay2 int) bool {
 		return true
 	}
 	// Any rectangle corner strictly inside the circle?
-	dist := func(px, py int) int64 {
-		dx, dy := int64(px-c.x), int64(py-c.y)
-		return dx*dx + dy*dy
-	}
-	if dist(ax1, ay1) < c.radSq || dist(ax1, ay2) < c.radSq || dist(ax2, ay1) < c.radSq || dist(ax2, ay2) < c.radSq {
+	if c.sqDist(ax1, ay1) < c.radSq || c.sqDist(ax1, ay2) < c.radSq || c.sqDist(ax2, ay1) < c.radSq || c.sqDist(ax2, ay2) < c.radSq {
 		return true
 	}
 	// Circle crossing a side of the rectangle?

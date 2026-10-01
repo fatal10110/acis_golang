@@ -326,6 +326,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			session.SendFrame(l.framePledgeCrest(req))
 
+		case clientpackets.OpcodeRequestSetPledgeCrest:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSetPledgeCrest)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSetPledgeCrest(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestAllyCrest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAllyCrest)
 			if err != nil {
@@ -407,9 +419,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Error().Err(err).Int32("object_id", c.ObjectID()).Msg("select character: reload row")
 				continue
 			}
+			// The list may predate a ban stored since; the row is what
+			// counts.
+			if fresh.AccessLevel < 0 {
+				continue
+			}
 			c = fresh
 			chars[req.Slot] = fresh
 			l.clanService().RestoreMembership(c, time.Now())
+			l.applyLoadedAccessLevel(c)
 			tmpl, ok := l.templates.Get(c.ClassID())
 			if !ok {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
@@ -512,6 +530,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
 					session.SendFrame(frame)
+				}
+			case clientpackets.OpcodeRequestExSetPledgeCrestLarge:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExSetPledgeCrestLarge)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestSetLargePledgeCrest(live, req) })
 				}
 			case clientpackets.OpcodeRequestPledgePowerGrades:
 				if live != nil {

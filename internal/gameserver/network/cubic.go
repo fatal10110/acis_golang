@@ -114,6 +114,24 @@ func (l *GameClientLink) expireCubic(live *livePlayer, id cubic.ID, runtime *cub
 	l.broadcastCharacterInfo(live)
 }
 
+// removeAllCubics empties live's cubic list and stops every cubic runtime,
+// its action tick, disappear timer and pending cast delay alike, telling no
+// one; it reports whether any cubic was listed. Death calls it as is; a
+// class change broadcasts afterwards (stopAllCubics).
+func (live *livePlayer) removeAllCubics() bool {
+	live.cubicsMu.Lock()
+	defer live.cubicsMu.Unlock()
+	ids := live.Character.CubicIDs()
+	for _, id := range ids {
+		live.Character.RemoveCubic(cubic.ID(id))
+	}
+	for _, runtime := range live.cubics {
+		runtime.Stop()
+	}
+	live.cubics = nil
+	return len(ids) > 0
+}
+
 // Cubics satisfies task.attackStanceCubics, letting AttackStance.Add restart
 // every non-Life cubic's action tick when live enters combat stance.
 func (live *livePlayer) Cubics() []task.AttackStanceCubic {

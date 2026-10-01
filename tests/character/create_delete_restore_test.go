@@ -9,6 +9,7 @@ import (
 )
 
 func TestCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t)
 	c := srv.Client
 
@@ -27,6 +28,7 @@ func TestCreateInvalidNameKeepsConnectionOpen(t *testing.T) {
 }
 
 func TestDeleteAndRestore(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithReuseDelays(0, 0))
 	c := srv.Client
 

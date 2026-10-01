@@ -42,6 +42,7 @@ func assertDestroyRefused(t *testing.T, h *traders, c *testsupport.ScriptedClien
 // of a pending trade request are both refused; once the target declines,
 // the requester's destroy goes through and names what disappeared.
 func TestDestroyRefusedWhilePendingTradeRequest(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	firstAdena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	secondAdena := h.srv.GiveItem(t, h.secondID, item.AdenaID, 100)
@@ -77,6 +78,7 @@ func TestDestroyRefusedWhilePendingTradeRequest(t *testing.T) {
 // TestDestroyRefusedDuringOpenTrade: both participants of an open trade
 // window are refused.
 func TestDestroyRefusedDuringOpenTrade(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	firstAdena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	ingots := h.srv.GiveItem(t, h.secondID, heavyIngot, 4)

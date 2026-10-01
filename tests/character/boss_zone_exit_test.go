@@ -49,6 +49,7 @@ func bootInBossZone(t *testing.T) (*gameservertest.Server, *zone.Boss, int32) {
 // connected (Player.isOnline), so walking or teleporting out drops the
 // permission. Being off the grid mid-teleport must not read as offline.
 func TestBossZoneTeleportOutRevokesPermission(t *testing.T) {
+	t.Parallel()
 	srv, boss, objID := bootInBossZone(t)
 	obj, ok := srv.State.Player(objID)
 	if !ok {
@@ -71,6 +72,7 @@ func TestBossZoneTeleportOutRevokesPermission(t *testing.T) {
 // (BossZone.java:148-151): a player logging out inside keeps its permission
 // and gets a fresh re-entry window.
 func TestBossZoneLogoutKeepsPermission(t *testing.T) {
+	t.Parallel()
 	srv, boss, objID := bootInBossZone(t)
 
 	srv.Client.Send(encodeSingleOpcode(clientpackets.OpcodeLogout))

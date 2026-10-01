@@ -16,6 +16,7 @@ import (
 // restarts back to character selection, and requires the walk destination
 // to survive in the characters row so the next selection starts there.
 func TestRestartReturnsToCharacterSelect(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithReuseDelays(0, 0))
 	c := srv.Client
 
@@ -64,6 +65,7 @@ func TestRestartReturnsToCharacterSelect(t *testing.T) {
 // out, and requires the live actor to leave world state while the
 // characters row keeps the walked position, heading, and level.
 func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 
@@ -110,6 +112,7 @@ func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
 // open. The next request must therefore be answered, and its reply must be
 // the first frame read, proving Logout itself produced none.
 func TestLogoutAtCharacterSelectKeepsConnectionOpen(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t)
 	c := srv.Client
 
@@ -131,6 +134,7 @@ func TestLogoutAtCharacterSelectKeepsConnectionOpen(t *testing.T) {
 // to be ignored the same way: no frame, and the following character
 // selection is still answered.
 func TestLogoutAfterRestartKeepsConnectionOpen(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithReuseDelays(0, 0))
 	c := srv.Client
 

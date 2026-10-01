@@ -17,6 +17,7 @@ import (
 // is registered by a request whose target does not exist), and a valid
 // request still works afterwards.
 func TestTradeRequestRejectsIncorrectTargets(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 
@@ -36,6 +37,7 @@ func TestTradeRequestRejectsIncorrectTargets(t *testing.T) {
 // client receives when it requests a second trade while its first request is
 // still pending; the target receives nothing further.
 func TestTradeRequestRejectsBusyRequester(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 
@@ -52,6 +54,7 @@ func TestTradeRequestRejectsBusyRequester(t *testing.T) {
 // third player gets when requesting someone who already has a pending trade
 // request from somebody else.
 func TestTradeRequestRejectsBusyTarget(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 	third, _ := h.third(t, "player3", "TraderThree")
@@ -70,6 +73,7 @@ func TestTradeRequestRejectsBusyTarget(t *testing.T) {
 // offering an item the reference marks untradable: no offer packets on either
 // side and no inventory mutation.
 func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	shots := h.srv.GiveItem(t, h.firstID, 1463, 5) // soulshot templates are not tradable
 	h.enterAll(t)
@@ -99,6 +103,7 @@ func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
 // SendTradeDone failure plus the canceled-trade message — and nothing is
 // transferred.
 func TestConfirmOutOfRangeCancelsTradeForBoth(t *testing.T) {
+	t.Parallel()
 	assertConfirmFromDistanceCancels(t, 2*tradeInteractionDistance)
 }
 
@@ -106,6 +111,7 @@ func TestConfirmOutOfRangeCancelsTradeForBoth(t *testing.T) {
 // confirm-time check: the interaction radius is strict, so a partner standing
 // exactly tradeInteractionDistance away is already out of range.
 func TestConfirmAtExactInteractionDistanceCancelsTrade(t *testing.T) {
+	t.Parallel()
 	assertConfirmFromDistanceCancels(t, tradeInteractionDistance)
 }
 
@@ -182,6 +188,7 @@ func assertConfirmFromDistanceCancels(t *testing.T, dx int32) {
 // Only the confirm-time check (TestConfirmOutOfRangeCancelsTradeForBoth)
 // measures distance.
 func TestAddTradeItemToleratesPartnerOutOfRange(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	h.enterAll(t)
