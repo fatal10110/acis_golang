@@ -79,6 +79,14 @@ type ClientLink struct {
 	purgeMu   sync.Mutex
 	purgeable map[*clientConn]struct{}
 
+	// liveMu guards live, the number of open connections per remote
+	// address (ip.String()). A connection is counted from before its ban
+	// check until its handler returns, so the ban sweep keeps an expired ban
+	// that a still-open connection could otherwise observe through Ban.
+	// Lock order: the ban list's lock, then liveMu.
+	liveMu sync.Mutex
+	live   map[string]int
+
 	// authMu guards the authenticated-account mapping: sessions plus
 	// holders. A second authentication for a mapped account closes both the
 	// old holder and the new client, so check-and-insert must be atomic.
@@ -131,6 +139,7 @@ func NewClientLink(
 		failedAttempts:     make(map[string]failedAttempt),
 		loginTimeout:       LoginTimeout,
 		purgeable:          make(map[*clientConn]struct{}),
+		live:               make(map[string]int),
 		holders:            make(map[string]*clientConn),
 		newKeyPair:         keys.Random,
 		newSessionKey:      logincrypt.NewSessionKey,
@@ -154,9 +163,10 @@ func (l *ClientLink) Serve(ctx context.Context, ln net.Listener) error {
 
 // purgeLoop sweeps the authenticated connections every half login timeout,
 // dropping those whose connection outlived it, as the reference's purge
-// task does. The same tick drops expired failed-attempt counts; with
-// purging disabled (zero loginTimeout) it still ticks at half LoginTimeout
-// for that sweep alone.
+// task does. The same tick drops expired failed-attempt counts and expired
+// temporary IP bans no open connection could still observe (see
+// IPBanList.SweepExpired); with purging disabled (zero loginTimeout) it
+// still ticks at half LoginTimeout for those sweeps alone.
 func (l *ClientLink) purgeLoop(ctx context.Context) {
 	interval := l.loginTimeout / 2
 	if interval <= 0 {
@@ -174,6 +184,7 @@ func (l *ClientLink) purgeLoop(ctx context.Context) {
 				l.purgeStale(now)
 			}
 			l.sweepFailedAttempts(now)
+			l.bans.SweepExpired(now, l.hasLiveConnection)
 		}
 	}
 }
@@ -204,6 +215,36 @@ func (l *ClientLink) registerPurgeable(c *clientConn) {
 	}
 	l.purgeable[c] = struct{}{}
 	l.purgeMu.Unlock()
+}
+
+// trackConnection counts an open connection from ip.
+func (l *ClientLink) trackConnection(ip net.IP) {
+	l.liveMu.Lock()
+	if l.live == nil {
+		l.live = make(map[string]int)
+	}
+	l.live[ip.String()]++
+	l.liveMu.Unlock()
+}
+
+// untrackConnection reverses one trackConnection for ip.
+func (l *ClientLink) untrackConnection(ip net.IP) {
+	key := ip.String()
+	l.liveMu.Lock()
+	if l.live[key] <= 1 {
+		delete(l.live, key)
+	} else {
+		l.live[key]--
+	}
+	l.liveMu.Unlock()
+}
+
+// hasLiveConnection reports whether a connection from addr (an ip.String()
+// key) is open.
+func (l *ClientLink) hasLiveConnection(addr string) bool {
+	l.liveMu.Lock()
+	defer l.liveMu.Unlock()
+	return l.live[addr] > 0
 }
 
 // unregisterPurgeable removes c from the purge set.
@@ -299,6 +340,10 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	}()
 
 	ip := remoteIP(conn)
+	// Counted before the ban check, so the ban sweep never drops an expired
+	// ban that a later failed attempt on this connection could observe.
+	l.trackConnection(ip)
+	defer l.untrackConnection(ip)
 	if l.bans.IsBanned(ip) {
 		l.log.Info().Str("ip", ip.String()).Msg("banned login client tried to connect")
 		return

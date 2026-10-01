@@ -148,8 +148,8 @@ const (
 	// DropOK means the drop may go ahead.
 	DropOK DropFailure = iota
 	// DropCannotDiscard means the item cannot be discarded: it is not
-	// held, it is bound to a pet that is out, the count is zero or above
-	// the stack, or the item is not droppable.
+	// held, the caller refuses it, the count is zero or above the stack,
+	// or the item is not droppable.
 	DropCannotDiscard
 	// DropNoop means the request is ignored: a quest item, a negative
 	// count, or several units of an unstackable item.
@@ -158,14 +158,16 @@ const (
 
 // DropItemFailure classifies a drop request without mutating inv, in the
 // order its checks answer: whether the item can be discarded at all comes
-// before anything about where it would land. bound reports whether the item
-// is bound to a pet that is out.
-func (s *Service) DropItemFailure(inv *itemcontainer.Inventory, objectID int32, count int, bound bool) DropFailure {
+// before anything about where it would land. refused reports that the
+// caller already refuses the item or the drop itself: an item bound to a pet
+// that is out or selected as the enchant scroll, or a server that allows no
+// discards.
+func (s *Service) DropItemFailure(inv *itemcontainer.Inventory, objectID int32, count int, refused bool) DropFailure {
 	if inv == nil {
 		return DropNoop
 	}
 	inst := inv.ItemByObjectID(objectID)
-	if inst == nil || bound || count == 0 {
+	if inst == nil || refused || count == 0 {
 		return DropCannotDiscard
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)

@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -764,6 +765,156 @@ func TestClientLinkFailedAttemptsConcurrentAccess(t *testing.T) {
 	wg.Wait()
 	if got := failedAttemptCount(l); got != 0 {
 		t.Fatalf("tracked addresses = %d, want 0 after sweeping past the window", got)
+	}
+}
+
+// syncBuffer is an io.Writer safe for a logger shared across goroutines.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf = append(b.buf, p...)
+	return len(p), nil
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return string(b.buf)
+}
+
+// Addresses banned at the threshold and never seen again lose their ban
+// entries once a sweep runs past the ban duration, while a permanent ban
+// stays. A swept ban no longer answers IsBanned; an unswept one would still
+// be active here, since the list's own clock has not reached its expiry.
+func TestClientLinkBanSweepDropsExpiredBansWithoutReconnect(t *testing.T) {
+	l, bans := newFailedAttemptLink()
+	permanent := net.ParseIP("192.0.2.30")
+	bans.Ban(permanent, 0)
+
+	now := time.Now()
+	var banned []net.IP
+	for i := range 500 {
+		ip := net.IPv4(10, 3, byte(i>>8), byte(i))
+		for range DefaultLoginTryBeforeBan {
+			l.recordFailedAttempt(ip, now)
+		}
+		banned = append(banned, ip)
+	}
+	if !bans.IsBanned(banned[0]) {
+		t.Fatal("threshold failures did not ban")
+	}
+
+	l.bans.SweepExpired(now.Add(DefaultLoginBlockAfterBan-time.Second), l.hasLiveConnection)
+	if !bans.IsBanned(banned[1]) {
+		t.Fatal("sweep before the ban duration elapsed removed the ban")
+	}
+
+	l.bans.SweepExpired(now.Add(DefaultLoginBlockAfterBan+time.Second), l.hasLiveConnection)
+	for _, ip := range banned {
+		if bans.IsBanned(ip) {
+			t.Fatalf("expired ban for %v survived the sweep", ip)
+		}
+	}
+	if !bans.IsBanned(permanent) {
+		t.Fatal("sweep removed a permanent ban")
+	}
+}
+
+// Connections opened before their address was banned keep the expired ban
+// alive through sweeps, so their failures after it expires change nothing,
+// as without any sweep: the threshold-crossing ban lands on the expired
+// entry, has no effect, and the next check lifts the entry.
+func TestClientLinkBanSweepKeepsExpiredBanForOpenConnections(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	addr, l, _, _, bans := newTestClientLink(t, accounts, false)
+	ip := net.ParseIP("127.0.0.1")
+
+	clients := make([]*fakeLoginClient, DefaultLoginTryBeforeBan)
+	for i := range clients {
+		clients[i] = dialLoginClient(t, addr)
+		clients[i].gameGuard()
+	}
+
+	bans.Ban(ip, time.Nanosecond) // a ban that has already run out
+	sweepAt := time.Now().Add(time.Second)
+	if !l.hasLiveConnection(ip.String()) {
+		t.Fatal("open connections are not tracked")
+	}
+	l.bans.SweepExpired(sweepAt, l.hasLiveConnection)
+
+	for i, c := range clients {
+		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "wrong"))
+		if reply := c.read(); reply[0] != serverpackets.OpcodeLoginFail {
+			t.Fatalf("attempt %d opcode = %#x, want LoginFail (%#x)", i+1, reply[0], serverpackets.OpcodeLoginFail)
+		}
+		c.expectClosed()
+	}
+
+	if bans.IsBanned(ip) {
+		t.Fatal("threshold ban took effect over an expired entry the sweep should have kept")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for l.hasLiveConnection(ip.String()) {
+		if time.Now().After(deadline) {
+			t.Fatal("closed connections are still tracked")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestClientLinkPurgeLoopSweepsExpiredBans(t *testing.T) {
+	var logs syncBuffer
+	bans := manager.NewIPBanList(zerolog.New(&logs))
+	bans.Ban(net.ParseIP("192.0.2.40"), time.Nanosecond)
+	bans.Ban(net.ParseIP("192.0.2.41"), 0)
+	newTestClientLink(t, newFakeAccountStore(), false, func(l *ClientLink) {
+		l.loginTimeout = 20 * time.Millisecond
+		l.bans = bans
+	})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for !strings.Contains(logs.String(), `"address":"192.0.2.40","message":"removed expired IP address ban"`) {
+		if time.Now().After(deadline) {
+			t.Fatalf("purge loop did not sweep an expired ban; log: %s", logs.String())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if strings.Contains(logs.String(), "192.0.2.41") {
+		t.Fatal("purge loop swept a permanent ban")
+	}
+	if !bans.IsBanned(net.ParseIP("192.0.2.41")) {
+		t.Fatal("permanent ban lost")
+	}
+}
+
+func TestClientLinkBanSweepConcurrentAccess(t *testing.T) {
+	l, bans := newFailedAttemptLink()
+	var wg sync.WaitGroup
+	for g := range 8 {
+		wg.Go(func() {
+			for i := range 200 {
+				ip := net.IPv4(10, 4, byte(g), byte(i))
+				l.trackConnection(ip)
+				_ = bans.IsBanned(ip)
+				bans.Ban(ip, time.Nanosecond)
+				l.untrackConnection(ip)
+				bans.SweepExpired(time.Now().Add(time.Second), l.hasLiveConnection)
+			}
+		})
+	}
+	wg.Wait()
+	bans.SweepExpired(time.Now().Add(time.Second), l.hasLiveConnection)
+	for g := range 8 {
+		for i := range 200 {
+			if l.hasLiveConnection(net.IPv4(10, 4, byte(g), byte(i)).String()) {
+				t.Fatal("connection count leaked")
+			}
+		}
 	}
 }
 

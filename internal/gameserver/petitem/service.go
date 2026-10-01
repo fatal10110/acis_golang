@@ -258,9 +258,16 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	return UseResult{Outcome: Equipped, ItemID: inst.TemplateID, Persist: actions}, UseOK
 }
 
+// transfer moves count units of objectID from one inventory to the other.
+// Unlike the shared inventory transfer, which moves at most what is there,
+// a count the item cannot satisfy moves nothing: below one, several units
+// of an unstackable item, or more than the stack holds.
 func (s *Service) transfer(from, to *itemcontainer.Inventory, objectID int32, count int) (TransferResult, GiveFailure, error) {
 	if s == nil {
 		s = NewService(nil)
+	}
+	if !validTransferCount(from, objectID, count) {
+		return TransferResult{}, GiveNoop, nil
 	}
 	res, ok, err := s.inventory.TransferItem(from, to, objectID, count)
 	if err != nil {
@@ -270,4 +277,19 @@ func (s *Service) transfer(from, to *itemcontainer.Inventory, objectID int32, co
 		return TransferResult{}, GiveNoop, nil
 	}
 	return TransferResult{Persist: res.Persist}, GiveOK, nil
+}
+
+func validTransferCount(from *itemcontainer.Inventory, objectID int32, count int) bool {
+	if from == nil || count < 1 {
+		return false
+	}
+	inst := from.ItemByObjectID(objectID)
+	if inst == nil {
+		return false
+	}
+	tmpl, ok := from.Templates().Get(inst.TemplateID)
+	if !ok || (count > 1 && !tmpl.Stackable) {
+		return false
+	}
+	return count <= inst.Snapshot().Count
 }
