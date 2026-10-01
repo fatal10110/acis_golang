@@ -93,6 +93,10 @@ type castInFlight interface {
 	InFlight() (modelskill.Definition, actorcast.Target, bool)
 }
 
+// Every production cast controller is an *actorcast.Controller; pin that it
+// keeps the surface describeState asserts at run time.
+var _ castInFlight = (*actorcast.Controller)(nil)
+
 // describeState shows p, right after c's info packet, what c is doing: the
 // leg it walks, from where it stands, or else the cast it has in flight,
 // with the skill's own hit time and reuse delay. cast is c's cast
