@@ -28,7 +28,7 @@ func TestAddTradeItemWithoutTransactionRightCancelsTrade(t *testing.T) {
 	link, _, firstCap, secondCap, first, second := newDirectTradeFixture(t)
 	openDirectTrade(t, link, first, second, firstCap, secondCap)
 
-	first.access.AllowTransaction = false
+	forbidTransactions(first)
 	link.handleAddTradeItem(first, clientpackets.AddTradeItem{ObjectID: 12345, Count: 1})
 
 	testsupport.AssertOpcodeSequence(t, firstCap.Frames(),
@@ -55,7 +55,7 @@ func TestTradeDoneWithoutTransactionRightKeepsTradeOpen(t *testing.T) {
 	ctx := context.Background()
 	openDirectTrade(t, link, first, second, firstCap, secondCap)
 
-	first.access.AllowTransaction = false
+	forbidTransactions(first)
 	link.handleTradeDone(ctx, first, clientpackets.TradeDone{Response: 1})
 
 	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeSystemMessage)
@@ -93,7 +93,7 @@ func TestTradeDoneWithoutTransactionRightAfterPartnerLeftKeepsTradeOpen(t *testi
 
 	link.leaveActiveTrade(second)
 	testsupport.ResetCapture(firstCap, secondCap)
-	first.access.AllowTransaction = false
+	forbidTransactions(first)
 	link.handleTradeDone(context.Background(), first, clientpackets.TradeDone{Response: 1})
 
 	testsupport.AssertOpcodeSequence(t, firstCap.Frames(), serverpackets.OpcodeSystemMessage)
@@ -104,4 +104,12 @@ func TestTradeDoneWithoutTransactionRightAfterPartnerLeftKeepsTradeOpen(t *testi
 	if !link.trades.HasActive(first.ObjectID()) {
 		t.Fatal("access gate on TradeDone closed the trade on the departed-partner path")
 	}
+}
+
+// forbidTransactions puts live under its access level with transactions
+// forbidden.
+func forbidTransactions(live *livePlayer) {
+	access := live.accessLevel()
+	access.AllowTransaction = false
+	live.access.Store(&access)
 }

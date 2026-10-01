@@ -515,7 +515,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 	count := int(req.Count)
-	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig.DiscardItemDisabled && !live.access.IsGM)
+	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig.DiscardItemDisabled && !live.accessLevel().IsGM)
 	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, refused) {
 	case invops.DropOK:
 	case invops.DropCannotDiscard:
@@ -527,7 +527,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}

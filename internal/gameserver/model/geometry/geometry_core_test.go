@@ -14,6 +14,56 @@ func TestNewCircleRejectsNonPositiveRadius(t *testing.T) {
 	}
 }
 
+func TestNewCircleRejectsOutOfInt32Range(t *testing.T) {
+	cases := []struct{ x, y, rad int }{
+		{math.MaxInt32 + 1, 0, 10},
+		{math.MinInt32 - 1, 0, 10},
+		{0, math.MaxInt32 + 1, 10},
+		{0, math.MinInt32 - 1, 10},
+		{0, 0, math.MaxInt32 + 1},
+		{0, 0, math.MaxInt64},
+	}
+	for _, tc := range cases {
+		if _, err := NewCircle(tc.x, tc.y, tc.rad); err == nil {
+			t.Errorf("NewCircle(%d, %d, %d) succeeded, want error", tc.x, tc.y, tc.rad)
+		}
+	}
+}
+
+// TestCircleAtInt32LimitsHasNoFalseOverlap pins circles at the edge of the
+// accepted range: squared distances across the full 32-bit span must not
+// wrap into false containment or intersection.
+func TestCircleAtInt32LimitsHasNoFalseOverlap(t *testing.T) {
+	const lo, hi = math.MinInt32, math.MaxInt32
+	far, err := NewCircle(hi, hi, hi)
+	if err != nil {
+		t.Fatalf("NewCircle at the limit: %v", err)
+	}
+	if far.Contains(lo, lo) || far.Contains(-300000, -300000) {
+		t.Error("far circle contains a point beyond its radius")
+	}
+	if far.IntersectsRect(-300000, 300000, -300000, 300000) {
+		t.Error("far circle intersects a rectangle beyond its radius")
+	}
+	if !far.Contains(0, hi) || !far.Contains(hi, hi) {
+		t.Error("far circle misses a point on its radius")
+	}
+	if minX, maxX, minY, maxY := far.Bounds(); minX != 0 || maxX != 2*hi || minY != 0 || maxY != 2*hi {
+		t.Errorf("Bounds() = %d, %d, %d, %d", minX, maxX, minY, maxY)
+	}
+
+	corner, err := NewCircle(lo, lo, 1)
+	if err != nil {
+		t.Fatalf("NewCircle at the limit: %v", err)
+	}
+	if corner.Contains(hi, hi) || corner.IntersectsRect(hi-1, hi, hi-1, hi) {
+		t.Error("unit circle at MinInt32 reaches the opposite corner")
+	}
+	if !corner.Contains(lo, lo) {
+		t.Error("unit circle misses its own centre")
+	}
+}
+
 func TestCircleContains(t *testing.T) {
 	c, err := NewCircle(0, 0, 10)
 	if err != nil {
