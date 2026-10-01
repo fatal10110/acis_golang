@@ -65,6 +65,12 @@ func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, comman
 		l.cancelClanLeaderNomination(live, f)
 	case "learn_clan_skills":
 		l.showPledgeSkillList(live)
+	case "create_ally":
+		if arg != "" {
+			l.createAlly(live, arg)
+		}
+	case "dissolve_ally":
+		l.dissolveAlly(live)
 	}
 }
 

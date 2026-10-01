@@ -1937,6 +1937,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
 	gclConfig.Clans.DropMissingCrests(crests)
+	gclConfig.Clans.DropDanglingAlliances()
 	if o.seedBoard != nil {
 		o.seedBoard(db)
 	}

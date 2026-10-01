@@ -130,6 +130,13 @@ import (
 // a stop or a surrender to another player, so a reply never has one to
 // answer.
 //
+// RequestAnswerJoinAlly with nothing pending, and RequestSetAllyCrest
+// refused (from anyone but the alliance's leader, deleting no crest, an
+// over-long or unstored image), are absent too: the reference answers each
+// with nothing, the invitation dialog closed when the client answered and
+// the crest dialog holds no pending action. tests/clan asserts the crest
+// silence.
+//
 // Say2 lines the reference drops without an answer are absent as well: an
 // empty or over-long line, an unknown channel, a non-GM announcement, a bot
 // whisper, a flooded channel, a party, clan or command-channel line from a
@@ -207,6 +214,11 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestUserCommand /attacklist without a clan", encodeRequestUserCommand(88), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestUserCommand /siegestatus without a clan", encodeRequestUserCommand(99), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestUserCommand /olympiadstat before noble status exists", encodeRequestUserCommand(109), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestJoinAlly without a clan", encodeAllyInt(clientpackets.OpcodeRequestJoinAlly, missingObjectID), []byte{serverpackets.OpcodeSystemMessage}},
+		{"AllyLeave without a clan", wire.NewPacketWriter(clientpackets.OpcodeAllyLeave).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"AllyDismiss without a clan", encodeNamedRequest(clientpackets.OpcodeAllyDismiss, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestDismissAlly without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestDismissAlly).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestAllyInfo without an alliance", wire.NewPacketWriter(clientpackets.OpcodeRequestAllyInfo).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 	}
 
 	for _, tc := range cases {
@@ -318,5 +330,11 @@ func encodeRequestOustPledgeMember(name string) []byte {
 func encodeRequestUserCommand(id int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUserCommand)
 	w.WriteInt32(id)
+	return w.Bytes()
+}
+
+func encodeAllyInt(opcode byte, v int32) []byte {
+	w := wire.NewPacketWriter(opcode)
+	w.WriteInt32(v)
 	return w.Bytes()
 }

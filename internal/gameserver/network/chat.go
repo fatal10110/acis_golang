@@ -37,14 +37,14 @@ type chatHandler func(l *GameClientLink, client *Client, live *livePlayer, line 
 // chatHandlers delivers each chat channel's lines. A line on a channel
 // absent here is logged and dropped, with no answer, as are the channels no
 // player says lines on (GM, Announcement, Boat, L2Friend, MSNChat,
-// CriticalAnnounce). The alliance and petition channels register here
-// with their systems.
+// CriticalAnnounce). The petition channel registers here with its system.
 var chatHandlers = map[chat.Type]chatHandler{
 	chat.All:                (*GameClientLink).chatAll,
 	chat.Shout:              (*GameClientLink).chatShout,
 	chat.Tell:               (*GameClientLink).chatTell,
 	chat.Party:              (*GameClientLink).chatParty,
 	chat.Clan:               (*GameClientLink).chatClan,
+	chat.Alliance:           (*GameClientLink).chatAlliance,
 	chat.Trade:              (*GameClientLink).chatTrade,
 	chat.PartyMatchRoom:     (*GameClientLink).chatPartyMatchRoom,
 	chat.PartyRoomCommander: (*GameClientLink).chatChannelCommander,
