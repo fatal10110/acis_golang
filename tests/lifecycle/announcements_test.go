@@ -69,26 +69,56 @@ func TestEnterWorldBurstReadsLoginAnnouncements(t *testing.T) {
 	assertCreatureSay(t, frames[n-2], 0, 18, "Newbie", "Read the rules")
 }
 
+// readAnnouncement returns the next CreatureSay c receives within d on its
+// own clock, skipping any other frame, or nil when none comes.
+func readAnnouncement(c *testsupport.ScriptedClient, d time.Duration) []byte {
+	end := c.Now().Add(d)
+	for left := d; left > 0; left = end.Sub(c.Now()) {
+		frame := c.ReadWithTimeout(left)
+		if frame == nil {
+			return nil
+		}
+		if frame[0] == serverpackets.OpcodeCreatureSay {
+			return frame
+		}
+	}
+	return nil
+}
+
 // An automatic announcement loaded at boot is said to every player online
 // once its initial delay from boot has passed, then once per delay, by no
-// one (Announcement.java, World.announceToOnlinePlayers).
+// one, until its limit runs out (Announcement.java,
+// World.announceToOnlinePlayers). On a driven clock the player logs in two
+// seconds into the three-second initial delay, which pins the first fire to
+// boot rather than to login.
 func TestBootAutomaticAnnouncementRepeats(t *testing.T) {
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithAnnouncements(`<list><announcement message="Vote for us" auto="true" initial_delay="30" delay="20" limit="2" /></list>`),
+		gameservertest.WithAnnouncements(`<list><announcement message="Vote for us" auto="true" initial_delay="3" delay="1" limit="2" /></list>`),
 	)
 	c := srv.Client
-	startInWorld(t, c)
+	boot := c.Now()
+	if srv.DrivesClock() {
+		srv.Advance(t, 2*time.Second)
+	}
+	c.Send(encodeRequestGameStart(0))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
 
 	for i := range 2 {
-		frame := c.ReadWithTimeout(time.Minute)
+		frame := readAnnouncement(c, 5*time.Second)
 		if frame == nil {
 			t.Fatalf("automatic announcement %d never came", i)
 		}
 		assertCreatureSay(t, frame, 0, 10, "", "Vote for us")
+		if want := time.Duration(3+i) * time.Second; srv.DrivesClock() && c.Now().Sub(boot) != want {
+			t.Fatalf("automatic announcement %d came %v after boot, want %v", i, c.Now().Sub(boot), want)
+		}
 	}
-	if frame := c.ReadWithTimeout(time.Minute); frame != nil {
-		t.Fatalf("frame %#x after the limit, want none", frame[0])
+	if frame := readAnnouncement(c, 2*time.Second); frame != nil {
+		t.Fatalf("CreatureSay %x after the limit, want none", frame)
 	}
 }
