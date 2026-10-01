@@ -57,7 +57,7 @@ func TestLifeDrainFeedsTheCasterFromTheDrainedHP(t *testing.T) {
 	setCasterMagicRolls(t, srv, objID, func() int { return 9999 })
 	srv.DamagePlayerHP(t, objID, srv.PlayerMaxHP(t, objID)/2)
 	hostile := srv.SpawnHostileNPC(t)
-	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 40}})
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 80}})
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)

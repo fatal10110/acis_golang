@@ -10,6 +10,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -63,6 +65,9 @@ func TestAutoSoulshotsRechargeEverySwing(t *testing.T) {
 	}
 
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: hostileX - 30, Y: hostileY, Z: hostileZ})
+	// The monster's P.Def. is pinned so four charged critical swings leave
+	// it standing.
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.PowerDefence, Op: effect.OpSet, Value: 20}})
 	drainUntilQuiet(t, c)
 	attacker := livePlayer(t, srv, objID)
 	done := make(chan struct{})

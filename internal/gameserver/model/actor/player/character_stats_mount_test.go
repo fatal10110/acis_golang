@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -294,12 +295,12 @@ func TestRiderAttacksFromTheMountsAtk(t *testing.T) {
 		base := striderRideAtk * tc.mul
 
 		wantP := base * statbonus.STRBonus[tmpl.STR] * lm
-		if got := c.PAtk(); !closeFloat(got, wantP) || int(got) != int(wantP) {
+		if got := c.PAtk(); got != math.Trunc(wantP) {
 			t.Fatalf("gap %d: PAtk() = %v, want %v (int %d)", tc.gap, got, wantP, int(wantP))
 		}
 		intMod := statbonus.INTBonus[tmpl.INT]
 		wantM := base * ((lm * lm) * (intMod * intMod))
-		if got := c.MAtk(); !closeFloat(got, wantM) || int(got) != int(wantM) {
+		if got := c.MAtk(); got != math.Trunc(wantM) {
 			t.Fatalf("gap %d: MAtk() = %v, want %v (int %d)", tc.gap, got, wantM, int(wantM))
 		}
 	}

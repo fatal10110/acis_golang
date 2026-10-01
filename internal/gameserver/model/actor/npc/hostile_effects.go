@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"math"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -32,14 +33,14 @@ func (h *Hostile) EffectSuccessInput(caster creature.FormulaActor, def modelskil
 	return in, ok
 }
 
-// MAtk returns this NPC's magic attack stat.
+// MAtk returns this NPC's magic attack stat, truncated to a whole number.
 func (h *Hostile) MAtk() float64 {
-	return h.calcStat(stat.MagicAttack, positiveStat(h.Instance.Template.MAtk))
+	return math.Trunc(h.calcStat(stat.MagicAttack, positiveStat(h.Instance.Template.MAtk)))
 }
 
-// MDef returns this NPC's magic defence stat.
+// MDef returns this NPC's magic defence stat, truncated to a whole number.
 func (h *Hostile) MDef() float64 {
-	return h.calcStat(stat.MagicDefence, positiveStat(h.Instance.Template.MDef))
+	return math.Trunc(h.calcStat(stat.MagicDefence, positiveStat(h.Instance.Template.MDef)))
 }
 
 func positiveStat(v float64) float64 {

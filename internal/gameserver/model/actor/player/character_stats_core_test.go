@@ -101,6 +101,10 @@ func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	basePDef := c.PDef()
 	baseMAtk := c.MAtk()
 	baseMDef := c.MDef()
+	// The multiplier applies to the finalized (untruncated) stat; the getter
+	// truncates the product.
+	rawPDef := c.calcStat(stat.PowerDefence, tmpl.PDef)
+	rawMDef := c.calcStat(stat.MagicDefence, tmpl.MDef)
 	baseMaxHP := c.MaxHPValue()
 	baseAttackSpeed := c.AttackSpeed()
 	baseRunSpeed := c.RunSpeed()
@@ -121,13 +125,13 @@ func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	if got, want := c.PAtk(), basePAtk+7; !closeFloat(got, want) {
 		t.Fatalf("PAtk() with stat func = %v, want %v", got, want)
 	}
-	if got, want := c.PDef(), basePDef*2; !closeFloat(got, want) {
+	if got, want := c.PDef(), math.Trunc(rawPDef*2); got != want {
 		t.Fatalf("PDef() with stat func = %v, want %v", got, want)
 	}
 	if got, want := c.MAtk(), baseMAtk+3; !closeFloat(got, want) {
 		t.Fatalf("MAtk() with stat func = %v, want %v", got, want)
 	}
-	if got, want := c.MDef(), baseMDef*2; !closeFloat(got, want) {
+	if got, want := c.MDef(), math.Trunc(rawMDef*2); got != want {
 		t.Fatalf("MDef() with stat func = %v, want %v", got, want)
 	}
 	if got, want := c.MaxHPValue(), baseMaxHP*2; !closeFloat(got, want) {
@@ -205,7 +209,9 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if !ok {
 		t.Fatal("PhysicalSkillInput() ok = false")
 	}
-	if got, want := phys.AttackPower, 5.4; !closeFloat(got, want) {
+	// P.Atk 5.4, M.Atk 13.286025 and M.Def 46.08 finalize fractional; every
+	// formula input reads the truncated int.
+	if got, want := phys.AttackPower, 5.0; got != want {
 		t.Fatalf("PhysicalSkillInput AttackPower = %v, want %v", got, want)
 	}
 	if got, want := phys.SkillPower, float64(skill.Power); !closeFloat(got, want) {
@@ -222,10 +228,10 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if !ok {
 		t.Fatal("MagicDamageInput() ok = false")
 	}
-	if got, want := magic.MAtk, 13.286025000000002; !closeFloat(got, want) {
+	if got, want := magic.MAtk, 13.0; got != want {
 		t.Fatalf("MagicDamageInput MAtk = %v, want %v", got, want)
 	}
-	if got, want := magic.MDef, 46.080000000000005; !closeFloat(got, want) {
+	if got, want := magic.MDef, 46.0; got != want {
 		t.Fatalf("MagicDamageInput MDef = %v, want %v", got, want)
 	}
 	if magic.SkillPower != 40 || magic.PvPMul != 1 || magic.ElementalMul != 1 {
@@ -236,10 +242,10 @@ func TestCharacterFormulaInputsResolveLiveStats(t *testing.T) {
 	if !ok {
 		t.Fatal("ManaDamageInput() ok = false")
 	}
-	if got, want := mana.MAtk, 13.286025000000002; !closeFloat(got, want) {
+	if got, want := mana.MAtk, 13.0; got != want {
 		t.Fatalf("ManaDamageInput MAtk = %v, want %v", got, want)
 	}
-	if got, want := mana.MDef, 46.080000000000005; !closeFloat(got, want) {
+	if got, want := mana.MDef, 46.0; got != want {
 		t.Fatalf("ManaDamageInput MDef = %v, want %v", got, want)
 	}
 	if got, want := mana.TargetMaxMp, 38.0; got != want {
@@ -4238,6 +4244,32 @@ func TestCharacterDamageInputsUsePvPMultipliers(t *testing.T) {
 }
 
 // ---- from character_stats_golden_test.go ----
+// rawPAtk, rawPDef, rawMAtk and rawMDef read the finalized stat before the
+// getters truncate it, so the pipeline golden stays sensitive to sub-integer
+// float drift (func insertion order, association) that truncation would hide.
+func rawPAtk(c *Character) float64 {
+	return c.calcStat(stat.PowerAttack, c.activeWeapon().stat("pAtk", positiveTemplateStat(c.template().PAtk)))
+}
+
+func rawPDef(c *Character) float64 {
+	return c.calcStat(stat.PowerDefence, positiveTemplateStat(c.template().PDef))
+}
+
+func rawMAtk(c *Character) float64 {
+	return c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", positiveTemplateStat(c.template().MAtk)))
+}
+
+func rawMDef(c *Character) float64 {
+	return c.calcStat(stat.MagicDefence, positiveTemplateStat(c.template().MDef))
+}
+
+func positiveTemplateStat(v float64) float64 {
+	if v > 0 {
+		return v
+	}
+	return 1
+}
+
 // goldenPlayerScenarios computes the stat pipeline parity oracle for
 // player.Character: actor x stat x active-modifier-set, including several
 // same-order funcs attached/detached in different sequences (float addition
@@ -4258,14 +4290,14 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSub, Value: 1e16}})
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
-		out["order30_forward"] = c.PAtk()
+		out["order30_forward"] = rawPAtk(c)
 
 		tmpl2 := combatTemplate()
 		c2 := liveCharacter(2, tmpl2, combatItems())
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1}})
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpSub, Value: 1e16}})
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 1e16}})
-		out["order30_reverse"] = c2.PAtk()
+		out["order30_reverse"] = rawPAtk(c2)
 	}
 
 	// Set rebasing: a *Set at order 0 must replace `base` for every func
@@ -4277,7 +4309,7 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 			{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 500},
 			{Stat: stat.MagicDefence, Op: effect.OpBaseMul, Value: 0.5},
 		})
-		out["set_rebase_mdef"] = c.MDef()
+		out["set_rebase_mdef"] = rawMDef(c)
 	}
 
 	// Attach then detach: value must return exactly to the pre-attach
@@ -4285,16 +4317,16 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 	{
 		tmpl := combatTemplate()
 		c := liveCharacter(4, tmpl, combatItems())
-		base := c.PAtk()
+		base := rawPAtk(c)
 		owner := effect.ModOwnerEffect(&effect.Effect{})
 		c.AddStatFuncs([]effect.Mod{
 			{Stat: stat.PowerAttack, Op: effect.OpAdd, Value: 7, Owner: owner},
 			{Stat: stat.PowerAttack, Op: effect.OpMul, Value: 1.25, Owner: owner},
 		})
 		out["attach_detach_before"] = base
-		out["attach_detach_during"] = c.PAtk()
+		out["attach_detach_during"] = rawPAtk(c)
 		c.RemoveStatsByOwner(owner)
-		out["attach_detach_after"] = c.PAtk()
+		out["attach_detach_after"] = rawPAtk(c)
 	}
 
 	// Mixed orders across several stats at once (BaseAdd, Mul, Add, AddMul,
@@ -4311,8 +4343,8 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 			{Stat: stat.MagicAttack, Op: effect.OpAddMul, Value: 10}, // -10%
 			{Stat: stat.RunSpeed, Op: effect.OpSubDiv, Value: 20},    // /(1-0.2)
 		})
-		out["mixed_pdef"] = c.PDef()
-		out["mixed_matk"] = c.MAtk()
+		out["mixed_pdef"] = rawPDef(c)
+		out["mixed_matk"] = rawMAtk(c)
 		out["mixed_runspeed"] = c.RunSpeed()
 	}
 
@@ -4331,14 +4363,14 @@ func goldenPlayerScenarios(t testing.TB) map[string]float64 {
 		tmplRef, _ := items.Get(50)
 		owner := effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmplRef})
 		c.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpEnchant, Owner: owner}})
-		out["enchant_patk_s_over3"] = c.PAtk()
+		out["enchant_patk_s_over3"] = rawPAtk(c)
 
 		inst2 := &item.Instance{ObjectID: 901, TemplateID: 50, Location: item.LocationPaperdoll, LocationData: 0, EnchantLevel: 2}
 		c2 := liveCharacter(7, tmpl, items, inst2)
 		tmplRef2, _ := items.Get(50)
 		owner2 := effect.ModOwnerItem(effect.ItemOwner{Inst: inst2, Tmpl: tmplRef2})
 		c2.AddStatFuncs([]effect.Mod{{Stat: stat.PowerAttack, Op: effect.OpEnchant, Owner: owner2}})
-		out["enchant_patk_s_under3"] = c2.PAtk()
+		out["enchant_patk_s_under3"] = rawPAtk(c2)
 	}
 
 	return out
@@ -4723,7 +4755,9 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	if !closeFloat(in.VulnModifier, 0.5) {
 		t.Fatalf("VulnModifier = %v, want 0.5", in.VulnModifier)
 	}
-	if want := 0.9420817669172932; !closeFloat(in.MAtkModifier, want) {
+	// sqrt(M.Atk) / M.Def * 11 over the truncated stats: M.Atk 53.1441 -> 53,
+	// M.Def 85.12 -> 85.
+	if want := math.Sqrt(53) / 85 * 11; !closeFloat(in.MAtkModifier, want) {
 		t.Fatalf("MAtkModifier = %v, want %v", in.MAtkModifier, want)
 	}
 	if want := 1 + 0.01*float64(def.MagicLevel+def.LevelDepend-target.CharLevel); !closeFloat(in.LevelModifier, want) {

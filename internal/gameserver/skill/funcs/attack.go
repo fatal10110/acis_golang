@@ -47,11 +47,13 @@ var MAtkCritical Func = func(effector stat.Actor, base, value float64) float64 {
 }
 
 // MAtkMod finalizes M.Atk from INT and the level-scaling factor, squaring
-// both multipliers.
+// both multipliers. The squares are multiplied together before they scale
+// value: the association moves the last bit, which the truncating M.Atk
+// getter can observe.
 var MAtkMod Func = func(effector stat.Actor, base, value float64) float64 {
 	intMod := statbonus.INTBonus[effector.INT()]
 	lvlMod := effector.LevelMod()
-	return value * (lvlMod * lvlMod) * (intMod * intMod)
+	return value * ((lvlMod * lvlMod) * (intMod * intMod))
 }
 
 // MAtkSpeed finalizes magic attack speed from WIT.

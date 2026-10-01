@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
@@ -269,9 +270,10 @@ func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
 }
 
 // PDef returns this NPC's physical defense stat, finalized through its stat
-// calculator (level scaling plus any active buff/debuff).
+// calculator (level scaling plus any active buff/debuff) and truncated to a
+// whole number.
 func (h *Hostile) PDef() float64 {
-	return h.calcStat(stat.PowerDefence, h.Instance.Template.PDef)
+	return math.Trunc(h.calcStat(stat.PowerDefence, h.Instance.Template.PDef))
 }
 
 // Evasion returns this NPC's physical evasion rating (per-mille), finalized
