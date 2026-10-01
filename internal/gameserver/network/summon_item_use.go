@@ -114,18 +114,19 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 	// SUMMON_A_PET follows every attempt, refused, held or started: after
 	// the refusal's answer, after the held cast's ActionFailed, or after the
 	// cast-start packets.
-	if itemAICastBusy(live) {
-		// A sit-down or stand-up in progress holds the cast, once it passes
-		// the attempt gate, as the next CAST intention; it runs when the
-		// transition settles.
-		if l.attemptItemAICast(live, live.Character, def) {
-			live.deferSummonCreatureCast(inv, inst, def)
-			sendMagicActionFailed(live)
-		}
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet))
-		return true
+	var run func()
+	switch {
+	case !l.attemptItemAICast(live, live.Character, def):
+		// The attempt gate answers its refusal before the cast is held or
+		// started.
+	case itemAICastBusy(live):
+		// A sit-down or stand-up in progress holds the cast as the next
+		// CAST intention; it runs when the transition settles.
+		live.deferSummonCreatureCast(inv, inst, def)
+		sendMagicActionFailed(live)
+	default:
+		run = l.beginSummonCreatureCast(live, inv, inst, def)
 	}
-	run := l.beginSummonCreatureCast(live, inv, inst, def)
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonAPet))
 	if run != nil {
 		run()

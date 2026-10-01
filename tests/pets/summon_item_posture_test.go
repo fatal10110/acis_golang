@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // The summon-item sitting gate reads Player.isSitting(), which a sit-down
@@ -129,6 +130,10 @@ func TestCollarDuringStandUpIsHeldUntilUp(t *testing.T) {
 		t.Fatalf("held collar cast = caster %d target %d skill %d, want %d/%d/%d", caster, target, skill, h.ownerID, h.ownerID, summonCreatureID)
 	}
 	assertFrameOpcode(t, mustRead(t, h.client, "held collar SetupGauge"), serverpackets.OpcodeSetupGauge, "held collar SetupGauge")
+	// SUMMON_A_PET went out with the hold; the resumed cast does not repeat it.
+	if frames := readImmediate(h.client); len(frames) != 0 {
+		t.Fatalf("held collar after its cast start = opcodes %x, want none", frameOpcodes(frames))
+	}
 	if !h.srv.PlayerCastingNow(t, h.ownerID) {
 		t.Fatal("held collar cast not in flight once up")
 	}
@@ -263,5 +268,46 @@ func assertNoSittingRefusal(t *testing.T, frames [][]byte, what string) {
 		if f[0] == serverpackets.OpcodeSystemMessage && wire.NewReader(f[1:]).ReadInt32() == serverpackets.SystemMessageCannotMoveWhileSitting {
 			t.Fatalf("%s answered CANT_MOVE_SITTING: opcodes %x", what, frameOpcodes(frames))
 		}
+	}
+}
+
+// TestCollarAttemptGateRefusesBeforeHoldOrStart pins tryToCast running
+// canAttemptCast before it decides to hold or start the cast
+// (PlayableAI.java:304-318): in formal wear the collar is refused with
+// CANNOT_USE_ITEMS_SKILLS_WITH_FORMALWEAR (PlayerCast.java:193-197) and
+// ActionFailed, SUMMON_A_PET follows (SummonItems.java:95-96), and nothing
+// is held, cast or summoned, standing or mid stand-up alike.
+func TestCollarAttemptGateRefusesBeforeHoldOrStart(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		start func(*testing.T, *petWorld)
+	}{
+		{name: "standing", start: func(*testing.T, *petWorld) {}},
+		{name: "mid stand-up", start: startOwnerStandUp},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			h := bootOwnerWithCollar(t, seedItem{TemplateID: gameservertest.FormalWearID, Count: 1})
+			h.client.Send(encodeUseItem(h.seededItem(t, gameservertest.FormalWearID), false))
+			drainUntilQuiet(t, h.client)
+			tt.start(t, h)
+
+			h.client.Send(encodeUseItem(h.collarID, false))
+			frames := readImmediate(h.client)
+			if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage}; string(got) != string(want) {
+				t.Fatalf("collar in formal wear %s = opcodes %x, want %x", tt.name, got, want)
+			}
+			assertStaticSystemMessage(t, frames[0], serverpackets.SystemMessageCannotUseSkillsWithFormalWear)
+			assertStaticSystemMessage(t, frames[2], serverpackets.SystemMessageSummonAPet)
+
+			h.srv.Advance(t, 3*time.Second)
+			if frames := drainFrames(t, h.client); len(frames) != 0 {
+				t.Fatalf("refused collar %s later sent opcodes %x, want none", tt.name, frameOpcodes(frames))
+			}
+			if _, ok := h.srv.State.Summon(h.ownerID); ok || h.srv.PlayerCastingNow(t, h.ownerID) {
+				t.Fatalf("collar in formal wear %s summoned or started a cast", tt.name)
+			}
+		})
 	}
 }
