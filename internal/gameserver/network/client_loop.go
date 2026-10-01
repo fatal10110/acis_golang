@@ -711,6 +711,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if !l.dispatchPartyExtended(client, live, second, payload) {
 					return
 				}
+			case clientpackets.OpcodeRequestOustFromPartyRoom, clientpackets.OpcodeRequestDismissPartyRoom,
+				clientpackets.OpcodeRequestWithdrawPartyRoom, clientpackets.OpcodeRequestAskJoinPartyRoom,
+				clientpackets.OpcodeAnswerJoinPartyRoom, clientpackets.OpcodeRequestListPartyMatchingWaitingRoom,
+				clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom:
+				if !l.dispatchPartyMatchExtended(client, live, second, payload) {
+					return
+				}
 			case clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
 					continue
@@ -1507,6 +1514,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		case clientpackets.OpcodeRequestJoinParty, clientpackets.OpcodeRequestAnswerJoinParty,
 			clientpackets.OpcodeRequestWithdrawParty, clientpackets.OpcodeRequestOustPartyMember:
 			if !l.dispatchParty(client, live, opcode, payload) {
+				return
+			}
+
+		case clientpackets.OpcodeRequestListPartyWaiting, clientpackets.OpcodeRequestManagePartyRoom,
+			clientpackets.OpcodeRequestJoinPartyRoom:
+			if !l.dispatchPartyMatch(client, live, opcode, payload) {
 				return
 			}
 

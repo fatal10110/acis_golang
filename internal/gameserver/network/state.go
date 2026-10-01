@@ -139,6 +139,9 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x6b: true, // acquire skill info
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point
+		0x6f: true, // party matching: open the window
+		0x70: true, // party matching: open or revise a room
+		0x71: true, // party matching: enter a room
 		0x72: true, // crystallize item
 		0x73: true, // private store sell: manage
 		0x74: true, // private store sell: set list
