@@ -37,11 +37,33 @@ const (
 
 // CastRejectionFor classifies a playable caster's target conditions: every
 // failure the handler's CanCast reports, with the system message the player
-// is shown, or CastRejectSilent when there is none. GROUND is checked
-// separately (GroundCastFailureFor). A nil target always classifies as
-// CastRejectNone: a missing target is dropped before the cast stops the
-// caster, not rejected after it.
+// is shown, or CastRejectSilent when there is none, then a player's
+// skill-type target rule. GROUND is checked separately
+// (GroundCastFailureFor). A nil target always classifies as CastRejectNone:
+// a missing target is dropped before the cast stops the caster, not rejected
+// after it.
 func CastRejectionFor(targetType modelskill.Target, caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
+	if rejection := targetTypeCastRejection(targetType, caster, target, skill, ctrl); rejection != CastRejectNone {
+		return rejection
+	}
+	return monsterOnlySkillRejection(caster, target, skill)
+}
+
+// monsterOnlySkillRejection refuses a player's SPOIL or DRAIN_SOUL skill
+// whose final target is not Monster-family (a Guard, SiegeGuard,
+// FriendlyMonster, door or playable), whatever its target type admits.
+func monsterOnlySkillRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
+	if target == nil || skill == nil || (skill.SkillType != "SPOIL" && skill.SkillType != "DRAIN_SOUL") {
+		return CastRejectNone
+	}
+	if caster == nil || caster.Kind() != actor.KindPlayer || target.MonsterKind() {
+		return CastRejectNone
+	}
+	return CastRejectInvalidTarget
+}
+
+// targetTypeCastRejection is the target type's own part of CastRejectionFor.
+func targetTypeCastRejection(targetType modelskill.Target, caster, target Actor, skill *modelskill.Definition, ctrl bool) CastRejection {
 	switch targetType {
 	case modelskill.TargetAura, modelskill.TargetFrontAura, modelskill.TargetAuraUndead:
 		if skill != nil && skill.Offensive && caster.InPeaceZone() {

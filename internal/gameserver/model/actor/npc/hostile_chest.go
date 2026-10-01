@@ -15,6 +15,10 @@ type Remover interface {
 	Remove(h *Hostile)
 }
 
+// Chest reports a Chest-kind NPC, a treasure box or a mimic alike: the
+// only target a chest key is used on.
+func (h *Hostile) Chest() bool { return h.chestKind() }
+
 // Box reports a treasure-box chest that an unlock skill can open.
 func (h *Hostile) Box() bool {
 	id := h.Instance.Template.ID
