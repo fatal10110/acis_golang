@@ -2,8 +2,8 @@ package serverpackets
 
 import (
 	"fmt"
-	"math"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -83,23 +83,9 @@ func writeBuyList(w *wire.Writer, list buylist.List, count func(buylist.Product)
 		if product.SiegeGuardTicket() {
 			price = float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate)
 		}
-		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, javaInt(price))
+		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.JavaInt(price))
 	}
 	return nil
-}
-
-// javaInt narrows f to an int32 the way a Java (int) cast does: toward
-// zero, saturating at the int32 range, NaN as 0.
-func javaInt(f float64) int32 {
-	switch {
-	case math.IsNaN(f):
-		return 0
-	case f >= math.MaxInt32:
-		return math.MaxInt32
-	case f <= math.MinInt32:
-		return math.MinInt32
-	}
-	return int32(f)
 }
 
 // FrameSellList builds the SellList packet for items the player can offer

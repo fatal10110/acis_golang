@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -128,7 +129,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		}
 		price := int32(p.Price)
 		if p.SiegeGuardTicket() {
-			price = javaInt(float64(price) * s.cfg.SiegeGuardsPriceRate)
+			price = commons.JavaInt(float64(price) * s.cfg.SiegeGuardsPriceRate)
 		}
 		if price < 0 || (price == 0 && !gm) {
 			return Purchase{}, nil
@@ -141,7 +142,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		}
 		// The tax applies to the unit price, before the count; the 32-bit
 		// products wrap as the reference's int arithmetic does.
-		price = javaInt(float64(price) * (1 + taxRate))
+		price = commons.JavaInt(float64(price) * (1 + taxRate))
 		subtotal += int64(row.Count * price)
 		if subtotal > math.MaxInt32 {
 			return Purchase{}, nil
@@ -261,18 +262,4 @@ func reduceAdena(inv *itemcontainer.Inventory, count int64) bool {
 		return inv.DestroyByTemplateID(item.AdenaID, int(count)) != nil
 	}
 	return true
-}
-
-// javaInt narrows f to an int32 the way a Java (int) cast does: toward
-// zero, saturating at the int32 range, NaN as 0.
-func javaInt(f float64) int32 {
-	switch {
-	case math.IsNaN(f):
-		return 0
-	case f >= math.MaxInt32:
-		return math.MaxInt32
-	case f <= math.MinInt32:
-		return math.MinInt32
-	}
-	return int32(f)
 }
