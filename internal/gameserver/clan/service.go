@@ -59,7 +59,10 @@ func (s *Service) Table() *Table { return s.table }
 // Invites is the pending clan invitation book.
 func (s *Service) Invites() *Invites { return s.invites }
 
-// write queues fn on ownerID's lane.
+// write queues fn on ownerID's lane. Every caller holds the changed clan's
+// mu, so the jobs on one lane follow the order the changes were made in and
+// an older row snapshot never lands after a newer one. Enqueue only appends
+// to the lane, so holding mu across it blocks nothing.
 func (s *Service) write(ownerID int32, what string, fn func(context.Context, Store) error) {
 	if s.store == nil {
 		return
@@ -79,6 +82,12 @@ func (s *Service) write(ownerID int32, what string, fn func(context.Context, Sto
 	if !s.writes.Enqueue(ownerID, job) {
 		log.Error().Int32("owner_id", ownerID).Msg("clan: " + what + ": write dropped")
 	}
+}
+
+// updateClanLocked queues cl's clan_data row as it stands; cl.mu is held.
+func (s *Service) updateClanLocked(cl *Clan) {
+	row := cl.rowLocked()
+	s.write(cl.id, "update clan", func(ctx context.Context, st Store) error { return st.UpdateClan(ctx, row) })
 }
 
 // ClanOf returns the clan c belongs to.

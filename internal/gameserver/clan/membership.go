@@ -73,14 +73,21 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 	if !s.table.insert(cl) {
 		return nil, CreateNameTaken
 	}
-	row := cl.Info()
-	clanRow := Row{ID: row.ID, Name: row.Name, LeaderID: c.ID}
+	// Only the founder, whose queue this runs on, can act on the clan yet;
+	// its rows are still queued under cl.mu like every later change, so
+	// they reach the store first.
+	cl.mu.Lock()
+	clanRow := Row{ID: id, Name: name, LeaderID: c.ID}
 	s.write(id, "store new clan", func(ctx context.Context, st Store) error { return st.InsertClan(ctx, clanRow) })
+	s.saveMembershipLocked(MembershipRow{
+		ObjectID: c.ID, ClanID: id, PowerGrade: leader.PowerGrade, PledgeType: leader.PledgeType,
+		JoinExpiry: c.ClanJoinExpiryTime(),
+	})
+	cl.mu.Unlock()
 
 	c.SetClanID(id)
 	c.SetTitle("")
 	c.SetPledgeClass(s.pledgeClass(c))
-	s.saveMembership(c, leader)
 	return cl, Created
 }
 
@@ -93,12 +100,10 @@ func LiveMember(c *player.Character) Member {
 	}
 }
 
-func (s *Service) saveMembership(c *player.Character, m Member) {
-	row := MembershipRow{
-		ObjectID: c.ID, ClanID: c.ClanID(), Title: c.Title(),
-		PowerGrade: m.PowerGrade, PledgeType: m.PledgeType, JoinExpiry: c.ClanJoinExpiryTime(),
-	}
-	s.write(c.ID, "save clan membership", func(ctx context.Context, st Store) error { return st.SaveMembership(ctx, row) })
+// saveMembershipLocked queues row; the clan's mu is held, so the row lands
+// before any removal of the same member that follows it.
+func (s *Service) saveMembershipLocked(row MembershipRow) {
+	s.write(row.ObjectID, "save clan membership", func(ctx context.Context, st Store) error { return st.SaveMembership(ctx, row) })
 }
 
 // JoinRefusal is why a clan invitation, or its acceptance, is refused.
@@ -164,13 +169,13 @@ func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, pledgeTyp
 	}
 	m.Title = ""
 	cl.members[c.ID] = &m
+	s.saveMembershipLocked(MembershipRow{ObjectID: c.ID, ClanID: cl.id, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType})
 	cl.mu.Unlock()
 
 	c.SetClanID(cl.id)
 	c.SetTitle("")
 	c.SetPledgeClass(s.pledgeClass(c))
 	c.SetClanJoinExpiryTime(0)
-	s.saveMembership(c, m)
 	return JoinAllowed
 }
 
@@ -255,25 +260,22 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 	}
 	cl.mu.Lock()
 	cl.charPenaltyExpiry = joinExpiry
-	row := cl.rowLocked()
+	s.updateClanLocked(cl)
 	cl.mu.Unlock()
-	s.write(cl.id, "update clan", func(ctx context.Context, st Store) error { return st.UpdateClan(ctx, row) })
 	return cl, m, Ousted
 }
 
-// remove drops objectID from cl's roster and writes its row: live is its
-// character when online, nil otherwise.
+// remove drops objectID from cl's roster and queues its row under cl.mu:
+// live is its character when online, nil otherwise.
 func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *player.Character, now time.Time) (Member, bool) {
 	cl.mu.Lock()
+	defer cl.mu.Unlock()
 	m, ok := cl.members[objectID]
 	wasLeader := objectID == cl.leaderID
-	if ok {
-		delete(cl.members, objectID)
-	}
-	cl.mu.Unlock()
 	if !ok {
 		return Member{}, false
 	}
+	delete(cl.members, objectID)
 	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil}
 	switch {
 	case wasLeader:

@@ -46,10 +46,10 @@ func (s *Service) SetMemberGrade(c *player.Character, name string, grade int) (*
 	m := cl.members[target.ObjectID]
 	m.PowerGrade = grade
 	updated := *m
-	cl.mu.Unlock()
 	s.write(updated.ObjectID, "set member power grade", func(ctx context.Context, st Store) error {
 		return st.SetPowerGrade(ctx, updated.ObjectID, grade)
 	})
+	cl.mu.Unlock()
 	return cl, updated, GradeSet
 }
 
@@ -67,10 +67,10 @@ func (s *Service) SetRankPrivileges(c *player.Character, rank int, privs int32) 
 	}
 	cl.mu.Lock()
 	cl.privileges[rank] = privs
-	cl.mu.Unlock()
 	s.write(cl.id, "store rank privileges", func(ctx context.Context, st Store) error {
 		return st.SetPrivileges(ctx, cl.id, rank, privs)
 	})
+	cl.mu.Unlock()
 	return cl, true
 }
 
@@ -116,9 +116,8 @@ func (s *Service) NominateLeader(c *player.Character, name string) NominationRes
 		return NominationPending
 	}
 	cl.newLeaderID = m.ObjectID
-	row := cl.rowLocked()
+	s.updateClanLocked(cl)
 	cl.mu.Unlock()
-	s.write(cl.id, "update clan", func(ctx context.Context, st Store) error { return st.UpdateClan(ctx, row) })
 	return Nominated
 }
 
@@ -145,8 +144,7 @@ func (s *Service) CancelNomination(c *player.Character) CancelResult {
 		return NoNomination
 	}
 	cl.newLeaderID = 0
-	row := cl.rowLocked()
+	s.updateClanLocked(cl)
 	cl.mu.Unlock()
-	s.write(cl.id, "update clan", func(ctx context.Context, st Store) error { return st.UpdateClan(ctx, row) })
 	return NominationCancelled
 }

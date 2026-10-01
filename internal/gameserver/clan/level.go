@@ -78,39 +78,47 @@ func (s *Service) RaiseLevel(c *player.Character, pay LevelPayer, now time.Time)
 	if !ok {
 		return []any{LevelFailed{}}
 	}
-	var notices []any
 	if price.reputation > 0 {
-		if info.Reputation < price.reputation || cl.MembersCount() < price.members {
-			return []any{LevelFailed{}}
-		}
-		if change, changed := s.addReputation(cl, -price.reputation); changed {
-			notices = append(notices, change)
-		}
-		notices = append(notices, ReputationDeducted{Points: price.reputation})
-	} else {
-		if pay.SP() < price.sp {
-			return []any{LevelFailed{}}
-		}
-		paid := false
-		if price.itemID != 0 {
-			paid = pay.PayItem(price.itemID, 1)
-		} else {
-			paid = pay.PayAdena(price.adena)
-		}
-		if !paid {
-			return []any{LevelFailed{}}
-		}
-		pay.TakeSP(price.sp)
+		return s.raiseLevelForReputation(cl, info.Level, price)
 	}
-	level := s.setLevel(cl, info.Level+1)
-	return append(notices, LevelRaised{Level: level})
+	if pay.SP() < price.sp {
+		return []any{LevelFailed{}}
+	}
+	paid := false
+	if price.itemID != 0 {
+		paid = pay.PayItem(price.itemID, 1)
+	} else {
+		paid = pay.PayAdena(price.adena)
+	}
+	if !paid {
+		return []any{LevelFailed{}}
+	}
+	pay.TakeSP(price.sp)
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	return []any{LevelRaised{Level: s.setLevelLocked(cl, info.Level+1)}}
 }
 
-// setLevel stores level as cl's level.
-func (s *Service) setLevel(cl *Clan, level int) int {
+// raiseLevelForReputation raises cl from level, which costs reputation.
+// The price check, the deduction and the new level happen under one hold
+// of cl.mu, so no other reputation change slips between them.
+func (s *Service) raiseLevelForReputation(cl *Clan, level int, price levelPrice) []any {
 	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	if cl.level != level || cl.reputation < price.reputation || len(cl.members) < price.members {
+		return []any{LevelFailed{}}
+	}
+	var notices []any
+	if change, changed := s.addReputationLocked(cl, -price.reputation); changed {
+		notices = append(notices, change)
+	}
+	notices = append(notices, ReputationDeducted{Points: price.reputation})
+	return append(notices, LevelRaised{Level: s.setLevelLocked(cl, level+1)})
+}
+
+// setLevelLocked stores level as cl's level; cl.mu is held.
+func (s *Service) setLevelLocked(cl *Clan, level int) int {
 	cl.level = level
-	cl.mu.Unlock()
 	s.write(cl.id, "update clan level", func(ctx context.Context, st Store) error { return st.UpdateLevel(ctx, cl.id, level) })
 	return level
 }
@@ -119,18 +127,16 @@ func (s *Service) setLevel(cl *Clan, level int) int {
 // leader the reputation notice.
 func TellsLeaderAboutReputation(level int) bool { return level > reputationLevel }
 
-// addReputation moves cl's reputation by delta. A clan below level 5
-// neither gains nor loses any; it reports no change then.
-func (s *Service) addReputation(cl *Clan, delta int) (ReputationChanged, bool) {
-	cl.mu.Lock()
+// addReputationLocked moves cl's reputation by delta; cl.mu is held. A
+// clan below level 5 neither gains nor loses any; it reports no change
+// then.
+func (s *Service) addReputationLocked(cl *Clan, delta int) (ReputationChanged, bool) {
 	if cl.level < minReputationLevel {
-		cl.mu.Unlock()
 		return ReputationChanged{}, false
 	}
 	before := cl.reputation
 	after := clampReputation(before + delta)
 	cl.reputation = after
-	cl.mu.Unlock()
 	change := ReputationChanged{Score: after}
 	switch {
 	case before > 0 && after <= 0:

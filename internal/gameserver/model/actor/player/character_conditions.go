@@ -139,9 +139,9 @@ func (a characterStatActor) IsInOlympiadMode() bool { return false }
 // PkKills satisfies conditions.PlayerActor.
 func (a characterStatActor) PkKills() int { return a.c.ProgressionValues().PKKills }
 
-// PledgeClass satisfies conditions.PlayerActor. Always 0: pledge rank isn't
-// modeled on Character yet (tracked in #1507), and no shipped stat func's
-// condition needs it.
+// PledgeClass satisfies conditions.PlayerActor. Always 0: Character.
+// PledgeClass now holds the clan rank, but the skill conditions do not read
+// it yet (#1507), and no shipped stat func's condition needs it.
 func (a characterStatActor) PledgeClass() int { return 0 }
 
 // IsClanLeader satisfies conditions.PlayerActor. Always false: see

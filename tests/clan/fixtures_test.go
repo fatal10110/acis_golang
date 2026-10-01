@@ -66,6 +66,13 @@ func clanPages(t *testing.T) map[string]string {
 // village master.
 func bootClanWorld(t *testing.T, leaderLevel, leaderSP, leaderAdena int, extra ...gameservertest.Option) *clanWorld {
 	t.Helper()
+	return bootClanWorldCarrying(t, leaderLevel, leaderSP, map[int32]int32{item.AdenaID: int32(leaderAdena)}, extra...)
+}
+
+// bootClanWorldCarrying is bootClanWorld with the founder carrying items,
+// count by template id, as it enters the world.
+func bootClanWorldCarrying(t *testing.T, leaderLevel, leaderSP int, items map[int32]int32, extra ...gameservertest.Option) *clanWorld {
+	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Founder", leaderLevel, leaderSP),
 		gameservertest.WithWantChars(1),
@@ -76,8 +83,10 @@ func bootClanWorld(t *testing.T, leaderLevel, leaderSP, leaderAdena int, extra .
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t)}
 	w.memberID = srv.SeedCharacterFor(t, "player2", "Recruit", 1, 0).ID
 	w.member = srv.DialClient(t, "player2", 1)
-	if leaderAdena > 0 {
-		srv.GiveItem(t, w.leaderID, item.AdenaID, int32(leaderAdena))
+	for id, count := range items {
+		if count > 0 {
+			srv.GiveItem(t, w.leaderID, id, count)
+		}
 	}
 	startInWorld(t, w.leader)
 	startInWorld(t, w.member)
