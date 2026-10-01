@@ -1,7 +1,6 @@
 package network
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -70,8 +69,8 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 				return false
 			}
 		case "ishero":
-			want, ok := parseConditionBool(raw)
-			if !ok || live.IsHero() != want {
+			want := parseConditionBool(raw)
+			if live.IsHero() != want {
 				return false
 			}
 		case "pkcount":
@@ -80,28 +79,27 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 				return false
 			}
 		case "flying":
-			want, ok := parseConditionBool(raw)
-			if !ok || live.Flying() != want {
+			want := parseConditionBool(raw)
+			if live.Flying() != want {
 				return false
 			}
 		case "transformed":
-			want, ok := parseConditionBool(raw)
-			if !ok || live.Transformed() != want {
+			want := parseConditionBool(raw)
+			if live.Transformed() != want {
 				return false
 			}
 		case "resting":
-			want, ok := parseConditionBool(raw)
-			if !ok || !live.Standing() != want {
+			want := parseConditionBool(raw)
+			if !live.Standing() != want {
 				return false
 			}
 		case "running":
-			want, ok := parseConditionBool(raw)
-			if !ok || live.Running() != want {
+			want := parseConditionBool(raw)
+			if live.Running() != want {
 				return false
 			}
 		case "moving", "riding", "olympiad":
-			want, ok := parseConditionBool(raw)
-			if !ok || want {
+			if parseConditionBool(raw) {
 				return false
 			}
 		case "castle", "clanhall":
@@ -118,9 +116,10 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 	return true
 }
 
-func parseConditionBool(raw string) (bool, bool) {
-	v, err := strconv.ParseBool(raw)
-	return v, err == nil
+// parseConditionBool reads a boolean condition attribute: true only for a
+// case-insensitive "true", false for anything else, never an error.
+func parseConditionBool(raw string) bool {
+	return strings.EqualFold(raw, "true")
 }
 
 func parseConditionInt(raw string) (int, bool) {

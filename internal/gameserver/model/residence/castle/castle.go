@@ -3,9 +3,9 @@ package castle
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 )
@@ -261,7 +261,7 @@ func parseSpawnLocation(raw string) (location.Location, int, error) {
 	}
 	var nums [4]int
 	for i, name := range []string{"x", "y", "z", "heading"} {
-		n, err := strconv.Atoi(parts[i])
+		n, err := commons.Atoi(parts[i])
 		if err != nil {
 			return location.Location{}, 0, fmt.Errorf("castle: pos %s: %w", name, err)
 		}

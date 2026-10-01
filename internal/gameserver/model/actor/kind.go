@@ -24,3 +24,13 @@ const (
 // Playable reports whether k is a player-controlled creature: a player or
 // its summon.
 func (k Kind) Playable() bool { return k == KindPlayer || k == KindSummon }
+
+// Creature reports whether k is a creature: a player, an NPC, a summon or a
+// door. Static objects and ground items are not.
+func (k Kind) Creature() bool {
+	switch k {
+	case KindPlayer, KindNPC, KindSummon, KindDoor:
+		return true
+	}
+	return false
+}

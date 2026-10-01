@@ -117,12 +117,12 @@ func (c *folkControl) Emit(ev event.Event) {
 	}
 }
 
-// waterSurface caps a walk under water at the surface of the water zone it
-// is in.
-func waterSurface(zones *zone.Index) func(location.Location, int) (int, bool) {
-	return func(position location.Location, groundZ int) (int, bool) {
+// waterSurface reports the water zone at a position and its surface level,
+// the mover's move.CreatureMove.SetWaterSurface query.
+func waterSurface(zones *zone.Index) func(location.Location) (int, bool) {
+	return func(position location.Location) (int, bool) {
 		water, ok := zone.FindAt[*zone.Water](zones, position.X, position.Y, position.Z)
-		if !ok || groundZ-water.WaterLevel() >= -20 {
+		if !ok {
 			return 0, false
 		}
 		return water.WaterLevel(), true

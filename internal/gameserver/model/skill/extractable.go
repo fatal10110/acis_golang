@@ -3,6 +3,8 @@ package skill
 import (
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ExtractableItem is one item id/quantity pair inside an ExtractableProduct.
@@ -52,12 +54,12 @@ func parseExtractableGroup(group string) (ExtractableProduct, bool) {
 	pairFields := len(fields) - 1
 	items := make([]ExtractableItem, 0, pairFields/2)
 	for i := 0; i < pairFields; i += 2 {
-		itemID, err := strconv.ParseInt(fields[i], 10, 32)
+		itemID, err := commons.ParseInt(fields[i], 32)
 		if err != nil {
 			return ExtractableProduct{}, false
 		}
 		// A quantity past the 32-bit range fails its group.
-		quantity, err := strconv.ParseInt(fields[i+1], 10, 32)
+		quantity, err := commons.ParseInt(fields[i+1], 32)
 		if err != nil {
 			return ExtractableProduct{}, false
 		}

@@ -2,8 +2,9 @@ package skill
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ID identifies a skill, independent of its level.
@@ -518,11 +519,11 @@ func ParseRef(raw string) (Ref, error) {
 		return Ref{}, fmt.Errorf("want \"skillId-level\"")
 	}
 	id, level := parts[0], parts[1]
-	rawID, err := strconv.ParseInt(id, 10, 32)
+	rawID, err := commons.ParseInt(id, 32)
 	if err != nil {
 		return Ref{}, err
 	}
-	lvl, err := strconv.Atoi(level)
+	lvl, err := commons.Atoi(level)
 	if err != nil {
 		return Ref{}, err
 	}

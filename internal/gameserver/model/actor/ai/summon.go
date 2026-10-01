@@ -37,6 +37,10 @@ type SummonActor interface {
 type SummonMoveController interface {
 	MoveController
 	MaybeStartFriendlyFollow(target attackable.Combatant, offset int) (bool, error)
+	// RecheckOffensiveFollow is one run of the offensive follow task: it
+	// answers like MaybeStartOffensiveFollow, but measures whether target is
+	// already in reach as the follow task does (3D while swimming or flying).
+	RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
 }
 
 // SummonCastController is the cast controller a summon AI drives: the shared
@@ -347,7 +351,7 @@ func (s *Summon) StartOffensiveFollowTicker(q *sim.Queue) (stop func()) {
 // offensive follow every 500 ms, the follow task's own cadence, which runs
 // independently of the shared 1 s AI think tick. That follow task manages
 // movement only and has no attack/cast
-// execution path, so this deliberately calls MaybeStartOffensiveFollow
+// execution path, so this deliberately calls RecheckOffensiveFollow
 // directly rather than the full thinkAttackLocked/thinkCastLocked — reusing
 // those would also re-run DoAttack/Cast on this 500 ms cadence once a
 // summon is already in range, doubling its attack/cast rate for any weapon
@@ -383,7 +387,7 @@ func (s *Summon) recheckOffensiveFollow() {
 		return
 	}
 
-	if _, err := s.move.MaybeStartOffensiveFollow(target, attackRange); err != nil {
+	if _, err := s.move.RecheckOffensiveFollow(target, attackRange); err != nil {
 		s.log.Warn().Err(err).Msg("ai: summon broadcast")
 	}
 }

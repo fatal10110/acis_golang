@@ -2,10 +2,11 @@ package xml
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/rs/zerolog"
 )
@@ -48,7 +49,8 @@ type skillElement struct {
 // skipped as a whole element. Within an otherwise-valid element, a single
 // level (regular or enchant) that fails to build is logged and skipped on
 // its own: other levels of the same skill, other skills, and other files
-// continue loading.
+// continue loading. A "#name" table reference in a value read without the
+// skill's tables (see conditionAttrs) skips the whole element instead.
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
@@ -96,6 +98,12 @@ func (sl *skillLoader) resolveTableValue(name, val string, tableIndex int) strin
 	return resolved
 }
 
+// resolver returns the table resolver for row tableIndex of the skill's
+// tables.
+func (sl *skillLoader) resolver(tableIndex int) tableResolver {
+	return func(name, val string) string { return sl.resolveTableValue(name, val, tableIndex) }
+}
+
 // resolveAttrMap folds an element's attributes into a name-keyed map,
 // resolving any "#name" table reference against row tableIndex first. A
 // repeated attribute name keeps the last value.
@@ -132,13 +140,13 @@ func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setElem, table
 // enchant-level counts and <table> blocks must all parse for any level to
 // build at all; a single level's own build failure only drops that level.
 func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]skill.Definition, error) {
-	rawID, err := strconv.ParseInt(el.ID, 10, 32)
+	rawID, err := commons.ParseInt(el.ID, 32)
 	if err != nil {
 		return nil, fmt.Errorf("skill id %q: %w", el.ID, err)
 	}
 	id := skill.ID(rawID)
 
-	levels, err := strconv.Atoi(el.Levels)
+	levels, err := commons.Atoi(el.Levels)
 	if err != nil {
 		return nil, fmt.Errorf("skill %d: levels %q: %w", id, el.Levels, err)
 	}
@@ -162,6 +170,16 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 	skipLevel := func(level int, err error) {
 		log.Error().Err(err).Str("file", path).Int("skill", int(id)).Int("level", level).Msg("data/xml: skipping malformed skill level")
 	}
+	// A table reference where none can be read rejects the whole skill, not
+	// just the level that reads it; any other template error drops only
+	// that level.
+	templateErr := func(level int, err error) error {
+		if errors.Is(err, errTableRefNotAllowed) {
+			return fmt.Errorf("skill %d level %d: %w", id, level, err)
+		}
+		skipLevel(level, err)
+		return nil
+	}
 
 	for i := 1; i <= levels; i++ {
 		vals := sl.resolveLevel(el.Sets, i)
@@ -172,7 +190,9 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 		}
 		def := skill.NewDefinition(id, i, el.Name, attrs)
 		if err := sl.applyTemplates(&def, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
-			skipLevel(i, err)
+			if err := templateErr(i, err); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		defs = append(defs, def)
@@ -203,7 +223,9 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 			fors = el.For
 		}
 		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			skipLevel(level, err)
+			if err := templateErr(level, err); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		defs = append(defs, def)
@@ -232,7 +254,9 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 			fors = el.For
 		}
 		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			skipLevel(level, err)
+			if err := templateErr(level, err); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		defs = append(defs, def)
@@ -247,12 +271,12 @@ func parseCountAttr(s string) (int, error) {
 	if s == "" {
 		return 0, nil
 	}
-	return strconv.Atoi(s)
+	return commons.Atoi(s)
 }
 
 func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
 	for _, c := range conds {
-		clause, err := sl.conditionClause(c.Attrs, c.Children, condIndex, msgMode)
+		clause, err := conditionClause(c.Attrs, c.Children, sl.resolver(condIndex), msgMode)
 		if err != nil {
 			return err
 		}
@@ -271,9 +295,13 @@ func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement
 
 func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcElement, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for _, op := range ops {
+	for i, op := range ops {
 		if strings.EqualFold(op.XMLName.Local, "cond") {
-			clause, err := sl.conditionClause(op.Attrs, op.Children, tableIndex, condMsgModeBoth)
+			// Only a leading <cond> gates the block; a later one is never read.
+			if i != 0 {
+				continue
+			}
+			clause, err := conditionClause(op.Attrs, op.Children, sl.resolver(tableIndex), condMsgModeRegular)
 			if err != nil {
 				return err
 			}
@@ -298,7 +326,7 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcEleme
 		if _, err := skill.ParseFuncOp(op.XMLName.Local); err != nil {
 			continue
 		}
-		fn, err := sl.funcTemplate(op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex)
+		fn, err := sl.funcTemplate(op.XMLName.Local, op.Attrs, op.Children, attachCond, tableIndex, sl.resolver(tableIndex))
 		if err != nil {
 			return err
 		}
@@ -350,11 +378,18 @@ func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause,
 	return eff, nil
 }
 
+// nestedEffectTemplates reads the children of an <effect>. Their conditions
+// belong to the effect, which has no tables, so none of their values may name
+// one; the funcs' own values still read the skill's tables.
 func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []condNode, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for _, n := range nodes {
+	for i, n := range nodes {
 		if strings.EqualFold(n.XMLName.Local, "cond") {
-			clause, err := sl.conditionClause(n.Attrs, n.Children, tableIndex, condMsgModeBoth)
+			// Only a leading <cond> gates the effect; a later one is never read.
+			if i != 0 {
+				continue
+			}
+			clause, err := conditionClause(n.Attrs, n.Children, nil, condMsgModeRegular)
 			if err != nil {
 				return err
 			}
@@ -362,7 +397,7 @@ func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []
 			continue
 		}
 		fnEl := funcElement(n)
-		fn, err := sl.funcTemplate(n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex)
+		fn, err := sl.funcTemplate(n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex, nil)
 		if err != nil {
 			return err
 		}
@@ -371,7 +406,10 @@ func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []
 	return nil
 }
 
-func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int) (skill.FuncTemplate, error) {
+// funcTemplate builds one stat func. Its values read row tableIndex of the
+// skill's tables; its condition child resolves table references with
+// condResolve.
+func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int, condResolve tableResolver) (skill.FuncTemplate, error) {
 	op, err := skill.ParseFuncOp(tag)
 	if err != nil {
 		return skill.FuncTemplate{}, err
@@ -389,46 +427,51 @@ func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []con
 	}
 	fn := skill.FuncTemplate{Op: op, Stat: stat, Value: value, AttachCondition: attachCond}
 	if len(children) > 0 {
-		cond := sl.condition(children[0], tableIndex)
+		cond, err := buildSkillCondition(children[0], condRolePredicate, condResolve)
+		if err != nil {
+			return skill.FuncTemplate{}, fmt.Errorf("%s %s: %w", tag, stat, err)
+		}
 		fn.Condition = &cond
 	}
 	return fn, nil
 }
 
-// condMsgMode selects how buildSkillConditionClause resolves a cond's
-// msg/msgId/addName attributes, following the differences between the three
-// places a skill file attaches a message to a condition:
-//   - condMsgModeRegular: a regular-level <cond> uses msg when present, else
-//     msgId (with addName only when msgId > 0); msgId and addName are never
-//     read alongside msg.
+// condMsgMode selects how conditionClause reads a cond's msg/msgId/addName
+// attributes:
+//   - condMsgModeRegular: a regular-level <cond> and a <for>/<effect>
+//     block's leading <cond> use msg when present, else msgId (with addName
+//     only when msgId > 0); msgId and addName are never read alongside msg.
 //   - condMsgModeEnchant: an enchant1cond/enchant2cond block reads only
 //     msg — msgId and addName are never consulted, even when present in the
 //     XML.
-//   - condMsgModeBoth: op-level <cond> attachment (the generic template
-//     parse, not the per-level skill loop) has no specified message
-//     semantics at all; this preserves the prior Go behavior of resolving
-//     msg and msgId independently rather than
-//     changing untested behavior outside this finding's scope.
 type condMsgMode int
 
 const (
 	condMsgModeRegular condMsgMode = iota
 	condMsgModeEnchant
-	condMsgModeBoth
 )
 
-// conditionClause resolves a <cond> element into a clause. A cond with no
-// predicate child returns (nil, nil): a missing condition element parses to
-// no condition, and attaching no condition is a tolerated no-op rather than
-// a load failure.
-func (sl *skillLoader) conditionClause(attrs []xml.Attr, children []condNode, tableIndex int, msgMode condMsgMode) (*skill.ConditionClause, error) {
+// conditionClause resolves a <cond> element into a clause, its predicate
+// resolving table references with resolve. A cond with no predicate child
+// returns (nil, nil): a missing condition element parses to no condition,
+// and attaching no condition is a tolerated no-op rather than a load
+// failure. The cond's own msg is read as written and its msgId may not name
+// a table.
+func conditionClause(attrs []xml.Attr, children []condNode, resolve tableResolver, msgMode condMsgMode) (*skill.ConditionClause, error) {
 	if len(children) == 0 {
 		return nil, nil
 	}
-	vals := sl.resolveAttrMap(attrs, tableIndex)
-	root := sl.condition(children[0], tableIndex)
-	a := newAttrValues(vals, "cond")
+	root, err := buildSkillCondition(children[0], condRolePredicate, resolve)
+	if err != nil {
+		return nil, fmt.Errorf("cond: %w", err)
+	}
+	a := newAttrValues(foldAttrs(attrs), "cond")
 	clause := skill.ConditionClause{Root: root}
+	if msgMode != condMsgModeEnchant && !a.has("msg") && a.has("msgId") {
+		if err := noTableRef("msgId", a.str("msgId")); err != nil {
+			return nil, fmt.Errorf("cond: %w", err)
+		}
+	}
 	switch msgMode {
 	case condMsgModeRegular:
 		if a.has("msg") {
@@ -439,10 +482,6 @@ func (sl *skillLoader) conditionClause(attrs []xml.Attr, children []condNode, ta
 		}
 	case condMsgModeEnchant:
 		clause.Message = a.strDefault("msg", "")
-	case condMsgModeBoth:
-		clause.Message = a.strDefault("msg", "")
-		clause.MessageID = a.int32LiteralDefault("msgId", 0)
-		clause.AddName = a.has("addName") && clause.MessageID > 0
 	}
 	if err := a.Err(); err != nil {
 		return nil, err
@@ -450,17 +489,26 @@ func (sl *skillLoader) conditionClause(attrs []xml.Attr, children []condNode, ta
 	return &clause, nil
 }
 
-func (sl *skillLoader) condition(n condNode, tableIndex int) skill.Condition {
-	attrs := sl.resolveAttrMap(n.Attrs, tableIndex)
+// buildSkillCondition converts one condition element in role into a
+// skill.Condition, reading its attributes with conditionAttrs.
+func buildSkillCondition(n condNode, role condRole, resolve tableResolver) (skill.Condition, error) {
+	attrs, err := conditionAttrs(n, role, resolve)
+	if err != nil {
+		return skill.Condition{}, fmt.Errorf("<%s>: %w", n.XMLName.Local, err)
+	}
 	var children []skill.Condition
-	for _, c := range n.Children {
-		children = append(children, sl.condition(c, tableIndex))
+	for i, c := range n.Children {
+		child, err := buildSkillCondition(c, childConditionRole(n, role, i), resolve)
+		if err != nil {
+			return skill.Condition{}, err
+		}
+		children = append(children, child)
 	}
 	return skill.Condition{
 		Kind:     strings.ToLower(n.XMLName.Local),
 		Attrs:    attrs,
 		Children: children,
-	}
+	}, nil
 }
 
 // buildSkillDefinitionAttrs resolves one level's raw <set> values into the
@@ -629,7 +677,7 @@ func parseCommaInts(raw string) ([]int, error) {
 	parts := strings.Split(raw, ",")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := strconv.Atoi(p)
+		n, err := commons.Atoi(p)
 		if err != nil {
 			return nil, err
 		}

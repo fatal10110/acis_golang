@@ -74,10 +74,7 @@ func TestLatchedFirstAttackSwingsOnceAfterDesireLost(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the latched runAI = %v, want %v", got, ai.IntentionAttack)
 	}
 
-	srv.Advance(t, attackTime)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want %v", got, ai.IntentionIdle)
-	}
+	intentionAfter(t, srv, hostile, attackTime, "once the latched swing finished, want idle", intentionIs(ai.IntentionIdle))
 	assertNoSwingFor(t, srv, attackTime)
 }
 
@@ -100,9 +97,6 @@ func TestHeavierDesireWaitsOneRunAIBehindLatchedAttack(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the latched runAI = %v, want %v", got, ai.IntentionAttack)
 	}
 
-	srv.Advance(t, attackTime)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
-		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want %v", got, ai.IntentionMoveTo)
-	}
+	intentionAfter(t, srv, hostile, attackTime, "once the latched swing finished, want move_to", intentionIs(ai.IntentionMoveTo))
 	readUntil(t, srv.Client, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 }

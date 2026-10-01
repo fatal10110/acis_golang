@@ -512,3 +512,36 @@ func TestCompileIntegersFollowReferenceGrammar(t *testing.T) {
 		}
 	}
 }
+
+// TestGameConditionReadsOnlyNight: the reference's <game> reader recognizes
+// only "night" (DocumentBase.parseGameCondition); a "chance" attribute is
+// unrecognized, exactly like any other unknown <game> attribute, so it never
+// becomes a random roll. A certain chance of 100 used to compile to a roll
+// that always passed.
+func TestGameConditionReadsOnlyNight(t *testing.T) {
+	for _, attrs := range []map[string]string{
+		{"chance": "50"},
+		{"chance": "100"},
+		{"Chance": "0"},
+	} {
+		node := leaf("game", attrs)
+		if c, err := Compile(node); err == nil {
+			t.Errorf("<game %v> compiled to %#v, want the unsupported-attribute error of <game bogus>", attrs, c)
+		}
+		clause := modelskill.ConditionClause{Root: node, MessageID: 4}
+		def := modelskill.Definition{Conditions: []modelskill.ConditionClause{clause}}
+		if _, ok := EvaluateSkill(def, source{&player{}}, nil); ok {
+			t.Errorf("<game %v>: cast allowed, want it refused like any condition that does not compile", attrs)
+		}
+	}
+
+	for raw, want := range map[string]bool{"true": true, "TRUE": true, "false": false, "1": false} {
+		c, err := Compile(leaf("game", map[string]string{"night": raw}))
+		if err != nil {
+			t.Fatalf("<game night=%q>: %v", raw, err)
+		}
+		if c != (GameTime{Night: want}) {
+			t.Errorf("<game night=%q> compiled %#v, want GameTime{Night: %v}", raw, c, want)
+		}
+	}
+}

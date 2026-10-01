@@ -134,10 +134,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the latched runAI = %v, want %v", got, ai.IntentionAttack)
 	}
 
-	srv.Advance(t, attackTime)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want %v", got, ai.IntentionIdle)
-	}
+	intentionAfter(t, srv, hostile, attackTime, "once the latched swing finished, want idle", intentionIs(ai.IntentionIdle))
 	assertNoSwingFor(t, srv, attackTime)
 }
 
@@ -280,9 +277,6 @@ func TestStunnedMonsterIdlesPastLatchAndSwingsItAfter(t *testing.T) {
 	}
 	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "latched swing after the stun")
 
-	srv.Advance(t, attackTime+10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got == ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want the latch spent", got)
-	}
+	intentionAfter(t, srv, hostile, attackTime+10*time.Millisecond, "once the latched swing finished, want the latch spent", func(got ai.Intention) bool { return got != ai.IntentionAttack })
 	assertNoSwingFor(t, srv, attackTime)
 }

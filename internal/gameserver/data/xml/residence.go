@@ -2,9 +2,9 @@ package xml
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -498,7 +498,7 @@ func splitInts(raw string) ([]int, error) {
 	parts := strings.Split(raw, ";")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := strconv.Atoi(p)
+		n, err := commons.Atoi(p)
 		if err != nil {
 			return nil, err
 		}
