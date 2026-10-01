@@ -372,6 +372,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if l.sevenSigns != nil {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(sevenSignsPeriodMessage(l.sevenSigns.CurrentPeriod())))
 	}
+	l.sendLoginAnnouncements(live)
 	if l.playerClock != nil && c.Race == player.RaceDarkElf {
 		l.playerClock.NotifyShadowSenseState(live)
 	}

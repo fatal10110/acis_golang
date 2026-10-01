@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -369,6 +370,9 @@ type GameClientLink struct {
 	gmAudit zerolog.Logger
 	// chat is the chat settings: log, bot filter and reuse delays.
 	chat ChatConfig
+	// announcements are the server announcements: read at login, repeated
+	// on their schedules and managed by //announce.
+	announcements *announcement.Registry
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -543,6 +547,9 @@ type GameClientLinkConfig struct {
 	// ShowServerNews shows the server news page at login when no clan
 	// notice is shown.
 	ShowServerNews bool
+	// Announcements are the server announcements; nil holds them in
+	// memory only, starting with none.
+	Announcements *announcement.Registry
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -655,6 +662,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)
 	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, serverNews: cfg.ShowServerNews}
+	link.announcements = cfg.Announcements
+	if link.announcements == nil {
+		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
+	}
 	link.clans = cfg.Clans
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
