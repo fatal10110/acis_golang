@@ -3,6 +3,8 @@ package npcs
 import (
 	"context"
 	"encoding/binary"
+	"maps"
+	"slices"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -65,12 +67,17 @@ func newTeleportClock() *teleportClock {
 func (c *teleportClock) set(at time.Time) { c.at.Store(at.UnixNano()) }
 func (c *teleportClock) now() time.Time   { return time.Unix(0, c.at.Load()) }
 
-// travelTemplates is the behavior catalog plus the newbie travel token.
+// travelTemplates is the behavior catalog plus the newbie travel token
+// and ancient adena.
 func travelTemplates() *item.Table {
-	return item.NewTable(append(gameservertest.ItemTemplates().All(), &item.Template{
-		ID: travelTokenID, Name: "Newbie Travel Token", Kind: item.KindEtcItem, Duration: -1, Stackable: true,
-		Dropable: true, Tradable: true, Destroyable: true, Depositable: true, EtcItem: &item.EtcItemDetail{},
-	}))
+	currency := func(id int32, name string) *item.Template {
+		return &item.Template{
+			ID: id, Name: name, Kind: item.KindEtcItem, Duration: -1, Stackable: true,
+			Dropable: true, Tradable: true, Destroyable: true, Depositable: true, EtcItem: &item.EtcItemDetail{},
+		}
+	}
+	return item.NewTable(append(gameservertest.ItemTemplates().All(),
+		currency(travelTokenID, "Newbie Travel Token"), currency(item.AncientAdenaID, "Ancient Adena")))
 }
 
 // bootGatekeeperWorld enters the world holding adena and tokens travel
@@ -78,6 +85,13 @@ func travelTemplates() *item.Table {
 func bootGatekeeperWorld(t *testing.T, adena, tokens int32, free bool, clock *teleportClock) (*folkWorld, *npc.Folk) {
 	t.Helper()
 	teleports, instants := gatekeeperDestinations()
+	return bootTravelWorld(t, teleports, instants, free, clock, map[int32]int32{item.AdenaID: adena, travelTokenID: tokens})
+}
+
+// bootTravelWorld enters the world holding held (template id to count),
+// next to the fixture gatekeeper offering teleports and instants.
+func bootTravelWorld(t *testing.T, teleports travel.TeleportTable, instants travel.InstantTable, free bool, clock *teleportClock, held map[int32]int32) (*folkWorld, *npc.Folk) {
+	t.Helper()
 	pages := dialogPages()
 	pages["gatekeeper/30080.htm"] = gatekeeperPage
 	srv := gameservertest.Boot(t,
@@ -89,11 +103,10 @@ func bootGatekeeperWorld(t *testing.T, adena, tokens int32, free bool, clock *te
 		noBypassReuse,
 	)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
-	if adena > 0 {
-		srv.GiveItem(t, w.player, item.AdenaID, adena)
-	}
-	if tokens > 0 {
-		srv.GiveItem(t, w.player, travelTokenID, tokens)
+	for _, id := range slices.Sorted(maps.Keys(held)) {
+		if held[id] > 0 {
+			srv.GiveItem(t, w.player, id, held[id])
+		}
 	}
 	startInWorld(t, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
@@ -281,6 +294,74 @@ func TestBypassTeleportTakesPriceItems(t *testing.T) {
 	assertLandedNear(t, frames[2], tokenSpot)
 	if got := w.savedCount(t, travelTokenID); got != 0 {
 		t.Fatalf("tokens saved = %d, want 0", got)
+	}
+}
+
+// sealedDestinations is the fixture gatekeeper offering a standard
+// destination priced in ancient adena, whose price needs the Seven Signs
+// seal owners, then one priced at two travel tokens.
+func sealedDestinations() (travel.TeleportTable, travel.InstantTable) {
+	return travel.TeleportTable{
+		gatekeeperID: {
+			{Location: paidSpot, Description: "Necropolis", Kind: travel.KindStandard, PriceID: int(item.AncientAdenaID), PriceCount: 100},
+			{Location: tokenSpot, Description: "Dark Elf Village", Kind: travel.KindStandard, PriceID: travelTokenID, PriceCount: 2},
+		},
+	}, travel.InstantTable{}
+}
+
+// TestBypassTeleportAncientAdenaNotYetPriced pins a destination priced in
+// ancient adena as logged and left alone until Seven Signs pricing exists:
+// teleport_request opens no list, and teleport answers no message, no jump
+// and no release of its own, only the dispatcher's; nothing is taken. A
+// destination priced at more than one item says S2_S1_DISAPPEARED with the
+// item and the count taken.
+func TestBypassTeleportAncientAdenaNotYetPriced(t *testing.T) {
+	t.Parallel()
+	teleports, instants := sealedDestinations()
+	w, gk := bootTravelWorld(t, teleports, instants, false, newTeleportClock(),
+		map[int32]int32{item.AncientAdenaID: 500, item.AdenaID: 1000, travelTokenID: 3})
+
+	w.openAnyNpcPage(t)
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), releaseOnly, gk, "")
+	w.openAnyNpcPage(t)
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport 0")), releaseOnly, gk, "")
+	for id, want := range map[int32]int{item.AncientAdenaID: 500, item.AdenaID: 1000} {
+		if got := w.held(t, id); got != want {
+			t.Fatalf("item %d held = %d, want %d", id, got, want)
+		}
+		if got := w.savedCount(t, id); got != want {
+			t.Fatalf("item %d saved = %d, want %d", id, got, want)
+		}
+	}
+
+	w.openAnyNpcPage(t)
+	frames := w.tripFrames(t, npcCommand(gk, "teleport 1"))
+	assertFrames(t, "two-token trip", frames, trip(sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(travelTokenID), itemNumberParam(2)))...)
+	assertLandedNear(t, frames[2], tokenSpot)
+	if got := w.savedCount(t, travelTokenID); got != 1 {
+		t.Fatalf("tokens saved = %d, want 1", got)
+	}
+}
+
+// TestBypassTeleportFreeListsAncientAdenaUnpriced pins FreeTeleport over a
+// destination priced in ancient adena: no price is read, so the list shows
+// it without one and taking it moves the player, nothing taken.
+func TestBypassTeleportFreeListsAncientAdenaUnpriced(t *testing.T) {
+	t.Parallel()
+	teleports, instants := sealedDestinations()
+	w, gk := bootTravelWorld(t, teleports, instants, true, newTeleportClock(), map[int32]int32{item.AncientAdenaID: 500})
+
+	id := strconv.Itoa(int(gk.ObjectID()))
+	w.openAnyNpcPage(t)
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), pageAnswer, gk, `<html><body>&$556;<br><br>`+
+		`<a action="bypass -h npc_`+id+`_teleport 0" msg="811;Necropolis">Necropolis</a><br1>`+
+		`<a action="bypass -h npc_`+id+`_teleport 1" msg="811;Dark Elf Village">Dark Elf Village</a><br1>`+
+		`</body></html>`)
+	frames := w.tripFrames(t, npcCommand(gk, "teleport 0"))
+	assertFrames(t, "free sealed trip", frames, trip()...)
+	assertLandedNear(t, frames[1], paidSpot)
+	if got := w.savedCount(t, item.AncientAdenaID); got != 500 {
+		t.Fatalf("ancient adena saved = %d, want 500", got)
 	}
 }
 
