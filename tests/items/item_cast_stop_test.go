@@ -162,11 +162,17 @@ func teleportMidCastWithPotion(t *testing.T, queue bool) int {
 // is kept.
 func TestTeleportStopDropsQueuedItemCast(t *testing.T) {
 	t.Parallel()
+	// Each run holds a cast open, which only the driven clock can do; a run
+	// that skipped leaves its count unset.
 	var bare, queued int
-	t.Run("nothing queued", func(t *testing.T) { bare = teleportMidCastWithPotion(t, false) })
-	t.Run("potion queued", func(t *testing.T) { queued = teleportMidCastWithPotion(t, true) })
+	var bareRan, queuedRan bool
+	t.Run("nothing queued", func(t *testing.T) { bare, bareRan = teleportMidCastWithPotion(t, false), true })
+	t.Run("potion queued", func(t *testing.T) { queued, queuedRan = teleportMidCastWithPotion(t, true), true })
 	if t.Failed() {
 		return
+	}
+	if !bareRan || !queuedRan {
+		t.Skip("holding a cast open needs the driven clock")
 	}
 	if queued != bare+1 {
 		t.Fatalf("teleport stop sent %d ActionFailed with a queued item cast and %d without, want one more", queued, bare)

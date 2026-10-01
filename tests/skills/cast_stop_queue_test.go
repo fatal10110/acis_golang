@@ -257,11 +257,17 @@ func teleportMidCastActionFailed(t *testing.T, queue bool) int {
 // answers one more ActionFailed than the same teleport with nothing queued.
 func TestTeleportStopDropsQueuedSkill(t *testing.T) {
 	t.Parallel()
+	// Each run holds a cast open, which only the driven clock can do; a run
+	// that skipped leaves its count unset.
 	var bare, queued int
-	t.Run("nothing queued", func(t *testing.T) { bare = teleportMidCastActionFailed(t, false) })
-	t.Run("skill queued", func(t *testing.T) { queued = teleportMidCastActionFailed(t, true) })
+	var bareRan, queuedRan bool
+	t.Run("nothing queued", func(t *testing.T) { bare, bareRan = teleportMidCastActionFailed(t, false), true })
+	t.Run("skill queued", func(t *testing.T) { queued, queuedRan = teleportMidCastActionFailed(t, true), true })
 	if t.Failed() {
 		return
+	}
+	if !bareRan || !queuedRan {
+		t.Skip("holding a cast open needs the driven clock")
 	}
 	if queued != bare+1 {
 		t.Fatalf("teleport stop sent %d ActionFailed with a queued skill and %d without, want one more", queued, bare)
