@@ -63,8 +63,9 @@ type Update struct {
 //
 // An inventory whose owner computes its limits live (a player's, whose slot
 // limit follows config and the inventoryLimit stat and whose weight limit
-// follows CON, config and the weightLimit stat) takes that owner as its
-// Limiter instead of the fixed SlotLimit and WeightLimit.
+// follows CON, config and the weightLimit stat, or a pet's, whose weight
+// limit does the same) takes that owner as its Limiter instead of the fixed
+// SlotLimit and WeightLimit.
 //
 // A player's inventory also ties its left hand to the right: a bow or
 // fishing rod leaving the right hand takes the arrows or lure out of the

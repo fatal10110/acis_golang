@@ -859,9 +859,8 @@ WeightLimit = 1.25
 	if got := cfg.ScaledExpGain(12564, 1000); got != 4000 {
 		t.Errorf("sin eater configured exp = %d, want 4000", got)
 	}
-	slots, _ := cfg.InventoryLimits(43)
-	if slots != 19 {
-		t.Errorf("pet inventory slots = %d, want 19", slots)
+	if cfg.InventorySlots != 19 {
+		t.Errorf("pet inventory slots = %d, want 19", cfg.InventorySlots)
 	}
 	if cfg == pet.DefaultConfig() {
 		t.Fatal("loadPetConfig returned defaults, want values from both files")
