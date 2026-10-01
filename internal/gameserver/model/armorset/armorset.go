@@ -138,14 +138,18 @@ func (s Set) ContainsAll(doll *itemcontainer.Inventory) bool {
 	return s.wears(doll, 0)
 }
 
-// Enchanted6 reports whether doll wears the set's chest at +6 or higher and
-// every other piece the set names at +6 or higher.
+// Enchant6Level is the enchant level from which a worn set's pieces grant
+// its +6 skill.
+const Enchant6Level = 6
+
+// Enchanted6 reports whether doll wears the set's chest at Enchant6Level or
+// higher and every other piece the set names at Enchant6Level or higher.
 func (s Set) Enchanted6(doll *itemcontainer.Inventory) bool {
 	chest := doll.ItemAt(itemcontainer.Chest)
-	if chest == nil || chest.Snapshot().EnchantLevel < 6 {
+	if chest == nil || chest.Snapshot().EnchantLevel < Enchant6Level {
 		return false
 	}
-	return s.wears(doll, 6)
+	return s.wears(doll, Enchant6Level)
 }
 
 // wears reports whether every non-chest piece the set names is worn at

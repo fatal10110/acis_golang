@@ -221,7 +221,8 @@ func TestArmorSetEquipGrantsSetSkills(t *testing.T) {
 // after the set's, and taking the chest off removes every set skill; a set
 // worn at login is restored with its skills; a scroll success taking the last worn piece to
 // +6 grants the +6 skill with a SkillList between the success message and
-// EnchantResult; a failure on a worn piece at +6 or higher removes it with
+// EnchantResult, and one that leaves another worn piece below +6 sends no
+// SkillList and grants nothing; a failure on a worn piece at +6 or higher removes it with
 // a SkillList ahead of the failure's own message.
 func TestArmorSetEnchant6Skill(t *testing.T) {
 	t.Parallel()
@@ -255,6 +256,30 @@ func TestArmorSetEnchant6Skill(t *testing.T) {
 		assertEnchantResult(t, frames[result], serverpackets.EnchantResultSuccess)
 		if got, want := rig.srv.PlayerMaxHP(t, rig.objID), before+mithrilEnchant6HP; got != want {
 			t.Fatalf("MaxHP after the +6 grant = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("success to +6 with another piece below +6 grants nothing", func(t *testing.T) {
+		t.Parallel()
+		rig := bootArmorSet(t, 0, map[int32]int{mithrilChestID: 6, mithrilLegsID: 5, mithrilHeadID: 5}, pieces, armorScrollD)
+		c := rig.srv.Client
+		startInWorld(t, c)
+		before := rig.srv.PlayerMaxHP(t, rig.objID)
+
+		openEnchantSelection(t, c, rig.objects[armorScrollD], armorScrollD)
+		c.Send(encodeRequestEnchantItem(rig.objects[mithrilLegsID]))
+		frames := collectUntilQuiet(t, c)
+		msg := frameIndex(t, frames, 0, serverpackets.OpcodeSystemMessage, serverpackets.SystemMessageS1S2SuccessfullyEnchanted)
+		result := frameIndex(t, frames, 0, serverpackets.OpcodeEnchantResult, 0)
+		if msg < 0 || result < msg {
+			t.Fatalf("frames %x: want the success message, then EnchantResult", opcodes(frames))
+		}
+		if lists := skillLists(frames[msg:result]); len(lists) != 0 {
+			t.Fatalf("frames %x: legs to +6 with the head at +5 sent %d SkillList(s), want 0", opcodes(frames), len(lists))
+		}
+		assertEnchantResult(t, frames[result], serverpackets.EnchantResultSuccess)
+		if got := rig.srv.PlayerMaxHP(t, rig.objID); got != before {
+			t.Fatalf("MaxHP after the legs reached +6 = %d, want %d", got, before)
 		}
 	})
 

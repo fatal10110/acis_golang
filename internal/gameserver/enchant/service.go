@@ -345,7 +345,7 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 		// skill, before the failure takes its level or the item itself.
 		if st := target.Snapshot(); st.Equipped() && hasEnchant4Skill(targetTemplate) && st.EnchantLevel >= item.Enchant4SkillLevel {
 			out.Steps = append(out.Steps, Step{Kind: StepRevokeEnchantSkill, Template: targetTemplate})
-		} else if st.Equipped() && targetTemplate.Kind == item.KindArmor && st.EnchantLevel >= armorSetEnchantLevel {
+		} else if st.Equipped() && targetTemplate.Kind == item.KindArmor && st.EnchantLevel >= armorset.Enchant6Level {
 			if skillID := s.wornSetEnchant6Skill(inv); skillID > 0 {
 				out.Steps = append(out.Steps, Step{Kind: StepRevokeArmorSetSkill, SkillID: skillID})
 			}
@@ -415,7 +415,7 @@ func (s *Service) success(inv *itemcontainer.Inventory, target *item.Instance, t
 	// belong to the set.
 	if st := target.Snapshot(); st.Equipped() && st.EnchantLevel == item.Enchant4SkillLevel && hasEnchant4Skill(tmpl) {
 		out.Steps = append(out.Steps, Step{Kind: StepGrantEnchantSkill, Template: tmpl})
-	} else if st.Equipped() && tmpl.Kind == item.KindArmor && st.EnchantLevel == armorSetEnchantLevel {
+	} else if st.Equipped() && tmpl.Kind == item.KindArmor && st.EnchantLevel == armorset.Enchant6Level {
 		if skillID := s.wornSetEnchant6Skill(inv); skillID > 0 {
 			out.Steps = append(out.Steps, Step{Kind: StepGrantArmorSetSkill, SkillID: skillID})
 		}
@@ -423,10 +423,6 @@ func (s *Service) success(inv *itemcontainer.Inventory, target *item.Instance, t
 	out.Steps = append(out.Steps, resultStep(ResultSuccess))
 	return out
 }
-
-// armorSetEnchantLevel is the enchant level from which a worn armor set's
-// pieces grant its +6 skill.
-const armorSetEnchantLevel = 6
 
 // wornSetEnchant6Skill returns the +6 skill of the armor set inv's worn
 // chest belongs to while every piece of it is at +6 or higher, or 0.
