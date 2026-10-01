@@ -43,7 +43,9 @@ func (l *GameClientLink) adminHide(gm *livePlayer, _ string) {
 
 // leaveGrid takes live off the grid where it stands: it leaves its zones,
 // drops a selection it no longer sees while its neighbors still see it, and
-// everything around forgets it as it forgets them.
+// everything around forgets it as it forgets them. Leaving the zones runs
+// their exit reactions while the neighbors still know live, as a creature
+// leaving its region does.
 func (l *GameClientLink) leaveGrid(live *livePlayer) {
 	l.leaveZones(live)
 	if l.world == nil {
@@ -58,7 +60,8 @@ func (l *GameClientLink) leaveGrid(live *livePlayer) {
 // rejoinGrid puts live, taken off the grid by leaveGrid, back on it where it
 // stands: everything around discovers it as it discovers them, and it
 // enters its zones again. A submerged live leaves and re-enters its water
-// zone too, which restarts its breath countdown (#3235).
+// zone too, so its breath countdown stops and starts afresh, as a creature
+// re-entering its region does.
 func (l *GameClientLink) rejoinGrid(live *livePlayer) {
 	if l.world != nil {
 		l.world.Rejoin(live)
