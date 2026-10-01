@@ -68,7 +68,7 @@ func testCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
 			t.Fatalf("write crest fixture: %v", err)
 		}
 	}
-	cache, err := datacache.LoadCrests(dir)
+	cache, _, err := datacache.LoadCrests(dir)
 	if err != nil {
 		t.Fatalf("LoadCrests: %v", err)
 	}
@@ -84,7 +84,7 @@ func testLargePledgeCrestCache(t *testing.T, crests map[int][]byte) *datacache.C
 			t.Fatalf("write crest fixture: %v", err)
 		}
 	}
-	cache, err := datacache.LoadCrests(dir)
+	cache, _, err := datacache.LoadCrests(dir)
 	if err != nil {
 		t.Fatalf("LoadCrests: %v", err)
 	}
@@ -100,7 +100,7 @@ func testAllyCrestCache(t *testing.T, crests map[int][]byte) *datacache.Crests {
 			t.Fatalf("write crest fixture: %v", err)
 		}
 	}
-	cache, err := datacache.LoadCrests(dir)
+	cache, _, err := datacache.LoadCrests(dir)
 	if err != nil {
 		t.Fatalf("LoadCrests: %v", err)
 	}
