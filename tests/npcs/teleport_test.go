@@ -134,6 +134,16 @@ func (w *folkWorld) tripFrames(t *testing.T, command string) [][]byte {
 
 // assertLandedNear checks frame is the player's jump to within the 20-unit
 // scatter of spot.
+// landing returns the TeleportToLocation among frames.
+func landing(t *testing.T, frames [][]byte) []byte {
+	t.Helper()
+	jump, ok := firstOpcode(frames, serverpackets.OpcodeTeleportToLocation)
+	if !ok {
+		t.Fatalf("no TeleportToLocation among %x", opcodes(frames))
+	}
+	return jump
+}
+
 func assertLandedNear(t *testing.T, frame []byte, spot location.Location) {
 	t.Helper()
 	r := wire.NewReader(frame[5:])
@@ -182,8 +192,19 @@ func teleportWindow(f *npc.Folk, paidPrice, freePrice int) string {
 
 var (
 	pageAnswer = []byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}
-	// jumped is the player's teleport, opened by its own stop's release.
-	jumped = [][]byte{{serverpackets.OpcodeActionFailed}, {serverpackets.OpcodeTeleportToLocation}}
+	// jumped is the player's teleport, opened by the releases of its own
+	// stops: Creature.teleportTo's abortAll (Creature.java:386-429,
+	// 1298-1306) stops the attack and the cast with the player already
+	// teleporting, and each stop answers ActionFailed twice, its refused
+	// tryToIdle's (PlayableAI.java:354-360) and its own (PlayerAttack.java:
+	// 58-63, PlayerCast.java:381-387).
+	jumped = [][]byte{
+		{serverpackets.OpcodeActionFailed},
+		{serverpackets.OpcodeActionFailed},
+		{serverpackets.OpcodeActionFailed},
+		{serverpackets.OpcodeActionFailed},
+		{serverpackets.OpcodeTeleportToLocation},
+	}
 	// releasedTwice is a trip's own release, then the dispatcher's.
 	releasedTwice = [][]byte{{serverpackets.OpcodeActionFailed}, {serverpackets.OpcodeActionFailed}}
 )
@@ -232,7 +253,7 @@ func TestBypassTeleportFreeLeavesOutPrices(t *testing.T) {
 	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), pageAnswer, gk, teleportWindow(gk, 0, 0))
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 0"))
 	assertFrames(t, "free teleport", frames, trip()...)
-	assertLandedNear(t, frames[1], paidSpot)
+	assertLandedNear(t, landing(t, frames), paidSpot)
 }
 
 // TestBypassTeleportPaysThenMoves pins a listed destination: its price is
@@ -247,7 +268,7 @@ func TestBypassTeleportPaysThenMoves(t *testing.T) {
 
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 0"))
 	assertFrames(t, "teleport 0", frames, trip(sysMsg(serverpackets.SystemMessageS1DisappearedAdena, numberParam(tripPrice)))...)
-	assertLandedNear(t, frames[2], paidSpot)
+	assertLandedNear(t, landing(t, frames), paidSpot)
 	if got := w.held(t, item.AdenaID); got != 500 {
 		t.Fatalf("adena held = %d, want 500", got)
 	}
@@ -276,7 +297,7 @@ func TestBypassTeleportRefusesWhatCannotBePaid(t *testing.T) {
 	w.openAnyNpcPage(t)
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 2"))
 	assertFrames(t, "free destination", frames, trip()...)
-	assertLandedNear(t, frames[1], freeSpot)
+	assertLandedNear(t, landing(t, frames), freeSpot)
 	if got := w.savedCount(t, item.AdenaID); got != tripPrice-1 {
 		t.Fatalf("adena saved = %d, want %d", got, tripPrice-1)
 	}
@@ -291,7 +312,7 @@ func TestBypassTeleportTakesPriceItems(t *testing.T) {
 	w.openAnyNpcPage(t)
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 1"))
 	assertFrames(t, "token trip", frames, trip(sysMsg(serverpackets.SystemMessageS1Disappeared, itemNameParam(travelTokenID)))...)
-	assertLandedNear(t, frames[2], tokenSpot)
+	assertLandedNear(t, landing(t, frames), tokenSpot)
 	if got := w.savedCount(t, travelTokenID); got != 0 {
 		t.Fatalf("tokens saved = %d, want 0", got)
 	}
@@ -337,7 +358,7 @@ func TestBypassTeleportAncientAdenaNotYetPriced(t *testing.T) {
 	w.openAnyNpcPage(t)
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 1"))
 	assertFrames(t, "two-token trip", frames, trip(sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(travelTokenID), itemNumberParam(2)))...)
-	assertLandedNear(t, frames[2], tokenSpot)
+	assertLandedNear(t, landing(t, frames), tokenSpot)
 	if got := w.savedCount(t, travelTokenID); got != 1 {
 		t.Fatalf("tokens saved = %d, want 1", got)
 	}
@@ -359,7 +380,7 @@ func TestBypassTeleportFreeListsAncientAdenaUnpriced(t *testing.T) {
 		`</body></html>`)
 	frames := w.tripFrames(t, npcCommand(gk, "teleport 0"))
 	assertFrames(t, "free sealed trip", frames, trip()...)
-	assertLandedNear(t, frames[1], paidSpot)
+	assertLandedNear(t, landing(t, frames), paidSpot)
 	if got := w.savedCount(t, item.AncientAdenaID); got != 500 {
 		t.Fatalf("ancient adena saved = %d, want 500", got)
 	}
@@ -403,7 +424,7 @@ func TestBypassTeleportIndexEdges(t *testing.T) {
 	w.openAnyNpcPage(t)
 	frames := w.tripFrames(t, npcCommand(gk, "instant_teleport 0"))
 	assertFrames(t, "instant_teleport 0", frames, append(append([][]byte{}, jumped...), []byte{serverpackets.OpcodeActionFailed})...)
-	assertLandedNear(t, frames[1], instantSpot)
+	assertLandedNear(t, landing(t, frames), instantSpot)
 }
 
 // TestBypassAdventurerCommands pins an adventurer guildsman's own

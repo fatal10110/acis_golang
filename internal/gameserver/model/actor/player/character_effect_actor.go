@@ -42,6 +42,13 @@ func (c *Character) aiDeniedBeforeEffect() bool {
 	return c.Dead() || c.liveLocked().AIDeniedBeforeEffect()
 }
 
+// DenyAIActionBeforeEffect is DenyAIAction leaving out the effect whose
+// on-start hook is running, if any: called from inside that hook, it
+// answers for the state c was in before the effect landed.
+func (c *Character) DenyAIActionBeforeEffect() bool {
+	return c.aiDeniedBeforeEffect() || c.ObserverMode() || c.InStoreMode()
+}
+
 // FearImmune reports false: only folk, siege flags and siege summons shrug
 // off fear.
 func (c *Character) FearImmune() bool { return false }
