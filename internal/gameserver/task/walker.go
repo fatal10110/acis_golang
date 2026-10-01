@@ -102,6 +102,9 @@ type walkerEntry struct {
 	onRoute  bool
 	reverse  bool
 	wakeTime time.Time
+	// left marks an actor taken off its route by LeaveRoute: neither an
+	// arrival nor the end of a node delay moves it until ResumeRoute.
+	left bool
 }
 
 // NewWalker returns a route walker over loaded walkerRoutes.xml data. A nil
@@ -210,6 +213,37 @@ func (w *Walker) Arrived(actor WalkerActor) error {
 	return w.moveToNextPoint(entry)
 }
 
+// LeaveRoute takes actor off its route while it acts on something else,
+// such as a cast: an arrival no longer advances the route, and a node delay
+// that runs out is dropped instead of walking on. ResumeRoute puts it back.
+func (w *Walker) LeaveRoute(actor WalkerActor) {
+	if actor == nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if entry, ok := w.entries[actor.ObjectID()]; ok {
+		entry.onRoute, entry.left = false, true
+	}
+}
+
+// ResumeRoute puts actor, taken off its route by LeaveRoute, back on it:
+// it walks to the route node nearest to where it stands and goes on from
+// there. An actor still on its route is left alone.
+func (w *Walker) ResumeRoute(actor WalkerActor) error {
+	if actor == nil {
+		return errors.New("task: nil walker actor")
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	entry, ok := w.entries[actor.ObjectID()]
+	if !ok || !entry.left {
+		return nil
+	}
+	entry.left = false
+	return w.moveToNextPoint(entry)
+}
+
 // MoveToNextPoint immediately requests actor's next route node.
 func (w *Walker) MoveToNextPoint(actor WalkerActor) error {
 	if actor == nil {
@@ -251,7 +285,8 @@ func (w *Walker) Tick() {
 }
 
 // release requests actor's next route node if its wait, as of now, has
-// elapsed and it is no longer moving.
+// elapsed and it is no longer moving; the wait of an actor off its route is
+// dropped instead.
 func (w *Walker) release(actor WalkerActor, now time.Time) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -260,6 +295,9 @@ func (w *Walker) release(actor WalkerActor, now time.Time) error {
 		return nil
 	}
 	entry.wakeTime = time.Time{}
+	if entry.left {
+		return nil
+	}
 	if err := w.moveToNextPoint(entry); err != nil {
 		return fmt.Errorf("task: walker %d: %w", actor.ObjectID(), err)
 	}

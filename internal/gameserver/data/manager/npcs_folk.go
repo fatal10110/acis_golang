@@ -109,6 +109,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Sink:                rt.Sink,
 		MaxGeoPathFailCount: s.MaxGeoPathFailCount,
 		Control:             control,
+		Route:               s.Walker,
 		Log:                 s.Log,
 	}
 	if s.Zones != nil {
