@@ -3002,19 +3002,29 @@ func TestCharacterSpawnProtectionMakesItInvulnerable(t *testing.T) {
 	}
 }
 
-func TestCharacterStopFakeDeathDoesNotBroadcastAfterDeath(t *testing.T) {
-	c := &Character{ID: 1}
-	c.SetStanding(false)
+// TestCharacterStopFakeDeathBroadcastsAfterDeath pins the get-up on a dead
+// character: the get-up and revive visuals still go out, once each, and it
+// takes the standing posture with no stand-up transition.
+func TestCharacterStopFakeDeathBroadcastsAfterDeath(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	c.StartFakeDeath()
 	rec := recordEvents(c)
 	if !c.MarkDead() {
 		t.Fatal("MarkDead() = false, want true")
 	}
 
-	if c.StopFakeDeath() {
-		t.Fatal("StopFakeDeath() = true for a dead character, want false")
+	if !c.StopFakeDeath() {
+		t.Fatal("StopFakeDeath() = false for a dead character lying down, want the posture changed")
 	}
-	if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 0 || revives != 0 {
-		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want none", stances, revives)
+	if stances, revives := event.Count[event.StanceChanged](rec), event.Count[event.FakeDeathRevived](rec); stances != 1 || revives != 1 {
+		t.Fatalf("dead fake-death exit broadcasts = stances:%d revives:%d, want one each", stances, revives)
+	}
+	if got := event.Of[event.StanceChanged](rec)[0]; got.Stance != event.StanceFakeDeathStop {
+		t.Fatalf("stance = %v, want StanceFakeDeathStop", got.Stance)
+	}
+	if !c.Standing() || c.StandingNow() || c.FakeDead() {
+		t.Fatalf("dead get-up Standing=%v StandingNow=%v FakeDead=%v, want standing at once, not faking",
+			c.Standing(), c.StandingNow(), c.FakeDead())
 	}
 }
 

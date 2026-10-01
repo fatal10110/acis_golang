@@ -187,22 +187,18 @@ func (c *Character) StartFakeDeath() bool {
 	return changed
 }
 
-// StopFakeDeath gets up out of fake death and sends the matching revive
-// visual. The character plays dead until the stand-up ends. A dead
-// character only leaves fake death.
+// StopFakeDeath gets up out of fake death and sends the get-up and revive
+// visuals, dead or alive. A living character plays dead until the stand-up
+// ends. A dead one takes the standing posture with no stand-up and leaves
+// fake death at once, so a later revive finds it standing and not faking.
 func (c *Character) StopFakeDeath() bool {
-	if c.Dead() {
-		c.stateMu.Lock()
-		c.fakeDeath = false
-		c.stateMu.Unlock()
-		return false
-	}
+	dead := c.Dead()
 	delay := fakeDeathDelay(fakeDeathStandMillis, c.MovementSpeedMultiplier())
 	c.stateMu.Lock()
 	c.initStateLocked()
 	changed := !c.standing
 	c.standing = true
-	if !c.beginPostureTransitionLocked(true, delay, true) {
+	if dead || !c.beginPostureTransitionLocked(true, delay, true) {
 		c.fakeDeath = false
 	}
 	c.stateMu.Unlock()
