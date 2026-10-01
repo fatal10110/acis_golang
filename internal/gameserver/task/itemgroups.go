@@ -1,6 +1,10 @@
 package task
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+import (
+	"slices"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+)
 
 // BoundRow is one items row of an operation whose rows must land together.
 type BoundRow struct {
@@ -14,10 +18,16 @@ type BoundRow struct {
 }
 
 // rowGroup is a set of rows no single write has landed together yet. Its
-// rows are guarded by ItemInstances.groupsMu.
+// rows are guarded by ItemInstances.groupsMu. A group's membership never
+// changes once Bind made it: binding one of its rows again builds a new group
+// holding both, so a write that saw a group knows every row it stands for.
 type rowGroup struct {
 	rows map[int32]BoundRow
 }
+
+// BoundGroups names the groups a write carried, which only that write's
+// landing may settle (Landed).
+type BoundGroups []*rowGroup
 
 // Bind records rows as one operation's: until one write lands them all, every
 // write of any of them — a handler's write, the persistence tick's chunk, a
@@ -36,9 +46,11 @@ type rowGroup struct {
 // land with only some of the rows it depends on. It still runs after the
 // operation's mutation, so a tick that reads one of the rows in between
 // writes that row alone, ahead of the operation's own write (#3034).
-func (i *ItemInstances) Bind(rows []BoundRow) {
+//
+// Bind returns the group the operation's write carries, for its Landed.
+func (i *ItemInstances) Bind(rows []BoundRow) BoundGroups {
 	if len(rows) < 2 {
-		return
+		return nil
 	}
 	// A deleted row carries no instance, but its destroyed instance is
 	// usually still pending, and writing that keeps its delete whole.
@@ -68,32 +80,31 @@ func (i *ItemInstances) Bind(rows []BoundRow) {
 	for id := range merged.rows {
 		i.groups[id] = merged
 	}
+	return BoundGroups{merged}
 }
 
 // Widen returns the rows bound to any of ids (Bind) that ids does not
-// already name. A write of ids writes these too, reading each instance's
-// state where it takes the row's place, or deleting a row with no instance.
-func (i *ItemInstances) Widen(ids []int32) []BoundRow {
+// already name, and the groups they came from. A write of ids writes these
+// too, reading each instance's state where it takes the row's place, or
+// deleting a row with no instance, and passes the groups to its Landed.
+func (i *ItemInstances) Widen(ids []int32) ([]BoundRow, BoundGroups) {
 	i.groupsMu.Lock()
 	defer i.groupsMu.Unlock()
 	if len(i.groups) == 0 {
-		return nil
+		return nil, nil
 	}
 	named := make(map[int32]struct{}, len(ids))
 	for _, id := range ids {
 		named[id] = struct{}{}
 	}
 	var out []BoundRow
-	seen := make(map[*rowGroup]struct{})
+	var carried BoundGroups
 	for _, id := range ids {
 		g := i.groups[id]
-		if g == nil {
+		if g == nil || slices.Contains(carried, g) {
 			continue
 		}
-		if _, ok := seen[g]; ok {
-			continue
-		}
-		seen[g] = struct{}{}
+		carried = append(carried, g)
 		for objectID, row := range g.rows {
 			if _, ok := named[objectID]; !ok {
 				out = append(out, row)
@@ -101,36 +112,28 @@ func (i *ItemInstances) Widen(ids []int32) []BoundRow {
 			}
 		}
 	}
-	return out
+	return out, carried
 }
 
-// Landed reports that one write has landed every row in ids. A group all of
-// whose rows that write carried is settled and stops widening writes; a
-// group the write covered only part of — it grew after the write took its
-// places — stays.
-func (i *ItemInstances) Landed(ids []int32) {
-	i.groupsMu.Lock()
-	defer i.groupsMu.Unlock()
-	if len(i.groups) == 0 {
+// Landed reports that one write, which carried groups (Bind, Widen), has
+// landed the rows in written — the rows it really wrote, not those a later
+// write took over. Each carried group whose every row is in written is
+// settled and stops widening writes.
+//
+// Only the carried groups are settled, and only rows still bound to them: a
+// row bound again since (Bind merges it into a newer group) belongs to an
+// operation whose state this write read too early to carry. Settling by row
+// would let an older write landing late clear that newer group before its own
+// write landed, and a failure of that write would then leave its rows to be
+// written apart.
+func (i *ItemInstances) Landed(groups BoundGroups, written []int32) {
+	if len(groups) == 0 {
 		return
 	}
-	written := make(map[int32]struct{}, len(ids))
-	for _, id := range ids {
-		written[id] = struct{}{}
-	}
-	for _, id := range ids {
-		g := i.groups[id]
-		if g == nil {
-			continue
-		}
-		covered := true
-		for member := range g.rows {
-			if _, ok := written[member]; !ok {
-				covered = false
-				break
-			}
-		}
-		if !covered {
+	i.groupsMu.Lock()
+	defer i.groupsMu.Unlock()
+	for _, g := range groups {
+		if !groupCovered(g, written) {
 			continue
 		}
 		for member := range g.rows {
@@ -139,6 +142,16 @@ func (i *ItemInstances) Landed(ids []int32) {
 			}
 		}
 	}
+}
+
+// groupCovered reports whether written names every row of g.
+func groupCovered(g *rowGroup, written []int32) bool {
+	for member := range g.rows {
+		if !slices.Contains(written, member) {
+			return false
+		}
+	}
+	return true
 }
 
 // retargetGroups points ownerID's bound rows at the instances a restore just

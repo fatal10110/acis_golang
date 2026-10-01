@@ -283,8 +283,13 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if len(order) == 0 {
 		return
 	}
+	// carried is the group this write lands whole, if it binds one. It
+	// holds every row of the groups the write widened to, so it alone
+	// stands for them.
+	var carried task.BoundGroups
 	if l.itemInstances != nil {
-		for _, bound := range l.itemInstances.Widen(order) {
+		widened, _ := l.itemInstances.Widen(order)
+		for _, bound := range widened {
 			row := rowAction{inst: bound.Inst, ownerID: bound.OwnerID, widened: true}
 			if bound.Inst == nil {
 				row.remove = true
@@ -302,7 +307,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				}
 				bound = append(bound, task.BoundRow{ObjectID: objectID, OwnerID: ownerID, Inst: row.inst})
 			}
-			l.itemInstances.Bind(bound)
+			carried = l.itemInstances.Bind(bound)
 		}
 	}
 
@@ -344,7 +349,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			return
 		}
 		if instances != nil {
-			instances.Landed(order)
+			instances.Landed(carried, keep)
 		}
 	}, owners[0], owners[1:]...)
 }

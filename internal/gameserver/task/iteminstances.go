@@ -649,7 +649,7 @@ func (i *ItemInstances) saveChunks(ctx context.Context, entries []pendingItem) (
 //
 // The flush also carries every row bound to one of items (Bind), read
 // where it takes its place like the rest, and a flush that lands settles the
-// groups it carried whole.
+// groups it carried whose every row it wrote (Landed).
 //
 // This per-call guarantee is unchanged by Save's chunking (Save simply
 // calls UpdateItems once per chunk); network.flushItemPersistence relies on
@@ -673,7 +673,8 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		ids = append(ids, inst.ObjectID)
 	}
 	var deletes []int32
-	for _, row := range i.Widen(ids) {
+	widened, carried := i.Widen(ids)
+	for _, row := range widened {
 		if row.Inst == nil {
 			deletes = append(deletes, row.ObjectID)
 			continue
@@ -702,6 +703,7 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		write.Add(objectID)
 	}
 	var err error
+	var landed []int32
 	write.Run(func(keep []int32) {
 		var batch item.FlushBatch
 		for _, st := range states {
@@ -716,13 +718,10 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 			}
 		}
 		err = i.flusher.Flush(ctx, batch)
+		landed = keep
 	})
 	if err == nil {
-		landed := deletes
-		for _, st := range states {
-			landed = append(landed, st.ObjectID)
-		}
-		i.Landed(landed)
+		i.Landed(carried, landed)
 	}
 	return err
 }
