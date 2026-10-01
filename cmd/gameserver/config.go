@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -81,6 +82,7 @@ type gameplayConfig struct {
 	AugmentationChances      augmentation.Chances
 	Admin                    adminConfig
 	Chat                     chatConfig
+	Petition                 petition.Config
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -210,6 +212,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Chat, err = loadChatConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Petition, err = loadPetitionConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil

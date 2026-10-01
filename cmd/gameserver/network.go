@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -98,6 +99,7 @@ func provideGameClientLink(
 	itemWrites *persist.Order,
 	pool *sim.Pool,
 	relations *relation.Manager,
+	petitions *petition.Manager,
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
 	board communityBoard,
@@ -222,6 +224,7 @@ func provideGameClientLink(
 		Characters:   characters,
 		Clans:        clans,
 		AccessLevels: characters,
+		Petitions:    petitions,
 
 		Board:          board.Config,
 		Mailbox:        board.Mailbox,

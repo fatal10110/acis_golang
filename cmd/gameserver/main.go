@@ -47,6 +47,7 @@ const (
 		debugHTTPStopTimeout +
 		shutdownSaveTimeout + // spawn_data
 		shutdownSaveTimeout + // character_relations
+		shutdownSaveTimeout + // petition, petition_message
 		simPoolStopTimeout +
 		task.ItemInstanceSaveTimeout + // item ticker finishing an in-flight save
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
@@ -192,9 +193,10 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			providePlayerClock,
 			provideMerchant,
 			provideRelations,
+			providePetitions,
 			provideCommunityBoard,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startDebugHTTP, startGameServer),
 	}
 }

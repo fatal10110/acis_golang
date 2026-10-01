@@ -60,6 +60,7 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -177,6 +178,7 @@ type options struct {
 	realPool               bool
 	merchant               merchantOptions
 	doors                  []*door.Template
+	petitionConfig         *petition.Config
 }
 
 type characterSpec struct {
@@ -764,6 +766,8 @@ type Server struct {
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
 	relationRows     *gamesql.RelationStore
+	Petitions        *petition.Manager // petitions the link was wired with
+	petitionRows     *gamesql.PetitionStore
 	Clans            *clan.Service
 	account          string
 	templates        *player.TemplateTable
@@ -1774,6 +1778,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
 	gclConfig.AccessLevels = chars
+	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
+	gclConfig.Petitions = petitions
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
@@ -1976,6 +1982,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Chars:            chars,
 		Relations:        relations,
 		relationRows:     relationRows,
+		Petitions:        petitions,
+		petitionRows:     petitionRows,
 		Items:            items,
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,

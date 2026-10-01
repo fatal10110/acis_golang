@@ -3,6 +3,8 @@ package bbs
 import (
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Config is the community board's server settings.
@@ -53,15 +55,5 @@ func NoticeText(notice string) string {
 	notice = strings.ReplaceAll(notice, "\r\n", "<br>")
 	notice = strings.ReplaceAll(notice, "action", "")
 	notice = strings.ReplaceAll(notice, "bypass", "")
-	if !strings.Contains(notice, `\`) {
-		return notice
-	}
-	var b strings.Builder
-	for i := 0; i < len(notice); i++ {
-		if notice[i] == '\\' && i+1 < len(notice) {
-			i++
-		}
-		b.WriteByte(notice[i])
-	}
-	return b.String()
+	return commons.HTMLValue(notice)
 }

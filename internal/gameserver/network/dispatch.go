@@ -53,6 +53,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -359,6 +360,9 @@ type GameClientLink struct {
 	// gms is the online game-master roster /gmlist reads and petitions
 	// notify.
 	gms admin.GMList[*livePlayer]
+	// petitions holds the petitions players send the game masters; see
+	// petition.go.
+	petitions *petition.Manager
 	// gmAudit records every admin command run; the zero logger records
 	// nothing.
 	gmAudit zerolog.Logger
@@ -486,6 +490,9 @@ type GameClientLinkConfig struct {
 	// AccessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only and finds no offline character.
 	AccessLevels accessLevelStore
+	// Petitions holds the petitions players send the game masters; nil
+	// starts with none and refuses every new one.
+	Petitions *petition.Manager
 	// FriendInviteClock times friend invitations out; nil means time.Now.
 	FriendInviteClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
@@ -615,6 +622,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
+		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
