@@ -693,6 +693,34 @@ func TestLoadServerBypassDelayUsesServerProperties(t *testing.T) {
 	}
 }
 
+// TestLoadCraftConfig pins the two craft knobs to their property keys and
+// shipped defaults: ManufactureTime in server.properties (300 ms) and
+// CraftingEnabled in players.properties (true).
+func TestLoadCraftConfig(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty.properties")
+	set := filepath.Join(dir, "set.properties")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(set, []byte("ManufactureTime = 1200\nCraftingEnabled = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := loadManufactureDelay(gameServerPaths{ConfigPath: empty}); err != nil || got != manufactureDelay(300*time.Millisecond) {
+		t.Fatalf("loadManufactureDelay(default) = %v, %v; want 300ms", got, err)
+	}
+	if got, err := loadManufactureDelay(gameServerPaths{ConfigPath: set}); err != nil || got != manufactureDelay(1200*time.Millisecond) {
+		t.Fatalf("loadManufactureDelay(set) = %v, %v; want 1.2s", got, err)
+	}
+	if got, err := loadCraftingEnabled(gameServerPaths{PlayersConfigPath: empty}); err != nil || !bool(got) {
+		t.Fatalf("loadCraftingEnabled(default) = %v, %v; want true", got, err)
+	}
+	if got, err := loadCraftingEnabled(gameServerPaths{PlayersConfigPath: set}); err != nil || bool(got) {
+		t.Fatalf("loadCraftingEnabled(set) = %v, %v; want false", got, err)
+	}
+}
+
 func TestLoadServerBypassDelayDefaultsToHundredMilliseconds(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "server.properties")
 	if err := os.WriteFile(configPath, nil, 0o600); err != nil {

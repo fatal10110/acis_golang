@@ -156,6 +156,14 @@ const characterHennasSchema = "CREATE TABLE IF NOT EXISTS `character_hennas` (\n
 	"  PRIMARY KEY (`char_obj_id`,`slot`,`class_index`)\n" +
 	")"
 
+// characterRecipeBookSchema mirrors the shipped character_recipebook table
+// definition verbatim.
+const characterRecipeBookSchema = "CREATE TABLE IF NOT EXISTS `character_recipebook` (\n" +
+	"  `charId` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `recipeId` SMALLINT NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`charId`,`recipeId`)\n" +
+	")"
+
 // petsSchema mirrors the shipped pets table definition verbatim.
 const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
@@ -243,7 +251,7 @@ var pool = dbtest.NewPool(dbtest.PoolConfig{Schema: schemaStmts, Seed: seedStmts
 var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
-	characterHennasSchema, petsSchema, characterSkillsSaveSchema,
+	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsStatusSchema,
 }
 

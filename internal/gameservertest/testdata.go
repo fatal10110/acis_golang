@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -67,6 +68,29 @@ func HennaTemplates(t testing.TB) *henna.Table {
 	return henna.NewTable([]henna.Henna{
 		{SymbolID: 1, DyeID: 4445, DrawPrice: 37000, STR: 1, CON: -3, Classes: []int{1, 4, 7, 11, 15, 19, 22, 26, 29, 32, 35, 39, 42, 45, 47, 50, 54, 56}},
 		{SymbolID: 2, DyeID: 4446, DrawPrice: 37000, STR: 1, DEX: -3, Classes: []int{1, 4, 7, 11, 15, 19, 22, 26, 29, 32, 35, 39, 42, 45, 47, 50, 54, 56}},
+	})
+}
+
+// RecipeTemplates is the recipe table the behavior suites boot with: rows
+// copied from the shipped recipes.xml, the dwarven mk_wooden_arrow (id 1)
+// and mk_broad_sword (id 2) and the common mk_lesser_healing_potion (id 686).
+func RecipeTemplates() *recipe.Table {
+	return recipe.NewTable([]recipe.Recipe{
+		{
+			ID: 1, Alias: "mk_wooden_arrow", ItemID: 1666, Level: 1, MPCost: 30, SuccessRate: 100, Dwarven: true,
+			Materials: []recipe.Ingredient{{ItemID: 1864, Count: 4}, {ItemID: 1869, Count: 2}},
+			Product:   recipe.Ingredient{ItemID: 17, Count: 500},
+		},
+		{
+			ID: 2, Alias: "mk_broad_sword", ItemID: 1786, Level: 1, MPCost: 30, SuccessRate: 100, Dwarven: true,
+			Materials: []recipe.Ingredient{{ItemID: 2005, Count: 1}, {ItemID: 1869, Count: 18}, {ItemID: 1870, Count: 18}},
+			Product:   recipe.Ingredient{ItemID: 3, Count: 1},
+		},
+		{
+			ID: 686, Alias: "mk_lesser_healing_potion", ItemID: 6926, Level: 1, MPCost: 30, SuccessRate: 100,
+			Materials: []recipe.Ingredient{{ItemID: 6908, Count: 2}},
+			Product:   recipe.Ingredient{ItemID: 1060, Count: 1},
+		},
 	})
 }
 

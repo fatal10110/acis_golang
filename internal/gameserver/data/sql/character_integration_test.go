@@ -255,6 +255,9 @@ func TestCharacterStore_Purge(t *testing.T) {
 	if n := countRows(t, db, "SELECT COUNT(*) FROM augmentations WHERE item_oid = ?", 0x10000101); n != 0 {
 		t.Errorf("augmentation rows after purge = %d, want 0", n)
 	}
+	if n := countRows(t, db, "SELECT COUNT(*) FROM character_recipebook WHERE charId = ?", c.ID); n != 0 {
+		t.Errorf("recipe book rows after purge = %d, want 0", n)
+	}
 
 	deleted, err = store.Purge(ctx, c.ID)
 	if err != nil {
@@ -332,6 +335,9 @@ func seedOwnedRows(t *testing.T, db *sql.DB, ownerID int32) {
 		0x10000101, 1, 1); err != nil {
 		t.Fatalf("seed augmentation: %v", err)
 	}
+	if err := NewRecipeBookStore(db).Insert(context.Background(), ownerID, 686); err != nil {
+		t.Fatalf("seed recipe: %v", err)
+	}
 }
 
 func countRows(t *testing.T, db *sql.DB, query string, args ...any) int {
@@ -341,4 +347,31 @@ func countRows(t *testing.T, db *sql.DB, query string, args ...any) int {
 		t.Fatalf("count rows: %v", err)
 	}
 	return n
+}
+
+// TestRecipeBookStoreRoundTrip lists an owner's recipe ids in ascending
+// order whatever order they were saved in, and deletes one row by owner
+// and recipe.
+func TestRecipeBookStoreRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	store := NewRecipeBookStore(sqltest.SharedDB(t))
+	const owner, other = 0x10000001, 0x10000002
+	for _, id := range []int{686, 1, 33} {
+		if err := store.Insert(ctx, owner, id); err != nil {
+			t.Fatalf("Insert(%d): %v", id, err)
+		}
+	}
+	if err := store.Insert(ctx, other, 2); err != nil {
+		t.Fatalf("Insert(other): %v", err)
+	}
+	if err := store.Delete(ctx, owner, 33); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	got, err := store.ListByOwner(ctx, owner)
+	if err != nil {
+		t.Fatalf("ListByOwner: %v", err)
+	}
+	if len(got) != 2 || got[0] != 1 || got[1] != 686 {
+		t.Fatalf("ListByOwner = %v, want [1 686]", got)
+	}
 }

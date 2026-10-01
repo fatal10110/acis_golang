@@ -57,6 +57,7 @@ func provideGameClientLink(
 	items *gamesql.ItemStore,
 	shortcuts *gamesql.ShortcutStore,
 	hennas *gamesql.HennaStore,
+	recipeBooks *gamesql.RecipeBookStore,
 	html *datacache.HTML,
 	crests *datacache.Crests,
 	validator *network.SessionValidator,
@@ -116,6 +117,8 @@ func provideGameClientLink(
 		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
 		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
 		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
+		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
+		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -127,6 +130,8 @@ func provideGameClientLink(
 		Shortcuts:     shortcuts,
 		Hennas:        hennas,
 		HennaTable:    data.Hennas,
+		RecipeBooks:   recipeBooks,
+		Recipes:       data.Recipes,
 		Templates:     data.Players,
 		ItemTemplates: data.Items,
 		HTML:          html,

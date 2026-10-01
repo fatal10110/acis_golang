@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -4010,5 +4011,40 @@ func TestFrameUserInfo_TeamByteBlueWhileSpawnProtected(t *testing.T) {
 	}
 	if protected[teamAt] != 1 {
 		t.Fatalf("spawn-protected team byte = %d, want TeamType.BLUE (1)", protected[teamAt])
+	}
+}
+
+// TestFrameRecipeBookPackets pins RecipeBookItemList (0xd6: page type with 0
+// dwarven and 1 common, max MP, count, then id and 1-based position per
+// recipe) and RecipeItemMakeInfo (0xd7: recipe id, page type, MP, max MP,
+// status).
+func TestFrameRecipeBookPackets(t *testing.T) {
+	got := framePayload(t, FrameRecipeBookItemList(true, 150, []recipe.Recipe{{ID: 32}, {ID: 1}}))
+	want := []byte{
+		0xd6,
+		0x00, 0x00, 0x00, 0x00,
+		0x96, 0x00, 0x00, 0x00,
+		0x02, 0x00, 0x00, 0x00,
+		0x20, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRecipeBookItemList() = %x, want %x", got, want)
+	}
+	if got := framePayload(t, FrameRecipeBookItemList(false, 0, nil)); !bytes.Equal(got, []byte{0xd6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}) {
+		t.Fatalf("empty common FrameRecipeBookItemList() = %x", got)
+	}
+
+	got = framePayload(t, FrameRecipeItemMakeInfo(recipe.Recipe{ID: 686}, 12, 150, -1))
+	want = []byte{
+		0xd7,
+		0xae, 0x02, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00,
+		0x0c, 0x00, 0x00, 0x00,
+		0x96, 0x00, 0x00, 0x00,
+		0xff, 0xff, 0xff, 0xff,
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRecipeItemMakeInfo() = %x, want %x", got, want)
 	}
 }

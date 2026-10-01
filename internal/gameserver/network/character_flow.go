@@ -251,6 +251,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	} else {
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
 	}
+	l.restoreRecipeBook(ctx, c)
 
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {

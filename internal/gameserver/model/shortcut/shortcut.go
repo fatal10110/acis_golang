@@ -190,6 +190,24 @@ func (l *List) Delete(slot, page int32) bool {
 	return true
 }
 
+// DeleteTarget removes every shortcut of type typ pointing at id and returns
+// them ordered by page, then slot.
+func (l *List) DeleteTarget(typ Type, id int32) []Shortcut {
+	if l == nil || l.bySlot == nil {
+		return nil
+	}
+	var out []Shortcut
+	for key, sc := range l.bySlot {
+		if sc.Type != typ || sc.ID != id {
+			continue
+		}
+		delete(l.bySlot, key)
+		out = append(out, sc)
+	}
+	sortByPageSlot(out)
+	return out
+}
+
 // All returns shortcuts ordered by page, then slot.
 func (l *List) All() []Shortcut {
 	if l == nil || len(l.bySlot) == 0 {
@@ -199,12 +217,7 @@ func (l *List) All() []Shortcut {
 	for _, shortcut := range l.bySlot {
 		out = append(out, shortcut)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Page != out[j].Page {
-			return out[i].Page < out[j].Page
-		}
-		return out[i].Slot < out[j].Slot
-	})
+	sortByPageSlot(out)
 	return out
 }
 
@@ -226,12 +239,7 @@ func (l *List) RefreshSkillLevel(skillID, level int32) []Shortcut {
 		l.bySlot[key] = sc
 		out = append(out, sc)
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Page != out[j].Page {
-			return out[i].Page < out[j].Page
-		}
-		return out[i].Slot < out[j].Slot
-	})
+	sortByPageSlot(out)
 	return out
 }
 
@@ -259,6 +267,15 @@ func RestoreItemShortcuts(shortcuts []Shortcut, lookup ItemLookup) []Shortcut {
 		out = append(out, sc)
 	}
 	return out
+}
+
+func sortByPageSlot(out []Shortcut) {
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Page != out[j].Page {
+			return out[i].Page < out[j].Page
+		}
+		return out[i].Slot < out[j].Slot
+	})
 }
 
 func slotKey(slot, page int32) int32 {

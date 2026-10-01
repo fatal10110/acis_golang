@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -255,6 +256,8 @@ type Character struct {
 	skills skillState
 	cubics cubic.List
 	hennas *henna.List
+	// recipes is the recipe book; it carries its own lock.
+	recipes recipe.Book
 }
 
 var _ effect.StatOwner = (*Character)(nil)

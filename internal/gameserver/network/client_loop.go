@@ -759,6 +759,59 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			onLive(live, func() { l.crystallizeLiveItem(live, req) })
 
+		case clientpackets.OpcodeRequestRecipeBookOpen:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRecipeBookOpen)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.openRecipeBook(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestRecipeBookDestroy:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRecipeBookDestroy)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.destroyRecipe(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestRecipeItemMakeInfo:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRecipeItemMakeInfo)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.sendRecipeItemMakeInfo(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestRecipeItemMakeSelf:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRecipeItemMakeSelf)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			// A craft inside the manufacture reuse window is dropped
+			// silently, before anything else is looked at.
+			if !client.performFloodProtected(floodProtectorManufacture, l.playerConfig.ManufactureDelay, time.Now()) {
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.makeRecipeSelf(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestEnchantItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEnchantItem)
 			if err != nil {

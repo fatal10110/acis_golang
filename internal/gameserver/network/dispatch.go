@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
@@ -25,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -61,6 +63,14 @@ type shortcutStore interface {
 
 type hennaStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
+}
+
+// recipeBookStore reads and writes the character_recipebook rows of one
+// player's recipe book.
+type recipeBookStore interface {
+	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
+	Insert(ctx context.Context, ownerID int32, recipeID int) error
+	Delete(ctx context.Context, ownerID int32, recipeID int) error
 }
 
 // petStore is the narrow persistence surface a pet-collar restore needs:
@@ -157,6 +167,12 @@ type PlayerConfig struct {
 	MaxBuffsAmount int
 	// MagicFailures makes magic-damage casts roll for a half or full resist.
 	MagicFailures bool
+	// CraftingDisabled is players.properties CraftingEnabled inverted, so
+	// the zero value keeps crafting on as the shipped config does.
+	CraftingDisabled bool
+	// ManufactureDelay is the reuse delay between two crafts on one client
+	// session.
+	ManufactureDelay time.Duration
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -176,6 +192,8 @@ type GameClientLink struct {
 	shortcuts     shortcutStore
 	hennas        hennaStore
 	hennaTable    *henna.Table
+	recipeBooks   recipeBookStore
+	craft         *craft.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -273,13 +291,17 @@ type Queues interface {
 type GameClientLinkConfig struct {
 	Validator *SessionValidator
 	// NoCipher keeps game packets cleartext after VersionCheck.
-	NoCipher      bool
-	LoginLink     func() *LoginLink
-	Roster        *manager.Roster
-	Items         itemStore
-	Shortcuts     shortcutStore
-	Hennas        hennaStore
-	HennaTable    *henna.Table
+	NoCipher    bool
+	LoginLink   func() *LoginLink
+	Roster      *manager.Roster
+	Items       itemStore
+	Shortcuts   shortcutStore
+	Hennas      hennaStore
+	HennaTable  *henna.Table
+	RecipeBooks recipeBookStore
+	// Recipes is the loaded recipe table; nil loads none, so every recipe
+	// request is dropped.
+	Recipes       *recipe.Table
 	Templates     *player.TemplateTable
 	ItemTemplates *item.Table
 	HTML          *datacache.HTML
@@ -351,6 +373,9 @@ type GameClientLinkConfig struct {
 	// falls back to the random source. Behavior harnesses inject a
 	// deterministic roll.
 	SkillEnchantRoll func() int
+	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
+	// the random source.
+	CraftRoll func(n int) int
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -373,6 +398,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		shortcuts:     cfg.Shortcuts,
 		hennas:        cfg.Hennas,
 		hennaTable:    cfg.HennaTable,
+		recipeBooks:   cfg.RecipeBooks,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
 		html:          cfg.HTML,
@@ -441,6 +467,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		enchantCfg = *cfg.PlayerConfig.Enchant
 	}
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
+	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {
@@ -468,6 +495,14 @@ func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	}
 	pet.SetRaidCursesDisabled(l.disableRaidCurse)
 	return pet, nil
+}
+
+// nextObjectID allocates a new world object id.
+func (l *GameClientLink) nextObjectID() (int32, error) {
+	if l.ids == nil {
+		return 0, errors.New("network: no object id allocator")
+	}
+	return l.ids.NextID()
 }
 
 func (l *GameClientLink) rollEnchantSkill() int {

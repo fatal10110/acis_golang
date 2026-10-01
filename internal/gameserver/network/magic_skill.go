@@ -1037,6 +1037,14 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 			}
+		case skillhandler.RecipeBookOpened:
+			if live != nil {
+				send(live, recipeBookFrame(live, m.Dwarven))
+			}
+		case skillhandler.CraftWhileOperatingMessage:
+			if live != nil {
+				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotCreateWhileTrading))
+			}
 		case skillhandler.SlotsFullMessage:
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
