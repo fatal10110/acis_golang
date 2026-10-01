@@ -151,7 +151,7 @@ func (a characterStatActor) LevelMod() float64 {
 
 func (a characterStatActor) IsSummon() bool { return false }
 
-func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID) }
+func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID()) }
 
 func (a characterStatActor) HennaBonus(s stat.Stat) float64 { return hennaBonusFor(a.c, s) }
 
@@ -831,7 +831,7 @@ func (c *Character) RechargeMP(amount float64) float64 {
 // charged spiritshot scales its M.Atk term; a fighter's does not.
 func (c *Character) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
 	scaling := formulas.HealShotScalingNone
-	if ClassMage(c.ClassID) {
+	if ClassMage(c.ClassID()) {
 		scaling = formulas.HealShotScalingMage
 	}
 	return creature.ResolveHealInput(def, c.HealProficiency(), c.MAtk(), scaling), true

@@ -56,7 +56,7 @@ func registerItemShortcut(t *testing.T, srv *gameservertest.Server, objectID int
 
 func hasItemShortcutRow(t *testing.T, srv *gameservertest.Server, objectID int32) bool {
 	t.Helper()
-	rows, err := srv.Shortcuts.ListByOwner(context.Background(), srv.SoleObjectID(t))
+	rows, err := srv.Shortcuts.ListByOwner(context.Background(), srv.SoleObjectID(t), 0)
 	if err != nil {
 		t.Fatalf("list shortcuts: %v", err)
 	}

@@ -156,6 +156,14 @@ func AutoGetSkillShortcuts(autoGet map[int32]int32) []Shortcut {
 	return out
 }
 
+// Replace drops every shortcut and registers shortcuts instead.
+func (l *List) Replace(shortcuts []Shortcut) {
+	l.bySlot = make(map[int32]Shortcut, len(shortcuts))
+	for _, shortcut := range shortcuts {
+		l.Register(shortcut)
+	}
+}
+
 // Register adds or replaces shortcut.
 func (l *List) Register(shortcut Shortcut) {
 	if l.bySlot == nil {

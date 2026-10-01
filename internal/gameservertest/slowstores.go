@@ -72,14 +72,14 @@ type slowShortcutStore struct {
 	delay time.Duration
 }
 
-func (s slowShortcutStore) Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error {
+func (s slowShortcutStore) Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error {
 	time.Sleep(s.delay)
-	return s.ShortcutStore.Save(ctx, ownerID, sc)
+	return s.ShortcutStore.Save(ctx, ownerID, classIndex, sc)
 }
 
-func (s slowShortcutStore) Delete(ctx context.Context, ownerID int32, slot, page int32) error {
+func (s slowShortcutStore) Delete(ctx context.Context, ownerID int32, classIndex int, slot, page int32) error {
 	time.Sleep(s.delay)
-	return s.ShortcutStore.Delete(ctx, ownerID, slot, page)
+	return s.ShortcutStore.Delete(ctx, ownerID, classIndex, slot, page)
 }
 
 type slowPetStore struct {

@@ -400,9 +400,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			c = fresh
 			chars[req.Slot] = fresh
-			tmpl, ok := l.templates.Get(c.ClassID)
+			tmpl, ok := l.templates.Get(c.ClassID())
 			if !ok {
-				l.log.Error().Int("class_id", c.ClassID).Msg("select character: no template loaded")
+				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 				return
 			}
 			session.SendFrame(serverpackets.FrameSSQInfo())
@@ -1168,6 +1168,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() { l.requestBypassToServer(live, req) })
+			l.finishPendingClassChange(live)
 
 		case clientpackets.OpcodeRequestTargetCancel:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)

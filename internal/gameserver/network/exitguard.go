@@ -12,6 +12,7 @@ type exitBlock int
 const (
 	exitAllowed exitBlock = iota
 	exitBlockEnchant
+	exitBlockClassChange
 	exitBlockNoRestartZone
 	exitBlockAttackStance
 )
@@ -20,12 +21,15 @@ const (
 // now. A selected enchant scroll the player still holds refuses silently; every later reason
 // carries its own system message.
 //
-// The reference also refuses while the character's subclass lock is held and
-// while an initialized festival of darkness holds the player; neither system
-// is ported yet, so both conditions are unreachable here.
+// A class change in progress refuses silently too. The reference also
+// refuses while an initialized festival of darkness holds the player; that
+// system is not ported yet, so the condition is unreachable here.
 func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
 	if l.enchantService().Selected(live.ObjectID(), live.Inventory()) {
 		return exitBlockEnchant
+	}
+	if live.ClassChangeLocked() {
+		return exitBlockClassChange
 	}
 	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoRestart) {
 		return exitBlockNoRestartZone

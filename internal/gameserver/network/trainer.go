@@ -27,14 +27,14 @@ func (l *GameClientLink) currentTrainer(live *livePlayer) (*npc.Folk, bool) {
 // empty list names the level of the next skill, or that none is left, and
 // closes the learn window. Every list ends with ActionFailed.
 func (l *GameClientLink) showSkillList(live *livePlayer, f *npc.Folk) {
-	if !f.CanTeach(live.ClassID) {
+	if !f.CanTeach(live.ClassID()) {
 		sendValidatedHTML(live, f.ObjectID(), f.NoSkillsPage(l.html), 0)
 		return
 	}
 	if list, ok := l.acquireSkillList(live); ok {
 		live.SendFrame(list)
 	} else {
-		if next := live.template.RequiredLevelForNextSkillGrant(live.Level()); next > 0 {
+		if next := live.Template().RequiredLevelForNextSkillGrant(live.Level()); next > 0 {
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageDoNotHaveFurtherSkillsToLearnS1, int32(next)))
 		} else {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
@@ -50,11 +50,11 @@ func (l *GameClientLink) showSkillList(live *livePlayer, f *npc.Folk) {
 // says nothing can be enchanted, names level 74 to a talker below it, and
 // closes the learn window. Every list ends with ActionFailed.
 func (l *GameClientLink) showEnchantSkillList(live *livePlayer, f *npc.Folk) {
-	if !f.CanTeach(live.ClassID) {
+	if !f.CanTeach(live.ClassID()) {
 		sendValidatedHTML(live, f.ObjectID(), f.NoSkillsPage(l.html), 0)
 		return
 	}
-	if tier, _ := player.ClassLevel(live.ClassID); tier < skillstate.EnchantMinClassLevel {
+	if tier, _ := player.ClassLevel(live.ClassID()); tier < skillstate.EnchantMinClassLevel {
 		sendValidatedHTML(live, f.ObjectID(), npc.ThirdClassRequiredPage, 0)
 		return
 	}

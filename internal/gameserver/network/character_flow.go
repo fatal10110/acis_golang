@@ -188,12 +188,20 @@ func restoredItemLocation(loc item.Location) bool {
 	return false
 }
 
+// findHenna resolves a saved henna row's symbol.
+func (l *GameClientLink) findHenna(symbolID int) (henna.Henna, bool) {
+	if l.hennaTable == nil {
+		return henna.Henna{}, false
+	}
+	return l.hennaTable.Find(symbolID)
+}
+
 // enterWorld sends the EnterWorld packet burst for c and registers it in the
 // live world state.
 func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *player.Character) (*livePlayer, bool) {
-	tmpl, ok := l.templates.Get(c.ClassID)
+	tmpl, ok := l.templates.Get(c.ClassID())
 	if !ok {
-		l.log.Error().Int("class_id", c.ClassID).Msg("enter world: no template loaded")
+		l.log.Error().Int("class_id", c.ClassID()).Msg("enter world: no template loaded")
 		return nil, false
 	}
 	items, err := l.items.ListByOwner(ctx, c.ID)
@@ -229,7 +237,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	shortcuts := shortcut.Starter()
 	if l.shortcuts != nil {
-		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID)
+		restored, listErr := l.shortcuts.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("enter world: list shortcuts")
 			shortcuts = nil
@@ -238,17 +246,11 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		}
 	}
 	if l.hennas != nil {
-		rows, listErr := l.hennas.ListByOwner(ctx, c.ID)
+		rows, listErr := l.hennas.ListByOwner(ctx, c.ID, c.ClassIndex())
 		if listErr != nil {
 			l.log.Error().Err(listErr).Msg("enter world: list hennas")
 		} else {
-			lookup := func(symbolID int) (henna.Henna, bool) {
-				if l.hennaTable == nil {
-					return henna.Henna{}, false
-				}
-				return l.hennaTable.Find(symbolID)
-			}
-			c.RestoreHennas(rows, lookup)
+			c.RestoreHennas(rows, l.findHenna)
 		}
 	} else {
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
@@ -492,7 +494,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	}
 	rewarding := l.playerConfig.AutoLearnSkills
 	before := live.SkillLevels()
-	if err := l.giveOrRewardSkills(live.Character, live.template); err != nil {
+	if err := l.giveOrRewardSkills(live.Character, live.Template()); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.RefreshExpertisePenalty()
@@ -522,7 +524,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserInfoSnapshot {
 	return serverpackets.UserInfoSnapshot{
 		Character:          live.Character,
-		Template:           live.template,
+		Template:           live.Template(),
 		Items:              live.inventoryItems(),
 		IsGM:               live.access.IsGM,
 		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
@@ -616,6 +618,10 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
+	// The body stays the base class's while a subclass is played.
+	if base, ok := l.templates.Get(c.BaseClassID); ok {
+		c.SetBaseTemplate(base)
+	}
 	// The characters row stores finalized max snapshots (Save writes
 	// ResourceValues), but the vitals fields are raw calculator bases once a
 	// template is attached — re-seed them from the class tables so the CON/MEN
@@ -627,17 +633,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// stale ITEM shortcut (its item consumed/traded/destroyed since last
 	// logout) is dropped, and every surviving one gets SharedReuseGroup from
 	// its item's etc-item data.
-	shortcuts = shortcut.RestoreItemShortcuts(shortcuts, func(objectID int32) (int32, bool) {
-		inst := c.Inventory().ItemByObjectID(objectID)
-		if inst == nil {
-			return 0, false
-		}
-		tmpl, ok := l.itemTemplates.Get(inst.TemplateID)
-		if !ok || tmpl.EtcItem == nil {
-			return -1, true
-		}
-		return tmpl.EtcItem.SharedReuseGroup, true
-	})
+	shortcuts = l.restoreItemShortcuts(c, shortcuts)
 	rt := player.Runtime{
 		World:  l.world,
 		Skills: l.skills,
@@ -686,7 +682,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	setWaterSurface(creatureLive.Move(), l.zones)
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
-	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, template: tmpl, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
@@ -715,6 +711,22 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		}
 	}
 	return live, nil
+}
+
+// restoreItemShortcuts keeps the ITEM shortcuts of shortcuts whose item c
+// still holds, each with its item's shared reuse group.
+func (l *GameClientLink) restoreItemShortcuts(c *player.Character, shortcuts []shortcut.Shortcut) []shortcut.Shortcut {
+	return shortcut.RestoreItemShortcuts(shortcuts, func(objectID int32) (int32, bool) {
+		inst := c.Inventory().ItemByObjectID(objectID)
+		if inst == nil {
+			return 0, false
+		}
+		tmpl, ok := l.itemTemplates.Get(inst.TemplateID)
+		if !ok || tmpl.EtcItem == nil {
+			return -1, true
+		}
+		return tmpl.EtcItem.SharedReuseGroup, true
+	})
 }
 
 func slotCharacter(chars []*player.Character, slot int32) (*player.Character, bool) {

@@ -149,6 +149,9 @@ type options struct {
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
 	classTemplate          *player.Template
+	extraClassTemplates    []*player.Template
+	subclassWithoutQuests  bool
+	subclassDelay          time.Duration
 	log                    zerolog.Logger
 	geo                    move.Geo
 	itemTemplates          *item.Table
@@ -574,6 +577,18 @@ func WithLevels(levels *player.LevelTable) Option {
 // characters, say, a real body size.
 func WithClassTemplate(tmpl *player.Template) Option {
 	return func(o *options) { o.classTemplate = tmpl }
+}
+
+// WithClassTemplates adds class templates beside the default ones, each
+// replacing a default of the same id, so a suite can play further classes.
+func WithClassTemplates(tmpls ...*player.Template) Option {
+	return func(o *options) { o.extraClassTemplates = append(o.extraClassTemplates, tmpls...) }
+}
+
+// WithSubclassRules sets players.properties SubClassWithoutQuests and the
+// server.properties SubclassTime reuse delay (default false and none).
+func WithSubclassRules(withoutQuests bool, delay time.Duration) Option {
+	return func(o *options) { o.subclassWithoutQuests, o.subclassDelay = withoutQuests, delay }
 }
 
 // WithLog sets the link logger (default zero-logger).
@@ -1340,6 +1355,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	shortcuts := gamesql.NewShortcutStore(db)
 	hennas := gamesql.NewHennaStore(db)
 	recipeBooks := gamesql.NewRecipeBookStore(db)
+	subclasses := gamesql.NewSubclassStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
@@ -1404,10 +1420,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("new shadow items: %v", err)
 	}
-	templates := Templates(t)
+	class0 := ClassTemplate()
 	if o.classTemplate != nil {
-		templates = templatesWith(t, o.classTemplate)
+		class0 = o.classTemplate
 	}
+	templates := templatesWith(t, class0, o.extraClassTemplates...)
 	itemTemplates := o.itemTemplates
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
@@ -1488,6 +1505,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
+	roster.SetSubclasses(subclasses)
 	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
@@ -1518,6 +1536,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Hennas:           hennas,
 		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
 		RecipeBooks:      recipeBooks,
+		Subclasses:       subclasses,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		Multisells:       o.multisells,
 		CraftRoll:        o.craftRoll,
@@ -1550,7 +1569,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,

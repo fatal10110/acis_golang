@@ -17,7 +17,6 @@ func testCharacter(objectID int32, name string) *player.Character {
 		ID:          objectID,
 		AccountName: "acct1",
 		Name:        name,
-		ClassID:     0,
 		BaseClassID: 0,
 		Race:        player.RaceHuman,
 		Sex:         player.SexMale,
@@ -61,7 +60,7 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 	}
 	gotRes := got.ResourceValues()
 	wantRes := c.ResourceValues()
-	if got.AccountName != c.AccountName || got.Name != c.Name || got.ClassID != c.ClassID ||
+	if got.AccountName != c.AccountName || got.Name != c.Name || got.ClassID() != c.ClassID() ||
 		got.Race != c.Race || got.Sex != c.Sex || got.CharLevel != c.CharLevel ||
 		gotRes != wantRes ||
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {

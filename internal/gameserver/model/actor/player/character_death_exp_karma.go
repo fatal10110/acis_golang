@@ -103,7 +103,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	// The loss is a negative experience add, not a removal: one that would
 	// take experience below zero is dropped rather than floored, no loss
 	// message goes out, and UserInfo is sent either way.
-	c.addExp(table, c.runtimeTemplate, -lostExp, &hooks)
+	c.addExp(table, c.template(), -lostExp, &hooks)
 	hooks.add(c.UpdateUserInfo)
 }
 
@@ -125,7 +125,7 @@ func (c *Character) RestoreExp(restorePercent float64) {
 	c.ExpBeforeDeath = 0
 	// A bare experience add: UserInfo, but no reward message.
 	var hooks progressionHooks
-	c.addExp(table, c.runtimeTemplate, restored, &hooks)
+	c.addExp(table, c.template(), restored, &hooks)
 	c.progressionMu.Unlock()
 	hooks.run()
 	c.UpdateUserInfo()

@@ -64,6 +64,8 @@ type gameplayConfig struct {
 	ManufactureDelay         manufactureDelay
 	CraftingEnabled          craftingEnabled
 	MultisellDelay           multisellDelay
+	SubclassDelay            subclassDelay
+	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
 	AllowDiscardItem         allowDiscardItem
 	SpawnMultiplier          spawnMultiplier
@@ -154,6 +156,12 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SubclassWithoutQuests, err = loadSubclassWithoutQuests(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.BlacksmithUseRecipes, err = loadBlacksmithUseRecipes(paths); err != nil {
@@ -583,6 +591,30 @@ func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
 		return 0, err
 	}
 	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
+}
+
+// subclassDelay is the reuse delay between two subclass add, change or
+// replace actions, read from server.properties.
+type subclassDelay time.Duration
+
+func loadSubclassDelay(paths gameServerPaths) (subclassDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return subclassDelay(time.Duration(config.NewFields(props, "subclass reuse delay").Int("SubclassTime", 2000)) * time.Millisecond), nil
+}
+
+// subclassWithoutQuests lets a subclass be added without its quests, read
+// from players.properties.
+type subclassWithoutQuests bool
+
+func loadSubclassWithoutQuests(paths gameServerPaths) (subclassWithoutQuests, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return subclassWithoutQuests(config.NewFields(props, "subclass without quests").Bool("SubClassWithoutQuests", false)), nil
 }
 
 // blacksmithUseRecipes makes a multisell exchange take the ingredients

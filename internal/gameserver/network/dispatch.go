@@ -65,19 +65,26 @@ type itemStore interface {
 }
 
 type shortcutStore interface {
-	ListByOwner(ctx context.Context, ownerID int32) ([]shortcut.Shortcut, error)
-	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
-	Delete(ctx context.Context, ownerID int32, slot, page int32) error
+	ListByOwner(ctx context.Context, ownerID int32, classIndex int) ([]shortcut.Shortcut, error)
+	Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error
+	Delete(ctx context.Context, ownerID int32, classIndex int, slot, page int32) error
 }
 
 type hennaStore interface {
-	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
-	Insert(ctx context.Context, ownerID int32, symbolID, slot int) error
-	Delete(ctx context.Context, ownerID int32, slot int) error
+	ListByOwner(ctx context.Context, ownerID int32, classIndex int) ([]henna.Row, error)
+	Insert(ctx context.Context, ownerID int32, classIndex, symbolID, slot int) error
+	Delete(ctx context.Context, ownerID int32, classIndex, slot int) error
 }
 
 // recipeBookStore reads and writes the character_recipebook rows of one
 // player's recipe book.
+// subclassStore is the character_subclasses persistence a class change
+// writes. Satisfied by *sql.SubclassStore.
+type subclassStore interface {
+	Insert(ctx context.Context, charID int32, sub player.SubClass) error
+	Delete(ctx context.Context, charID int32, index int) error
+}
+
 type recipeBookStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
 	Insert(ctx context.Context, ownerID int32, recipeID int) error
@@ -193,6 +200,12 @@ type PlayerConfig struct {
 	// MultisellDelay is the reuse delay between two multisell exchanges on
 	// one client session.
 	MultisellDelay time.Duration
+	// SubclassDelay is the reuse delay between two subclass add, change or
+	// replace actions of one player.
+	SubclassDelay time.Duration
+	// SubclassWithoutQuests lets a subclass be added without the quests it
+	// otherwise needs.
+	SubclassWithoutQuests bool
 	// KeepMaintainedIngredients is players.properties BlacksmithUseRecipes
 	// inverted, so the zero value takes every ingredient as the shipped
 	// config does.
@@ -217,6 +230,7 @@ type GameClientLink struct {
 	hennas        hennaStore
 	hennaTable    *henna.Table
 	recipeBooks   recipeBookStore
+	subclasses    subclassStore
 	craft         *craft.Service
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
@@ -328,6 +342,9 @@ type GameClientLinkConfig struct {
 	Hennas      hennaStore
 	HennaTable  *henna.Table
 	RecipeBooks recipeBookStore
+	// Subclasses writes the subclass rows a village master's subclass
+	// commands add and replace.
+	Subclasses subclassStore
 	// Recipes is the loaded recipe table; nil loads none, so every recipe
 	// request is dropped.
 	Recipes  *recipe.Table
@@ -454,6 +471,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		hennas:        cfg.Hennas,
 		hennaTable:    cfg.HennaTable,
 		recipeBooks:   cfg.RecipeBooks,
+		subclasses:    cfg.Subclasses,
 		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
