@@ -83,8 +83,10 @@ func TestControllerChaseStopsWithinOffsetOfPawnWithoutReaim(t *testing.T) {
 			if got := sink.arrivals(); got != 1 {
 				t.Fatalf("Arrived events = %d, want 1", got)
 			}
-			if got := len(self.headings); got != 0 {
-				t.Fatalf("headings set = %d, want none: only a player's pawn walk turns per step", got)
+			// The chase start faces the target's cell; only a player's pawn
+			// walk turns again per step.
+			if want := (location.Location{}).HeadingTo(location.Location{X: 300}); len(self.headings) != 1 || self.headings[0] != want {
+				t.Fatalf("headings set = %v, want [%d] from the chase start only", self.headings, want)
 			}
 		})
 	}

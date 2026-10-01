@@ -139,9 +139,14 @@ func (c *Controller) segmentAdvanced(ev event.Move) {
 	// waypoint rather than a follow target.
 	ev.FollowTarget = 0
 	ev.FollowOffset = 0
-	// Rotate toward the new leg immediately before broadcasting it: the
-	// heading is set to the destination directly before the
-	// MoveToLocation send.
+	c.broadcastMoveStart(ev)
+}
+
+// broadcastMoveStart turns the actor toward the leg ev starts, then shows
+// observers the walk. Every walk start and route leg faces its destination
+// before the movement is broadcast, so a later stop or appearance carries the
+// walk's direction; a same-cell request faces heading 0.
+func (c *Controller) broadcastMoveStart(ev event.Move) {
 	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
 	c.self.BroadcastMove(ev)
 }
@@ -341,7 +346,7 @@ func (c *Controller) pawnFriendlyFollowTick() {
 	c.applyPathFindOutcome(outcome)
 	ev.FollowTarget = target.ObjectID()
 	ev.FollowOffset = c.friendlyOffset
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 }
 
@@ -464,7 +469,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			ev.FollowTarget = target.ObjectID()
 			ev.FollowOffset = offset
 		}
-		c.self.BroadcastMove(ev)
+		c.broadcastMoveStart(ev)
 		c.addPositionUpdate()
 		return true, nil
 	}
@@ -492,7 +497,7 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return nil
 }
@@ -509,7 +514,7 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 		return false, nil
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return true, nil
 }
@@ -536,7 +541,7 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.applyPathFindOutcome(outcome)
 	ev.FollowTarget = target.ObjectID()
 	ev.FollowOffset = offset
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return true
 }
@@ -552,7 +557,7 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, 
 		return event.Move{}, err
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return ev, nil
 }
