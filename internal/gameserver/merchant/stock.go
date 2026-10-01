@@ -56,7 +56,9 @@ type Stock struct {
 }
 
 // NewStock starts every limited product of lists at its full count. Row
-// writes run on worker, one lane per buylist; a nil worker writes inline.
+// writes run on worker, one lane per buylist; a nil worker writes inline
+// while holding the stock's lock, which only a test without a database
+// should rely on.
 func NewStock(lists *buylist.Table, store StockStore, worker *persist.Worker, now func() time.Time, log zerolog.Logger) *Stock {
 	s := &Stock{
 		store:    store,
@@ -152,10 +154,9 @@ func (s *Stock) Decrease(p buylist.Product, n int) bool {
 	}
 	next := s.now().Add(time.Duration(p.RestockDelayMillis) * time.Millisecond)
 	s.restock[key] = next
-	s.mu.Unlock()
-
 	row := StockRow{ListID: p.BuyListID, ItemID: p.ItemID, Count: count, NextRestock: next}
 	s.write(p.BuyListID, func(ctx context.Context) error { return s.store.SaveStock(ctx, row) })
+	s.mu.Unlock()
 	return true
 }
 
@@ -163,18 +164,14 @@ func (s *Stock) Decrease(p buylist.Product, n int) bool {
 // count, ends its timer and deletes its row.
 func (s *Stock) Restock() {
 	now := s.now()
-	var due []stockKey
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	for key, at := range s.restock {
 		if now.Before(at) {
 			continue
 		}
 		s.counts[key] = s.products[key].MaxCount
 		delete(s.restock, key)
-		due = append(due, key)
-	}
-	s.mu.Unlock()
-	for _, key := range due {
 		s.write(key.list, func(ctx context.Context) error { return s.store.DeleteStock(ctx, key.list, key.item) })
 	}
 }
@@ -184,8 +181,11 @@ func (s *Stock) Start(log zerolog.Logger) *scheduler.Ticker {
 	return scheduler.Start(RestockTick, s.Restock, log)
 }
 
-// write queues one row write on listID's lane, so the writes of one
-// product land in the order they were made.
+// write queues one row write on listID's lane. The caller holds s.mu, so
+// the writes of one product reach the lane in the order its count and
+// restock timer changed: a restock's delete and the next sale's save can
+// not swap. Enqueue only appends to the lane; a nil worker runs the write
+// inline, still under s.mu.
 func (s *Stock) write(listID int, op func(context.Context) error) {
 	if s.store == nil {
 		return
