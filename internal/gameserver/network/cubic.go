@@ -153,6 +153,13 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	if live == nil || runtime == nil {
 		return
 	}
+	if !live.cubicStillActive(id, runtime) {
+		// A stopped cubic (evicted, expired) is gone: a combat-stance entry
+		// that snapshotted its runtime before the stop may have restarted
+		// the tick, so end it here without acting or broadcasting.
+		runtime.StopAction()
+		return
+	}
 	if live.Character.Dead() {
 		// Matches Cubic.fireAction's own isDead()/isOnline() self-check:
 		// a dead owner stops the cubic outright rather than firing.

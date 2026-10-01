@@ -6,13 +6,15 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 func cubicRuntimeDef(id cubic.ID) modelskill.Definition {
 	return modelskill.Definition{
-		SkillType: "SUMMON", IsCubic: true, NpcID: int(id),
+		Level: 1, SkillType: "SUMMON", IsCubic: true, NpcID: int(id),
 		CubicActivationTime: 5, SummonTotalLifeTime: 900_000,
 	}
 }
@@ -76,5 +78,33 @@ func TestEvictedCubicRuntimeDoesNotActForARegrantedID(t *testing.T) {
 	}
 	if liveCubicRuntime(live, cubic.Life) != regranted {
 		t.Fatal("evicted runtime's late expiry dropped the regranted runtime")
+	}
+}
+
+// A combat-stance entry can snapshot a cubic's runtime, lose the race to an
+// eviction that stops it, and restart its tick afterwards. That stale tick
+// must neither act nor broadcast a MagicSkillUse for a cubic the client no
+// longer shows.
+func TestStaleCubicTickDoesNotFire(t *testing.T) {
+	const healSkill = 4051
+	link := &GameClientLink{
+		log:    zerolog.Nop(),
+		skills: skillstate.NewPersistence(nil, skillTable(modelskill.Definition{ID: healSkill, Level: 1, Power: 10})),
+	}
+	frames := &testsupport.FrameCapture{}
+	live := newTestLivePlayer(t, 1, frames)
+	live.Character.SetRollSource(func(int) int { return 0 })
+	live.Character.SetResourceValues(player.Resources{MaxHP: 80, CurrentHP: 20, MaxMP: 30, CurrentMP: 30})
+
+	live.Character.AddOrRefreshCubic(cubic.Life, false)
+	link.syncCubicRuntime(live, cubic.Life, cubicRuntimeDef(cubic.Life))
+	evicted := liveCubicRuntime(live, cubic.Life)
+	live.Character.AddOrRefreshCubic(cubic.Storm, false)
+	link.syncCubicRuntime(live, cubic.Storm, cubicRuntimeDef(cubic.Storm))
+
+	evicted.Action() // the late combat-stance restart
+	link.fireCubic(live, cubic.Life, evicted)
+	if got := frames.Frames(); len(got) != 0 {
+		t.Fatalf("stale Life Cubic tick sent %d frames, want none", len(got))
 	}
 }
