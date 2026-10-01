@@ -79,14 +79,14 @@ const socialInterval = 12 * time.Second
 
 // Folk is a live civilian NPC. It stands where it spawned, or walks its
 // route when given movement (EnableMovement), is shown to nearby players,
-// can be selected, and answers a player's interact with its chat window. It
-// takes no part in combat: nothing damages it, it holds no effects, and it
-// never casts, so its stats are fixed at spawn.
+// can be selected, and answers a player's interact with its chat window.
+// It never attacks or casts, but any other creature may attack it by force:
+// it takes damage, never below 1 HP, regenerates, and holds the buffs and
+// debuffs cast on it (no other effect lands on it).
 type Folk struct {
 	world.Presence
 	Instance *Instance
-	fixedStats
-	inPeace bool
+	inPeace  bool
 
 	// motion is the movement of a route walker; nil for a standing NPC.
 	// EnableMovement sets it before the NPC is published.
@@ -94,61 +94,14 @@ type Folk struct {
 
 	// lastSocial is the Unix millisecond time of the last talk animation.
 	lastSocial atomic.Int64
-}
 
-// fixedStats are the client-visible stats of an NPC that holds no effects,
-// settled once at spawn from its template and passive skills.
-type fixedStats struct {
-	maxHP, pAtkSpd, mAtkSpd          int
-	moveMultiplier, atkSpdMultiplier float64
-	// moveSpeed is the speed the NPC walks or runs at, by its stance.
-	moveSpeed float64
-}
-
-// settleFixedStats finalizes inst's stats through the builtin stat funcs
-// and the template passives lookup resolves.
-func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, error) {
-	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
-	if err != nil {
-		return fixedStats{}, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
-	}
-	t := inst.Template
-	calc := func(s stat.Stat, base float64) float64 {
-		c := effect.NewCalculator(defaultBuiltin(s))
-		for _, m := range mods {
-			if m.Stat == s {
-				c.AddMod(m)
-			}
-		}
-		v := c.Calc(templateStatActor{t: t}, base)
-		if s.CantBeNegative() && v <= 0 {
-			return 1
-		}
-		return v
-	}
-	fs := fixedStats{
-		maxHP:   int(calc(stat.MaxHP, t.HPMax)),
-		pAtkSpd: int(calc(stat.PowerAttackSpeed, t.AtkSpd)),
-		mAtkSpd: int(calc(stat.MagicAttackSpeed, magicAttackSpeedBase)),
-	}
-	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
-	// The move speed over the base speed the stance picks, as a moving NPC
-	// computes it; 0 for an NPC whose base is 0.
-	base := int(t.RunSpeed)
-	if inst.WalkMode {
-		base = int(t.WalkSpeed)
-	}
-	if base != 0 {
-		speed := float32(calc(stat.RunSpeed, float64(base)))
-		fs.moveMultiplier = float64(speed / float32(base))
-		fs.moveSpeed = float64(speed)
-	}
-	return fs, nil
+	folkCombat
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
-// the template's passive skills into the stats it is shown with. inPeace
-// reports whether its spawn point lies in a peace zone.
+// the template's passive skills into its stats. inPeace reports whether its
+// spawn point lies in a peace zone. Attach gives it the runtime it fights
+// with before it is published.
 func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, error) {
 	if inst == nil || inst.Template == nil {
 		return nil, errors.New("npc: nil folk instance")
@@ -160,11 +113,13 @@ func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, e
 	if len(skills) > 0 {
 		lookup = skills[0]
 	}
-	fs, err := settleFixedStats(inst, lookup)
+	mods, err := effect.TemplatePassiveMods(lookup, inst.Template.Passives)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	return &Folk{Instance: inst, fixedStats: fs, inPeace: inPeace}, nil
+	f := &Folk{Instance: inst, inPeace: inPeace}
+	f.initCombat(mods)
+	return f, nil
 }
 
 // ObjectID returns this NPC's world object id.
@@ -184,16 +139,6 @@ func (f *Folk) CollisionRadius() float64 { return f.Instance.Template.CollisionR
 
 // CollisionHeight returns the template body height.
 func (f *Folk) CollisionHeight() float64 { return f.Instance.Template.CollisionHeight }
-
-// MaxHP returns the NPC's maximum HP.
-func (f *Folk) MaxHP() int { return f.maxHP }
-
-// CurrentHP returns the NPC's HP, always full: nothing damages it.
-func (f *Folk) CurrentHP() int { return f.maxHP }
-
-// Running reports the run stance every spawned NPC takes, walk for a
-// route walker.
-func (f *Folk) Running() bool { return !f.Instance.WalkMode }
 
 // Muted reports a civilian NPC a player's interact does nothing on.
 func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
@@ -229,17 +174,18 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 	if t.UsingServerSideTitle {
 		title = t.Title
 	}
+	pAtkSpd := f.AttackSpeed()
 	return npcinfo.Snapshot{
 		ObjectID: f.ObjectID(), TemplateID: t.TemplateID,
 		X: x, Y: y, Z: z, Heading: f.Heading(),
-		MAtkSpd: f.mAtkSpd, PAtkSpd: f.pAtkSpd,
+		MAtkSpd: f.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
-		MoveMultiplier: f.moveMultiplier, AtkSpdMultiplier: f.atkSpdMultiplier,
-		CurrentHP: f.maxHP, MaxHP: f.maxHP,
+		MoveMultiplier: float64(f.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, t.AtkSpd),
+		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: f.Running(), SummonAnimation: 2,
-		Name: name, Title: title,
+		Running: f.Running(), InCombat: f.InCombat(), SummonAnimation: 2,
+		AbnormalEffect: f.AbnormalEffect(), Name: name, Title: title,
 	}
 }
 

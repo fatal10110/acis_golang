@@ -2658,6 +2658,9 @@ type pvpFlagNPC struct {
 func (pvpFlagNPC) ObjectID() int32 { return 4 }
 func (n pvpFlagNPC) Guard() bool   { return n.guard }
 
+// Attackable reports the attackable NPC a helpful skill flags its caster on.
+func (pvpFlagNPC) Attackable() bool { return true }
+
 func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}

@@ -532,20 +532,36 @@ func FolkTemplate(kind string, npcID int) *npc.Template {
 }
 
 // SpawnFolkNPCAt places a civilian NPC built from tmpl at at through the
-// production Folk constructor, the way the spawner places one.
+// production civilian spawner, standing (no route walker).
 func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location) *npc.Folk {
 	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inPeace := s.zones != nil && s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
-	f, err := npc.NewFolk(inst, inPeace)
+	inst.Home, inst.HasHome = at, true
+	f, err := s.folkSpawner(nil, Geo{}).Spawn(inst, at, 0)
 	if err != nil {
-		t.Fatalf("new folk npc: %v", err)
+		t.Fatalf("spawn folk npc: %v", err)
 	}
-	s.State.Spawn(f, at.X, at.Y, at.Z, 0)
 	return f
+}
+
+// folkSpawner is the production civilian spawner over this server's world,
+// with walker as its route walker task.
+func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.FolkSpawner {
+	return gamemanager.FolkSpawner{
+		State:               s.State,
+		Walker:              walker,
+		Geo:                 geo,
+		Positions:           s.positions,
+		Queues:              s.queues,
+		NewSink:             network.FolkSinks(s.State, s.stance),
+		Zones:               s.zones,
+		Effects:             s.effectEnv,
+		MaxGeoPathFailCount: s.maxGeoPathFail,
+		Log:                 s.log,
+	}
 }
 
 // SpawnRouteFolkNPCAt places a civilian NPC built from tmpl at at through
@@ -603,18 +619,7 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	}
 	inst.Home, inst.HasHome, inst.WalkMode = spec.At, true, spec.WalkMode
 	inst.SpawnHeading = spec.Heading
-	spawner := gamemanager.FolkSpawner{
-		State:               s.State,
-		Walker:              walker,
-		Geo:                 geo,
-		Positions:           s.positions,
-		Queues:              s.queues,
-		NewSink:             network.FolkSinks(s.State),
-		Zones:               s.zones,
-		MaxGeoPathFailCount: s.maxGeoPathFail,
-		Log:                 s.log,
-	}
-	f, err := spawner.Spawn(inst, spec.At, spec.Heading)
+	f, err := s.folkSpawner(walker, geo).Spawn(inst, spec.At, spec.Heading)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}

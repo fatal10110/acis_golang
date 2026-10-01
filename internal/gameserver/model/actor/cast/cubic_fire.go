@@ -101,8 +101,9 @@ func DecideLifeCubicTarget(owner CubicFireOwner) (Target, bool) {
 }
 
 // pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
-// selected target, if within range and not already dead. The reference's
-// full isAttackableWithoutForceBy alignment/karma matrix is not replicated
+// selected target, if within range and not already dead. A civilian NPC,
+// never attackable without force, is never one. The reference's full
+// isAttackableWithoutForceBy alignment/karma matrix is not replicated
 // here — deferred, see fatal10110/acis_golang#1129.
 func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
 	selected := owner.Target()
@@ -111,6 +112,9 @@ func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
 	}
 	combatant, ok := selected.(attackable.Combatant)
 	if !ok || combatant.AlikeDead() {
+		return nil, false
+	}
+	if civilian, ok := selected.(interface{ Folk() bool }); ok && civilian.Folk() {
 		return nil, false
 	}
 	target, ok := selected.(Target)

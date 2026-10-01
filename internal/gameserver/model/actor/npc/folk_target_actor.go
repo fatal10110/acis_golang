@@ -15,7 +15,7 @@ var _ skilltarget.Actor = (*Folk)(nil)
 func (f *Folk) Folk() bool        { return true }
 func (f *Folk) FolkOrGuard() bool { return true }
 
-// Dead reports false: nothing damages a civilian NPC.
+// Dead reports false: no damage takes a civilian NPC below 1 HP.
 func (f *Folk) Dead() bool { return false }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any

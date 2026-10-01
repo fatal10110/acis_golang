@@ -136,8 +136,8 @@ type Queues interface {
 
 // NewNpcsWithMaxBuffsAmount builds live NPCs with the configured buff-slot
 // base, RandomWalkRate and raid base multipliers, each running its work on a
-// queue from queues. newFolkSink builds the sink a route-walking civilian NPC
-// shows its movement through.
+// queue from queues. newFolkSink builds the sink a civilian NPC shows its
+// movement and status through.
 func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, effects, queues, zoneIndexes...)
 }
@@ -239,6 +239,8 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		NewSink:             newFolkSink,
 		Zones:               zones,
 		Skills:              castDefs,
+		Effects:             effects,
+		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
 		Log:                 log,
 	}
