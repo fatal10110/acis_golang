@@ -6,6 +6,7 @@ package announcement
 
 import (
 	"maps"
+	"math"
 	"slices"
 	"sync"
 	"time"
@@ -234,7 +235,7 @@ func (r *Registry) startLocked(e *entry) {
 		}
 		e.next = r.queue.Now().Add(initial)
 	} else {
-		e.left = int32(e.Limit)
+		e.left = javaInt(e.Limit)
 	}
 	run := e.run
 	e.timer = r.queue.After(initial, func() { r.fire(e, run) })
@@ -275,6 +276,19 @@ func (e *entry) stop() {
 		e.timer.Stop()
 		e.timer = nil
 	}
+}
+
+// javaInt narrows n to the reference's 32-bit count. Both sources of a limit,
+// the file loader and //announce add_auto, refuse a value out of that range,
+// so the bounds, clamping, only guard against a new caller.
+func javaInt(n int) int32 {
+	switch {
+	case n > math.MaxInt32:
+		return math.MaxInt32
+	case n < math.MinInt32:
+		return math.MinInt32
+	}
+	return int32(n)
 }
 
 func seconds(n int) time.Duration {
