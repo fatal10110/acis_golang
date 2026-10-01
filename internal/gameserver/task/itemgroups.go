@@ -33,7 +33,9 @@ type rowGroup struct {
 // Bind has to run before the operation's write takes its places in the rows'
 // order (persist.Order), so a write that takes a later place has already seen
 // the group. Rows already bound to another group merge with it: a row cannot
-// land with only some of the rows it depends on.
+// land with only some of the rows it depends on. It still runs after the
+// operation's mutation, so a tick that reads one of the rows in between
+// writes that row alone, ahead of the operation's own write (#3034).
 func (i *ItemInstances) Bind(rows []BoundRow) {
 	if len(rows) < 2 {
 		return
