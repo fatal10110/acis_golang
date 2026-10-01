@@ -62,7 +62,7 @@ func bootEnchantRig(t *testing.T) (srv *gameservertest.Server, player *testsuppo
 func wearSword(t *testing.T, srv *gameservertest.Server, ownerID int32) int32 {
 	t.Helper()
 	objectID := srv.GiveItem(t, ownerID, swordID, 1)
-	row := swordRow(t, srv, ownerID, objectID)
+	row := itemRow(t, srv, ownerID, objectID)
 	row.Location, row.LocationData = item.LocationPaperdoll, itemcontainer.RHand
 	if err := srv.Items.Update(context.Background(), row); err != nil {
 		t.Fatalf("wear sword: %v", err)
@@ -70,7 +70,7 @@ func wearSword(t *testing.T, srv *gameservertest.Server, ownerID int32) int32 {
 	return objectID
 }
 
-func swordRow(t *testing.T, srv *gameservertest.Server, ownerID, objectID int32) *item.Instance {
+func itemRow(t *testing.T, srv *gameservertest.Server, ownerID, objectID int32) *item.Instance {
 	t.Helper()
 	rows, err := srv.Items.ListByOwner(context.Background(), ownerID)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestAdminEnchant(t *testing.T) {
 		t.Fatal("SkillList after //enchant rhand 3 still lists the +4 skill")
 	}
 	srv.FlushItems(t)
-	if got := swordRow(t, srv, gmID, gmSword).EnchantLevel; got != 3 {
+	if got := itemRow(t, srv, gmID, gmSword).EnchantLevel; got != 3 {
 		t.Fatalf("GM sword enchant level row = %d, want 3", got)
 	}
 
@@ -165,10 +165,10 @@ func TestAdminEnchant(t *testing.T) {
 		}
 	}
 	srv.FlushItems(t)
-	if got := swordRow(t, srv, playerID, playerSword).EnchantLevel; got != 7 {
+	if got := itemRow(t, srv, playerID, playerSword).EnchantLevel; got != 7 {
 		t.Fatalf("player sword enchant level row = %d, want 7", got)
 	}
-	if got := swordRow(t, srv, gmID, gmSword).EnchantLevel; got != 3 {
+	if got := itemRow(t, srv, gmID, gmSword).EnchantLevel; got != 3 {
 		t.Fatalf("GM sword enchant level row = %d, want 3 still", got)
 	}
 }
