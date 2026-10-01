@@ -70,6 +70,7 @@ type gameplayConfig struct {
 	DisableRaidCurse         raidCursesDisabled
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
+	Freight                  network.FreightConfig
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -169,6 +170,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Merchant, err = loadMerchantConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Freight, err = loadFreightConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -456,6 +460,30 @@ func loadMerchantConfig(paths gameServerPaths) (merchant.Config, error) {
 		WearPrice:            f.Int("WearPrice", def.WearPrice),
 	}
 	return cfg, f.Err()
+}
+
+// loadFreightConfig reads the freight settings: whether the service runs
+// from server.properties, its region binding and price from
+// players.properties.
+func loadFreightConfig(paths gameServerPaths) (network.FreightConfig, error) {
+	def := network.DefaultFreightConfig()
+	server, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return network.FreightConfig{}, err
+	}
+	sf := config.NewFields(server, "freight")
+	cfg := network.FreightConfig{Allow: sf.Bool("AllowFreight", def.Allow)}
+	if err := sf.Err(); err != nil {
+		return network.FreightConfig{}, err
+	}
+	players, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return network.FreightConfig{}, err
+	}
+	pf := config.NewFields(players, "freight")
+	cfg.RegionBased = pf.Bool("RegionBasedFreight", def.RegionBased)
+	cfg.Price = pf.Int("FreightPrice", def.Price)
+	return cfg, pf.Err()
 }
 
 // characterSelectDelay is the reuse delay shared by one client's

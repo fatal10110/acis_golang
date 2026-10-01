@@ -10,9 +10,8 @@ type BypassOutcome int
 
 const (
 	// BypassUnported names a command of a system not in place yet (skill
-	// lists, quests, shops, warehouses, teleports, lottery, observation,
-	// castles and the like), or one no dialog handles. It answers nothing
-	// of its own.
+	// lists, quests, teleports, lottery, observation, castles and the
+	// like), or one no dialog handles. It answers nothing of its own.
 	BypassUnported BypassOutcome = iota
 	// BypassChatWindow opens HTML, then releases the client with
 	// ActionFailed.
@@ -41,6 +40,9 @@ const (
 	// BypassMultisell opens the multisell list Multisell names, in its
 	// inventory-only form when InventoryOnly is set.
 	BypassMultisell
+	// BypassWarehouse runs the warehouse keeper's storage command
+	// Warehouse.
+	BypassWarehouse
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -74,6 +76,11 @@ type BypassReply struct {
 	// InventoryOnly opens the list on the talker's unworn armor and
 	// weapons: only the entries taking one of them, one set per item.
 	InventoryOnly bool
+	// Warehouse is the storage command BypassWarehouse runs, and
+	// FreightTarget the text after the command's last '_', which names the
+	// character a FreightCharacter command opens.
+	Warehouse     WarehouseCommand
+	FreightTarget string
 }
 
 // fishermanCommands are the fisherman's own commands, run before the
@@ -85,7 +92,8 @@ var fishermanCommands = []string{"FishSkillList", "FishingChampionship", "Fishin
 // or warehouse keeper first applies its karma gate to every command,
 // answering with its refusal page when that page exists. A symbol maker's
 // Draw and RemoveList open its windows. A merchant or fisherman then
-// answers its sell, multisell and shop commands. The generic commands
+// answers its sell, multisell and shop commands, and a warehouse keeper
+// its storage commands. The generic commands
 // follow: Chat <n> opens chat page n (page 0 when n does not parse), Link
 // <path> opens data/html/<path>, multisell <list> and exc_multisell <list>
 // open a multisell list. Every other command belongs to a system not in
@@ -132,6 +140,13 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
+	if reply.CancelEnchant {
+		if cmd := warehouseCommand(command); cmd != WarehouseNoCommand {
+			reply.Outcome, reply.Warehouse = BypassWarehouse, cmd
+			reply.FreightTarget = command[strings.LastIndexByte(command, '_')+1:]
+			return reply
+		}
+	}
 	if kind == "Merchant" || kind == "Fisherman" {
 		if out, ok := f.merchantMultisell(pages, talker, command, reply); ok {
 			return out

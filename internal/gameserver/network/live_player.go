@@ -144,6 +144,9 @@ type livePlayer struct {
 	// shownMultisell is the multisell list p was last shown, the one its
 	// exchanges choose from, or nil. Set and read on p's queue.
 	shownMultisell atomic.Pointer[multisell.List]
+	// storage is p's warehouse and freight state, set at attach and owned
+	// by p's queue from then on.
+	storage playerStorage
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.

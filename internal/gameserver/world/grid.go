@@ -50,6 +50,16 @@ func (g *Grid) RegionAt(x, y int) (region *Region, ok bool) {
 	return g.regions[(x-MinX)/regionSize][(y-MinY)/regionSize], true
 }
 
+// RegionKey identifies the region holding game coordinate (x, y): a
+// positive number no other region shares, and the same one on every boot,
+// or 0 outside the world's bounds.
+func RegionKey(x, y int) int {
+	if x < MinX || x > MaxX || y < MinY || y > MaxY {
+		return 0
+	}
+	return (x-MinX)/regionSize*RegionsY + (y-MinY)/regionSize + 1
+}
+
 // Neighbors returns every Region within depth grid steps of r, including r
 // itself, clipped to the grid's edges.
 func (g *Grid) Neighbors(r *Region, depth int) []*Region {

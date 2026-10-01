@@ -48,6 +48,14 @@ import (
 // parity; tests/npcs/merchant_test.go pins each silent branch. The
 // try-on's empty request is answered and probed here.
 //
+// SendWarehouseDepositList, SendWarehouseWithdrawList and RequestPackageSend
+// are absent too: the reference answers most of their refusals with nothing
+// (no warehouse opened, no keeper selected or in reach, a karma player, a
+// row naming an item not held), and the client closes its warehouse or
+// package window when it sends the request, leaving no click pending.
+// tests/npcs/warehouse_test.go pins those silences and every refusal that
+// does answer.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.

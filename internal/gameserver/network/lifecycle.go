@@ -9,6 +9,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/rs/zerolog"
@@ -128,6 +129,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if inv := live.Character.Inventory(); inv != nil {
 		l.flushItemPersistence(inv)
 	}
+	owners = append(owners, l.releaseStorage(live)...)
 	if l.world != nil {
 		l.world.Despawn(live)
 		l.world.RemovePlayer(live.ObjectID())
@@ -328,7 +330,7 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // restores it from that state when it is. The two sites have to keep
 // agreeing about what an entry means; changing the rule here without
 // changing it there turns a failed logout write into a missing inventory.
-func (l *GameClientLink) flushItemPersistence(inv *itemcontainer.Inventory) {
+func (l *GameClientLink) flushItemPersistence(inv persistedContainer) {
 	inv.ReleasePersistence()
 	if l.itemInstances == nil {
 		return
@@ -347,6 +349,14 @@ func (l *GameClientLink) flushItemPersistence(inv *itemcontainer.Inventory) {
 		}
 		itemInstances.RemoveItems(items)
 	})
+}
+
+// persistedContainer is an inventory, warehouse or freight whose items a
+// logout writes for the last time.
+type persistedContainer interface {
+	ReleasePersistence()
+	OwnerID() int32
+	Items() []*item.Instance
 }
 
 func (l *GameClientLink) notifyPlayerLogout(account string) {

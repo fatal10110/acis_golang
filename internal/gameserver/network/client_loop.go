@@ -371,6 +371,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					}
 					continue
 				}
+				// Another character of the account still in the world is a
+				// previous session of the account that has not finished
+				// leaving, and it may hold this character's freight, which it
+				// writes on its way out. The selection aborts silently until
+				// that session is gone; its writes are then on this
+				// character's lane, which the wait below covers.
+				if prev, ok := l.accountPlayerInWorld(chars); ok {
+					l.log.Info().Int32("object_id", prev.ObjectID()).
+						Msg("game client: account character still in the world, closing previous session")
+					prev.kickClient()
+					continue
+				}
 			}
 			// A previous session of this character has left the world, so
 			// every save it queued is on the lane. Wait for them, then read
@@ -1376,12 +1388,52 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestSellItem(live, req) })
 			}
 
+		case clientpackets.OpcodeSendWarehouseDeposit:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.SendWarehouseDepositList, error) {
+				return clientpackets.DecodeSendWarehouseDepositList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestWarehouseDeposit(live, req) })
+			}
+
+		case clientpackets.OpcodeSendWarehouseWithdraw:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.SendWarehouseWithdrawList, error) {
+				return clientpackets.DecodeSendWarehouseWithdrawList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestWarehouseWithdraw(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPackageSend:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestPackageSend, error) {
+				return clientpackets.DecodeRequestPackageSend(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPackageSend(live, req) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
-			clientpackets.OpcodeSendWarehouseDeposit,
-			clientpackets.OpcodeSendWarehouseWithdraw,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeDummy3E,
 			clientpackets.OpcodeRequestGetOnVehicle,
@@ -1390,7 +1442,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeRequestPackageSend,
 			clientpackets.OpcodeGameGuardReply,
 			clientpackets.OpcodeRequestShowMiniMap:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")

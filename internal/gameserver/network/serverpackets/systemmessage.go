@@ -444,3 +444,11 @@ const (
 	SystemMessageNoLongerTryingOn                         = 1306
 	SystemMessageYouCanNotTryThoseItemsOnAtTheSameTime    = 1368
 )
+
+// Warehouse and freight refusals; no parameter.
+const (
+	SystemMessageNoItemDepositedInWH                   = 282
+	SystemMessageNoRightToUseClanWarehouse             = 709
+	SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse = 710
+	SystemMessageCharacterDoesNotExist                 = 873
+)

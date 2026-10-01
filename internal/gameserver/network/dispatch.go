@@ -122,6 +122,9 @@ type PlayerConfig struct {
 	// StorageSlots is the base warehouse, freight, private store and recipe
 	// book size.
 	StorageSlots player.StorageSlots
+	// Freight holds the freight service settings; nil uses the shipped
+	// defaults.
+	Freight *FreightConfig
 	// AllowWater controls whether entering a water zone starts the
 	// drowning breath-gauge countdown at all.
 	AllowWater          bool
