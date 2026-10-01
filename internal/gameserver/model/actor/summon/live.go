@@ -387,7 +387,6 @@ type PetConfig struct {
 	Exp     int64
 	SP      int
 	ExpType int
-	CON     int
 	Passive bool
 	Config  *petmodel.Config
 	Growth  *npc.PetData
@@ -501,11 +500,6 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 // NewPet returns a live pet actor.
 func NewPet(cfg PetConfig) (*Actor, error) {
 	petCfg := copyPetConfig(cfg.Config)
-	if petCfg != nil && cfg.Inventory != nil {
-		slots, weight := petCfg.InventoryLimits(cfg.CON)
-		cfg.Inventory.SlotLimit = slots
-		cfg.Inventory.WeightLimit = weight
-	}
 	a := &Actor{
 		id:             cfg.ObjectID,
 		level:          cfg.Level,
@@ -551,6 +545,9 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
+	if petCfg != nil && cfg.Inventory != nil {
+		cfg.Inventory.SetLimiter(a)
+	}
 	a.settleWeightPenalty()
 	return a, nil
 }

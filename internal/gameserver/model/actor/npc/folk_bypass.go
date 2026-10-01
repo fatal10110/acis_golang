@@ -10,8 +10,8 @@ type BypassOutcome int
 
 const (
 	// BypassUnported names a command of a system not in place yet (quests,
-	// teleports, lottery, observation, castles and the
-	// like), or one no dialog handles. It answers nothing of its own.
+	// lottery, observation, castles and the like), or one no dialog
+	// handles. It answers nothing of its own.
 	BypassUnported BypassOutcome = iota
 	// BypassChatWindow opens HTML, then releases the client with
 	// ActionFailed.
@@ -53,6 +53,20 @@ const (
 	BypassAugmentMake
 	// BypassAugmentCancel opens the augmentation removal window.
 	BypassAugmentCancel
+	// BypassReleased answers ActionFailed of the command's own, ahead of
+	// the dispatcher's.
+	BypassReleased
+	// BypassTeleportList opens the list of this NPC's standard
+	// destinations.
+	BypassTeleportList
+	// BypassTeleport takes the talker to destination Index of this NPC's
+	// list.
+	BypassTeleport
+	// BypassInstantTeleport takes the talker to instant destination Index
+	// of this NPC's list.
+	BypassInstantTeleport
+	// BypassQuestInfo opens the client's quest information window.
+	BypassQuestInfo
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -91,6 +105,9 @@ type BypassReply struct {
 	// character a FreightCharacter command opens.
 	Warehouse     WarehouseCommand
 	FreightTarget string
+	// Index is the destination BypassTeleport and BypassInstantTeleport
+	// name.
+	Index int
 }
 
 // fishermanCommands are the fisherman's championship commands, run before
@@ -106,12 +123,14 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // RemoveList open its windows. A merchant or fisherman then answers its
 // sell, multisell and shop commands, and a warehouse keeper its storage
 // commands. The trainer commands follow: SkillList and EnchantSkillList
-// open the skills to learn and to enchant. Then the generic ones: Chat <n>
-// opens chat page n (page 0 when n does not parse), Link <path> opens
-// data/html/<path>, multisell <list> and exc_multisell <list> open a
-// multisell list, and Augment 1 and Augment 2 open the augmentation and
-// removal windows. Every other command belongs to a system not in place
-// yet.
+// open the skills to learn and to enchant, after an adventurer guildsman's
+// raidInfo and questlist. Then the generic ones: Chat <n> opens chat page n
+// (page 0 when n does not parse), Link <path> opens data/html/<path>,
+// multisell <list> and exc_multisell <list> open a multisell list, Augment
+// 1 and Augment 2 open the augmentation and removal windows,
+// teleport_request opens the destination list, and teleport <index> and
+// instant_teleport <index> take the talker to a destination. Every other
+// command belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -171,6 +190,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 		if shop, ok := merchantCommand(reply, rules, command); ok {
 			return shop
+		}
+	}
+	if kind == "Adventurer" {
+		if out, ok := f.adventurerCommand(pages, command, reply); ok {
+			return out
 		}
 	}
 	switch {
@@ -233,8 +257,68 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassRefused
 		}
 		return reply
+	case command == "teleport_request":
+		reply.Outcome = BypassTeleportList
+		return reply
+	case strings.HasPrefix(command, "teleport"):
+		return teleportCommand(reply, BypassTeleport, command)
+	case strings.HasPrefix(command, "instant_teleport"):
+		return teleportCommand(reply, BypassInstantTeleport, command)
 	}
+	// ponytail: CPRecovery, an arena manager's paid CP restore, is cast by
+	// the NPC; civilian NPCs cast nothing until #3038 gives them a cast
+	// runtime, so it is logged with every other unported command.
 	return reply
+}
+
+// teleportCommand answers "<command> <index>", split on spaces: outcome
+// names destination index. A command without an index, or whose index
+// does not parse, is only released.
+func teleportCommand(reply BypassReply, outcome BypassOutcome, command string) BypassReply {
+	words := strings.FieldsFunc(command, func(r rune) bool { return r == ' ' })
+	if len(words) < 2 {
+		reply.Outcome = BypassReleased
+		return reply
+	}
+	index, err := strconv.ParseInt(words[1], 10, 32)
+	if err != nil {
+		reply.Outcome = BypassReleased
+		return reply
+	}
+	reply.Outcome, reply.Index = outcome, int(index)
+	return reply
+}
+
+// adventurerCommand answers an adventurer guildsman's own commands:
+// raidInfo <level> opens the raid boss page of that level, the overview
+// for level 0, and questlist, in any case, opens the quest information
+// window. The level is read from the tenth character on: a command too
+// short to hold one, or whose level does not parse, aborts. ok is false
+// for every other command.
+func (f *Folk) adventurerCommand(pages Pages, command string, reply BypassReply) (BypassReply, bool) {
+	switch {
+	case strings.HasPrefix(command, "raidInfo"):
+		chars := []rune(command)
+		if len(chars) < 9 {
+			reply.Outcome = BypassAborted
+			return reply, true
+		}
+		level, err := strconv.ParseInt(strings.TrimFunc(string(chars[9:]), javaSpace), 10, 32)
+		if err != nil {
+			reply.Outcome = BypassAborted
+			return reply, true
+		}
+		path := "data/html/adventurer_guildsman/raid_info/info.htm"
+		if level != 0 {
+			path = "data/html/adventurer_guildsman/raid_info/level" + strconv.FormatInt(level, 10) + ".htm"
+		}
+		reply.Outcome, reply.HTML = BypassChatWindow, f.page(pages, path)
+		return reply, true
+	case strings.EqualFold(command, "questlist"):
+		reply.Outcome = BypassQuestInfo
+		return reply, true
+	}
+	return reply, false
 }
 
 // merchantCommand answers a merchant's shop commands, split on spaces with

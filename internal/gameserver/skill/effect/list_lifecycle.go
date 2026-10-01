@@ -50,7 +50,7 @@ func (l *List) AddRestored(e *Effect) {
 }
 
 func (l *List) addAnnounced(e *Effect, announce bool) {
-	if l == nil || e == nil {
+	if l == nil || e == nil || (l.admit != nil && !l.admit(e)) {
 		return
 	}
 	var pending []func()

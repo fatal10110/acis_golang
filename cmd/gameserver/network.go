@@ -181,6 +181,9 @@ func provideGameClientLink(
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
+		Teleports:        data.Teleports,
+		InstantTeleports: data.InstantTeleports,
+		FreeTeleport:     bool(gameplay.FreeTeleport),
 		Log:              log,
 
 		Augmentations:       data.Augmentations,

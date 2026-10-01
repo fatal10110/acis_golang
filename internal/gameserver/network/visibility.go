@@ -270,8 +270,8 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		}
 		if inv := a.PetInventory(); inv != nil {
 			totalWeight = inv.TotalWeight()
-			weightLimit = inv.WeightLimit
 		}
+		weightLimit = a.WeightLimit()
 	} else {
 		lifetime := a.Lifetime()
 		curFed, maxFed = lifetime.TimeRemaining, lifetime.TotalLifeTime

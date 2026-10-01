@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -36,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -217,6 +219,7 @@ type GameClientLink struct {
 	craft         *craft.Service
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
+	gatekeeper    *gatekeeper.Service
 	exchange      *exchange.Service
 	augment       *augment.Service
 	templates     *player.TemplateTable
@@ -391,6 +394,15 @@ type GameClientLinkConfig struct {
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
+	// Teleports and InstantTeleports are the destinations civilian NPCs
+	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
+	// when true, no destination is charged for. TeleportClock is the local
+	// wall clock the weekend half-price hours are read from; nil means
+	// time.Now.
+	Teleports        travel.TeleportTable
+	InstantTeleports travel.InstantTable
+	FreeTeleport     bool
+	TeleportClock    func() time.Time
 	Log              zerolog.Logger
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
@@ -512,6 +524,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
 	link.enchant.SetArmorSets(cfg.ArmorSets)
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
+	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)

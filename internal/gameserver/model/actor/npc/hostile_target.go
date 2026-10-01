@@ -68,6 +68,11 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 		}
 	}
 
+	// A civilian NPC is never an automatic target: it is no attackable NPC
+	// a confused one may turn on, nor a karma-holding playable.
+	if _, ok := target.(*Folk); ok {
+		return false
+	}
 	_, targetIsNPC := target.(*Hostile)
 	if !targetIsNPC {
 		graceTarget := target
@@ -157,7 +162,7 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 		return false
 	}
 
-	if _, targetIsNPC := target.(*Hostile); targetIsNPC {
+	if target.Kind() == actor.KindNPC {
 		return false
 	}
 

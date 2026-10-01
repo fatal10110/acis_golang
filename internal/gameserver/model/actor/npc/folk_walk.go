@@ -66,7 +66,7 @@ func (f *Folk) EnableMovement(m FolkMovement) (*FolkWalker, error) {
 	if m.Queue == nil {
 		return nil, errors.New("npc: folk movement needs a queue")
 	}
-	cm, err := move.NewCreatureMove(f.Instance.Home, f.moveSpeed, m.Geo)
+	cm, err := move.NewCreatureMove(f.Instance.Home, f.MoveSpeed(), m.Geo)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d folk movement: %w", f.Instance.Template.ID, err)
 	}

@@ -81,6 +81,13 @@ func WithEnv(env Env) Option {
 	}
 }
 
+// WithAdmission makes the list hold only the effects admit accepts. Any
+// other effect added to it is dropped before it starts: no start hook, no
+// stat change, no icon or message.
+func WithAdmission(admit func(*Effect) bool) Option {
+	return func(l *List) { l.admit = admit }
+}
+
 // IsNight reports whether it is night on the server that owns l.
 func (l *List) IsNight() bool {
 	return l != nil && l.night != nil && l.night.IsNight()
@@ -138,6 +145,9 @@ type List struct {
 	activity     ActivityRegistry
 	cancelLesser bool
 	night        conditions.NightSource
+	// admit, when set, decides which effects the list holds at all; see
+	// WithAdmission.
+	admit func(*Effect) bool
 
 	buffs   []*Effect
 	debuffs []*Effect
