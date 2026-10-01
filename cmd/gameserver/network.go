@@ -126,6 +126,7 @@ func provideGameClientLink(
 		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
 		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
 		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
+		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
 		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
 		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),

@@ -136,9 +136,13 @@ func TestStunnedMonsterWanderChainKeepsRolling(t *testing.T) {
 		t.Fatalf("clock %v already at the rescheduled firing %v", hostile.Now(), second)
 	}
 
+	// The walk is checked only on a driven clock, which runs the firing
+	// inside the advance, and before the read can move the clock. On the
+	// wall clock the firing may land after the advance returns and a short
+	// walk may arrive before any check, so its MoveToLocation is the proof.
 	advanceTo(t, srv, hostile, second)
-	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation at the rescheduled firing")
-	if !hostile.IsMoving() {
+	if srv.DrivesClock() && !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false at the rescheduled firing, want the random walk")
 	}
+	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation at the rescheduled firing")
 }

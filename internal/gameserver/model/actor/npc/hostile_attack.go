@@ -391,7 +391,10 @@ func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
 }
 
-// AttackableWithoutForceBy uses the ordinary NPC attackability rule.
+// AttackableWithoutForceBy reports whether a playable may attack this NPC
+// without Ctrl: only a Monster-family NPC that caster may attack. A town
+// Guard and a FriendlyMonster always need Ctrl, and so does a SiegeGuard,
+// which needs a siege in progress (none runs yet) to be attacked at all.
 func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
-	return h.AttackableBy(caster)
+	return h.MonsterKind() && h.AttackableBy(caster)
 }

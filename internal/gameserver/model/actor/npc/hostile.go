@@ -665,6 +665,12 @@ func (h *Hostile) FolkOrGuard() bool {
 	return hostileKind(h.Instance) == "Guard"
 }
 
+// FeedableBeast reports whether this NPC is of the FeedableBeast kind, the
+// only target a beast spice is fed to.
+func (h *Hostile) FeedableBeast() bool {
+	return hostileKind(h.Instance) == "FeedableBeast"
+}
+
 // chestKind reports whether this NPC's instance type is specifically the
 // lootable Chest kind. HalishaChest is Monster-family but distinct from
 // Chest, and is not excluded by this check.

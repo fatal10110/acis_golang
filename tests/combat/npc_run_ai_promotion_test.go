@@ -112,15 +112,7 @@ func TestHeavierMoveToTakesOverRunningAttack(t *testing.T) {
 		t.Fatal("AddMoveToDesire() = false, want the walk queued")
 	}
 
-	srv.Advance(t, attackTime-10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() inside the swing = %v, want %v", got, ai.IntentionAttack)
-	}
-
-	srv.Advance(t, 20*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
-		t.Fatalf("CurrentIntention() once the swing finished = %v, want %v", got, ai.IntentionMoveTo)
-	}
+	intentionAcross(t, srv, hostile, attackTime, ai.IntentionAttack, ai.IntentionMoveTo, "the swing finishing")
 	if got := hostile.AI().Desires().Len(); got != 2 {
 		t.Fatalf("queued desires = %d, want the attack desire still queued behind the walk", got)
 	}

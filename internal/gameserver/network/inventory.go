@@ -20,8 +20,9 @@ import (
 )
 
 // useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
-// an item-carried AI cast as its force-use flag.
-func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
+// an item-carried AI cast as its force-use flag. rollDice consumes the
+// client's dice reuse gate; see useWindowItem.
+func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, rollDice func() bool) {
 	if live == nil {
 		return
 	}
@@ -96,7 +97,13 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 	if l.useRecipeItem(live, inst, tmpl) {
 		return
 	}
+	if l.useWindowItem(live, tmpl, rollDice) {
+		return
+	}
 	if l.usePaganKey(live, inv, inst, tmpl) {
+		return
+	}
+	if l.useTargetCastItem(live, inv, inst, ctrl) {
 		return
 	}
 	if tmpl.Kind == item.KindEtcItem && tmpl.Slot != item.SlotNone {

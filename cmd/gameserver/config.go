@@ -64,6 +64,7 @@ type gameplayConfig struct {
 	ManufactureDelay         manufactureDelay
 	CraftingEnabled          craftingEnabled
 	MultisellDelay           multisellDelay
+	RollDiceDelay            rollDiceDelay
 	SubclassDelay            subclassDelay
 	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
@@ -156,6 +157,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.RollDiceDelay, err = loadRollDiceDelay(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
@@ -591,6 +595,18 @@ func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
 		return 0, err
 	}
 	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
+}
+
+// rollDiceDelay is the reuse delay between two dice throws on one client
+// session, read from server.properties.
+type rollDiceDelay time.Duration
+
+func loadRollDiceDelay(paths gameServerPaths) (rollDiceDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return rollDiceDelay(time.Duration(config.NewFields(props, "roll dice reuse delay").Int("RollDiceTime", 4200)) * time.Millisecond), nil
 }
 
 // subclassDelay is the reuse delay between two subclass add, change or

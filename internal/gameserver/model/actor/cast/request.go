@@ -148,6 +148,10 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 		return started, err
 	}
 	if rejection != skilltarget.CastRejectNone {
+		// The target conditions are the last part of the can-cast checks, so
+		// a refusal there hands on to a nextActionAttack attack like any
+		// other can-cast refusal.
+		started.CanCastFailure = true
 		return started, ErrInvalidTarget
 	}
 	if hooks.AfterCanCast != nil {
