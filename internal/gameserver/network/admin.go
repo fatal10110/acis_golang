@@ -30,6 +30,10 @@ var adminCommands = map[string]adminCommand{
 	"admin_instant_move": (*GameClientLink).adminTeleport,
 	"admin_kick":         (*GameClientLink).adminKick,
 	"admin_enchant":      (*GameClientLink).adminEnchant,
+	"admin_set":          (*GameClientLink).adminSet,
+	"admin_gmoff":        (*GameClientLink).adminGMOff,
+	"admin_ban":          (*GameClientLink).adminBan,
+	"admin_unban":        (*GameClientLink).adminUnban,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they
@@ -81,12 +85,12 @@ func (l *GameClientLink) sendBypassBuildCmd(live *livePlayer, req clientpackets.
 func (l *GameClientLink) runAdminCommand(gm *livePlayer, entry adminEntry, word, line, audited string) {
 	run, ported := adminCommands[word]
 	if !ported && !l.admin.Defines(word) {
-		if gm.access.IsGM {
+		if gm.accessLevel().IsGM {
 			sendText(gm, "The command "+strings.TrimPrefix(word, "admin_")+" doesn't exist.")
 		}
 		return
 	}
-	if !l.admin.HasAccess(word, gm.access) {
+	if !l.admin.HasAccess(word, gm.accessLevel()) {
 		if !l.admin.Defines(word) {
 			l.log.Warn().Str("command", word).Msg("admin: no rights defined for admin command")
 		}

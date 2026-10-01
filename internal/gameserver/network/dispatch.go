@@ -338,6 +338,9 @@ type GameClientLink struct {
 	relations     *relation.Manager
 	friendInvites *relation.Invites
 	characters    characterDirectory
+	// accessLevels stores the access levels admin commands change; nil
+	// keeps them in memory only.
+	accessLevels accessLevelStore
 	// macros persists each player's macro list; see macro.go.
 	macros macroStore
 	// recommendations persists who recommended whom and the counters; see
@@ -471,6 +474,9 @@ type GameClientLinkConfig struct {
 	// Characters finds characters, online or not, by name and id for the
 	// friend and block commands; nil finds none.
 	Characters characterDirectory
+	// AccessLevels stores the access levels admin commands change; nil
+	// keeps them in memory only and finds no offline character.
+	AccessLevels accessLevelStore
 	// FriendInviteClock times friend invitations out; nil means time.Now.
 	FriendInviteClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
@@ -585,6 +591,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
 		characters:       cfg.Characters,
+		accessLevels:     cfg.AccessLevels,
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{

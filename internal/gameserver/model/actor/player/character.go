@@ -132,10 +132,13 @@ type Character struct {
 
 	AccessLevel int
 
-	// clan and title are the clan membership and title the client sees;
-	// see character_clan.go.
-	clan  clanState
-	title atomic.Pointer[string]
+	// clan is the clan membership the client sees; see character_clan.go.
+	clan clanState
+
+	// title and colors are what the client shows above the character;
+	// see character_title.go.
+	title  atomic.Pointer[string]
+	colors atomic.Pointer[nameColors]
 
 	// DeleteAt is the persisted deletion deadline, in epoch milliseconds;
 	// zero means the character is not scheduled for deletion.

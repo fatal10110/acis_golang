@@ -309,6 +309,18 @@ const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
 	"  PRIMARY KEY (`clan_id`,`ranking`)\n" +
 	")"
 
+// accountsSchema mirrors the shipped accounts table definition verbatim.
+// The login server owns it; the game server's behavior harness runs a login
+// server on the same database.
+const accountsSchema = "CREATE TABLE IF NOT EXISTS `accounts` (\n" +
+	"	`login` VARCHAR(45) NOT NULL DEFAULT '',\n" +
+	"	`password` VARCHAR(60) NOT NULL DEFAULT '',\n" +
+	"	`last_active` BIGINT NOT NULL DEFAULT 0,\n" +
+	"	`access_level` INT(3) NOT NULL DEFAULT 0,\n" +
+	"	`last_server` INT(4) NOT NULL DEFAULT 1,\n" +
+	"	PRIMARY KEY (`login`)\n" +
+	")"
+
 // sevenSignsStatusSeed seeds the single status row the gameserver reads and
 // writes, matching the shipped schema seed.
 const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
@@ -342,6 +354,7 @@ var schemaStmts = []string{
 	characterRelationsSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema,
+	accountsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

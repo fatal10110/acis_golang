@@ -19,7 +19,7 @@ func (l *GameClientLink) adminKick(gm *livePlayer, line string) {
 			return
 		}
 		for _, p := range l.world.Players() {
-			if live, ok := p.(*livePlayer); ok && !live.access.IsGM {
+			if live, ok := p.(*livePlayer); ok && !live.accessLevel().IsGM {
 				live.kickClient()
 			}
 		}

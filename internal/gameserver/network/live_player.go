@@ -83,9 +83,10 @@ type livePlayer struct {
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	macros           *macro.List
-	// access is the character's access level, resolved once at login and
-	// never changed afterwards, so any goroutine may read it.
-	access admin.AccessLevel
+	// access is the character's access level, resolved at login and
+	// replaced by setAccessLevel on p's queue; any goroutine reads it
+	// through accessLevel.
+	access atomic.Pointer[admin.AccessLevel]
 	// teleportMode is how p's move clicks travel; owned by p's queue.
 	teleportMode teleportMode
 	// handlerPanicked records that a task this player's connection waited on
