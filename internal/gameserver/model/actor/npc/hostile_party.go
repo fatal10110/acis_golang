@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"math"
-
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -34,15 +32,16 @@ const flatAttackedHateWeight = 200
 // families (WizardBase, MonsterBehavior, LV3Monster, …) use different
 // formulas Go hasn't ported. Until #185 lands that per-script dispatch,
 // every Hostile uses this one damage-proportional formula for Playable
-// attackers instead (truncating damage the same way the reference does, so
-// a sub-1 DOT tick contributes zero hate here too), and falls back to the
+// attackers instead (narrowing damage like the reference's (int) damage
+// argument, so a sub-1 DOT tick contributes zero hate and an unbounded
+// zero-defence hit a finite Integer.MAX_VALUE-sized one), and falls back to the
 // flat pre-existing weight for everything else — an approximation, not the
 // full per-script behavior.
 func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float64) float64 {
 	if !creature.Playable(attacker) {
 		return flatAttackedHateWeight
 	}
-	return math.Trunc(damage) / (float64(h.Level()) + 7) * 100
+	return float64(commons.JavaInt(damage)) / (float64(h.Level()) + 7) * 100
 }
 
 // NotifyAggression records the incoming aggression on this NPC and fans it
