@@ -441,19 +441,6 @@ func TestBypassAdventurerCommands(t *testing.T) {
 	}
 }
 
-// TestBypassCPRecoveryNotYetCast pins the arena manager's paid CP restore
-// as logged and released until civilian NPCs can cast: no adena is taken.
-func TestBypassCPRecoveryNotYetCast(t *testing.T) {
-	t.Parallel()
-	w, _ := bootGatekeeperWorld(t, 500, 0, false, newTeleportClock())
-	arena := w.spawnFolk(t, folkTemplate("Folk", 31226), 60)
-	w.openAnyNpcPage(t)
-	assertAnswer(t, w.tripFrames(t, npcCommand(arena, "CPRecovery")), releaseOnly, arena, "")
-	if got := w.held(t, item.AdenaID); got != 500 {
-		t.Fatalf("adena held = %d, want 500", got)
-	}
-}
-
 // TestBypassTeleportListShippedGatekeeper pins the list of a shipped
 // gatekeeper, Dion's 30080, against its teleports.xml rows read by hand:
 // its fourteen standard destinations at weekday prices, then none of the

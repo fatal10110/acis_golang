@@ -1,0 +1,444 @@
+package npc
+
+import (
+	"sync"
+	"time"
+
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+)
+
+// FolkCastAI is the cast seam a civilian NPC's AI drives for one cast
+// desire, from queueing it to starting the cast.
+type FolkCastAI interface {
+	// FinalTarget resolves the creature ref's target type aims at from the
+	// requested target; nil drops the request.
+	FinalTarget(target attackable.Combatant, ref modelskill.Ref) attackable.Combatant
+	// CanDesire runs the gates a cast request passes before it is queued:
+	// the skill's reuse, and the MP and HP its hit takes.
+	CanDesire(target attackable.Combatant, ref modelskill.Ref) bool
+	MeetsHPMPDisabled(target attackable.Combatant, ref modelskill.Ref) bool
+	CanAttempt(target attackable.Combatant, ref modelskill.Ref) bool
+	Range(ref modelskill.Ref) int
+	StopsMovement(ref modelskill.Ref) bool
+	SkillType(ref modelskill.Ref) string
+	CanCast(target attackable.Combatant, ref modelskill.Ref) bool
+	Cast(target attackable.Combatant, ref modelskill.Ref)
+}
+
+// FolkAI is the AI task a civilian NPC ticks on while it holds cast
+// desires: once a second, on its own queue, while its region is active.
+type FolkAI interface {
+	Add(task.AIActor)
+	Remove(task.AIActor)
+}
+
+// castDesireDecay is how much weight every cast desire loses each third AI
+// tick.
+const castDesireDecay = 66000
+
+// folkCast is a civilian NPC's cast runtime: the controller its casts run
+// on and the desires its AI picks them from. The controller is set once
+// before the NPC is published; desires is safe for concurrent use; step
+// belongs to the NPC's queue.
+type folkCast struct {
+	control CastControl
+	castAI  FolkCastAI
+	ai      FolkAI
+
+	desires *ai.DesireQueue
+	step    int
+
+	// currentMu guards current, the cast desire the AI last acted on (nil
+	// when none): a cast break from another actor's queue closes it.
+	currentMu sync.Mutex
+	current   *ai.Desire
+
+	// skillMu guards disabledSkills, read from the queues of the casts
+	// that check the reuse.
+	skillMu        sync.Mutex
+	disabledSkills map[int32]time.Time
+}
+
+// SetCaster gives f its cast runtime: control is its cast controller, the
+// surface its damage and crowd-control paths drive, and castAI the seam its
+// AI casts through. Call it once, before f is published.
+func (f *Folk) SetCaster(control CastControl, castAI FolkCastAI) {
+	f.cast.control, f.cast.castAI = control, castAI
+}
+
+// CastControl returns f's cast controller, nil when it has none.
+func (f *Folk) CastControl() CastControl { return f.cast.control }
+
+// AddCastDesire asks f to cast ref at target with weight, the way a dialog
+// command or script asks an NPC: a skill still in reuse, or one whose hit
+// f cannot pay, is refused, and an equal desire already queued gains the
+// weight instead. f's AI starts the cast on its next tick, closing in
+// first when target is out of the skill's range.
+func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, weight float64) {
+	if target == nil || f.cast.castAI == nil || f.queue == nil {
+		return
+	}
+	f.queue.Post(func() {
+		castAI := f.cast.castAI
+		if !castAI.CanDesire(target, ref) {
+			return
+		}
+		final := castAI.FinalTarget(target, ref)
+		if final == nil {
+			return
+		}
+		f.cast.desires.AddOrUpdate(&ai.Desire{
+			Kind: ai.IntentionCast, FinalTarget: final, Skill: ref,
+			MoveToTarget: true, Weight: weight, QueuedAt: f.now(),
+		})
+		if f.cast.ai != nil {
+			f.cast.ai.Add(f)
+		}
+	})
+}
+
+// AbortCast stops f's cast in flight, observers seeing it canceled, and
+// drops every desire it holds, leaving its AI idle: what a death or a
+// despawn does to the NPC's casting.
+func (f *Folk) AbortCast() {
+	f.StopCast()
+	if f.queue == nil {
+		return
+	}
+	f.queue.Post(func() {
+		f.cast.desires.Clear()
+		f.setCurrentDesire(nil)
+		if f.cast.ai != nil {
+			f.cast.ai.Remove(f)
+		}
+	})
+}
+
+// Tick does nothing: TickThink runs the whole AI step, in order.
+func (f *Folk) Tick() {}
+
+// TickThink runs one AI tick on f's queue: invalid cast desires are
+// dropped, the heaviest one left is acted on unless a cast is in flight,
+// and every third tick the cast desires lose weight. An NPC with no desire
+// left leaves the AI task.
+func (f *Folk) TickThink() error {
+	f.runAI()
+	f.cast.step++
+	if f.cast.step%3 == 0 {
+		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
+		f.cast.step = 0
+	}
+	if f.cast.desires.Len() == 0 && !f.CastingNow() && f.cast.ai != nil {
+		f.setCurrentDesire(nil)
+		f.cast.ai.Remove(f)
+	}
+	return nil
+}
+
+// runAI prunes f's cast desires and acts on the heaviest one when f is not
+// casting.
+func (f *Folk) runAI() {
+	castAI := f.cast.castAI
+	if castAI == nil {
+		return
+	}
+	f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
+		if d.Kind == ai.IntentionCast && (d.Weight <= 0 || !castAI.MeetsHPMPDisabled(d.FinalTarget, d.Skill)) {
+			return true
+		}
+		return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
+	})
+	if f.denyAIAction() || f.CastingNow() {
+		return
+	}
+	desire, ok := f.cast.desires.Peek()
+	if !ok {
+		return
+	}
+	f.setCurrentDesire(desire)
+	f.thinkCast(desire)
+}
+
+// thinkCast acts on a cast desire: f stays put while its target is out of
+// the skill's range, stops and faces its target for a cast long enough to
+// show, and when the final gates refuse turns toward its target instead.
+func (f *Folk) thinkCast(d *ai.Desire) {
+	castAI := f.cast.castAI
+	target, ref := d.FinalTarget, d.Skill
+	if !f.Knows(target) && castAI.SkillType(ref) != "SUMMON_FRIEND" && target.ObjectID() != f.ObjectID() {
+		return
+	}
+	if !castAI.CanAttempt(target, ref) {
+		return
+	}
+	castRange := castAI.Range(ref)
+	if f.outOfReach(target, castRange) {
+		// ponytail: a civilian NPC that can move closes in on its target
+		// before casting, and a route walker a cast stopped resumes its route
+		// afterwards (#3126). No cast reaches either until scripts cast
+		// through Folk (#166), so the NPC waits for its target here.
+		return
+	}
+	self := target.ObjectID() == f.ObjectID()
+	if castAI.StopsMovement(ref) {
+		f.stopMoving()
+		if !self {
+			f.setHeadingTo(target)
+		}
+	}
+	if !castAI.CanCast(target, ref) || (castRange > 0 && !self && !f.canSee(target)) {
+		if !self {
+			f.broadcastMoveToPawn(target)
+		}
+		return
+	}
+	castAI.Cast(target, ref)
+}
+
+// denyAIAction reports a state in which the NPC's AI does nothing: a
+// teleport under way, or death.
+func (f *Folk) denyAIAction() bool {
+	return f.AlikeDead() || (f.motion != nil && f.motion.teleporting.Load())
+}
+
+// outOfReach reports whether target stands at castRange plus both bodies,
+// and fifty more while it moves, or farther; a negative range is never out
+// of reach.
+func (f *Folk) outOfReach(target attackable.Combatant, castRange int) bool {
+	if castRange < 0 {
+		return false
+	}
+	reach := int(float64(castRange) + f.CollisionRadius() + target.CollisionRadius())
+	if target.IsMoving() {
+		reach += 50
+	}
+	sx, sy, _ := f.Position()
+	tx, ty, _ := target.Position()
+	dx, dy := float64(sx-tx), float64(sy-ty)
+	return dx*dx+dy*dy >= float64(reach)*float64(reach)
+}
+
+func (f *Folk) stopMoving() {
+	if f.motion != nil {
+		f.motion.ctl.Stop()
+	}
+}
+
+func (f *Folk) setHeadingTo(target attackable.Combatant) {
+	sx, sy, _ := f.Position()
+	tx, ty, _ := target.Position()
+	f.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
+}
+
+func (f *Folk) broadcastMoveToPawn(target attackable.Combatant) {
+	sx, sy, sz := f.Position()
+	origin := location.Location{X: sx, Y: sy, Z: sz}
+	tx, ty, tz := target.Position()
+	dest := location.Location{X: tx, Y: ty, Z: tz}
+	f.emit(event.MoveToPawn{TargetID: target.ObjectID(), Distance: int(origin.Distance3D(dest)), Origin: origin})
+}
+
+func (f *Folk) setCurrentDesire(d *ai.Desire) {
+	f.cast.currentMu.Lock()
+	f.cast.current = d
+	f.cast.currentMu.Unlock()
+}
+
+// castFinished closes the cast desire that drove f's last cast; a cast
+// that ran to its end, on f's queue, has the AI pick the next one at once.
+// An abort can come from another actor's queue: a hit's cast break or a
+// crowd-control effect.
+func (f *Folk) castFinished(interrupted bool) {
+	f.cast.currentMu.Lock()
+	cur := f.cast.current
+	f.cast.current = nil
+	f.cast.currentMu.Unlock()
+	if cur != nil {
+		f.cast.desires.RemoveIf(cur.Equal)
+	}
+	if !interrupted {
+		f.runAI()
+	}
+}
+
+// CastEvents returns the sink f's cast controller reports to: an abort
+// shows observers the cancel, an offensive cast that reached a target puts
+// f in its attack stance, and every cast end closes the desire behind it.
+func (f *Folk) CastEvents() event.Sink { return folkCastSink{f} }
+
+type folkCastSink struct{ f *Folk }
+
+func (s folkCastSink) Emit(ev event.Event) {
+	f := s.f
+	switch e := ev.(type) {
+	case event.CastAborted:
+		f.BroadcastSkillCanceled()
+	case event.AttackStanceRequested:
+		f.emit(event.AttackStanceRequested{})
+	case event.CastFinished:
+		f.castFinished(e.Interrupted)
+	}
+}
+
+// CastingNow reports whether f has a cast in flight.
+func (f *Folk) CastingNow() bool {
+	c := f.cast.control
+	return c != nil && c.CastingNow()
+}
+
+// CurrentSkillIsMagic reports whether f's cast in flight is a magic skill.
+func (f *Folk) CurrentSkillIsMagic() bool {
+	c := f.cast.control
+	return c != nil && c.CurrentSkillIsMagic()
+}
+
+// InterruptCast aborts f's cast while it is still inside its interrupt
+// window; observers see MagicSkillCanceled.
+func (f *Folk) InterruptCast() {
+	if c := f.cast.control; c != nil {
+		c.InterruptCast()
+	}
+}
+
+// StopCast aborts f's cast unconditionally; observers see
+// MagicSkillCanceled when a cast was in flight.
+func (f *Folk) StopCast() {
+	if c := f.cast.control; c != nil {
+		c.StopCast()
+	}
+}
+
+// BreakCastOnDamage rolls whether damage f takes breaks its cast, reading
+// MEN, ATTACK_CANCEL and the roll from f. An invulnerable NPC is never
+// broken, and one with no cast in flight draws no roll.
+func (f *Folk) BreakCastOnDamage(damage float64) {
+	c := f.cast.control
+	if c == nil || !c.CastingNow() {
+		return
+	}
+	c.InterruptCastOnDamage(damage, f.MEN(), func(base float64) float64 {
+		return f.CalcStat(stat.AttackCancel, base)
+	}, f.Roll(100), f.Invul())
+}
+
+// BroadcastSkillUse shows observers the start of f's cast of skillID at
+// level on the target at the given position.
+func (f *Folk) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
+	sx, sy, sz := f.Position()
+	f.emit(event.MagicSkillUse{
+		CasterID: f.ObjectID(), CasterAt: location.Location{X: sx, Y: sy, Z: sz},
+		TargetID: targetID, TargetAt: location.Location{X: targetX, Y: targetY, Z: targetZ},
+		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
+	})
+}
+
+// BroadcastSkillLaunched shows observers the launch of f's cast of skillID
+// at level onto targetIDs.
+func (f *Folk) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
+	f.emit(event.SkillLaunched{SkillID: skillID, Level: level, TargetIDs: targetIDs})
+}
+
+// BroadcastSkillCanceled shows observers f's cast canceled.
+func (f *Folk) BroadcastSkillCanceled() {
+	f.emit(event.SkillCanceled{ObjectID: f.ObjectID()})
+}
+
+// TestCursesOnSkillSee reports false: only a playable caster draws the raid
+// curse.
+func (f *Folk) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool { return false }
+
+// NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
+func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+
+// ConsumeHP takes a skill's HP cost from f, never below its floor.
+func (f *Folk) ConsumeHP(amount float64) { f.reduceHP(amount, f) }
+
+// SkillDisabled reports whether key is still waiting for its reuse delay.
+func (f *Folk) SkillDisabled(key int32) bool {
+	f.cast.skillMu.Lock()
+	defer f.cast.skillMu.Unlock()
+	expiresAt, ok := f.cast.disabledSkills[key]
+	if !ok {
+		return false
+	}
+	if f.now().Before(expiresAt) {
+		return true
+	}
+	delete(f.cast.disabledSkills, key)
+	return false
+}
+
+// DisableSkill marks key unusable until delay elapses.
+func (f *Folk) DisableSkill(key int32, delay time.Duration) {
+	if delay <= 0 {
+		return
+	}
+	f.cast.skillMu.Lock()
+	defer f.cast.skillMu.Unlock()
+	if f.cast.disabledSkills == nil {
+		f.cast.disabledSkills = make(map[int32]time.Time)
+	}
+	f.cast.disabledSkills[key] = f.now().Add(delay)
+}
+
+// AddSkillReuse installs an NPC-local reuse delay; nothing persists it.
+func (f *Folk) AddSkillReuse(_ modelskill.Ref, key int32, delay time.Duration) {
+	f.DisableSkill(key, delay)
+}
+
+// HeldItemTypeMask returns the item-type bits of f's right-hand weapon and
+// left-hand shield.
+func (f *Folk) HeldItemTypeMask() int32 { return f.heldMask }
+
+// sighted is a body f can look at.
+type sighted interface {
+	Position() (x, y, z int)
+	CollisionHeight() float64
+}
+
+// canSee reports whether f has line of sight to target.
+func (f *Folk) canSee(target sighted) bool {
+	if f.los == nil {
+		return true
+	}
+	ox, oy, oz := f.Position()
+	tx, ty, tz := target.Position()
+	return f.los.CanSeeActor(ox, oy, oz, f.CollisionHeight(), tx, ty, tz, target.CollisionHeight())
+}
+
+// now reads the clock f's queue runs on.
+func (f *Folk) now() time.Time {
+	if f.queue == nil {
+		return time.Now()
+	}
+	return f.queue.Now()
+}
+
+// templateHeldMask is the item-type bits of the weapon in t's right hand
+// and the shield in its left, as items resolves them; an unknown or
+// mismatched item id holds nothing.
+func templateHeldMask(t *Template, items *item.Table) int32 {
+	if items == nil {
+		return 0
+	}
+	var mask int32
+	if id := t.LeftHand; id != 0 {
+		if tmpl, ok := items.Get(int32(id)); ok && tmpl.Kind == item.KindArmor && tmpl.Armor != nil {
+			mask = tmpl.Armor.Type.Mask()
+		}
+	}
+	if id := t.RightHand; id != 0 {
+		if tmpl, ok := items.Get(int32(id)); ok && tmpl.Weapon != nil {
+			mask |= tmpl.Weapon.Type.Mask()
+		}
+	}
+	return mask
+}

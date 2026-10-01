@@ -35,10 +35,13 @@ func (f *Folk) Undead() bool { return f.Instance.Template.Race == RaceUndead }
 // ClanGroups are the template's clan tags.
 func (f *Folk) ClanGroups() []string { return f.Instance.Template.Clans }
 
-// A civilian NPC never casts, so its caster-side answers are never asked
-// for real; it holds no ground point, summon, party, clan, duel, Olympiad,
-// corpse, spoil or seed state, and is not a monster, artifact, chest or pet.
-func (f *Folk) CanSeeTarget(skilltarget.Actor) bool        { return true }
+// CanSeeTarget reports whether target is in the NPC's line of sight, the
+// sight its casts are checked against.
+func (f *Folk) CanSeeTarget(target skilltarget.Actor) bool { return f.canSee(target) }
+
+// A civilian NPC casts only at creatures: it holds no ground point, summon,
+// party, clan, duel, Olympiad, corpse, spoil or seed state, and is not a
+// monster, artifact, chest or pet.
 func (f *Folk) CanSeePoint(int, int, int) bool             { return true }
 func (f *Folk) EffectRangeInPeaceZone(_, _, _, _ int) bool { return false }
 func (f *Folk) GroundTarget() (x, y, z int)                { return 0, 0, 0 }

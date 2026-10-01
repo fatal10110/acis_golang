@@ -117,6 +117,20 @@ func (a *AIController) CanAttempt(target attackable.Combatant, ref modelskill.Re
 	return !a.Controller.SkillOnCooldown(def)
 }
 
+// CanDesire runs the gates an AI cast request for ref passes before it is
+// queued: the skill's reuse, then the MP and the HP its hit takes.
+func (a *AIController) CanDesire(target attackable.Combatant, ref modelskill.Ref) bool {
+	if !a.CanAttempt(target, ref) {
+		return false
+	}
+	def, _ := a.definition(ref)
+	actor := a.Controller.actor
+	if mp := actor.MPCost(def); mp > 0 && mp > actor.MP() {
+		return false
+	}
+	return def.HPConsume <= 0 || def.HPConsume <= actor.HP()
+}
+
 // CanCast validates the final HP/MP/mute/reuse/item gates immediately before
 // the cast commits.
 func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) bool {

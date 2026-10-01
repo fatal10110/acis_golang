@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -26,10 +27,14 @@ var (
 // damage, heal and debuff it from their own queues; its regeneration and
 // effect ticks run on its own.
 type folkCombat struct {
-	// world, queue and sink are set by Attach before the NPC is published.
+	// world, queue, sink, los and heldMask are set by Attach before the NPC
+	// is published.
 	world *world.State
 	queue *sim.Queue
 	sink  event.Sink
+	los   LineOfSight
+	// heldMask is the item-type bits of the template's weapon and shield.
+	heldMask int32
 
 	effects  *effect.List
 	maxBuffs atomic.Int32
@@ -69,6 +74,14 @@ type FolkRuntime struct {
 	// MaxBuffsAmount is the configured base buff-slot count; zero keeps the
 	// shipped default.
 	MaxBuffsAmount int
+	// AI is the AI task the NPC ticks on while it holds cast desires; nil
+	// leaves them unacted on.
+	AI FolkAI
+	// LOS answers the NPC's line of sight; nil sees everything.
+	LOS LineOfSight
+	// Items resolves the template's held weapon and shield; nil leaves the
+	// NPC holding nothing.
+	Items *item.Table
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -95,7 +108,9 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	if rt.Queue == nil {
 		return errors.New("npc: folk runtime needs a queue")
 	}
-	f.world, f.queue, f.sink = rt.World, rt.Queue, rt.Sink
+	f.world, f.queue, f.sink, f.los = rt.World, rt.Queue, rt.Sink, rt.LOS
+	f.cast.ai = rt.AI
+	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	if rt.MaxBuffsAmount > 0 {
 		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
 	}
