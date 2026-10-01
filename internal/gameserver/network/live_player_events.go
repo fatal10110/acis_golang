@@ -388,13 +388,17 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.ThinkRequested:
 		l.thinkCurrentIntention(live)
 	case event.CastAborted:
-		l.broadcastCastAborted(live, e.Interrupted)
+		l.broadcastCastAborted(live)
 	case event.CastStopAck:
 		sendMagicActionFailed(live)
 	case event.SkillMasteryProc:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillReadyToUseAgain))
 	case event.CastFinished:
-		l.finishLiveCast(live, e.Skill, e.Target)
+		l.finishLiveCast(live, e.Skill, e.Target, e.Interrupted)
+		// An interrupt reports itself after everything its stop answered.
+		if e.Broken {
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
+		}
 	case event.PetSummonRequested:
 		if controlItem, ok := e.ControlItem.(*item.Instance); ok {
 			(&gameSummonSpawner{link: l, live: live}).SpawnPet(live.Character, controlItem)
@@ -503,8 +507,14 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 }
 
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
-// target ends.
-func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant) {
+// target ends. A stopped cast reports its end while it still counts as in
+// flight, so a skill or item cast queued behind it is refused the way a cast
+// requested mid-cast is: it is dropped, going idle, with ActionFailed.
+func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant, stopped bool) {
+	if stopped && live.dropDeferredCast() {
+		sendMagicActionFailed(live)
+		return
+	}
 	if l.finishDeferredAction(live) {
 		return
 	}

@@ -475,6 +475,16 @@ func (p *livePlayer) hasDeferredItemAICast() bool {
 	return p.deferredItem != nil
 }
 
+// dropDeferredCast drops the skill request or item cast queued as the next
+// CAST intention, reporting whether one was queued.
+func (p *livePlayer) dropDeferredCast() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	queued := p.deferredMagic != nil || p.deferredItem != nil
+	p.deferredMagic, p.deferredItem = nil, nil
+	return queued
+}
+
 func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl})
 }
