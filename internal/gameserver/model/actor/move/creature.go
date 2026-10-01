@@ -164,8 +164,11 @@ type CreatureMove struct {
 	// lastUpdate is when the last position update, retarget catch-up or
 	// the move start ran on the queue clock. Player movers only.
 	lastUpdate time.Time
-	owner      moveOwner
-	timer      *sim.Timer
+	// catchUps counts the retarget catch-ups that stepped the mover (see
+	// catchUpLocked).
+	catchUps uint64
+	owner    moveOwner
+	timer    *sim.Timer
 	// timedSteps is how many position updates the pending arrival timer
 	// stands for.
 	timedSteps int
@@ -192,6 +195,10 @@ type moveOwner interface {
 	// knowsPawn reports whether the actor still knows the pawn its walk
 	// heads for; the arrival timer ends the walk of a pawn it does not.
 	knowsPawn(Pawn) bool
+	// mayCatchUp reports whether a request heading for pawn (nil for a
+	// fixed point) may run the retarget catch-up of a walk in flight: the
+	// actor is visible and knows pawn.
+	mayCatchUp(Pawn) bool
 }
 
 // NewCreatureMove builds movement state at origin with a non-negative ground
@@ -587,9 +594,10 @@ func (m *CreatureMove) Walkable(x, y, z int) bool {
 // MoveToLocationWithPathOutcome, retained for tests and embedded movement
 // state. Production chase/wander/walker accounting goes through Controller.
 func (m *CreatureMove) MoveToLocation(target location.Location) (event.Move, error) {
+	catchUp := m.mayCatchUp(nil)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	ev, _, err := m.moveToLocationLocked(target, nil, 0, false)
+	ev, _, err := m.moveToLocationLocked(target, nil, 0, false, catchUp)
 	return ev, err
 }
 
@@ -597,9 +605,10 @@ func (m *CreatureMove) MoveToLocation(target location.Location) (event.Move, err
 // how geodata resolved the route, so callers can count blocked pathfinding
 // attempts the same way a successful routed search clears that streak.
 func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (event.Move, pathFindResult, error) {
+	catchUp := m.mayCatchUp(nil)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.moveToLocationLocked(target, nil, 0, false)
+	return m.moveToLocationLocked(target, nil, 0, false, catchUp)
 }
 
 // MoveToPawnWithPathOutcome starts a tracking pawn walk straight toward
@@ -609,9 +618,10 @@ func (m *CreatureMove) MoveToLocationWithPathOutcome(target location.Location) (
 // any other pawn. It otherwise reports like MoveToLocationWithPathOutcome.
 func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
+	catchUp := m.mayCatchUp(pawn)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, true)
+	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, true, catchUp)
 }
 
 // ChasePawnWithPathOutcome starts a chase pawn walk toward pawn's current
@@ -621,9 +631,10 @@ func (m *CreatureMove) MoveToPawnWithPathOutcome(pawn Pawn, offset int) (event.M
 // the ground, 3D swimming or flying).
 func (m *CreatureMove) ChasePawnWithPathOutcome(pawn Pawn, offset int) (event.Move, pathFindResult, error) {
 	x, y, z := pawn.Position()
+	catchUp := m.mayCatchUp(pawn)
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, false)
+	return m.moveToLocationLocked(location.Location{X: x, Y: y, Z: z}, pawn, offset, false, catchUp)
 }
 
 type pathFindResult int
@@ -634,7 +645,21 @@ const (
 	pathFailed
 )
 
-func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn, offset int, tracks bool) (event.Move, pathFindResult, error) {
+// mayCatchUp reports whether a request heading for pawn (nil for a fixed
+// point) may run the retarget catch-up of a player's walk in flight (see
+// moveOwner.mayCatchUp). It reads the owner's answer without holding mu, as
+// that may take other actors' locks.
+func (m *CreatureMove) mayCatchUp(pawn Pawn) bool {
+	m.mu.Lock()
+	owner := m.owner
+	retarget := m.moving && m.playerStepsLocked()
+	m.mu.Unlock()
+	return !retarget || owner == nil || owner.mayCatchUp(pawn)
+}
+
+// moveToLocationLocked starts a request toward target. catchUp lets a
+// player's walk in flight first run its retarget catch-up. Callers hold mu.
+func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn, offset int, tracks, catchUp bool) (event.Move, pathFindResult, error) {
 	moveType := m.moveTypeLocked()
 	if moveType == MoveGround {
 		target.Z = int(m.geo.Height(target.X, target.Y, target.Z))
@@ -642,11 +667,12 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	// Retargeting an in-flight walk keeps a mid-route block sticky through
 	// the new destination, and the start-speed update count running. Only a
 	// fresh request (not currently moving) clears them. A player's walk in
-	// flight first advances by the time passed since its last update.
+	// flight first advances by the time passed since its last update, unless
+	// catchUp holds it where it stands.
 	if !m.moving {
 		m.routeBlocked = false
 		m.updates = 0
-	} else if m.playerStepsLocked() {
+	} else if m.playerStepsLocked() && catchUp {
 		m.catchUpLocked()
 	}
 	if m.playerStepsLocked() {
@@ -1149,8 +1175,9 @@ func (m *CreatureMove) stepLocked(passed float64, moveType MoveType, maxZ int) (
 // retarget: it advances toward the current destination, without re-aiming a
 // pawn walk, by the time passed since the last update, and counts as a
 // position update. A closed line leaves the walker in place and the walk
-// blocked. It runs no milestone, even on reaching the destination. Callers
-// hold mu.
+// blocked. Any other catch-up is a step, counted in catchUps even when it
+// stays on the same cell. It runs no milestone, even on reaching the
+// destination. Callers hold mu.
 func (m *CreatureMove) catchUpLocked() {
 	elapsed := m.nowLocked().Sub(m.lastUpdate)
 	m.updates++
@@ -1162,6 +1189,14 @@ func (m *CreatureMove) catchUpLocked() {
 	}
 	m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
 	m.origin = next
+	m.catchUps++
+}
+
+// catchUpCount returns how many retarget catch-ups stepped the mover so far.
+func (m *CreatureMove) catchUpCount() uint64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.catchUps
 }
 
 // abandonPawnWalk is the position update of the pawn walk gen once its pawn
@@ -1431,7 +1466,7 @@ func (m *CreatureMove) FollowTick(target TargetSnapshot, actorRadius float64) (e
 
 	followMode := m.followMode
 	followOffset := m.followOffset
-	ev, _, err := m.moveToLocationLocked(target.Position, nil, 0, false)
+	ev, _, err := m.moveToLocationLocked(target.Position, nil, 0, false, true)
 	if err != nil {
 		return event.Move{}, false, err
 	}
