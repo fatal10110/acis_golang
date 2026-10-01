@@ -387,13 +387,13 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 // validateItemEffect validates a <for> block's <effect> child (name and val
 // are required) without attaching anything: an item has no effect
 // templates, so the effect is parsed and discarded for an item template
-// rather than stored. This only
-// checks the effect element's own required attrs, not its nested func/cond
-// children (ponytail: no shipped item XML carries <effect> today; deepen
-// if a future datapack file nests funcs inside one). Like a stat func's,
-// the effect's val reads the item's own tables; every other value the
-// effect reader would resolve against a template's tables fails instead,
-// because an item is not such a template.
+// rather than stored. Beyond the effect's required attrs it checks only
+// table references (ponytail: no shipped item XML carries <effect> today;
+// validate the nested funcs' stat/val grammar if a datapack file starts
+// using one). Like a stat func's, the effect's val and its funcs' vals read
+// the item's own tables; every other value the effect reader would resolve
+// against a template's tables, its own or its <cond> and func conditions',
+// fails instead, because neither an item nor the effect is such a template.
 func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) error {
 	vals := foldAttrs(opEl.Attrs)
 	for _, name := range itemEffectTableAttrs {
@@ -413,6 +413,38 @@ func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) 
 	_ = a.float64("val")
 	if err := a.Err(); err != nil {
 		return fmt.Errorf("item template %d: %w", id, err)
+	}
+	for _, ch := range opEl.Children {
+		if err := validateItemEffectChild(id, ch, tables); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateItemEffectChild checks the table references of one child of an
+// item <effect>: a <cond> reads like an item's own, and a stat func's val
+// reads the item's tables while its condition may name none.
+func validateItemEffectChild(id int32, ch condNode, tables map[string][]string) error {
+	if strings.EqualFold(ch.XMLName.Local, "cond") {
+		if len(ch.Children) == 0 {
+			return nil
+		}
+		_, err := buildUseCondition(id, ch.Attrs, ch.Children)
+		return err
+	}
+	if _, err := item.ParseFuncOp(ch.XMLName.Local); err != nil {
+		return nil
+	}
+	if raw, ok := foldAttrs(ch.Attrs)["val"]; ok {
+		if _, err := resolveTableValue(tables, "val", raw, 1); err != nil {
+			return fmt.Errorf("item template %d: effect %s: %w", id, ch.XMLName.Local, err)
+		}
+	}
+	if len(ch.Children) > 0 {
+		if _, err := buildCondition(ch.Children[0], condRolePredicate); err != nil {
+			return fmt.Errorf("item template %d: effect %s: %w", id, ch.XMLName.Local, err)
+		}
 	}
 	return nil
 }

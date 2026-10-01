@@ -91,8 +91,12 @@ func childConditionRole(n condNode, role condRole, i int) condRole {
 		return condRoleUnread
 	}
 	switch strings.ToLower(n.XMLName.Local) {
-	case "and", "or", "not":
+	case "and", "or":
 		return condRolePredicate
+	case "not":
+		if i == 0 {
+			return condRolePredicate
+		}
 	case "player":
 		if i == 0 && hasAttrFold(n, "insidePoly") {
 			return condRolePolyZone

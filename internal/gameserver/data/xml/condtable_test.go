@@ -54,6 +54,7 @@ func TestSkillConditionTableRefsRejectedWithoutSkillTemplate(t *testing.T) {
 		"effect cond level":           `<for><effect name="Buff" val="0" time="1"><cond><player level="#t"/></cond><add stat="pAtk" val="1"/></effect></for>`,
 		"effect func cond level":      `<for><effect name="Buff" val="0" time="1"><add stat="pAtk" val="1"><player level="#t"/></add></effect></for>`,
 		"effect cond pair part":       `<for><effect name="Buff" val="0" time="1"><cond><player active_skill_id_lvl="7,#t"/></cond><add stat="pAtk" val="1"/></effect></for>`,
+		"not child":                   `<cond><not><player hp="#t"/></not></cond>`,
 	}
 	for name, body := range cases {
 		table := loadCondTableSkill(t, body)
@@ -98,6 +99,12 @@ func TestSkillConditionTableRefsResolveWithSkillTemplate(t *testing.T) {
 		{
 			name: "boolean read as written", body: `<cond><player resting="#t"/></cond>`,
 			attr: rootAttrs, key: "resting", want: [3]string{"#t", "#t", "#t"},
+		},
+		{
+			// <not> reads only its first child; the second is never parsed.
+			name: "not reads its first child only", body: `<cond><not><player level="#t"/><player hp="#t"/></not></cond>`,
+			attr: func(def skill.Definition) map[string]string { return def.Conditions[0].Root.Children[1].Attrs },
+			key:  "hp", want: [3]string{"#t", "#t", "#t"},
 		},
 	}
 	for _, tc := range cases {
@@ -161,14 +168,21 @@ func TestItemConditionTableRefsFollowReference(t *testing.T) {
 		<item id="10" type="EtcItem" name="a"><cond msg="x" msgId="#10"><player level="1"/></cond></item>
 		<item id="12" type="EtcItem" name="a"><for><effect name="Buff" val="0" count="#1"/></for></item>
 		<item id="13" type="EtcItem" name="a"><for><effect name="Buff" val="0" stackType="#1"/></for></item>
+		<item id="20" type="EtcItem" name="a"><for><effect name="Buff" val="0"><cond msgId="#10"><player level="1"/></cond></effect></for></item>
+		<item id="21" type="EtcItem" name="a"><for><effect name="Buff" val="0"><cond><player level="#1"/></cond></effect></for></item>
+		<item id="22" type="EtcItem" name="a"><for><effect name="Buff" val="0"><add stat="pAtk" val="1"><player level="#1"/></add></effect></for></item>
+		<item id="23" type="EtcItem" name="a"><table name="#t"> 5 </table><for><effect name="Buff" val="0"><add stat="pAtk" val="#t"/></effect></for></item>
+		<item id="24" type="EtcItem" name="a"><cond><not><player level="1"/><player hp="#t"/></not></cond></item>
+		<item id="25" type="EtcItem" name="a"><cond><not><player hp="#t"/></not></cond></item>
+		<item id="26" type="EtcItem" name="a"><for><effect name="Buff" val="0"><cond msg="x" msgId="#10"><player level="1"/></cond></effect></for></item>
 		<item id="99" type="EtcItem" name="a"></item>`)
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
-	loaded := map[int32]bool{3: true, 4: true, 7: true, 9: true, 10: true, 13: true, 99: true}
-	for _, id := range []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 99} {
+	loaded := map[int32]bool{3: true, 4: true, 7: true, 9: true, 10: true, 13: true, 23: true, 24: true, 26: true, 99: true}
+	for _, id := range []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 20, 21, 22, 23, 24, 25, 26, 99} {
 		tpl, ok := table.Get(id)
 		if ok != loaded[id] {
 			t.Errorf("item %d loaded = %v, want %v", id, ok, loaded[id])
