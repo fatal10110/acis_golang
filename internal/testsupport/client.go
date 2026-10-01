@@ -99,8 +99,12 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 		// Formatted, not wrapped: a caller that tolerates a timeout must
 		// not find one in here, however it inspects the error, because the
 		// stream is already misaligned. It wraps errFrameCutOff instead, which
-		// carries no timeout.
-		return nil, fmt.Errorf("%w: %v", errFrameCutOff, err)
+		// carries no timeout, or errFrameStalled when the rest never came.
+		cut := errFrameCutOff
+		if ne, ok := errors.AsType[net.Error](err); ok && ne.Timeout() {
+			cut = errFrameStalled
+		}
+		return nil, fmt.Errorf("%w: %v", cut, err)
 	}
 	f.received.Add(1)
 	return payload, nil
@@ -109,6 +113,10 @@ func (f *ScriptedClient) readFrame(d time.Duration) ([]byte, error) {
 // errFrameCutOff marks a frame whose first byte arrived but whose rest did
 // not: the server closed or stalled mid-frame.
 var errFrameCutOff = errors.New("frame cut off after its first byte")
+
+// errFrameStalled is an errFrameCutOff whose rest did not arrive within
+// frameInFlight while the connection stayed open.
+var errFrameStalled = fmt.Errorf("%w: stalled", errFrameCutOff)
 
 // writeFrame writes one raw frame and counts it.
 func (f *ScriptedClient) writeFrame(payload []byte) error {
@@ -164,7 +172,8 @@ func (f *ScriptedClient) TryRead(d time.Duration) ([]byte, error) {
 
 // AwaitClose reports whether the server closes the connection within d,
 // draining any frames it sends first. Use it to assert a disconnect that
-// closes without a reply frame.
+// closes without a reply frame. A frame stalled mid-way is not a close: the
+// connection is still open. A frame cut off by the close is one.
 func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
 	f.t.Helper()
 	// One budget across every frame drained, on the clock reads wait on.
@@ -174,7 +183,7 @@ func (f *ScriptedClient) AwaitClose(d time.Duration) bool {
 		if err == nil {
 			continue
 		}
-		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+		if ne, ok := err.(net.Error); ok && ne.Timeout() || errors.Is(err, errFrameStalled) {
 			return false
 		}
 		return true
