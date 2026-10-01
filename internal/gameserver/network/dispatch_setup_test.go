@@ -383,7 +383,10 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	combat := ai.NewPlayerAttack(ch, moveCtl, attackCtl)
 	control.combat = combat
 
-	return &livePlayer{Character: ch, session: capture.Send, access: (*admin.Data)(nil).Resolve(ch.AccessLevel), attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+	p := &livePlayer{Character: ch, session: capture.Send, attack: attackCtl, move: moveCtl, combat: combat, visibilitySend: capture.Send}
+	access := (*admin.Data)(nil).Resolve(ch.AccessLevel)
+	p.access.Store(&access)
+	return p
 }
 
 // testControllerSink receives a fixture player's attack and movement
