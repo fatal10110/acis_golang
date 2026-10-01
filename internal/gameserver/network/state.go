@@ -157,6 +157,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc6: true, // try on merchant items
 		0xca: true, // game guard reply
 		0xcd: true, // show mini map
+		0xcf: true, // record info (view refresh)
 		0xd0: true, // extended packets
 	},
 }

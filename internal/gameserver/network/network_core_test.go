@@ -233,6 +233,7 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeDlgAnswer,
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
+		clientpackets.OpcodeRequestRecordInfo,
 		clientpackets.OpcodeExtended,
 	}
 	for _, opcode := range opcodes {
