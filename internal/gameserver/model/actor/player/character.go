@@ -130,6 +130,9 @@ type Character struct {
 	KarmaPoints       int
 	PvPKills, PKKills int
 
+	// AccessLevel is the level loaded from the character row. It is not
+	// updated when the level changes in game; the live level is the
+	// network layer's livePlayer access level.
 	AccessLevel int
 
 	// clan is the clan membership the client sees; see character_clan.go.

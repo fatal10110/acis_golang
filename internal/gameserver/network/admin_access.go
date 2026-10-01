@@ -22,8 +22,8 @@ const (
 )
 
 // adminSet answers //set <field> ...: //set access changes a character's
-// access level. The other fields are not ported yet: they log the gap and
-// release the client.
+// access level. The other fields are not ported yet (#3165): they log the
+// gap and release the client.
 func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
@@ -32,7 +32,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		return
 	}
 	if args[0] != "access" {
-		l.log.Warn().Str("field", args[0]).Msg("admin: //set field not implemented yet")
+		l.log.Warn().Str("field", args[0]).Msg("admin: //set field not implemented yet (#3165)")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -140,8 +140,8 @@ func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 
 // adminBan answers //ban account|chat|player [name [minutes]]. Without a
 // name the selected player is banned; with one, the online player so named,
-// else the offline account or character. A chat ban is not ported yet: it
-// logs the gap and releases the client.
+// else the offline account or character. A chat ban is not ported yet
+// (#3164, #3155): it logs the gap and releases the client.
 //
 // An unknown kind answers nothing, as the reference does; a chat command
 // leaves no client action pending.
@@ -184,13 +184,13 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 			sendText(gm, "Ban request sent for account "+name+".")
 			return
 		}
-		onPlayer(gm, target, func() {
-			l.sendAccountAccessLevel(target.AccountName(), accountBannedLevel)
-			target.kickClient()
-		})
+		// The ban goes out from gm's goroutine: target's queue is closed once
+		// it starts leaving the world, and the ban must not depend on it.
+		l.sendAccountAccessLevel(target.AccountName(), accountBannedLevel)
+		onPlayer(gm, target, target.kickClient)
 		sendText(gm, target.AccountName()+" account is banned.")
 	case "chat":
-		l.log.Warn().Msg("admin: //ban chat not implemented yet")
+		l.log.Warn().Msg("admin: //ban chat not implemented yet (#3164, #3155)")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 	case "player":
 		l.changeCharAccessLevel(gm, target, name, characterBannedLevel)
@@ -199,7 +199,8 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 
 // adminUnban answers //unban account|chat|player name: an offline account
 // or character gets its access back; an online one is not banned. A chat
-// unban is not ported yet: it logs the gap and releases the client.
+// unban is not ported yet (#3164, #3155): it logs the gap and releases the
+// client.
 //
 // An unknown kind answers nothing, as the reference does; a chat command
 // leaves no client action pending.
@@ -231,7 +232,7 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 		l.sendAccountAccessLevel(name, accountUnbannedLevel)
 		sendText(gm, "Unban request sent for account "+javaString(name)+".")
 	case "chat":
-		l.log.Warn().Msg("admin: //unban chat not implemented yet")
+		l.log.Warn().Msg("admin: //unban chat not implemented yet (#3164, #3155)")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 	case "player":
 		if target != nil {
