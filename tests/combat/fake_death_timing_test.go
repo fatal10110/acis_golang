@@ -1,7 +1,6 @@
 package combat
 
 import (
-	"slices"
 	"testing"
 	"time"
 
@@ -28,8 +27,10 @@ import (
 //   - mult is CreatureStatus.getMovementSpeedMultiplier, the DEX run-speed
 //     bonus for an unequipped player on land;
 //   - CharInfo writes isSitting() ? 0 : 1 (CharInfo.java:130), and a hit on
-//     a seated player broadcasts ChangeWaitType(WT_STANDING)
-//     (PlayerStatus.java:124-125).
+//     a seated player not playing dead broadcasts ChangeWaitType(WT_STANDING)
+//     once: its ATTACKED stand intention (PlayerAI.onEvtAttacked/thinkStand,
+//     PlayerAI.java:148-158, 490-504) stands it up before the damage, whose
+//     own stand-up (PlayerStatus.java:124-125) then finds it standing.
 
 // victimFakeDeathDelays are the reference lie-down and get-up lengths for
 // victim: (int)(3000 / DEXBonus[dex]) and (int)(2500 / DEXBonus[dex]) ms.
@@ -149,18 +150,9 @@ func TestRestartDuringFakeDeathLieDownEndsSeated(t *testing.T) {
 	before := srv.PlayerCurrentHP(t, id)
 	attackPlayer(t, c, id)
 	srv.AdvanceUntil(t, "first hit on the seated victim", func() bool { return srv.PlayerCurrentHP(t, id) < before })
-	// On the real pool the hit's own stand-up and the attacked stand
-	// intention can both stand the player up (#3093), so only the kind of
-	// frame is pinned: a stand-up, never a get-up out of fake death.
-	for _, rc := range []struct {
-		who string
-		c   *scriptedClient
-	}{{"self", vc}, {"observer", c}} {
-		got := postureLifeFrames(readQuiet(rc.c), id)
-		if len(got) == 0 || slices.ContainsFunc(got, func(f fakeDeathFrame) bool { return f != frameStand }) {
-			t.Errorf("%s posture frames after the hit = %v, want ChangeWaitType(STANDING) only", rc.who, got)
-		}
-	}
+	// The stand intention stands the player up ahead of the damage, which
+	// then finds it standing: one stand-up, never a get-up out of fake death.
+	assertFramesOnly(t, vc, c, id, []fakeDeathFrame{frameStand})
 }
 
 // TestStandWhileLyingInFakeDeathGetsUpTwice has a player lying in fake

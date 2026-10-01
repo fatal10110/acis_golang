@@ -235,6 +235,26 @@ func (c *Character) GetUpFromFakeDeath() {
 	c.StopFakeDeath()
 }
 
+// StandFromFakeDeath is a stand intention's answer to a character seated
+// while it plays dead: it gets up out of fake death through
+// GetUpFromFakeDeath and reports true. A character that is not both seated
+// and playing dead is left alone and it reports false. The check takes the
+// standing posture in the same stateMu section, so of two stands racing on
+// one character (its own request and a hit landing from another queue),
+// only one gets it up.
+func (c *Character) StandFromFakeDeath() bool {
+	c.stateMu.Lock()
+	ok := c.stateInit && !c.standing && !c.sittingNow && c.fakeDeath
+	if ok {
+		c.standing = true
+	}
+	c.stateMu.Unlock()
+	if ok {
+		c.GetUpFromFakeDeath()
+	}
+	return ok
+}
+
 // fakeDeathDelay is millis divided by the movement speed multiplier,
 // truncated to whole milliseconds. A zero multiplier (a player too heavy to
 // move) saturates at the largest int32 millisecond count.

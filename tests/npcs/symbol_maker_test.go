@@ -84,7 +84,7 @@ func bootSymbolWorld(t *testing.T, adena int32, dyeCounts map[int32]int32) *folk
 	for id, count := range dyeCounts {
 		srv.GiveItem(t, w.player, id, count)
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
 	return w

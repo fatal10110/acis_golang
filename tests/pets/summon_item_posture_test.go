@@ -33,7 +33,7 @@ func startOwnerSitDown(t *testing.T, h *petWorld) {
 	}
 	h.client.Send(encodeRequestChangeWaitType(false))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 }
 
 // startOwnerStandUp seats the owner, then starts its stand-up and returns
@@ -46,7 +46,7 @@ func startOwnerStandUp(t *testing.T, h *petWorld) {
 	sitOwner(t, h)
 	h.client.Send(encodeRequestChangeWaitType(true))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "stand ChangeWaitType")
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 }
 
 // assertHeldCollar checks a collar use answered by ActionFailed then
@@ -83,7 +83,7 @@ func TestCollarDuringSitDownIsHeldThenRefusedOnceSeated(t *testing.T) {
 	startOwnerSitDown(t, h)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertHeldCollar(t, h, readImmediate(h.client), "collar mid sit-down")
+	assertHeldCollar(t, h, h.srv.ReadQueued(t, h.client), "collar mid sit-down")
 
 	h.srv.SettlePosture(t, h.ownerID)
 	frames := drainFrames(t, h.client)
@@ -111,11 +111,11 @@ func TestCollarDuringStandUpIsHeldUntilUp(t *testing.T) {
 	startOwnerStandUp(t, h)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertHeldCollar(t, h, readImmediate(h.client), "collar mid stand-up")
+	assertHeldCollar(t, h, h.srv.ReadQueued(t, h.client), "collar mid stand-up")
 
 	// Well short of the stand-up's end the cast is still held.
 	h.srv.Advance(t, 2*time.Second)
-	if frames := readImmediate(h.client); len(frames) != 0 {
+	if frames := h.srv.ReadQueued(t, h.client); len(frames) != 0 {
 		t.Fatalf("held collar before the stand-up ended = opcodes %x, want none", frameOpcodes(frames))
 	}
 	if h.srv.PlayerCastingNow(t, h.ownerID) {
@@ -131,7 +131,7 @@ func TestCollarDuringStandUpIsHeldUntilUp(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, h.client, "held collar SetupGauge"), serverpackets.OpcodeSetupGauge, "held collar SetupGauge")
 	// SUMMON_A_PET went out with the hold; the resumed cast does not repeat it.
-	if frames := readImmediate(h.client); len(frames) != 0 {
+	if frames := h.srv.ReadQueued(t, h.client); len(frames) != 0 {
 		t.Fatalf("held collar after its cast start = opcodes %x, want none", frameOpcodes(frames))
 	}
 	if !h.srv.PlayerCastingNow(t, h.ownerID) {
@@ -157,9 +157,9 @@ func TestHeldCollarDestroyedBeforeUpIsRefused(t *testing.T) {
 	startOwnerStandUp(t, h)
 
 	h.client.Send(encodeUseItem(h.collarID, false))
-	assertHeldCollar(t, h, readImmediate(h.client), "collar mid stand-up")
+	assertHeldCollar(t, h, h.srv.ReadQueued(t, h.client), "collar mid stand-up")
 	h.client.Send(encodeRequestDestroyItem(h.collarID, 1))
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 	if got := h.ownerItemCount(t, wolfCollarID); got != 0 {
 		t.Fatalf("collar count = %d after the destroy, want 0", got)
 	}
@@ -197,7 +197,7 @@ func TestSummonItemsDuringPostureTransitionProceed(t *testing.T) {
 			posture.start(t, h)
 
 			h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
-			assertNoSittingRefusal(t, readImmediate(h.client), "tree kit mid "+posture.name)
+			assertNoSittingRefusal(t, h.srv.ReadQueued(t, h.client), "tree kit mid "+posture.name)
 			if decorationCount(h) != 1 {
 				t.Fatalf("tree kit mid %s planted %d decorations, want 1", posture.name, decorationCount(h))
 			}
@@ -294,7 +294,7 @@ func TestCollarAttemptGateRefusesBeforeHoldOrStart(t *testing.T) {
 			tt.start(t, h)
 
 			h.client.Send(encodeUseItem(h.collarID, false))
-			frames := readImmediate(h.client)
+			frames := h.srv.ReadQueued(t, h.client)
 			if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage}; string(got) != string(want) {
 				t.Fatalf("collar in formal wear %s = opcodes %x, want %x", tt.name, got, want)
 			}

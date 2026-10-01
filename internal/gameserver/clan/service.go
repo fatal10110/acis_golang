@@ -31,6 +31,10 @@ type Config struct {
 	// LifeCrystalNeeded is players.properties LifeCrystalNeeded: learning a
 	// clan skill also takes one of the skill's item from the leader.
 	LifeCrystalNeeded bool
+	// MembersCanWithdrawFromWarehouse is MembersCanWithdrawFromClanWH: a
+	// member holding the warehouse-search privilege may withdraw from the
+	// clan warehouse, not only the leader.
+	MembersCanWithdrawFromWarehouse bool
 }
 
 // DefaultConfig is the shipped clans.properties and LifeCrystalNeeded.

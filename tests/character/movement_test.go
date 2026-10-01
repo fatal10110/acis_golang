@@ -3,7 +3,9 @@ package character
 import (
 	"math"
 	"testing"
+	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -189,18 +191,89 @@ func TestRunStartsAtWalkSpeed(t *testing.T) {
 		// (PlayerMove.updatePosition's Math.round, PlayerMove.java:272).
 		// Each update walks the time since the last one: exactly the tick
 		// interval on the driven clock. On the real pool the updates since
-		// the walk started cover at least as many intervals, so the walk
-		// phase gets at least as far; how much of the wall-clock time falls
-		// in each phase is not pinned there.
+		// the walk started cover at least as many intervals of wall time,
+		// but each walks only that time's whole milliseconds, so the walk
+		// phase gets at least walkPhaseFloor; how much of the wall-clock
+		// time falls in each phase is not pinned there.
 		got, want := mover.Position().X, int(math.Floor(accurate+0.5))
 		if !srv.DrivesClock() {
-			if update <= 5 && got < want {
-				t.Fatalf("X after update %d = %d, want at least %d (walk %v)", update, got, want, character.WalkSpeed())
+			if floor := walkPhaseFloor(spawn.X, character.WalkSpeed(), update); update <= 5 && got < floor {
+				t.Fatalf("X after update %d = %d, want at least %d (walk %v)", update, got, floor, character.WalkSpeed())
 			}
 			continue
 		}
 		if got != want {
 			t.Fatalf("X after update %d = %d, want %d (walk %v, run %v)", update, got, want, character.WalkSpeed(), character.RunSpeed())
 		}
+	}
+}
+
+// walkPhaseFloor is the least X a player walking +X from x at walk speed
+// reaches after its first updates position updates, when those span at
+// least as many tick intervals of wall time. Each update walks the whole
+// milliseconds since the last one (PlayerMove.updatePosition's
+// Duration.toMillis, PlayerMove.java:215-222), dropping up to a millisecond
+// each, so the updates walk more than a millisecond less per interval in
+// all; the cell is that position rounded half up.
+func walkPhaseFloor(x int, walk float64, updates int) int {
+	walked := time.Duration(updates) * (move.PositionUpdateInterval - time.Millisecond)
+	return int(math.Floor(float64(x) + walk*walked.Seconds() + 0.5))
+}
+
+// TestRunStartWalkFloorAllowsMillisecondTruncation pins walkPhaseFloor
+// against production stepping: five walk-phase updates spanning just over
+// five intervals of uneven length, as the real pool's scheduling lands them,
+// walk only 498 whole milliseconds (PlayerMove.java:215-222), short of the
+// nominal five intervals' cell but not of walkPhaseFloor.
+func TestRunStartWalkFloorAllowsMillisecondTruncation(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
+	if !srv.DrivesClock() {
+		t.Skip("landing position updates at chosen instants needs the driven clock")
+	}
+	c := srv.Client
+
+	c.Send(encodeRequestGameStart(0))
+	c.Read() // SSQInfo
+	c.Read() // CharSelected
+	c.Send(encodeEnterWorld())
+	readEnterWorldBurst(t, c)
+	objID := srv.SoleObjectID(t)
+	obj, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("player missing from world state")
+	}
+	character, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %T is not an online character", obj)
+	}
+	walk := character.WalkSpeed()
+
+	spawn := location.Location{X: 10, Y: 20, Z: 30}
+	c.Send(encodeMoveBackwardToLocation(location.Location{X: 3_000, Y: 20, Z: 30}, spawn, 1))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
+	}
+	mover := srv.PlayerMove(t, objID)
+	// 500.2 ms in all, but 100+99+100+99+100 = 498 whole milliseconds.
+	gaps := []time.Duration{100_500 * time.Microsecond, 99_600 * time.Microsecond, 100_300 * time.Microsecond, 99_800 * time.Microsecond, 100 * time.Millisecond}
+	var span time.Duration
+	for _, gap := range gaps {
+		srv.TickPositionsAfter(t, gap)
+		span += gap
+	}
+	if span < time.Duration(len(gaps))*move.PositionUpdateInterval {
+		t.Fatalf("gaps span %v, want at least %d intervals", span, len(gaps))
+	}
+	got := mover.Position().X
+	if want := int(math.Floor(float64(spawn.X) + walk*0.498 + 0.5)); got != want {
+		t.Fatalf("X after %d uneven updates = %d, want %d (498 ms at walk %v)", len(gaps), got, want, walk)
+	}
+	nominal := int(math.Floor(float64(spawn.X) + walk*0.5 + 0.5))
+	if got >= nominal {
+		t.Fatalf("X after %d uneven updates = %d reaches the nominal cell %d at walk %v; pick gaps whose truncation crosses a cell", len(gaps), got, nominal, walk)
+	}
+	if floor := walkPhaseFloor(spawn.X, walk, len(gaps)); got < floor {
+		t.Fatalf("X after %d uneven updates = %d, below walkPhaseFloor %d (walk %v)", len(gaps), got, floor, walk)
 	}
 }

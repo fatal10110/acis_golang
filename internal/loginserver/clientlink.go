@@ -3,10 +3,10 @@ package loginserver
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand/v2"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -179,18 +179,22 @@ func (l *ClientLink) purgeLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			now := time.Now()
-			if l.loginTimeout > 0 {
-				l.purgeStale(now)
-			}
-			l.sweepFailedAttempts(now)
-			l.bans.SweepExpired(now, l.hasLiveConnection)
+			l.sweep(time.Now())
 		}
 	}
 }
 
-// purgeStale closes every registered connection that connected more than
-// loginTimeout ago, replying with a LoginFail first.
+// sweep is one purge-loop tick at now. It never waits on a client socket.
+func (l *ClientLink) sweep(now time.Time) {
+	if l.loginTimeout > 0 {
+		l.purgeStale(now)
+	}
+	l.sweepFailedAttempts(now)
+	l.bans.SweepExpired(now, l.hasLiveConnection)
+}
+
+// purgeStale asks every registered connection that connected more than
+// loginTimeout ago to close with a LoginFail; see clientConn.requestClose.
 func (l *ClientLink) purgeStale(now time.Time) {
 	l.purgeMu.Lock()
 	var stale []*clientConn
@@ -202,8 +206,9 @@ func (l *ClientLink) purgeStale(now time.Time) {
 	l.purgeMu.Unlock()
 
 	for _, c := range stale {
-		l.log.Info().Str("ip", c.remoteIP.String()).Str("account", c.account).Msg("purging login client stuck past the login timeout")
-		c.kick()
+		if c.kick() {
+			l.log.Info().Str("ip", c.remoteIP.String()).Str("account", c.account).Msg("purging login client stuck past the login timeout")
+		}
 	}
 }
 
@@ -265,9 +270,9 @@ func (l *ClientLink) clearHolder(account string, c *clientConn) {
 }
 
 // clientConn is one connected login client. Its handler goroutine owns the
-// protocol flow; the purge loop and a duplicate login's eviction may
-// additionally close it from outside, so sends and the close are serialized
-// by sendMu.
+// protocol flow and every write. The purge loop and a duplicate login's
+// eviction close it from outside only through requestClose, which never
+// blocks on the socket; the handler then writes that final packet itself.
 type clientConn struct {
 	conn        net.Conn
 	remoteIP    net.IP
@@ -286,25 +291,49 @@ type clientConn struct {
 	loginKey2   int32
 
 	// sendMu guards closed and serializes every write and the close.
-	// closed is set by the first closeWith; from then on nothing else is
+	// closed is set by the first close; from then on nothing else is
 	// written, so that close's packet is the last frame the client sees.
 	sendMu sync.Mutex
 	closed bool
+
+	// closeRequest holds the final packet of the first requestClose. Once
+	// set, the next send or close writes that packet instead and closes the
+	// connection, so a requested close wins over any later reply or close.
+	closeRequest atomic.Pointer[[]byte]
 }
 
-// send writes payload unless the connection has already been closed.
+// errFrameTooLarge rejects a payload whose frame would exceed the wire
+// limit; nothing is written for it.
+var errFrameTooLarge = errors.New("login packet exceeds maximum frame length")
+
+// send writes payload unless the connection has already been closed. When a
+// close was requested, it performs that close instead and writes nothing
+// else.
 func (c *clientConn) send(payload []byte) error {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
 	if c.closed {
 		return net.ErrClosed
 	}
-	return c.sendLocked(payload)
+	if final := c.closeRequest.Load(); final != nil {
+		c.closeLocked(*final)
+		return net.ErrClosed
+	}
+	if err := c.writeLocked(payload); err != nil {
+		if !errors.Is(err, errFrameTooLarge) {
+			// A failed or timed-out write may have left part of a frame on
+			// the wire: nothing may follow it, not even a final packet.
+			c.closed = true
+			c.conn.Close()
+		}
+		return err
+	}
+	return nil
 }
 
-func (c *clientConn) sendLocked(payload []byte) error {
+func (c *clientConn) writeLocked(payload []byte) error {
 	if wire.FrameHeaderSize+commoncrypt.PaddedSize(len(payload)+8) > wire.MaxFrameLength {
-		return fmt.Errorf("login packet exceeds maximum frame length")
+		return errFrameTooLarge
 	}
 	if err := setWriteDeadline(c.conn); err != nil {
 		return err
@@ -312,26 +341,51 @@ func (c *clientConn) sendLocked(payload []byte) error {
 	return wire.WriteFrame(c.conn, c.crypt.Encrypt(payload))
 }
 
-// kick replies LoginFail AccessFailed and closes the connection; safe to
-// call while the handler goroutine is blocked reading.
-func (c *clientConn) kick() {
-	c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+// kick asks the connection to close with LoginFail AccessFailed; see
+// requestClose.
+func (c *clientConn) kick() bool {
+	return c.requestClose(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
+}
+
+// requestClose asks the handler goroutine to close the connection with
+// payload as its final packet, and reports whether this was the first
+// request. It never blocks on the socket, so a peer that stopped reading
+// cannot stall the caller: a handler blocked reading is woken through an
+// expired read deadline, and one blocked writing closes the connection
+// once that write ends, with the requested packet unless the write failed.
+// The first request wins, as does a close that already happened.
+func (c *clientConn) requestClose(payload []byte) bool {
+	if !c.closeRequest.CompareAndSwap(nil, &payload) {
+		return false
+	}
+	// The handler re-checks closeRequest after every read-deadline reset,
+	// so this past deadline cannot be overwritten before it takes effect.
+	_ = c.conn.SetReadDeadline(time.Unix(1, 0))
+	return true
 }
 
 // closeWith writes the final packet, when payload is non-nil, and closes
-// the connection. The first close wins: once the connection is closed, a
-// later closeWith does nothing and send refuses, so the client never
-// receives anything after a final packet. Safe to call from any goroutine,
-// including while the handler goroutine is blocked reading.
+// the connection. A pending requestClose's packet replaces payload. The
+// first close wins: once the connection is closed, a later closeWith does
+// nothing and send refuses, so the client never receives anything after a
+// final packet. Only the handler goroutine calls it; other goroutines use
+// requestClose.
 func (c *clientConn) closeWith(payload []byte) {
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
+	c.closeLocked(payload)
+}
+
+func (c *clientConn) closeLocked(payload []byte) {
 	if c.closed {
 		return
 	}
 	c.closed = true
+	if final := c.closeRequest.Load(); final != nil {
+		payload = *final
+	}
 	if payload != nil {
-		_ = c.sendLocked(payload)
+		_ = c.writeLocked(payload)
 	}
 	c.conn.Close()
 }
@@ -344,8 +398,9 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 			return
 		}
 		// Close first: a handler that ended without a final packet still
-		// closes through closeWith, so a racing kick or eviction cannot
-		// write after it.
+		// closes through closeWith, which writes a requested close's packet
+		// if one is pending; a later kick or eviction then finds the
+		// connection closed.
 		c.closeWith(nil)
 		l.unregisterPurgeable(c)
 		if c.account != "" {
@@ -398,6 +453,9 @@ func (l *ClientLink) handleConnection(ctx context.Context, conn net.Conn) {
 	for {
 		if err := setLoginClientReadDeadline(conn, c.authed); err != nil {
 			return
+		}
+		if c.closeRequest.Load() != nil {
+			return // the deferred close writes the requested packet
 		}
 		payload, err := frames.ReadFrame()
 		if err != nil {
@@ -520,12 +578,11 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 	if mapped {
 		// A second authentication while the account is still mapped here:
 		// both the previous holder, when one is still connected, and the
-		// new client are closed and the mapping is dropped. Evicting the
-		// previous holder happens outside authMu: it writes to another
-		// connection's socket, which can block on a stalled reader, and
-		// this mutex gates every account's login.
+		// new client are closed and the mapping is dropped. The previous
+		// holder's own handler writes its final packet, so a holder that
+		// stopped reading cannot stall this login.
 		if old != nil {
-			old.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
+			old.requestClose(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		}
 		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse))
 		return false
@@ -546,7 +603,14 @@ func (l *ClientLink) onRequestAuthLogin(ctx context.Context, c *clientConn, payl
 func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req clientpackets.RequestAuthLogin) (model.Account, bool) {
 	account, err := l.accounts.Account(ctx, req.Username)
 	switch {
-	case errors.Is(err, loginsql.ErrAccountNotFound):
+	case err != nil:
+		// A failed lookup is treated exactly like an unknown account: with
+		// auto-creation off it counts as a failed attempt, so a database
+		// outage can lead to IP bans; with it on, creation is attempted and
+		// is refused by the store if the account does exist.
+		if !errors.Is(err, loginsql.ErrAccountNotFound) {
+			l.log.Error().Str("account", req.Username).Err(err).Msg("look up account")
+		}
 		if !l.autoCreateAccounts {
 			l.recordFailedAttempt(c.remoteIP, time.Now())
 			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailUserOrPassWrong))
@@ -555,21 +619,16 @@ func (l *ClientLink) authenticate(ctx context.Context, c *clientConn, req client
 		hashed, herr := l.hashPassword(req.Password)
 		if herr != nil {
 			l.log.Error().Err(herr).Msg("hash password for auto-created account")
-			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 			return model.Account{}, false
 		}
 		account, err = l.accounts.CreateAccount(ctx, req.Username, hashed, time.Now())
 		if err != nil {
 			l.log.Error().Str("account", req.Username).Err(err).Msg("auto-create account")
-			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
+			c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccessFailed))
 			return model.Account{}, false
 		}
 		return account, true
-
-	case err != nil:
-		l.log.Error().Str("account", req.Username).Err(err).Msg("look up account")
-		c.closeWith(serverpackets.EncodeLoginFail(serverpackets.LoginFailSystemError))
-		return model.Account{}, false
 
 	default:
 		if bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(req.Password)) != nil {

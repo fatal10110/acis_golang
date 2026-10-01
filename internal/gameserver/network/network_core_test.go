@@ -142,7 +142,7 @@ func TestAllowedGatesOpcodesByState(t *testing.T) {
 		{"in-game accepts enchant item", StateInGame, 0x58, true},
 		{"in-game accepts pet item use", StateInGame, 0x8a, true},
 		{"in-game accepts bypass command", StateInGame, 0x21, true},
-		{"in-game accepts say2 chat (Java-mapped, unported)", StateInGame, 0x38, true},
+		{"in-game accepts say2 chat", StateInGame, 0x38, true},
 		{"in-game rejects create character", StateInGame, 0x0b, false},
 		{"in-game rejects enter world replay", StateInGame, 0x03, false},
 

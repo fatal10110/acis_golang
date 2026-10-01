@@ -1869,8 +1869,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestRecordInfo(live) })
 			}
 
+		case clientpackets.OpcodeSay2:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeSay2)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.handleSay2(client, live, req) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
-			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeDummy34,

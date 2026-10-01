@@ -101,7 +101,7 @@ func bootSeller(t *testing.T, stacks ...[2]int32) *sellWorld {
 	for _, s := range stacks {
 		w.items[s[0]] = srv.GiveItem(t, w.player, s[0], s[1])
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
 	return w

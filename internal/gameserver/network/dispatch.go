@@ -309,6 +309,7 @@ type GameClientLink struct {
 	parties          *partyRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
+	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
 	targets          *skilltarget.Registry
@@ -355,6 +356,8 @@ type GameClientLink struct {
 	// gmAudit records every admin command run; the zero logger records
 	// nothing.
 	gmAudit zerolog.Logger
+	// chat is the chat settings: log, bot filter and reuse delays.
+	chat ChatConfig
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -511,6 +514,9 @@ type GameClientLinkConfig struct {
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
+	// Chat is the chat settings of server.properties; the zero value logs
+	// nothing and rate-limits nothing.
+	Chat ChatConfig
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
@@ -579,6 +585,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
+		chat:             cfg.Chat,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,

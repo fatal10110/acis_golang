@@ -270,7 +270,7 @@ func TestBypassWarehouseCancelsEnchantSelection(t *testing.T) {
 	)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	scroll := srv.GiveItem(t, w.player, 955, 1)
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
 	f := w.spawnFolk(t, folkTemplate("WarehouseKeeper", 30005), 50)
@@ -292,7 +292,7 @@ func TestBypassRefusedWhileTradeRequestPending(t *testing.T) {
 	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
 	otherID := w.srv.SeedCharacterFor(t, "player2", "Other", playerLevel, 0).ID
 	other := w.srv.DialClient(t, "player2", 1)
-	startInWorld(t, other)
+	startInWorld(t, w.srv, other)
 	drainUntilQuiet(t, w.c)
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)
 	drainUntilQuiet(t, other)

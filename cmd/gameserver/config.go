@@ -80,6 +80,7 @@ type gameplayConfig struct {
 	Freight                  network.FreightConfig
 	AugmentationChances      augmentation.Chances
 	Admin                    adminConfig
+	Chat                     chatConfig
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -206,6 +207,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Admin, err = loadAdminConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Chat, err = loadChatConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -399,7 +403,7 @@ func loadInventorySlots(paths gameServerPaths) (player.InventorySlots, error) {
 }
 
 // loadStorageSlots reads the base warehouse, freight, private store and
-// recipe book sizes.
+// recipe book sizes, and the clan warehouse size.
 func loadStorageSlots(paths gameServerPaths) (player.StorageSlots, error) {
 	props, err := config.LoadFile(paths.PlayersConfigPath)
 	if err != nil {
@@ -415,7 +419,10 @@ func loadStorageSlots(paths gameServerPaths) (player.StorageSlots, error) {
 		PrivateStoreDwarf:   fields.Int("MaxPvtStoreSlotsDwarf", def.PrivateStoreDwarf),
 		DwarfRecipe:         fields.Int("DwarfRecipeLimit", def.DwarfRecipe),
 		CommonRecipe:        fields.Int("CommonRecipeLimit", def.CommonRecipe),
-		Configured:          true,
+		// The shipped file sets 200; a file without the key gets the
+		// reference's own 150.
+		ClanWarehouse: fields.Int("MaximumWarehouseSlotsForClan", 150),
+		Configured:    true,
 	}
 	if err := fields.Err(); err != nil {
 		return player.StorageSlots{}, err
