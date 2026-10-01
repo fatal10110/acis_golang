@@ -229,16 +229,13 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 }
 
 // spawnFolk places a civilian NPC built from inst in the world at (loc,
-// heading). It stands there for the server's lifetime: nothing kills it,
-// so it takes no AI tick, decay or respawn.
+// heading). Nothing kills it, so it takes no AI tick, decay or respawn; a
+// route walker walks its route for the server's lifetime.
 func (n *Npcs) spawnFolk(inst *npc.Instance, loc location.Location, heading int) {
-	inPeace := n.zones != nil && n.zones.NPCInPeaceZone(loc.X, loc.Y, loc.Z)
-	f, err := npc.NewFolk(inst, inPeace, n.castDefs)
-	if err != nil {
+	if _, err := n.folk.Spawn(inst, loc, heading); err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
 		return
 	}
-	n.state.Spawn(f, loc.X, loc.Y, loc.Z, heading)
 	n.folkCount.Add(1)
 }
 

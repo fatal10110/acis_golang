@@ -514,13 +514,17 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 		endInteractIdle(live)
 		return
 	}
-	// A moving NPC target is answered StopMove instead; no interact target
-	// moves yet.
-	at := live.CurrentLocation()
-	live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID(), interactionDistance, at)
-	})
+	// A walking NPC is answered with the player's StopMove, without turning
+	// toward it; any other target is faced with MoveToPawn.
+	if f, ok := target.(*npc.Folk); ok && f.IsMoving() {
+		live.BroadcastStop()
+	} else {
+		at := live.CurrentLocation()
+		live.Character.SetHeading(at.HeadingTo(targetLocation(target)))
+		l.broadcastLiveFrame(live, func() wire.Frame {
+			return serverpackets.FrameMoveToPawn(live.ObjectID(), target.ObjectID(), interactionDistance, at)
+		})
+	}
 	l.onInteract(live, target)
 	endInteractIdle(live)
 }
