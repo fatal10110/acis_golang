@@ -131,9 +131,10 @@ func TestTickWriteCannotBeOvertakenByAnEarlierHandlerWrite(t *testing.T) {
 	releaseRow := func() { releaseOnce.Do(func() { close(release) }) }
 	t.Cleanup(releaseRow)
 	worker.Enqueue(4, func() {
-		holder.Run(func([]int32) {
+		holder.Run(func([]int32) error {
 			close(held)
 			<-release
+			return nil
 		})
 	})
 	<-held

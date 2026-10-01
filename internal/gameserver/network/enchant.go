@@ -352,18 +352,19 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 		}
 	}
 	instances := l.itemInstances
-	l.queueItemWrite(reserved, func(keep []int32) {
+	l.queueItemWrite(reserved, func(keep []int32) error {
 		batch := keptRows(batch, keep)
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if err := l.items.WriteBatch(ctx, batch); err != nil {
 			l.log.Error().Err(err).Int("saves", len(batch.Saves)).Int("deletes", len(batch.Deletes)).
 				Msg("write item rows")
-			return
+			return err
 		}
 		if instances != nil {
 			instances.Landed(carried, keep)
 		}
+		return nil
 	}, owners[0], owners[1:]...)
 }
 
@@ -436,7 +437,7 @@ const itemWriteRowWait = 20 * time.Millisecond
 // every later flush of it, so this follows the row release in persist.Order:
 // the worker recovers a panicking job, so a write that panics has to leave
 // the bookkeeping as it found it.
-func (l *GameClientLink) queueItemWrite(reserved *persist.Write, write func(keep []int32), laneOwner int32, alsoOwed ...int32) {
+func (l *GameClientLink) queueItemWrite(reserved *persist.Write, write func(keep []int32) error, laneOwner int32, alsoOwed ...int32) {
 	owed := []persist.Owed{l.persist.Owe(laneOwner)}
 	for _, ownerID := range alsoOwed {
 		owed = append(owed, l.persist.Owe(ownerID))
