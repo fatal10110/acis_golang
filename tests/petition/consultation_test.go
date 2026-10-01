@@ -9,6 +9,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -16,12 +17,14 @@ import (
 // master joins it (Petition.join), both sides chat on the petition
 // channels (ChatPetition, Petition.sendMessage), the petitioner cannot end
 // it, the chat is replayed in the EnterWorld burst after the login
-// notices and before the reuse timers (EnterWorld.java:254), the game
+// board pages and before the reuse timers (EnterWorld.java:254), the game
 // master closes it (RequestPetitionCancel.java:37-38) and the petitioner
 // rates it (PetitionVote.java), which the petition window then shows.
 func TestPetitionConsultation(t *testing.T) {
 	t.Parallel()
-	r := boot(t)
+	// The server news is on so the relog burst carries a login board page
+	// the petition chat has to follow.
+	r := boot(t, gameservertest.WithServerNews(true), gameservertest.WithHTMLPages(map[string]string{"servnews.htm": serverNews}))
 	r.enterAll(t)
 	id := r.submit(t)
 
@@ -50,11 +53,16 @@ func TestPetitionConsultation(t *testing.T) {
 
 	r.restart(t, r.player, r.playerID)
 	burst := enterWorld(t, r.player)
-	shortcuts, cooltimes := index(burst, serverpackets.OpcodeShortCutInit), index(burst, serverpackets.OpcodeSkillCoolTime)
-	if shortcuts < 0 || cooltimes < shortcuts {
-		t.Fatalf("burst = %x, want ShortCutInit before SkillCoolTime", testsupport.FrameOpcodes(burst))
+	// EnterWorld.java:225-256: the login board page (here the server news)
+	// comes first, then the petition chat, then the reuse timers.
+	shortcuts, news, cooltimes := index(burst, serverpackets.OpcodeShortCutInit), index(burst, serverpackets.OpcodeNpcHtmlMessage), index(burst, serverpackets.OpcodeSkillCoolTime)
+	if shortcuts < 0 || news != shortcuts+1 || cooltimes < news {
+		t.Fatalf("burst = %x, want ShortCutInit, the server news, then SkillCoolTime", testsupport.FrameOpcodes(burst))
 	}
-	assertSays(t, burst[shortcuts+1:cooltimes], playerLine, gmLine)
+	if page := htmlBody(t, burst[news]); page != serverNews+"\n" {
+		t.Fatalf("server news = %q, want %q", page, serverNews)
+	}
+	assertSays(t, burst[news+1:cooltimes], playerLine, gmLine)
 	drain(t, r.gm)
 
 	assertMessages(t, exchange(t, r.gm, encodePetitionCancel()), msg(serverpackets.SystemMessagePetitionEndedWithS1, "Player"))
@@ -140,6 +148,9 @@ func TestPetitionAcceptedWithoutChatStoresPending(t *testing.T) {
 
 // index returns the position of the first frame carrying opcode, -1 when
 // none does.
+// serverNews is the server news page shown at login.
+const serverNews = "<html><body>SERVER NEWS</body></html>"
+
 func index(frames [][]byte, opcode byte) int {
 	for i, frame := range frames {
 		if frame[0] == opcode {
