@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -58,6 +61,17 @@ var msListFiles = map[string]string{
 		<item><ingredient id="65336" count="10"/><production id="20" count="1"/></item>
 		<item><ingredient id="9102" count="1" maintainIngredient="true"/><ingredient id="57" count="5"/>
 			<production id="20" count="1"/></item>
+	</list>`,
+	// 9004: open to every NPC, not keeping enchantment: a sword taken by
+	// itself, an ingredient merged past the largest int32, one whose count
+	// times 9 passes it, clan reputation, and a plain ore exchange.
+	"9004.xml": `<list>
+		<item><ingredient id="30" count="1"/><production id="20" count="1"/></item>
+		<item><ingredient id="9102" count="2000000000"/><ingredient id="9102" count="2000000000"/>
+			<production id="20" count="1"/></item>
+		<item><ingredient id="9102" count="300000000"/><production id="20" count="1"/></item>
+		<item><ingredient id="65336" count="10"/><production id="20" count="1"/></item>
+		<item><ingredient id="9102" count="1"/><production id="20" count="1"/></item>
 	</list>`,
 	// 9003: an exchange keeping enchantment.
 	"9003.xml": `<list maintainEnchantment="true">
@@ -129,7 +143,9 @@ func bootMultisell(t *testing.T, character gameservertest.Option, stacks [][2]in
 	catalog := msCatalog()
 	pages := dialogPages()
 	pages["exchangelvlimit.htm"] = "<html><body>Too experienced %objectId%</body></html>"
-	pages["common/shadow_item-lowlevel.htm"] = "<html><body>Shadow low %objectId%</body></html>"
+	for _, page := range []string{"shadow_item-lowlevel", "shadow_item_mi_c", "shadow_item_hi_c", "shadow_item_b"} {
+		pages["common/"+page+".htm"] = "<html><body>" + page + " %objectId%</body></html>"
+	}
 	opts := append([]gameservertest.Option{
 		character,
 		gameservertest.WithWantChars(1),
@@ -189,6 +205,26 @@ func (w *msWorld) chooseID(t *testing.T, listID, entry, amount int32) [][]byte {
 	pkt.WriteInt32(amount)
 	w.c.Send(pkt.Bytes())
 	return drainFrames(t, w.c)
+}
+
+// msSeedRow lets edit change the stored row of the player's item objectID
+// before the player enters the world.
+func msSeedRow(t *testing.T, srv *gameservertest.Server, objectID int32, edit func(row *item.Instance)) {
+	t.Helper()
+	rows, err := srv.Items.ListByOwner(context.Background(), srv.SoleObjectID(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.ObjectID == objectID {
+			edit(row)
+			if err := srv.Items.Update(context.Background(), row); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("no item row %d", objectID)
 }
 
 // held is how many units of templateID the live inventory holds, worn or
@@ -482,18 +518,7 @@ func TestMultisellChooseNeedsTheListsNpcInReach(t *testing.T) {
 func TestMultisellInventoryOnlyKeepsEnchantment(t *testing.T) {
 	t.Parallel()
 	w := bootMultisell(t, msTalker(), [][2]int32{{msSwordID, 1}, {msBowID, 1}}, func(srv *gameservertest.Server, items map[int32]int32) {
-		rows, err := srv.Items.ListByOwner(context.Background(), srv.SoleObjectID(t))
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, row := range rows {
-			if row.ObjectID == items[msSwordID] {
-				row.EnchantLevel = 3
-				if err := srv.Items.Update(context.Background(), row); err != nil {
-					t.Fatal(err)
-				}
-			}
-		}
+		msSeedRow(t, srv, items[msSwordID], func(row *item.Instance) { row.EnchantLevel = 3 })
 	})
 	aug := item.Augmentation{Attributes: 0x12345, SkillID: 3203, SkillLevel: 2}
 	w.srv.PlayerInventory(t, w.player).ItemByObjectID(w.items[msSwordID]).SetAugmentation(&aug)
@@ -528,28 +553,71 @@ func TestMultisellInventoryOnlyKeepsEnchantment(t *testing.T) {
 	}
 }
 
-// TestMultisellNewbieAndShadowPages pins the merchant's level-bound
-// commands for a level 20 player: Newbie_Exc_Multisell opens for a level 6
-// to 25 player who made at most the first occupation change, and
-// Multisell_Shadow opens the shadow weapon page for the player's level.
-func TestMultisellNewbieAndShadowPages(t *testing.T) {
+// TestMultisellNewbieExchangeOpens pins Newbie_Exc_Multisell for a level
+// 20 player who made no occupation change: the inventory-only list opens.
+func TestMultisellNewbieExchangeOpens(t *testing.T) {
 	t.Parallel()
 	young := bootMultisell(t, msTalker(), [][2]int32{{msSwordID, 1}}, nil)
 	if pages := msPages(t, young.open(t, young.merchant, "Newbie_Exc_Multisell 9003")); len(pages) != 1 || pages[0].size != 1 {
 		t.Fatalf("Newbie_Exc_Multisell at level %d = %+v, want the list", playerLevel, pages)
 	}
-	assertAnswer(t, young.open(t, young.merchant, "Multisell_Shadow"),
-		[]byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}, young.merchant,
-		wantChatPage("<html><body>Shadow low %objectId%</body></html>", young.merchant))
+}
+
+// TestMultisellShadowPageFollowsLevel pins Multisell_Shadow's level bands:
+// below 40 the low-level page, then the mid C, high C and B grade pages
+// from 40, 46 and 52.
+func TestMultisellShadowPageFollowsLevel(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		level int
+		page  string
+	}{
+		{39, "shadow_item-lowlevel"},
+		{40, "shadow_item_mi_c"},
+		{45, "shadow_item_mi_c"},
+		{46, "shadow_item_hi_c"},
+		{51, "shadow_item_hi_c"},
+		{52, "shadow_item_b"},
+	} {
+		t.Run(tc.page+" at "+strconv.Itoa(tc.level), func(t *testing.T) {
+			t.Parallel()
+			w := bootMultisell(t, gameservertest.WithCharacter("Shadowed", tc.level, 0), nil, nil)
+			assertAnswer(t, w.open(t, w.merchant, "Multisell_Shadow"),
+				[]byte{serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed}, w.merchant,
+				wantChatPage("<html><body>"+tc.page+" %objectId%</body></html>", w.merchant))
+		})
+	}
 }
 
 // TestMultisellNewbieExchangeRefusesVeterans pins Newbie_Exc_Multisell for
-// a level 30 player: exchangelvlimit.htm as a chat window, and no list.
+// a player outside levels 6 to 25 or past the first occupation change:
+// exchangelvlimit.htm as a chat window, and no list.
 func TestMultisellNewbieExchangeRefusesVeterans(t *testing.T) {
 	t.Parallel()
-	old := bootMultisell(t, gameservertest.WithCharacter("Veteran", 30, 0), [][2]int32{{msSwordID, 1}}, nil)
-	assertAnswer(t, old.open(t, old.merchant, "Newbie_Exc_Multisell 9003"), chatWindowAnswer, old.merchant,
-		wantChatPage("<html><body>Too experienced %objectId%</body></html>", old.merchant))
+	for _, tc := range []struct {
+		name  string
+		level int
+		class int
+	}{
+		{"level 5", 5, 0},
+		{"level 30", 30, 0},
+		{"level 20 gladiator", playerLevel, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			w := bootMultisell(t, gameservertest.WithCharacter("Veteran", tc.level, 0), [][2]int32{{msSwordID, 1}}, func(srv *gameservertest.Server, _ map[int32]int32) {
+				if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET classid = ?, base_class = ? WHERE obj_Id = ?", tc.class, tc.class, srv.SoleObjectID(t)); err != nil {
+					t.Fatal(err)
+				}
+			})
+			frames := w.open(t, w.merchant, "Newbie_Exc_Multisell 9003")
+			if pages := msPages(t, frames); len(pages) != 0 {
+				t.Fatalf("Newbie_Exc_Multisell opened %+v", pages)
+			}
+			assertAnswer(t, frames, chatWindowAnswer, w.merchant,
+				wantChatPage("<html><body>Too experienced %objectId%</body></html>", w.merchant))
+		})
+	}
 }
 
 // TestMultisellKeepsMaintainedIngredients pins BlacksmithUseRecipes off: an
@@ -584,4 +652,146 @@ func TestMultisellReuseDelay(t *testing.T) {
 	if got := w.held(t, item.AdenaID); got != 90 {
 		t.Fatalf("adena = %d, want 90", got)
 	}
+}
+
+// msSwords lists the player's swords as {enchant, worn} in inventory order.
+func (w *msWorld) msSwords(t *testing.T) [][2]int {
+	t.Helper()
+	var out [][2]int
+	for _, inst := range w.srv.PlayerInventory(t, w.player).ItemsByTemplateID(msSwordID) {
+		st := inst.Snapshot()
+		worn := 0
+		if st.Equipped() {
+			worn = 1
+		}
+		out = append(out, [2]int{st.EnchantLevel, worn})
+	}
+	return out
+}
+
+var msSwordForPotion = []msMessage{
+	msg(serverpackets.SystemMessageS1Disappeared, msSwordID),
+	msg(serverpackets.SystemMessageEarnedItemS1, msPotionID),
+	traded,
+}
+
+// TestMultisellTakesLowestEnchantedCopy pins the take on a list that does
+// not keep enchantment: each unit is the lowest-enchanted copy held, a +0
+// one as soon as it is met, even with enchanted copies listed before it.
+func TestMultisellTakesLowestEnchantedCopy(t *testing.T) {
+	t.Parallel()
+	w := bootMultisell(t, msTalker(), [][2]int32{{msSwordID, 1}}, func(srv *gameservertest.Server, _ map[int32]int32) {
+		for _, enchant := range []int{5, 3} {
+			id := srv.GiveItem(t, srv.SoleObjectID(t), msSwordID, 1)
+			msSeedRow(t, srv, id, func(row *item.Instance) { row.EnchantLevel = enchant })
+		}
+	})
+	if got := w.msSwords(t); len(got) != 3 || got[0][0] == 0 || got[len(got)-1][0] != 0 {
+		t.Fatalf("swords = %v, want the +0 last so the take has to look past enchanted copies", got)
+	}
+	w.mustOpen(t, "9004")
+
+	assertMessages(t, w.choose(t, "9004", 1, 1), msSwordForPotion...)
+	if got := w.msSwords(t); len(got) != 2 || got[0][0]+got[1][0] != 8 {
+		t.Fatalf("swords after one exchange = %v, want the +3 and the +5 kept", got)
+	}
+	assertMessages(t, w.choose(t, "9004", 1, 1), msSwordForPotion...)
+	if got := w.msSwords(t); len(got) != 1 || got[0][0] != 5 {
+		t.Fatalf("swords after two exchanges = %v, want the +5 kept", got)
+	}
+}
+
+// TestMultisellNeverTakesWornCopy pins worn items on a list that does not
+// keep enchantment: a worn +0 sword is passed over for an unworn +3 one, and
+// once the worn one is all that is left it does not count, answering
+// NOT_ENOUGH_ITEMS with the sword still worn and the list kept.
+func TestMultisellNeverTakesWornCopy(t *testing.T) {
+	t.Parallel()
+	w := bootMultisell(t, msTalker(), [][2]int32{{msSwordID, 1}, {msOreID, 1}}, func(srv *gameservertest.Server, items map[int32]int32) {
+		msSeedRow(t, srv, items[msSwordID], func(row *item.Instance) {
+			row.Location, row.LocationData = item.LocationPaperdoll, itemcontainer.RHand
+		})
+		id := srv.GiveItem(t, srv.SoleObjectID(t), msSwordID, 1)
+		msSeedRow(t, srv, id, func(row *item.Instance) { row.EnchantLevel = 3 })
+	})
+	if got := w.msSwords(t); len(got) != 2 || !slices.Contains(got, [2]int{0, 1}) {
+		t.Fatalf("swords = %v, want a worn +0 and an unworn +3", got)
+	}
+	w.mustOpen(t, "9004")
+
+	assertMessages(t, w.choose(t, "9004", 1, 1), msSwordForPotion...)
+	if got := w.msSwords(t); len(got) != 1 || got[0] != [2]int{0, 1} {
+		t.Fatalf("swords after the exchange = %v, want the worn +0 alone", got)
+	}
+	assertMessages(t, w.choose(t, "9004", 1, 1), msg(serverpackets.SystemMessageNotEnoughItems))
+	if got := w.msSwords(t); len(got) != 1 || got[0] != [2]int{0, 1} {
+		t.Fatalf("swords after the refusal = %v, want the worn +0 still worn", got)
+	}
+	assertMessages(t, w.choose(t, "9004", 5, 1),
+		msg(serverpackets.SystemMessageS1Disappeared, msOreID),
+		msg(serverpackets.SystemMessageEarnedItemS1, msPotionID),
+		traded)
+}
+
+// TestMultisellKeptEnchantmentNeedsThatLevel pins the count on a list
+// keeping enchantment: a +3 sword does not pay for an entry asking a +0 one,
+// answering NOT_ENOUGH_ITEMS with the sword kept and the list open.
+func TestMultisellKeptEnchantmentNeedsThatLevel(t *testing.T) {
+	t.Parallel()
+	w := bootMultisell(t, msTalker(), [][2]int32{{msSwordID, 1}, {msBowID, 1}}, func(srv *gameservertest.Server, items map[int32]int32) {
+		msSeedRow(t, srv, items[msSwordID], func(row *item.Instance) { row.EnchantLevel = 3 })
+	})
+	w.mustOpen(t, "9003")
+
+	assertMessages(t, w.choose(t, "9003", 1, 1), msg(serverpackets.SystemMessageNotEnoughItems))
+	if got := w.msSwords(t); len(got) != 1 || got[0] != [2]int{3, 0} {
+		t.Fatalf("swords after the refusal = %v, want the +3 kept", got)
+	}
+	assertMessages(t, w.choose(t, "9003", 2, 1),
+		msg(serverpackets.SystemMessageS1Disappeared, msBowID),
+		msg(serverpackets.SystemMessageEarnedItemS1, msPotionID),
+		traded)
+}
+
+// TestMultisellRefusesOverflowingQuantities pins
+// YOU_HAVE_EXCEEDED_QUANTITY_THAT_CAN_BE_INPUTTED: an entry whose repeated
+// ingredient adds up past the largest int32, and an ingredient whose count
+// times the amount passes it, are refused before anything is taken, keeping
+// the list.
+func TestMultisellRefusesOverflowingQuantities(t *testing.T) {
+	t.Parallel()
+	w := bootMultisell(t, msTalker(), [][2]int32{{msOreID, 10}}, nil)
+	w.mustOpen(t, "9004")
+
+	assertMessages(t, w.choose(t, "9004", 2, 1), msg(serverpackets.SystemMessageExceededQuantityThatCanBeInput))
+	assertMessages(t, w.choose(t, "9004", 3, 9), msg(serverpackets.SystemMessageExceededQuantityThatCanBeInput))
+	if got := w.held(t, msOreID); got != 10 {
+		t.Fatalf("ore = %d after the refusals, want 10", got)
+	}
+	assertMessages(t, w.choose(t, "9004", 5, 1),
+		msg(serverpackets.SystemMessageS1Disappeared, msOreID),
+		msg(serverpackets.SystemMessageEarnedItemS1, msPotionID),
+		traded)
+}
+
+// TestMultisellClanReputationTooLow pins a clan member buying with clan
+// reputation: THE_CLAN_REPUTATION_SCORE_IS_TOO_LOW, nothing taken, the list
+// kept.
+func TestMultisellClanReputationTooLow(t *testing.T) {
+	t.Parallel()
+	w := bootMultisell(t, msTalker(), [][2]int32{{msOreID, 1}}, func(srv *gameservertest.Server, _ map[int32]int32) {
+		if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET clanid = ? WHERE obj_Id = ?", 268435456, srv.SoleObjectID(t)); err != nil {
+			t.Fatal(err)
+		}
+	})
+	w.mustOpen(t, "9004")
+
+	assertMessages(t, w.choose(t, "9004", 4, 1), msg(serverpackets.SystemMessageClanReputationScoreTooLow))
+	if got := w.held(t, msOreID); got != 1 {
+		t.Fatalf("ore = %d after the refusal, want 1", got)
+	}
+	assertMessages(t, w.choose(t, "9004", 5, 1),
+		msg(serverpackets.SystemMessageS1Disappeared, msOreID),
+		msg(serverpackets.SystemMessageEarnedItemS1, msPotionID),
+		traded)
 }
