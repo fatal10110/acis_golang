@@ -121,6 +121,8 @@ func provideGameClientLink(
 		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
 		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
 		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
+		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
+		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -135,6 +137,7 @@ func provideGameClientLink(
 		RecipeBooks:   recipeBooks,
 		Recipes:       data.Recipes,
 		Merchant:      shops,
+		Multisells:    data.Multisells,
 		Templates:     data.Players,
 		ItemTemplates: data.Items,
 		HTML:          html,

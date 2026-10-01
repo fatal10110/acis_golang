@@ -98,7 +98,6 @@ Missing M3 data/UI client packets:
 - `RequestSetPledgeCrest`
 - `RequestSetAllyCrest`
 - `RequestExSetPledgeCrestLarge`
-- `MultiSellChoose`
 - `RequestBuyProcure`
 - `RequestBuySeed`
 - `RequestProcureCropList`
@@ -240,7 +239,6 @@ wired until production owner flows can emit them truthfully.
 
 Missing M3 data/UI server packets:
 
-- `MultiSellList`
 - `SellListProcure`
 - `BuyListSeed`
 - `RecipeShopItemInfo`

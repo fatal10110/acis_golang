@@ -40,6 +40,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -127,6 +128,9 @@ type options struct {
 	craftingDisabled       bool
 	manufactureDelay       time.Duration
 	craftRoll              func(n int) int
+	multisells             *multisell.Table
+	multisellDelay         time.Duration
+	keepMaintained         bool
 	enchantConfig          *enchant.Config
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
@@ -475,6 +479,23 @@ func WithManufactureDelay(d time.Duration) Option {
 // random source), so craft outcomes are deterministic.
 func WithCraftRoll(roll func(n int) int) Option {
 	return func(o *options) { o.craftRoll = roll }
+}
+
+// WithMultisells loads table as the multisell lists (default: none).
+func WithMultisells(table *multisell.Table) Option {
+	return func(o *options) { o.multisells = table }
+}
+
+// WithMultisellDelay sets the reuse delay between two multisell exchanges
+// on one client (default 0: every exchange request is taken).
+func WithMultisellDelay(d time.Duration) Option {
+	return func(o *options) { o.multisellDelay = d }
+}
+
+// WithKeepMaintainedIngredients boots with players.properties
+// BlacksmithUseRecipes off: a maintainIngredient ingredient is kept.
+func WithKeepMaintainedIngredients() Option {
+	return func(o *options) { o.keepMaintained = true }
 }
 
 // WithEnchantRoll supplies the enchant dice roll source wired into the link
@@ -1419,6 +1440,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
 		RecipeBooks:      recipeBooks,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
+		Multisells:       o.multisells,
 		CraftRoll:        o.craftRoll,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
@@ -1449,7 +1471,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

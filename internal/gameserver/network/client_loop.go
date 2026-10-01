@@ -891,6 +891,21 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.deleteHenna(live, req) })
 			}
 
+		case clientpackets.OpcodeMultiSellChoose:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeMultiSellChoose)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				// The reuse gate is consulted only with a player in the
+				// world; a refused exchange still drops the open list.
+				allowed := client.performFloodProtected(floodProtectorMultisell, l.playerConfig.MultisellDelay, time.Now())
+				onLive(live, func() { l.requestMultiSellChoose(live, req, allowed) })
+			}
+
 		case clientpackets.OpcodeRequestEnchantItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEnchantItem)
 			if err != nil {

@@ -65,6 +65,13 @@ import (
 // absent for the same reason: the reference returns without an answer, and
 // the symbol windows hold no pending action, asking again on the next click.
 // tests/npcs asserts that silence.
+//
+// MultiSellChoose refused for its reuse window, its amount, list or entry,
+// the NPC or the player's reach, or a non-stackable entry asked for more
+// than once, is absent as well: the reference drops the open list without
+// an answer, and the multisell window holds no pending action — it stays
+// open and sends again only on the next click. tests/npcs asserts that
+// silence.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 

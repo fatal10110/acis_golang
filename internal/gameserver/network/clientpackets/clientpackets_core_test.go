@@ -1580,3 +1580,22 @@ func TestDecodeSymbolMakerRequests(t *testing.T) {
 		t.Fatal("DecodeRequestHennaUnequipList: want error on short payload")
 	}
 }
+
+// TestDecodeMultiSellChoose pins MultiSellChoose (0xa7): three
+// little-endian int32 after the opcode — list id, entry id, amount — the
+// reference's readD() order. A payload short of the three is an error.
+func TestDecodeMultiSellChoose(t *testing.T) {
+	payload := []byte{
+		0xa7,
+		0xea, 0x03, 0x00, 0x00, // list 1002
+		0x02, 0x00, 0x00, 0x00, // entry 2
+		0x0f, 0x27, 0x00, 0x00, // amount 9999
+	}
+	got, err := DecodeMultiSellChoose(payload)
+	if err != nil || got != (MultiSellChoose{ListID: 1002, EntryID: 2, Amount: 9999}) {
+		t.Fatalf("DecodeMultiSellChoose = %+v, %v", got, err)
+	}
+	if _, err := DecodeMultiSellChoose(payload[:12]); err == nil {
+		t.Fatal("DecodeMultiSellChoose: want error on short payload")
+	}
+}

@@ -12,6 +12,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -27,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -177,6 +179,13 @@ type PlayerConfig struct {
 	// ManufactureDelay is the reuse delay between two crafts on one client
 	// session.
 	ManufactureDelay time.Duration
+	// MultisellDelay is the reuse delay between two multisell exchanges on
+	// one client session.
+	MultisellDelay time.Duration
+	// KeepMaintainedIngredients is players.properties BlacksmithUseRecipes
+	// inverted, so the zero value takes every ingredient as the shipped
+	// config does.
+	KeepMaintainedIngredients bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -200,6 +209,7 @@ type GameClientLink struct {
 	craft         *craft.Service
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
+	exchange      *exchange.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -307,8 +317,11 @@ type GameClientLinkConfig struct {
 	RecipeBooks recipeBookStore
 	// Recipes is the loaded recipe table; nil loads none, so every recipe
 	// request is dropped.
-	Recipes       *recipe.Table
-	Merchant      *merchant.Service // nil: every buylist is unknown
+	Recipes  *recipe.Table
+	Merchant *merchant.Service // nil: every buylist is unknown
+	// Multisells is the loaded multisell table; nil loads none, so no list
+	// opens.
+	Multisells    *multisell.Table
 	Templates     *player.TemplateTable
 	ItemTemplates *item.Table
 	HTML          *datacache.HTML
@@ -477,6 +490,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
+	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {

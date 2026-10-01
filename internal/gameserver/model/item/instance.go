@@ -396,6 +396,21 @@ func (inst *Instance) SetEnchantLevel(level int) bool {
 	return true
 }
 
+// SetAugmentation puts a copy of aug on inst, or clears it when aug is nil,
+// and schedules persistence.
+func (inst *Instance) SetAugmentation(aug *Augmentation) {
+	if aug != nil {
+		cp := *aug
+		aug = &cp
+	}
+	mu := inst.lock()
+	mu.Lock()
+	inst.Augmentation = aug
+	mu.Unlock()
+
+	inst.persisted()
+}
+
 // SetCustomType2 changes the second custom-type flag and schedules persistence.
 func (inst *Instance) SetCustomType2(value int) bool {
 	mu := inst.lock()
