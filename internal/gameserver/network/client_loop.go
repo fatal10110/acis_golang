@@ -341,6 +341,69 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestSetPledgeCrest(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestJoinAlly:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestJoinAlly)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestJoinAlly(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAnswerJoinAlly:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAnswerJoinAlly)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestAnswerJoinAlly(live, req) })
+			}
+
+		case clientpackets.OpcodeAllyLeave:
+			if live != nil {
+				onLive(live, func() { l.allyLeave(live) })
+			}
+
+		case clientpackets.OpcodeAllyDismiss:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAllyDismiss)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.allyDismiss(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestDismissAlly:
+			if live != nil {
+				onLive(live, func() { l.requestDismissAlly(live) })
+			}
+
+		case clientpackets.OpcodeRequestSetAllyCrest:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSetAllyCrest)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSetAllyCrest(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAllyInfo:
+			if live != nil {
+				onLive(live, func() { l.requestAllyInfo(live) })
+			}
+
 		case clientpackets.OpcodeRequestAllyCrest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAllyCrest)
 			if err != nil {

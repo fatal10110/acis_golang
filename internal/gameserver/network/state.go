@@ -149,11 +149,18 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x77: true, // private store sell: set title
 		0x79: true, // buy from a private store
 		0x81: true, // online game-master list
+		0x82: true, // invite a clan into the alliance
+		0x83: true, // answer an alliance invitation
+		0x84: true, // leave the alliance
+		0x85: true, // dismiss a clan from the alliance
+		0x86: true, // dissolve the alliance
+		0x87: true, // upload alliance crest
 		0x88: true, // request ally crest
 		0x89: true, // change pet name
 		0x8a: true, // pet use item
 		0x8b: true, // give item to pet
 		0x8c: true, // get item from pet
+		0x8e: true, // alliance information
 		0x8f: true, // pet get item
 		0x90: true, // private store buy: manage
 		0x91: true, // private store buy: set list
