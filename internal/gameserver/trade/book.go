@@ -11,9 +11,23 @@ import (
 // RequestTimeout is how long a pending direct-trade request remains usable.
 const RequestTimeout = 15 * time.Second
 
+// pendingRequest is a request as its target holds it.
 type pendingRequest struct {
 	requesterID int32
 	expiresAt   time.Time
+	// requesterLeft marks a requester that left the world after asking. The
+	// target stays held until the request expires, but the login that asked
+	// is gone: a later login under the same id never asked, so an answer
+	// reaches nothing of it.
+	requesterLeft bool
+}
+
+// outgoingRequest is a request as its requester holds it. It expires on its
+// own, so a requester stays busy for the whole timeout even when its target
+// left the world before answering.
+type outgoingRequest struct {
+	targetID  int32
+	expiresAt time.Time
 }
 
 // Book owns pending and active direct-trade sessions. mu guards every map.
@@ -21,7 +35,7 @@ type Book struct {
 	mu                 sync.Mutex
 	now                func() time.Time
 	pendingByTarget    map[int32]pendingRequest
-	pendingByRequester map[int32]int32
+	pendingByRequester map[int32]outgoingRequest
 	active             map[int32]*session
 }
 
@@ -93,7 +107,7 @@ func NewBook(now func() time.Time) *Book {
 	return &Book{
 		now:                now,
 		pendingByTarget:    make(map[int32]pendingRequest),
-		pendingByRequester: make(map[int32]int32),
+		pendingByRequester: make(map[int32]outgoingRequest),
 		active:             make(map[int32]*session),
 	}
 }
@@ -111,33 +125,46 @@ func (b *Book) Request(requesterID, targetID int32) RequestResult {
 		return RequestResult{Status: RequestTargetBusy}
 	}
 
-	b.pendingByTarget[targetID] = pendingRequest{requesterID: requesterID, expiresAt: b.now().Add(RequestTimeout)}
-	b.pendingByRequester[requesterID] = targetID
+	expiresAt := b.now().Add(RequestTimeout)
+	b.pendingByTarget[targetID] = pendingRequest{requesterID: requesterID, expiresAt: expiresAt}
+	b.pendingByRequester[requesterID] = outgoingRequest{targetID: targetID, expiresAt: expiresAt}
 	return RequestResult{Status: RequestStarted}
 }
 
 // Answer accepts or rejects a pending direct-trade request.
+//
+// Accepting a request whose requester has left opens the session on the
+// target's side only, with the requester already marked as left: the target
+// trades against the login that asked, which is gone, and a later login under
+// the same id can neither reach the session nor be reached by it.
 func (b *Book) Answer(targetID int32, accept bool) AnswerResult {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	now := b.now()
 	pending, ok := b.pendingByTarget[targetID]
-	if ok {
-		delete(b.pendingByTarget, targetID)
-		delete(b.pendingByRequester, pending.requesterID)
-	}
 	if !ok {
 		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
 	}
+	delete(b.pendingByTarget, targetID)
+	if out, ok := b.pendingByRequester[pending.requesterID]; ok && !pending.requesterLeft && out.targetID == targetID {
+		delete(b.pendingByRequester, pending.requesterID)
+	}
+	result := AnswerResult{RequesterID: pending.requesterID, TargetID: targetID, RequesterLeft: pending.requesterLeft}
 	if !accept || !now.Before(pending.expiresAt) {
-		return AnswerResult{Status: AnswerDenied, RequesterID: pending.requesterID, TargetID: targetID}
+		result.Status = AnswerDenied
+		return result
 	}
 
 	s := newSession(pending.requesterID, targetID)
-	b.active[pending.requesterID] = s
+	if pending.requesterLeft {
+		s.leftID = pending.requesterID
+	} else {
+		b.active[pending.requesterID] = s
+	}
 	b.active[targetID] = s
-	return AnswerResult{Status: AnswerAccepted, RequesterID: pending.requesterID, TargetID: targetID}
+	result.Status = AnswerAccepted
+	return result
 }
 
 // Session returns a snapshot of the player's active direct-trade session.
@@ -274,9 +301,25 @@ func (b *Book) Cancel(playerID int32) CancelResult {
 // departure only on its own next trade action. The departed side can no
 // longer reach the session, so a later login under the same id starts free
 // of it. When the partner has already left too, the session is dropped.
+//
+// A request still waiting for an answer goes the same way. One playerID
+// received is dropped, so a later login has nothing to answer, while its
+// requester stays busy until the request would have expired. One playerID
+// sent no longer holds playerID, so a later login is free to trade at once,
+// while its target stays held until expiry and an answer opens nothing on
+// that later login (Answer).
 func (b *Book) Leave(playerID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	delete(b.pendingByTarget, playerID)
+	if out, ok := b.pendingByRequester[playerID]; ok {
+		delete(b.pendingByRequester, playerID)
+		if pending, ok := b.pendingByTarget[out.targetID]; ok && pending.requesterID == playerID {
+			pending.requesterLeft = true
+			b.pendingByTarget[out.targetID] = pending
+		}
+	}
 
 	s := b.active[playerID]
 	if s == nil || s.locked {
@@ -521,13 +564,19 @@ func (o *offer) snapshot() Offer {
 	return Offer{OwnerID: o.ownerID, Items: items}
 }
 
+// purgeExpiredLocked drops expired requests from both sides. Each side
+// expires on its own: a request either participant left behind is held on
+// one side only.
 func (b *Book) purgeExpiredLocked(now time.Time) {
 	for targetID, pending := range b.pendingByTarget {
-		if now.Before(pending.expiresAt) {
-			continue
+		if !now.Before(pending.expiresAt) {
+			delete(b.pendingByTarget, targetID)
 		}
-		delete(b.pendingByTarget, targetID)
-		delete(b.pendingByRequester, pending.requesterID)
+	}
+	for requesterID, out := range b.pendingByRequester {
+		if !now.Before(out.expiresAt) {
+			delete(b.pendingByRequester, requesterID)
+		}
 	}
 }
 
