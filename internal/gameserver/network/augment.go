@@ -135,7 +135,7 @@ func (l *GameClientLink) refineAugment(live *livePlayer, req clientpackets.Reque
 		sendRefineFailed(live)
 		return
 	}
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
 	out := l.augment.Refine(augment.RefineRequest{
 		State:      l.augmentState(live),
@@ -212,7 +212,7 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 	}
 	adenaOwner := live.ObjectID()
 	var persist []invops.Persist
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
 	if check.Price > 0 {
 		paid := inv.DestroyByTemplateID(item.AdenaID, check.Price)

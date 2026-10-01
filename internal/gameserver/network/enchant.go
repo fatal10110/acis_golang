@@ -56,7 +56,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	}
 
 	playerID := live.ObjectID()
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
 	result, err := l.enchantService().EnchantItem(enchantflow.Request{
 		PlayerID: playerID,
@@ -251,7 +251,12 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // The binding comes after the mutation, so every caller opens the operation
 // (task.ItemInstances.BeginOperation) before it mutates and ends it once this
 // returns: until then the tick and a container's last flush read none of its
-// rows, and so never land one of them changed but not yet bound.
+// rows, and so never land one of them changed but not yet bound. The caller
+// names the owners whose containers it mutates, so this write and another
+// actor's operation on one of those owners — the partner spending the adena
+// a trade settling on this queue just gave it — never interleave: the other
+// operation reads the row before this one changed it or after this write
+// bound and placed it, and then widens to the whole group.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return

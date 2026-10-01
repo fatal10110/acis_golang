@@ -433,7 +433,7 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 	for i, row := range req.Items {
 		rows[i] = privatestore.PurchaseRow{ObjectID: row.ObjectID, Count: int(row.Count), Price: int(row.Price)}
 	}
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
 	defer end()
 	deal, err := owner.PrivateStore().Buy(l.inventory, l.storeTrader(owner), l.storeTrader(live), rows)
 	l.applyPersistActions(deal.Persist)
@@ -470,7 +470,7 @@ func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.Request
 	for i, row := range req.Items {
 		rows[i] = privatestore.SaleRow{ObjectID: row.ObjectID, ItemID: row.ItemID, Enchant: row.Enchant, Count: int(row.Count), Price: int(row.Price)}
 	}
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(live.ObjectID(), owner.ObjectID())
 	defer end()
 	deal, err := owner.PrivateStore().Sell(l.inventory, l.storeTrader(owner), l.storeTrader(live), rows)
 	l.applyPersistActions(deal.Persist)

@@ -92,8 +92,10 @@ type ItemInstances struct {
 	// groups maps each row of a write that has not landed yet to every row
 	// that must land with it (Bind).
 	groups map[int32]*rowGroup
-	// ops keeps UpdateItems from reading rows while a multi-row operation
-	// has changed them but not yet bound them (BeginOperation).
+	// ops keeps UpdateItems, and the writes of operations on the same
+	// owners, from reading rows while a multi-row operation has changed them
+	// but not yet bound them (BeginOperation). Its lock is taken before
+	// groupsMu, never after.
 	ops operationGate
 	// afterWiden, when set, runs inside UpdateItems' reading span, between
 	// its Widen and its state reads. Only tests set it.

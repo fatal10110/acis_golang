@@ -115,7 +115,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// write waits while any operation is open, so the broadcasts, the despawn
 	// and ItemAdded below stay out of it. A failed pickup changed nothing and
 	// has no rows to write.
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
 	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	l.applyPersistActions(res.Persist)

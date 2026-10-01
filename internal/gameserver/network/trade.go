@@ -317,8 +317,11 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 // The partner's own queue keeps running while this settles on the
 // confirmer's, so the check and every move happen inside one exchange that
 // holds both inventories: nothing the partner does can slip between them and
-// leave the trade half done. Both inventories' updates and weight reach their
-// owners through the inventory-update tick, on each owner's own queue.
+// leave the trade half done. The item operation holds both owners from the
+// exchange until both legs are bound and placed, so an item operation the
+// partner runs meanwhile on a leg it receives waits for the trade's write
+// and then carries both legs. Both inventories' updates and weight reach
+// their owners through the inventory-update tick, on each owner's own queue.
 func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirmerID int32) {
 	// Confirm already took the ready session out of the book, so a failed
 	// re-check cancels straight to the participants: a book cancel would
@@ -332,7 +335,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 
 	status := tradebook.SettlementEmpty
 	if !session.Empty() {
-		end := l.itemInstances.BeginOperation()
+		end := l.itemInstances.BeginOperation(first.Inventory().OwnerID(), second.Inventory().OwnerID())
 		defer end()
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
