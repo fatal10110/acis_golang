@@ -152,20 +152,6 @@ func (l *GameClientLink) adminNamedPlayer(gm *livePlayer, name string, orSelf bo
 	return adminTargetPlayer(gm, orSelf)
 }
 
-// livePlayerByName returns the online player called name, matched
-// case-insensitively.
-func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
-	if l.world == nil {
-		return nil, false
-	}
-	obj, ok := l.world.PlayerByName(name)
-	if !ok {
-		return nil, false
-	}
-	p, ok := obj.(*livePlayer)
-	return p, ok
-}
-
 // onPlayer runs fn for target on target's queue: at once when target is gm,
 // whose queue the command already runs on, else posted there. A target that
 // left the world meanwhile drops it.
