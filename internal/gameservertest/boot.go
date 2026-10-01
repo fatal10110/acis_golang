@@ -141,6 +141,7 @@ type options struct {
 	craftRoll              func(n int) int
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
+	rollDiceDelay          time.Duration
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
@@ -523,6 +524,12 @@ func WithCraftRoll(roll func(n int) int) Option {
 // WithMultisells loads table as the multisell lists (default: none).
 func WithMultisells(table *multisell.Table) Option {
 	return func(o *options) { o.multisells = table }
+}
+
+// WithRollDiceDelay sets the reuse delay between two dice throws on one
+// client session. The default 0 leaves throws ungated.
+func WithRollDiceDelay(d time.Duration) Option {
+	return func(o *options) { o.rollDiceDelay = d }
 }
 
 // WithMultisellDelay sets the reuse delay between two multisell exchanges
@@ -1593,7 +1600,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,

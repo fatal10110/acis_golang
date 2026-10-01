@@ -64,3 +64,13 @@ func angleClose(diff, max float64) bool {
 	}
 	return math.Abs(diff) <= max
 }
+
+// Ahead returns the point offset units in front of l along its heading,
+// each axis offset truncated toward zero.
+func (l OrientedLocation) Ahead(offset int) Location {
+	radians := headingDegrees(l.Heading) * (math.Pi / 180)
+	at := l.Location
+	at.X += int(math.Cos(radians) * float64(offset))
+	at.Y += int(math.Sin(radians) * float64(offset))
+	return at
+}
