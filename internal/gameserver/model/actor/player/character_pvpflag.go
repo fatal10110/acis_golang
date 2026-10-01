@@ -96,7 +96,9 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
 		return false
 	}
-	return target.Kind() == actor.KindNPC && !target.Guard()
+	// A civilian NPC is no attackable NPC.
+	npc, ok := target.(interface{ Attackable() bool })
+	return target.Kind() == actor.KindNPC && ok && npc.Attackable() && !target.Guard()
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a

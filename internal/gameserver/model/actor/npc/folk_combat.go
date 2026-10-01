@@ -1,0 +1,239 @@
+package npc
+
+import (
+	"math"
+	"math/rand"
+	"sync"
+	"sync/atomic"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
+
+var (
+	_ creature.FormulaActor = (*Folk)(nil)
+	_ effect.Actor          = (*Folk)(nil)
+)
+
+// folkCombat is the state a civilian NPC fights with. Other creatures
+// damage, heal and debuff it from their own queues; its regeneration and
+// effect ticks run on its own.
+type folkCombat struct {
+	// world, queue and sink are set by Attach before the NPC is published.
+	world *world.State
+	queue *sim.Queue
+	sink  event.Sink
+
+	effects  *effect.List
+	maxBuffs atomic.Int32
+
+	// statMu guards statCalcs slot creation; each Calculator guards its own
+	// mods.
+	statMu    sync.RWMutex
+	statCalcs [stat.Count]*effect.Calculator
+	// speedMu orders move-speed hand-offs to a walking NPC's movement.
+	speedMu sync.Mutex
+
+	running        atomic.Bool
+	inCombat       atomic.Bool
+	abnormalEffect atomic.Int32
+	invul          atomic.Bool
+	immobilized    atomic.Bool
+
+	// vitalsMu guards hp and mp.
+	vitalsMu sync.Mutex
+	hp, mp   float64
+	// hpBar is the health-bar segment state HPStatusUpdate advances.
+	hpBar creature.HPBar
+}
+
+// FolkRuntime is what a civilian NPC needs to take part in combat beyond
+// its template. A nil dependency leaves the matching behavior off: no queue
+// means nothing regenerates the NPC or ticks its effects, no sink shows its
+// changes to nobody, and no world leaves it knowing nobody.
+type FolkRuntime struct {
+	World *world.State
+	Queue *sim.Queue
+	Sink  event.Sink
+	// Effects is the server's effect-list context.
+	Effects effect.Env
+	// MaxBuffsAmount is the configured base buff-slot count; zero keeps the
+	// shipped default.
+	MaxBuffsAmount int
+}
+
+// folkAdmits reports whether a civilian NPC holds e: only plain buffs and
+// debuffs land on one; every other effect is dropped before it starts.
+func folkAdmits(e *effect.Effect) bool {
+	return e.Type == effect.TypeBuff || e.Type == effect.TypeDebuff
+}
+
+// initCombat settles the NPC's stats from its template passives mods and
+// fills its HP and MP.
+func (f *Folk) initCombat(mods []effect.Mod) {
+	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
+	f.maxBuffs.Store(maxBuffCount)
+	f.running.Store(!f.Instance.WalkMode)
+	f.AttachStatFuncs(mods)
+	f.hp = float64(f.MaxHP())
+	f.mp = math.Trunc(f.MaxMPValue())
+	f.hpBar.Calibrate(float64(f.MaxHP()))
+}
+
+// Attach installs rt. Call it once, before the NPC is published.
+func (f *Folk) Attach(rt FolkRuntime) {
+	f.world, f.queue, f.sink = rt.World, rt.Queue, rt.Sink
+	if rt.MaxBuffsAmount > 0 {
+		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
+	}
+	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
+	f.effects.SetQueue(rt.Queue)
+}
+
+// Queue returns the queue the NPC's regeneration and effects run on.
+func (f *Folk) Queue() *sim.Queue { return f.queue }
+
+func (f *Folk) emit(ev event.Event) {
+	if f.sink != nil {
+		f.sink.Emit(ev)
+	}
+}
+
+// OnInactiveRegion stops every effect the NPC holds once no player is near
+// its region. The departing player's goroutine calls it, so the stop runs
+// on the NPC's own queue, and only if the region is still inactive then.
+func (f *Folk) OnInactiveRegion() {
+	if f.queue == nil {
+		return
+	}
+	f.queue.Post(func() {
+		if f.world != nil {
+			if placed, active := f.world.RegionActivity(f); !placed || active {
+				return
+			}
+		}
+		f.effects.StopAll()
+	})
+}
+
+// CharacterName returns the template name.
+func (f *Folk) CharacterName() string { return f.Instance.Template.Name }
+
+// Karma reports 0: NPCs carry no PK karma.
+func (f *Folk) Karma() int { return 0 }
+
+// AlikeDead reports false: a civilian NPC never dies.
+func (f *Folk) AlikeDead() bool { return false }
+
+// FakeDeath reports false: NPCs never feign death.
+func (f *Folk) FakeDeath() bool { return false }
+
+// RecentFakeDeath reports false: NPCs never feign death.
+func (f *Folk) RecentFakeDeath() bool { return false }
+
+// MovementDisabled reports a template that cannot move, an immobilized NPC
+// or a teleport under way.
+func (f *Folk) MovementDisabled() bool {
+	return !f.Instance.Template.CanMove || f.immobilized.Load() || (f.motion != nil && f.motion.teleporting.Load())
+}
+
+// SilentMoving reports whether an effect lets the NPC move unseen.
+func (f *Folk) SilentMoving() bool { return f.effects.IsAffected(effect.FlagSilentMove) }
+
+// Knows reports whether other is in the NPC's known list.
+func (f *Folk) Knows(other attackable.Combatant) bool {
+	tracked, ok := other.(world.Tracked)
+	return ok && world.Knows(f, tracked)
+}
+
+// SpawnProtected reports false: spawn protection is a player state.
+func (f *Folk) SpawnProtected() bool { return false }
+
+// CanGiveDamage reports true: only access levels revoke damage.
+func (f *Folk) CanGiveDamage() bool { return true }
+
+// RaidRelated reports false.
+func (f *Folk) RaidRelated() bool { return false }
+
+// SiegeGuard reports false.
+func (f *Folk) SiegeGuard() bool { return false }
+
+// Guard reports false: a civilian NPC is no guard.
+func (f *Folk) Guard() bool { return false }
+
+// Attackable reports false: a civilian NPC keeps no hate or aggro, so the
+// aggro controls below do nothing.
+func (f *Folk) Attackable() bool { return false }
+
+// Running reports the NPC's run stance: walk for a route walker in walk
+// mode until it is first hit, run otherwise.
+func (f *Folk) Running() bool { return f.running.Load() }
+
+// InCombat reports whether the NPC holds an attack stance.
+func (f *Folk) InCombat() bool { return f.inCombat.Load() }
+
+// SetInCombat records the attack stance and reports whether it changed.
+// The stance tracker clears it when the stance expires.
+func (f *Folk) SetInCombat(inCombat bool) bool { return f.inCombat.Swap(inCombat) != inCombat }
+
+// NotifyAttacked reports a damaging hit or an offensive skill reaching the
+// NPC: it enters its attack stance.
+func (f *Folk) NotifyAttacked(attacker attackable.Combatant) {
+	f.emit(event.Attacked{Attacker: attacker})
+}
+
+// NotifyEvaded reports a missed hit, which the NPC does not react to.
+func (f *Folk) NotifyEvaded(attackable.Combatant) {}
+
+// BroadcastAutoAttackStop reports that the attack stance expired.
+func (f *Folk) BroadcastAutoAttackStop() { f.emit(event.AutoAttackStopped{}) }
+
+// forceRunStance switches a walking NPC to its run stance, as any hit
+// does: the movement speeds up, and observers see the stance change and
+// the NPC's info again.
+func (f *Folk) forceRunStance() {
+	if !f.running.CompareAndSwap(false, true) {
+		return
+	}
+	f.refreshMoveSpeed()
+	if f.MoveSpeed() != 0 {
+		f.emit(event.MoveTypeChanged{Running: true})
+	}
+	f.emit(event.NPCInfoChanged{})
+}
+
+// Roll draws a uniform random integer in [0, n).
+func (f *Folk) Roll(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return rand.Intn(n)
+}
+
+// AbnormalEffect returns the NPC's client-visible abnormal-effect bits.
+func (f *Folk) AbnormalEffect() int {
+	return int(f.abnormalEffect.Load()) | f.effects.CrowdControlAbnormalEffect()
+}
+
+// StartAbnormalEffect adds mask to the NPC's abnormal state.
+func (f *Folk) StartAbnormalEffect(mask int) { f.abnormalEffect.Or(int32(mask)) }
+
+// StopAbnormalEffect removes mask from the NPC's abnormal state.
+func (f *Folk) StopAbnormalEffect(mask int) { f.abnormalEffect.And(^int32(mask)) }
+
+// UpdateAbnormalEffect shows observers the NPC's info again.
+func (f *Folk) UpdateAbnormalEffect() { f.emit(event.AbnormalEffectChanged{}) }
+
+// ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
+// always shown, the view an NPC that cannot move is announced with.
+func (f *Folk) ServerObjectInfoSnapshot() npcinfo.Snapshot {
+	s := f.NPCInfoSnapshot()
+	s.Name = f.Instance.Template.Name
+	return s
+}

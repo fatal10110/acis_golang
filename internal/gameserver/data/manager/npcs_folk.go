@@ -9,15 +9,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
 
-// FolkSpawner places civilian NPCs in the world. A civilian whose template
-// alias names a walker route (walkerRoutes.xml, keyed by that alias for
-// both the route and the NPC) is given movement and walks the route from
-// the moment it spawns; every other one stands at its spawn point.
+// FolkSpawner places civilian NPCs in the world, each on a queue of its
+// own that its regeneration, effects and walk run on. A civilian whose
+// template alias names a walker route (walkerRoutes.xml, keyed by that
+// alias for both the route and the NPC) is given movement and walks the
+// route from the moment it spawns; every other one stands at its spawn
+// point.
 type FolkSpawner struct {
 	State  *world.State
 	Walker *task.Walker
@@ -25,12 +28,16 @@ type FolkSpawner struct {
 	// Positions ticks a walker's position while it walks.
 	Positions move.PositionUpdateRegistry
 	Queues    Queues
-	// NewSink builds the sink a walker shows its movement through; nil
-	// leaves it unseen.
+	// NewSink builds the sink the NPC shows its movement and status
+	// through; nil leaves them unseen.
 	NewSink func(*npc.Folk) event.Sink
 	Zones   *zone.Index
-	// Skills resolves template passives into the NPC's fixed stats.
-	Skills              actorcast.Definitions
+	// Skills resolves template passives into the NPC's stats.
+	Skills actorcast.Definitions
+	// Effects is the server's effect-list context.
+	Effects effect.Env
+	// MaxBuffsAmount is the configured base buff-slot count.
+	MaxBuffsAmount      int
 	MaxGeoPathFailCount int
 	Log                 zerolog.Logger
 }
@@ -43,6 +50,16 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 	if err != nil {
 		return nil, err
 	}
+	rt := npc.FolkRuntime{
+		World:          s.State,
+		Queue:          s.Queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)),
+		Effects:        s.Effects,
+		MaxBuffsAmount: s.MaxBuffsAmount,
+	}
+	if s.NewSink != nil {
+		rt.Sink = s.NewSink(f)
+	}
+	f.Attach(rt)
 	alias := inst.Template.Alias
 	if s.Walker == nil || alias == "" || !s.Walker.HasRoute(alias, alias) {
 		s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
@@ -52,15 +69,13 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 	control := &folkControl{walker: s.Walker, log: s.Log}
 	m := npc.FolkMovement{
 		Geo:                 s.Geo,
-		Queue:               s.Queues.NewQueue(fmt.Sprintf("npc-%d", inst.ObjectID)),
+		Queue:               rt.Queue,
 		Positions:           s.Positions,
 		World:               s.State,
+		Sink:                rt.Sink,
 		MaxGeoPathFailCount: s.MaxGeoPathFailCount,
 		Control:             control,
 		Log:                 s.Log,
-	}
-	if s.NewSink != nil {
-		m.Sink = s.NewSink(f)
 	}
 	if s.Zones != nil {
 		m.WaterSurface = waterSurface(s.Zones)

@@ -366,8 +366,6 @@ func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl,
 		return false
 	}
 	if ctrl {
-		// A civilian NPC is not a combatant yet, so the attack answers
-		// ActionFailed (#2664).
 		l.attackLiveTarget(live, f, shift)
 		return true
 	}

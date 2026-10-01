@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -47,18 +48,21 @@ func (l *GameClientLink) broadcastFolkFrame(f *npc.Folk, build func() wire.Frame
 	})
 }
 
-// FolkSinks returns the event-sink factory for route-walking civilian NPCs
-// spawned into state.
-func FolkSinks(state *world.State) func(*npc.Folk) event.Sink {
-	return func(f *npc.Folk) event.Sink { return &folkSink{world: state, f: f} }
+// A civilian NPC is a skill cast participant.
+var _ skillhandler.NPC = (*npc.Folk)(nil)
+
+// FolkSinks returns the event-sink factory for civilian NPCs spawned into
+// state; stance tracks the attack stance a hit puts one in.
+func FolkSinks(state *world.State, stance AttackStanceTracker) func(*npc.Folk) event.Sink {
+	return func(f *npc.Folk) event.Sink { return &folkSink{world: state, stance: stance, f: f} }
 }
 
-// folkSink maps one walking civilian NPC's events to packets for its
-// observers.
+// folkSink maps one civilian NPC's events to packets for its observers.
 type folkSink struct {
-	world *world.State
-	f     *npc.Folk
-	known world.KnownBuffer
+	world  *world.State
+	stance AttackStanceTracker
+	f      *npc.Folk
+	known  world.KnownBuffer
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -78,7 +82,41 @@ func (s *folkSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.SocialAction(f.ObjectID(), e.ID) })
 	case event.NpcSay:
 		s.broadcast(func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text) })
+	case event.HPChanged:
+		known := s.known.SnapshotCopy(s.world, f)
+		defer known.Release()
+		sendHPToWatchers(known.Tracked(), f.ObjectID(), f.HPStatusUpdate)
+	case event.Status:
+		attrs := npcStatusAttributes(e.Attrs)
+		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
+	case event.Attacked:
+		s.startAttackStance()
+	case event.AutoAttackStopped:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(f.ObjectID()) })
+	case event.MoveTypeChanged:
+		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running) })
+	case event.AbnormalEffectChanged:
+		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+	case event.NPCInfoChanged:
+		if e.ServerObject {
+			s.broadcast(func() wire.Frame { return frames.ObjectInfo(f.ServerObjectInfoSnapshot()) })
+			return
+		}
+		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
 	}
+}
+
+// startAttackStance enters or refreshes the NPC's attack stance. Entering
+// it shows AutoAttackStart to the NPC's observers.
+func (s *folkSink) startAttackStance() {
+	if s.stance == nil {
+		return
+	}
+	s.stance.Add(s.f)
+	if !s.f.SetInCombat(true) {
+		return
+	}
+	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStart(s.f.ObjectID()) })
 }
 
 // broadcast fans one lazily built frame out to the NPC's observers.

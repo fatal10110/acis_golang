@@ -273,19 +273,3 @@ func TestMutedAndUnportedFolkOpenNothing(t *testing.T) {
 		}
 	}
 }
-
-// TestForcedClickOnFolkIsRefused pins a CTRL click on a selected civilian
-// NPC: it opens no page, and, the NPC not being a combatant yet, the attack
-// is answered ActionFailed (#2664).
-func TestForcedClickOnFolkIsRefused(t *testing.T) {
-	t.Parallel()
-	w := bootFolkWorld(t, merchantPages())
-	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)
-	w.selectFolk(t, f)
-
-	w.c.Send(encodeAttackRequest(f.ObjectID(), w.at))
-	frames := drainFrames(t, w.c)
-	if got := interactOrder(frames); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("forced click = %x, want only ActionFailed", opcodes(frames))
-	}
-}
