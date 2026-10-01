@@ -117,6 +117,28 @@ func (l *GameClientLink) broadcastToClanQueued(cl *clan.Clan, actor *livePlayer,
 	}
 }
 
+// broadcastLiveFrameAfterClanQueued is broadcastLiveFrame for a frame that
+// follows broadcastToClanQueued frames of cl: a viewer who belongs to cl
+// gets it on its own queue, behind them; every other viewer, and live,
+// directly.
+func (l *GameClientLink) broadcastLiveFrameAfterClanQueued(live *livePlayer, cl *clan.Clan, frame func() wire.Frame) {
+	broadcastFrame(frame, func(send func(frameReceiver)) {
+		send(live)
+		if l.world == nil {
+			return
+		}
+		known := live.known.SnapshotCopy(l.world, live)
+		defer known.Release()
+		for _, o := range known.Tracked() {
+			if viewer, ok := o.(*livePlayer); ok && cl.IsMember(viewer.ObjectID()) {
+				send(queuedMember{actor: live, member: viewer})
+			} else if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		}
+	})
+}
+
 // showPledgeSkillList opens the clan skills live's clan can learn now. A
 // player who does not lead a clan, or whose clan has nothing left to
 // learn, gets the refusal page instead. Both end with ActionFailed.

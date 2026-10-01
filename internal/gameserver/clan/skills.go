@@ -158,6 +158,20 @@ type (
 	}
 )
 
+// learnRefusalLocked returns the node for skill id at level when the clan
+// can learn it now and its reputation covers the cost; otherwise the
+// refusal, SkillUnavailable or SkillLowReputation. cl.mu is held.
+func (cl *Clan) learnRefusalLocked(trees *modelskill.Trees, id, level int) (modelskill.ClanSkill, any) {
+	node, status := trees.CheckClanSkillLearn(cl.level, cl.reputation, cl.skillLevelsLocked(), modelskill.ID(id), level)
+	switch status {
+	case modelskill.LearnUnavailable:
+		return node, SkillUnavailable{}
+	case modelskill.LearnNeedsCost:
+		return node, SkillLowReputation{}
+	}
+	return node, nil
+}
+
 // LearnSkill has c's clan learn skill id at level, the next level the
 // clan can learn of it, for its reputation cost and, when the item is
 // required, one of its item paid through payItem. Only the clan's leader
@@ -168,23 +182,19 @@ func (s *Service) LearnSkill(c *player.Character, trees *modelskill.Trees, id, l
 	if !ok || !cl.IsLeader(c.ID) {
 		return []any{SkillUnavailable{}}
 	}
-	node, ok := cl.LearnableSkill(trees, id, level)
-	if !ok {
-		return []any{SkillUnavailable{}}
-	}
-	if cl.Reputation() < node.Cost {
-		return []any{SkillLowReputation{}}
+	cl.mu.RLock()
+	node, refusal := cl.learnRefusalLocked(trees, id, level)
+	cl.mu.RUnlock()
+	if refusal != nil {
+		return []any{refusal}
 	}
 	if s.cfg.LifeCrystalNeeded && !payItem(node.ItemID) {
 		return []any{SkillMissingItem{}}
 	}
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
-	if _, ok := trees.ClanSkillFor(cl.level, cl.skillLevelsLocked(), modelskill.ID(id), level); !ok {
-		return []any{SkillUnavailable{}}
-	}
-	if cl.reputation < node.Cost {
-		return []any{SkillLowReputation{}}
+	if _, refusal := cl.learnRefusalLocked(trees, id, level); refusal != nil {
+		return []any{refusal}
 	}
 	var notices []any
 	change, changed := s.addReputationLocked(cl, -node.Cost)

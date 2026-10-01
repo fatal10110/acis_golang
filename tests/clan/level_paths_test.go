@@ -107,7 +107,9 @@ func TestRaiseClanLevelWithReputation(t *testing.T) {
 		}
 	}
 	member := drainFrames(t, w.member)
-	if got := only(member, sys, skills, info); string(got) != string([]byte{sys, skills, info, info, sys}) {
+	// The member stands in the leader's view: the level-up visual follows
+	// the clan's header and notice.
+	if got := only(member, sys, skills, info, visual); string(got) != string([]byte{sys, skills, info, info, sys, visual}) {
 		t.Fatalf("member's view of the level-up = %x", opcodes(member))
 	}
 	if ids := messages(t, member); !slices.Equal(ids, []int{serverpackets.SystemMessageReputationLowClanSkillsDeactivated, serverpackets.SystemMessageClanLevelIncreased}) {

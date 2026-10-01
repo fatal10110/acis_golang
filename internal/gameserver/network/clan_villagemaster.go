@@ -163,8 +163,9 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 				func() wire.Frame {
 					return serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanLevelIncreased)
 				})
+			// The visual follows those frames for a clan member watching.
 			self := skillCastObject(live)
-			l.broadcastLiveFrame(live, func() wire.Frame {
+			l.broadcastLiveFrameAfterClanQueued(live, cl, func() wire.Frame {
 				return serverpackets.FrameMagicSkillUse(self, self, clanLevelUpSkillID, 1, 0, 0, false)
 			})
 		}
