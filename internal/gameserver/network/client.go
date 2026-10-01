@@ -36,7 +36,9 @@ type Client struct {
 
 	// stats and floodProtectors are owned by the connection's read-loop
 	// goroutine: both track per-frame progress along the read path, which
-	// no other goroutine observes.
+	// no other goroutine observes. A gate the loop hands to a task it then
+	// waits on in onLive (UseItem's dice gate) is consulted by that task
+	// while the loop stays parked, so the loop still owns it.
 	stats           clientStats
 	floodProtectors [numFloodProtectors]time.Time
 }

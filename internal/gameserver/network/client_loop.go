@@ -790,7 +790,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			onLive(live, func() { l.useItem(live, req.ObjectID, req.CtrlPressed) })
+			// The dice gate belongs to this read loop, which stays parked
+			// in onLive while useItem runs, so the throw consults it there.
+			rollDice := func() bool {
+				return client.performFloodProtected(floodProtectorRollDice, l.playerConfig.RollDiceDelay, time.Now())
+			}
+			onLive(live, func() { l.useItem(live, req.ObjectID, req.CtrlPressed, rollDice) })
 
 		case clientpackets.OpcodeRequestUnEquipItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUnequipItem)
@@ -1512,6 +1517,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestPackageSend(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestShowMiniMap:
+			// The request carries no body; with no player in the world
+			// nothing answers, as the specified handler does.
+			if live != nil {
+				onLive(live, func() { l.showMiniMap(live, serverpackets.RegularMapID) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeDummy23,
@@ -1524,8 +1536,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeGameGuardReply,
-			clientpackets.OpcodeRequestShowMiniMap:
+			clientpackets.OpcodeGameGuardReply:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
 			continue
 
