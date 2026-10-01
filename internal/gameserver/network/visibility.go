@@ -24,6 +24,9 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
 		}
+		if title, ok := storeTitleFrame(o); ok {
+			p.sendVisibilityFrame(title)
+		}
 	case *npc.Hostile:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *npc.Decoration:

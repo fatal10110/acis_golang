@@ -103,12 +103,6 @@ Missing M3 data/UI client packets:
 - `RequestProcureCropList`
 - `RequestSetSeed`
 - `RequestSetCrop`
-- `RequestRecipeShopMessageSet`
-- `RequestRecipeShopListSet`
-- `RequestRecipeShopManageQuit`
-- `RequestRecipeShopMakeInfo`
-- `RequestRecipeShopMakeItem`
-- `RequestRecipeShopManagePrev`
 - `RequestExEnchantSkillInfo`
 - `RequestExEnchantSkill`
 - `RequestExFishRanking`
@@ -237,10 +231,6 @@ Missing M3 data/UI server packets:
 
 - `SellListProcure`
 - `BuyListSeed`
-- `RecipeShopItemInfo`
-- `RecipeShopManageList`
-- `RecipeShopMsg`
-- `RecipeShopSellList`
 - `ExShowSeedInfo`
 - `ExShowCropInfo`
 - `ExShowManorDefaultInfo`
@@ -352,7 +342,8 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestEnchantItem` is wired through the enchant-scroll `UseItem` path, `ChooseInventoryItem`, scroll ownership/count validation, item enchantability/grade/type gates, scroll consumption, item enchant persistence, blessed reset, normal break/crystal reward, `EnchantResult`, `InventoryUpdate`, `SystemMessage`, and self `UserInfo`. Config-file overrides for enchant rates, store/trade-state gates, and +4 dual/+6 armor-set passive skill side effects remain deferred to their owning systems.
 - `RequestPetUseItem`, `RequestGiveItemToPet`, `RequestGetItemFromPet`, and `RequestPetGetItem` are wired for active-pet lookup, pet inventory transfer/equip mutation, immediate visible ground-item pickup, item persistence, `GetItem`, `DeleteObject`, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet AI movement-to-pickup, drop-protection/looter gates, pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.
 - `RequestHennaItemList`, `RequestHennaItemInfo`, `RequestHennaEquip`, `RequestHennaUnequipList`, `RequestHennaUnequipInfo` and `RequestHennaUnequip` are wired to the dye symbol flow against the loaded `hennas.xml`, answering `HennaEquipList`, `HennaItemInfo`, `HennaUnequipList`, `HennaItemUnequipInfo`, `HennaInfo`, self `UserInfo`, `SystemMessage` and batched `InventoryUpdate`; draws and deletions persist `character_hennas`. The symbol maker's `Draw` and `RemoveList` dialog commands open the two windows.
-- `RequestRecipeBookOpen`, `RequestRecipeBookDestroy`, `RequestRecipeItemMakeInfo` and `RequestRecipeItemMakeSelf` are wired to the persisted recipe book (`character_recipebook`) and self crafting, answering `RecipeBookItemList`, `RecipeItemMakeInfo`, `SystemMessage`, MP `StatusUpdate` and batched `InventoryUpdate`. The Common/Dwarven Craft skills and recipe items (the `Recipes` item handler) open and fill the book. Private workshop (recipe shop) packets and the manufacture store state remain with the private-store work.
+- `RequestRecipeBookOpen`, `RequestRecipeBookDestroy`, `RequestRecipeItemMakeInfo` and `RequestRecipeItemMakeSelf` are wired to the persisted recipe book (`character_recipebook`) and self crafting, answering `RecipeBookItemList`, `RecipeItemMakeInfo`, `SystemMessage`, MP `StatusUpdate` and batched `InventoryUpdate`. The Common/Dwarven Craft skills and recipe items (the `Recipes` item handler) open and fill the book. A running workshop locks the book.
+- Private stores and workshops are wired. `RequestActionUse` actions 10, 61, 28, 37 and 51 and `RequestPrivateStoreManageSell`/`RequestPrivateStoreManageBuy` open the manage windows (`PrivateStoreManageListSell`, `PrivateStoreManageListBuy`, `RecipeShopManageList`); `SetPrivateStoreListSell`, `SetPrivateStoreListBuy` and `RequestRecipeShopListSet` open the store (sitting the owner down, `UserInfo`/`CharInfo` with the operate byte, then `PrivateStoreMsgSell`/`PrivateStoreMsgBuy`/`RecipeShopMsg`); `SetPrivateStoreMsgSell`, `SetPrivateStoreMsgBuy` and `RequestRecipeShopMessageSet` set the titles; the quit requests close the store; a second click on an operating player interacts with it and shows `PrivateStoreListSell`, `PrivateStoreListBuy` or `RecipeShopSellList`; `RequestPrivateStoreBuy`/`RequestPrivateStoreSell` settle a deal as one inventory exchange with the purchase messages on both sides; `RequestRecipeShopMakeInfo`, `RequestRecipeShopMakeItem` and `RequestRecipeShopManagePrev` answer `RecipeShopItemInfo` and `RecipeShopSellList` and craft for a customer. The opcode `RequestRecipeShopManageList` (0xb0) stays unregistered, as in the reference.
 - `RequestShortCutReg` and `RequestShortCutDel` are wired for persisted client shortcut entries, including starter shortcut creation, EnterWorld restoration, `ShortCutRegister`, and `ShortCutDelete`. A recipe shortcut is kept only while the recipe book holds its recipe. Item reuse timers, macro bodies, and soulshot auto-use side effects remain deferred to their owning systems.
 - `RequestChangePetName` remains deferred because the Go runtime has no active pet naming state, pet-name uniqueness query, NPC-name lookup by name, or control-item custom type update flow.
 - `RequestPledgeCrest` is wired against the loaded small pledge crest `.dds` cache and emits `PledgeCrest`. `RequestAllyCrest` is wired in game against loaded ally crest `.dds` cache data and emits `AllyCrest` only when data exists. Crest upload/update packets and large pledge crests remain deferred to the clan/crest write-owner flows.

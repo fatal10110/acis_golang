@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -4187,6 +4188,283 @@ func TestFrameSymbolMakerPackets(t *testing.T) {
 	)
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameHennaItemUnequipInfo() = %x, want %x", got, want)
+	}
+}
+
+// storePacketTemplates is a one-handed sword (weapon, type2 0, right hand
+// slot 0x80, reference price 1000) and a stackable potion (etc item, type2
+// 5, no slot, reference price 40).
+func storePacketTemplates() *item.Table {
+	return item.NewTable([]*item.Template{
+		{ID: 1, Kind: item.KindWeapon, Slot: item.SlotRHand, ReferencePrice: 1000},
+		{ID: 1060, Kind: item.KindEtcItem, Stackable: true, ReferencePrice: 40},
+	})
+}
+
+// TestFramePrivateStoreSellPackets pins the sell store packets against the
+// field order the reference writes: PrivateStoreManageListSell (0x9a: owner,
+// package flag, adena, then each listable item as type2 D, object, item,
+// count, H 0, H enchant, H 0, body part D, reference price D, then each
+// listed row the same plus its price before the reference price) and
+// PrivateStoreListSell (0x9b: owner, package flag, buyer adena, then each
+// listed row as type2, object, item, count, H 0, H enchant, H 0, body part,
+// price, reference price).
+func TestFramePrivateStoreSellPackets(t *testing.T) {
+	templates := storePacketTemplates()
+	candidates := []privatestore.SellCandidate{{Item: item.InstanceState{ObjectID: 500, TemplateID: 1060, Count: 7}, Count: 4}}
+	listed := []privatestore.SellItem{{ObjectID: 501, TemplateID: 1, Enchant: 3, Count: 1, Quantity: 1, Price: 9000}}
+	frame, err := FramePrivateStoreManageListSell(100, true, 1234, candidates, listed, templates)
+	if err != nil {
+		t.Fatalf("FramePrivateStoreManageListSell: %v", err)
+	}
+	want := []byte{0x9a}
+	want = appendD(want, 100)
+	want = appendD(want, 1)
+	want = appendD(want, 1234)
+	want = appendD(want, 1)
+	want = appendD(want, 5)
+	want = appendD(want, 500)
+	want = appendD(want, 1060)
+	want = appendD(want, 4)
+	want = appendH(want, 0)
+	want = appendH(want, 0)
+	want = appendH(want, 0)
+	want = appendD(want, 0)
+	want = appendD(want, 40)
+	want = appendD(want, 1)
+	want = appendD(want, 0)
+	want = appendD(want, 501)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendH(want, 0)
+	want = appendH(want, 3)
+	want = appendH(want, 0)
+	want = appendD(want, 0x80)
+	want = appendD(want, 9000)
+	want = appendD(want, 1000)
+	if got := framePayload(t, frame); !bytes.Equal(got, want) {
+		t.Fatalf("FramePrivateStoreManageListSell() = %x, want %x", got, want)
+	}
+
+	frame, err = FramePrivateStoreListSell(100, false, 77, listed, templates)
+	if err != nil {
+		t.Fatalf("FramePrivateStoreListSell: %v", err)
+	}
+	want = []byte{0x9b}
+	want = appendD(want, 100)
+	want = appendD(want, 0)
+	want = appendD(want, 77)
+	want = appendD(want, 1)
+	want = appendD(want, 0)
+	want = appendD(want, 501)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendH(want, 0)
+	want = appendH(want, 3)
+	want = appendH(want, 0)
+	want = appendD(want, 0x80)
+	want = appendD(want, 9000)
+	want = appendD(want, 1000)
+	if got := framePayload(t, frame); !bytes.Equal(got, want) {
+		t.Fatalf("FramePrivateStoreListSell() = %x, want %x", got, want)
+	}
+
+	if _, err := FramePrivateStoreListSell(100, false, 0, []privatestore.SellItem{{TemplateID: 999}}, templates); err == nil {
+		t.Fatal("FramePrivateStoreListSell with an unknown template built a frame")
+	}
+}
+
+// TestFramePrivateStoreBuyPackets pins PrivateStoreManageListBuy (0xb7:
+// owner, adena, then each wantable item as item D, H enchant, count D,
+// reference price D, H 0, body part D, H type2, then each wanted row as item,
+// H enchant, quantity, reference price, H 0, body part, H type2, price,
+// reference price) and PrivateStoreListBuy (0xb8: owner, seller adena, then
+// each row as the seller's object, item, H enchant, count, reference price,
+// H 0, body part, H type2, price, quantity).
+func TestFramePrivateStoreBuyPackets(t *testing.T) {
+	templates := storePacketTemplates()
+	candidates := []item.InstanceState{{ObjectID: 600, TemplateID: 1, Count: 1, EnchantLevel: 2}}
+	listed := []privatestore.BuyItem{{TemplateID: 1060, Quantity: 20, Price: 35}}
+	frame, err := FramePrivateStoreManageListBuy(100, 5000, candidates, listed, templates)
+	if err != nil {
+		t.Fatalf("FramePrivateStoreManageListBuy: %v", err)
+	}
+	want := []byte{0xb7}
+	want = appendD(want, 100)
+	want = appendD(want, 5000)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendH(want, 2)
+	want = appendD(want, 1)
+	want = appendD(want, 1000)
+	want = appendH(want, 0)
+	want = appendD(want, 0x80)
+	want = appendH(want, 0)
+	want = appendD(want, 1)
+	want = appendD(want, 1060)
+	want = appendH(want, 0)
+	want = appendD(want, 20)
+	want = appendD(want, 40)
+	want = appendH(want, 0)
+	want = appendD(want, 0)
+	want = appendH(want, 5)
+	want = appendD(want, 35)
+	want = appendD(want, 40)
+	if got := framePayload(t, frame); !bytes.Equal(got, want) {
+		t.Fatalf("FramePrivateStoreManageListBuy() = %x, want %x", got, want)
+	}
+
+	offers := []privatestore.BuyOffer{{BuyItem: listed[0], ObjectID: 700, Count: 6}}
+	frame, err = FramePrivateStoreListBuy(100, 88, offers, templates)
+	if err != nil {
+		t.Fatalf("FramePrivateStoreListBuy: %v", err)
+	}
+	want = []byte{0xb8}
+	want = appendD(want, 100)
+	want = appendD(want, 88)
+	want = appendD(want, 1)
+	want = appendD(want, 700)
+	want = appendD(want, 1060)
+	want = appendH(want, 0)
+	want = appendD(want, 6)
+	want = appendD(want, 40)
+	want = appendH(want, 0)
+	want = appendD(want, 0)
+	want = appendH(want, 5)
+	want = appendD(want, 35)
+	want = appendD(want, 20)
+	if got := framePayload(t, frame); !bytes.Equal(got, want) {
+		t.Fatalf("FramePrivateStoreListBuy() = %x, want %x", got, want)
+	}
+}
+
+// TestFramePrivateStoreTitles pins the three title packets: object id then
+// the null-terminated UTF-16 text, under 0x9c (sell), 0xb9 (buy) and 0xdb
+// (workshop).
+func TestFramePrivateStoreTitles(t *testing.T) {
+	for _, tc := range []struct {
+		frame  wire.Frame
+		opcode byte
+	}{
+		{FramePrivateStoreMsgSell(100, "ab"), 0x9c},
+		{FramePrivateStoreMsgBuy(100, "ab"), 0xb9},
+		{FrameRecipeShopMsg(100, "ab"), 0xdb},
+	} {
+		want := []byte{tc.opcode, 0x64, 0, 0, 0, 'a', 0, 'b', 0, 0, 0}
+		if got := framePayload(t, tc.frame); !bytes.Equal(got, want) {
+			t.Fatalf("title %#x = %x, want %x", tc.opcode, got, want)
+		}
+	}
+}
+
+// TestFrameRecipeShopPackets pins RecipeShopManageList (0xd8: owner, adena,
+// page with 0 dwarven and 1 common, book recipes as id and 1-based position,
+// then offered recipes as id, 0, cost), RecipeShopSellList (0xd9: crafter,
+// MP, max MP, customer adena, then offered recipes as id, 0, cost) and
+// RecipeShopItemInfo (0xda: crafter, recipe, MP, max MP, -1).
+func TestFrameRecipeShopPackets(t *testing.T) {
+	offered := []privatestore.ManufactureItem{{RecipeID: 1, Cost: 300, Dwarven: true}}
+	got := framePayload(t, FrameRecipeShopManageList(100, 250, true, []recipe.Recipe{{ID: 1}, {ID: 2}}, offered))
+	want := []byte{0xd8}
+	want = appendD(want, 100)
+	want = appendD(want, 250)
+	want = appendD(want, 0)
+	want = appendD(want, 2)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendD(want, 2)
+	want = appendD(want, 2)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendD(want, 0)
+	want = appendD(want, 300)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRecipeShopManageList() = %x, want %x", got, want)
+	}
+	got = framePayload(t, FrameRecipeShopManageList(100, 0, false, nil, nil))
+	if want := []byte{0xd8, 0x64, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; !bytes.Equal(got, want) {
+		t.Fatalf("empty FrameRecipeShopManageList() = %x, want %x", got, want)
+	}
+
+	got = framePayload(t, FrameRecipeShopSellList(100, 40, 90, 1500, offered))
+	want = []byte{0xd9}
+	want = appendD(want, 100)
+	want = appendD(want, 40)
+	want = appendD(want, 90)
+	want = appendD(want, 1500)
+	want = appendD(want, 1)
+	want = appendD(want, 1)
+	want = appendD(want, 0)
+	want = appendD(want, 300)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRecipeShopSellList() = %x, want %x", got, want)
+	}
+
+	got = framePayload(t, FrameRecipeShopItemInfo(100, 686, 40, 90))
+	want = []byte{0xda, 0x64, 0, 0, 0, 0xae, 0x02, 0, 0, 40, 0, 0, 0, 90, 0, 0, 0, 0xff, 0xff, 0xff, 0xff}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameRecipeShopItemInfo() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameSystemMessageParams pins the mixed-parameter SystemMessage: id,
+// parameter count, then each parameter's type followed by its text or
+// value.
+func TestFrameSystemMessageParams(t *testing.T) {
+	got := framePayload(t, FrameSystemMessageParams(SystemMessageS2S3SCreatedForS1ForS4Adena,
+		TextParam("Al"), NumberParam(2), ItemNameParam(1060), ItemNumberParam(300)))
+	want := []byte{0x64}
+	want = appendD(want, 1147)
+	want = appendD(want, 4)
+	want = appendD(want, 0)
+	want = append(want, 'A', 0, 'l', 0, 0, 0)
+	want = appendD(want, 1)
+	want = appendD(want, 2)
+	want = appendD(want, 3)
+	want = appendD(want, 1060)
+	want = appendD(want, 6)
+	want = appendD(want, 300)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("FrameSystemMessageParams() = %x, want %x", got, want)
+	}
+}
+
+// TestFrameUserAndCharInfoCarryOperateType pins the operate byte UserInfo
+// and CharInfo write right after the mount type: a character running a
+// package sale (operate type 8) differs from one with no store in that byte
+// alone.
+func TestFrameUserAndCharInfoCarryOperateType(t *testing.T) {
+	tmpl := &player.Template{}
+	c := &player.Character{Name: "M"}
+	encode := map[string]func() []byte{
+		"UserInfo": func() []byte { return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})) },
+		"CharInfo": func() []byte { return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})) },
+	}
+	for name, enc := range encode {
+		c.SetOperateType(privatestore.OperateNone)
+		idle := enc()
+		c.SetOperateType(privatestore.OperatePackageSell)
+		selling := enc()
+		if len(idle) != len(selling) {
+			t.Fatalf("%s payload lengths differ: %d vs %d", name, len(idle), len(selling))
+		}
+		at := -1
+		for i := range idle {
+			if idle[i] != selling[i] {
+				if at >= 0 {
+					t.Fatalf("%s differs at %d and %d, want one operate byte", name, at, i)
+				}
+				at = i
+			}
+		}
+		if at < 0 || idle[at] != 0 || selling[at] != 8 {
+			t.Fatalf("%s operate byte at %d = %d -> %d, want 0 -> 8", name, at, idle[at], selling[at])
+		}
+		// The byte before it is the mount type, 0 for a character on foot;
+		// TestFrameUserInfo pins the full UserInfo layout around both.
+		if idle[at-1] != 0 {
+			t.Fatalf("%s byte before the operate type = %d, want mount type 0", name, idle[at-1])
+		}
 	}
 }
 

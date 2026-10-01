@@ -116,12 +116,22 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point
 		0x72: true, // crystallize item
+		0x73: true, // private store sell: manage
+		0x74: true, // private store sell: set list
+		0x76: true, // private store sell: quit
+		0x77: true, // private store sell: set title
+		0x79: true, // buy from a private store
 		0x88: true, // request ally crest
 		0x89: true, // change pet name
 		0x8a: true, // pet use item
 		0x8b: true, // give item to pet
 		0x8c: true, // get item from pet
 		0x8f: true, // pet get item
+		0x90: true, // private store buy: manage
+		0x91: true, // private store buy: set list
+		0x93: true, // private store buy: quit
+		0x94: true, // private store buy: set title
+		0x96: true, // sell to a private store
 		0x97: true, // time check
 		0x9d: true, // request skill reuse timers
 		0x9e: true, // package sendable item list
@@ -131,6 +141,12 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window
 		0xaf: true, // craft a recipe
+		0xb1: true, // workshop: set name
+		0xb2: true, // workshop: set list
+		0xb3: true, // workshop: quit
+		0xb5: true, // workshop: craft window
+		0xb6: true, // workshop: order a craft
+		0xb7: true, // workshop: back to its list
 		0xba: true, // symbol draw window
 		0xbb: true, // symbol draw details
 		0xbc: true, // draw a symbol

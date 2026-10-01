@@ -159,10 +159,7 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 			return attack
 		}
 		if v.Operating() {
-			return func() {
-				l.log.Debug().Int32("target", v.ObjectID()).Msg("targeting: private store interact not modeled")
-				live.SendFrame(serverpackets.FrameActionFailed())
-			}
+			return func() { l.tryToInteract(live, v, shift) }
 		}
 		return func() { l.startLiveFollow(live, v, shift) }
 	case *staticobject.Object:
@@ -542,9 +539,12 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 }
 
 // onInteract acts on an interact target in reach: the player's own summon
-// shows its status window, a civilian NPC talks.
+// shows its status window, a civilian NPC talks, a player running a store
+// shows its store window.
 func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 	switch t := target.(type) {
+	case *livePlayer:
+		l.showPrivateStore(live, t)
 	case *summon.Actor:
 		live.SendFrame(serverpackets.FramePetStatusShow(t.SummonType()))
 	case *npc.Folk:

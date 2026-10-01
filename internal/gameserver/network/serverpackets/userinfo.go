@@ -217,7 +217,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0) // ally crest id: clans are not modeled
 	w.WriteInt32(0) // relation flags: clan leadership/siege state is not modeled
 	w.WriteUint8(uint8(c.MountType()))
-	w.WriteUint8(0) // operate type: shops/crafting are not modeled
+	w.WriteUint8(uint8(c.OperateType()))
 	w.WriteUint8(0) // crystallize flag: not modeled
 
 	w.WriteInt32(int32(progression.PKKills))
