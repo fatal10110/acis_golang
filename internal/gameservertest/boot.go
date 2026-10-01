@@ -26,6 +26,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -134,6 +135,7 @@ type options struct {
 	productionTickers      bool
 	handAI                 bool
 	realPool               bool
+	merchant               merchantOptions
 	doors                  []*door.Template
 }
 
@@ -564,7 +566,9 @@ type Server struct {
 	AttackStance     *task.AttackStance
 	Effects          *task.Effects
 	AI               *task.AI
-	Water            *task.Water               // set by WithWater; nil otherwise
+	Water            *task.Water // set by WithWater; nil otherwise
+	BuyListStock     *merchant.Stock
+	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	account          string
 	templates        *player.TemplateTable
@@ -1393,7 +1397,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			o.attackStanceNow = time.Now
 		}
 	}
+	buyListStore := gamesql.NewBuyListStore(db)
+	shops, stock := bootMerchant(t, o.merchant, buyListStore, persistWorker, ids, o.log)
 	gclConfig := network.GameClientLinkConfig{
+		Merchant:         shops,
 		Validator:        validator,
 		Effects:          effectEnv,
 		LoginLink:        func() *network.LoginLink { return loginLink },
@@ -1628,6 +1635,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		zones:            o.zones,
 		AI:               ai,
 		Water:            water,
+		BuyListStock:     stock,
+		BuyListRows:      buyListStore,
 		account:          o.account,
 		templates:        templates,
 		ids:              ids,

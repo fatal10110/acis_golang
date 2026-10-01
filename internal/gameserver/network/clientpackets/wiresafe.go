@@ -58,6 +58,7 @@ const (
 	OpcodeRequestPackageItemList  = 0x9e
 	OpcodeRequestPackageSend      = 0x9f
 	OpcodeDlgAnswer               = 0xc5
+	OpcodeRequestPreviewItem      = 0xc6
 	OpcodeGameGuardReply          = 0xca
 	OpcodeRequestShowMiniMap      = 0xcd
 )

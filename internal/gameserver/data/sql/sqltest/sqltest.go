@@ -164,6 +164,15 @@ const characterRecipeBookSchema = "CREATE TABLE IF NOT EXISTS `character_recipeb
 	"  PRIMARY KEY (`charId`,`recipeId`)\n" +
 	")"
 
+// buylistsSchema mirrors the shipped buylists table definition verbatim.
+const buylistsSchema = "CREATE TABLE IF NOT EXISTS `buylists` (\n" +
+	"  `buylist_id` INT UNSIGNED,\n" +
+	"  `item_id` INT UNSIGNED,\n" +
+	"  `count` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `next_restock_time` BIGINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`buylist_id`, `item_id`)\n" +
+	")"
+
 // petsSchema mirrors the shipped pets table definition verbatim.
 const petsSchema = "CREATE TABLE IF NOT EXISTS `pets` (\n" +
 	"  `item_obj_id` decimal(11) NOT NULL default 0,\n" +
@@ -252,7 +261,7 @@ var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
-	sevenSignsStatusSchema,
+	sevenSignsStatusSchema, buylistsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

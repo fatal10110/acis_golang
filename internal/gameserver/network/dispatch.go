@@ -15,6 +15,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -194,6 +195,7 @@ type GameClientLink struct {
 	hennaTable    *henna.Table
 	recipeBooks   recipeBookStore
 	craft         *craft.Service
+	merchant      *merchant.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -302,6 +304,7 @@ type GameClientLinkConfig struct {
 	// Recipes is the loaded recipe table; nil loads none, so every recipe
 	// request is dropped.
 	Recipes       *recipe.Table
+	Merchant      *merchant.Service // nil: every buylist is unknown
 	Templates     *player.TemplateTable
 	ItemTemplates *item.Table
 	HTML          *datacache.HTML
@@ -399,6 +402,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		hennas:        cfg.Hennas,
 		hennaTable:    cfg.HennaTable,
 		recipeBooks:   cfg.RecipeBooks,
+		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
 		html:          cfg.HTML,

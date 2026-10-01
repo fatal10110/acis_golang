@@ -1516,3 +1516,31 @@ func TestDecodeRecipeBookRequests(t *testing.T) {
 		t.Fatal("DecodeRequestRecipeItemMakeSelf: want error on short payload")
 	}
 }
+
+// TestDecodeRequestPreviewItem pins the try-on request layout: an unused
+// int, the list id, the item count, then one item id per item. A negative
+// count reads as none, a count over 100 is refused without reading the
+// rows, and missing rows are a short packet.
+func TestDecodeRequestPreviewItem(t *testing.T) {
+	payload, _ := hex.DecodeString("c6" + "07000000" + "01000000" + "02000000" + "41090000" + "50040000")
+	got, err := DecodeRequestPreviewItem(payload)
+	if err != nil {
+		t.Fatalf("DecodeRequestPreviewItem: %v", err)
+	}
+	if got.ListID != 1 || len(got.Items) != 2 || got.Items[0] != 2369 || got.Items[1] != 1104 {
+		t.Fatalf("DecodeRequestPreviewItem = %+v, want list 1 items [2369 1104]", got)
+	}
+
+	negative, _ := hex.DecodeString("c6" + "00000000" + "05000000" + "ffffffff")
+	if got, err := DecodeRequestPreviewItem(negative); err != nil || got.ListID != 5 || len(got.Items) != 0 {
+		t.Fatalf("negative count = %+v, %v; want list 5 and no items", got, err)
+	}
+	tooMany, _ := hex.DecodeString("c6" + "00000000" + "05000000" + "65000000")
+	if _, err := DecodeRequestPreviewItem(tooMany); err == nil || errors.Is(err, wire.ErrShortPacket) {
+		t.Fatalf("101 items: err = %v, want a refusal that is not a short packet", err)
+	}
+	short, _ := hex.DecodeString("c6" + "00000000" + "05000000" + "02000000" + "41090000")
+	if _, err := DecodeRequestPreviewItem(short); !errors.Is(err, wire.ErrShortPacket) {
+		t.Fatalf("missing row: err = %v, want a short packet", err)
+	}
+}

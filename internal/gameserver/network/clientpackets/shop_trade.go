@@ -190,6 +190,43 @@ func DecodeRequestBuyItem(payload []byte, maxItems int) (RequestBuyItem, error) 
 	return req, nil
 }
 
+// maxPreviewItems is the most items one RequestPreviewItem may try on.
+const maxPreviewItems = 100
+
+// RequestPreviewItem asks the targeted merchant to show Items of buylist
+// ListID worn for a while.
+type RequestPreviewItem struct {
+	ListID int32
+	Items  []int32
+}
+
+// DecodeRequestPreviewItem parses a raw RequestPreviewItem payload (opcode
+// byte included). A negative item count reads as none; one over
+// maxPreviewItems is refused without reading the rows.
+func DecodeRequestPreviewItem(payload []byte) (RequestPreviewItem, error) {
+	r := newReader(payload)
+	if r.Remaining() < 3*4 {
+		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: need at least %d bytes, got %d: %w", 3*4, r.Remaining(), wire.ErrShortPacket)
+	}
+	r.ReadInt32() // unknown
+	req := RequestPreviewItem{ListID: r.ReadInt32()}
+	count := max(r.ReadInt32(), 0)
+	if count > maxPreviewItems {
+		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: item count %d exceeds max %d", count, maxPreviewItems)
+	}
+	if r.Remaining() < int(count)*4 {
+		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: %d items need %d bytes, got %d: %w", count, count*4, r.Remaining(), wire.ErrShortPacket)
+	}
+	req.Items = make([]int32, count)
+	for i := range req.Items {
+		req.Items[i] = r.ReadInt32()
+	}
+	if err := r.Err(); err != nil {
+		return RequestPreviewItem{}, fmt.Errorf("clientpackets: RequestPreviewItem: %w", err)
+	}
+	return req, nil
+}
+
 // SellItemRequest is one requested object/template/count row in
 // RequestSellItem.
 type SellItemRequest struct {

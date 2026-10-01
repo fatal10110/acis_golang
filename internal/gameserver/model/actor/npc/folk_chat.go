@@ -11,11 +11,13 @@ type Pages interface {
 }
 
 // ChatRules are the players.properties gates a karma-carrying talker meets
-// at a shop, gatekeeper or warehouse dialog.
+// at a shop, gatekeeper or warehouse dialog, and the server.properties
+// AllowWear gate on a merchant's try-on window.
 type ChatRules struct {
 	KarmaCanShop         bool
 	KarmaCanUseGK        bool
 	KarmaCanUseWarehouse bool
+	AllowWear            bool
 }
 
 // ChatOutcome is what an interact with a civilian NPC opens.

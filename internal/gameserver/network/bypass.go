@@ -186,7 +186,9 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 // folkBypass runs command on f for live. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
-	reply := f.Bypass(l.html, l.playerConfig.chatRules(), live.Karma(), command)
+	rules := l.playerConfig.chatRules()
+	rules.AllowWear = l.merchant.Config().AllowWear
+	reply := f.Bypass(l.html, rules, live.Karma(), command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -201,6 +203,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		sendValidatedHTML(live, f.ObjectID(), reply.HTML, 0)
 	case npc.BypassSellList:
 		l.sendSellList(live, f, reply.HTML)
+	case npc.BypassBuyList:
+		l.showBuyWindow(live, f, reply.ListID)
+	case npc.BypassWearList:
+		l.showWearWindow(live, f, reply.ListID)
 	case npc.BypassAborted:
 		return false
 	case npc.BypassUnported:

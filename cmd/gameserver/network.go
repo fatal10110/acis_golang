@@ -15,6 +15,7 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -58,6 +59,7 @@ func provideGameClientLink(
 	shortcuts *gamesql.ShortcutStore,
 	hennas *gamesql.HennaStore,
 	recipeBooks *gamesql.RecipeBookStore,
+	shops *merchant.Service,
 	html *datacache.HTML,
 	crests *datacache.Crests,
 	validator *network.SessionValidator,
@@ -132,6 +134,7 @@ func provideGameClientLink(
 		HennaTable:    data.Hennas,
 		RecipeBooks:   recipeBooks,
 		Recipes:       data.Recipes,
+		Merchant:      shops,
 		Templates:     data.Players,
 		ItemTemplates: data.Items,
 		HTML:          html,
