@@ -7,6 +7,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
@@ -301,8 +302,7 @@ func (l *GameClientLink) sendBlockList(live *livePlayer) {
 // the reference; the client shows what it typed itself and waits on no
 // reply.
 //
-// The LogChat chat log does not record the message yet; it lands with the
-// chat log itself (#154).
+// A delivered message is recorded in the chat log.
 func (l *GameClientLink) handleRequestSendL2FriendSay(live *livePlayer, req clientpackets.RequestSendL2FriendSay) {
 	if req.Message == "" || len(utf16.Encode([]rune(req.Message))) > friendSayMaxLength {
 		return
@@ -316,5 +316,6 @@ func (l *GameClientLink) handleRequestSendL2FriendSay(live *livePlayer, req clie
 		live.SendFrame(serverpackets.FrameL2FriendSay(serverpackets.SystemMessageS1HasAddedYouToIgnoreList2, live.Name, req.Recipient, req.Message))
 		return
 	}
+	l.chat.Log.Info().Msg(chat.FriendLogEntry(live.Name, req.Recipient, req.Message))
 	recipient.SendFrame(serverpackets.FrameL2FriendSay(0, req.Recipient, live.Name, req.Message))
 }
