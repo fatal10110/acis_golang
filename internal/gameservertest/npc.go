@@ -497,24 +497,23 @@ func (s *Server) TickEffects() {
 // intervals.
 func (s *Server) TickPositions() {
 	if s.queues.advanceThen != nil {
-		if err := s.catchUp(); err != nil {
+		if err := s.tickPositionsDriven(move.PositionUpdateInterval); err != nil {
 			panic(err)
 		}
-		s.queues.advanceThen(move.PositionUpdateInterval, s.positions.Tick)
-	} else {
-		s.positionTicks.Lock()
-		next := s.positionTicks.last.Add(move.PositionUpdateInterval)
-		if now := time.Now(); next.Before(now) {
-			next = now.Add(move.PositionUpdateInterval)
-		}
-		time.Sleep(time.Until(next))
-		if err := s.awaitHandled(); err != nil {
-			panic(err)
-		}
-		s.positionTicks.last = time.Now()
-		s.positions.Tick()
-		s.positionTicks.Unlock()
+		return
 	}
+	s.positionTicks.Lock()
+	next := s.positionTicks.last.Add(move.PositionUpdateInterval)
+	if now := time.Now(); next.Before(now) {
+		next = now.Add(move.PositionUpdateInterval)
+	}
+	time.Sleep(time.Until(next))
+	if err := s.awaitHandled(); err != nil {
+		panic(err)
+	}
+	s.positionTicks.last = time.Now()
+	s.positions.Tick()
+	s.positionTicks.Unlock()
 	if err := s.queues.settle(); err != nil {
 		panic(err)
 	}
@@ -530,13 +529,20 @@ func (s *Server) TickPositionsAfter(tb testing.TB, d time.Duration) {
 	if s.queues.advanceThen == nil {
 		tb.Fatal("TickPositionsAfter needs the driven clock")
 	}
-	if err := s.catchUp(); err != nil {
+	if err := s.tickPositionsDriven(d); err != nil {
 		tb.Fatal(err)
+	}
+}
+
+// tickPositionsDriven moves the driven clock by d, runs one production
+// movement-correction tick ahead of the timers due at that instant, and
+// waits for the posted ticks to run.
+func (s *Server) tickPositionsDriven(d time.Duration) error {
+	if err := s.catchUp(); err != nil {
+		return err
 	}
 	s.queues.advanceThen(d, s.positions.Tick)
-	if err := s.queues.settle(); err != nil {
-		tb.Fatal(err)
-	}
+	return s.queues.settle()
 }
 
 // parkedMove is a MoveController that never moves.
