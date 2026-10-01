@@ -226,7 +226,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 // forced to run and loses its toggles before the wyvern's skill list, the
 // Ride, the speed refresh and the feed gauge go out.
 func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) {
-	if !l.disarmLive(live) {
+	if !l.disarm(live, true) {
 		return
 	}
 	l.changeLiveMoveType(live, true)
@@ -242,14 +242,15 @@ func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int3
 	live.Character.StartMountFeed()
 }
 
-// disarmLive takes live's weapon and shield off, naming each item removed,
-// and refreshes its appearance for everyone around. It refuses, changing
-// nothing, while a cursed weapon is held. Otherwise the attack in progress
-// stops and the character goes idle, dropping any attack intention it was
-// still approaching, before ActionFailed. Each hand that comes off
-// refreshes the grade penalty ahead of its disarm message, as a player's
-// body-slot unequip does.
-func (l *GameClientLink) disarmLive(live *livePlayer) bool {
+// disarm takes live's weapon off, and its shield too when leftHandIncluded,
+// naming each item removed, and refreshes its appearance for everyone
+// around. It refuses, changing nothing, while a cursed weapon is held.
+// Otherwise the attack in progress stops first, as a player's attack stop
+// does: the character goes idle, dropping any attack intention it was still
+// approaching, and the client is released with ActionFailed. Each hand that
+// comes off refreshes the grade penalty ahead of its disarm message, as a
+// player's body-slot unequip does.
+func (l *GameClientLink) disarm(live *livePlayer, leftHandIncluded bool) bool {
 	if live.Character.CursedWeaponEquipped() {
 		return false
 	}
@@ -258,8 +259,12 @@ func (l *GameClientLink) disarmLive(live *livePlayer) bool {
 	}
 	live.tryToIdle(false)
 	live.SendFrame(serverpackets.FrameActionFailed())
+	slots := []item.Slot{item.SlotRHand}
+	if leftHandIncluded {
+		slots = append(slots, item.SlotLHand)
+	}
 	if inv := live.Inventory(); inv != nil && l.inventory != nil {
-		for _, slot := range []item.Slot{item.SlotRHand, item.SlotLHand} {
+		for _, slot := range slots {
 			res, ok := l.inventory.UnequipBodySlot(inv, int32(slot))
 			if !ok || len(res.Changed) == 0 {
 				continue

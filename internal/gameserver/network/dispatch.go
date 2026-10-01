@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -24,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
@@ -213,6 +215,7 @@ type GameClientLink struct {
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
 	exchange      *exchange.Service
+	augment       *augment.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -399,6 +402,15 @@ type GameClientLinkConfig struct {
 	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
 	// the random source.
 	CraftRoll func(n int) int
+	// Augmentations is the loaded augmentation data a refine rolls from;
+	// nil refuses every refine as unsuitable.
+	Augmentations *augmentation.Table
+	// AugmentationChances are the players.properties augmentation skill,
+	// glow and base stat chances.
+	AugmentationChances augmentation.Chances
+	// AugmentRoll draws the uniform ints a refine rolls, both ends
+	// inclusive; nil falls back to the random source.
+	AugmentRoll augmentation.Rand
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -494,6 +506,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
+	link.augment = newAugmentService(cfg)
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {
 		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {

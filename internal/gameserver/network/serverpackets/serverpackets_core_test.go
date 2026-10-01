@@ -547,7 +547,7 @@ func TestFrameCharSelectInfo(t *testing.T) {
 		HairStyle: 1, HairColor: 2, Face: 0,
 		DeleteTimerSeconds: 0,
 	}
-	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, EnchantLevel: 5}
+	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, EnchantLevel: 5, AugmentationID: 8191<<16 | 3}
 	slot.Paperdoll[10] = item.PaperdollEntry{ObjectID: 101, TemplateID: 1146}
 
 	got := framePayload(t, FrameCharSelectInfo("acct1", 999, []CharacterSlot{slot}, 0))
@@ -605,11 +605,23 @@ func TestFrameCharSelectInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(slot.ClassID))
 	want = binary.LittleEndian.AppendUint32(want, 1) // active slot (activeID=0, i=0)
 
-	want = append(want, 5)                           // enchant effect from the RHAND weapon
-	want = binary.LittleEndian.AppendUint32(want, 0) // augmentation id
+	want = append(want, 5)                                    // enchant effect from the RHAND weapon
+	want = binary.LittleEndian.AppendUint32(want, 8191<<16|3) // the RHAND weapon's augmentation id
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameCharSelectInfo mismatch:\n got  %x\n want %x", got, want)
+	}
+}
+
+// TestFrameCharSelectInfoUnsetAugmentationReadsZero pins that an
+// augmentations row left at its column default (-1) shows as no
+// augmentation on the character list.
+func TestFrameCharSelectInfoUnsetAugmentationReadsZero(t *testing.T) {
+	slot := CharacterSlot{Name: "Newbie", ObjectID: 1}
+	slot.Paperdoll[rhandPaperdollIndex] = item.PaperdollEntry{ObjectID: 100, TemplateID: 2369, AugmentationID: -1}
+	got := framePayload(t, FrameCharSelectInfo("acct1", 1, []CharacterSlot{slot}, 0))
+	if tail := binary.LittleEndian.Uint32(got[len(got)-4:]); tail != 0 {
+		t.Fatalf("augmentation id = %d, want 0", int32(tail))
 	}
 }
 
@@ -3166,7 +3178,10 @@ func TestFrameUserInfo(t *testing.T) {
 	}
 	c.AttachRuntime(tmpl, nil)
 	items := []*item.Instance{
-		{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex, EnchantLevel: 200},
+		{
+			ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex, EnchantLevel: 200,
+			Augmentation: &item.Augmentation{Attributes: 8191<<16 | 3},
+		},
 	}
 
 	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, Items: items, IsGM: true}))
@@ -3211,7 +3226,7 @@ func TestFrameUserInfo(t *testing.T) {
 	for i := 0; i < 14; i++ {
 		want = binary.LittleEndian.AppendUint16(want, 0)
 	}
-	want = binary.LittleEndian.AppendUint32(want, 0) // rhand augmentation
+	want = binary.LittleEndian.AppendUint32(want, 8191<<16|3) // rhand augmentation
 	for i := 0; i < 12; i++ {
 		want = binary.LittleEndian.AppendUint16(want, 0)
 	}

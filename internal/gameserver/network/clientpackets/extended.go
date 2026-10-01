@@ -21,6 +21,8 @@ const (
 	OpcodeRequestConfirmTargetItem     uint16 = 0x0029
 	OpcodeRequestConfirmRefinerItem    uint16 = 0x002a
 	OpcodeRequestConfirmGemStone       uint16 = 0x002b
+	OpcodeRequestRefine                uint16 = 0x002c
 	OpcodeRequestConfirmCancelItem     uint16 = 0x002d
+	OpcodeRequestRefineCancel          uint16 = 0x002e
 	OpcodeRequestExMagicSkillUseGround uint16 = 0x002f
 )

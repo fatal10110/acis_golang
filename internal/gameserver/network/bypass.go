@@ -216,8 +216,20 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.openMultisell(live, f, reply.Multisell, reply.InventoryOnly)
 	case npc.BypassWarehouse:
 		return l.warehouseBypass(live, f, reply)
+	case npc.BypassSkillList:
+		l.showSkillList(live, f)
+	case npc.BypassEnchantSkillList:
+		l.showEnchantSkillList(live, f)
+	case npc.BypassFishSkillList:
+		l.showFishSkillList(live)
 	case npc.BypassAborted:
 		return false
+	case npc.BypassAugmentMake:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSelectItemToAugment))
+		live.SendFrame(serverpackets.FrameExShowVariationMakeWindow())
+	case npc.BypassAugmentCancel:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSelectItemToRemoveAugmentation))
+		live.SendFrame(serverpackets.FrameExShowVariationCancelWindow())
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

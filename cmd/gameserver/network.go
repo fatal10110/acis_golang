@@ -181,6 +181,9 @@ func provideGameClientLink(
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		Log:              log,
+
+		Augmentations:       data.Augmentations,
+		AugmentationChances: gameplay.AugmentationChances,
 	})
 	if err != nil {
 		return nil, err
@@ -191,12 +194,15 @@ func provideGameClientLink(
 	return link, nil
 }
 
-func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig, worker *persist.Worker, log zerolog.Logger) *skillstate.Persistence {
+func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConfig, worker *persist.Worker, log zerolog.Logger) (*skillstate.Persistence, error) {
 	skills := skillstate.NewPersistenceWithStoreSkillCooltime(gamesql.NewSkillSaveStore(pool), data.Skills, bool(gameplay.StoreSkillCooltime), gamesql.NewCharacterSkillStore(pool))
 	// A learn, enchant or level refresh runs on the player's queue; its
 	// character_skills write must not block that queue.
 	skills.SetPersistWorker(worker, log)
-	return skills
+	if err := skills.SetAugmentations(data.Augmentations); err != nil {
+		return nil, err
+	}
+	return skills, nil
 }
 
 // onlineAccounts collects the account names of every player currently in

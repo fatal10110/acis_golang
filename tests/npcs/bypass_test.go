@@ -173,7 +173,7 @@ func TestBypassNpcRejections(t *testing.T) {
 		{npcCommand(far, "Chat 1"), releaseOnly},
 		{"npc_" + strconv.Itoa(int(near.ObjectID())), releaseOnly},
 		{npcCommand(near, "Buy 1"), releaseOnly},
-		{npcCommand(near, "SkillList"), releaseOnly},
+		{npcCommand(near, "TerritoryStatus"), releaseOnly},
 		{npcCommand(near, "Quest"), releaseOnly},
 		{npcCommand(near, "Link ../../config/server.properties"), releaseOnly},
 		{npcCommand(near, "Link"), nil},
@@ -223,7 +223,9 @@ func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 // TestBypassKarmaGateCoversEveryCommand pins the shop karma gate on
 // dialog commands: with KarmaPlayerCanShop off, a player carrying karma
 // gets the refusal page, as is, for every command. A fisherman checks its
-// own refusal page, then, past its own commands, the merchant one.
+// own refusal page, then, past its own commands, the merchant one: with no
+// fisherman refusal page, its FishSkillList still opens the fishing list
+// (here empty: nothing left to learn, then AcquireSkillDone).
 func TestBypassKarmaGateCoversEveryCommand(t *testing.T) {
 	t.Parallel()
 	const pkPage = "<html><body>No trade with killers %objectId%</body></html>"
@@ -243,11 +245,11 @@ func TestBypassKarmaGateCoversEveryCommand(t *testing.T) {
 		{merchant, "Chat 1", chatWindowAnswer},
 		{merchant, "Buy 1", chatWindowAnswer},
 		{fisherman, "Chat 1", chatWindowAnswer},
-		{fisherman, "FishSkillList", releaseOnly},
+		{fisherman, "FishSkillList", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeAcquireSkillDone, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}},
 	} {
 		w.openAnyNpcPage(t)
 		html := ""
-		if len(tc.want) > 1 {
+		if tc.want[0] == serverpackets.OpcodeNpcHtmlMessage {
 			html = pkPage + "\n"
 		}
 		assertAnswer(t, w.bypass(t, npcCommand(tc.f, tc.command)), tc.want, tc.f, html)
@@ -334,4 +336,43 @@ func encodeTradeRequest(objectID int32) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeTradeRequest)
 	w.WriteInt32(objectID)
 	return w.Bytes()
+}
+
+// TestBypassAugmentOpensVariationWindows pins a blacksmith's Augment
+// command: "Augment 1" prompts for the item to augment and opens the
+// augmentation window, "Augment 2" prompts for the item to restore and opens
+// the removal window, each then released by the dispatcher; any other
+// choice is only released, and a choice too short or not a digit aborts
+// with nothing sent.
+func TestBypassAugmentOpensVariationWindows(t *testing.T) {
+	t.Parallel()
+	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
+	smith := w.spawnFolk(t, folkTemplate("Trainer", 30300), 50)
+
+	for _, tc := range []struct {
+		command string
+		want    []byte
+		message int32
+		window  uint16
+	}{
+		{"Augment 1", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeExtended, serverpackets.OpcodeActionFailed}, serverpackets.SystemMessageSelectItemToAugment, serverpackets.OpcodeExShowVariationMakeWindow},
+		{"Augment 2", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeExtended, serverpackets.OpcodeActionFailed}, serverpackets.SystemMessageSelectItemToRemoveAugmentation, serverpackets.OpcodeExShowVariationCancelWindow},
+		{"Augment 3", releaseOnly, 0, 0},
+		{"Augment", nil, 0, 0},
+		{"Augment x", nil, 0, 0},
+	} {
+		w.openAnyNpcPage(t)
+		frames := w.bypass(t, npcCommand(smith, tc.command))
+		assertAnswer(t, frames, tc.want, smith, "")
+		if tc.message == 0 {
+			continue
+		}
+		if got := wire.NewReader(frames[0][1:]).ReadInt32(); got != tc.message {
+			t.Fatalf("%s: system message = %d, want %d", tc.command, got, tc.message)
+		}
+		r := wire.NewReader(frames[1][1:])
+		if sub := r.ReadUint16(); sub != tc.window || r.Remaining() != 0 {
+			t.Fatalf("%s: window = %#x with %d more bytes, want %#x alone", tc.command, sub, r.Remaining(), tc.window)
+		}
+	}
 }

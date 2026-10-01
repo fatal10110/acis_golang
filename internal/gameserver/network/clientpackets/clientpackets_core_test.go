@@ -1311,6 +1311,32 @@ func TestDecodeVariationRequests(t *testing.T) {
 	if cancel != (RequestConfirmCancelItem{ObjectID: 1000}) {
 		t.Fatalf("DecodeRequestConfirmCancelItem = %+v, want ObjectID 1000", cancel)
 	}
+	refine, err := DecodeRequestRefine([]byte{
+		OpcodeExtended,
+		0x2c, 0x00,
+		0xe8, 0x03, 0x00, 0x00,
+		0xd0, 0x07, 0x00, 0x00,
+		0xb8, 0x0b, 0x00, 0x00,
+		0x14, 0x00, 0x00, 0x00,
+	})
+	if err != nil {
+		t.Fatalf("DecodeRequestRefine: %v", err)
+	}
+	if want := (RequestRefine{TargetObjectID: 1000, RefinerObjectID: 2000, GemstoneObjectID: 3000, GemstoneCount: 20}); refine != want {
+		t.Fatalf("DecodeRequestRefine = %+v, want %+v", refine, want)
+	}
+
+	refineCancel, err := DecodeRequestRefineCancel([]byte{
+		OpcodeExtended,
+		0x2e, 0x00,
+		0xe8, 0x03, 0x00, 0x00,
+	})
+	if err != nil {
+		t.Fatalf("DecodeRequestRefineCancel: %v", err)
+	}
+	if refineCancel != (RequestRefineCancel{ObjectID: 1000}) {
+		t.Fatalf("DecodeRequestRefineCancel = %+v, want ObjectID 1000", refineCancel)
+	}
 }
 
 func TestDecodeVariationRequestsShort(t *testing.T) {
@@ -1322,6 +1348,12 @@ func TestDecodeVariationRequestsShort(t *testing.T) {
 	}
 	if _, err := DecodeRequestConfirmGemStone([]byte{OpcodeExtended, 0x2b, 0x00, 1}); err == nil {
 		t.Fatal("DecodeRequestConfirmGemStone: want error on short payload")
+	}
+	if _, err := DecodeRequestRefine([]byte{OpcodeExtended, 0x2c, 0x00, 1}); err == nil {
+		t.Fatal("DecodeRequestRefine: want error on short payload")
+	}
+	if _, err := DecodeRequestRefineCancel([]byte{OpcodeExtended, 0x2e, 0x00, 1}); err == nil {
+		t.Fatal("DecodeRequestRefineCancel: want error on short payload")
 	}
 	if _, err := DecodeRequestConfirmCancelItem([]byte{OpcodeExtended, 0x2d, 0x00, 1}); err == nil {
 		t.Fatal("DecodeRequestConfirmCancelItem: want error on short payload")

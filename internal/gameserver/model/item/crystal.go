@@ -7,15 +7,17 @@ type crystalTypeData struct {
 	itemID             int32
 	enchantBonusArmor  int32
 	enchantBonusWeapon int32
+	gemstoneID         int32
+	gemstoneCount      int
 }
 
 var crystalTypeTable = [...]crystalTypeData{
 	CrystalNone: {itemID: 0, enchantBonusArmor: 0, enchantBonusWeapon: 0},
 	CrystalD:    {itemID: 1458, enchantBonusArmor: 11, enchantBonusWeapon: 90},
-	CrystalC:    {itemID: 1459, enchantBonusArmor: 6, enchantBonusWeapon: 45},
-	CrystalB:    {itemID: 1460, enchantBonusArmor: 11, enchantBonusWeapon: 67},
-	CrystalA:    {itemID: 1461, enchantBonusArmor: 19, enchantBonusWeapon: 144},
-	CrystalS:    {itemID: 1462, enchantBonusArmor: 25, enchantBonusWeapon: 250},
+	CrystalC:    {itemID: 1459, enchantBonusArmor: 6, enchantBonusWeapon: 45, gemstoneID: 2130, gemstoneCount: 20},
+	CrystalB:    {itemID: 1460, enchantBonusArmor: 11, enchantBonusWeapon: 67, gemstoneID: 2130, gemstoneCount: 30},
+	CrystalA:    {itemID: 1461, enchantBonusArmor: 19, enchantBonusWeapon: 144, gemstoneID: 2131, gemstoneCount: 20},
+	CrystalS:    {itemID: 1462, enchantBonusArmor: 25, enchantBonusWeapon: 250, gemstoneID: 2131, gemstoneCount: 25},
 }
 
 func (c CrystalType) data() crystalTypeData {
@@ -41,6 +43,18 @@ func (c CrystalType) EnchantBonusArmor() int32 {
 // weapon of grade c earns when crystallized.
 func (c CrystalType) EnchantBonusWeapon() int32 {
 	return c.data().enchantBonusWeapon
+}
+
+// GemstoneID returns the gemstone item augmenting a weapon of grade c
+// consumes, or 0 below C grade.
+func (c CrystalType) GemstoneID() int32 {
+	return c.data().gemstoneID
+}
+
+// GemstoneCount returns how many gemstones augmenting a weapon of grade c
+// consumes, or 0 below C grade.
+func (c CrystalType) GemstoneCount() int {
+	return c.data().gemstoneCount
 }
 
 // Crystallizable reports whether t can be crystallized at all.

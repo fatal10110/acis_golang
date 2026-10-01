@@ -65,6 +65,7 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 	srv, c, objID := bootLearner(t, append(generalLearnOpts(t, 50),
 		gameservertest.WithSpellbooks(bookPolicy(t, 3)))...)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, 0)
 
 	c.Send(encodeRequestAcquireSkillInfo(3, 1, 0))
 	reply := c.Read()
@@ -93,13 +94,15 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 	if skillType, count := r.ReadInt32(), r.ReadInt32(); skillType != int32(serverpackets.AcquireSkillTypeUsual) || count != 1 {
 		t.Fatalf("AcquireSkillList = type %d count %d, want usual with 1 entry", skillType, count)
 	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "trainer list ActionFailed")
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{})
 }
 
 // TestLearnGeneralSkillPersistsAndRefreshesShortcut walks the full learn
 // flow: the SP charge (StatusUpdate + message), the LearnedSkill message,
-// the refreshed skill list, the emptied trainer list, the persisted
+// the refreshed skill list, the trainer list closing with nothing left to
+// learn (AcquireSkillDone), the persisted
 // character_skills row, and the shortcut bound to the skill re-pointed at
 // the newly learned level.
 func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
@@ -107,6 +110,7 @@ func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
 	srv, c, objID := bootLearner(t, generalLearnOpts(t, 50)...)
 	bindSkillShortcut(t, srv, objID, 3, 3, -1)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, 0)
 
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
 	assertSPStatus(t, c.Read(), objID, 0)
@@ -124,7 +128,7 @@ func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, 3, 1)
 	assertSkillList(t, c.Read(), skillListEntry{passive: 0, level: 1, id: 3})
 	assertShortCutRegister(t, c, 3, 3, 1)
-	assertAcquireSkillListEmpty(t, c.Read(), serverpackets.AcquireSkillTypeUsual)
+	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
 }
@@ -136,6 +140,7 @@ func TestLearnSkillRejectsInsufficientSP(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootLearner(t, generalLearnOpts(t, 49)...)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, 0)
 
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
 	reply := c.Read()
@@ -153,6 +158,7 @@ func TestLearnSkillRejectsInsufficientSP(t *testing.T) {
 	if err := r.Err(); err != nil {
 		t.Fatalf("read AcquireSkillList: %v", err)
 	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "trainer list ActionFailed")
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{})
 }
@@ -170,6 +176,7 @@ func TestFishingSkillTreeGating(t *testing.T) {
 		gameservertest.WithSkillTrees(fishingTrees()))
 	adena := srv.GiveItem(t, objID, 57, 5)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID)
 
 	c.Send(encodeRequestAcquireSkillInfo(1368, 1, 1))
 	reply := c.Read()
@@ -197,7 +204,7 @@ func TestFishingSkillTreeGating(t *testing.T) {
 		t.Fatalf("extended opcode = %#x, want ExStorageMaxCount (%#x)", sub, serverpackets.OpcodeExStorageMaxCount)
 	}
 	assertSkillList(t, c.Read(), skillListEntry{passive: 0, level: 1, id: 1368})
-	assertAcquireSkillListEmpty(t, c.Read(), serverpackets.AcquireSkillTypeFishing)
+	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{1368: 1})
 
@@ -224,6 +231,7 @@ func TestFishingSkillTreeRejectsMissingItem(t *testing.T) {
 		gameservertest.WithSkills(learnerTable(t, modelskill.Definition{ID: 1368, Level: 1, Activation: modelskill.ActivationActive})),
 		gameservertest.WithSkillTrees(fishingTrees()))
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID)
 
 	c.Send(encodeRequestAcquireSkill(1368, 1, 1))
 	reply := c.Read()
@@ -241,6 +249,7 @@ func TestFishingSkillTreeRejectsMissingItem(t *testing.T) {
 	if err := r.Err(); err != nil {
 		t.Fatalf("read AcquireSkillList: %v", err)
 	}
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "fishing list ActionFailed")
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{})
 }
