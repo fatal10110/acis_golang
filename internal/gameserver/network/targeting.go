@@ -485,9 +485,10 @@ func (l *GameClientLink) finishDeferredInteract(live *livePlayer) bool {
 // and locks further input. A player that cannot act, sits, flies, runs a
 // private store or trades gets nothing more. Out of approach range, a
 // movable player walks toward the target unless shift is held. In range,
-// the player still inside interaction distance faces the target and acts
-// on it. Every outcome but the approach walk, or a player that cannot move
-// holding the interact, ends it idle.
+// the player still inside interaction distance acts on the target: it
+// faces a standing target, and stops in place (StopMove) without turning
+// for a walking NPC. Every outcome but the approach walk, or a player that
+// cannot move holding the interact, ends it idle.
 func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, shift bool) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	if live.DenyAIAction() || !live.Standing() || live.Flying() || !l.playerCanAttemptInteract(live) {

@@ -81,18 +81,9 @@ func (s *folkSink) Emit(ev event.Event) {
 	}
 }
 
-// broadcast fans one lazily built frame out over a detached snapshot of the
-// NPC's known list, so no region lock is held while frames are sent.
+// broadcast fans one lazily built frame out to the NPC's observers.
 func (s *folkSink) broadcast(build func() wire.Frame) {
-	known := s.known.SnapshotCopy(s.world, s.f)
-	defer known.Release()
-	broadcastFrame(build, func(send func(frameReceiver)) {
-		for _, o := range known.Tracked() {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		}
-	})
+	broadcastKnown(&s.known, s.world, s.f, build)
 }
 
 // chatRules are the karma gates on service NPC dialogs.

@@ -57,6 +57,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		World:               s.State,
 		MaxGeoPathFailCount: s.MaxGeoPathFailCount,
 		Control:             control,
+		Log:                 s.Log,
 	}
 	if s.NewSink != nil {
 		m.Sink = s.NewSink(f)

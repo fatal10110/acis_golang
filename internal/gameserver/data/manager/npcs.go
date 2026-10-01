@@ -58,9 +58,10 @@ type KillRewardConfig struct {
 //
 // A combat-capable entry becomes a npc.Hostile with an AI loop, decay and
 // respawn. A civilian service NPC (a shop, trainer, gatekeeper, village
-// master and the like) becomes a npc.Folk that stands at its spawn point
-// for players to talk to. Any other non-combat instance type (castle
-// artifacts, siege flags, towers) is counted and skipped.
+// master and the like) becomes a npc.Folk for players to talk to: it
+// stands at its spawn point, or walks its route when its template alias
+// names one in the walker route data. Any other non-combat instance type
+// (castle artifacts, siege flags, towers) is counted and skipped.
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
 type Npcs struct {

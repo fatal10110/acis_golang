@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/npcstring"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/rs/zerolog"
 )
 
 // FolkMovement is what a route-walking civilian NPC moves with. A civilian
@@ -35,6 +36,8 @@ type FolkMovement struct {
 	// Control receives event.Arrived, on Queue, each time a walk reaches
 	// its destination, after the NPC's position settles there.
 	Control event.Sink
+	// Log reports a failed-pathfinding streak that overflows.
+	Log zerolog.Logger
 }
 
 // folkMotion is a walking civilian NPC's movement: the moving actor its
@@ -122,8 +125,12 @@ func (m *folkMotion) SyncPosition(position location.Location) {
 	}
 }
 
-// BroadcastMove shows observers a walk.
-func (m *folkMotion) BroadcastMove(ev event.Move) { m.emit(ev) }
+// BroadcastMove turns the NPC toward the walk's destination and shows
+// observers the walk.
+func (m *folkMotion) BroadcastMove(ev event.Move) {
+	m.SetHeading(ev.Origin.HeadingTo(ev.Destination))
+	m.emit(ev)
+}
 
 // BroadcastStop shows observers a stop in place.
 func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }
@@ -144,7 +151,7 @@ func (m *folkMotion) GeoPathFailCount() int { return int(m.geoPathFails.Load()) 
 func (m *folkMotion) ResetGeoPathFailCount() { m.geoPathFails.Store(0) }
 
 // AddGeoPathFailCount counts one more failed pathfinding attempt; past the
-// configured maximum the streak restarts from zero instead.
+// configured maximum the streak is logged and restarts from zero instead.
 func (m *folkMotion) AddGeoPathFailCount() {
 	limit := int32(m.cfg.MaxGeoPathFailCount)
 	if limit <= 0 {
@@ -152,11 +159,21 @@ func (m *folkMotion) AddGeoPathFailCount() {
 	}
 	for {
 		cur := m.geoPathFails.Load()
-		next := cur + 1
-		if cur > limit {
-			next = 0
+		if cur <= limit {
+			if m.geoPathFails.CompareAndSwap(cur, cur+1) {
+				return
+			}
+			continue
 		}
-		if m.geoPathFails.CompareAndSwap(cur, next) {
+		if m.geoPathFails.CompareAndSwap(cur, 0) {
+			x, y, z := m.Folk.Position()
+			m.cfg.Log.Warn().
+				Str("npc", m.Instance.Template.Name).
+				Int("x", x).
+				Int("y", y).
+				Int("z", z).
+				Int("heading", m.Heading()).
+				Msg("geopath fail overflow")
 			return
 		}
 	}
