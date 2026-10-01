@@ -199,6 +199,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.BypassPage:
 		sendValidatedHTML(live, f.ObjectID(), reply.HTML, 0)
+	case npc.BypassSellList:
+		l.sendSellList(live, f, reply.HTML)
 	case npc.BypassAborted:
 		return false
 	case npc.BypassUnported:

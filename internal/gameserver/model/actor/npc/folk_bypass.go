@@ -25,12 +25,16 @@ const (
 	// BypassAborted is a command so malformed its handling stops outright:
 	// nothing is sent, not even the dispatcher's closing ActionFailed.
 	BypassAborted
+	// BypassSellList opens the merchant's sell window on the talker's
+	// sellable items. With none to offer, HTML, when set, is shown instead.
+	BypassSellList
 )
 
 // BypassReply is a civilian NPC's answer to one dialog command.
 type BypassReply struct {
 	Outcome BypassOutcome
-	// HTML is the page BypassChatWindow and BypassPage open.
+	// HTML is the page BypassChatWindow and BypassPage open, or the page
+	// BypassSellList shows when there is nothing to sell.
 	HTML string
 	// LeadingActionFailed releases the client before anything else: a
 	// dungeon gatekeeper does so for every command.
@@ -75,6 +79,14 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 			reply.Outcome, reply.HTML = BypassChatWindow, page
 			return reply
 		}
+	}
+	// A merchant or fisherman keeps its sale's empty page in its own folder.
+	if (kind == "Merchant" || kind == "Fisherman") && strings.EqualFold(firstToken(command), "Sell") {
+		reply.Outcome = BypassSellList
+		if page, ok := pages.Get("data/html/" + chat.dir + "/" + strconv.Itoa(f.NpcID()) + "-empty.htm"); ok {
+			reply.HTML = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
+		}
+		return reply
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
 	switch {

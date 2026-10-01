@@ -1242,9 +1242,22 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.handleDlgAnswer(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestSellItem:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSellItem, error) {
+				return clientpackets.DecodeRequestSellItem(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSellItem(live, req) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
-			clientpackets.OpcodeRequestSellItem,
 			clientpackets.OpcodeRequestBuyItem,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,

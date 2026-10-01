@@ -100,7 +100,6 @@ Missing M3 data/UI client packets:
 - `RequestExSetPledgeCrestLarge`
 - `MultiSellChoose`
 - `RequestBuyItem`
-- `RequestSellItem`
 - `RequestPreviewItem`
 - `RequestBuyProcure`
 - `RequestBuySeed`
@@ -127,9 +126,8 @@ Missing M3 data/UI client packets:
 - `RequestConfirmGemStone`
 - `RequestConfirmCancelItem`
 
-`RequestBuyItem` and `RequestSellItem` currently have Go decoders and byte-layout tests only. They
-are still counted as gaps because merchant NPC context, buylist loading/restock wiring, buy/sell
-inventory mutation, adena persistence, and the NPC dialog/bypass owner flow are not implemented.
+`RequestBuyItem` currently has a Go decoder and byte-layout tests only. It is still counted as a gap
+because buylist loading/restock wiring and buy-side inventory mutation are not implemented.
 
 `RequestExEnchantSkillInfo` and `RequestExEnchantSkill` currently have Go decoders and byte-layout
 tests only. They are still counted as gaps because the skill-enchant tree, trainer validation, cost
@@ -141,7 +139,8 @@ counted as gaps because the live augmentation validation/apply/remove flow is no
 
 Implemented and wired M3 data/UI client packets in Go:
 
-- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link` and karma-gate answers; the other NPC dialog commands and the admin, quest, community-board, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
+- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link`, merchant `Sell` and karma-gate answers; the other NPC dialog commands and the admin, quest, community-board, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
+- `RequestSellItem` (sells to the targeted merchant or mercenary manager in interaction distance: sellable rows go for half their reference price in adena, then the merchant's sold page)
 - `RequestLinkHtml`
 - `RequestAllyCrest`
 - `RequestExPledgeCrestLarge`
@@ -239,9 +238,9 @@ Remaining EnterWorld burst packet gaps:
 
 `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
-`PledgeSkillList`, `ExMailArrived`, `PlaySound`, `BuyList`, and `SellList`
+`PledgeSkillList`, `ExMailArrived`, `PlaySound`, and `BuyList`
 currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
-(`talkToFolk`, #720), link and help pages, and the arena signboard. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
+(`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
 frame builders only. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
 `ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
@@ -252,7 +251,6 @@ Missing M3 data/UI server packets:
 
 - `MultiSellList`
 - `BuyList`
-- `SellList`
 - `SellListProcure`
 - `BuyListSeed`
 - `HennaEquipList`
