@@ -35,15 +35,16 @@ func TestFlushWaitsForARequeuedItemWrite(t *testing.T) {
 	holder := order.Reserve(objectID)
 	// Owner 4 shares no lane with owner 1, so only the row is contended.
 	worker.Enqueue(4, func() {
-		holder.Run(func([]int32) {
+		holder.Run(func([]int32) error {
 			close(held)
 			<-release
+			return nil
 		})
 	})
 	<-held
 
 	var wrote atomic.Bool
-	link.queueItemWrite(order.Reserve(objectID), func([]int32) { wrote.Store(true) }, ownerID)
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) error { wrote.Store(true); return nil }, ownerID)
 
 	flushed := make(chan error, 1)
 	go func() { flushed <- worker.Flush(context.Background(), ownerID) }()
@@ -85,7 +86,7 @@ func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
 	link := &GameClientLink{persist: worker, itemWrites: order, log: zerolog.Nop()}
 
 	const ownerID, objectID int32 = 1, 910
-	link.queueItemWrite(order.Reserve(objectID), func([]int32) { panic("store driver blew up") }, ownerID)
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) error { panic("store driver blew up") }, ownerID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -95,7 +96,7 @@ func TestPanickingItemWriteDoesNotWedgeItsLane(t *testing.T) {
 
 	// The row the panicking write held must be free for the next one.
 	landed := false
-	link.queueItemWrite(order.Reserve(objectID), func([]int32) { landed = true }, ownerID)
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) error { landed = true; return nil }, ownerID)
 	if err := worker.Flush(ctx, ownerID); err != nil {
 		t.Fatalf("flush after the following write: %v", err)
 	}
@@ -129,7 +130,7 @@ func TestFlushWaitsForAWriteOwedByAnotherLane(t *testing.T) {
 	<-started
 
 	var wrote atomic.Bool
-	link.queueItemWrite(order.Reserve(objectID), func([]int32) { wrote.Store(true) }, writer, other)
+	link.queueItemWrite(order.Reserve(objectID), func([]int32) error { wrote.Store(true); return nil }, writer, other)
 
 	flushed := make(chan error, 1)
 	go func() { flushed <- worker.Flush(context.Background(), other) }()

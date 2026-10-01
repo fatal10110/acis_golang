@@ -28,9 +28,9 @@ func memberRow(t *testing.T, frame []byte) (name string, level, online int32) {
 
 // TestMemberLoginAndLogout logs the recruit out and back in. Its fellow
 // member sees its row go offline, then on login hears it logged in and
-// sees its row online again. The login burst carries the member's own row
-// and the roster right after EtcStatusUpdate, ahead of the world spawn's
-// welcome.
+// sees its row online again. The login burst carries the clan's skill
+// list, the member's own row and the roster right after EtcStatusUpdate,
+// ahead of the world spawn's welcome.
 func TestMemberLoginAndLogout(t *testing.T) {
 	w := bootClanWorld(t, 10, 0, 0)
 	w.found(t, "Knights")
@@ -49,10 +49,11 @@ func TestMemberLoginAndLogout(t *testing.T) {
 	burst := startInWorld(t, c)
 	order := opcodes(burst)
 	etc := bytes.IndexByte(order, serverpackets.OpcodeEtcStatusUpdate)
-	if etc < 0 || etc+2 >= len(order) || order[etc+1] != serverpackets.OpcodePledgeShowMemberListUpdate || order[etc+2] != serverpackets.OpcodePledgeShowMemberListAll {
-		t.Fatalf("login burst = %x, want PledgeShowMemberListUpdate, PledgeShowMemberListAll right after EtcStatusUpdate", order)
+	if etc < 0 || etc+3 >= len(order) || !isPledgeSkillList(burst[etc+1]) ||
+		order[etc+2] != serverpackets.OpcodePledgeShowMemberListUpdate || order[etc+3] != serverpackets.OpcodePledgeShowMemberListAll {
+		t.Fatalf("login burst = %x, want PledgeSkillList, PledgeShowMemberListUpdate, PledgeShowMemberListAll right after EtcStatusUpdate", order)
 	}
-	if name, _, online := memberRow(t, burst[etc+1]); name != "Recruit" || online != w.memberID {
+	if name, _, online := memberRow(t, burst[etc+2]); name != "Recruit" || online != w.memberID {
 		t.Fatalf("own login row = %q online %d, want Recruit online %d", name, online, w.memberID)
 	}
 	welcome := -1
@@ -64,8 +65,8 @@ func TestMemberLoginAndLogout(t *testing.T) {
 			}
 		}
 	}
-	if welcome < etc+2 {
-		t.Fatalf("WELCOME_TO_LINEAGE at %d, want after the clan block at %d", welcome, etc+2)
+	if welcome < etc+3 {
+		t.Fatalf("WELCOME_TO_LINEAGE at %d, want after the clan block at %d", welcome, etc+3)
 	}
 
 	leader := drainFrames(t, w.leader)

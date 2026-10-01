@@ -2,6 +2,7 @@ package persist
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,8 +17,8 @@ func TestLaterWriteSupersedesAnEarlierOne(t *testing.T) {
 	second := o.Reserve(1)
 
 	var landed []string
-	second.Run(func([]int32) { landed = append(landed, "second") })
-	first.Run(func([]int32) { landed = append(landed, "first") })
+	second.Run(func([]int32) error { landed = append(landed, "second"); return nil })
+	first.Run(func([]int32) error { landed = append(landed, "first"); return nil })
 
 	if len(landed) != 1 || landed[0] != "second" {
 		t.Fatalf("writes that landed = %v, want only the later one", landed)
@@ -30,8 +31,8 @@ func TestEarlierWriteStillLandsWhenItRunsFirst(t *testing.T) {
 	second := o.Reserve(1)
 
 	var landed []string
-	first.Run(func([]int32) { landed = append(landed, "first") })
-	second.Run(func([]int32) { landed = append(landed, "second") })
+	first.Run(func([]int32) error { landed = append(landed, "first"); return nil })
+	second.Run(func([]int32) error { landed = append(landed, "second"); return nil })
 
 	if len(landed) != 2 || landed[0] != "first" || landed[1] != "second" {
 		t.Fatalf("writes that landed = %v, want both in order", landed)
@@ -48,11 +49,12 @@ func TestWritesOfOneRowDoNotOverlap(t *testing.T) {
 	for range writers {
 		w := o.Reserve(1)
 		wg.Go(func() {
-			w.Run(func([]int32) {
+			w.Run(func([]int32) error {
 				if inFlight.Add(1) != 1 {
 					overlaps.Add(1)
 				}
 				inFlight.Add(-1)
+				return nil
 			})
 		})
 	}
@@ -70,11 +72,11 @@ func TestWritesOfDifferentRowsAreIndependent(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		held.Run(func([]int32) { <-release })
+		held.Run(func([]int32) error { <-release; return nil })
 	}()
 
 	ran := make(chan struct{})
-	go func() { other.Run(func([]int32) { close(ran) }) }()
+	go func() { other.Run(func([]int32) error { close(ran); return nil }) }()
 	<-ran
 	close(release)
 	<-done
@@ -85,12 +87,33 @@ func TestBatchWriteKeepsOnlyRowsNoLaterWriteLanded(t *testing.T) {
 	o := NewOrder()
 	batch := o.Reserve(3, 1, 2)
 	later := o.Reserve(2)
-	later.Run(func([]int32) {})
+	later.Run(func([]int32) error { return nil })
 
 	var kept []int32
-	batch.Run(func(ids []int32) { kept = append(kept, ids...) })
+	batch.Run(func(ids []int32) error { kept = append(kept, ids...); return nil })
 	if len(kept) != 2 || kept[0] != 1 || kept[1] != 3 {
 		t.Fatalf("batch wrote %v, want rows 1 and 3 in id order", kept)
+	}
+}
+
+// A write that failed landed nothing, so it supersedes nothing. Two writes of
+// rows 1 and 2 holding their places in different orders — the first later on
+// row 1, the second later on row 2 — must not leave the first keeping row 1
+// alone once the second has run and failed: the rows land together or not at
+// all (#3125).
+func TestFailedWriteSupersedesNothing(t *testing.T) {
+	o := NewOrder()
+	first, second := o.Begin(), o.Begin()
+	second.Add(1)
+	first.Add(1)
+	first.Add(2)
+	second.Add(2)
+
+	second.Run(func([]int32) error { return errors.New("refused") })
+	var kept []int32
+	first.Run(func(ids []int32) error { kept = append(kept, ids...); return nil })
+	if len(kept) != 2 || kept[0] != 1 || kept[1] != 2 {
+		t.Fatalf("first write kept %v after the second failed, want rows 1 and 2", kept)
 	}
 }
 
@@ -99,11 +122,12 @@ func TestNilOrderRunsEveryWrite(t *testing.T) {
 	var o *Order
 	var runs int
 	for range 2 {
-		o.Reserve(1, 2).Run(func(ids []int32) {
+		o.Reserve(1, 2).Run(func(ids []int32) error {
 			runs++
 			if len(ids) != 2 {
 				t.Fatalf("ids = %v, want both rows", ids)
 			}
+			return nil
 		})
 	}
 	if runs != 2 {
@@ -115,7 +139,7 @@ func TestNilOrderRunsEveryWrite(t *testing.T) {
 // against a stale one.
 func TestRowStateIsDroppedOnceQuiet(t *testing.T) {
 	o := NewOrder()
-	o.Reserve(1).Run(func([]int32) {})
+	o.Reserve(1).Run(func([]int32) error { return nil })
 	o.mu.Lock()
 	rows := len(o.rows)
 	o.mu.Unlock()
@@ -123,7 +147,7 @@ func TestRowStateIsDroppedOnceQuiet(t *testing.T) {
 		t.Fatalf("rows still tracked = %d, want 0 once no write is outstanding", rows)
 	}
 	ran := false
-	o.Reserve(1).Run(func([]int32) { ran = true })
+	o.Reserve(1).Run(func([]int32) error { ran = true; return nil })
 	if !ran {
 		t.Fatal("a write for a row that went quiet must run")
 	}
@@ -142,9 +166,10 @@ func TestTryRunGivesUpRatherThanHoldingItsCaller(t *testing.T) {
 	batch := o.Reserve(700, 701)
 	started, hold := make(chan struct{}), make(chan struct{})
 	w.Enqueue(4, func() {
-		batch.Run(func([]int32) {
+		batch.Run(func([]int32) error {
 			close(started)
 			<-hold
+			return nil
 		})
 	})
 	<-started
@@ -152,7 +177,7 @@ func TestTryRunGivesUpRatherThanHoldingItsCaller(t *testing.T) {
 	// A write for one of the held rows, on the other lane.
 	contended := o.Reserve(700)
 	w.Enqueue(1, func() {
-		if contended.TryRun(time.Millisecond, func([]int32) {}) {
+		if contended.TryRun(time.Millisecond, func([]int32) error { return nil }) {
 			t.Error("took a row the batch is holding")
 		}
 	})
@@ -185,21 +210,22 @@ func TestTryRunKeepsItsPlaceForALaterAttempt(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		held.Run(func([]int32) {
+		held.Run(func([]int32) error {
 			close(taken)
 			<-release
+			return nil
 		})
 	}()
 	<-taken
 
-	if waiting.TryRun(time.Millisecond, func([]int32) { t.Error("wrote while the row was held") }) {
+	if waiting.TryRun(time.Millisecond, func([]int32) error { t.Error("wrote while the row was held"); return nil }) {
 		t.Fatal("TryRun reported a write it could not have made")
 	}
 	close(release)
 	<-done
 
 	landed := false
-	if !waiting.TryRun(time.Second, func([]int32) { landed = true }) {
+	if !waiting.TryRun(time.Second, func([]int32) error { landed = true; return nil }) {
 		t.Fatal("TryRun gave up on a free row")
 	}
 	if !landed {
@@ -219,7 +245,7 @@ func TestCancelReleasesWithoutWriting(t *testing.T) {
 		t.Fatalf("rows still tracked = %d, want 0 after a cancelled reservation", rows)
 	}
 	landed := false
-	o.Reserve(1).Run(func([]int32) { landed = true })
+	o.Reserve(1).Run(func([]int32) error { landed = true; return nil })
 	if !landed {
 		t.Fatal("a cancelled reservation must not supersede a later write")
 	}

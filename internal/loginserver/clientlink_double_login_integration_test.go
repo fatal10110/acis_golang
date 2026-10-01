@@ -105,6 +105,12 @@ func TestClientLinkLoginForAccountOnGameServerRejectsAndKicks(t *testing.T) {
 	key1, key2 := first.login(l, "player1", "s3cret")
 
 	gs.sendPlayerInGame("player1")
+	// PlayerInGame is applied on the link's goroutine; wait for it, or the
+	// second login can take the still-mapped double-login path instead.
+	waitUntil(t, "player1 online on server 1", func() bool {
+		_, online := servers.AccountServerID("player1")
+		return online
+	})
 
 	second := dialLoginClient(t, clientAddr)
 	second.gameGuard()

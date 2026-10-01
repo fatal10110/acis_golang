@@ -208,17 +208,17 @@ Implemented and wired EnterWorld burst packets in Go:
 - `ShortCutInit`
 - `Die`
 - `SkillCoolTime`
+- `PledgeSkillList` for a clan member, first in the clan block; also `PledgeSkillListAdd` to every online member as the clan learns a skill ([#717](https://github.com/fatal10110/acis_golang/issues/717))
 
 Remaining EnterWorld burst packet gaps:
 
-- `PledgeSkillList` ([#717](https://github.com/fatal10110/acis_golang/issues/717))
 - `ExMailArrived` ([#718](https://github.com/fatal10110/acis_golang/issues/718))
 - `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
 - `NpcHtmlMessage` clan notice / server news ([#2951](https://github.com/fatal10110/acis_golang/issues/2951))
 
 `PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
-`PledgeSkillList`, `ExMailArrived`, and `PlaySound`
+`ExMailArrived`, and `PlaySound`
 currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
 (`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow` (the blacksmith's `Augment 1` and
@@ -338,7 +338,7 @@ Implemented and wired M5 shortcut server packets in Go:
 - `RequestChangeMoveType`, `RequestChangeWaitType`, and `RequestSocialAction` now wire the current run/walk, sit/stand, and social-animation state available in Go. Missing higher-level gates such as mount state, fishing, requester/trade state, and full AI intention are still owned by the systems that introduce those states.
 - `RequestDropItem`, `RequestDestroyItem`, and `SendTimeCheck` are wired. Drop/destroy currently cover the inventory/template/count gates available in Go and emit `InventoryUpdate`; player drops also place a ground item through the ground-item task and emit the animated `DropItem` frame during the transient dropper-id window.
 - `RequestCrystallizeItem` is wired for restored runtime-known Crystallize skill levels, crystallizable item gates, crystal reward grants, `SystemMessage` feedback, and `InventoryUpdate`.
-- `RequestAcquireSkillInfo` and `RequestAcquireSkill` are wired for usual class-template skill learning, learned-skill persistence, `SkillList` refresh, SP `StatusUpdate`, and success/failure `SystemMessage` feedback. Enchant, clan, fishing, transform, and special-trainer learning remain deferred to their owning systems.
+- `RequestAcquireSkillInfo` and `RequestAcquireSkill` are wired for usual class-template skill learning, learned-skill persistence, `SkillList` refresh, SP `StatusUpdate`, and success/failure `SystemMessage` feedback. Clan skill learning (pledge type 2) is wired to the clan's leader, reputation and item cost (#149). Enchant, fishing, transform, and special-trainer learning remain deferred to their owning systems.
 - `RequestMagicSkillUse` is wired for known non-passive active skills with `SELF`, `NONE`, `GROUND`, or `ONE` targets, using the current cast controller for MP/HP/item/reuse validation and emitting `MagicSkillUse`, `SetupGauge`, `MagicSkillLaunched`, `SystemMessage`, `ActionFailed`, and MP/HP `StatusUpdate` where applicable. Full AI intention scheduling, delayed cast timers, target-handler integration, effect/skill-handler application, toggles, fusion/signet/chance skills, item-triggered casts, and summon/pet casts remain deferred to the M6 cast/effect runtime. The player cast now runs the real timed Launch/Hit/Finish lifecycle with abort/interrupt broadcasting `MagicSkillCanceled`, `SystemMessage`, and `ActionFailed` (#1000, #1002).
 - `RequestEnchantItem` is wired through the enchant-scroll `UseItem` path, `ChooseInventoryItem`, scroll ownership/count validation, item enchantability/grade/type gates, scroll consumption, item enchant persistence, blessed reset, normal break/crystal reward, `EnchantResult`, `InventoryUpdate`, `SystemMessage`, and self `UserInfo`. Config-file overrides for enchant rates, store/trade-state gates, and +4 dual/+6 armor-set passive skill side effects remain deferred to their owning systems.
 - `RequestPetUseItem`, `RequestGiveItemToPet`, `RequestGetItemFromPet`, and `RequestPetGetItem` are wired for active-pet lookup, pet inventory transfer/equip mutation, immediate visible ground-item pickup, item persistence, `GetItem`, `DeleteObject`, `PetInventoryUpdate`, player `InventoryUpdate`, and pet-use `SystemMessage` feedback. Pet AI movement-to-pickup, drop-protection/looter gates, pet food/potion item handlers, player operating/transaction-state gates, and richer pet stat refreshes remain deferred to their owning systems.

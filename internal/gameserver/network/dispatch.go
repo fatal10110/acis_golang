@@ -309,6 +309,7 @@ type GameClientLink struct {
 	parties          *partyRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
+	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
 	targets          *skilltarget.Registry

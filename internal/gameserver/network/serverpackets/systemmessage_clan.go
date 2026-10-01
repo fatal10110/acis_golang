@@ -37,8 +37,10 @@ const (
 	SystemMessageClanMemberS1PrivilegeChangedToS2   = 1761 // text then number parameter
 	SystemMessageClanCanAccumulateReputation        = 1771 // no parameter
 	SystemMessageS1DeductedFromClanRep              = 1787 // number parameter
+	SystemMessageClanSkillS1Added                   = 1788 // skill name parameter
 	SystemMessageReputationLowClanSkillsDeactivated = 1789 // no parameter
 	SystemMessageFailedToIncreaseClanLevel          = 1790 // no parameter
 	SystemMessageS1ClanIsFull                       = 1835 // text parameter
+	SystemMessageAcquireSkillFailedBadClanRepScore  = 1852 // no parameter
 	SystemMessageClanSkillsActivatedReputation      = 1862 // no parameter
 )

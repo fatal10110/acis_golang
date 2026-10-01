@@ -43,7 +43,10 @@ type Member struct {
 	PowerGrade int
 	Apprentice int32
 	Sponsor    int32
-	Online     bool
+	// LvlJoinedAcademy is the level the member joined the academy at; 0
+	// for a member that never did, which is what marks an academy member.
+	LvlJoinedAcademy int
+	Online           bool
 }
 
 // Clan is one clan. mu guards every field: members join and leave on their
@@ -69,10 +72,34 @@ type Clan struct {
 	allyPenaltyType   int
 	charPenaltyExpiry int64
 	dissolvingExpiry  int64
-	atWar             bool
 
 	members    map[int32]*Member
 	privileges map[int]int32
+	// skills maps each skill the clan learnt to its level.
+	skills map[int]int
+	// subunits are the academy, royal guards and knight orders the clan
+	// founded, by pledge type.
+	subunits map[int]*SubPledge
+	// wars are the clans this clan declared war on; attackers the clans
+	// that declared war on it; warPenalties when this clan may declare
+	// war again on a clan it stopped a war with, in epoch milliseconds.
+	wars         map[int32]struct{}
+	attackers    map[int32]struct{}
+	warPenalties map[int32]int64
+}
+
+// newClan returns a clan with empty rosters and registries.
+func newClan(id int32, name string, leaderID int32) *Clan {
+	return &Clan{
+		id: id, name: name, leaderID: leaderID,
+		members:      map[int32]*Member{},
+		privileges:   map[int]int32{},
+		skills:       map[int]int{},
+		subunits:     map[int]*SubPledge{},
+		wars:         map[int32]struct{}{},
+		attackers:    map[int32]struct{}{},
+		warPenalties: map[int32]int64{},
+	}
 }
 
 // Info is a clan's header as the pledge window shows it.
@@ -138,7 +165,7 @@ func (cl *Clan) infoLocked() Info {
 		CrestID: cl.crestID, CrestLarge: cl.crestLargeID,
 		Rank: cl.rank, Reputation: cl.reputation,
 		DissolvingExpiry: cl.dissolvingExpiry,
-		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID, AtWar: cl.atWar,
+		AllyID:           cl.allyID, AllyName: cl.allyName, AllyCrestID: cl.allyCrestID, AtWar: len(cl.wars) > 0,
 	}
 	if leader, ok := cl.members[cl.leaderID]; ok {
 		info.LeaderName = leader.Name
@@ -285,9 +312,12 @@ func (cl *Clan) HasPrivilege(objectID int32, p Privilege) bool {
 	return cl.MemberPrivileges(objectID)&int32(p) != 0
 }
 
-// leadsSubunit returns the sub-unit objectID leads, 0 when none. Sub-units
-// are not loaded yet (#149), so no member leads one.
-func (cl *Clan) leadsSubunit(int32) int { return 0 }
+// leadsSubunit returns the sub-unit objectID leads, 0 when none.
+func (cl *Clan) leadsSubunit(objectID int32) int {
+	cl.mu.RLock()
+	defer cl.mu.RUnlock()
+	return cl.leadsSubunitLocked(objectID)
+}
 
 // PowerGradeCounts returns how many members hold each power grade 0-9.
 func (cl *Clan) PowerGradeCounts() [10]int {

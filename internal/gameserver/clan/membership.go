@@ -59,11 +59,7 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 		s.log.Error().Err(err).Msg("clan: allocate clan id")
 		return nil, CreateFailed
 	}
-	cl := &Clan{
-		id: id, name: name, leaderID: c.ID,
-		members:    map[int32]*Member{},
-		privileges: map[int]int32{},
-	}
+	cl := newClan(id, name, c.ID)
 	leader := LiveMember(c)
 	leader.Title = ""
 	leader.PowerGrade = LeaderPowerGrade
@@ -120,6 +116,9 @@ const (
 	JoinTargetPenalty
 	JoinClanFull
 	JoinSubunitFull
+	// JoinAcademyRequirements refuses an academy recruit above level 40
+	// or past its first class transfer.
+	JoinAcademyRequirements
 )
 
 // CheckJoin reports whether inviterID may invite target into cl's sub-unit
@@ -131,9 +130,9 @@ func (s *Service) CheckJoin(cl *Clan, inviterID int32, target *player.Character,
 }
 
 // checkJoinLocked runs the invitation rules. The target's block list is
-// not modeled yet (#3151), so a blocking target is never refused. Only the
-// main clan recruits: sub-units are not loaded yet (#149), so an
-// invitation into one finds no room.
+// not modeled yet (#3151), so a blocking target is never refused. An
+// invitation into a sub-unit the clan has not founded finds no room: a
+// crafted request could otherwise fill a sub-unit no roster lists.
 func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, pledgeType int, now time.Time) JoinRefusal {
 	nowMs := now.UnixMilli()
 	switch {
@@ -147,20 +146,39 @@ func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, pledg
 		return JoinClanPenalty
 	case target.ClanJoinExpiryTime() > nowMs:
 		return JoinTargetPenalty
-	case pledgeType != SubunitMain:
+	case pledgeType == SubunitAcademy && !academyAge(target):
+		return JoinAcademyRequirements
+	}
+	if _, founded := cl.subunits[pledgeType]; pledgeType != SubunitMain && !founded {
 		return JoinSubunitFull
-	case cl.subunitCountLocked(pledgeType) >= MaxMembers(cl.level, pledgeType):
-		return JoinClanFull
+	}
+	if cl.subunitCountLocked(pledgeType) >= MaxMembers(cl.level, pledgeType) {
+		if pledgeType == SubunitMain {
+			return JoinClanFull
+		}
+		return JoinSubunitFull
 	}
 	return JoinAllowed
 }
 
+// academyAge reports whether c may join an academy: level 40 or below and
+// not past its first class transfer.
+func academyAge(c *player.Character) bool {
+	classLevel, _ := player.ClassLevel(c.ClassID())
+	return c.Level() <= academyMaxLevel && classLevel <= academyMaxClassLevel
+}
+
 // Join puts c into cl's sub-unit pledgeType on inviterID's invitation,
-// re-checking the invitation rules first. A main-clan recruit takes rank 6.
+// re-checking the invitation rules first. A recruit takes rank 6 in the
+// main clan, 7 in a royal guard, 8 in a knight order and 9 in the academy,
+// which also records the level it joined at.
 func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, pledgeType int, now time.Time) JoinRefusal {
 	m := LiveMember(c)
 	m.PledgeType = pledgeType
-	m.PowerGrade = MemberPowerGrade
+	m.PowerGrade = recruitPowerGrade(pledgeType)
+	if pledgeType == SubunitAcademy {
+		m.LvlJoinedAcademy = c.Level()
+	}
 	m.Online = true
 	cl.mu.Lock()
 	if refusal := cl.checkJoinLocked(inviterID, c, pledgeType, now); refusal != JoinAllowed {
@@ -169,7 +187,10 @@ func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, pledgeTyp
 	}
 	m.Title = ""
 	cl.members[c.ID] = &m
-	s.saveMembershipLocked(MembershipRow{ObjectID: c.ID, ClanID: cl.id, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType})
+	s.saveMembershipLocked(MembershipRow{
+		ObjectID: c.ID, ClanID: cl.id, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType,
+		LvlJoinedAcademy: m.LvlJoinedAcademy,
+	})
 	cl.mu.Unlock()
 
 	c.SetClanID(cl.id)
@@ -276,6 +297,7 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 		return Member{}, false
 	}
 	delete(cl.members, objectID)
+	s.unlinkLeaverLocked(cl, m)
 	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil}
 	switch {
 	case wasLeader:
