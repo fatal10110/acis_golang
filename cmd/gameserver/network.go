@@ -102,6 +102,7 @@ func provideGameClientLink(
 	clans *clan.Service,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
+	chatLog chatLogger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
 	freightCfg := gameplay.Freight
@@ -195,6 +196,13 @@ func provideGameClientLink(
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),
+		Chat: network.ChatConfig{
+			Log:              chatLog.enabled(gameplay.Chat.LogChat),
+			WalkerProtection: gameplay.Chat.WalkerProtection,
+			GlobalDelay:      gameplay.Chat.GlobalDelay,
+			TradeDelay:       gameplay.Chat.TradeDelay,
+			HeroVoiceDelay:   gameplay.Chat.HeroVoiceDelay,
+		},
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),

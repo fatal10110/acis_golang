@@ -143,6 +143,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestFriendDel", decodes(DecodeRequestFriendDel), seedPacket(OpcodeRequestFriendDel, "Kookaburra")},
 	{"RequestBlock", decodes(DecodeRequestBlock), seedPacket(OpcodeRequestBlock, int32(0), "Kookaburra")},
 	{"RequestSendL2FriendSay", decodes(DecodeRequestSendL2FriendSay), seedPacket(OpcodeRequestSendL2FriendSay, "hello", "Kookaburra")},
+	{"Say2", decodes(DecodeSay2), seedPacket(OpcodeSay2, "hello", int32(2), "Kookaburra")},
 	{"RequestPetUseItem", decodes(DecodeRequestPetUseItem), seedPacket(OpcodeRequestPetUseItem, seedObjectID)},
 	{"RequestGiveItemToPet", decodes(DecodeRequestGiveItemToPet), seedPacket(OpcodeRequestGiveItemToPet, seedObjectID, int32(1))},
 	{"RequestGetItemFromPet", decodes(DecodeRequestGetItemFromPet), seedPacket(OpcodeRequestGetItemFromPet, seedObjectID, int32(1), int32(0))},

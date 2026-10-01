@@ -60,6 +60,7 @@ const (
 	SystemMessageAlreadyTrading                    = 142
 	SystemMessageTargetIncorrect                   = 144
 	SystemMessageTargetNotFound                    = 145
+	SystemMessageInMessageRefusalMode              = 176
 	SystemMessageCannotUseQuestItems               = 148
 	SystemMessageCannotPickupOrUseItemTrading      = 149
 	SystemMessageS1IsBusyTryLater                  = 153

@@ -124,15 +124,28 @@ func mapRegion(loc location.Location) location.Point {
 
 // PointAt returns the restart point whose map region contains loc, if any.
 func (t *Table) PointAt(loc location.Location) (Point, bool) {
+	if i := t.PointIndexAt(loc); i >= 0 {
+		return t.Points[i], true
+	}
+	return Point{}, false
+}
+
+// PointIndexAt returns the index in Points of the restart point whose map
+// region contains loc, or -1 when none does or t is nil. Two positions with
+// the same index lie in the same region.
+func (t *Table) PointIndexAt(loc location.Location) int {
+	if t == nil {
+		return -1
+	}
 	region := mapRegion(loc)
-	for _, p := range t.Points {
+	for i, p := range t.Points {
 		for _, r := range p.MapRegions {
 			if r == region {
-				return p, true
+				return i
 			}
 		}
 	}
-	return Point{}, false
+	return -1
 }
 
 // CalculatedPoint resolves the restart point that applies to a creature of

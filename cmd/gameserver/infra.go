@@ -27,24 +27,36 @@ func (g gmAuditLogger) enabled(on bool) zerolog.Logger {
 	return zerolog.Logger(g)
 }
 
-func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Logger, gmAuditLogger, error) {
+// chatLogger is the chat log sink, apart from the process logger.
+type chatLogger zerolog.Logger
+
+// enabled returns the chat sink when on is set (server.properties LogChat),
+// else the zero logger, which records nothing.
+func (c chatLogger) enabled(on bool) zerolog.Logger {
+	if !on {
+		return zerolog.Logger{}
+	}
+	return zerolog.Logger(c)
+}
+
+func provideGameServerLogger(lc fx.Lifecycle, paths gameServerPaths) (zerolog.Logger, gmAuditLogger, chatLogger, error) {
 	props, err := config.LoadFile(paths.LoggingPath)
 	if err != nil {
-		return zerolog.Logger{}, gmAuditLogger{}, err
+		return zerolog.Logger{}, gmAuditLogger{}, chatLogger{}, err
 	}
 	cfg, err := logging.ConfigFromProperties(props)
 	if err != nil {
-		return zerolog.Logger{}, gmAuditLogger{}, err
+		return zerolog.Logger{}, gmAuditLogger{}, chatLogger{}, err
 	}
 	rt, err := logging.Setup(paths.LogRoot, cfg, os.Stderr)
 	if err != nil {
-		return zerolog.Logger{}, gmAuditLogger{}, err
+		return zerolog.Logger{}, gmAuditLogger{}, chatLogger{}, err
 	}
 	lc.Append(fx.Hook{OnStop: func(context.Context) error { return rt.Close() }})
 	// Config warnings are raised lazily while properties are read, so route
 	// them here rather than leaving them on the unconfigured stderr logger.
 	config.SetLogger(rt.Logger)
-	return rt.Logger, gmAuditLogger(rt.GMAudit), nil
+	return rt.Logger, gmAuditLogger(rt.GMAudit), chatLogger(rt.Chat), nil
 }
 
 func provideGameServerDatabase(lc fx.Lifecycle, cfg gameServerConfig) (*sql.DB, error) {

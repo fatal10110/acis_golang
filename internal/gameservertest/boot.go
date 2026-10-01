@@ -97,6 +97,7 @@ type options struct {
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
 	gmAudit                zerolog.Logger
+	chat                   network.ChatConfig
 	restarts               *restart.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
@@ -259,6 +260,11 @@ func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlis
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
 func WithGMAudit(log zerolog.Logger) Option { return func(o *options) { o.gmAudit = log } }
+
+// WithChat sets the server.properties chat settings: the chat log, the bot
+// whisper filter and the chat reuse delays (default: nothing logged,
+// nothing filtered, no delay).
+func WithChat(cfg network.ChatConfig) Option { return func(o *options) { o.chat = cfg } }
 
 // WithRestartPoints supplies the restart-point table wired into the link
 // (default: none, so restart requests answer ActionFailed).
@@ -1682,6 +1688,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Levels:           levels,
 		Admin:            o.admin,
 		GMAudit:          o.gmAudit,
+		Chat:             o.chat,
 		Log:              o.log,
 	}
 	// The clans are restored once the characters are seeded, below.

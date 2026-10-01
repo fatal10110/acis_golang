@@ -129,6 +129,14 @@ import (
 // naming nobody, and every war proposal reply: no request proposes a war,
 // a stop or a surrender to another player, so a reply never has one to
 // answer.
+//
+// Say2 lines the reference drops without an answer are absent as well: an
+// empty or over-long line, an unknown channel, a non-GM announcement, a bot
+// whisper, a flooded channel, a party, clan or command-channel line from a
+// player outside one, a hero line from a non-hero, and a channel with no
+// handler. Chat registers no pending client action (the client prints the
+// line only when the server sends it back). tests/social, tests/party and
+// tests/clan assert those silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -179,6 +187,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestFriendDel naming no friend", encodeNamedRequest(clientpackets.OpcodeRequestFriendDel, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestBlock naming no character", encodeRequestBlock(clientpackets.BlockAdd, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestSendL2FriendSay to no friend", encodeRequestSendL2FriendSay("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"Say2 whisper to nobody online", encodeSay2Tell("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 	}
@@ -255,6 +264,14 @@ func encodeRequestSendL2FriendSay(message, recipient string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSendL2FriendSay)
 	w.WriteString(message)
 	w.WriteString(recipient)
+	return w.Bytes()
+}
+
+func encodeSay2Tell(text, target string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSay2)
+	w.WriteString(text)
+	w.WriteInt32(2)
+	w.WriteString(target)
 	return w.Bytes()
 }
 
