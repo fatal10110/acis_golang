@@ -56,14 +56,22 @@ func NewCrestsIn(dir string) *Crests {
 }
 
 // LoadCrests reads valid crest .dds files from dir into memory; new crests
-// are saved there too.
-func LoadCrests(dir string) (*Crests, error) {
+// are saved there too. A crest file whose size does not match its family is
+// deleted and skipped, and its name is returned in deleted.
+//
+// The load stops at the first file it cannot handle (an id that is not a
+// number, an unreadable file, an undeletable invalid file), as the
+// reference does. It then returns the cache holding the crests read before
+// that file together with a non-nil error saying why it stopped, so the
+// caller can keep the partial cache and report the failure. A nil cache
+// with an error means the directory itself could not be read.
+func LoadCrests(dir string) (c *Crests, deleted []string, err error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("load crests from %q: %w", dir, err)
+		return nil, nil, fmt.Errorf("load crests from %q: %w", dir, err)
 	}
 
-	c := NewCrestsIn(dir)
+	c = NewCrestsIn(dir)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -72,7 +80,7 @@ func LoadCrests(dir string) (*Crests, error) {
 		name := entry.Name()
 		typ, id, ok, err := parseCrestName(name)
 		if err != nil {
-			return c, nil
+			return c, deleted, fmt.Errorf("load crests from %q: crest file %s: %w", dir, name, err)
 		}
 		if !ok {
 			continue
@@ -81,19 +89,20 @@ func LoadCrests(dir string) (*Crests, error) {
 		path := filepath.Join(dir, name)
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return c, nil
+			return c, deleted, fmt.Errorf("load crests from %q: %w", dir, err)
 		}
 		spec, _ := typ.spec()
 		if len(data) != spec.size {
 			if err := os.Remove(path); err != nil {
-				return c, nil
+				return c, deleted, fmt.Errorf("load crests from %q: delete invalid crest: %w", dir, err)
 			}
+			deleted = append(deleted, name)
 			continue
 		}
 		c.byKey[crestKey{typ, id}] = data
 	}
 
-	return c, nil
+	return c, deleted, nil
 }
 
 // Get returns a copy of the typ crest id's data when it exists.

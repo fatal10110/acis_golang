@@ -88,25 +88,20 @@ func (s *Service) newCrestID(typ datacache.CrestType, files *datacache.Crests) (
 	return 0, false
 }
 
-// changeCrest points cl's typ crest at id, queues the clan_data column and
-// removes the image it pointed at before. Clearing a crest that is not set
-// changes nothing and reports false.
+// changeCrest points cl's typ crest at id and queues the clan_data column;
+// the image it pointed at before is removed once that column write has
+// landed. Clearing a crest that is not set changes nothing and reports
+// false.
 func (s *Service) changeCrest(cl *Clan, typ datacache.CrestType, id int32, files *datacache.Crests) bool {
 	cl.mu.Lock()
+	defer cl.mu.Unlock()
 	field := cl.crestFieldLocked(typ)
 	if field == nil || (id == 0 && *field == 0) {
-		cl.mu.Unlock()
 		return false
 	}
 	old := *field
 	*field = id
-	s.queueCrestLocked(cl, typ, id)
-	cl.mu.Unlock()
-	if old != 0 {
-		if err := files.Remove(typ, int(old)); err != nil {
-			s.log.Error().Err(err).Int32("clan_id", cl.id).Msg("clan: remove replaced crest")
-		}
-	}
+	s.queueCrestLocked(cl, typ, id, old, files)
 	return true
 }
 
@@ -126,7 +121,7 @@ func (s *Service) DropMissingCrests(files *datacache.Crests) {
 			}
 			s.log.Warn().Int32("clan_id", cl.id).Int("crest_type", int(typ)).Int32("crest_id", *field).Msg("clan: removing non-existent crest")
 			*field = 0
-			s.queueCrestLocked(cl, typ, 0)
+			s.queueCrestLocked(cl, typ, 0, 0, files)
 		}
 		cl.mu.Unlock()
 	}
@@ -145,10 +140,30 @@ func (cl *Clan) crestFieldLocked(typ datacache.CrestType) *int32 {
 	return nil
 }
 
-// queueCrestLocked queues cl's typ crest column as id; cl.mu is held.
-func (s *Service) queueCrestLocked(cl *Clan, typ datacache.CrestType, id int32) {
-	clanID := cl.id
+// queueCrestLocked queues cl's typ crest column as id; cl.mu is held. A
+// non-zero replaced crest is removed from files right after the column
+// write succeeds on the clan's lane, so a crash before the write lands
+// leaves the stored column pointing at an image that still exists, and a
+// failed write keeps the image the stored column still names.
+func (s *Service) queueCrestLocked(cl *Clan, typ datacache.CrestType, id, replaced int32, files *datacache.Crests) {
+	clanID, log := cl.id, s.log
+	removeReplaced := func() {
+		if replaced == 0 {
+			return
+		}
+		if err := files.Remove(typ, int(replaced)); err != nil {
+			log.Error().Err(err).Int32("clan_id", clanID).Msg("clan: remove replaced crest")
+		}
+	}
+	if s.store == nil {
+		removeReplaced()
+		return
+	}
 	s.write(clanID, "update clan crest", func(ctx context.Context, st Store) error {
-		return st.UpdateCrest(ctx, clanID, typ, id)
+		if err := st.UpdateCrest(ctx, clanID, typ, id); err != nil {
+			return err
+		}
+		removeReplaced()
+		return nil
 	})
 }

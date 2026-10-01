@@ -241,7 +241,7 @@ func TestBootDropsMissingCrests(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "Crest_700.dds"), bytes.Repeat([]byte{9}, pledgeCrestSize), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	crests, err := datacache.LoadCrests(dir)
+	crests, _, err := datacache.LoadCrests(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

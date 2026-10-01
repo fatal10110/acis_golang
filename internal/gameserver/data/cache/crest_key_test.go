@@ -19,7 +19,7 @@ func TestCrestsSameIDDifferentFamily(t *testing.T) {
 	writeCrestFixture(t, dir, "LargeCrest_5.dds", large)
 	writeCrestFixture(t, dir, "AllyCrest_5.dds", ally)
 
-	crests, err := LoadCrests(dir)
+	crests, _, err := LoadCrests(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
