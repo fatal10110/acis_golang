@@ -267,10 +267,12 @@ Missing M4 world/movement server packets:
 - `ValidateLocationInVehicle`
 - `VehicleStarted`
 
-Implemented M4 time/day-night server packet encoders in Go. The only sender is the admin `//atmosphere sky day|night` broadcast, tracked by #3172. Day/night crossings and EnterWorld do not send them:
+Implemented sky server packets in Go and wired to their only sender, the admin `//atmosphere sky|ssqinfo <state>` broadcast to every online player (#3172). Day/night crossings and EnterWorld do not send SunRise/SunSet:
 
 - `SunRise`
 - `SunSet`
+- `ExRedSky`
+- `SSQInfo` (all four seven-signs sky states)
 
 Implemented M5 item/status server packet encoders in Go, with owning runtime wiring still tracked by the relevant systems:
 
