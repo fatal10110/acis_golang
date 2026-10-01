@@ -86,7 +86,7 @@ func coerceByte(val any) (v byte, ok bool, err error) {
 		return byte(n), true, nil
 	}
 	if str, ok := val.(string); ok {
-		n, err := strconv.ParseInt(str, 10, 8)
+		n, err := ParseInt(str, 8)
 		if err != nil {
 			return 0, true, err
 		}
@@ -268,7 +268,7 @@ func coerceInt(val any) (v int, ok bool, err error) {
 		return int(n), true, nil
 	}
 	if str, ok := val.(string); ok {
-		n, err := strconv.Atoi(str)
+		n, err := Atoi(str)
 		if err != nil {
 			return 0, true, err
 		}
@@ -388,7 +388,7 @@ func coerceIntArray(val any) (v []int, ok bool, err error) {
 		parts := strings.Split(str, ";")
 		out := make([]int, len(parts))
 		for i, p := range parts {
-			n, err := strconv.Atoi(p)
+			n, err := Atoi(p)
 			if err != nil {
 				return nil, true, err
 			}
@@ -453,7 +453,7 @@ func coerceInt64(val any) (v int64, ok bool, err error) {
 		return n, true, nil
 	}
 	if str, ok := val.(string); ok {
-		n, err := strconv.ParseInt(str, 10, 64)
+		n, err := ParseInt(str, 64)
 		if err != nil {
 			return 0, true, err
 		}
@@ -486,7 +486,7 @@ func (s *StatSet) GetInt64Array(key string) ([]int64, error) {
 		parts := strings.Split(str, ";")
 		out := make([]int64, len(parts))
 		for i, p := range parts {
-			n, err := strconv.ParseInt(p, 10, 64)
+			n, err := ParseInt(p, 64)
 			if err != nil {
 				return nil, fmt.Errorf("commons: StatSet key %q: %w", key, err)
 			}

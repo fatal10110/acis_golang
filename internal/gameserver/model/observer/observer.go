@@ -3,7 +3,6 @@ package observer
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -69,7 +68,7 @@ func NewSpawn(set *commons.StatSet) (Spawn, error) {
 	parts := strings.Split(groupText, ";")
 	groups := make([]int, 0, len(parts))
 	for _, part := range parts {
-		groupID, err := strconv.Atoi(part)
+		groupID, err := commons.Atoi(part)
 		if err != nil {
 			return Spawn{}, wrap(fmt.Errorf("groups %q: %w", groupText, err))
 		}

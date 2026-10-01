@@ -2,7 +2,6 @@ package commons
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -33,7 +32,7 @@ func ParseGameDuration(s string) (time.Duration, error) {
 		if !ok {
 			continue
 		}
-		v, err := strconv.Atoi(n)
+		v, err := Atoi(n)
 		if err != nil {
 			return 0, fmt.Errorf("commons: game duration %q: %w", s, err)
 		}

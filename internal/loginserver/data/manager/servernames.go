@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ServerNames is the static id -> display-name table used to name a newly
@@ -29,7 +30,7 @@ type serverNamesFile struct {
 type serverID int32
 
 func (id *serverID) UnmarshalXMLAttr(attr xml.Attr) error {
-	n, err := strconv.ParseInt(attr.Value, 10, 32)
+	n, err := commons.ParseInt(attr.Value, 32)
 	if err != nil {
 		return fmt.Errorf("%s: %w", attr.Name.Local, err)
 	}

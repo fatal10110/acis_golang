@@ -82,7 +82,7 @@ func (a *attrValues) int(key string) int {
 		a.fail(fmt.Errorf("attribute %q is required", key))
 		return 0
 	}
-	n, err := strconv.Atoi(raw)
+	n, err := commons.Atoi(raw)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0
@@ -126,7 +126,7 @@ func (a *attrValues) intDefault(key string, def int) int {
 	if !ok {
 		return def
 	}
-	n, err := strconv.Atoi(raw)
+	n, err := commons.Atoi(raw)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return def

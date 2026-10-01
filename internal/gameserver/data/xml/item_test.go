@@ -718,14 +718,13 @@ func TestLoadItemTemplatesDecodesConditionMessageIDLiterals(t *testing.T) {
 	writeItemFile(t, dir, "fixture.xml", `
 		<item id="1" type="EtcItem" name="decimal"><cond msgId="100"><player /></cond></item>
 		<item id="2" type="EtcItem" name="octal"><cond msgId="0144"><player /></cond></item>
-		<item id="3" type="EtcItem" name="hex"><cond msgId="0x64"><player /></cond></item>
-		<item id="4" type="EtcItem" name="hash"><cond msgId="#64" addName="1"><player /></cond></item>`)
+		<item id="3" type="EtcItem" name="hex"><cond msgId="0x64" addName="1"><player /></cond></item>`)
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
-	for _, id := range []int32{1, 2, 3, 4} {
+	for _, id := range []int32{1, 2, 3} {
 		tpl, ok := table.Get(id)
 		if !ok {
 			t.Fatalf("item %d was not loaded", id)
@@ -734,8 +733,8 @@ func TestLoadItemTemplatesDecodesConditionMessageIDLiterals(t *testing.T) {
 		if cond.MessageID != 100 {
 			t.Errorf("item %d MessageID = %d, want 100", id, cond.MessageID)
 		}
-		if cond.AddName != (id == 4) {
-			t.Errorf("item %d AddName = %t, want %t", id, cond.AddName, id == 4)
+		if cond.AddName != (id == 3) {
+			t.Errorf("item %d AddName = %t, want %t", id, cond.AddName, id == 3)
 		}
 	}
 }

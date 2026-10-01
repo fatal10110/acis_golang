@@ -3,9 +3,9 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/rs/zerolog"
 )
@@ -255,12 +255,12 @@ func parseIntPairAttr(a *attrValues, key string) (int32, int32) {
 		a.fail(fmt.Errorf("attribute %q: want \"a,b\", got %q", key, raw))
 		return 0, 0
 	}
-	rate, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
+	rate, err := commons.ParseInt(strings.TrimSpace(parts[0]), 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0
 	}
-	value, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 32)
+	value, err := commons.ParseInt(strings.TrimSpace(parts[1]), 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0
@@ -335,7 +335,7 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 				// has no effect templates, so on an <item> the parsed
 				// template is validated then discarded: validate required
 				// attrs, no attachment.
-				if err := validateItemEffect(id, opEl); err != nil {
+				if err := validateItemEffect(id, opEl, tables); err != nil {
 					return nil, nil, err
 				}
 				continue
@@ -362,7 +362,10 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 				mod.AttachCondition = attachCond
 			}
 			if len(opEl.Children) > 0 {
-				cond := buildCondition(opEl.Children[0])
+				cond, err := buildCondition(opEl.Children[0], condRolePredicate)
+				if err != nil {
+					return nil, nil, fmt.Errorf("item template %d: %s: %w", id, opEl.XMLName.Local, err)
+				}
 				mod.Condition = &cond
 			}
 			modifiers = append(modifiers, mod)
@@ -387,9 +390,24 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 // rather than stored. This only
 // checks the effect element's own required attrs, not its nested func/cond
 // children (ponytail: no shipped item XML carries <effect> today; deepen
-// if a future datapack file nests funcs inside one).
-func validateItemEffect(id int32, opEl funcElement) error {
+// if a future datapack file nests funcs inside one). Like a stat func's,
+// the effect's val reads the item's own tables; every other value the
+// effect reader would resolve against a template's tables fails instead,
+// because an item is not such a template.
+func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) error {
 	vals := foldAttrs(opEl.Attrs)
+	for _, name := range itemEffectTableAttrs {
+		if err := noTableRef(name, vals[name]); err != nil {
+			return fmt.Errorf("item template %d: effect: %w", id, err)
+		}
+	}
+	if raw, ok := vals["val"]; ok {
+		resolved, err := resolveTableValue(tables, "val", raw, 1)
+		if err != nil {
+			return fmt.Errorf("item template %d: effect: %w", id, err)
+		}
+		vals["val"] = resolved
+	}
 	a := newAttrValues(vals, "effect")
 	_ = a.str("name")
 	_ = a.float64("val")
@@ -397,6 +415,13 @@ func validateItemEffect(id int32, opEl funcElement) error {
 		return fmt.Errorf("item template %d: %w", id, err)
 	}
 	return nil
+}
+
+// itemEffectTableAttrs are the <effect> attributes whose value the effect
+// reader resolves against the template's tables.
+var itemEffectTableAttrs = []string{
+	"name", "count", "time", "self", "noicon", "stackOrder", "effectPower",
+	"effectType", "triggeredId", "triggeredLevel", "chanceType", "activationChance",
 }
 
 // buildStatModifier reads one stat-modifier element's "stat" and "val"
@@ -414,11 +439,16 @@ func buildStatModifier(op item.FuncOp, vals map[string]string) (item.StatModifie
 	return mod, nil
 }
 
+// buildUseCondition reads a <cond> element. An item has no tables, so
+// neither its msgId nor any condition value it reads may name one.
 func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.UseCondition, error) {
 	if len(children) == 0 {
 		return item.UseCondition{}, fmt.Errorf("item template %d: cond: no predicate defined", id)
 	}
-	root := buildCondition(children[0])
+	root, err := buildCondition(children[0], condRolePredicate)
+	if err != nil {
+		return item.UseCondition{}, fmt.Errorf("item template %d: cond: %w", id, err)
+	}
 	a := newAttrValues(foldAttrs(attrs), fmt.Sprintf("item template %d: use condition", id))
 
 	var uc item.UseCondition
@@ -426,6 +456,9 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.Us
 	case a.has("msg"):
 		uc.Message = a.strDefault("msg", "")
 	case a.has("msgId"):
+		if err := noTableRef("msgId", a.str("msgId")); err != nil {
+			return item.UseCondition{}, fmt.Errorf("item template %d: cond: %w", id, err)
+		}
 		uc.MessageID = a.int32LiteralDefault("msgId", 0)
 		if a.has("addName") && uc.MessageID > 0 {
 			uc.AddName = true
@@ -438,20 +471,25 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.Us
 	return uc, nil
 }
 
-// buildCondition converts one decoded condition node into an item.Condition,
-// recursively converting its children.
-func buildCondition(n condNode) item.Condition {
-	attrs := make(map[string]string, len(n.Attrs))
-	for _, a := range n.Attrs {
-		attrs[a.Name.Local] = a.Value
+// buildCondition converts one decoded condition node in role into an
+// item.Condition, recursively converting its children. Values are kept as
+// written; one the condition reader would take as a table reference fails.
+func buildCondition(n condNode, role condRole) (item.Condition, error) {
+	attrs, err := conditionAttrs(n, role, nil)
+	if err != nil {
+		return item.Condition{}, fmt.Errorf("<%s>: %w", n.XMLName.Local, err)
 	}
 	var children []item.Condition
-	for _, c := range n.Children {
-		children = append(children, buildCondition(c))
+	for i, c := range n.Children {
+		child, err := buildCondition(c, childConditionRole(n, role, i))
+		if err != nil {
+			return item.Condition{}, err
+		}
+		children = append(children, child)
 	}
 	return item.Condition{
 		Kind:     strings.ToLower(n.XMLName.Local),
 		Attrs:    attrs,
 		Children: children,
-	}
+	}, nil
 }

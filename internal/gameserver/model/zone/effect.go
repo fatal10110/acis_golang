@@ -2,7 +2,6 @@ package zone
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -142,11 +141,11 @@ func parseSkillRefs(raw string) ([]SkillRef, error) {
 		if len(idLevel) != 2 {
 			return nil, fmt.Errorf("zone: malformed skill reference %q", part)
 		}
-		id, err := strconv.Atoi(idLevel[0])
+		id, err := commons.Atoi(idLevel[0])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}
-		level, err := strconv.Atoi(idLevel[1])
+		level, err := commons.Atoi(idLevel[1])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}

@@ -283,16 +283,12 @@ func compileUsingAttr(name, value string) (Condition, error) {
 	return UsingItemType{Mask: int(item.ParseWornKindMask(value))}, nil
 }
 
+// compileGameAttr reads the one <game> attribute a data file can set. A
+// chance roll is a GameChance built in code (weapon cast/crit triggers),
+// never a <game chance> attribute, which is as unsupported as any other.
 func compileGameAttr(name, value string) (Condition, error) {
-	switch name {
-	case "night":
+	if name == "night" {
 		return GameTime{Night: parseBool(value)}, nil
-	case "chance":
-		pct, err := decodeInt(value)
-		if err != nil {
-			return nil, err
-		}
-		return GameChance{Percent: pct}, nil
 	}
 	return nil, fmt.Errorf("unsupported game attribute")
 }
