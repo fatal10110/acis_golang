@@ -6,16 +6,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// HPRegenRate returns this NPC's HP regeneration per tick
-// (CreatureStatus.getRegenHp: calcStat(REGENERATE_HP_RATE, template base)).
+// HPRegenRate returns this NPC's HP regeneration per tick: the template
+// base, scaled by the raid HP regen multiplier while raid related, finalized
+// through the stat calculator.
 func (h *Hostile) HPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen)
+	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen*h.raidBaseMultipliers().HPRegen)
 }
 
-// MPRegenRate returns this NPC's MP regeneration per tick
-// (CreatureStatus.getRegenMp: calcStat(REGENERATE_MP_RATE, template base)).
+// MPRegenRate returns this NPC's MP regeneration per tick: the template
+// base, scaled by the raid MP regen multiplier while raid related, finalized
+// through the stat calculator.
 func (h *Hostile) MPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen)
+	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen*h.raidBaseMultipliers().MPRegen)
 }
 
 // TickRegen applies one HP/MP regeneration step (CreatureStatus.

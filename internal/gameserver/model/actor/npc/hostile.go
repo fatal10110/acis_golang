@@ -136,6 +136,9 @@ type Hostile struct {
 	// or one of its minions), set per-instance rather than derived from
 	// the template. See RaidRelated.
 	raidRelated atomic.Bool
+	// raidMultipliers scale the base defences and regeneration while
+	// raidRelated is set; nil leaves them unchanged. See SetRaidMultipliers.
+	raidMultipliers atomic.Pointer[RaidMultipliers]
 
 	// cast is the live cast controller; see SetCastController.
 	cast atomic.Pointer[CastControl]

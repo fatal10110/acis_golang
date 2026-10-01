@@ -38,9 +38,11 @@ func (h *Hostile) MAtk() float64 {
 	return math.Trunc(h.calcStat(stat.MagicAttack, positiveStat(h.Instance.Template.MAtk)))
 }
 
-// MDef returns this NPC's magic defence stat, truncated to a whole number.
+// MDef returns this NPC's magic defence stat, finalized from the template
+// base scaled by the raid defence multiplier while raid related, and
+// truncated to a whole number.
 func (h *Hostile) MDef() float64 {
-	return math.Trunc(h.calcStat(stat.MagicDefence, positiveStat(h.Instance.Template.MDef)))
+	return math.Trunc(h.calcStat(stat.MagicDefence, positiveStat(h.Instance.Template.MDef)*h.raidBaseMultipliers().Defence))
 }
 
 func positiveStat(v float64) float64 {
