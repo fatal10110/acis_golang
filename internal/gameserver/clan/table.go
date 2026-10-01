@@ -62,6 +62,7 @@ type Snapshot struct {
 	Clans      []Row
 	Members    []MemberRow
 	Privileges []PrivilegeRow
+	Skills     []SkillRow
 }
 
 // Table is the clan registry. mu guards clans; each clan guards itself.
@@ -91,6 +92,7 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 			dissolvingExpiry: r.DissolvingExpiry,
 			members:          map[int32]*Member{},
 			privileges:       map[int]int32{},
+			skills:           map[int]int{},
 		}
 		if r.AllyPenaltyExpiry > nowMs {
 			cl.allyPenaltyExpiry, cl.allyPenaltyType = r.AllyPenaltyExpiry, r.AllyPenaltyType
@@ -113,6 +115,11 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 	for _, p := range s.Privileges {
 		if cl, ok := t.clans[p.ClanID]; ok {
 			cl.privileges[p.Rank] = p.Privs
+		}
+	}
+	for _, sk := range s.Skills {
+		if cl, ok := t.clans[sk.ClanID]; ok {
+			cl.skills[sk.ID] = sk.Level
 		}
 	}
 	t.rankLadder(s.Clans)

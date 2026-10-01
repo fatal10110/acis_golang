@@ -73,6 +73,8 @@ type Clan struct {
 
 	members    map[int32]*Member
 	privileges map[int]int32
+	// skills maps each skill the clan learnt to its level.
+	skills map[int]int
 }
 
 // Info is a clan's header as the pledge window shows it.

@@ -315,7 +315,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// snapshot rather than missed.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
-	skillList := skillListEntries(c, l.skills)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
 	if l.playerClock != nil {
@@ -351,6 +350,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	l.enterWorldClan(client, live)
+	// Taken once the clan block has given the clan's skills, so the login
+	// SkillList carries them.
+	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
 		// character is restored and before it enters the world.
@@ -590,8 +592,9 @@ func skillListEntriesGreyed(c *player.Character, skills *skillstate.Persistence,
 	}
 	sort.Ints(ids)
 
-	// Worn formal wear greys out every skill. The negative-reputation clan
-	// skill flag is not modeled yet.
+	// Worn formal wear greys out every skill. The reference also greys a
+	// clan skill while the clan's reputation is negative, but no member
+	// holds its clan's skills at 0 reputation or below, so that never shows.
 	disabled := formalWear
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {

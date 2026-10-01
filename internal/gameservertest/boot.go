@@ -1847,6 +1847,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load clans: %v", err)
 	}
+	if o.skills != nil {
+		clanRows.KeepSkills(func(sk clan.Skill) bool {
+			return o.skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
+		})
+	}
 	gclConfig.Clans.Table().Restore(clanRows, time.Now(), clanConfig.JoinDays)
 	gclConfig.Clans.DropMissingCrests(crests)
 
