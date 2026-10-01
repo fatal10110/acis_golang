@@ -42,6 +42,10 @@ type Row struct {
 	AllyPenaltyType   int
 	CharPenaltyExpiry int64
 	DissolvingExpiry  int64
+	// The community board's notice and introduction.
+	NoticeEnabled bool
+	Notice        string
+	Introduction  string
 }
 
 // MemberRow is one characters row of a clan member.
@@ -92,6 +96,7 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 		cl.crestID, cl.crestLargeID = r.CrestID, r.CrestLargeID
 		cl.allyID, cl.allyName, cl.allyCrestID = r.AllyID, r.AllyName, r.AllyCrestID
 		cl.dissolvingExpiry = r.DissolvingExpiry
+		cl.board.restore(r)
 		if r.AllyPenaltyExpiry > nowMs {
 			cl.allyPenaltyExpiry, cl.allyPenaltyType = r.AllyPenaltyExpiry, r.AllyPenaltyType
 		}

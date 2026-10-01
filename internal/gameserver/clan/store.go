@@ -59,6 +59,11 @@ type Store interface {
 	// EndWar keeps the pair's row with its penalty expiry, or deletes it
 	// when expiry is 0.
 	EndWar(ctx context.Context, clanID, targetID int32, expiry int64) error
+	// UpdateNotice stores the clan's board notice and whether it shows
+	// at login.
+	UpdateNotice(ctx context.Context, clanID int32, enabled bool, notice string) error
+	// UpdateIntroduction stores the clan's board introduction.
+	UpdateIntroduction(ctx context.Context, clanID int32, introduction string) error
 }
 
 // Writer runs a store write later, on ownerID's lane, so writes for one

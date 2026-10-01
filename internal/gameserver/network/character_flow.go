@@ -381,6 +381,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.Dead() {
 		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), dieOptions(live)))
 	}
+	l.sendLoginBoardPages(client, live)
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
