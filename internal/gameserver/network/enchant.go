@@ -97,6 +97,10 @@ func (l *GameClientLink) applyEnchantSteps(live *livePlayer, steps []enchantflow
 			l.applyEnchantSkillChange(live, step.Template, true)
 		case enchantflow.StepRevokeEnchantSkill:
 			l.applyEnchantSkillChange(live, step.Template, false)
+		case enchantflow.StepGrantArmorSetSkill:
+			l.applyArmorSetSkillChange(live, step.SkillID, true)
+		case enchantflow.StepRevokeArmorSetSkill:
+			l.applyArmorSetSkillChange(live, step.SkillID, false)
 		case enchantflow.StepUnequipped:
 			// The reference does not refresh the grade penalty for an item
 			// a failed enchant destroys, so only the equip side effects are
@@ -124,6 +128,28 @@ func (l *GameClientLink) applyEnchantSkillChange(live *livePlayer, tmpl *item.Te
 		}
 	} else {
 		resend = l.skills.RevokeEnchant4Skill(live.Character, tmpl)
+	}
+	if resend {
+		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+	}
+}
+
+// applyArmorSetSkillChange adds or removes the worn armor set's +6 skill
+// after an enchant attempt on a worn armor piece. A grant resends SkillList
+// when the skill is loaded; a removal always does.
+func (l *GameClientLink) applyArmorSetSkillChange(live *livePlayer, skillID int32, grant bool) {
+	if l.skills == nil {
+		return
+	}
+	resend := true
+	if grant {
+		var err error
+		resend, err = l.skills.GrantArmorSetSkill(live.Character, skillID)
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("grant armor set skill")
+		}
+	} else {
+		l.skills.RevokeArmorSetSkill(live.Character, skillID)
 	}
 	if resend {
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))

@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -411,6 +412,10 @@ type GameClientLinkConfig struct {
 	// AugmentRoll draws the uniform ints a refine rolls, both ends
 	// inclusive; nil falls back to the random source.
 	AugmentRoll augmentation.Rand
+	// ArmorSets is the loaded armor set data whose +6 skill an armor
+	// enchant grants and revokes; nil grants none. The equip-time set
+	// skills come from the skill persistence's own table.
+	ArmorSets *armorset.Table
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -503,6 +508,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		enchantCfg = *cfg.PlayerConfig.Enchant
 	}
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
+	link.enchant.SetArmorSets(cfg.ArmorSets)
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)

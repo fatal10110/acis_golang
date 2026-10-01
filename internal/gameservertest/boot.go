@@ -33,6 +33,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
@@ -135,6 +136,7 @@ type options struct {
 	multisellDelay         time.Duration
 	keepMaintained         bool
 	augmentations          *augmentation.Table
+	armorSets              *armorset.Table
 	augmentationChances    *augmentation.Chances
 	augmentRoll            augmentation.Rand
 	enchantConfig          *enchant.Config
@@ -518,6 +520,12 @@ func WithAugmentations(table *augmentation.Table, chances *augmentation.Chances,
 	return func(o *options) {
 		o.augmentations, o.augmentationChances, o.augmentRoll = table, chances, roll
 	}
+}
+
+// WithArmorSets loads table as the armor set data a worn set grants its
+// skills from (default: none).
+func WithArmorSets(table *armorset.Table) Option {
+	return func(o *options) { o.armorSets = table }
 }
 
 // WithEnchantRoll supplies the enchant dice roll source wired into the link
@@ -1317,6 +1325,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := o.skills.SetAugmentations(o.augmentations); err != nil {
 		t.Fatalf("augmentation bonuses: %v", err)
 	}
+	o.skills.SetArmorSets(o.armorSets)
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
@@ -1524,6 +1533,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Log:              o.log,
 	}
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
+	gclConfig.ArmorSets = o.armorSets
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances

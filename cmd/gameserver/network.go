@@ -184,6 +184,7 @@ func provideGameClientLink(
 
 		Augmentations:       data.Augmentations,
 		AugmentationChances: gameplay.AugmentationChances,
+		ArmorSets:           data.ArmorSets,
 	})
 	if err != nil {
 		return nil, err
@@ -202,6 +203,7 @@ func provideSkillPersistence(pool *sql.DB, data *gameData, gameplay gameplayConf
 	if err := skills.SetAugmentations(data.Augmentations); err != nil {
 		return nil, err
 	}
+	skills.SetArmorSets(data.ArmorSets)
 	return skills, nil
 }
 

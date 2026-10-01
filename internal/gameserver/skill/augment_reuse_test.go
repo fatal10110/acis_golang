@@ -61,9 +61,9 @@ func TestAugmentationActiveSkillRedisabledOnEquip(t *testing.T) {
 		inv.EquipItem(inst, tmpl)
 		return NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{active, passive})), c, clock, inst
 	}
-	equip := func(t *testing.T, p *Persistence, c *player.Character, inst *item.Instance) (reported []AugmentChange) {
+	equip := func(t *testing.T, p *Persistence, c *player.Character, inst *item.Instance) (reported []SkillChange) {
 		t.Helper()
-		if _, _, err := p.EquipItemStatsReporting(c, inst, tmpl, func(ch AugmentChange) { reported = append(reported, ch) }); err != nil {
+		if _, _, err := p.EquipItemStatsReporting(c, inst, tmpl, func(ch SkillChange) { reported = append(reported, ch) }); err != nil {
 			t.Fatalf("EquipItemStatsReporting: %v", err)
 		}
 		return reported

@@ -224,9 +224,9 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 		return
 	}
 	var skillsChanged, timersChanged bool
-	// An augmentation's skill refreshes the skill list the moment it is
-	// granted or removed, ahead of the item's other skills.
-	augmented := func(change skillstate.AugmentChange) {
+	// An armor set's or augmentation's skill refreshes the skill list the
+	// moment it is granted or removed, ahead of the item's other skills.
+	stage := func(change skillstate.SkillChange) {
 		if change.SkillsChanged {
 			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 		}
@@ -247,7 +247,7 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 			continue
 		}
 		if inst.Equipped() {
-			changed, timers, err := l.skills.EquipItemStatsReporting(live.Character, inst, tmpl, augmented)
+			changed, timers, err := l.skills.EquipItemStatsReporting(live.Character, inst, tmpl, stage)
 			if err != nil {
 				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
 			}
@@ -255,7 +255,7 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 			timersChanged = timersChanged || timers
 			continue
 		}
-		if l.skills.UnequipItemStatsReporting(live.Character, inv, inst, tmpl, augmented) {
+		if l.skills.UnequipItemStatsReporting(live.Character, inv, inst, tmpl, stage) {
 			skillsChanged = true
 		}
 	}

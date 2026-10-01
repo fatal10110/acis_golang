@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
 
 // Set is one armor set template.
@@ -97,6 +98,80 @@ func (t *Table) Len() int {
 
 // FindByChest returns the armor set whose chest piece is chestID.
 func (t *Table) FindByChest(chestID int32) (Set, bool) {
+	if t == nil {
+		return Set{}, false
+	}
 	s, ok := t.byChest[chestID]
 	return s, ok
+}
+
+// Worn returns the set whose chest piece doll wears.
+func (t *Table) Worn(doll *itemcontainer.Inventory) (Set, bool) {
+	if t == nil || doll == nil {
+		return Set{}, false
+	}
+	chest := doll.ItemAt(itemcontainer.Chest)
+	if chest == nil {
+		return Set{}, false
+	}
+	return t.FindByChest(chest.TemplateID)
+}
+
+// pieceSlots are the paperdoll positions of PieceIDs, in the same order.
+var pieceSlots = [5]int{itemcontainer.Chest, itemcontainer.Legs, itemcontainer.Head, itemcontainer.Gloves, itemcontainer.Feet}
+
+// ContainsItem reports whether itemID is the set's piece for paperdoll
+// position slot. Any position other than the five set pieces' holds none.
+func (s Set) ContainsItem(slot int, itemID int32) bool {
+	for i, pos := range pieceSlots {
+		if pos == slot {
+			return s.PieceIDs()[i] == itemID
+		}
+	}
+	return false
+}
+
+// ContainsAll reports whether doll wears every non-chest piece the set
+// names; a piece the set leaves at 0 accepts whatever that position holds.
+// The chest is not checked: the set is looked up by the worn chest.
+func (s Set) ContainsAll(doll *itemcontainer.Inventory) bool {
+	return s.wears(doll, 0)
+}
+
+// Enchanted6 reports whether doll wears the set's chest at +6 or higher and
+// every other piece the set names at +6 or higher.
+func (s Set) Enchanted6(doll *itemcontainer.Inventory) bool {
+	chest := doll.ItemAt(itemcontainer.Chest)
+	if chest == nil || chest.Snapshot().EnchantLevel < 6 {
+		return false
+	}
+	return s.wears(doll, 6)
+}
+
+// wears reports whether every non-chest piece the set names is worn at
+// minEnchant or higher.
+func (s Set) wears(doll *itemcontainer.Inventory, minEnchant int) bool {
+	ids := s.PieceIDs()
+	for i := 1; i < len(ids); i++ {
+		if ids[i] == 0 {
+			continue
+		}
+		inst := doll.ItemAt(pieceSlots[i])
+		if inst == nil || inst.TemplateID != ids[i] || inst.Snapshot().EnchantLevel < minEnchant {
+			return false
+		}
+	}
+	return true
+}
+
+// WearsShield reports whether doll holds the set's shield in the left hand.
+func (s Set) WearsShield(doll *itemcontainer.Inventory) bool {
+	inst := doll.ItemAt(itemcontainer.LHand)
+	return inst != nil && inst.TemplateID == s.Shield
+}
+
+// IsShield reports whether itemID is the set's shield; a set without one
+// has none.
+func (s Set) IsShield(itemID int32) bool {
+	return s.Shield != 0 && s.Shield == itemID
 }
