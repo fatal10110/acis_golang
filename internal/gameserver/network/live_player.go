@@ -226,6 +226,9 @@ type itemAICastIntention struct {
 	selected  world.Tracked
 	// ctrl is the UseItem Ctrl modifier, the cast's force-use flag.
 	ctrl bool
+	// summon marks a pet collar's SUMMON_CREATURE: item is the collar the
+	// pet comes from, kept rather than consumed.
+	summon bool
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
@@ -466,10 +469,20 @@ func (p *livePlayer) hasDeferredItemAICast() bool {
 }
 
 func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
+	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl})
+}
+
+// deferSummonCreatureCast stores the SUMMON_CREATURE cast of the pet collar
+// collar as the next CAST intention, cast on the player itself.
+func (p *livePlayer) deferSummonCreatureCast(inventory *itemcontainer.Inventory, collar *item.Instance, skill modelskill.Definition) {
+	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: collar, skill: skill, selected: p.Character, summon: true})
+}
+
+func (p *livePlayer) setDeferredItemAICast(itemCast *itemAICastIntention) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.clearNextIntentionLocked()
-	p.deferredItem = &itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl}
+	p.deferredItem = itemCast
 }
 
 func (p *livePlayer) takeDeferredItemAICast() *itemAICastIntention {

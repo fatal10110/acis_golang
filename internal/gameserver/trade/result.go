@@ -34,6 +34,10 @@ type AnswerResult struct {
 	Status      AnswerStatus
 	RequesterID int32
 	TargetID    int32
+	// RequesterLeft reports that the requester left the world after asking:
+	// a login now holding RequesterID never asked and must hear nothing of
+	// the answer.
+	RequesterLeft bool
 }
 
 // AddStatus describes the outcome of adding an item to an active offer.
