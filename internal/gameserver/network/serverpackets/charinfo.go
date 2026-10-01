@@ -56,11 +56,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	for i := 0; i < 4; i++ {
 		w.WriteUint16(0)
 	}
-	w.WriteInt32(0) // right-hand augmentation id
+	w.WriteInt32(paperdoll[rhandPaperdollIndex].AugmentationID)
 	for i := 0; i < 12; i++ {
 		w.WriteUint16(0)
 	}
-	w.WriteInt32(0) // left-hand augmentation id
+	w.WriteInt32(paperdoll[lhandPaperdollIndex].AugmentationID)
 	for i := 0; i < 4; i++ {
 		w.WriteUint16(0)
 	}

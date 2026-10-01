@@ -138,6 +138,7 @@ const (
 	SystemMessageSummonOnlyOne                     = 580
 	SystemMessageYouCannotSummonInCombat           = 578
 	SystemMessageNotCallPetFromThisLocation        = 604
+	SystemMessageDoNotHaveFurtherSkillsToLearnS1   = 607
 	SystemMessageNoMoreSkillsToLearn               = 750
 	SystemMessageObserversCannotParticipate        = 781
 	SystemMessagePetCannotUseItem                  = 972
@@ -277,6 +278,23 @@ const (
 	SystemMessageS1CreatedS2S3SForS4Adena       = 1148 // text, number, item-name, item-number parameters
 	SystemMessageCreationOfS2ForS1AtS3AdenaFail = 1149 // text, item-name, item-number parameters
 	SystemMessageS1FailedToCreateS2ForS3Adena   = 1150 // text, item-name, item-number parameters
+
+	// Augmentation feedback.
+	SystemMessageSelectItemToAugment                   = 1957 // no parameter
+	SystemMessageNotSuitableItem                       = 1960 // no parameter
+	SystemMessageGemstoneQuantityIncorrect             = 1961 // no parameter
+	SystemMessageSelectItemToRemoveAugmentation        = 1963 // no parameter
+	SystemMessageAugmentationRemovalNeedsAugmentedItem = 1964 // no parameter
+	SystemMessageAugmentationRemovedFromS1             = 1965 // item-name parameter
+	SystemMessageAlreadyAugmented                      = 1970 // no parameter
+	SystemMessageLifeStoneLevelTooHigh                 = 1971 // no parameter
+	SystemMessageCannotAugmentWhileOperating           = 1972 // no parameter
+	SystemMessageCannotAugmentWhileDead                = 1974 // no parameter
+	SystemMessageCannotAugmentWhileTrading             = 1975 // no parameter
+	SystemMessageCannotAugmentWhileParalyzed           = 1976 // no parameter
+	SystemMessageCannotAugmentWhileFishing             = 1977 // no parameter
+	SystemMessageCannotAugmentWhileSitting             = 1978 // no parameter
+	SystemMessageAugmentationFailedInappropriate       = 2001 // no parameter
 )
 
 // SystemMessageParam is one typed SystemMessage parameter: Text for a text

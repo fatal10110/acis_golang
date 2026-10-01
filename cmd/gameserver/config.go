@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -70,6 +71,7 @@ type gameplayConfig struct {
 	DisableRaidCurse         raidCursesDisabled
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
+	AugmentationChances      augmentation.Chances
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -169,6 +171,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Merchant, err = loadMerchantConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.AugmentationChances, err = loadAugmentationChances(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -320,6 +325,27 @@ func loadEnchantConfig(paths gameServerPaths) (enchant.Config, error) {
 		return enchant.Config{}, err
 	}
 	return cfg, nil
+}
+
+// loadAugmentationChances reads the life stone skill, glow and base stat
+// chances from players.properties.
+func loadAugmentationChances(paths gameServerPaths) (augmentation.Chances, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return augmentation.Chances{}, err
+	}
+	def := augmentation.DefaultChances()
+	fields := config.NewFields(props, "augmentation")
+	var out augmentation.Chances
+	for grade, name := range [...]string{"NG", "Mid", "High", "Top"} {
+		out.Skill[grade] = fields.Int("Augmentation"+name+"SkillChance", def.Skill[grade])
+		out.Glow[grade] = fields.Int("Augmentation"+name+"GlowChance", def.Glow[grade])
+	}
+	out.BaseStat = fields.Int("AugmentationBaseStatChance", def.BaseStat)
+	if err := fields.Err(); err != nil {
+		return augmentation.Chances{}, err
+	}
+	return out, nil
 }
 
 // loadInventorySlots reads the base player inventory slot counts by race.

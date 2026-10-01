@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -25,16 +26,25 @@ const (
 )
 
 // RequestAcquireSkillInfo and RequestAcquireSkill carry an int32 skill type
-// whose values are the AcquireSkillType the trainer list belongs to. The
-// pledge (clan) type is recognized but handled as unavailable: the clan
-// runtime the pledge flow requires is not ported yet.
+// whose values are the AcquireSkillType the trainer list belongs to. Both
+// are made at the civilian NPC the player last selected and can still
+// interact with; without one they answer nothing. The pledge (clan) type
+// is recognized but handled as unavailable: the clan runtime the pledge
+// flow requires is not ported yet.
 
 func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
-	if !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
+	if live == nil || !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
+		return
+	}
+	trainer, ok := l.currentTrainer(live)
+	if !ok {
 		return
 	}
 	switch req.SkillType {
 	case acquireSkillTypeUsual:
+		if !trainer.CanTeach(live.ClassID) {
+			return
+		}
 		l.sendGeneralAcquireSkillInfo(live, req)
 	case acquireSkillTypeFishing:
 		l.sendFishingAcquireSkillInfo(live, req)
@@ -47,12 +57,16 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 }
 
 func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	if !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
+	if live == nil || !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
+		return
+	}
+	trainer, ok := l.currentTrainer(live)
+	if !ok {
 		return
 	}
 	switch req.SkillType {
 	case acquireSkillTypeUsual:
-		l.learnGeneralAcquireSkill(live, req)
+		l.learnGeneralAcquireSkill(live, trainer, req)
 	case acquireSkillTypeFishing:
 		l.learnFishingAcquireSkill(live, req)
 	default:
@@ -62,9 +76,6 @@ func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.R
 }
 
 func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
-	if live == nil {
-		return
-	}
 	offer, ok := skillstate.GeneralOfferFor(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if !ok {
 		return
@@ -76,10 +87,10 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 	live.SendFrame(serverpackets.FrameAcquireSkillInfo(req.SkillID, req.Level, int32(offer.Grant.CorrectedCost()), acquireSkillTypeUsual, reqs))
 }
 
-func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	if live == nil {
-		return
-	}
+// learnGeneralAcquireSkill learns a usual skill at trainer. The learn does
+// not ask whether trainer trains live's profession; the list it reopens
+// does. A skill that is not the next learnable level answers nothing.
+func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc.Folk, req clientpackets.RequestAcquireSkill) {
 	_, status, err := skillstate.LearnGeneral(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
@@ -90,28 +101,23 @@ func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, req clientpa
 	case skillstate.LearnDone:
 	case skillstate.LearnNeedsSP:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughSPToLearnSkill))
-		live.SendFrame(l.acquireSkillList(live))
+		l.showSkillList(live, trainer)
 		return
 	case skillstate.LearnMissingItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
-		live.SendFrame(l.acquireSkillList(live))
+		l.showSkillList(live, trainer)
 		return
 	default:
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoMoreSkillsToLearn))
-		live.SendFrame(l.acquireSkillList(live))
 		return
 	}
 
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
-	live.SendFrame(l.acquireSkillList(live))
+	l.showSkillList(live, trainer)
 }
 
 func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
-	if live == nil {
-		return
-	}
 	offer, ok := skillstate.FishingOfferFor(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if !ok {
 		return
@@ -122,9 +128,6 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 }
 
 func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	if live == nil {
-		return
-	}
 	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
@@ -135,7 +138,7 @@ func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpa
 	case skillstate.LearnDone:
 	case skillstate.LearnMissingItem:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemMissingToLearnSkill))
-		live.SendFrame(l.fishingAcquireSkillList(live))
+		l.showFishSkillList(live)
 		return
 	default:
 		return
@@ -147,14 +150,16 @@ func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpa
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
-	live.SendFrame(l.fishingAcquireSkillList(live))
+	l.showFishSkillList(live)
 }
 
 func (l *GameClientLink) skillDefinitionLoaded(skillID, level int) bool {
 	return l != nil && l.skills != nil && l.skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 }
 
-func (l *GameClientLink) acquireSkillList(live *livePlayer) wire.Frame {
+// acquireSkillList builds the usual trainer list of skills live can learn
+// now; ok is false when there is none.
+func (l *GameClientLink) acquireSkillList(live *livePlayer) (list wire.Frame, ok bool) {
 	grants := acquireSkillListEntries(live)
 	entries := grants[:0]
 	for _, grant := range grants {
@@ -162,7 +167,10 @@ func (l *GameClientLink) acquireSkillList(live *livePlayer) wire.Frame {
 			entries = append(entries, grant)
 		}
 	}
-	return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeUsual, entries)
+	if len(entries) == 0 {
+		return wire.Frame{}, false
+	}
+	return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeUsual, entries), true
 }
 
 func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListEntry {
@@ -184,11 +192,12 @@ func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListE
 // fishingAcquireSkillList builds the fishing-type trainer list of skills the
 // character can learn now; each entry's displayed cost is 0 and its row tag
 // is 1 (the fishing marker), matching the oracle's FishingSkillNode layout.
-func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) wire.Frame {
-	if l.skillTrees == nil || live == nil {
-		return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeFishing, nil)
-	}
+// ok is false when there is none.
+func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) (list wire.Frame, ok bool) {
 	nodes := l.skillTrees.FishingSkillsFor(live.Level(), live.HasDwarvenCraft(), skillstate.TreeSkillLevels(live.SkillLevels()))
+	if len(nodes) == 0 {
+		return wire.Frame{}, false
+	}
 	entries := make([]serverpackets.AcquireSkillListEntry, 0, len(nodes))
 	for _, node := range nodes {
 		entries = append(entries, serverpackets.AcquireSkillListEntry{
@@ -197,5 +206,5 @@ func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) wire.Frame {
 			Unknown: 1,
 		})
 	}
-	return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeFishing, entries)
+	return serverpackets.FrameAcquireSkillList(serverpackets.AcquireSkillTypeFishing, entries), true
 }

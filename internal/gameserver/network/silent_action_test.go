@@ -80,6 +80,14 @@ import (
 // an answer, and the multisell window holds no pending action — it stays
 // open and sends again only on the next click. tests/npcs asserts that
 // silence.
+//
+// The augmentation window's requests are absent as well. RequestRefine and
+// RequestRefineCancel answer every refusal with their extended result packet,
+// which this barrier (itself an extended reply) cannot tell apart, so
+// tests/items asserts those answers. The three confirmation steps and
+// RequestConfirmCancelItem naming an item the player does not hold get
+// nothing, as in the reference: the window registers no pending client
+// action and only asks again on the next item dropped into it.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 

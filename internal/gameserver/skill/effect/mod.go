@@ -72,15 +72,17 @@ type Condition interface {
 
 // ModOwner identifies whatever attached a Mod, so a Calculator can later
 // remove every Mod a given owner attached. It is a closed, comparable sum
-// of the three things a Mod is ever attributed to: a running buff/debuff
-// effect, a learned passive skill, or an equipped item. The zero ModOwner
-// never equals a real owner (a nil *Effect, a zero modelskill.Ref, and a
-// zero ItemOwner are all impossible for a genuinely attached Mod), so it
+// of the four things a Mod is ever attributed to: a running buff/debuff
+// effect, a learned passive skill, an equipped item, or the augmentation an
+// equipped item carries. The zero ModOwner never equals a real owner (a nil
+// *Effect, a zero modelskill.Ref, a zero ItemOwner and a nil augmented
+// instance are all impossible for a genuinely attached Mod), so it
 // is safe as a "no owner" placeholder without a separate flag.
 type ModOwner struct {
-	effect *Effect
-	skill  modelskill.Ref
-	item   ItemOwner
+	effect  *Effect
+	skill   modelskill.Ref
+	item    ItemOwner
+	augment *item.Instance
 }
 
 // ModOwnerEffect identifies a Mod attached by a running buff/debuff effect.
@@ -91,6 +93,11 @@ func ModOwnerSkill(ref modelskill.Ref) ModOwner { return ModOwner{skill: ref} }
 
 // ModOwnerItem identifies a Mod attached by an equipped item instance.
 func ModOwnerItem(owner ItemOwner) ModOwner { return ModOwner{item: owner} }
+
+// ModOwnerAugmentation identifies a Mod attached by the augmentation an
+// equipped item instance carries: its bonuses are attached and removed
+// apart from the item's own functions.
+func ModOwnerAugmentation(inst *item.Instance) ModOwner { return ModOwner{augment: inst} }
 
 // Stripped reports whether o is an effect a stop-all is ending
 // (List.StopAll, List.StopAllExceptThoseThatLastThroughDeath). A holder

@@ -7,6 +7,8 @@ const (
 	requestConfirmRefinerItemSize = 2 + 2*4
 	requestConfirmGemStoneSize    = 2 + 4*4
 	requestConfirmCancelItemSize  = 2 + 4
+	requestRefineSize             = 2 + 4*4
+	requestRefineCancelSize       = 2 + 4
 )
 
 // RequestConfirmTargetItem asks the server to validate an item for
@@ -97,6 +99,53 @@ func DecodeRequestConfirmCancelItem(payload []byte) (RequestConfirmCancelItem, e
 	req := RequestConfirmCancelItem{ObjectID: r.ReadInt32()}
 	if err := r.Err(); err != nil {
 		return RequestConfirmCancelItem{}, fmt.Errorf("clientpackets: RequestConfirmCancelItem: %w", err)
+	}
+	return req, nil
+}
+
+// RequestRefine asks the server to augment the target with the life stone
+// and gemstones the confirmation steps accepted.
+type RequestRefine struct {
+	TargetObjectID   int32
+	RefinerObjectID  int32
+	GemstoneObjectID int32
+	GemstoneCount    int32
+}
+
+// DecodeRequestRefine parses a raw extended RequestRefine payload (opcode
+// byte included).
+func DecodeRequestRefine(payload []byte) (RequestRefine, error) {
+	r, err := newExtendedReader(payload, "RequestRefine", OpcodeRequestRefine, requestRefineSize)
+	if err != nil {
+		return RequestRefine{}, err
+	}
+	req := RequestRefine{
+		TargetObjectID:   r.ReadInt32(),
+		RefinerObjectID:  r.ReadInt32(),
+		GemstoneObjectID: r.ReadInt32(),
+		GemstoneCount:    r.ReadInt32(),
+	}
+	if err := r.Err(); err != nil {
+		return RequestRefine{}, fmt.Errorf("clientpackets: RequestRefine: %w", err)
+	}
+	return req, nil
+}
+
+// RequestRefineCancel asks the server to remove an item's augmentation.
+type RequestRefineCancel struct {
+	ObjectID int32
+}
+
+// DecodeRequestRefineCancel parses a raw extended RequestRefineCancel
+// payload (opcode byte included).
+func DecodeRequestRefineCancel(payload []byte) (RequestRefineCancel, error) {
+	r, err := newExtendedReader(payload, "RequestRefineCancel", OpcodeRequestRefineCancel, requestRefineCancelSize)
+	if err != nil {
+		return RequestRefineCancel{}, err
+	}
+	req := RequestRefineCancel{ObjectID: r.ReadInt32()}
+	if err := r.Err(); err != nil {
+		return RequestRefineCancel{}, fmt.Errorf("clientpackets: RequestRefineCancel: %w", err)
 	}
 	return req, nil
 }

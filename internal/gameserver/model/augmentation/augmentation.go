@@ -80,9 +80,12 @@ type Table struct {
 	StatGroups []StatGroup
 	Skills     []Skill
 	bySkillID  map[int]Skill
-	Blue       [skillLevels][]int
-	Purple     [skillLevels][]int
-	Red        [skillLevels][]int
+	// byColor holds each stat color block's stat tables, in file order:
+	// the stat groups of one order appended together.
+	byColor [statColors][]Stat
+	Blue    [skillLevels][]int
+	Purple  [skillLevels][]int
+	Red     [skillLevels][]int
 }
 
 // NewTable builds an augmentation lookup table.
@@ -91,6 +94,12 @@ func NewTable(groups []StatGroup, skills []Skill) (*Table, error) {
 		StatGroups: append([]StatGroup(nil), groups...),
 		Skills:     append([]Skill(nil), skills...),
 		bySkillID:  make(map[int]Skill, len(skills)),
+	}
+	for _, g := range groups {
+		if g.Order < 0 || g.Order >= statColors {
+			return nil, fmt.Errorf("augmentation stat group: order %d outside 0..%d", g.Order, statColors-1)
+		}
+		t.byColor[g.Order] = append(t.byColor[g.Order], g.Stats...)
 	}
 	for _, s := range skills {
 		t.bySkillID[s.ID] = s
@@ -104,6 +113,9 @@ func NewTable(groups []StatGroup, skills []Skill) (*Table, error) {
 		default:
 			return nil, fmt.Errorf("augmentation skill %d: unknown color %q", s.ID, s.Color)
 		}
+	}
+	if err := t.validate(); err != nil {
+		return nil, err
 	}
 	return t, nil
 }

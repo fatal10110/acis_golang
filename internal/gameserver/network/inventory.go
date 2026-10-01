@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -223,6 +224,17 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 		return
 	}
 	var skillsChanged, timersChanged bool
+	// An augmentation's skill refreshes the skill list the moment it is
+	// granted or removed, ahead of the item's other skills.
+	augmented := func(change skillstate.AugmentChange) {
+		if change.SkillsChanged {
+			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
+		}
+		if change.TimersChanged {
+			now := live.Now()
+			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+		}
+	}
 	for _, inst := range res.Changed {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
 		if !ok {
@@ -235,7 +247,7 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 			continue
 		}
 		if inst.Equipped() {
-			changed, timers, err := l.skills.EquipItemStats(live.Character, inst, tmpl)
+			changed, timers, err := l.skills.EquipItemStatsReporting(live.Character, inst, tmpl, augmented)
 			if err != nil {
 				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
 			}
@@ -243,7 +255,7 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 			timersChanged = timersChanged || timers
 			continue
 		}
-		if l.skills.UnequipItemStats(live.Character, inv, inst, tmpl) {
+		if l.skills.UnequipItemStatsReporting(live.Character, inv, inst, tmpl, augmented) {
 			skillsChanged = true
 		}
 	}

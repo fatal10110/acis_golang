@@ -10,8 +10,15 @@ import (
 // enchant in an ExEnchantSkillInfo requirement entry.
 const enchantSkillRequirementType = 4
 
+// sendEnchantSkillInfo quotes one skill enchant at the civilian NPC the
+// player last selected, can still interact with, and is trained by. Every
+// refusal answers nothing.
 func (l *GameClientLink) sendEnchantSkillInfo(live *livePlayer, req clientpackets.RequestExEnchantSkillInfo) {
 	if live == nil {
+		return
+	}
+	trainer, ok := l.currentTrainer(live)
+	if !ok || !trainer.CanTeach(live.ClassID) {
 		return
 	}
 	offer, ok := skillstate.EnchantOfferFor(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.SkillLevel))
@@ -34,8 +41,16 @@ func (l *GameClientLink) sendEnchantSkillInfo(live *livePlayer, req clientpacket
 	live.SendFrame(serverpackets.FrameExEnchantSkillInfo(info))
 }
 
+// applyEnchantSkill attempts one skill enchant at the civilian NPC the
+// player last selected and can still interact with; without one it answers
+// nothing. The attempt does not ask whether that NPC trains the player's
+// profession; the enchant list it reopens after a roll does.
 func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.RequestExEnchantSkill) {
 	if live == nil {
+		return
+	}
+	trainer, ok := l.currentTrainer(live)
+	if !ok {
 		return
 	}
 	result, status, err := skillstate.Enchant(live.Character, l.levels, live.template, l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
@@ -67,4 +82,5 @@ func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.R
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+	l.showEnchantSkillList(live, trainer)
 }

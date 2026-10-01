@@ -9,10 +9,9 @@ import (
 type BypassOutcome int
 
 const (
-	// BypassUnported names a command of a system not in place yet (skill
-	// lists, quests, shops, warehouses, teleports, lottery, observation,
-	// castles and the like), or one no dialog handles. It answers nothing
-	// of its own.
+	// BypassUnported names a command of a system not in place yet (quests,
+	// shops, warehouses, teleports, lottery, observation, castles and the
+	// like), or one no dialog handles. It answers nothing of its own.
 	BypassUnported BypassOutcome = iota
 	// BypassChatWindow opens HTML, then releases the client with
 	// ActionFailed.
@@ -41,6 +40,16 @@ const (
 	// BypassMultisell opens the multisell list Multisell names, in its
 	// inventory-only form when InventoryOnly is set.
 	BypassMultisell
+	// BypassSkillList opens this trainer's list of skills to learn.
+	BypassSkillList
+	// BypassEnchantSkillList opens this trainer's list of skills to enchant.
+	BypassEnchantSkillList
+	// BypassFishSkillList opens the fishing skills list.
+	BypassFishSkillList
+	// BypassAugmentMake opens the augmentation window.
+	BypassAugmentMake
+	// BypassAugmentCancel opens the augmentation removal window.
+	BypassAugmentCancel
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -76,20 +85,24 @@ type BypassReply struct {
 	InventoryOnly bool
 }
 
-// fishermanCommands are the fisherman's own commands, run before the
-// merchant karma gate it inherits.
-var fishermanCommands = []string{"FishSkillList", "FishingChampionship", "FishingReward"}
+// fishermanCommands are the fisherman's championship commands, run before
+// the merchant karma gate it inherits; the championship is not in place
+// yet.
+var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
 // link after the object id, sent by talker. A shop, fisherman, gatekeeper
 // or warehouse keeper first applies its karma gate to every command,
-// answering with its refusal page when that page exists. A symbol maker's
-// Draw and RemoveList open its windows. A merchant or fisherman then
-// answers its sell, multisell and shop commands. The generic commands
-// follow: Chat <n> opens chat page n (page 0 when n does not parse), Link
-// <path> opens data/html/<path>, multisell <list> and exc_multisell <list>
-// open a multisell list. Every other command belongs to a system not in
-// place yet.
+// answering with its refusal page when that page exists. A fisherman's
+// FishSkillList opens the fishing skills list. A symbol maker's Draw and
+// RemoveList open its windows. A merchant or fisherman then answers its
+// sell, multisell and shop commands. The trainer commands follow: SkillList
+// and EnchantSkillList open the skills to learn and to enchant. Then the
+// generic ones: Chat <n> opens chat page n (page 0 when n does not parse),
+// Link <path> opens data/html/<path>, multisell <list> and exc_multisell
+// <list> open a multisell list, and Augment 1 and Augment 2 open the
+// augmentation and removal windows. Every other command belongs to a system
+// not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -103,6 +116,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		return reply
 	}
 	if kind == "Fisherman" {
+		if strings.HasPrefix(command, "FishSkillList") {
+			reply.Outcome = BypassFishSkillList
+			return reply
+		}
 		for _, own := range fishermanCommands {
 			if strings.HasPrefix(command, own) {
 				return reply
@@ -141,11 +158,16 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	switch {
-	case strings.HasPrefix(command, "SkillList"), strings.HasPrefix(command, "EnchantSkillList"),
-		strings.EqualFold(command, "TerritoryStatus"), strings.HasPrefix(command, "Quest"):
-		// The skill lists belong to the trainer flow, TerritoryStatus to
-		// castles, and Quest to the quest engine (#130): each is checked
-		// ahead of Chat, so none falls through to it.
+	case strings.HasPrefix(command, "SkillList"):
+		reply.Outcome = BypassSkillList
+		return reply
+	case strings.HasPrefix(command, "EnchantSkillList"):
+		reply.Outcome = BypassEnchantSkillList
+		return reply
+	case strings.EqualFold(command, "TerritoryStatus"), strings.HasPrefix(command, "Quest"):
+		// TerritoryStatus belongs to castles and Quest to the quest engine
+		// (#130): each is checked ahead of Chat, so neither falls through
+		// to it.
 		return reply
 	case strings.HasPrefix(command, "Chat"):
 		val := 0
@@ -173,6 +195,27 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		return reply
 	case strings.HasPrefix(command, "exc_multisell"):
 		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], javaSpace), true
+		return reply
+	case strings.HasPrefix(command, "Augment"):
+		// The choice is the one character after "Augment ": a command too
+		// short to hold it, or one that is no digit, stops the handling.
+		if len(command) < 9 {
+			reply.Outcome = BypassAborted
+			return reply
+		}
+		choice, err := strconv.Atoi(strings.TrimFunc(command[8:9], func(r rune) bool { return r <= ' ' }))
+		if err != nil {
+			reply.Outcome = BypassAborted
+			return reply
+		}
+		switch choice {
+		case 1:
+			reply.Outcome = BypassAugmentMake
+		case 2:
+			reply.Outcome = BypassAugmentCancel
+		default:
+			reply.Outcome = BypassRefused
+		}
 		return reply
 	}
 	return reply

@@ -96,6 +96,12 @@ func readShadowSenseAnnouncement(t *testing.T, c *testsupport.ScriptedClient) bo
 // skill 1 known at currentLevel.
 func seedEnchanter(t *testing.T, currentLevel int, opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
+	return seedEnchanterAt(t, 76, currentLevel, opts...)
+}
+
+// seedEnchanterAt is seedEnchanter with the character at charLevel.
+func seedEnchanterAt(t *testing.T, charLevel, currentLevel int, opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
 	var objID int32
 	opts = append([]gameservertest.Option{
 		gameservertest.WithWantChars(1),
@@ -108,7 +114,7 @@ func seedEnchanter(t *testing.T, currentLevel int, opts ...gameservertest.Option
 			if err != nil {
 				t.Fatalf("new enchanter: %v", err)
 			}
-			ch.CharLevel = 76
+			ch.CharLevel = charLevel
 			ch.SP = 1_000_000
 			ch.Exp = 100_000_000
 			if err := chars.Create(context.Background(), ch); err != nil {
@@ -127,15 +133,21 @@ func seedEnchanter(t *testing.T, currentLevel int, opts ...gameservertest.Option
 	return srv, srv.Client, objID
 }
 
+// duelistParentClass is the second profession the duelist (88) upgrades
+// from: a trainer teaches a third profession through it.
+const duelistParentClass = 2
+
 // TestEnchantSkillSuccessRefreshesShortcut walks a deterministic successful
 // enchant: the trainer info quotes the offer's rate, the apply re-points the
 // bound shortcut before the success message lands, refreshes the skill list
-// and user info, and persists the enchanted level.
+// and user info, reopens the trainer's (now empty) enchant list, and
+// persists the enchanted level.
 func TestEnchantSkillSuccessRefreshesShortcut(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := seedEnchanter(t, 1, gameservertest.WithSkillTrees(enchantTree(101, 100)))
 	bindSkillShortcut(t, srv, objID, 0, 1, 1)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, duelistParentClass)
 
 	c.Send(encodeRequestExEnchantSkillInfo(1, 101))
 	frame := c.Read()
@@ -154,13 +166,16 @@ func TestEnchantSkillSuccessRefreshesShortcut(t *testing.T) {
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageSucceededEnchantingSkillS1, 1, 101)
 	assertSkillListContains(t, c.Read(), skillListEntry{passive: 1, level: 101, id: 1})
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeUserInfo, "post-enchant UserInfo")
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageThereIsNoSkillThatEnablesEnchant)
+	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{1: 101})
 }
 
 // TestEnchantSkillFailureResetsShortcutAndLevel verifies a failed roll (rate
 // 0, deterministic dice above the rate) resets the skill to its top
-// non-enchanted level, re-points the shortcut first, and reports the failure.
+// non-enchanted level, re-points the shortcut first, reports the failure,
+// and reopens the trainer's enchant list.
 func TestEnchantSkillFailureResetsShortcutAndLevel(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := seedEnchanter(t, 101,
@@ -169,12 +184,15 @@ func TestEnchantSkillFailureResetsShortcutAndLevel(t *testing.T) {
 	)
 	bindSkillShortcut(t, srv, objID, 0, 1, 101)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, duelistParentClass)
 
 	c.Send(encodeRequestExEnchantSkill(1, 102))
 	assertShortCutRegister(t, c, 0, 1, 1)
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageFailedEnchantingSkillS1, 1, 102)
 	assertSkillListContains(t, c.Read(), skillListEntry{passive: 1, level: 1, id: 1})
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeUserInfo, "post-enchant UserInfo")
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageThereIsNoSkillThatEnablesEnchant)
+	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{1: 1})
 }

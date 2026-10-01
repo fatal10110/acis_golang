@@ -3,6 +3,9 @@ package network
 import (
 	"context"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -33,12 +36,12 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	// neither kept nor saved: the reference answers ShortCutRegister
 	// before its integrity check drops the entry.
 	if sc.Type == shortcut.Recipe && !live.RecipeBook().Has(int(sc.ID)) {
-		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
+		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
 		return
 	}
 	live.shortcuts.Register(sc)
 	l.saveShortcut(live, sc, "register shortcut")
-	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
+	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
 }
 
 // deleteShortcut mirrors the reference behavior: a delete on a page outside
@@ -80,7 +83,7 @@ func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level 
 	updated := live.shortcuts.RefreshSkillLevel(skillID, level)
 	for _, sc := range updated {
 		l.saveShortcut(live, sc, "refresh skill shortcut")
-		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(sc)))
+		live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
 	}
 }
 
@@ -103,16 +106,18 @@ func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op
 	})
 }
 
-func serverShortcutList(shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
+func serverShortcutList(inv *itemcontainer.Inventory, shortcuts []shortcut.Shortcut) []serverpackets.Shortcut {
 	out := make([]serverpackets.Shortcut, 0, len(shortcuts))
 	for _, sc := range shortcuts {
-		out = append(out, serverShortcut(sc))
+		out = append(out, serverShortcut(inv, sc))
 	}
 	return out
 }
 
-func serverShortcut(sc shortcut.Shortcut) serverpackets.Shortcut {
-	return serverpackets.Shortcut{
+// serverShortcut builds the wire entry of sc. An item shortcut on an
+// augmented weapon or armor piece held in inv carries its augmentation id.
+func serverShortcut(inv *itemcontainer.Inventory, sc shortcut.Shortcut) serverpackets.Shortcut {
+	out := serverpackets.Shortcut{
 		Slot:             sc.Slot,
 		Page:             sc.Page,
 		ID:               sc.ID,
@@ -121,6 +126,19 @@ func serverShortcut(sc shortcut.Shortcut) serverpackets.Shortcut {
 		Level:            sc.Level,
 		SharedReuseGroup: sc.SharedReuseGroup,
 	}
+	if sc.Type != shortcut.Item || inv == nil {
+		return out
+	}
+	inst := inv.ItemByObjectID(sc.ID)
+	if inst == nil {
+		return out
+	}
+	if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok && tmpl.Kind != item.KindEtcItem {
+		if aug, ok := inst.AugmentationValue(); ok {
+			out.AugmentationID = aug.Attributes
+		}
+	}
+	return out
 }
 
 func serverShortcutType(typ shortcut.Type) serverpackets.ShortcutType {
