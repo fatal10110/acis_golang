@@ -301,7 +301,7 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcEleme
 			if i != 0 {
 				continue
 			}
-			clause, err := conditionClause(op.Attrs, op.Children, sl.resolver(tableIndex), condMsgModeBoth)
+			clause, err := conditionClause(op.Attrs, op.Children, sl.resolver(tableIndex), condMsgModeRegular)
 			if err != nil {
 				return err
 			}
@@ -389,7 +389,7 @@ func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []
 			if i != 0 {
 				continue
 			}
-			clause, err := conditionClause(n.Attrs, n.Children, nil, condMsgModeBoth)
+			clause, err := conditionClause(n.Attrs, n.Children, nil, condMsgModeRegular)
 			if err != nil {
 				return err
 			}
@@ -436,26 +436,19 @@ func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []con
 	return fn, nil
 }
 
-// condMsgMode selects how buildSkillConditionClause resolves a cond's
-// msg/msgId/addName attributes, following the differences between the three
-// places a skill file attaches a message to a condition:
-//   - condMsgModeRegular: a regular-level <cond> uses msg when present, else
-//     msgId (with addName only when msgId > 0); msgId and addName are never
-//     read alongside msg.
+// condMsgMode selects how conditionClause reads a cond's msg/msgId/addName
+// attributes:
+//   - condMsgModeRegular: a regular-level <cond> and a <for>/<effect>
+//     block's leading <cond> use msg when present, else msgId (with addName
+//     only when msgId > 0); msgId and addName are never read alongside msg.
 //   - condMsgModeEnchant: an enchant1cond/enchant2cond block reads only
 //     msg — msgId and addName are never consulted, even when present in the
 //     XML.
-//   - condMsgModeBoth: op-level <cond> attachment (the generic template
-//     parse, not the per-level skill loop) has no specified message
-//     semantics at all; this preserves the prior Go behavior of resolving
-//     msg and msgId independently rather than
-//     changing untested behavior outside this finding's scope.
 type condMsgMode int
 
 const (
 	condMsgModeRegular condMsgMode = iota
 	condMsgModeEnchant
-	condMsgModeBoth
 )
 
 // conditionClause resolves a <cond> element into a clause, its predicate
@@ -489,10 +482,6 @@ func conditionClause(attrs []xml.Attr, children []condNode, resolve tableResolve
 		}
 	case condMsgModeEnchant:
 		clause.Message = a.strDefault("msg", "")
-	case condMsgModeBoth:
-		clause.Message = a.strDefault("msg", "")
-		clause.MessageID = a.int32LiteralDefault("msgId", 0)
-		clause.AddName = a.has("addName") && clause.MessageID > 0
 	}
 	if err := a.Err(); err != nil {
 		return nil, err

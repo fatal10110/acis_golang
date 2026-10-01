@@ -337,3 +337,25 @@ func TestSkillTemplateReadsOnlyALeadingCond(t *testing.T) {
 		}
 	}
 }
+
+// TestTemplateCondMessageFollowsReference: a <for> or <effect> block's
+// leading <cond> reads msg first and msgId only without one, like a
+// skill-level <cond>; a table reference in an unread msgId does not reject
+// the skill (probe: attach condition message "x"/"y", message id 0).
+func TestTemplateCondMessageFollowsReference(t *testing.T) {
+	t.Parallel()
+	forDef, ok := loadCondTableSkill(t, `<for><cond msg="x" msgId="#t"><player level="1"/></cond><add stat="pAtk" val="1"/></for>`).Get(1, 1)
+	if !ok {
+		t.Fatal("<for> cond: skill not loaded")
+	}
+	if c := forDef.Funcs[0].AttachCondition; c == nil || c.Message != "x" || c.MessageID != 0 {
+		t.Errorf("<for> cond = %+v, want message \"x\" and no message id", c)
+	}
+	effDef, ok := loadCondTableSkill(t, `<for><effect name="Buff" val="0" time="1"><cond msg="y" msgId="#t"><player level="1"/></cond><add stat="pAtk" val="1"/></effect></for>`).Get(1, 1)
+	if !ok {
+		t.Fatal("<effect> cond: skill not loaded")
+	}
+	if c := effDef.Effects[0].Funcs[0].AttachCondition; c == nil || c.Message != "y" || c.MessageID != 0 {
+		t.Errorf("<effect> cond = %+v, want message \"y\" and no message id", c)
+	}
+}
