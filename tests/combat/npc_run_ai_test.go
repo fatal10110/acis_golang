@@ -119,7 +119,9 @@ func decayAttackDesire(t *testing.T, hostile *npc.Hostile) {
 // unless the monster's intention then satisfies ok. A driven clock runs the
 // timer inside the advance, so ok is checked at once. On the wall clock the
 // advance only sleeps until the timer is due, and its callback can land
-// after the advance returns, so it waits for ok.
+// after the advance returns, so it waits for ok: the wall-clock run checks
+// only that the state is reached, not when, and timing regressions are
+// caught by the driven-clock run alone.
 func intentionAfter(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile, d time.Duration, what string, ok func(ai.Intention) bool) {
 	t.Helper()
 	srv.Advance(t, d)
@@ -141,7 +143,8 @@ func intentionIs(want ai.Intention) func(ai.Intention) bool {
 // its swing timer due at (timed from the swing's start) and after 10ms
 // past it. Only a driven clock holds the swing's start: on the wall clock
 // the swing began before its Attack frame arrived, by however long
-// delivery took, so the 10ms window before the timer cannot hold there.
+// delivery took, so the 10ms window before the timer cannot hold there,
+// and only the after state is checked (see intentionAfter).
 func intentionAcross(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile, at time.Duration, before, after ai.Intention, what string) {
 	t.Helper()
 	rest := time.Duration(0)

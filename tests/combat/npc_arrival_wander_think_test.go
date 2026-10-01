@@ -106,7 +106,8 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	// past a short walk's arrival. On the wall clock the advance only sleeps
 	// until the firing is due: its callback may still be on its way, and a
 	// short walk may already have arrived, so the walk's MoveToLocation is
-	// the proof there.
+	// the proof there. That read waits up to a second, so on the wall clock
+	// a late firing passes: only the driven clock pins the firing's time.
 	advanceTo(t, srv, hostile, promoted.Add(wanderTimer))
 	if srv.DrivesClock() && !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false when the promotion's wander timer ran out, want the next random walk")
