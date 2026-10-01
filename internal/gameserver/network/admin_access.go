@@ -101,15 +101,19 @@ func adminSelectedPlayer(gm *livePlayer) (*livePlayer, bool) {
 }
 
 // changeAccessLevel moves online target to level on target's queue,
-// disconnects it when level bans it, then runs report.
+// disconnects it when level bans it, then runs report. A target already
+// leaving the world gets level stored from gm's goroutine instead.
 func (l *GameClientLink) changeAccessLevel(gm, target *livePlayer, level int, report func()) {
-	onPlayer(gm, target, func() {
+	if !onPlayer(gm, target, func() {
 		l.setAccessLevel(target, level)
 		if level < 0 {
 			target.kickClient()
 		}
 		report()
-	})
+	}) {
+		l.storeLeavingAccessLevel(target, level)
+		report()
+	}
 }
 
 // adminGMOff answers //gmoff [minutes]: gm drops to the user level and gets
@@ -248,10 +252,12 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 // level of the character named name changes.
 func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name string, level int) {
 	if target != nil {
-		onPlayer(gm, target, func() {
+		if !onPlayer(gm, target, func() {
 			l.setAccessLevel(target, level)
 			target.kickClient()
-		})
+		}) {
+			l.storeLeavingAccessLevel(target, level)
+		}
 		sendText(gm, target.Name+" has been banned.")
 		return
 	}

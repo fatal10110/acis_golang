@@ -81,6 +81,18 @@ func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 	l.storeAccessLevel(live.ObjectID(), access.Level, live.Title())
 }
 
+// storeLeavingAccessLevel stores the level setAccessLevel would have stored
+// for target, whose queue closed as it left the world and so dropped the
+// change: the stored level must not depend on the target still playing.
+func (l *GameClientLink) storeLeavingAccessLevel(target *livePlayer, level int) {
+	access := l.resolveAccessLevel(target.Character, level)
+	title := target.Title()
+	if level > 0 {
+		title = trimTitle(access.Name)
+	}
+	l.storeAccessLevel(target.ObjectID(), access.Level, title)
+}
+
 // storeAccessLevel writes objectID's access level, and the title the change
 // left it, on its persistence lane, ahead of any save its logout queues
 // after.
