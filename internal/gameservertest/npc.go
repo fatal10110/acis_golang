@@ -520,6 +520,25 @@ func (s *Server) TickPositions() {
 	}
 }
 
+// TickPositionsAfter is TickPositions on the driven clock with d, rather
+// than one interval, passing before the tick, so a test can pin how a
+// player's update walks an uneven gap such as the real pool's scheduling
+// jitter. It fails the test on the real pool, whose ticks keep the
+// production ticker's fixed rate.
+func (s *Server) TickPositionsAfter(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if s.queues.advanceThen == nil {
+		tb.Fatal("TickPositionsAfter needs the driven clock")
+	}
+	if err := s.catchUp(); err != nil {
+		tb.Fatal(err)
+	}
+	s.queues.advanceThen(d, s.positions.Tick)
+	if err := s.queues.settle(); err != nil {
+		tb.Fatal(err)
+	}
+}
+
 // parkedMove is a MoveController that never moves.
 type parkedMove struct{}
 
